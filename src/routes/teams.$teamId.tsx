@@ -3,9 +3,10 @@ import { motion } from "framer-motion";
 import { useState } from "react";
 import {
   ArrowLeft, ShieldCheck, MapPin, Users, Star, Trophy, Calendar,
-  Award, DollarSign, Share2, Plus,
+  Award, DollarSign, Share2, Plus, Pencil,
 } from "lucide-react";
 import { ORGS, GAMES, POST_KIND_META, type PostKind, type Org } from "@/lib/sample-data";
+import { isMyOrg } from "@/lib/org-store";
 import { PostCard } from "@/components/PostCard";
 import { GameCard } from "@/components/GameCard";
 
