@@ -5,7 +5,7 @@ import {
   ArrowLeft, ShieldCheck, MapPin, Users, Star, Trophy, Calendar,
   Award, DollarSign, Share2, Plus,
 } from "lucide-react";
-import { ORGS, GAMES, POST_KIND_META, type PostKind } from "@/lib/sample-data";
+import { ORGS, GAMES, POST_KIND_META, type PostKind, type Org } from "@/lib/sample-data";
 import { PostCard } from "@/components/PostCard";
 import { GameCard } from "@/components/GameCard";
 
@@ -39,7 +39,7 @@ const FILTERS: { key: PostKind | "all"; label: string }[] = [
 ];
 
 function TeamPage() {
-  const org = Route.useLoaderData();
+  const org = Route.useLoaderData() as Org;
   const [filter, setFilter] = useState<PostKind | "all">("all");
   const [tab, setTab] = useState<"posts" | "about" | "games">("posts");
   const [following, setFollowing] = useState(false);

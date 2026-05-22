@@ -11,7 +11,9 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as TabsRouteImport } from './routes/_tabs'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as TeamsTeamIdRouteImport } from './routes/teams.$teamId'
 import { Route as GamesGameIdRouteImport } from './routes/games.$gameId'
+import { Route as TabsTeamsRouteImport } from './routes/_tabs.teams'
 import { Route as TabsProfileRouteImport } from './routes/_tabs.profile'
 import { Route as TabsNotificationsRouteImport } from './routes/_tabs.notifications'
 import { Route as TabsFeedRouteImport } from './routes/_tabs.feed'
@@ -27,10 +29,20 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const TeamsTeamIdRoute = TeamsTeamIdRouteImport.update({
+  id: '/teams/$teamId',
+  path: '/teams/$teamId',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const GamesGameIdRoute = GamesGameIdRouteImport.update({
   id: '/games/$gameId',
   path: '/games/$gameId',
   getParentRoute: () => rootRouteImport,
+} as any)
+const TabsTeamsRoute = TabsTeamsRouteImport.update({
+  id: '/teams',
+  path: '/teams',
+  getParentRoute: () => TabsRoute,
 } as any)
 const TabsProfileRoute = TabsProfileRouteImport.update({
   id: '/profile',
@@ -65,7 +77,9 @@ export interface FileRoutesByFullPath {
   '/feed': typeof TabsFeedRoute
   '/notifications': typeof TabsNotificationsRoute
   '/profile': typeof TabsProfileRoute
+  '/teams': typeof TabsTeamsRoute
   '/games/$gameId': typeof GamesGameIdRoute
+  '/teams/$teamId': typeof TeamsTeamIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -74,7 +88,9 @@ export interface FileRoutesByTo {
   '/feed': typeof TabsFeedRoute
   '/notifications': typeof TabsNotificationsRoute
   '/profile': typeof TabsProfileRoute
+  '/teams': typeof TabsTeamsRoute
   '/games/$gameId': typeof GamesGameIdRoute
+  '/teams/$teamId': typeof TeamsTeamIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -85,7 +101,9 @@ export interface FileRoutesById {
   '/_tabs/feed': typeof TabsFeedRoute
   '/_tabs/notifications': typeof TabsNotificationsRoute
   '/_tabs/profile': typeof TabsProfileRoute
+  '/_tabs/teams': typeof TabsTeamsRoute
   '/games/$gameId': typeof GamesGameIdRoute
+  '/teams/$teamId': typeof TeamsTeamIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -96,7 +114,9 @@ export interface FileRouteTypes {
     | '/feed'
     | '/notifications'
     | '/profile'
+    | '/teams'
     | '/games/$gameId'
+    | '/teams/$teamId'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -105,7 +125,9 @@ export interface FileRouteTypes {
     | '/feed'
     | '/notifications'
     | '/profile'
+    | '/teams'
     | '/games/$gameId'
+    | '/teams/$teamId'
   id:
     | '__root__'
     | '/'
@@ -115,13 +137,16 @@ export interface FileRouteTypes {
     | '/_tabs/feed'
     | '/_tabs/notifications'
     | '/_tabs/profile'
+    | '/_tabs/teams'
     | '/games/$gameId'
+    | '/teams/$teamId'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   TabsRoute: typeof TabsRouteWithChildren
   GamesGameIdRoute: typeof GamesGameIdRoute
+  TeamsTeamIdRoute: typeof TeamsTeamIdRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -140,12 +165,26 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/teams/$teamId': {
+      id: '/teams/$teamId'
+      path: '/teams/$teamId'
+      fullPath: '/teams/$teamId'
+      preLoaderRoute: typeof TeamsTeamIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/games/$gameId': {
       id: '/games/$gameId'
       path: '/games/$gameId'
       fullPath: '/games/$gameId'
       preLoaderRoute: typeof GamesGameIdRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/_tabs/teams': {
+      id: '/_tabs/teams'
+      path: '/teams'
+      fullPath: '/teams'
+      preLoaderRoute: typeof TabsTeamsRouteImport
+      parentRoute: typeof TabsRoute
     }
     '/_tabs/profile': {
       id: '/_tabs/profile'
@@ -191,6 +230,7 @@ interface TabsRouteChildren {
   TabsFeedRoute: typeof TabsFeedRoute
   TabsNotificationsRoute: typeof TabsNotificationsRoute
   TabsProfileRoute: typeof TabsProfileRoute
+  TabsTeamsRoute: typeof TabsTeamsRoute
 }
 
 const TabsRouteChildren: TabsRouteChildren = {
@@ -199,6 +239,7 @@ const TabsRouteChildren: TabsRouteChildren = {
   TabsFeedRoute: TabsFeedRoute,
   TabsNotificationsRoute: TabsNotificationsRoute,
   TabsProfileRoute: TabsProfileRoute,
+  TabsTeamsRoute: TabsTeamsRoute,
 }
 
 const TabsRouteWithChildren = TabsRoute._addFileChildren(TabsRouteChildren)
@@ -207,6 +248,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   TabsRoute: TabsRouteWithChildren,
   GamesGameIdRoute: GamesGameIdRoute,
+  TeamsTeamIdRoute: TeamsTeamIdRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
