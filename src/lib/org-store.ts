@@ -16,6 +16,21 @@ export function addOrg(org: Org) {
   emit();
 }
 
+export function updateOrg(id: string, patch: Partial<Omit<Org, "id" | "kind" | "upcoming" | "posts">>) {
+  const idx = ORGS.findIndex((o) => o.id === id);
+  if (idx === -1) return;
+  ORGS[idx] = { ...ORGS[idx], ...patch };
+  emit();
+}
+
+export function getOrgById(id: string): Org | undefined {
+  return ORGS.find((o) => o.id === id);
+}
+
+export function isMyOrg(id: string): boolean {
+  return myOrgIds.has(id);
+}
+
 export function getMyOrgs(): Org[] {
   return ORGS.filter((o) => myOrgIds.has(o.id));
 }
