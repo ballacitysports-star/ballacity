@@ -528,7 +528,7 @@ function CreateOrg() {
               type="button"
               disabled={!canNext}
               onClick={() => setStep((s) => s + 1)}
-              className="flex-1 inline-flex items-center justify-center gap-2 rounded-2xl bg-lime-gradient py-3.5 text-sm font-bold text-primary-foreground glow-lime disabled:opacity-40 disabled:glow-lime-none"
+              className="flex-1 inline-flex items-center justify-center gap-2 rounded-2xl bg-lime-gradient py-3.5 text-sm font-bold text-primary-foreground glow-lime disabled:opacity-40"
             >
               Continue <ArrowRight className="h-4 w-4" />
             </motion.button>
