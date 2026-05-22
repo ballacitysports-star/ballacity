@@ -9,38 +9,130 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as TabsRouteImport } from './routes/_tabs'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as GamesGameIdRouteImport } from './routes/games.$gameId'
+import { Route as TabsProfileRouteImport } from './routes/_tabs.profile'
+import { Route as TabsNotificationsRouteImport } from './routes/_tabs.notifications'
+import { Route as TabsFeedRouteImport } from './routes/_tabs.feed'
+import { Route as TabsDiscoverRouteImport } from './routes/_tabs.discover'
+import { Route as TabsCreateRouteImport } from './routes/_tabs.create'
 
+const TabsRoute = TabsRouteImport.update({
+  id: '/_tabs',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const GamesGameIdRoute = GamesGameIdRouteImport.update({
+  id: '/games/$gameId',
+  path: '/games/$gameId',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const TabsProfileRoute = TabsProfileRouteImport.update({
+  id: '/profile',
+  path: '/profile',
+  getParentRoute: () => TabsRoute,
+} as any)
+const TabsNotificationsRoute = TabsNotificationsRouteImport.update({
+  id: '/notifications',
+  path: '/notifications',
+  getParentRoute: () => TabsRoute,
+} as any)
+const TabsFeedRoute = TabsFeedRouteImport.update({
+  id: '/feed',
+  path: '/feed',
+  getParentRoute: () => TabsRoute,
+} as any)
+const TabsDiscoverRoute = TabsDiscoverRouteImport.update({
+  id: '/discover',
+  path: '/discover',
+  getParentRoute: () => TabsRoute,
+} as any)
+const TabsCreateRoute = TabsCreateRouteImport.update({
+  id: '/create',
+  path: '/create',
+  getParentRoute: () => TabsRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/create': typeof TabsCreateRoute
+  '/discover': typeof TabsDiscoverRoute
+  '/feed': typeof TabsFeedRoute
+  '/notifications': typeof TabsNotificationsRoute
+  '/profile': typeof TabsProfileRoute
+  '/games/$gameId': typeof GamesGameIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/create': typeof TabsCreateRoute
+  '/discover': typeof TabsDiscoverRoute
+  '/feed': typeof TabsFeedRoute
+  '/notifications': typeof TabsNotificationsRoute
+  '/profile': typeof TabsProfileRoute
+  '/games/$gameId': typeof GamesGameIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/_tabs': typeof TabsRouteWithChildren
+  '/_tabs/create': typeof TabsCreateRoute
+  '/_tabs/discover': typeof TabsDiscoverRoute
+  '/_tabs/feed': typeof TabsFeedRoute
+  '/_tabs/notifications': typeof TabsNotificationsRoute
+  '/_tabs/profile': typeof TabsProfileRoute
+  '/games/$gameId': typeof GamesGameIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/'
+  fullPaths:
+    | '/'
+    | '/create'
+    | '/discover'
+    | '/feed'
+    | '/notifications'
+    | '/profile'
+    | '/games/$gameId'
   fileRoutesByTo: FileRoutesByTo
-  to: '/'
-  id: '__root__' | '/'
+  to:
+    | '/'
+    | '/create'
+    | '/discover'
+    | '/feed'
+    | '/notifications'
+    | '/profile'
+    | '/games/$gameId'
+  id:
+    | '__root__'
+    | '/'
+    | '/_tabs'
+    | '/_tabs/create'
+    | '/_tabs/discover'
+    | '/_tabs/feed'
+    | '/_tabs/notifications'
+    | '/_tabs/profile'
+    | '/games/$gameId'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  TabsRoute: typeof TabsRouteWithChildren
+  GamesGameIdRoute: typeof GamesGameIdRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/_tabs': {
+      id: '/_tabs'
+      path: ''
+      fullPath: '/'
+      preLoaderRoute: typeof TabsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/': {
       id: '/'
       path: '/'
@@ -48,12 +140,84 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/games/$gameId': {
+      id: '/games/$gameId'
+      path: '/games/$gameId'
+      fullPath: '/games/$gameId'
+      preLoaderRoute: typeof GamesGameIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/_tabs/profile': {
+      id: '/_tabs/profile'
+      path: '/profile'
+      fullPath: '/profile'
+      preLoaderRoute: typeof TabsProfileRouteImport
+      parentRoute: typeof TabsRoute
+    }
+    '/_tabs/notifications': {
+      id: '/_tabs/notifications'
+      path: '/notifications'
+      fullPath: '/notifications'
+      preLoaderRoute: typeof TabsNotificationsRouteImport
+      parentRoute: typeof TabsRoute
+    }
+    '/_tabs/feed': {
+      id: '/_tabs/feed'
+      path: '/feed'
+      fullPath: '/feed'
+      preLoaderRoute: typeof TabsFeedRouteImport
+      parentRoute: typeof TabsRoute
+    }
+    '/_tabs/discover': {
+      id: '/_tabs/discover'
+      path: '/discover'
+      fullPath: '/discover'
+      preLoaderRoute: typeof TabsDiscoverRouteImport
+      parentRoute: typeof TabsRoute
+    }
+    '/_tabs/create': {
+      id: '/_tabs/create'
+      path: '/create'
+      fullPath: '/create'
+      preLoaderRoute: typeof TabsCreateRouteImport
+      parentRoute: typeof TabsRoute
+    }
   }
 }
 
+interface TabsRouteChildren {
+  TabsCreateRoute: typeof TabsCreateRoute
+  TabsDiscoverRoute: typeof TabsDiscoverRoute
+  TabsFeedRoute: typeof TabsFeedRoute
+  TabsNotificationsRoute: typeof TabsNotificationsRoute
+  TabsProfileRoute: typeof TabsProfileRoute
+}
+
+const TabsRouteChildren: TabsRouteChildren = {
+  TabsCreateRoute: TabsCreateRoute,
+  TabsDiscoverRoute: TabsDiscoverRoute,
+  TabsFeedRoute: TabsFeedRoute,
+  TabsNotificationsRoute: TabsNotificationsRoute,
+  TabsProfileRoute: TabsProfileRoute,
+}
+
+const TabsRouteWithChildren = TabsRoute._addFileChildren(TabsRouteChildren)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  TabsRoute: TabsRouteWithChildren,
+  GamesGameIdRoute: GamesGameIdRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { startInstance } from './start.ts'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
+  }
+}
