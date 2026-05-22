@@ -1,0 +1,207 @@
+import { createFileRoute, Link, notFound } from "@tanstack/react-router";
+import { motion } from "framer-motion";
+import { ArrowLeft, Share2, Bookmark, MapPin, Clock, Users, Calendar, MessageCircle } from "lucide-react";
+import { GAMES, SPORTS } from "@/lib/sample-data";
+import { formatWhen } from "@/lib/format";
+
+const emojiBySport: Record<string, string> = Object.fromEntries(SPORTS.map((s) => [s.name, s.emoji]));
+
+export const Route = createFileRoute("/games/$gameId")({
+  loader: ({ params }) => {
+    const game = GAMES.find((g) => g.id === params.gameId);
+    if (!game) throw notFound();
+    return { game };
+  },
+  head: ({ loaderData }) => ({
+    meta: [
+      { title: `${loaderData?.game.title ?? "Game"} — OpenRun` },
+      { name: "description", content: loaderData?.game.description },
+      { property: "og:image", content: loaderData?.game.image },
+    ],
+  }),
+  notFoundComponent: () => (
+    <div className="min-h-dvh grid place-items-center px-6 text-center">
+      <div>
+        <h1 className="font-display text-3xl font-bold">Game not found</h1>
+        <p className="text-muted-foreground mt-2">It may have wrapped up or been cancelled.</p>
+        <Link to="/feed" className="inline-block mt-5 rounded-full bg-lime px-5 py-2.5 text-sm font-bold text-primary-foreground">
+          Back to feed
+        </Link>
+      </div>
+    </div>
+  ),
+  errorComponent: ({ reset }) => (
+    <div className="min-h-dvh grid place-items-center px-6 text-center">
+      <div>
+        <h1 className="font-display text-2xl font-bold">Something went wrong</h1>
+        <button onClick={reset} className="mt-4 rounded-full bg-lime px-5 py-2.5 text-sm font-bold text-primary-foreground">Try again</button>
+      </div>
+    </div>
+  ),
+  component: GameDetail,
+});
+
+function GameDetail() {
+  const { game } = Route.useLoaderData();
+  const spotsLeft = game.maxPlayers - game.joined;
+
+  const players = Array.from({ length: game.joined }, (_, i) => ({
+    initials: ["MC", "AG", "JK", "RC", "TB", "SO", "PN", "DP", "EL", "VM"][i % 10],
+  }));
+
+  return (
+    <div className="pb-32">
+      {/* Hero */}
+      <div className="relative h-72">
+        <img src={game.image} alt={game.title} className="h-full w-full object-cover" />
+        <div className="absolute inset-0 bg-gradient-to-t from-background via-background/40 to-background/40" />
+        <div className="absolute top-4 left-4 right-4 flex items-center justify-between">
+          <Link to="/feed" className="grid h-10 w-10 place-items-center rounded-full border border-border bg-background/70 backdrop-blur">
+            <ArrowLeft className="h-5 w-5" />
+          </Link>
+          <div className="flex gap-2">
+            <button className="grid h-10 w-10 place-items-center rounded-full border border-border bg-background/70 backdrop-blur">
+              <Bookmark className="h-4 w-4" />
+            </button>
+            <button className="grid h-10 w-10 place-items-center rounded-full border border-border bg-background/70 backdrop-blur">
+              <Share2 className="h-4 w-4" />
+            </button>
+          </div>
+        </div>
+        <div className="absolute bottom-4 left-4 right-4">
+          <div className="flex flex-wrap items-center gap-2 mb-2">
+            <span className="inline-flex items-center gap-1 rounded-full bg-background/70 backdrop-blur px-3 py-1 text-xs font-semibold">
+              {emojiBySport[game.sport]} {game.sport}
+            </span>
+            <span className="rounded-full bg-background/70 backdrop-blur px-3 py-1 text-xs font-semibold">{game.skill}</span>
+            {game.urgent && (
+              <span className="rounded-full bg-coral-gradient px-3 py-1 text-xs font-bold text-white">⚡ {spotsLeft} spots left</span>
+            )}
+          </div>
+          <h1 className="font-display text-3xl font-bold drop-shadow-lg">{game.title}</h1>
+        </div>
+      </div>
+
+      <div className="mx-auto max-w-md px-4 mt-5 space-y-5">
+        {/* Meta */}
+        <div className="grid grid-cols-2 gap-2">
+          <Meta icon={<Clock className="h-4 w-4 text-lime" />} label="Starts" value={formatWhen(game.date)} />
+          <Meta icon={<Calendar className="h-4 w-4 text-lime" />} label="Duration" value={game.duration} />
+          <Meta icon={<Users className="h-4 w-4 text-coral" />} label="Players" value={`${game.joined} / ${game.maxPlayers}`} />
+          <Meta icon={<MapPin className="h-4 w-4 text-coral" />} label="Distance" value={`${game.distanceMi} mi`} />
+        </div>
+
+        {/* Location card */}
+        <div className="rounded-3xl border border-border bg-surface overflow-hidden">
+          <div
+            className="h-32 relative"
+            style={{
+              background:
+                "radial-gradient(50% 60% at 50% 50%, oklch(0.30 0.08 145 / 0.5), transparent 60%), linear-gradient(180deg, oklch(0.18 0.03 240), oklch(0.14 0.03 250))",
+            }}
+          >
+            <svg className="absolute inset-0 h-full w-full opacity-30" aria-hidden>
+              <defs>
+                <pattern id="g2" width="32" height="32" patternUnits="userSpaceOnUse">
+                  <path d="M 32 0 L 0 0 0 32" fill="none" stroke="oklch(1 0 0 / 0.1)" strokeWidth="1" />
+                </pattern>
+              </defs>
+              <rect width="100%" height="100%" fill="url(#g2)" />
+            </svg>
+            <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 grid h-12 w-12 place-items-center rounded-full bg-lime text-primary-foreground glow-lime">
+              <MapPin className="h-5 w-5" />
+            </div>
+          </div>
+          <div className="p-4">
+            <div className="font-semibold">{game.location}</div>
+            <div className="text-sm text-muted-foreground">{game.neighborhood} · {game.indoor ? "Indoor" : "Outdoor"}</div>
+          </div>
+        </div>
+
+        {/* Host */}
+        <div className="flex items-center gap-3 rounded-3xl border border-border bg-surface p-4">
+          <div className="grid h-12 w-12 place-items-center rounded-2xl bg-lime-gradient font-bold text-primary-foreground">
+            {game.host.avatar}
+          </div>
+          <div className="flex-1">
+            <div className="text-xs uppercase tracking-wider text-muted-foreground">Hosted by</div>
+            <div className="font-semibold">{game.host.name} <span className="text-muted-foreground font-normal text-sm">{game.host.username}</span></div>
+            <div className="text-xs text-lime font-semibold">★ {game.host.rating} host rating</div>
+          </div>
+          <button className="rounded-full border border-border px-3 py-1.5 text-xs font-semibold">Follow</button>
+        </div>
+
+        {/* About */}
+        <div>
+          <h2 className="font-display text-sm font-bold uppercase tracking-wider text-muted-foreground mb-2">About the run</h2>
+          <p className="text-sm leading-relaxed">{game.description}</p>
+          {game.equipment.length > 0 && (
+            <div className="mt-3 flex flex-wrap gap-2">
+              {game.equipment.map((e: string) => (
+                <span key={e} className="rounded-full border border-border bg-surface px-3 py-1 text-xs">{e}</span>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Players */}
+        <div>
+          <div className="flex items-center justify-between mb-2">
+            <h2 className="font-display text-sm font-bold uppercase tracking-wider text-muted-foreground">
+              Roster ({game.joined}/{game.maxPlayers})
+            </h2>
+            <button className="text-xs font-semibold text-lime">See all</button>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {players.map((p, i) => (
+              <motion.div
+                key={i}
+                initial={{ scale: 0, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                transition={{ delay: i * 0.04 }}
+                className="grid h-11 w-11 place-items-center rounded-full border border-border bg-surface text-xs font-bold"
+              >
+                {p.initials}
+              </motion.div>
+            ))}
+            {Array.from({ length: spotsLeft }).map((_, i) => (
+              <div
+                key={`empty-${i}`}
+                className="grid h-11 w-11 place-items-center rounded-full border-2 border-dashed border-border bg-transparent text-muted-foreground text-lg"
+              >
+                +
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* Sticky CTA */}
+      <div className="fixed bottom-0 left-0 right-0 z-30 px-4 pb-[max(env(safe-area-inset-bottom),0.75rem)] pt-3 backdrop-blur-xl bg-background/80 border-t border-border">
+        <div className="mx-auto max-w-md flex items-center gap-2">
+          <button className="grid h-12 w-12 place-items-center rounded-2xl border border-border bg-surface">
+            <MessageCircle className="h-5 w-5" />
+          </button>
+          <motion.button
+            whileTap={{ scale: 0.97 }}
+            className="flex-1 rounded-2xl bg-lime-gradient py-3.5 font-bold text-primary-foreground glow-lime"
+          >
+            {game.price === 0 ? "Join free · " : `Join · $${game.price} · `}
+            {spotsLeft} spot{spotsLeft === 1 ? "" : "s"} left
+          </motion.button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function Meta({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) {
+  return (
+    <div className="rounded-2xl border border-border bg-surface p-3">
+      <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-wider text-muted-foreground">
+        {icon}{label}
+      </div>
+      <div className="mt-0.5 font-semibold text-sm">{value}</div>
+    </div>
+  );
+}
