@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as TabsRouteImport } from './routes/_tabs'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as TeamsCreateRouteImport } from './routes/teams.create'
 import { Route as TeamsTeamIdRouteImport } from './routes/teams.$teamId'
 import { Route as GamesGameIdRouteImport } from './routes/games.$gameId'
 import { Route as TabsTeamsRouteImport } from './routes/_tabs.teams'
@@ -27,6 +28,11 @@ const TabsRoute = TabsRouteImport.update({
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const TeamsCreateRoute = TeamsCreateRouteImport.update({
+  id: '/teams/create',
+  path: '/teams/create',
   getParentRoute: () => rootRouteImport,
 } as any)
 const TeamsTeamIdRoute = TeamsTeamIdRouteImport.update({
@@ -80,6 +86,7 @@ export interface FileRoutesByFullPath {
   '/teams': typeof TabsTeamsRoute
   '/games/$gameId': typeof GamesGameIdRoute
   '/teams/$teamId': typeof TeamsTeamIdRoute
+  '/teams/create': typeof TeamsCreateRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -91,6 +98,7 @@ export interface FileRoutesByTo {
   '/teams': typeof TabsTeamsRoute
   '/games/$gameId': typeof GamesGameIdRoute
   '/teams/$teamId': typeof TeamsTeamIdRoute
+  '/teams/create': typeof TeamsCreateRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -104,6 +112,7 @@ export interface FileRoutesById {
   '/_tabs/teams': typeof TabsTeamsRoute
   '/games/$gameId': typeof GamesGameIdRoute
   '/teams/$teamId': typeof TeamsTeamIdRoute
+  '/teams/create': typeof TeamsCreateRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -117,6 +126,7 @@ export interface FileRouteTypes {
     | '/teams'
     | '/games/$gameId'
     | '/teams/$teamId'
+    | '/teams/create'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -128,6 +138,7 @@ export interface FileRouteTypes {
     | '/teams'
     | '/games/$gameId'
     | '/teams/$teamId'
+    | '/teams/create'
   id:
     | '__root__'
     | '/'
@@ -140,6 +151,7 @@ export interface FileRouteTypes {
     | '/_tabs/teams'
     | '/games/$gameId'
     | '/teams/$teamId'
+    | '/teams/create'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -147,6 +159,7 @@ export interface RootRouteChildren {
   TabsRoute: typeof TabsRouteWithChildren
   GamesGameIdRoute: typeof GamesGameIdRoute
   TeamsTeamIdRoute: typeof TeamsTeamIdRoute
+  TeamsCreateRoute: typeof TeamsCreateRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -163,6 +176,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/teams/create': {
+      id: '/teams/create'
+      path: '/teams/create'
+      fullPath: '/teams/create'
+      preLoaderRoute: typeof TeamsCreateRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/teams/$teamId': {
@@ -249,6 +269,7 @@ const rootRouteChildren: RootRouteChildren = {
   TabsRoute: TabsRouteWithChildren,
   GamesGameIdRoute: GamesGameIdRoute,
   TeamsTeamIdRoute: TeamsTeamIdRoute,
+  TeamsCreateRoute: TeamsCreateRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
