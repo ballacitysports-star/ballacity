@@ -137,7 +137,7 @@ function GameDetail() {
           <p className="text-sm leading-relaxed">{game.description}</p>
           {game.equipment.length > 0 && (
             <div className="mt-3 flex flex-wrap gap-2">
-              {game.equipment.map((e) => (
+              {game.equipment.map((e: string) => (
                 <span key={e} className="rounded-full border border-border bg-surface px-3 py-1 text-xs">{e}</span>
               ))}
             </div>
