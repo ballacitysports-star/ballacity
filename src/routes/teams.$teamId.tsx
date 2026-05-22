@@ -62,7 +62,7 @@ function TeamPage() {
         </button>
       </div>
 
-      <div className="px-4 -mt-14 relative">
+        <div className="px-4 -mt-14 relative">
         {/* Identity */}
         <div className="flex items-end justify-between gap-3">
           <motion.div
@@ -74,15 +74,26 @@ function TeamPage() {
           >
             {org.avatar}
           </motion.div>
-          <motion.button
-            whileTap={{ scale: 0.95 }}
-            onClick={() => setFollowing((f) => !f)}
-            className={`mb-2 rounded-full px-5 py-2.5 text-sm font-bold transition-all ${
-              following ? "border border-border bg-surface text-foreground" : "bg-lime-gradient text-primary-foreground glow-lime"
-            }`}
-          >
-            {following ? "Following ✓" : "Follow"}
-          </motion.button>
+          <div className="mb-2 flex items-center gap-2">
+            {isMyOrg(org.id) && (
+              <Link
+                to="/teams/$teamId/edit"
+                params={{ teamId: org.id }}
+                className="rounded-full border border-border bg-surface px-4 py-2.5 text-sm font-bold inline-flex items-center gap-1.5 hover:border-lime/40"
+              >
+                <Pencil className="h-3.5 w-3.5" /> Edit
+              </Link>
+            )}
+            <motion.button
+              whileTap={{ scale: 0.95 }}
+              onClick={() => setFollowing((f) => !f)}
+              className={`rounded-full px-5 py-2.5 text-sm font-bold transition-all ${
+                following ? "border border-border bg-surface text-foreground" : "bg-lime-gradient text-primary-foreground glow-lime"
+              }`}
+            >
+              {following ? "Following ✓" : "Follow"}
+            </motion.button>
+          </div>
         </div>
 
         <div className="mt-3">
