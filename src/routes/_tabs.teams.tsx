@@ -1,8 +1,9 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import { Search, Plus, Megaphone } from "lucide-react";
-import { ORGS, type OrgKind } from "@/lib/sample-data";
+import { type OrgKind } from "@/lib/sample-data";
+import { useAllOrgs } from "@/lib/org-store";
 import { OrgCard } from "@/components/OrgCard";
 
 export const Route = createFileRoute("/_tabs/teams")({
@@ -19,16 +20,17 @@ const TABS: { key: OrgKind | "all"; label: string }[] = [
 function TeamsPage() {
   const [kind, setKind] = useState<OrgKind | "all">("all");
   const [q, setQ] = useState("");
+  const orgs = useAllOrgs();
 
   const list = useMemo(
     () =>
-      ORGS.filter((o) => (kind === "all" ? true : o.kind === kind)).filter((o) =>
+      orgs.filter((o) => (kind === "all" ? true : o.kind === kind)).filter((o) =>
         q ? (o.name + o.handle + o.tagline + o.sports.join(" ")).toLowerCase().includes(q.toLowerCase()) : true,
       ),
-    [kind, q],
+    [orgs, kind, q],
   );
 
-  const featured = ORGS.find((o) => o.verified && o.kind === "team")!;
+  const featured = orgs.find((o) => o.verified && o.kind === "team") ?? orgs[0];
 
   return (
     <div className="mx-auto max-w-md px-4 pt-6">
@@ -65,9 +67,9 @@ function TeamsPage() {
             className="flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
           />
         </div>
-        <button className="grid h-11 w-11 place-items-center rounded-full bg-lime-gradient text-primary-foreground glow-lime" aria-label="Create org">
+        <Link to="/teams/create" className="grid h-11 w-11 place-items-center rounded-full bg-lime-gradient text-primary-foreground glow-lime" aria-label="Create org">
           <Plus className="h-5 w-5" strokeWidth={2.5} />
-        </button>
+        </Link>
       </div>
 
       {/* Kind tabs */}
