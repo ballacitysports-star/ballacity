@@ -135,6 +135,27 @@ function CreateOrg() {
     setStaff((s) => [...s, { name: staffName.trim(), role: staffRole.trim(), avatar: initials(staffName) }]);
     setStaffName(""); setStaffRole("");
   }
+  function updateStaffAvatar(i: number, file: File) {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = reader.result;
+      if (typeof result === "string") {
+        setStaff((s) => {
+          const next = [...s];
+          next[i] = { ...next[i], avatar: result };
+          return next;
+        });
+      }
+    };
+    reader.readAsDataURL(file);
+  }
+  function resetStaffAvatar(i: number) {
+    setStaff((s) => {
+      const next = [...s];
+      next[i] = { ...next[i], avatar: initials(next[i].name) };
+      return next;
+    });
+  }
 
   function toggleSport(s: Sport) {
     setSports((arr) => (arr.includes(s) ? arr.filter((x) => x !== s) : [...arr, s]));
@@ -377,18 +398,42 @@ function CreateOrg() {
                       >
                         <Plus className="h-4 w-4" /> Add staff member
                       </button>
-                      {staff.map((m, i) => (
-                        <div key={i} className="flex items-center gap-3 rounded-2xl border border-border bg-surface p-3">
-                          <div className="grid h-10 w-10 place-items-center rounded-full bg-secondary text-xs font-bold">{m.avatar}</div>
-                          <div className="flex-1 min-w-0">
-                            <div className="text-sm font-semibold truncate">{m.name}</div>
-                            <div className="text-xs text-muted-foreground truncate">{m.role}</div>
+                      {staff.map((m, i) => {
+                        const hasCustomAvatar = m.avatar.startsWith("data:");
+                        return (
+                          <div key={i} className="flex items-center gap-2 rounded-2xl border border-border bg-surface p-3">
+                            <label className="relative shrink-0 cursor-pointer">
+                              <input
+                                type="file"
+                                accept="image/*"
+                                className="hidden"
+                                onChange={(e) => {
+                                  const file = e.target.files?.[0];
+                                  if (file) updateStaffAvatar(i, file);
+                                }}
+                              />
+                              {hasCustomAvatar ? (
+                                <img src={m.avatar} alt="" className="h-10 w-10 rounded-full object-cover" />
+                              ) : (
+                                <div className="grid h-10 w-10 place-items-center rounded-full bg-secondary text-xs font-bold">{m.avatar}</div>
+                              )}
+                              <span className="absolute -bottom-1 -right-1 grid h-4 w-4 place-items-center rounded-full bg-lime text-[8px] font-bold text-primary-foreground">+</span>
+                            </label>
+                            <div className="flex-1 min-w-0">
+                              <div className="text-sm font-semibold truncate">{m.name}</div>
+                              <div className="text-xs text-muted-foreground truncate">{m.role}</div>
+                            </div>
+                            {hasCustomAvatar && (
+                              <button type="button" onClick={() => resetStaffAvatar(i)} className="text-muted-foreground hover:text-lime" title="Reset to initials">
+                                <X className="h-4 w-4" />
+                              </button>
+                            )}
+                            <button type="button" onClick={() => setStaff((s) => s.filter((_, j) => j !== i))} className="text-muted-foreground hover:text-coral">
+                              <X className="h-4 w-4" />
+                            </button>
                           </div>
-                          <button type="button" onClick={() => setStaff((s) => s.filter((_, j) => j !== i))} className="text-muted-foreground hover:text-coral">
-                            <X className="h-4 w-4" />
-                          </button>
-                        </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   </Section>
                 </>

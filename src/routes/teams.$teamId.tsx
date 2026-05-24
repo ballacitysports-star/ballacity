@@ -229,9 +229,13 @@ function TeamPage() {
                     <div className="space-y-2">
                       {org.staff.map((s) => (
                         <div key={s.name} className="flex items-center gap-3 rounded-2xl border border-border bg-surface p-3">
-                          <div className="grid h-10 w-10 place-items-center rounded-full bg-secondary text-xs font-bold">
-                            {s.avatar}
-                          </div>
+                          {s.avatar.startsWith("data:") ? (
+                            <img src={s.avatar} alt="" className="h-10 w-10 rounded-full object-cover" />
+                          ) : (
+                            <div className="grid h-10 w-10 place-items-center rounded-full bg-secondary text-xs font-bold">
+                              {s.avatar}
+                            </div>
+                          )}
                           <div>
                             <div className="text-sm font-semibold">{s.name}</div>
                             <div className="text-xs text-muted-foreground">{s.role}</div>

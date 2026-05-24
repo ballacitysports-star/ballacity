@@ -145,6 +145,7 @@ function EditOrg() {
       record: kind === "team" ? { w: wins, l: losses } : undefined,
       homeCourt: kind === "team" ? homeCourt : undefined,
       staff: kind === "team" ? staff : undefined,
+      roster: kind === "team" ? staff.length : org.roster,
     });
     nav({ to: "/teams/$teamId", params: { teamId: org.id } });
   }
@@ -165,6 +166,27 @@ function EditOrg() {
     if (!staffName.trim() || !staffRole.trim()) return;
     setStaff((s) => [...s, { name: staffName.trim(), role: staffRole.trim(), avatar: initials(staffName) }]);
     setStaffName(""); setStaffRole("");
+  }
+  function updateStaffAvatar(i: number, file: File) {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = reader.result;
+      if (typeof result === "string") {
+        setStaff((s) => {
+          const next = [...s];
+          next[i] = { ...next[i], avatar: result };
+          return next;
+        });
+      }
+    };
+    reader.readAsDataURL(file);
+  }
+  function resetStaffAvatar(i: number) {
+    setStaff((s) => {
+      const next = [...s];
+      next[i] = { ...next[i], avatar: initials(next[i].name) };
+      return next;
+    });
   }
   function moveStaff(i: number, dir: -1 | 1) {
     setStaff((s) => {
@@ -411,26 +433,50 @@ function EditOrg() {
                       >
                         <Plus className="h-4 w-4" /> Add staff member
                       </button>
-                      {staff.map((m, i) => (
-                        <div key={i} className="flex items-center gap-2 rounded-2xl border border-border bg-surface p-3">
-                          <div className="grid h-10 w-10 place-items-center rounded-full bg-secondary text-xs font-bold">{m.avatar}</div>
-                          <div className="flex-1 min-w-0">
-                            <div className="text-sm font-semibold truncate">{m.name}</div>
-                            <div className="text-xs text-muted-foreground truncate">{m.role}</div>
-                          </div>
-                          <div className="flex flex-col">
-                            <button type="button" onClick={() => moveStaff(i, -1)} disabled={i === 0} className="text-muted-foreground hover:text-lime disabled:opacity-20">
-                              <ChevronUp className="h-4 w-4" />
+                      {staff.map((m, i) => {
+                        const hasCustomAvatar = m.avatar.startsWith("data:");
+                        return (
+                          <div key={i} className="flex items-center gap-2 rounded-2xl border border-border bg-surface p-3">
+                            <label className="relative shrink-0 cursor-pointer">
+                              <input
+                                type="file"
+                                accept="image/*"
+                                className="hidden"
+                                onChange={(e) => {
+                                  const file = e.target.files?.[0];
+                                  if (file) updateStaffAvatar(i, file);
+                                }}
+                              />
+                              {hasCustomAvatar ? (
+                                <img src={m.avatar} alt="" className="h-10 w-10 rounded-full object-cover" />
+                              ) : (
+                                <div className="grid h-10 w-10 place-items-center rounded-full bg-secondary text-xs font-bold">{m.avatar}</div>
+                              )}
+                              <span className="absolute -bottom-1 -right-1 grid h-4 w-4 place-items-center rounded-full bg-lime text-[8px] font-bold text-primary-foreground">+</span>
+                            </label>
+                            <div className="flex-1 min-w-0">
+                              <div className="text-sm font-semibold truncate">{m.name}</div>
+                              <div className="text-xs text-muted-foreground truncate">{m.role}</div>
+                            </div>
+                            <div className="flex flex-col">
+                              <button type="button" onClick={() => moveStaff(i, -1)} disabled={i === 0} className="text-muted-foreground hover:text-lime disabled:opacity-20">
+                                <ChevronUp className="h-4 w-4" />
+                              </button>
+                              <button type="button" onClick={() => moveStaff(i, 1)} disabled={i === staff.length - 1} className="text-muted-foreground hover:text-lime disabled:opacity-20">
+                                <ChevronDown className="h-4 w-4" />
+                              </button>
+                            </div>
+                            {hasCustomAvatar && (
+                              <button type="button" onClick={() => resetStaffAvatar(i)} className="text-muted-foreground hover:text-lime" title="Reset to initials">
+                                <X className="h-4 w-4" />
+                              </button>
+                            )}
+                            <button type="button" onClick={() => setStaff((s) => s.filter((_, j) => j !== i))} className="text-muted-foreground hover:text-coral ml-1">
+                              <Trash2 className="h-4 w-4" />
                             </button>
-                            <button type="button" onClick={() => moveStaff(i, 1)} disabled={i === staff.length - 1} className="text-muted-foreground hover:text-lime disabled:opacity-20">
-                              <ChevronDown className="h-4 w-4" />
-                            </button>
                           </div>
-                          <button type="button" onClick={() => setStaff((s) => s.filter((_, j) => j !== i))} className="text-muted-foreground hover:text-coral ml-1">
-                            <X className="h-4 w-4" />
-                          </button>
-                        </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   </Section>
                 </>
