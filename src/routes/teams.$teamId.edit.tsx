@@ -145,6 +145,7 @@ function EditOrg() {
       record: kind === "team" ? { w: wins, l: losses } : undefined,
       homeCourt: kind === "team" ? homeCourt : undefined,
       staff: kind === "team" ? staff : undefined,
+      roster: kind === "team" ? staff.length : org.roster,
     });
     nav({ to: "/teams/$teamId", params: { teamId: org.id } });
   }
