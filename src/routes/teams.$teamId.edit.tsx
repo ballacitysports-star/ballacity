@@ -537,6 +537,16 @@ function EditOrg() {
                     );
                   })}
                 </div>
+                <label className="mt-2 flex cursor-pointer items-center justify-center gap-2 rounded-2xl border border-dashed border-border bg-surface/40 py-3 text-sm font-semibold text-muted-foreground hover:border-lime hover:text-lime">
+                  <Upload className="h-4 w-4" /> Upload custom cover
+                  <input type="file" accept="image/*" onChange={onCoverUpload} className="hidden" />
+                </label>
+                {cover.startsWith("data:") && (
+                  <div className="mt-2 relative aspect-video overflow-hidden rounded-xl border-2 border-lime">
+                    <img src={cover} alt="" className="h-full w-full object-cover" />
+                    <span className="absolute top-1.5 left-1.5 rounded-full bg-background/80 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider">Custom</span>
+                  </div>
+                )}
               </Section>
 
               <Section title="Live preview">
@@ -547,6 +557,17 @@ function EditOrg() {
                   <Sparkles className="h-3 w-3 text-lime" /> This is how players will see you in feeds.
                 </div>
               </Section>
+
+              <div className="pt-4 mt-4 border-t border-border">
+                <button
+                  type="button"
+                  onClick={handleDelete}
+                  className="w-full inline-flex items-center justify-center gap-2 rounded-2xl border border-coral/40 bg-coral/10 py-3 text-sm font-bold text-coral hover:bg-coral/20"
+                >
+                  <Trash2 className="h-4 w-4" /> Delete organization
+                </button>
+                <p className="text-[11px] text-muted-foreground text-center mt-2">Permanently removes this profile and its posts.</p>
+              </div>
             </div>
           )}
         </motion.div>
