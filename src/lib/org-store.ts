@@ -23,6 +23,14 @@ export function updateOrg(id: string, patch: Partial<Omit<Org, "id" | "kind" | "
   emit();
 }
 
+export function deleteOrg(id: string) {
+  const idx = ORGS.findIndex((o) => o.id === id);
+  if (idx === -1) return;
+  ORGS.splice(idx, 1);
+  myOrgIds.delete(id);
+  emit();
+}
+
 export function getOrgById(id: string): Org | undefined {
   return ORGS.find((o) => o.id === id);
 }
