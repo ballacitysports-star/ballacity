@@ -2,12 +2,12 @@ import { createFileRoute, Link, useNavigate, notFound } from "@tanstack/react-ro
 import { useMemo, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
-  ArrowLeft, ArrowRight, Check, Sparkles, X, Plus,
+  ArrowLeft, ArrowRight, Check, Sparkles, X, Plus, ChevronUp, ChevronDown, Trash2, Upload,
 } from "lucide-react";
 import {
-  SPORTS, HERO_IMAGE, imageFor, type Sport, type Org,
+  SPORTS, imageFor, type Sport, type Org,
 } from "@/lib/sample-data";
-import { getOrgById, updateOrg, isMyOrg } from "@/lib/org-store";
+import { getOrgById, updateOrg, deleteOrg, isMyOrg } from "@/lib/org-store";
 import { OrgCard } from "@/components/OrgCard";
 
 export const Route = createFileRoute("/teams/$teamId/edit")({
@@ -166,10 +166,32 @@ function EditOrg() {
     setStaff((s) => [...s, { name: staffName.trim(), role: staffRole.trim(), avatar: initials(staffName) }]);
     setStaffName(""); setStaffRole("");
   }
+  function moveStaff(i: number, dir: -1 | 1) {
+    setStaff((s) => {
+      const j = i + dir;
+      if (j < 0 || j >= s.length) return s;
+      const next = [...s];
+      [next[i], next[j]] = [next[j], next[i]];
+      return next;
+    });
+  }
+  function onCoverUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => typeof reader.result === "string" && setCover(reader.result);
+    reader.readAsDataURL(file);
+  }
+  function handleDelete() {
+    if (!confirm(`Delete ${org.name}? This cannot be undone.`)) return;
+    deleteOrg(org.id);
+    nav({ to: "/teams" });
+  }
 
   function toggleSport(s: Sport) {
     setSports((arr) => (arr.includes(s) ? arr.filter((x) => x !== s) : [...arr, s]));
   }
+
 
   return (
     <div className="mx-auto max-w-md px-4 pt-6 pb-32">
@@ -390,13 +412,21 @@ function EditOrg() {
                         <Plus className="h-4 w-4" /> Add staff member
                       </button>
                       {staff.map((m, i) => (
-                        <div key={i} className="flex items-center gap-3 rounded-2xl border border-border bg-surface p-3">
+                        <div key={i} className="flex items-center gap-2 rounded-2xl border border-border bg-surface p-3">
                           <div className="grid h-10 w-10 place-items-center rounded-full bg-secondary text-xs font-bold">{m.avatar}</div>
                           <div className="flex-1 min-w-0">
                             <div className="text-sm font-semibold truncate">{m.name}</div>
                             <div className="text-xs text-muted-foreground truncate">{m.role}</div>
                           </div>
-                          <button type="button" onClick={() => setStaff((s) => s.filter((_, j) => j !== i))} className="text-muted-foreground hover:text-coral">
+                          <div className="flex flex-col">
+                            <button type="button" onClick={() => moveStaff(i, -1)} disabled={i === 0} className="text-muted-foreground hover:text-lime disabled:opacity-20">
+                              <ChevronUp className="h-4 w-4" />
+                            </button>
+                            <button type="button" onClick={() => moveStaff(i, 1)} disabled={i === staff.length - 1} className="text-muted-foreground hover:text-lime disabled:opacity-20">
+                              <ChevronDown className="h-4 w-4" />
+                            </button>
+                          </div>
+                          <button type="button" onClick={() => setStaff((s) => s.filter((_, j) => j !== i))} className="text-muted-foreground hover:text-coral ml-1">
                             <X className="h-4 w-4" />
                           </button>
                         </div>
@@ -507,6 +537,16 @@ function EditOrg() {
                     );
                   })}
                 </div>
+                <label className="mt-2 flex cursor-pointer items-center justify-center gap-2 rounded-2xl border border-dashed border-border bg-surface/40 py-3 text-sm font-semibold text-muted-foreground hover:border-lime hover:text-lime">
+                  <Upload className="h-4 w-4" /> Upload custom cover
+                  <input type="file" accept="image/*" onChange={onCoverUpload} className="hidden" />
+                </label>
+                {cover.startsWith("data:") && (
+                  <div className="mt-2 relative aspect-video overflow-hidden rounded-xl border-2 border-lime">
+                    <img src={cover} alt="" className="h-full w-full object-cover" />
+                    <span className="absolute top-1.5 left-1.5 rounded-full bg-background/80 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider">Custom</span>
+                  </div>
+                )}
               </Section>
 
               <Section title="Live preview">
@@ -517,6 +557,17 @@ function EditOrg() {
                   <Sparkles className="h-3 w-3 text-lime" /> This is how players will see you in feeds.
                 </div>
               </Section>
+
+              <div className="pt-4 mt-4 border-t border-border">
+                <button
+                  type="button"
+                  onClick={handleDelete}
+                  className="w-full inline-flex items-center justify-center gap-2 rounded-2xl border border-coral/40 bg-coral/10 py-3 text-sm font-bold text-coral hover:bg-coral/20"
+                >
+                  <Trash2 className="h-4 w-4" /> Delete organization
+                </button>
+                <p className="text-[11px] text-muted-foreground text-center mt-2">Permanently removes this profile and its posts.</p>
+              </div>
             </div>
           )}
         </motion.div>
