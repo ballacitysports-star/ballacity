@@ -135,6 +135,27 @@ function CreateOrg() {
     setStaff((s) => [...s, { name: staffName.trim(), role: staffRole.trim(), avatar: initials(staffName) }]);
     setStaffName(""); setStaffRole("");
   }
+  function updateStaffAvatar(i: number, file: File) {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = reader.result;
+      if (typeof result === "string") {
+        setStaff((s) => {
+          const next = [...s];
+          next[i] = { ...next[i], avatar: result };
+          return next;
+        });
+      }
+    };
+    reader.readAsDataURL(file);
+  }
+  function resetStaffAvatar(i: number) {
+    setStaff((s) => {
+      const next = [...s];
+      next[i] = { ...next[i], avatar: initials(next[i].name) };
+      return next;
+    });
+  }
 
   function toggleSport(s: Sport) {
     setSports((arr) => (arr.includes(s) ? arr.filter((x) => x !== s) : [...arr, s]));
