@@ -412,13 +412,21 @@ function EditOrg() {
                         <Plus className="h-4 w-4" /> Add staff member
                       </button>
                       {staff.map((m, i) => (
-                        <div key={i} className="flex items-center gap-3 rounded-2xl border border-border bg-surface p-3">
+                        <div key={i} className="flex items-center gap-2 rounded-2xl border border-border bg-surface p-3">
                           <div className="grid h-10 w-10 place-items-center rounded-full bg-secondary text-xs font-bold">{m.avatar}</div>
                           <div className="flex-1 min-w-0">
                             <div className="text-sm font-semibold truncate">{m.name}</div>
                             <div className="text-xs text-muted-foreground truncate">{m.role}</div>
                           </div>
-                          <button type="button" onClick={() => setStaff((s) => s.filter((_, j) => j !== i))} className="text-muted-foreground hover:text-coral">
+                          <div className="flex flex-col">
+                            <button type="button" onClick={() => moveStaff(i, -1)} disabled={i === 0} className="text-muted-foreground hover:text-lime disabled:opacity-20">
+                              <ChevronUp className="h-4 w-4" />
+                            </button>
+                            <button type="button" onClick={() => moveStaff(i, 1)} disabled={i === staff.length - 1} className="text-muted-foreground hover:text-lime disabled:opacity-20">
+                              <ChevronDown className="h-4 w-4" />
+                            </button>
+                          </div>
+                          <button type="button" onClick={() => setStaff((s) => s.filter((_, j) => j !== i))} className="text-muted-foreground hover:text-coral ml-1">
                             <X className="h-4 w-4" />
                           </button>
                         </div>
