@@ -2,12 +2,12 @@ import { createFileRoute, Link, useNavigate, notFound } from "@tanstack/react-ro
 import { useMemo, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
-  ArrowLeft, ArrowRight, Check, Sparkles, X, Plus,
+  ArrowLeft, ArrowRight, Check, Sparkles, X, Plus, ChevronUp, ChevronDown, Trash2, Upload,
 } from "lucide-react";
 import {
-  SPORTS, HERO_IMAGE, imageFor, type Sport, type Org,
+  SPORTS, imageFor, type Sport, type Org,
 } from "@/lib/sample-data";
-import { getOrgById, updateOrg, isMyOrg } from "@/lib/org-store";
+import { getOrgById, updateOrg, deleteOrg, isMyOrg } from "@/lib/org-store";
 import { OrgCard } from "@/components/OrgCard";
 
 export const Route = createFileRoute("/teams/$teamId/edit")({
