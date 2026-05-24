@@ -166,10 +166,32 @@ function EditOrg() {
     setStaff((s) => [...s, { name: staffName.trim(), role: staffRole.trim(), avatar: initials(staffName) }]);
     setStaffName(""); setStaffRole("");
   }
+  function moveStaff(i: number, dir: -1 | 1) {
+    setStaff((s) => {
+      const j = i + dir;
+      if (j < 0 || j >= s.length) return s;
+      const next = [...s];
+      [next[i], next[j]] = [next[j], next[i]];
+      return next;
+    });
+  }
+  function onCoverUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => typeof reader.result === "string" && setCover(reader.result);
+    reader.readAsDataURL(file);
+  }
+  function handleDelete() {
+    if (!confirm(`Delete ${org.name}? This cannot be undone.`)) return;
+    deleteOrg(org.id);
+    nav({ to: "/teams" });
+  }
 
   function toggleSport(s: Sport) {
     setSports((arr) => (arr.includes(s) ? arr.filter((x) => x !== s) : [...arr, s]));
   }
+
 
   return (
     <div className="mx-auto max-w-md px-4 pt-6 pb-32">
