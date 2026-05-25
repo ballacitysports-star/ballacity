@@ -44,6 +44,9 @@ function TeamPage() {
   const [filter, setFilter] = useState<PostKind | "all">("all");
   const [tab, setTab] = useState<"posts" | "about" | "games">("posts");
   const [following, setFollowing] = useState(false);
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
+  const canEdit = mounted && isMyOrg(org.id);
 
   const posts = org.posts.filter((p) => (filter === "all" ? true : p.kind === filter));
   const upcomingGames = GAMES.filter((g) => org.upcoming.includes(g.id));
