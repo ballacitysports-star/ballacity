@@ -13,6 +13,7 @@ import { Route as TabsRouteImport } from './routes/_tabs'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as TeamsCreateRouteImport } from './routes/teams.create'
 import { Route as TeamsTeamIdRouteImport } from './routes/teams.$teamId'
+import { Route as ReviewNewRouteImport } from './routes/review.new'
 import { Route as GamesGameIdRouteImport } from './routes/games.$gameId'
 import { Route as TabsTeamsRouteImport } from './routes/_tabs.teams'
 import { Route as TabsProfileRouteImport } from './routes/_tabs.profile'
@@ -39,6 +40,11 @@ const TeamsCreateRoute = TeamsCreateRouteImport.update({
 const TeamsTeamIdRoute = TeamsTeamIdRouteImport.update({
   id: '/teams/$teamId',
   path: '/teams/$teamId',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ReviewNewRoute = ReviewNewRouteImport.update({
+  id: '/review/new',
+  path: '/review/new',
   getParentRoute: () => rootRouteImport,
 } as any)
 const GamesGameIdRoute = GamesGameIdRouteImport.update({
@@ -91,6 +97,7 @@ export interface FileRoutesByFullPath {
   '/profile': typeof TabsProfileRoute
   '/teams': typeof TabsTeamsRoute
   '/games/$gameId': typeof GamesGameIdRoute
+  '/review/new': typeof ReviewNewRoute
   '/teams/$teamId': typeof TeamsTeamIdRouteWithChildren
   '/teams/create': typeof TeamsCreateRoute
   '/teams/$teamId/edit': typeof TeamsTeamIdEditRoute
@@ -104,6 +111,7 @@ export interface FileRoutesByTo {
   '/profile': typeof TabsProfileRoute
   '/teams': typeof TabsTeamsRoute
   '/games/$gameId': typeof GamesGameIdRoute
+  '/review/new': typeof ReviewNewRoute
   '/teams/$teamId': typeof TeamsTeamIdRouteWithChildren
   '/teams/create': typeof TeamsCreateRoute
   '/teams/$teamId/edit': typeof TeamsTeamIdEditRoute
@@ -119,6 +127,7 @@ export interface FileRoutesById {
   '/_tabs/profile': typeof TabsProfileRoute
   '/_tabs/teams': typeof TabsTeamsRoute
   '/games/$gameId': typeof GamesGameIdRoute
+  '/review/new': typeof ReviewNewRoute
   '/teams/$teamId': typeof TeamsTeamIdRouteWithChildren
   '/teams/create': typeof TeamsCreateRoute
   '/teams/$teamId/edit': typeof TeamsTeamIdEditRoute
@@ -134,6 +143,7 @@ export interface FileRouteTypes {
     | '/profile'
     | '/teams'
     | '/games/$gameId'
+    | '/review/new'
     | '/teams/$teamId'
     | '/teams/create'
     | '/teams/$teamId/edit'
@@ -147,6 +157,7 @@ export interface FileRouteTypes {
     | '/profile'
     | '/teams'
     | '/games/$gameId'
+    | '/review/new'
     | '/teams/$teamId'
     | '/teams/create'
     | '/teams/$teamId/edit'
@@ -161,6 +172,7 @@ export interface FileRouteTypes {
     | '/_tabs/profile'
     | '/_tabs/teams'
     | '/games/$gameId'
+    | '/review/new'
     | '/teams/$teamId'
     | '/teams/create'
     | '/teams/$teamId/edit'
@@ -170,6 +182,7 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   TabsRoute: typeof TabsRouteWithChildren
   GamesGameIdRoute: typeof GamesGameIdRoute
+  ReviewNewRoute: typeof ReviewNewRoute
   TeamsTeamIdRoute: typeof TeamsTeamIdRouteWithChildren
   TeamsCreateRoute: typeof TeamsCreateRoute
 }
@@ -202,6 +215,13 @@ declare module '@tanstack/react-router' {
       path: '/teams/$teamId'
       fullPath: '/teams/$teamId'
       preLoaderRoute: typeof TeamsTeamIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/review/new': {
+      id: '/review/new'
+      path: '/review/new'
+      fullPath: '/review/new'
+      preLoaderRoute: typeof ReviewNewRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/games/$gameId': {
@@ -299,6 +319,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   TabsRoute: TabsRouteWithChildren,
   GamesGameIdRoute: GamesGameIdRoute,
+  ReviewNewRoute: ReviewNewRoute,
   TeamsTeamIdRoute: TeamsTeamIdRouteWithChildren,
   TeamsCreateRoute: TeamsCreateRoute,
 }
