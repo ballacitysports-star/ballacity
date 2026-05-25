@@ -82,6 +82,7 @@ function TeamPage() {
               <Link
                 to="/teams/$teamId/edit"
                 params={{ teamId: org.id }}
+                data-render="client-only"
                 className="rounded-full border border-border bg-surface px-4 py-2.5 text-sm font-bold inline-flex items-center gap-1.5 hover:border-lime/40"
               >
                 <Pencil className="h-3.5 w-3.5" /> Edit
@@ -90,6 +91,7 @@ function TeamPage() {
             <motion.button
               whileTap={{ scale: 0.95 }}
               onClick={() => setFollowing((f) => !f)}
+              data-render="ssr-stable"
               className={`rounded-full px-5 py-2.5 text-sm font-bold transition-all ${
                 following ? "border border-border bg-surface text-foreground" : "bg-lime-gradient text-primary-foreground glow-lime"
               }`}
