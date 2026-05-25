@@ -144,6 +144,9 @@ function Profile() {
           </button>
         </motion.div>
 
+        {/* Reviews */}
+        <ReviewsSection revieweeId="me" />
+
         {/* Upcoming */}
         <div className="mt-6">
           <h2 className="font-display text-sm font-bold uppercase tracking-wider text-muted-foreground mb-2 flex items-center gap-1.5">
