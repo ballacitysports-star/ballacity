@@ -1,6 +1,6 @@
 import { createFileRoute, Link, notFound } from "@tanstack/react-router";
 import { motion } from "framer-motion";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   ArrowLeft, ShieldCheck, MapPin, Users, Star, Trophy, Calendar,
   Award, DollarSign, Share2, Plus, Pencil,
