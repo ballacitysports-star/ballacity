@@ -78,7 +78,7 @@ function TeamPage() {
             {org.avatar}
           </motion.div>
           <div className="mb-2 flex items-center gap-2">
-            {isMyOrg(org.id) && (
+            {canEdit && (
               <Link
                 to="/teams/$teamId/edit"
                 params={{ teamId: org.id }}
