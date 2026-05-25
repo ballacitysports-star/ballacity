@@ -117,3 +117,48 @@
   .scrollbar-hide::-webkit-scrollbar { display: none; }
   .scrollbar-hide { scrollbar-width: none; }
 }
+
+/* Debug mode — highlight SSR vs client render boundaries.
+ * Toggle via the bug button (bottom-right) or localStorage `openrun:debug-mode`. */
+html[data-debug="1"] [data-render="client-only"] {
+  outline: 2px dashed oklch(0.78 0.18 145);
+  outline-offset: 2px;
+  position: relative;
+}
+html[data-debug="1"] [data-render="client-only"]::after {
+  content: "client";
+  position: absolute;
+  top: -8px;
+  right: -4px;
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  background: oklch(0.78 0.18 145);
+  color: #000;
+  padding: 1px 4px;
+  border-radius: 3px;
+  pointer-events: none;
+  z-index: 50;
+}
+html[data-debug="1"] [data-render="ssr-stable"] {
+  outline: 2px dashed oklch(0.7 0.18 25);
+  outline-offset: 2px;
+  position: relative;
+}
+html[data-debug="1"] [data-render="ssr-stable"]::after {
+  content: "ssr";
+  position: absolute;
+  top: -8px;
+  right: -4px;
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  background: oklch(0.7 0.18 25);
+  color: #fff;
+  padding: 1px 4px;
+  border-radius: 3px;
+  pointer-events: none;
+  z-index: 50;
+}
