@@ -1,6 +1,6 @@
 import { createFileRoute, Link, notFound } from "@tanstack/react-router";
 import { motion } from "framer-motion";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   ArrowLeft, ShieldCheck, MapPin, Users, Star, Trophy, Calendar,
   Award, DollarSign, Share2, Plus, Pencil,
@@ -44,6 +44,9 @@ function TeamPage() {
   const [filter, setFilter] = useState<PostKind | "all">("all");
   const [tab, setTab] = useState<"posts" | "about" | "games">("posts");
   const [following, setFollowing] = useState(false);
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
+  const canEdit = mounted && isMyOrg(org.id);
 
   const posts = org.posts.filter((p) => (filter === "all" ? true : p.kind === filter));
   const upcomingGames = GAMES.filter((g) => org.upcoming.includes(g.id));
@@ -75,7 +78,7 @@ function TeamPage() {
             {org.avatar}
           </motion.div>
           <div className="mb-2 flex items-center gap-2">
-            {isMyOrg(org.id) && (
+            {canEdit && (
               <Link
                 to="/teams/$teamId/edit"
                 params={{ teamId: org.id }}
