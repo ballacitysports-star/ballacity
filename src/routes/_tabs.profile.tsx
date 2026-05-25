@@ -4,6 +4,7 @@ import { Settings, Trophy, Calendar, Video, Shield, Users, Plus } from "lucide-r
 import { ME, GAMES } from "@/lib/sample-data";
 import { GameCard } from "@/components/GameCard";
 import { OrgCard } from "@/components/OrgCard";
+import { ReviewsSection } from "@/components/ReviewsSection";
 import { useMyOrgs } from "@/lib/org-store";
 import { HERO_IMAGE } from "@/lib/sample-data";
 
