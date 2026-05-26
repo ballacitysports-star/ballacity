@@ -145,15 +145,21 @@ function TeamPage() {
 
         {/* Tabs */}
         <div className="mt-6 flex gap-1 rounded-full border border-border bg-surface p-1">
-          {(["posts", "about", "games"] as const).map((t) => (
+          {(["posts", "about", "games", "reviews"] as const).map((t) => (
             <button
               key={t}
               onClick={() => setTab(t)}
-              className={`flex-1 rounded-full px-3 py-2 text-sm font-semibold capitalize transition-all ${
+              className={`flex-1 rounded-full px-2 py-2 text-xs font-semibold capitalize transition-all ${
                 tab === t ? "bg-lime text-primary-foreground" : "text-muted-foreground"
               }`}
             >
-              {t === "games" ? `Games · ${upcomingGames.length}` : t === "posts" ? `Posts · ${org.posts.length}` : "About"}
+              {t === "games"
+                ? `Games · ${upcomingGames.length}`
+                : t === "posts"
+                  ? `Posts · ${org.posts.length}`
+                  : t === "reviews"
+                    ? "Reviews"
+                    : "About"}
             </button>
           ))}
         </div>
