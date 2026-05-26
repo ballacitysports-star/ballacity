@@ -1,10 +1,13 @@
 import { createFileRoute, Link, notFound } from "@tanstack/react-router";
 import { motion } from "framer-motion";
-import { ArrowLeft, Share2, Bookmark, MapPin, Clock, Users, Calendar, MessageCircle } from "lucide-react";
+import { ArrowLeft, Share2, Bookmark, MapPin, Clock, Users, Calendar, MessageCircle, Star } from "lucide-react";
 import { GAMES, SPORTS } from "@/lib/sample-data";
 import { formatWhen } from "@/lib/format";
+import { ReviewsSection } from "@/components/ReviewsSection";
 
 const emojiBySport: Record<string, string> = Object.fromEntries(SPORTS.map((s) => [s.name, s.emoji]));
+
+const hostIdFor = (username: string) => `host-${username.replace(/^@/, "").toLowerCase()}`;
 
 export const Route = createFileRoute("/games/$gameId")({
   loader: ({ params }) => {
