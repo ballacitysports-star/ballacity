@@ -1,10 +1,13 @@
 import { createFileRoute, Link, notFound } from "@tanstack/react-router";
 import { motion } from "framer-motion";
-import { ArrowLeft, Share2, Bookmark, MapPin, Clock, Users, Calendar, MessageCircle } from "lucide-react";
+import { ArrowLeft, Share2, Bookmark, MapPin, Clock, Users, Calendar, MessageCircle, Star } from "lucide-react";
 import { GAMES, SPORTS } from "@/lib/sample-data";
 import { formatWhen } from "@/lib/format";
+import { ReviewsSection } from "@/components/ReviewsSection";
 
 const emojiBySport: Record<string, string> = Object.fromEntries(SPORTS.map((s) => [s.name, s.emoji]));
+
+const hostIdFor = (username: string) => `host-${username.replace(/^@/, "").toLowerCase()}`;
 
 export const Route = createFileRoute("/games/$gameId")({
   loader: ({ params }) => {
@@ -128,8 +131,28 @@ function GameDetail() {
             <div className="font-semibold">{game.host.name} <span className="text-muted-foreground font-normal text-sm">{game.host.username}</span></div>
             <div className="text-xs text-lime font-semibold">★ {game.host.rating} host rating</div>
           </div>
-          <button className="rounded-full border border-border px-3 py-1.5 text-xs font-semibold">Follow</button>
+          <Link
+            to="/review/new"
+            search={{
+              revieweeId: hostIdFor(game.host.username),
+              revieweeKind: "host",
+              revieweeName: game.host.name,
+              kind: "player",
+              context: game.title,
+            } as any}
+            className="inline-flex items-center gap-1 rounded-full border border-lime/40 bg-lime/10 px-3 py-1.5 text-xs font-bold text-lime"
+          >
+            <Star className="h-3 w-3" /> Review
+          </Link>
         </div>
+
+        {/* Host reviews */}
+        <ReviewsSection
+          revieweeId={hostIdFor(game.host.username)}
+          revieweeKind="host"
+          revieweeName={game.host.name}
+        />
+
 
         {/* About */}
         <div>

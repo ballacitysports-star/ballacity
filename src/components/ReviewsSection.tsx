@@ -101,7 +101,15 @@ function ReviewCard({ r, index }: { r: Review; index: number }) {
   );
 }
 
-export function ReviewsSection({ revieweeId }: { revieweeId: string }) {
+export function ReviewsSection({
+  revieweeId,
+  revieweeKind = "player",
+  revieweeName,
+}: {
+  revieweeId: string;
+  revieweeKind?: "player" | "trainer" | "team" | "host";
+  revieweeName?: string;
+}) {
   const reviews = useReviewsFor(revieweeId);
   const [filter, setFilter] = useState<ReviewerKind | "all">("all");
 
@@ -119,7 +127,7 @@ export function ReviewsSection({ revieweeId }: { revieweeId: string }) {
         </h2>
         <Link
           to="/review/new"
-          search={{ revieweeId, kind: "player" } as any}
+          search={{ revieweeId, revieweeKind, revieweeName, kind: "player" } as any}
           className="inline-flex items-center gap-1 text-xs font-bold text-lime"
         >
           <MessageSquarePlus className="h-3.5 w-3.5" /> Write

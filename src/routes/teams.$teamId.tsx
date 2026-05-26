@@ -9,6 +9,7 @@ import { ORGS, GAMES, POST_KIND_META, type PostKind, type Org } from "@/lib/samp
 import { isMyOrg } from "@/lib/org-store";
 import { PostCard } from "@/components/PostCard";
 import { GameCard } from "@/components/GameCard";
+import { ReviewsSection } from "@/components/ReviewsSection";
 
 export const Route = createFileRoute("/teams/$teamId")({
   head: ({ params }) => {
@@ -42,7 +43,7 @@ const FILTERS: { key: PostKind | "all"; label: string }[] = [
 function TeamPage() {
   const org = Route.useLoaderData() as Org;
   const [filter, setFilter] = useState<PostKind | "all">("all");
-  const [tab, setTab] = useState<"posts" | "about" | "games">("posts");
+  const [tab, setTab] = useState<"posts" | "about" | "games" | "reviews">("posts");
   const [following, setFollowing] = useState(false);
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
@@ -144,15 +145,21 @@ function TeamPage() {
 
         {/* Tabs */}
         <div className="mt-6 flex gap-1 rounded-full border border-border bg-surface p-1">
-          {(["posts", "about", "games"] as const).map((t) => (
+          {(["posts", "about", "games", "reviews"] as const).map((t) => (
             <button
               key={t}
               onClick={() => setTab(t)}
-              className={`flex-1 rounded-full px-3 py-2 text-sm font-semibold capitalize transition-all ${
+              className={`flex-1 rounded-full px-2 py-2 text-xs font-semibold capitalize transition-all ${
                 tab === t ? "bg-lime text-primary-foreground" : "text-muted-foreground"
               }`}
             >
-              {t === "games" ? `Games · ${upcomingGames.length}` : t === "posts" ? `Posts · ${org.posts.length}` : "About"}
+              {t === "games"
+                ? `Games · ${upcomingGames.length}`
+                : t === "posts"
+                  ? `Posts · ${org.posts.length}`
+                  : t === "reviews"
+                    ? "Reviews"
+                    : "About"}
             </button>
           ))}
         </div>
@@ -269,6 +276,15 @@ function TeamPage() {
             )}
             {upcomingGames.map((g, i) => <GameCard key={g.id} game={g} index={i} />)}
           </div>
+        )}
+
+        {/* Reviews tab */}
+        {tab === "reviews" && (
+          <ReviewsSection
+            revieweeId={org.id}
+            revieweeKind={org.kind === "coach" ? "trainer" : "team"}
+            revieweeName={org.name}
+          />
         )}
       </div>
     </div>
