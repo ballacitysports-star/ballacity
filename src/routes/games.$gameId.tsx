@@ -124,9 +124,6 @@ function GameDetail() {
         {/* Host */}
         <div className="flex items-center gap-3 rounded-3xl border border-border bg-surface p-4">
           <div className="grid h-12 w-12 place-items-center rounded-2xl bg-lime-gradient font-bold text-primary-foreground">
-        {/* Host */}
-        <div className="flex items-center gap-3 rounded-3xl border border-border bg-surface p-4">
-          <div className="grid h-12 w-12 place-items-center rounded-2xl bg-lime-gradient font-bold text-primary-foreground">
             {game.host.avatar}
           </div>
           <div className="flex-1">
