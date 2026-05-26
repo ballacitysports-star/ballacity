@@ -277,6 +277,15 @@ function TeamPage() {
             {upcomingGames.map((g, i) => <GameCard key={g.id} game={g} index={i} />)}
           </div>
         )}
+
+        {/* Reviews tab */}
+        {tab === "reviews" && (
+          <ReviewsSection
+            revieweeId={org.id}
+            revieweeKind={org.kind === "coach" ? "trainer" : "team"}
+            revieweeName={org.name}
+          />
+        )}
       </div>
     </div>
   );
