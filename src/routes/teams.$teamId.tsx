@@ -9,6 +9,7 @@ import { ORGS, GAMES, POST_KIND_META, type PostKind, type Org } from "@/lib/samp
 import { isMyOrg } from "@/lib/org-store";
 import { PostCard } from "@/components/PostCard";
 import { GameCard } from "@/components/GameCard";
+import { ReviewsSection } from "@/components/ReviewsSection";
 
 export const Route = createFileRoute("/teams/$teamId")({
   head: ({ params }) => {
