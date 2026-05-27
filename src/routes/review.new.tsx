@@ -1,11 +1,12 @@
 import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { motion } from "framer-motion";
-import { ArrowLeft, Star, Check } from "lucide-react";
+import { ArrowLeft, Star, Check, Lock, Globe, ShieldCheck } from "lucide-react";
 import {
   addReview,
   REVIEWER_META,
   REVIEWEE_META,
+  CRITERIA,
   type ReviewerKind,
   type RevieweeKind,
 } from "@/lib/reviews";
@@ -50,18 +51,13 @@ function ReviewNew() {
   const [body, setBody] = useState("");
   const [context, setContext] = useState(search.context ?? "");
   const [scores, setScores] = useState<Record<string, number>>({});
+  const [isPrivate, setIsPrivate] = useState(false);
 
   const reviewerMeta = REVIEWER_META[kind];
   const revieweeMeta = REVIEWEE_META[revieweeKind];
 
-  // When the player is reviewing a non-player, the sub-fields come from the reviewee meta.
-  // Otherwise (player-on-player etc.) keep the reviewer-driven set.
-  const subFields = useMemo(
-    () => (revieweeKind === "player" ? reviewerMeta.subFields : revieweeMeta.subFields),
-    [revieweeKind, reviewerMeta.subFields, revieweeMeta.subFields],
-  );
-  const labelFor = (f: string) => revieweeMeta.promptLabels[f] ?? f;
-
+  const criteria = useMemo(() => CRITERIA[revieweeKind], [revieweeKind]);
+  const verified = context.trim().length > 0;
   const canSubmit = body.trim().length >= 8 && rating > 0;
 
   const submit = () => {
@@ -79,8 +75,10 @@ function ReviewNew() {
       title: title.trim() || undefined,
       body: body.trim(),
       context: context.trim() || undefined,
+      verified,
+      isPrivate,
     });
-    toast.success("Review posted");
+    toast.success(isPrivate ? "Private feedback sent" : "Review posted");
     if (revieweeKind === "team" || revieweeKind === "trainer") {
       nav({ to: "/teams/$teamId", params: { teamId: search.revieweeId ?? "" } });
     } else {
@@ -120,7 +118,7 @@ function ReviewNew() {
         {/* Reviewee summary */}
         <div className="rounded-2xl border border-border bg-surface p-3 flex items-center gap-3">
           <div className="text-2xl">{revieweeMeta.emoji}</div>
-          <div className="min-w-0">
+          <div className="min-w-0 flex-1">
             <div className="text-[10px] uppercase tracking-wider text-muted-foreground">
               Reviewing {revieweeMeta.label.toLowerCase()}
             </div>
@@ -128,6 +126,11 @@ function ReviewNew() {
               {search.revieweeName ?? search.revieweeId ?? "Unknown"}
             </div>
           </div>
+          {verified && (
+            <span className="inline-flex items-center gap-1 rounded-full bg-lime/15 px-2 py-0.5 text-[10px] font-bold text-lime">
+              <ShieldCheck className="h-3 w-3" /> Verified
+            </span>
+          )}
         </div>
 
         {/* Reviewer role */}
@@ -154,7 +157,7 @@ function ReviewNew() {
                     }`}
                   >
                     <span className="text-base">{m.emoji}</span>
-                    {m.label} → {revieweeMeta.label}
+                    {m.label}
                   </button>
                 );
               })}
@@ -186,18 +189,18 @@ function ReviewNew() {
           </div>
         </section>
 
-        {/* Sub-scores */}
+        {/* 10-criterion breakdown */}
         <section>
           <h2 className="font-display text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2">
-            Breakdown
+            10-point breakdown
           </h2>
           <div className="space-y-3 rounded-2xl border border-border bg-surface p-4">
-            {subFields.map((f) => {
-              const value = scores[f] ?? 4;
+            {criteria.map((c) => {
+              const value = scores[c.key] ?? 4;
               return (
-                <div key={f}>
+                <div key={c.key}>
                   <div className="flex items-center justify-between text-sm">
-                    <span className="font-semibold">{labelFor(f)}</span>
+                    <span className="font-semibold">{c.label}</span>
                     <span className="text-lime font-bold">{value} / 5</span>
                   </div>
                   <input
@@ -207,7 +210,7 @@ function ReviewNew() {
                     step={1}
                     value={value}
                     onChange={(e) =>
-                      setScores((s) => ({ ...s, [f]: Number(e.target.value) }))
+                      setScores((s) => ({ ...s, [c.key]: Number(e.target.value) }))
                     }
                     className="mt-1 w-full accent-lime"
                   />
@@ -244,15 +247,16 @@ function ReviewNew() {
             maxLength={600}
             className="mt-2 w-full resize-none rounded-2xl border border-border bg-surface px-4 py-3 text-sm outline-none focus:border-lime"
           />
-          <div className="mt-1 text-right text-[10px] text-muted-foreground">
-            {body.length} / 600
+          <div className="mt-1 flex items-center justify-between text-[10px] text-muted-foreground">
+            <span>Auto-moderation filters toxic language.</span>
+            <span>{body.length} / 600</span>
           </div>
         </section>
 
         {/* Context */}
         <section>
           <label className="font-display text-xs font-bold uppercase tracking-wider text-muted-foreground">
-            Context (optional)
+            Event / context (unlocks verified badge)
           </label>
           <input
             value={context}
@@ -261,6 +265,36 @@ function ReviewNew() {
             maxLength={80}
             className="mt-2 w-full rounded-2xl border border-border bg-surface px-4 py-3 text-sm outline-none focus:border-lime"
           />
+        </section>
+
+        {/* Public / private */}
+        <section>
+          <h2 className="font-display text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2">
+            Visibility
+          </h2>
+          <div className="grid grid-cols-2 gap-2">
+            <button
+              onClick={() => setIsPrivate(false)}
+              className={`flex items-center gap-2 rounded-2xl border px-3 py-3 text-sm font-semibold ${
+                !isPrivate ? "border-lime bg-lime/10" : "border-border bg-surface text-muted-foreground"
+              }`}
+            >
+              <Globe className="h-4 w-4" /> Public
+            </button>
+            <button
+              onClick={() => setIsPrivate(true)}
+              className={`flex items-center gap-2 rounded-2xl border px-3 py-3 text-sm font-semibold ${
+                isPrivate ? "border-coral bg-coral/10 text-coral" : "border-border bg-surface text-muted-foreground"
+              }`}
+            >
+              <Lock className="h-4 w-4" /> Private to them
+            </button>
+          </div>
+          <p className="mt-2 text-[11px] text-muted-foreground">
+            {isPrivate
+              ? "Only the recipient sees this. Doesn't affect public reputation."
+              : "Counts toward reputation score and is visible on their profile."}
+          </p>
         </section>
 
         <Link

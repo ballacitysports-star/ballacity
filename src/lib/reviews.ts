@@ -7,193 +7,186 @@ export type Review = {
   id: string;
   kind: ReviewerKind;          // who is leaving the review
   revieweeKind: RevieweeKind;  // who the review is about
-  revieweeId: string;          // "me" for the demo player, org id for trainer/team, host id for host
+  revieweeId: string;
   reviewerName: string;
   reviewerHandle: string;
   reviewerAvatar: string;
   reviewerSubtitle?: string;
-  rating: number;
-  scores?: Partial<{
-    skill: number;
-    sportsmanship: number;
-    reliability: number;
-    communication: number;
-    coachability: number;
-    impact: number;
-    teamwork: number;
-    punctuality: number;
-  }>;
+  rating: number;              // 1..5 overall
+  scores?: Record<string, number>; // criterion key -> 1..5
   title?: string;
   body: string;
-  context?: string;
+  context?: string;            // e.g. event name (also acts as verified participation)
   date: string;
+  verified?: boolean;          // verified participation badge
+  isPrivate?: boolean;         // private feedback (only visible to reviewee)
+  helpfulCount?: number;
+  flagged?: boolean;           // hidden after moderation
 };
-
-type ScoreKey = keyof NonNullable<Review["scores"]>;
 
 export const REVIEWER_META: Record<
   ReviewerKind,
-  { label: string; emoji: string; color: string; subFields: ScoreKey[] }
+  { label: string; emoji: string; color: "lime" | "coral" }
 > = {
-  player:  { label: "Player",  emoji: "🏀", color: "lime",
-             subFields: ["skill", "sportsmanship", "teamwork"] },
-  trainer: { label: "Trainer", emoji: "🧠", color: "coral",
-             subFields: ["coachability", "skill", "punctuality"] },
-  team:    { label: "Team",    emoji: "🛡️", color: "lime",
-             subFields: ["impact", "teamwork", "reliability"] },
-  host:    { label: "Host",    emoji: "🎯", color: "coral",
-             subFields: ["reliability", "sportsmanship", "communication"] },
+  player:  { label: "Player",  emoji: "🏀", color: "lime" },
+  trainer: { label: "Trainer", emoji: "🧠", color: "coral" },
+  team:    { label: "Team",    emoji: "🛡️", color: "lime" },
+  host:    { label: "Host",    emoji: "🎯", color: "coral" },
 };
 
-// Sub-fields rendered when a *player* writes a review ABOUT this reviewee kind.
-export const REVIEWEE_META: Record<
-  RevieweeKind,
-  { label: string; emoji: string; subFields: ScoreKey[]; promptLabels: Record<string, string> }
-> = {
-  player:  { label: "Player",  emoji: "🏀",
-             subFields: ["skill", "sportsmanship", "teamwork"],
-             promptLabels: { skill: "Skill", sportsmanship: "Sportsmanship", teamwork: "Teamwork" } },
-  trainer: { label: "Trainer", emoji: "🧠",
-             subFields: ["skill", "communication", "punctuality"],
-             promptLabels: { skill: "Knowledge", communication: "Communication", punctuality: "Punctuality" } },
-  team:    { label: "Team",    emoji: "🛡️",
-             subFields: ["reliability", "teamwork", "impact"],
-             promptLabels: { reliability: "Organization", teamwork: "Vibe", impact: "Competition" } },
-  host:    { label: "Host",    emoji: "🎯",
-             subFields: ["reliability", "communication", "sportsmanship"],
-             promptLabels: { reliability: "Organization", communication: "Communication", sportsmanship: "Fairness" } },
+// 10 criteria for each relationship type (player → X).
+// Order is intentional — first 3 surface as the "top strengths".
+export const CRITERIA: Record<RevieweeKind, { key: string; label: string }[]> = {
+  player: [
+    { key: "sportsmanship",  label: "Sportsmanship" },
+    { key: "communication",  label: "Communication" },
+    { key: "teamwork",       label: "Teamwork" },
+    { key: "reliability",    label: "Reliability" },
+    { key: "effort",         label: "Effort & Hustle" },
+    { key: "leadership",     label: "Leadership" },
+    { key: "respect",        label: "Respectfulness" },
+    { key: "competitive",    label: "Competitive Attitude" },
+    { key: "skill",          label: "Skill Level" },
+    { key: "energy",         label: "Positive Energy" },
+  ],
+  trainer: [
+    { key: "knowledge",      label: "Coaching Knowledge" },
+    { key: "communication",  label: "Communication Skills" },
+    { key: "motivation",     label: "Motivation & Encouragement" },
+    { key: "professionalism",label: "Professionalism" },
+    { key: "effectiveness",  label: "Training Effectiveness" },
+    { key: "development",    label: "Player Development" },
+    { key: "punctuality",    label: "Punctuality" },
+    { key: "fairness",       label: "Fairness" },
+    { key: "safety",         label: "Safety Awareness" },
+    { key: "experience",     label: "Overall Experience" },
+  ],
+  team: [
+    { key: "culture",        label: "Team Culture" },
+    { key: "organization",   label: "Organization" },
+    { key: "competitiveness",label: "Competitiveness" },
+    { key: "coaching",       label: "Coaching Quality" },
+    { key: "communication",  label: "Communication" },
+    { key: "facilities",     label: "Facilities" },
+    { key: "opportunities",  label: "Player Opportunities" },
+    { key: "inclusiveness",  label: "Inclusiveness" },
+    { key: "scheduling",     label: "Scheduling Reliability" },
+    { key: "satisfaction",   label: "Overall Satisfaction" },
+  ],
+  host: [
+    { key: "organization",   label: "Event Organization" },
+    { key: "facility",       label: "Facility Quality" },
+    { key: "scheduling",     label: "Scheduling" },
+    { key: "communication",  label: "Communication" },
+    { key: "fairness",       label: "Fair Competition" },
+    { key: "safety",         label: "Safety & Security" },
+    { key: "staff",          label: "Staff Professionalism" },
+    { key: "checkin",        label: "Check-in Experience" },
+    { key: "atmosphere",     label: "Entertainment / Atmosphere" },
+    { key: "experience",     label: "Overall Event Experience" },
+  ],
 };
 
-// Sample reviews about the "me" player (id: "me")
+export const REVIEWEE_META: Record<RevieweeKind, { label: string; emoji: string }> = {
+  player:  { label: "Player",  emoji: "🏀" },
+  trainer: { label: "Trainer", emoji: "🧠" },
+  team:    { label: "Team",    emoji: "🛡️" },
+  host:    { label: "Host",    emoji: "🎯" },
+};
+
+// Reputation tier ladder (gamified levels)
+export const REPUTATION_LEVELS = [
+  { min: 0,  name: "Rookie",     emoji: "🌱", color: "text-muted-foreground" },
+  { min: 40, name: "Rising",     emoji: "⚡", color: "text-sky-400" },
+  { min: 60, name: "Pro",        emoji: "🔥", color: "text-lime" },
+  { min: 75, name: "Elite",      emoji: "💎", color: "text-coral" },
+  { min: 90, name: "Legend",     emoji: "👑", color: "text-amber-400" },
+] as const;
+
+// -------------------------- seed data --------------------------
+
+function ago(days: number) {
+  return new Date(Date.now() - days * 86400_000).toISOString();
+}
+
 const initial: Review[] = [
+  // ---- About "me" (player) ----
   {
     id: "rv1", kind: "player", revieweeKind: "player", revieweeId: "me",
     reviewerName: "Riley Chen", reviewerHandle: "@riley", reviewerAvatar: "RC",
     reviewerSubtitle: "Player · Basketball",
-    rating: 5,
-    scores: { skill: 4, sportsmanship: 5, teamwork: 5 },
+    rating: 5, verified: true, helpfulCount: 14,
+    scores: { sportsmanship: 5, communication: 5, teamwork: 5, reliability: 5, effort: 5, leadership: 4, respect: 5, competitive: 5, skill: 4, energy: 5 },
     title: "Glue guy on any team",
     body: "Locked up their best wing in the 4th and still found me on three back-cuts. Bring this guy back.",
-    context: "Friday Night Run · 5v5",
-    date: new Date(Date.now() - 2 * 86400_000).toISOString(),
+    context: "Friday Night Run · 5v5", date: ago(2),
   },
   {
     id: "rv2", kind: "host", revieweeKind: "player", revieweeId: "me",
     reviewerName: "Marcus Lee", reviewerHandle: "@marcus", reviewerAvatar: "ML",
     reviewerSubtitle: "Hosted · Tompkins Square Courts",
-    rating: 5,
-    scores: { reliability: 5, sportsmanship: 5, communication: 4 },
+    rating: 5, verified: true, helpfulCount: 8,
+    scores: { reliability: 5, sportsmanship: 5, communication: 4, respect: 5, effort: 5, energy: 5, teamwork: 4, leadership: 4, competitive: 4, skill: 4 },
     title: "First in, last out",
     body: "Showed up 15 min early to help set cones and stayed to break down. Auto-invite from now on.",
-    context: "Sunday Sunset 7v7",
-    date: new Date(Date.now() - 6 * 86400_000).toISOString(),
+    context: "Sunday Sunset 7v7", date: ago(6),
   },
   {
     id: "rv3", kind: "trainer", revieweeKind: "player", revieweeId: "me",
     reviewerName: "Coach Jordan Kim", reviewerHandle: "@coachjordan", reviewerAvatar: "JK",
     reviewerSubtitle: "Trainer · USATF L2",
-    rating: 4,
-    scores: { coachability: 5, skill: 4, punctuality: 5 },
+    rating: 4, verified: true, helpfulCount: 5,
+    scores: { sportsmanship: 5, communication: 4, teamwork: 4, reliability: 5, effort: 5, leadership: 4, respect: 5, competitive: 5, skill: 4, energy: 5 },
     title: "Big jump in 6 weeks",
     body: "Came in unable to hold tempo for 3 miles, finished the block running 7:00s for 5K. Listens, adjusts.",
-    context: "Spring 5K Block · Week 6",
-    date: new Date(Date.now() - 12 * 86400_000).toISOString(),
+    context: "Spring 5K Block · Week 6", date: ago(12),
   },
   {
     id: "rv4", kind: "team", revieweeKind: "player", revieweeId: "me",
     reviewerName: "Eastside Elite", reviewerHandle: "@eastsideelite", reviewerAvatar: "EE",
     reviewerSubtitle: "Team · Dyckman Div 1",
-    rating: 5,
-    scores: { impact: 5, teamwork: 5, reliability: 4 },
+    rating: 5, verified: true, helpfulCount: 11,
+    scores: { sportsmanship: 5, communication: 5, teamwork: 5, reliability: 4, effort: 5, leadership: 4, respect: 5, competitive: 5, skill: 5, energy: 4 },
     title: "Earned a roster spot",
     body: "Two-day evaluation. Played within the offense, switched on D, didn't force shots. Offering a spot for summer.",
-    context: "Open Tryouts · Day 2",
-    date: new Date(Date.now() - 20 * 86400_000).toISOString(),
+    context: "Open Tryouts · Day 2", date: ago(20),
   },
-
   // ---- Player → Trainer ----
   {
     id: "rv5", kind: "player", revieweeKind: "trainer", revieweeId: "c-jordan-kim",
     reviewerName: "Alex Rivera", reviewerHandle: "@alex", reviewerAvatar: "AR",
     reviewerSubtitle: "Player · Running",
-    rating: 5,
-    scores: { skill: 5, communication: 5, punctuality: 5 },
+    rating: 5, verified: true, helpfulCount: 9,
+    scores: { knowledge: 5, communication: 5, motivation: 5, professionalism: 5, effectiveness: 5, development: 5, punctuality: 5, fairness: 5, safety: 5, experience: 5 },
     title: "Knows exactly when to push",
     body: "Programs are dialed and feedback is specific. Dropped my 5K by 90s in one block.",
-    context: "Spring 5K Block",
-    date: new Date(Date.now() - 3 * 86400_000).toISOString(),
+    context: "Spring 5K Block", date: ago(3),
   },
-  {
-    id: "rv6", kind: "player", revieweeKind: "trainer", revieweeId: "c-priya-n",
-    reviewerName: "Sam Park", reviewerHandle: "@spark", reviewerAvatar: "SP",
-    reviewerSubtitle: "Player · Volleyball",
-    rating: 5,
-    scores: { skill: 5, communication: 4, punctuality: 5 },
-    title: "Setter mechanics, completely rebuilt",
-    body: "First clinic in years where every cue clicked. My hands are quieter and my second touch is faster.",
-    context: "Setter Mechanics · Small Group",
-    date: new Date(Date.now() - 8 * 86400_000).toISOString(),
-  },
-
   // ---- Player → Team ----
   {
     id: "rv7", kind: "player", revieweeKind: "team", revieweeId: "t-eastside-elite",
     reviewerName: "Devon Wright", reviewerHandle: "@dwright", reviewerAvatar: "DW",
     reviewerSubtitle: "Player · Basketball",
-    rating: 5,
-    scores: { reliability: 5, teamwork: 5, impact: 5 },
+    rating: 5, verified: true, helpfulCount: 12,
+    scores: { culture: 5, organization: 5, competitiveness: 5, coaching: 5, communication: 5, facilities: 4, opportunities: 5, inclusiveness: 4, scheduling: 5, satisfaction: 5 },
     title: "Run like pros",
     body: "Practices start on time, film sessions are tight, captains actually lead. Best run I've had in NYC.",
-    context: "Open Tryouts · Day 1",
-    date: new Date(Date.now() - 5 * 86400_000).toISOString(),
+    context: "Open Tryouts · Day 1", date: ago(5),
   },
-  {
-    id: "rv8", kind: "player", revieweeKind: "team", revieweeId: "t-fc-mosaic",
-    reviewerName: "Nico Alvarez", reviewerHandle: "@nico", reviewerAvatar: "NA",
-    reviewerSubtitle: "Player · Soccer",
-    rating: 4,
-    scores: { reliability: 4, teamwork: 5, impact: 4 },
-    title: "Welcoming, competitive",
-    body: "Subbed in for a tryout, kept me in the squad. Group chat is active and respectful.",
-    context: "Roster Trial",
-    date: new Date(Date.now() - 14 * 86400_000).toISOString(),
-  },
-  {
-    id: "rv9", kind: "player", revieweeKind: "team", revieweeId: "t-westside-paddles",
-    reviewerName: "Jamie O.", reviewerHandle: "@jamieo", reviewerAvatar: "JO",
-    reviewerSubtitle: "Player · Pickleball",
-    rating: 5,
-    scores: { reliability: 5, teamwork: 5, impact: 4 },
-    title: "Round robin done right",
-    body: "Brackets posted ahead, courts ready, refs fair. Came as a 3.5 single, left with three new doubles partners.",
-    context: "Open Play Round Robin",
-    date: new Date(Date.now() - 9 * 86400_000).toISOString(),
-  },
-
   // ---- Player → Host ----
   {
     id: "rv10", kind: "player", revieweeKind: "host", revieweeId: "host-marcus",
     reviewerName: "Taylor Brooks", reviewerHandle: "@tbrooks", reviewerAvatar: "TB",
     reviewerSubtitle: "Player · Soccer",
-    rating: 5,
-    scores: { reliability: 5, communication: 5, sportsmanship: 5 },
+    rating: 5, verified: true, helpfulCount: 7,
+    scores: { organization: 5, facility: 5, scheduling: 5, communication: 5, fairness: 5, safety: 5, staff: 5, checkin: 5, atmosphere: 5, experience: 5 },
     title: "Best Sunday run in the city",
     body: "Cones up before kickoff, balanced teams, called fouls fairly. Always the first game I sign up for.",
-    context: "Sunday Sunset 7v7",
-    date: new Date(Date.now() - 4 * 86400_000).toISOString(),
-  },
-  {
-    id: "rv11", kind: "player", revieweeKind: "host", revieweeId: "host-marcus",
-    reviewerName: "Priya N.", reviewerHandle: "@priyan", reviewerAvatar: "PN",
-    reviewerSubtitle: "Player · Soccer",
-    rating: 4,
-    scores: { reliability: 5, communication: 4, sportsmanship: 5 },
-    title: "Smooth check-in, fair teams",
-    body: "Roster was set 30 min before kick. Sub rotation was fair even with extra players.",
-    context: "Sunday Sunset 7v7",
-    date: new Date(Date.now() - 11 * 86400_000).toISOString(),
+    context: "Sunday Sunset 7v7", date: ago(4),
   },
 ];
+
+// -------------------------- store --------------------------
 
 let reviews: Review[] = [...initial];
 const listeners = new Set<() => void>();
@@ -204,19 +197,33 @@ function emit() {
   listeners.forEach((l) => l());
 }
 
-export function addReview(r: Omit<Review, "id" | "date"> & { id?: string; date?: string }) {
+export function addReview(
+  r: Omit<Review, "id" | "date" | "helpfulCount"> & { id?: string; date?: string },
+) {
   const full: Review = {
     id: r.id ?? `rv-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
     date: r.date ?? new Date().toISOString(),
+    helpfulCount: 0,
     ...r,
   };
+  // Naive spam/toxicity gate: very short body or banned terms = auto-flag.
+  const banned = /\b(idiot|stupid|trash|loser|hate)\b/i;
+  if (full.body.trim().length < 8 || banned.test(full.body)) full.flagged = true;
   reviews = [full, ...reviews];
   emit();
   return full;
 }
 
-export function getReviewsFor(revieweeId: string): Review[] {
-  return reviews.filter((r) => r.revieweeId === revieweeId);
+export function markHelpful(id: string) {
+  reviews = reviews.map((r) =>
+    r.id === id ? { ...r, helpfulCount: (r.helpfulCount ?? 0) + 1 } : r,
+  );
+  emit();
+}
+
+export function reportReview(id: string) {
+  reviews = reviews.map((r) => (r.id === id ? { ...r, flagged: true } : r));
+  emit();
 }
 
 function subscribe(cb: () => void) {
@@ -224,17 +231,90 @@ function subscribe(cb: () => void) {
   return () => listeners.delete(cb);
 }
 
+export function getReviewsFor(revieweeId: string): Review[] {
+  return reviews.filter((r) => r.revieweeId === revieweeId);
+}
+
 export function useReviewsFor(revieweeId: string): Review[] {
   useSyncExternalStore(subscribe, () => version, () => version);
   return getReviewsFor(revieweeId);
 }
 
-export function summarizeReviews(list: Review[]) {
-  if (!list.length) return { avg: 0, count: 0, byKind: {} as Record<ReviewerKind, number> };
-  const sum = list.reduce((a, r) => a + r.rating, 0);
-  const byKind = list.reduce((acc, r) => {
+// -------------------------- reputation --------------------------
+
+export type Reputation = {
+  avg: number;
+  count: number;
+  trustScore: number;            // 0..100
+  level: (typeof REPUTATION_LEVELS)[number];
+  byKind: Record<ReviewerKind, number>;
+  criteriaAverages: { key: string; label: string; avg: number }[];
+  topStrengths: { key: string; label: string; avg: number }[];
+  aiSummary: string;
+  verifiedShare: number;         // 0..1
+  recentTrend: "up" | "down" | "flat";
+};
+
+export function computeReputation(list: Review[], kind: RevieweeKind): Reputation {
+  const visible = list.filter((r) => !r.flagged && !r.isPrivate);
+  const count = visible.length;
+  const avg = count ? visible.reduce((a, r) => a + r.rating, 0) / count : 0;
+
+  const byKind = visible.reduce((acc, r) => {
     acc[r.kind] = (acc[r.kind] ?? 0) + 1;
     return acc;
   }, {} as Record<ReviewerKind, number>);
-  return { avg: sum / list.length, count: list.length, byKind };
+
+  const criteria = CRITERIA[kind];
+  const criteriaAverages = criteria.map((c) => {
+    const values = visible.map((r) => r.scores?.[c.key]).filter((v): v is number => typeof v === "number");
+    const a = values.length ? values.reduce((x, y) => x + y, 0) / values.length : 0;
+    return { key: c.key, label: c.label, avg: a };
+  });
+  const topStrengths = [...criteriaAverages]
+    .filter((c) => c.avg > 0)
+    .sort((a, b) => b.avg - a.avg)
+    .slice(0, 3);
+
+  const verifiedShare = count ? visible.filter((r) => r.verified).length / count : 0;
+
+  // Trust score: avg quality (60%) + volume curve (20%) + verified share (15%) + diversity (5%)
+  const quality = (avg / 5) * 60;
+  const volume = Math.min(1, count / 12) * 20;
+  const verified = verifiedShare * 15;
+  const diversity = (Math.min(4, Object.keys(byKind).length) / 4) * 5;
+  const trustScore = Math.round(quality + volume + verified + diversity);
+
+  const level = [...REPUTATION_LEVELS].reverse().find((l) => trustScore >= l.min)!;
+
+  // Recent trend: last 3 vs prior 3
+  const sorted = [...visible].sort((a, b) => +new Date(b.date) - +new Date(a.date));
+  const recent = sorted.slice(0, 3).map((r) => r.rating);
+  const prior = sorted.slice(3, 6).map((r) => r.rating);
+  const m = (xs: number[]) => (xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : 0);
+  const dr = m(recent) - m(prior);
+  const recentTrend: Reputation["recentTrend"] = dr > 0.25 ? "up" : dr < -0.25 ? "down" : "flat";
+
+  // AI-style summary (templated, deterministic)
+  const aiSummary = buildSummary({ count, avg, topStrengths, kind, trend: recentTrend });
+
+  return { avg, count, trustScore, level, byKind, criteriaAverages, topStrengths, aiSummary, verifiedShare, recentTrend };
+}
+
+function buildSummary(args: {
+  count: number;
+  avg: number;
+  topStrengths: { label: string }[];
+  kind: RevieweeKind;
+  trend: Reputation["recentTrend"];
+}): string {
+  if (!args.count) return "No reviews yet — play a few games and feedback will start rolling in.";
+  const strengths = args.topStrengths.map((s) => s.label.toLowerCase()).slice(0, 3).join(", ");
+  const subject = args.kind === "player" ? "This player" : args.kind === "trainer" ? "This coach" : args.kind === "team" ? "This team" : "This host";
+  const trend = args.trend === "up"
+    ? "Momentum is rising fast over the last few outings."
+    : args.trend === "down"
+    ? "Recent feedback has cooled slightly — watch for the next runs."
+    : "Feedback has been remarkably consistent.";
+  return `${subject} is most known for ${strengths}. ${trend}`;
 }
