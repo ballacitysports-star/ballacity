@@ -1,14 +1,21 @@
 import { useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import { Link } from "@tanstack/react-router";
-import { Star, MessageSquarePlus } from "lucide-react";
+import { Star, MessageSquarePlus, ThumbsUp, Flag, ShieldCheck, Lock, ArrowUpDown } from "lucide-react";
 import {
   REVIEWER_META,
-  summarizeReviews,
+  computeReputation,
+  markHelpful,
+  reportReview,
   useReviewsFor,
   type ReviewerKind,
   type Review,
+  type RevieweeKind,
 } from "@/lib/reviews";
+import { ReputationCard } from "@/components/ReputationCard";
+import { toast } from "sonner";
+
+type Sort = "recent" | "top" | "lowest" | "helpful";
 
 const FILTERS: { key: ReviewerKind | "all"; label: string }[] = [
   { key: "all", label: "All" },
@@ -16,6 +23,13 @@ const FILTERS: { key: ReviewerKind | "all"; label: string }[] = [
   { key: "host", label: "🎯 Hosts" },
   { key: "trainer", label: "🧠 Trainers" },
   { key: "team", label: "🛡️ Teams" },
+];
+
+const SORTS: { key: Sort; label: string }[] = [
+  { key: "recent", label: "Recent" },
+  { key: "top", label: "Highest" },
+  { key: "lowest", label: "Lowest" },
+  { key: "helpful", label: "Most helpful" },
 ];
 
 function timeAgo(iso: string) {
@@ -42,8 +56,11 @@ function Stars({ value, size = 14 }: { value: number; size?: number }) {
   );
 }
 
-function ReviewCard({ r, index }: { r: Review; index: number }) {
+function ReviewCard({ r, index, isOwner }: { r: Review; index: number; isOwner: boolean }) {
   const meta = REVIEWER_META[r.kind];
+  const [reported, setReported] = useState(false);
+  const [helped, setHelped] = useState(false);
+
   return (
     <motion.article
       initial={{ opacity: 0, y: 10 }}
@@ -56,17 +73,25 @@ function ReviewCard({ r, index }: { r: Review; index: number }) {
           {r.reviewerAvatar}
         </div>
         <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-1.5">
             <span className="truncate font-semibold text-sm">{r.reviewerName}</span>
             <span
               className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider ${
-                meta.color === "lime"
-                  ? "bg-lime/15 text-lime"
-                  : "bg-coral/15 text-coral"
+                meta.color === "lime" ? "bg-lime/15 text-lime" : "bg-coral/15 text-coral"
               }`}
             >
               {meta.emoji} {meta.label}
             </span>
+            {r.verified && (
+              <span className="inline-flex items-center gap-0.5 rounded-full bg-lime/15 px-1.5 py-0.5 text-[9px] font-bold text-lime">
+                <ShieldCheck className="h-2.5 w-2.5" /> Verified
+              </span>
+            )}
+            {r.isPrivate && (
+              <span className="inline-flex items-center gap-0.5 rounded-full bg-secondary px-1.5 py-0.5 text-[9px] font-bold text-muted-foreground">
+                <Lock className="h-2.5 w-2.5" /> Private
+              </span>
+            )}
           </div>
           {r.reviewerSubtitle && (
             <div className="text-xs text-muted-foreground">{r.reviewerSubtitle}</div>
@@ -88,15 +113,47 @@ function ReviewCard({ r, index }: { r: Review; index: number }) {
       )}
 
       {r.scores && Object.keys(r.scores).length > 0 && (
-        <div className="mt-3 grid grid-cols-3 gap-2">
-          {Object.entries(r.scores).map(([k, v]) => (
-            <div key={k} className="rounded-xl border border-border bg-background/40 p-2 text-center">
-              <div className="font-display text-sm font-bold text-lime">{v}<span className="text-muted-foreground text-[10px]">/5</span></div>
-              <div className="text-[9px] uppercase tracking-wider text-muted-foreground">{k}</div>
-            </div>
-          ))}
-        </div>
+        <details className="mt-3 group">
+          <summary className="cursor-pointer text-[10px] uppercase tracking-wider text-muted-foreground hover:text-lime">
+            See all 10 criteria
+          </summary>
+          <div className="mt-2 grid grid-cols-2 gap-1.5">
+            {Object.entries(r.scores).map(([k, v]) => (
+              <div key={k} className="flex items-center justify-between rounded-lg border border-border bg-background/40 px-2 py-1">
+                <span className="text-[10px] uppercase tracking-wide text-muted-foreground truncate">{k}</span>
+                <span className="font-display text-xs font-bold text-lime">{v}<span className="text-muted-foreground text-[9px]">/5</span></span>
+              </div>
+            ))}
+          </div>
+        </details>
       )}
+
+      {/* Actions */}
+      <div className="mt-3 flex items-center justify-between border-t border-border pt-2">
+        <button
+          onClick={() => {
+            if (helped) return;
+            markHelpful(r.id);
+            setHelped(true);
+          }}
+          className={`inline-flex items-center gap-1 text-[11px] font-semibold ${helped ? "text-lime" : "text-muted-foreground"}`}
+        >
+          <ThumbsUp className="h-3 w-3" /> Helpful · {(r.helpfulCount ?? 0) + (helped ? 1 : 0)}
+        </button>
+        {!isOwner && (
+          <button
+            onClick={() => {
+              if (reported) return;
+              reportReview(r.id);
+              setReported(true);
+              toast.success("Reported anonymously. Our mods will review.");
+            }}
+            className={`inline-flex items-center gap-1 text-[11px] font-semibold ${reported ? "text-coral" : "text-muted-foreground"}`}
+          >
+            <Flag className="h-3 w-3" /> {reported ? "Reported" : "Report"}
+          </button>
+        )}
+      </div>
     </motion.article>
   );
 }
@@ -105,19 +162,36 @@ export function ReviewsSection({
   revieweeId,
   revieweeKind = "player",
   revieweeName,
+  isOwner = false,
 }: {
   revieweeId: string;
-  revieweeKind?: "player" | "trainer" | "team" | "host";
+  revieweeKind?: RevieweeKind;
   revieweeName?: string;
+  /** If true, private reviews are visible (only the reviewee sees them). */
+  isOwner?: boolean;
 }) {
-  const reviews = useReviewsFor(revieweeId);
+  const all = useReviewsFor(revieweeId);
   const [filter, setFilter] = useState<ReviewerKind | "all">("all");
+  const [sort, setSort] = useState<Sort>("recent");
 
-  const summary = useMemo(() => summarizeReviews(reviews), [reviews]);
-  const list = useMemo(
-    () => (filter === "all" ? reviews : reviews.filter((r) => r.kind === filter)),
-    [reviews, filter],
+  // Public view hides private + flagged. Reputation always uses public-visible reviews.
+  const publicReviews = useMemo(
+    () => all.filter((r) => !r.flagged && (isOwner || !r.isPrivate)),
+    [all, isOwner],
   );
+
+  const rep = useMemo(() => computeReputation(all, revieweeKind), [all, revieweeKind]);
+
+  const list = useMemo(() => {
+    let xs = publicReviews;
+    if (filter !== "all") xs = xs.filter((r) => r.kind === filter);
+    const sorted = [...xs];
+    if (sort === "recent") sorted.sort((a, b) => +new Date(b.date) - +new Date(a.date));
+    if (sort === "top") sorted.sort((a, b) => b.rating - a.rating);
+    if (sort === "lowest") sorted.sort((a, b) => a.rating - b.rating);
+    if (sort === "helpful") sorted.sort((a, b) => (b.helpfulCount ?? 0) - (a.helpfulCount ?? 0));
+    return sorted;
+  }, [publicReviews, filter, sort]);
 
   return (
     <div className="mt-6">
@@ -134,33 +208,9 @@ export function ReviewsSection({
         </Link>
       </div>
 
-      {/* Summary */}
-      <div className="rounded-3xl border border-border bg-surface p-4">
-        <div className="flex items-center gap-3">
-          <div className="font-display text-3xl font-bold">{summary.avg.toFixed(1)}</div>
-          <div>
-            <Stars value={summary.avg} size={16} />
-            <div className="text-xs text-muted-foreground mt-0.5">
-              {summary.count} review{summary.count === 1 ? "" : "s"}
-            </div>
-          </div>
-        </div>
-        <div className="mt-3 grid grid-cols-4 gap-2">
-          {(["player", "host", "trainer", "team"] as ReviewerKind[]).map((k) => {
-            const count = summary.byKind[k] ?? 0;
-            const meta = REVIEWER_META[k];
-            return (
-              <div key={k} className="rounded-xl border border-border bg-background/40 p-2 text-center">
-                <div className="text-base leading-none">{meta.emoji}</div>
-                <div className="mt-1 font-display text-sm font-bold">{count}</div>
-                <div className="text-[9px] uppercase tracking-wider text-muted-foreground">{meta.label}</div>
-              </div>
-            );
-          })}
-        </div>
-      </div>
+      <ReputationCard rep={rep} />
 
-      {/* Filter chips */}
+      {/* Reviewer-kind filter chips */}
       <div className="mt-3 flex gap-2 overflow-x-auto pb-1 -mx-1 px-1">
         {FILTERS.map((f) => (
           <button
@@ -177,13 +227,33 @@ export function ReviewsSection({
         ))}
       </div>
 
+      {/* Sort */}
+      <div className="mt-2 flex items-center gap-2 overflow-x-auto pb-1 -mx-1 px-1">
+        <span className="shrink-0 inline-flex items-center gap-1 text-[10px] uppercase tracking-wider text-muted-foreground">
+          <ArrowUpDown className="h-3 w-3" /> Sort
+        </span>
+        {SORTS.map((s) => (
+          <button
+            key={s.key}
+            onClick={() => setSort(s.key)}
+            className={`shrink-0 rounded-full px-2.5 py-1 text-[11px] font-semibold border ${
+              sort === s.key
+                ? "border-coral bg-coral/15 text-coral"
+                : "border-border bg-surface text-muted-foreground"
+            }`}
+          >
+            {s.label}
+          </button>
+        ))}
+      </div>
+
       <div className="mt-3 space-y-3">
         {list.length === 0 ? (
           <div className="rounded-2xl border border-dashed border-border bg-surface/40 p-6 text-center text-sm text-muted-foreground">
-            No reviews in this category yet.
+            No reviews in this view yet.
           </div>
         ) : (
-          list.map((r, i) => <ReviewCard key={r.id} r={r} index={i} />)
+          list.map((r, i) => <ReviewCard key={r.id} r={r} index={i} isOwner={isOwner} />)
         )}
       </div>
     </div>
