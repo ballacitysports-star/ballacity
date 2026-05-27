@@ -145,7 +145,7 @@ function Profile() {
         </motion.div>
 
         {/* Reviews */}
-        <ReviewsSection revieweeId="me" />
+        <ReviewsSection revieweeId="me" revieweeKind="player" revieweeName={ME.name} isOwner />
 
         {/* Upcoming */}
         <div className="mt-6">
