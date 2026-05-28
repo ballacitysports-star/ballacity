@@ -113,7 +113,7 @@ function ago(days: number) {
 const initial: Review[] = [
   // ---- About "me" (player) ----
   {
-    id: "rv1", kind: "player", revieweeKind: "player", revieweeId: "me",
+    id: "rv1", kind: "player", revieweeKind: "player", revieweeId: "me", revieweeName: "Alex Rivera",
     reviewerName: "Riley Chen", reviewerHandle: "@riley", reviewerAvatar: "RC",
     reviewerSubtitle: "Player · Basketball",
     rating: 5, verified: true, helpfulCount: 14,
@@ -123,7 +123,7 @@ const initial: Review[] = [
     context: "Friday Night Run · 5v5", date: ago(2),
   },
   {
-    id: "rv2", kind: "host", revieweeKind: "player", revieweeId: "me",
+    id: "rv2", kind: "host", revieweeKind: "player", revieweeId: "me", revieweeName: "Alex Rivera",
     reviewerName: "Marcus Lee", reviewerHandle: "@marcus", reviewerAvatar: "ML",
     reviewerSubtitle: "Hosted · Tompkins Square Courts",
     rating: 5, verified: true, helpfulCount: 8,
@@ -133,7 +133,7 @@ const initial: Review[] = [
     context: "Sunday Sunset 7v7", date: ago(6),
   },
   {
-    id: "rv3", kind: "trainer", revieweeKind: "player", revieweeId: "me",
+    id: "rv3", kind: "trainer", revieweeKind: "player", revieweeId: "me", revieweeName: "Alex Rivera",
     reviewerName: "Coach Jordan Kim", reviewerHandle: "@coachjordan", reviewerAvatar: "JK",
     reviewerSubtitle: "Trainer · USATF L2",
     rating: 4, verified: true, helpfulCount: 5,
@@ -143,7 +143,7 @@ const initial: Review[] = [
     context: "Spring 5K Block · Week 6", date: ago(12),
   },
   {
-    id: "rv4", kind: "team", revieweeKind: "player", revieweeId: "me",
+    id: "rv4", kind: "team", revieweeKind: "player", revieweeId: "me", revieweeName: "Alex Rivera",
     reviewerName: "Eastside Elite", reviewerHandle: "@eastsideelite", reviewerAvatar: "EE",
     reviewerSubtitle: "Team · Dyckman Div 1",
     rating: 5, verified: true, helpfulCount: 11,
@@ -154,7 +154,7 @@ const initial: Review[] = [
   },
   // ---- Player → Trainer ----
   {
-    id: "rv5", kind: "player", revieweeKind: "trainer", revieweeId: "c-jordan-kim",
+    id: "rv5", kind: "player", revieweeKind: "trainer", revieweeId: "c-jordan-kim", revieweeName: "Coach Jordan Kim",
     reviewerName: "Alex Rivera", reviewerHandle: "@alex", reviewerAvatar: "AR",
     reviewerSubtitle: "Player · Running",
     rating: 5, verified: true, helpfulCount: 9,
@@ -165,7 +165,7 @@ const initial: Review[] = [
   },
   // ---- Player → Team ----
   {
-    id: "rv7", kind: "player", revieweeKind: "team", revieweeId: "t-eastside-elite",
+    id: "rv7", kind: "player", revieweeKind: "team", revieweeId: "t-eastside-elite", revieweeName: "Eastside Elite",
     reviewerName: "Devon Wright", reviewerHandle: "@dwright", reviewerAvatar: "DW",
     reviewerSubtitle: "Player · Basketball",
     rating: 5, verified: true, helpfulCount: 12,
@@ -176,7 +176,7 @@ const initial: Review[] = [
   },
   // ---- Player → Host ----
   {
-    id: "rv10", kind: "player", revieweeKind: "host", revieweeId: "host-marcus",
+    id: "rv10", kind: "player", revieweeKind: "host", revieweeId: "host-marcus", revieweeName: "Marcus Lee",
     reviewerName: "Taylor Brooks", reviewerHandle: "@tbrooks", reviewerAvatar: "TB",
     reviewerSubtitle: "Player · Soccer",
     rating: 5, verified: true, helpfulCount: 7,
