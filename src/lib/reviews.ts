@@ -241,6 +241,21 @@ export function useReviewsFor(revieweeId: string): Review[] {
   return getReviewsFor(revieweeId);
 }
 
+export function getAllReviewees(): { revieweeId: string; revieweeKind: RevieweeKind; revieweeName: string }[] {
+  const map = new Map<string, { revieweeId: string; revieweeKind: RevieweeKind; revieweeName: string }>();
+  for (const r of reviews) {
+    if (!map.has(r.revieweeId)) {
+      map.set(r.revieweeId, { revieweeId: r.revieweeId, revieweeKind: r.revieweeKind, revieweeName: r.revieweeName });
+    }
+  }
+  return Array.from(map.values());
+}
+
+export function useAllReviewees(): { revieweeId: string; revieweeKind: RevieweeKind; revieweeName: string }[] {
+  useSyncExternalStore(subscribe, () => version, () => version);
+  return getAllReviewees();
+}
+
 // -------------------------- reputation --------------------------
 
 export type Reputation = {
