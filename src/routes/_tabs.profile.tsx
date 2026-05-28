@@ -18,6 +18,8 @@ export const Route = createFileRoute("/_tabs/profile")({
 
 function Profile() {
   const myOrgs = useMyOrgs();
+  const myReviews = useReviewsFor("me");
+  const myRep = useMemo(() => computeReputation(myReviews, "player"), [myReviews]);
   return (
     <div className="mx-auto max-w-md">
       {/* Cover */}
