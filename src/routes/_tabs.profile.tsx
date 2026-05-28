@@ -1,12 +1,15 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { motion } from "framer-motion";
-import { Settings, Trophy, Calendar, Video, Shield, Users, Plus } from "lucide-react";
+import { Settings, Trophy, Calendar, Video, Shield, Users, Plus, BarChart3 } from "lucide-react";
 import { ME, GAMES } from "@/lib/sample-data";
 import { GameCard } from "@/components/GameCard";
 import { OrgCard } from "@/components/OrgCard";
 import { ReviewsSection } from "@/components/ReviewsSection";
 import { useMyOrgs } from "@/lib/org-store";
 import { HERO_IMAGE } from "@/lib/sample-data";
+import { computeReputation, useReviewsFor } from "@/lib/reviews";
+import { ReputationBadge } from "@/components/ReputationBadge";
+import { useMemo } from "react";
 
 export const Route = createFileRoute("/_tabs/profile")({
   head: () => ({ meta: [{ title: "Profile — OpenRun" }] }),
