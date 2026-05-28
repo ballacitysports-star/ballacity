@@ -4,6 +4,9 @@ import { ArrowLeft, Share2, Bookmark, MapPin, Clock, Users, Calendar, MessageCir
 import { GAMES, SPORTS } from "@/lib/sample-data";
 import { formatWhen } from "@/lib/format";
 import { ReviewsSection } from "@/components/ReviewsSection";
+import { computeReputation, useReviewsFor } from "@/lib/reviews";
+import { ReputationBadge } from "@/components/ReputationBadge";
+import { useMemo } from "react";
 
 const emojiBySport: Record<string, string> = Object.fromEntries(SPORTS.map((s) => [s.name, s.emoji]));
 
