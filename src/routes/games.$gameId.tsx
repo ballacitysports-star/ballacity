@@ -51,6 +51,9 @@ function GameDetail() {
   const { game } = Route.useLoaderData();
   const spotsLeft = game.maxPlayers - game.joined;
 
+  const hostReviews = useReviewsFor(hostIdFor(game.host.username));
+  const hostRep = useMemo(() => computeReputation(hostReviews, "host"), [hostReviews]);
+
   const players = Array.from({ length: game.joined }, (_, i) => ({
     initials: ["MC", "AG", "JK", "RC", "TB", "SO", "PN", "DP", "EL", "VM"][i % 10],
   }));
