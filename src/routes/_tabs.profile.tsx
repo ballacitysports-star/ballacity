@@ -1,12 +1,15 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { motion } from "framer-motion";
-import { Settings, Trophy, Calendar, Video, Shield, Users, Plus } from "lucide-react";
+import { Settings, Trophy, Calendar, Video, Shield, Users, Plus, BarChart3 } from "lucide-react";
 import { ME, GAMES } from "@/lib/sample-data";
 import { GameCard } from "@/components/GameCard";
 import { OrgCard } from "@/components/OrgCard";
 import { ReviewsSection } from "@/components/ReviewsSection";
 import { useMyOrgs } from "@/lib/org-store";
 import { HERO_IMAGE } from "@/lib/sample-data";
+import { computeReputation, useReviewsFor } from "@/lib/reviews";
+import { ReputationBadge } from "@/components/ReputationBadge";
+import { useMemo } from "react";
 
 export const Route = createFileRoute("/_tabs/profile")({
   head: () => ({ meta: [{ title: "Profile — OpenRun" }] }),
@@ -15,6 +18,8 @@ export const Route = createFileRoute("/_tabs/profile")({
 
 function Profile() {
   const myOrgs = useMyOrgs();
+  const myReviews = useReviewsFor("me");
+  const myRep = useMemo(() => computeReputation(myReviews, "player"), [myReviews]);
   return (
     <div className="mx-auto max-w-md">
       {/* Cover */}
@@ -62,6 +67,11 @@ function Profile() {
               <div className="text-[10px] uppercase tracking-wider text-muted-foreground">{s.v}</div>
             </div>
           ))}
+        </div>
+
+        {/* Reputation badge (above the fold) */}
+        <div className="mt-4">
+          <ReputationBadge rep={myRep} />
         </div>
 
         {/* Sports & skill */}
@@ -143,6 +153,21 @@ function Profile() {
             Upgrade · $7.99 / mo
           </button>
         </motion.div>
+
+        {/* Reviews Hub link */}
+        <Link
+          to="/reviews"
+          className="mt-4 flex items-center gap-3 rounded-2xl border border-border bg-surface p-3 hover:border-lime/40 transition-colors"
+        >
+          <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-lime/15 text-lime">
+            <BarChart3 className="h-5 w-5" />
+          </div>
+          <div className="min-w-0 flex-1">
+            <div className="font-semibold text-sm">Reviews Hub</div>
+            <div className="text-xs text-muted-foreground">Trust scores and AI insights across OpenRun</div>
+          </div>
+          <div className="text-lime text-xs font-bold">→</div>
+        </Link>
 
         {/* Reviews */}
         <ReviewsSection revieweeId="me" revieweeKind="player" revieweeName={ME.name} isOwner />

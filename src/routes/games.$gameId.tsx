@@ -4,6 +4,9 @@ import { ArrowLeft, Share2, Bookmark, MapPin, Clock, Users, Calendar, MessageCir
 import { GAMES, SPORTS } from "@/lib/sample-data";
 import { formatWhen } from "@/lib/format";
 import { ReviewsSection } from "@/components/ReviewsSection";
+import { computeReputation, useReviewsFor } from "@/lib/reviews";
+import { ReputationBadge } from "@/components/ReputationBadge";
+import { useMemo } from "react";
 
 const emojiBySport: Record<string, string> = Object.fromEntries(SPORTS.map((s) => [s.name, s.emoji]));
 
@@ -47,6 +50,9 @@ export const Route = createFileRoute("/games/$gameId")({
 function GameDetail() {
   const { game } = Route.useLoaderData();
   const spotsLeft = game.maxPlayers - game.joined;
+
+  const hostReviews = useReviewsFor(hostIdFor(game.host.username));
+  const hostRep = useMemo(() => computeReputation(hostReviews, "host"), [hostReviews]);
 
   const players = Array.from({ length: game.joined }, (_, i) => ({
     initials: ["MC", "AG", "JK", "RC", "TB", "SO", "PN", "DP", "EL", "VM"][i % 10],
@@ -145,6 +151,13 @@ function GameDetail() {
             <Star className="h-3 w-3" /> Write review
           </Link>
         </div>
+
+        {/* Host reputation (above the fold) */}
+        {hostRep.count > 0 && (
+          <div className="mt-3">
+            <ReputationBadge rep={hostRep} />
+          </div>
+        )}
 
         {/* Host reviews */}
         <ReviewsSection

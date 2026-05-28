@@ -9,6 +9,7 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as ReviewsRouteImport } from './routes/reviews'
 import { Route as TabsRouteImport } from './routes/_tabs'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as TeamsCreateRouteImport } from './routes/teams.create'
@@ -23,6 +24,11 @@ import { Route as TabsDiscoverRouteImport } from './routes/_tabs.discover'
 import { Route as TabsCreateRouteImport } from './routes/_tabs.create'
 import { Route as TeamsTeamIdEditRouteImport } from './routes/teams.$teamId.edit'
 
+const ReviewsRoute = ReviewsRouteImport.update({
+  id: '/reviews',
+  path: '/reviews',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const TabsRoute = TabsRouteImport.update({
   id: '/_tabs',
   getParentRoute: () => rootRouteImport,
@@ -90,6 +96,7 @@ const TeamsTeamIdEditRoute = TeamsTeamIdEditRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/reviews': typeof ReviewsRoute
   '/create': typeof TabsCreateRoute
   '/discover': typeof TabsDiscoverRoute
   '/feed': typeof TabsFeedRoute
@@ -104,6 +111,7 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/reviews': typeof ReviewsRoute
   '/create': typeof TabsCreateRoute
   '/discover': typeof TabsDiscoverRoute
   '/feed': typeof TabsFeedRoute
@@ -120,6 +128,7 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/_tabs': typeof TabsRouteWithChildren
+  '/reviews': typeof ReviewsRoute
   '/_tabs/create': typeof TabsCreateRoute
   '/_tabs/discover': typeof TabsDiscoverRoute
   '/_tabs/feed': typeof TabsFeedRoute
@@ -136,6 +145,7 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/reviews'
     | '/create'
     | '/discover'
     | '/feed'
@@ -150,6 +160,7 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/reviews'
     | '/create'
     | '/discover'
     | '/feed'
@@ -165,6 +176,7 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/_tabs'
+    | '/reviews'
     | '/_tabs/create'
     | '/_tabs/discover'
     | '/_tabs/feed'
@@ -181,6 +193,7 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   TabsRoute: typeof TabsRouteWithChildren
+  ReviewsRoute: typeof ReviewsRoute
   GamesGameIdRoute: typeof GamesGameIdRoute
   ReviewNewRoute: typeof ReviewNewRoute
   TeamsTeamIdRoute: typeof TeamsTeamIdRouteWithChildren
@@ -189,6 +202,13 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/reviews': {
+      id: '/reviews'
+      path: '/reviews'
+      fullPath: '/reviews'
+      preLoaderRoute: typeof ReviewsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/_tabs': {
       id: '/_tabs'
       path: ''
@@ -318,6 +338,7 @@ const TeamsTeamIdRouteWithChildren = TeamsTeamIdRoute._addFileChildren(
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   TabsRoute: TabsRouteWithChildren,
+  ReviewsRoute: ReviewsRoute,
   GamesGameIdRoute: GamesGameIdRoute,
   ReviewNewRoute: ReviewNewRoute,
   TeamsTeamIdRoute: TeamsTeamIdRouteWithChildren,

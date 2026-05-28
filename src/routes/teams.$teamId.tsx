@@ -1,6 +1,6 @@
 import { createFileRoute, Link, notFound } from "@tanstack/react-router";
 import { motion } from "framer-motion";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   ArrowLeft, ShieldCheck, MapPin, Users, Star, Trophy, Calendar,
   Award, DollarSign, Share2, Plus, Pencil,
@@ -10,6 +10,8 @@ import { isMyOrg } from "@/lib/org-store";
 import { PostCard } from "@/components/PostCard";
 import { GameCard } from "@/components/GameCard";
 import { ReviewsSection } from "@/components/ReviewsSection";
+import { computeReputation, useReviewsFor } from "@/lib/reviews";
+import { ReputationBadge } from "@/components/ReputationBadge";
 
 export const Route = createFileRoute("/teams/$teamId")({
   head: ({ params }) => {
@@ -48,6 +50,10 @@ function TeamPage() {
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
   const canEdit = mounted && isMyOrg(org.id);
+
+  const orgReviews = useReviewsFor(org.id);
+  const orgKind: "trainer" | "team" = org.kind === "coach" ? "trainer" : "team";
+  const orgRep = useMemo(() => computeReputation(orgReviews, orgKind), [orgReviews, orgKind]);
 
   const posts = org.posts.filter((p) => (filter === "all" ? true : p.kind === filter));
   const upcomingGames = GAMES.filter((g) => org.upcoming.includes(g.id));
@@ -154,6 +160,13 @@ function TeamPage() {
             </>
           )}
         </div>
+
+        {/* Reputation badge (visible on all tabs) */}
+        {orgRep.count > 0 && (
+          <div className="mt-4">
+            <ReputationBadge rep={orgRep} />
+          </div>
+        )}
 
         {/* Tabs */}
         <div className="mt-6 flex gap-1 rounded-full border border-border bg-surface p-1">

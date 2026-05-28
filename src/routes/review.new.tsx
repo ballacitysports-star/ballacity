@@ -66,6 +66,7 @@ function ReviewNew() {
       kind,
       revieweeKind,
       revieweeId: search.revieweeId ?? "me",
+      revieweeName: (search.revieweeName as string) ?? ME.name,
       reviewerName: ME.name,
       reviewerHandle: ME.username,
       reviewerAvatar: ME.avatar,
