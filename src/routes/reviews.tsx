@@ -1,8 +1,9 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { motion } from "framer-motion";
-import { Star, Trophy, ArrowUpDown } from "lucide-react";
+import { Trophy, ArrowUpDown } from "lucide-react";
 import {
   computeReputation,
+  getReviewsFor,
   useAllReviewees,
   useReviewsFor,
   REVIEWEE_META,
