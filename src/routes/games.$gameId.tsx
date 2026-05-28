@@ -152,6 +152,13 @@ function GameDetail() {
           </Link>
         </div>
 
+        {/* Host reputation (above the fold) */}
+        {hostRep.count > 0 && (
+          <div className="mt-3">
+            <ReputationBadge rep={hostRep} />
+          </div>
+        )}
+
         {/* Host reviews */}
         <ReviewsSection
           revieweeId={hostIdFor(game.host.username)}
