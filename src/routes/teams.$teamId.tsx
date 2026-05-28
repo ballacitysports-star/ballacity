@@ -161,6 +161,13 @@ function TeamPage() {
           )}
         </div>
 
+        {/* Reputation badge (visible on all tabs) */}
+        {orgRep.count > 0 && (
+          <div className="mt-4">
+            <ReputationBadge rep={orgRep} />
+          </div>
+        )}
+
         {/* Tabs */}
         <div className="mt-6 flex gap-1 rounded-full border border-border bg-surface p-1">
           {(["posts", "about", "games", "reviews"] as const).map((t) => (
