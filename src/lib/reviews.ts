@@ -8,6 +8,7 @@ export type Review = {
   kind: ReviewerKind;          // who is leaving the review
   revieweeKind: RevieweeKind;  // who the review is about
   revieweeId: string;
+  revieweeName: string;         // name of the reviewee
   reviewerName: string;
   reviewerHandle: string;
   reviewerAvatar: string;
