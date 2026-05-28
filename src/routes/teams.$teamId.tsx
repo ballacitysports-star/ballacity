@@ -1,6 +1,6 @@
 import { createFileRoute, Link, notFound } from "@tanstack/react-router";
 import { motion } from "framer-motion";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   ArrowLeft, ShieldCheck, MapPin, Users, Star, Trophy, Calendar,
   Award, DollarSign, Share2, Plus, Pencil,
@@ -10,6 +10,8 @@ import { isMyOrg } from "@/lib/org-store";
 import { PostCard } from "@/components/PostCard";
 import { GameCard } from "@/components/GameCard";
 import { ReviewsSection } from "@/components/ReviewsSection";
+import { computeReputation, useReviewsFor } from "@/lib/reviews";
+import { ReputationBadge } from "@/components/ReputationBadge";
 
 export const Route = createFileRoute("/teams/$teamId")({
   head: ({ params }) => {
