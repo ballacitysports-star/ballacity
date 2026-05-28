@@ -51,6 +51,10 @@ function TeamPage() {
   useEffect(() => setMounted(true), []);
   const canEdit = mounted && isMyOrg(org.id);
 
+  const orgReviews = useReviewsFor(org.id);
+  const orgKind: "trainer" | "team" = org.kind === "coach" ? "trainer" : "team";
+  const orgRep = useMemo(() => computeReputation(orgReviews, orgKind), [orgReviews, orgKind]);
+
   const posts = org.posts.filter((p) => (filter === "all" ? true : p.kind === filter));
   const upcomingGames = GAMES.filter((g) => org.upcoming.includes(g.id));
 
