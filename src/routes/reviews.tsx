@@ -95,7 +95,7 @@ function ReviewsDashboard() {
   const sorted = useMemo(() => {
     const withRep = filtered.map((r) => ({
       ...r,
-      rep: computeReputation(useReviewsFor(r.revieweeId), r.revieweeKind),
+      rep: computeReputation(getReviewsFor(r.revieweeId), r.revieweeKind),
     }));
     if (sort === "trust") withRep.sort((a, b) => b.rep.trustScore - a.rep.trustScore);
     if (sort === "rating") withRep.sort((a, b) => b.rep.avg - a.rep.avg);
