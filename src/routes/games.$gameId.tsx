@@ -309,7 +309,7 @@ function GameDetail() {
           <motion.button
             whileTap={{ scale: 0.97 }}
             onClick={handleJoin}
-            disabled={!joined && spotsLeft <= 0 && !isPaid}
+            disabled={!joined && !isPending && !isConfirmed && spotsLeft <= 0}
             className={`flex-1 rounded-2xl py-3.5 font-bold inline-flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed ${
               isConfirmed ? "bg-lime/15 border border-lime/40 text-lime" :
               isPending ? "bg-surface border border-coral/40 text-coral" :
@@ -318,15 +318,17 @@ function GameDetail() {
             }`}
           >
             {isConfirmed ? (
-              <><Check className="h-4 w-4" /> Confirmed · You're in</>
+              <><Check className="h-4 w-4" /> Confirmed · Tap to leave</>
             ) : isPending ? (
-              <><Clock className="h-4 w-4" /> Payment pending verification</>
+              <><Clock className="h-4 w-4" /> {requiresApproval && !isPaid ? "Request pending · Tap to cancel" : "Payment pending · Tap to withdraw"}</>
             ) : joined && !isPaid ? (
               <><Check className="h-4 w-4" /> You're in · Tap to leave</>
             ) : spotsLeft <= 0 ? (
               <>Full</>
             ) : isPaid ? (
               <><CreditCard className="h-4 w-4" /> Pay host · ${fee.toFixed(2)}</>
+            ) : requiresApproval ? (
+              <>Request to join · {spotsLeft} spot{spotsLeft === 1 ? "" : "s"} left</>
             ) : (
               <>Join free · {spotsLeft} spot{spotsLeft === 1 ? "" : "s"} left</>
             )}
@@ -336,6 +338,7 @@ function GameDetail() {
     </div>
   );
 }
+
 
 function Meta({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) {
   return (
