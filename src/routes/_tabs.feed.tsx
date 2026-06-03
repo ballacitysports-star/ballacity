@@ -211,7 +211,7 @@ function FilterSheet({ onClose }: { onClose: () => void }) {
 
         <div className="flex gap-2">
           <button onClick={reset} className="flex-1 rounded-full border border-border py-3 text-sm font-bold">Reset</button>
-          <button onClick={apply} className="flex-1 rounded-full bg-lime-gradient py-3 text-sm font-bold text-primary-foreground">Apply</button>
+          <button onClick={onClose} className="flex-1 rounded-full bg-lime-gradient py-3 text-sm font-bold text-primary-foreground">Done</button>
         </div>
       </motion.div>
     </motion.div>
