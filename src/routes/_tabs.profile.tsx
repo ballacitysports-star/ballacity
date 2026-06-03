@@ -38,6 +38,29 @@ function Profile() {
       .filter((g) => (seen.has(g.id) ? false : (seen.add(g.id), true)))
       .sort((a, b) => +new Date(a.date) - +new Date(b.date));
   }, [joinedGameIds, hosted]);
+
+  if (!user || !me) {
+    return (
+      <div className="mx-auto max-w-md px-4 py-10">
+        <div className="rounded-3xl border border-border bg-surface p-8 text-center">
+          <div className="mx-auto mb-3 grid h-14 w-14 place-items-center rounded-2xl bg-lime/15 text-lime">
+            <LogIn className="h-6 w-6" />
+          </div>
+          <h1 className="font-display text-xl font-bold">Sign in to view your profile</h1>
+          <p className="mt-2 text-sm text-muted-foreground">
+            Your games, stats, and reputation live here once you sign in.
+          </p>
+          <Link
+            to="/auth"
+            className="mt-5 inline-flex items-center gap-2 rounded-full bg-lime-gradient px-5 py-2.5 text-sm font-bold text-primary-foreground"
+          >
+            <LogIn className="h-4 w-4" /> Sign in
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="mx-auto max-w-md">
       {/* Cover */}
