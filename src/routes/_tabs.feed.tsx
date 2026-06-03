@@ -5,6 +5,7 @@ import { Logo } from "@/components/Logo";
 import { SportChips } from "@/components/SportChips";
 import { GameCard } from "@/components/GameCard";
 import { GAMES, type Sport } from "@/lib/sample-data";
+import { useHostedGames } from "@/lib/hosted-games-store";
 import { motion } from "framer-motion";
 
 export const Route = createFileRoute("/_tabs/feed")({
@@ -15,16 +16,18 @@ export const Route = createFileRoute("/_tabs/feed")({
 function Feed() {
   const [sport, setSport] = useState<string | null>(null);
   const [q, setQ] = useState("");
+  const hosted = useHostedGames();
 
   const filtered = useMemo(() => {
-    return GAMES.filter((g) => (sport ? g.sport === sport : true))
+    const all = [...hosted, ...GAMES];
+    return all.filter((g) => (sport ? g.sport === sport : true))
       .filter((g) =>
         q
           ? (g.title + g.location + g.host.name).toLowerCase().includes(q.toLowerCase())
           : true,
       )
       .sort((a, b) => +new Date(a.date) - +new Date(b.date));
-  }, [sport, q]);
+  }, [sport, q, hosted]);
 
   const urgent = filtered.filter((g) => g.urgent);
 
