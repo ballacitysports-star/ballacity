@@ -26,6 +26,7 @@ function Profile() {
   const myReviews = useReviewsFor("me");
   const myRep = useMemo(() => computeReputation(myReviews, "player"), [myReviews]);
   const { user } = useAuth();
+  const me = useMyProfile();
   const joinedGameIds = useJoinedGameIds();
   const hosted = useHostedGames();
   const upcomingGames = useMemo(() => {
