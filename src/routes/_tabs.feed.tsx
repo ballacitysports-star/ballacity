@@ -16,7 +16,6 @@ export const Route = createFileRoute("/_tabs/feed")({
 });
 
 function Feed() {
-  const [sport, setSport] = useState<string | null>(null);
   const [q, setQ] = useState("");
   const [filtersOpen, setFiltersOpen] = useState(false);
   const hosted = useHostedGames();
@@ -25,10 +24,17 @@ function Feed() {
   const joinedSet = useMemo(() => new Set(joinedIds), [joinedIds]);
   const hostedIds = useMemo(() => new Set(hosted.map((g) => g.id)), [hosted]);
 
+  // Quick chip = single-sport shortcut for preferredSports.
+  // null/empty = All sports. Multi-select still possible via the filter sheet.
+  const chipSport: string | null =
+    prefs.preferredSports.length === 1 ? prefs.preferredSports[0] : null;
+  const setChipSport = (s: string | null) => {
+    setFeedPrefs({ ...prefs, preferredSports: s ? [s as Sport] : [] });
+  };
+
   const filtered = useMemo(() => {
     const all = [...hosted, ...GAMES];
     return all
-      .filter((g) => (sport ? g.sport === sport : true))
       .filter((g) => (prefs.preferredSports.length ? prefs.preferredSports.includes(g.sport) : true))
       .filter((g) => (prefs.sections.hostedByMeOnly ? hostedIds.has(g.id) : true))
       .filter((g) => (prefs.sections.joinedOnly ? joinedSet.has(g.id) : true))
@@ -40,7 +46,8 @@ function Feed() {
           : true,
       )
       .sort((a, b) => +new Date(a.date) - +new Date(b.date));
-  }, [sport, q, hosted, prefs, joinedSet, hostedIds]);
+  }, [q, hosted, prefs, joinedSet, hostedIds]);
+
 
   const urgent = filtered.filter((g) => g.urgent);
   const activeFilterCount =
@@ -92,7 +99,7 @@ function Feed() {
       </div>
 
       <div className="mb-5">
-        <SportChips selected={sport} onSelect={setSport} />
+        <SportChips selected={chipSport} onSelect={setChipSport} />
       </div>
 
       {prefs.sections.showUrgent && urgent.length > 0 && (
