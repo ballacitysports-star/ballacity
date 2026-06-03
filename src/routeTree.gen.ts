@@ -10,6 +10,7 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as ReviewsRouteImport } from './routes/reviews'
+import { Route as AuthRouteImport } from './routes/auth'
 import { Route as TabsRouteImport } from './routes/_tabs'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as TeamsCreateRouteImport } from './routes/teams.create'
@@ -27,6 +28,11 @@ import { Route as TeamsTeamIdEditRouteImport } from './routes/teams.$teamId.edit
 const ReviewsRoute = ReviewsRouteImport.update({
   id: '/reviews',
   path: '/reviews',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AuthRoute = AuthRouteImport.update({
+  id: '/auth',
+  path: '/auth',
   getParentRoute: () => rootRouteImport,
 } as any)
 const TabsRoute = TabsRouteImport.update({
@@ -96,6 +102,7 @@ const TeamsTeamIdEditRoute = TeamsTeamIdEditRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/auth': typeof AuthRoute
   '/reviews': typeof ReviewsRoute
   '/create': typeof TabsCreateRoute
   '/discover': typeof TabsDiscoverRoute
@@ -111,6 +118,7 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/auth': typeof AuthRoute
   '/reviews': typeof ReviewsRoute
   '/create': typeof TabsCreateRoute
   '/discover': typeof TabsDiscoverRoute
@@ -128,6 +136,7 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/_tabs': typeof TabsRouteWithChildren
+  '/auth': typeof AuthRoute
   '/reviews': typeof ReviewsRoute
   '/_tabs/create': typeof TabsCreateRoute
   '/_tabs/discover': typeof TabsDiscoverRoute
@@ -145,6 +154,7 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/auth'
     | '/reviews'
     | '/create'
     | '/discover'
@@ -160,6 +170,7 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/auth'
     | '/reviews'
     | '/create'
     | '/discover'
@@ -176,6 +187,7 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/_tabs'
+    | '/auth'
     | '/reviews'
     | '/_tabs/create'
     | '/_tabs/discover'
@@ -193,6 +205,7 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   TabsRoute: typeof TabsRouteWithChildren
+  AuthRoute: typeof AuthRoute
   ReviewsRoute: typeof ReviewsRoute
   GamesGameIdRoute: typeof GamesGameIdRoute
   ReviewNewRoute: typeof ReviewNewRoute
@@ -207,6 +220,13 @@ declare module '@tanstack/react-router' {
       path: '/reviews'
       fullPath: '/reviews'
       preLoaderRoute: typeof ReviewsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/auth': {
+      id: '/auth'
+      path: '/auth'
+      fullPath: '/auth'
+      preLoaderRoute: typeof AuthRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/_tabs': {
@@ -338,6 +358,7 @@ const TeamsTeamIdRouteWithChildren = TeamsTeamIdRoute._addFileChildren(
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   TabsRoute: TabsRouteWithChildren,
+  AuthRoute: AuthRoute,
   ReviewsRoute: ReviewsRoute,
   GamesGameIdRoute: GamesGameIdRoute,
   ReviewNewRoute: ReviewNewRoute,
@@ -347,3 +368,13 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { startInstance } from './start.ts'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
+  }
+}
