@@ -18,9 +18,7 @@ const hostIdFor = (username: string) => `host-${username.replace(/^@/, "").toLow
 
 export const Route = createFileRoute("/games/$gameId")({
   loader: ({ params }) => {
-    const game = GAMES.find((g) => g.id === params.gameId);
-    if (!game) throw notFound();
-    return { game };
+    return { gameId: params.gameId };
   },
   head: ({ loaderData }) => ({
     meta: [
