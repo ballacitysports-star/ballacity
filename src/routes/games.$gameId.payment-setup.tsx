@@ -32,6 +32,7 @@ function SetupPage() {
   const [deadline, setDeadline] = useState("");
   const [refundPolicy, setRefundPolicy] = useState("");
   const [instructions, setInstructions] = useState("");
+  const [requiresApproval, setRequiresApproval] = useState(false);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => { if (!loading && !user) nav({ to: "/auth" }); }, [loading, user, nav]);
@@ -47,6 +48,7 @@ function SetupPage() {
         setDeadline(s.payment_deadline ? s.payment_deadline.slice(0, 16) : "");
         setRefundPolicy(s.refund_policy ?? "");
         setInstructions(s.payment_instructions ?? "");
+        setRequiresApproval(!!s.requires_approval);
       }
     })();
   }, [user, game.id]);
