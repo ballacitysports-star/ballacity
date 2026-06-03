@@ -1,65 +1,55 @@
-## Goal
-Add a complete team/coach profile creation flow so users can register new organizations from within the app.
+# Demo-Ready Stability Pass
 
-## Current State
-- Teams page (`/teams`) has a non-functional `+` button.
-- Org detail pages (`/teams/$teamId`) exist with rich profiles, posts, and games tabs.
-- Game creation (`/create`) already has a polished multi-section form pattern to follow.
-- The `Org` data model and `OrgCard`/`PostCard` components are ready.
+Scope you picked: fix the known hydration crash, walk every route end-to-end and repair anything that's broken, and enable Lovable Cloud so we have a real backend to migrate to next. Treating this as **Phase 1** of a multi-phase production push — backend migration of stores (reviews, joins, teams, orgs) is Phase 2.
 
-## Plan
+## Phase 1 — what I'll do this turn
 
-### 1. Route & Navigation
-- Create route `/teams/create` (under `_tabs` layout).
-- Wire the `+` button on `/teams` to navigate to `/teams/create`.
-- Add a "My orgs" section on the `/profile` page with a CTA to create one.
+### 1. Fix the hydration crash (Critical)
+- Error: server rendered `52`, client rendered `50` inside the sports grid on `/`.
+- Cause: `SPORTS` counts in `src/lib/sample-data.ts` are derived from `Math.random()` or `Date.now()` at module init, so SSR and client compute different numbers.
+- Fix: make the count either a static seeded value, or render it client-only via `useHydrated()` / `<ClientOnly>` fallback.
 
-### 2. Multi-Step Wizard (`/teams/create`)
-Build a 4-step creation wizard following the existing dark neon form aesthetic:
+### 2. Route + interaction audit (every page)
+For each route I'll click every button, link, form, and tab in the browser tool at 390×844 (mobile) and note + fix anything broken. Routes to cover:
+- `/` (Landing)
+- `/feed`, `/discover`, `/create`, `/notifications`, `/profile`, `/teams`
+- `/games/$gameId`
+- `/teams/$teamId`, `/teams/$teamId/edit`, `/teams/create`
+- `/reviews`, `/review/new`
+- 404 / not-found fallback
 
-**Step 1 — Choose type**
-- Big visual cards: "Team / Club" vs "Coach / Trainer"
-- Brief copy explaining each
+Specific things I'll verify and repair:
+- All `<Link to=...>` targets resolve (no dead routes).
+- Bottom nav highlights match the active route.
+- Join / Leave game (already fixed — re-verify).
+- Write review flow from trainer, team, game host, player profile pre-fills correctly and submits.
+- Create team / edit team / delete team round-trip.
+- Profile reputation badge + reviews hub render with zero reviews (empty states).
+- No console errors or hydration warnings on any route.
 
-**Step 2 — Identity & basics**
-- Name, handle (`@`), tagline, city
-- Sport(s) selection (multi-select chips from existing `SPORTS` data)
-- Year founded
+### 3. Mobile polish (light)
+- Confirm sticky CTAs don't cover content on iPhone-sized viewports.
+- Tap targets ≥44px on icon-only buttons.
+- Fix any obvious overflow / clipped text spotted during the audit.
 
-**Step 3 — Details (conditional)**
-- **Team:** League name, home court/venue, staff list (name + role), win-loss record (optional)
-- **Coach:** Credentials (tag input), hourly rate slider, years experience
-- Bio textarea (shared)
-- Achievements (tag input, shared)
+### 4. Enable Lovable Cloud (foundation only)
+- Turn on Cloud so Phase 2 can migrate stores.
+- No schema or data migration yet — purely provisioning + verifying the integration files land cleanly.
 
-**Step 4 — Branding & preview**
-- Accent color picker (preset neon swatches matching the design system)
-- Avatar initials (auto-generated from name, editable)
-- Cover image selection (reuses existing sport images as presets)
-- Live preview of the `OrgCard` as you edit
+## Phase 2 — next turn (not this one)
+Once you approve Phase 1's result, I'll:
+- Add auth (email/password + Google), profiles table, RLS.
+- Migrate `games-store`, `org-store`, `reviews`, joined-games from in-memory `Set`/arrays into Postgres tables with `createServerFn` + `requireSupabaseAuth`.
+- Wire the protected `_authenticated` subtree for create/edit flows.
+- Replace `sample-data.ts` reads with real queries (keep seed data as a one-time insert).
 
-### 3. Submission & State
-- On submit, append the new org to an in-memory list (no backend yet; sample-data pattern).
-- Navigate to the new org's detail page (`/teams/$teamId`).
-- Show a success toast/animation.
+## Out of scope for this pass
+Payments, notifications, email, analytics, real search, performance profiling, full a11y audit, security scan. Those come after the data layer is real — auditing them on in-memory mocks would be wasted work.
 
-### 4. Profile — "My Orgs" Management
-- Update `/profile` to show a "My Organizations" section listing orgs the user created.
-- Each org shows quick stats (followers, posts count) and an "Edit" button (future scope: stub).
-- If no orgs, show an empty state with a create CTA.
+## Deliverable at end of Phase 1
+- Hydration error gone.
+- Every visible button/link/form on every route either works or has a clear "coming soon" state.
+- Cloud enabled and reachable.
+- A short checklist in chat: ✅ fixed / ⚠️ needs Phase 2 / ⛔ blocked, plus a Production Readiness Score for where we are after Phase 1.
 
-### 5. Component Reuse
-- Reuse `Section` and `Toggle` patterns from `src/routes/_tabs.create.tsx`.
-- Use existing `SPORTS` chips style and `OrgCard` for live preview.
-- Keep all new components in `src/components/` if shared, or inline in the route if single-use.
-
-## Out of Scope (for this plan)
-- Backend persistence / database (follows existing sample-data pattern).
-- Image upload for cover/avatar (use preset sport images + color initials).
-- Edit org flow after creation.
-- Verification badge logic.
-
-## Success Criteria
-- A user can tap the `+` on `/teams`, complete the 4-step wizard, and immediately see their new org profile at `/teams/$teamId`.
-- The creation UI matches the existing Court Neon aesthetic and mobile-first patterns.
-- The `/profile` page shows the user's created orgs.
+Approve and I'll execute Phase 1.
