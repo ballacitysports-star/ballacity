@@ -1,11 +1,13 @@
 import { createFileRoute, Link, notFound } from "@tanstack/react-router";
 import { motion } from "framer-motion";
-import { ArrowLeft, Share2, Bookmark, MapPin, Clock, Users, Calendar, MessageCircle, Star } from "lucide-react";
+import { ArrowLeft, Share2, Bookmark, MapPin, Clock, Users, Calendar, MessageCircle, Star, Check } from "lucide-react";
 import { GAMES, SPORTS } from "@/lib/sample-data";
 import { formatWhen } from "@/lib/format";
 import { ReviewsSection } from "@/components/ReviewsSection";
 import { computeReputation, useReviewsFor } from "@/lib/reviews";
 import { ReputationBadge } from "@/components/ReputationBadge";
+import { joinGame, leaveGame, useIsJoined } from "@/lib/games-store";
+import { toast } from "sonner";
 import { useMemo } from "react";
 
 const emojiBySport: Record<string, string> = Object.fromEntries(SPORTS.map((s) => [s.name, s.emoji]));
@@ -49,14 +51,34 @@ export const Route = createFileRoute("/games/$gameId")({
 
 function GameDetail() {
   const { game } = Route.useLoaderData();
-  const spotsLeft = game.maxPlayers - game.joined;
+  const joined = useIsJoined(game.id);
+  const effectiveJoined = game.joined + (joined ? 1 : 0);
+  const spotsLeft = Math.max(0, game.maxPlayers - effectiveJoined);
+
+  const handleJoin = () => {
+    if (joined) {
+      leaveGame(game.id);
+      toast("You left the game.");
+      return;
+    }
+    if (spotsLeft <= 0) {
+      toast.error("This game is full.");
+      return;
+    }
+    joinGame(game.id);
+    toast.success(`You're in! See you at ${game.location}.`);
+  };
 
   const hostReviews = useReviewsFor(hostIdFor(game.host.username));
   const hostRep = useMemo(() => computeReputation(hostReviews, "host"), [hostReviews]);
 
-  const players = Array.from({ length: game.joined }, (_, i) => ({
-    initials: ["MC", "AG", "JK", "RC", "TB", "SO", "PN", "DP", "EL", "VM"][i % 10],
-  }));
+  const players = [
+    ...(joined ? [{ initials: "YOU", isMe: true }] : []),
+    ...Array.from({ length: game.joined }, (_, i) => ({
+      initials: ["MC", "AG", "JK", "RC", "TB", "SO", "PN", "DP", "EL", "VM"][i % 10],
+      isMe: false,
+    })),
+  ];
 
   return (
     <div className="pb-32">
@@ -184,7 +206,7 @@ function GameDetail() {
         <div>
           <div className="flex items-center justify-between mb-2">
             <h2 className="font-display text-sm font-bold uppercase tracking-wider text-muted-foreground">
-              Roster ({game.joined}/{game.maxPlayers})
+              Roster ({effectiveJoined}/{game.maxPlayers})
             </h2>
             <button className="text-xs font-semibold text-lime">See all</button>
           </div>
@@ -195,7 +217,9 @@ function GameDetail() {
                 initial={{ scale: 0, opacity: 0 }}
                 animate={{ scale: 1, opacity: 1 }}
                 transition={{ delay: i * 0.04 }}
-                className="grid h-11 w-11 place-items-center rounded-full border border-border bg-surface text-xs font-bold"
+                className={`grid h-11 w-11 place-items-center rounded-full border text-xs font-bold ${
+                  p.isMe ? "border-lime bg-lime/15 text-lime" : "border-border bg-surface"
+                }`}
               >
                 {p.initials}
               </motion.div>
@@ -220,10 +244,21 @@ function GameDetail() {
           </button>
           <motion.button
             whileTap={{ scale: 0.97 }}
-            className="flex-1 rounded-2xl bg-lime-gradient py-3.5 font-bold text-primary-foreground glow-lime"
+            onClick={handleJoin}
+            disabled={!joined && spotsLeft <= 0}
+            className={`flex-1 rounded-2xl py-3.5 font-bold inline-flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed ${
+              joined
+                ? "bg-surface border border-lime/40 text-lime"
+                : "bg-lime-gradient text-primary-foreground glow-lime"
+            }`}
           >
-            {game.price === 0 ? "Join free · " : `Join · $${game.price} · `}
-            {spotsLeft} spot{spotsLeft === 1 ? "" : "s"} left
+            {joined ? (
+              <><Check className="h-4 w-4" /> You're in · Tap to leave</>
+            ) : spotsLeft <= 0 ? (
+              <>Full</>
+            ) : (
+              <>{game.price === 0 ? "Join free · " : `Join · $${game.price} · `}{spotsLeft} spot{spotsLeft === 1 ? "" : "s"} left</>
+            )}
           </motion.button>
         </div>
       </div>
