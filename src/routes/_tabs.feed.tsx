@@ -1,4 +1,4 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { Search, SlidersHorizontal, Bell, X } from "lucide-react";
 import { Logo } from "@/components/Logo";
@@ -124,9 +124,14 @@ function Feed() {
           <div className="space-y-3">
             {filtered.map((g, i) => <GameCard key={g.id} game={g} index={i} />)}
             {filtered.length === 0 && (
-              <div className="rounded-2xl border border-border bg-surface p-8 text-center text-muted-foreground">
-                No games match yet.{" "}
-                <Link to="/profile/edit" className="text-lime font-bold">Adjust feed</Link>.
+              <div className="rounded-2xl border border-border bg-surface p-8 text-center text-muted-foreground space-y-3">
+                <div>No games match your filters.</div>
+                <button
+                  onClick={() => setFeedPrefs(DEFAULT_PREFS)}
+                  className="inline-flex rounded-full bg-lime px-4 py-2 text-sm font-bold text-primary-foreground"
+                >
+                  Clear filters
+                </button>
               </div>
             )}
           </div>
@@ -154,7 +159,13 @@ function FilterSheet({ onClose }: { onClose: () => void }) {
     setFeedPrefs({ ...prefs, preferredSports: next });
   };
   const toggleSection = (k: keyof typeof sections) => {
-    setFeedPrefs({ ...prefs, sections: { ...sections, [k]: !sections[k] } });
+    const nextSections = { ...sections, [k]: !sections[k] };
+    // Mutually exclusive pairs to prevent empty-feed states
+    if (k === "paidOnly" && nextSections.paidOnly) nextSections.freeOnly = false;
+    if (k === "freeOnly" && nextSections.freeOnly) nextSections.paidOnly = false;
+    if (k === "hostedByMeOnly" && nextSections.hostedByMeOnly) nextSections.joinedOnly = false;
+    if (k === "joinedOnly" && nextSections.joinedOnly) nextSections.hostedByMeOnly = false;
+    setFeedPrefs({ ...prefs, sections: nextSections });
   };
 
   const reset = () => setFeedPrefs({ preferredSports: [], sections: DEFAULT_PREFS.sections });

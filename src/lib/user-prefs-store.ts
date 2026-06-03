@@ -171,9 +171,22 @@ export function useFeedPrefs(): FeedPrefs {
     () => JSON.stringify(DEFAULT_PREFS),
   );
   const parsed = JSON.parse(s) as FeedPrefs;
+  const sections = { ...DEFAULT_PREFS.sections, ...(parsed.sections ?? {}) };
+  // Sanitize impossible filter combinations that would yield an empty feed forever
+  if (sections.paidOnly && sections.freeOnly) {
+    sections.paidOnly = false;
+    sections.freeOnly = false;
+  }
+  if (sections.hostedByMeOnly && sections.joinedOnly) {
+    sections.hostedByMeOnly = false;
+    sections.joinedOnly = false;
+  }
+  if (!sections.showForYou && !sections.showUrgent) {
+    sections.showForYou = true;
+  }
   return {
     preferredSports: parsed.preferredSports ?? [],
-    sections: { ...DEFAULT_PREFS.sections, ...(parsed.sections ?? {}) },
+    sections,
   };
 }
 
