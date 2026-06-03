@@ -29,17 +29,17 @@ function Discover() {
               "radial-gradient(60% 50% at 30% 30%, oklch(0.28 0.08 200 / 0.55), transparent 60%), radial-gradient(50% 40% at 80% 70%, oklch(0.30 0.08 145 / 0.45), transparent 60%), linear-gradient(180deg, oklch(0.18 0.03 240), oklch(0.14 0.03 250))",
           }}
         />
-        <svg className="absolute inset-0 h-full w-full opacity-25" aria-hidden>
+        <svg className="absolute inset-0 h-full w-full opacity-25" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden>
           <defs>
-            <pattern id="grid" width="44" height="44" patternUnits="userSpaceOnUse">
-              <path d="M 44 0 L 0 0 0 44" fill="none" stroke="oklch(1 0 0 / 0.08)" strokeWidth="1" />
+            <pattern id="grid" width="6" height="6" patternUnits="userSpaceOnUse">
+              <path d="M 6 0 L 0 0 0 6" fill="none" stroke="oklch(1 0 0 / 0.08)" strokeWidth="0.3" />
             </pattern>
           </defs>
-          <rect width="100%" height="100%" fill="url(#grid)" />
+          <rect width="100" height="100" fill="url(#grid)" />
           {/* Faux roads */}
-          <path d="M 0 60% Q 30% 50%, 60% 55% T 100% 50%" stroke="oklch(1 0 0 / 0.15)" strokeWidth="14" fill="none" />
-          <path d="M 30% 0 Q 35% 40%, 50% 50% T 70% 100%" stroke="oklch(1 0 0 / 0.10)" strokeWidth="10" fill="none" />
-          <path d="M 0 25% L 100% 30%" stroke="oklch(1 0 0 / 0.08)" strokeWidth="6" fill="none" />
+          <path d="M 0 60 Q 30 50 60 55 T 100 50" stroke="oklch(1 0 0 / 0.15)" strokeWidth="2" fill="none" vectorEffect="non-scaling-stroke" />
+          <path d="M 30 0 Q 35 40 50 50 T 70 100" stroke="oklch(1 0 0 / 0.10)" strokeWidth="1.5" fill="none" vectorEffect="non-scaling-stroke" />
+          <path d="M 0 25 L 100 30" stroke="oklch(1 0 0 / 0.08)" strokeWidth="1" fill="none" vectorEffect="non-scaling-stroke" />
         </svg>
       </div>
 
