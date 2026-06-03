@@ -1,6 +1,6 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { ArrowLeft, Check, X, LogIn } from "lucide-react";
-import { useState } from "react";
+import { ArrowLeft, Check, X } from "lucide-react";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { SPORTS, type Sport } from "@/lib/sample-data";
 import {
@@ -48,18 +48,13 @@ function EditProfile() {
   const setSkill = (s: Sport, skill: number) =>
     setSports(sports.map((x) => (x.name === s ? { ...x, skill } : x)));
 
-  if (!loading && !user) {
-    return (
-      <div className="mx-auto max-w-md px-4 py-10">
-        <div className="rounded-3xl border border-border bg-surface p-8 text-center">
-          <h1 className="font-display text-xl font-bold">Sign in to edit your profile</h1>
-          <Link to="/auth" className="mt-5 inline-flex items-center gap-2 rounded-full bg-lime-gradient px-5 py-2.5 text-sm font-bold text-primary-foreground">
-            <LogIn className="h-4 w-4" /> Sign in
-          </Link>
-        </div>
-      </div>
-    );
-  }
+  useEffect(() => {
+    if (!loading && !user) {
+      nav({ to: "/" });
+    }
+  }, [loading, user, nav]);
+
+  if (!loading && !user) return null;
 
   const save = () => {
     if (!user) { toast.error("Sign in to save"); return; }
