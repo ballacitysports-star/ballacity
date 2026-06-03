@@ -56,7 +56,6 @@ function EditProfile() {
       city: city.trim().slice(0, 80),
       bio: bio.trim().slice(0, 280),
       sports,
-      badges,
     });
     setFeedPrefs({ preferredSports, sections });
     toast.success("Profile saved");
