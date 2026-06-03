@@ -1,13 +1,14 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { ArrowLeft, Plus, Trash2, ToggleLeft, ToggleRight, Inbox, Settings as SettingsIcon, ShieldCheck, ExternalLink } from "lucide-react";
+import { ArrowLeft, Plus, Trash2, ToggleLeft, ToggleRight, Inbox, Settings as SettingsIcon, ShieldCheck, ExternalLink, UserCheck } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/use-auth";
 import {
   PAYMENT_TYPES, paymentTypeMeta,
-  type PaymentMethod, type PaymentSubmission, type PaymentType,
+  type PaymentMethod, type PaymentSubmission, type PaymentType, type JoinRequest,
   listMyPaymentMethods, createPaymentMethod, updatePaymentMethod, deletePaymentMethod,
   listHostSubmissions, reviewSubmission, getSignedProofUrl,
+  listHostJoinRequests, reviewJoinRequest,
 } from "@/lib/payments";
 import { LegalNotice } from "@/components/LegalNotice";
 import { GAMES } from "@/lib/sample-data";
