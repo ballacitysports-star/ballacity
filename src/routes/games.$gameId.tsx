@@ -72,9 +72,13 @@ function GameDetail() {
   const hostReviews = useReviewsFor(hostIdFor(game.host.username));
   const hostRep = useMemo(() => computeReputation(hostReviews, "host"), [hostReviews]);
 
-  const players = Array.from({ length: game.joined }, (_, i) => ({
-    initials: ["MC", "AG", "JK", "RC", "TB", "SO", "PN", "DP", "EL", "VM"][i % 10],
-  }));
+  const players = [
+    ...(joined ? [{ initials: "YOU", isMe: true }] : []),
+    ...Array.from({ length: game.joined }, (_, i) => ({
+      initials: ["MC", "AG", "JK", "RC", "TB", "SO", "PN", "DP", "EL", "VM"][i % 10],
+      isMe: false,
+    })),
+  ];
 
   return (
     <div className="pb-32">
