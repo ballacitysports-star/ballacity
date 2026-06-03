@@ -9,7 +9,7 @@ import { ReputationBadge } from "@/components/ReputationBadge";
 import { joinGame, leaveGame, useIsJoined } from "@/lib/games-store";
 import { toast } from "sonner";
 import { useEffect, useMemo, useState } from "react";
-import { getGamePaymentSettings, listMySubmissionsForGame, type GamePaymentSettings, type PaymentSubmission } from "@/lib/payments";
+import { getGamePaymentSettings, listMySubmissionsForGame, deleteMyPendingSubmission, getMyJoinRequest, createJoinRequest, cancelMyJoinRequest, type GamePaymentSettings, type PaymentSubmission, type JoinRequest } from "@/lib/payments";
 import { LegalNotice } from "@/components/LegalNotice";
 
 const emojiBySport: Record<string, string> = Object.fromEntries(SPORTS.map((s) => [s.name, s.emoji]));
@@ -59,26 +59,65 @@ function GameDetail() {
   const nav = useNavigate();
   const [settings, setSettings] = useState<GamePaymentSettings | null>(null);
   const [mySubs, setMySubs] = useState<PaymentSubmission[]>([]);
+  const [myReq, setMyReq] = useState<JoinRequest | null>(null);
 
-  useEffect(() => {
-    getGamePaymentSettings(game.id).then(setSettings).catch(() => {});
-    listMySubmissionsForGame(game.id).then(setMySubs).catch(() => {});
-  }, [game.id]);
+  const refreshStatus = async () => {
+    try {
+      const [s, subs, req] = await Promise.all([
+        getGamePaymentSettings(game.id),
+        listMySubmissionsForGame(game.id),
+        getMyJoinRequest(game.id),
+      ]);
+      setSettings(s); setMySubs(subs); setMyReq(req);
+      if (req?.status === "approved" && !joined) joinGame(game.id);
+    } catch {}
+  };
+  useEffect(() => { refreshStatus(); /* eslint-disable-next-line */ }, [game.id]);
 
   const fee = Number(settings?.entry_fee ?? game.price);
   const isPaid = fee > 0;
+  const requiresApproval = !!settings?.requires_approval;
   const latestSub = mySubs[0];
-  const isConfirmed = latestSub?.status === "verified";
-  const isPending = latestSub?.status === "pending";
+  const isConfirmed = latestSub?.status === "verified" || myReq?.status === "approved";
+  const isPending = latestSub?.status === "pending" || (requiresApproval && myReq?.status === "pending");
 
-  const handleJoin = () => {
-    if (joined && !isPaid) {
-      leaveGame(game.id);
-      toast("You left the game.");
+  const handleJoin = async () => {
+    // Confirmed → leave / withdraw
+    if (isConfirmed || joined) {
+      try {
+        if (latestSub && latestSub.status !== "rejected") {
+          await deleteMyPendingSubmission(latestSub.id).catch(() => {});
+        }
+        if (myReq && myReq.status === "pending") {
+          await cancelMyJoinRequest(game.id).catch(() => {});
+        }
+        leaveGame(game.id);
+        toast("You left the game.");
+        refreshStatus();
+      } catch (e: any) { toast.error(e.message ?? "Could not leave."); }
+      return;
+    }
+    // Pending → cancel request / withdraw submission
+    if (isPending) {
+      try {
+        if (latestSub?.status === "pending") await deleteMyPendingSubmission(latestSub.id);
+        if (myReq?.status === "pending") await cancelMyJoinRequest(game.id);
+        toast("Request canceled.");
+        refreshStatus();
+      } catch (e: any) { toast.error(e.message ?? "Could not cancel."); }
       return;
     }
     if (spotsLeft <= 0) { toast.error("This game is full."); return; }
     if (isPaid) { nav({ to: "/games/$gameId/pay", params: { gameId: game.id } }); return; }
+    if (requiresApproval) {
+      if (!settings) { toast.error("Host hasn't enabled approvals yet."); return; }
+      try {
+        await createJoinRequest({ game_id: game.id, host_id: settings.host_id });
+        toast.success("Request sent. The host will review it.");
+        refreshStatus();
+      } catch (e: any) { toast.error(e.message ?? "Could not send request."); }
+      return;
+    }
     joinGame(game.id);
     toast.success(`You're in! See you at ${game.location}.`);
   };
@@ -270,7 +309,7 @@ function GameDetail() {
           <motion.button
             whileTap={{ scale: 0.97 }}
             onClick={handleJoin}
-            disabled={!joined && spotsLeft <= 0 && !isPaid}
+            disabled={!joined && !isPending && !isConfirmed && spotsLeft <= 0}
             className={`flex-1 rounded-2xl py-3.5 font-bold inline-flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed ${
               isConfirmed ? "bg-lime/15 border border-lime/40 text-lime" :
               isPending ? "bg-surface border border-coral/40 text-coral" :
@@ -279,15 +318,17 @@ function GameDetail() {
             }`}
           >
             {isConfirmed ? (
-              <><Check className="h-4 w-4" /> Confirmed · You're in</>
+              <><Check className="h-4 w-4" /> Confirmed · Tap to leave</>
             ) : isPending ? (
-              <><Clock className="h-4 w-4" /> Payment pending verification</>
+              <><Clock className="h-4 w-4" /> {requiresApproval && !isPaid ? "Request pending · Tap to cancel" : "Payment pending · Tap to withdraw"}</>
             ) : joined && !isPaid ? (
               <><Check className="h-4 w-4" /> You're in · Tap to leave</>
             ) : spotsLeft <= 0 ? (
               <>Full</>
             ) : isPaid ? (
               <><CreditCard className="h-4 w-4" /> Pay host · ${fee.toFixed(2)}</>
+            ) : requiresApproval ? (
+              <>Request to join · {spotsLeft} spot{spotsLeft === 1 ? "" : "s"} left</>
             ) : (
               <>Join free · {spotsLeft} spot{spotsLeft === 1 ? "" : "s"} left</>
             )}
@@ -297,6 +338,7 @@ function GameDetail() {
     </div>
   );
 }
+
 
 function Meta({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) {
   return (

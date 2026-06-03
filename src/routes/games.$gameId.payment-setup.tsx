@@ -32,6 +32,7 @@ function SetupPage() {
   const [deadline, setDeadline] = useState("");
   const [refundPolicy, setRefundPolicy] = useState("");
   const [instructions, setInstructions] = useState("");
+  const [requiresApproval, setRequiresApproval] = useState(false);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => { if (!loading && !user) nav({ to: "/auth" }); }, [loading, user, nav]);
@@ -47,6 +48,7 @@ function SetupPage() {
         setDeadline(s.payment_deadline ? s.payment_deadline.slice(0, 16) : "");
         setRefundPolicy(s.refund_policy ?? "");
         setInstructions(s.payment_instructions ?? "");
+        setRequiresApproval(!!s.requires_approval);
       }
     })();
   }, [user, game.id]);
@@ -65,8 +67,9 @@ function SetupPage() {
         payment_deadline: deadline ? new Date(deadline).toISOString() : null,
         refund_policy: refundPolicy || null,
         payment_instructions: instructions || null,
+        requires_approval: requiresApproval,
       });
-      toast.success("Payment settings saved");
+      toast.success("Settings saved");
       nav({ to: "/games/$gameId", params: { gameId: game.id } });
     } catch (e: any) { toast.error(e.message); } finally { setSaving(false); }
   };
@@ -91,6 +94,24 @@ function SetupPage() {
             className="w-full rounded-xl border border-border bg-surface pl-7 pr-3 py-3 text-sm outline-none focus:border-lime" />
         </div>
       </section>
+
+      <section>
+        <button type="button" onClick={() => setRequiresApproval((v) => !v)}
+          className={`w-full flex items-center justify-between gap-3 rounded-2xl border p-4 text-left ${
+            requiresApproval ? "border-lime bg-lime/5" : "border-border bg-surface"
+          }`}>
+          <div className="min-w-0">
+            <div className="font-semibold text-sm">Require my approval to join</div>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              Players send a request and you decide who's in. Useful for skill-matched or invite-only games.
+            </p>
+          </div>
+          <div className={`shrink-0 grid h-7 w-12 items-center rounded-full p-0.5 transition-colors ${requiresApproval ? "bg-lime" : "bg-secondary"}`}>
+            <div className={`h-6 w-6 rounded-full bg-background shadow transition-transform ${requiresApproval ? "translate-x-5" : ""}`} />
+          </div>
+        </button>
+      </section>
+
 
       <section>
         <Label>Accepted payment methods</Label>

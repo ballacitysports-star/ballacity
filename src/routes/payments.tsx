@@ -1,13 +1,14 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { ArrowLeft, Plus, Trash2, ToggleLeft, ToggleRight, Inbox, Settings as SettingsIcon, ShieldCheck, ExternalLink } from "lucide-react";
+import { ArrowLeft, Plus, Trash2, ToggleLeft, ToggleRight, Inbox, Settings as SettingsIcon, ShieldCheck, ExternalLink, UserCheck } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/use-auth";
 import {
   PAYMENT_TYPES, paymentTypeMeta,
-  type PaymentMethod, type PaymentSubmission, type PaymentType,
+  type PaymentMethod, type PaymentSubmission, type PaymentType, type JoinRequest,
   listMyPaymentMethods, createPaymentMethod, updatePaymentMethod, deletePaymentMethod,
   listHostSubmissions, reviewSubmission, getSignedProofUrl,
+  listHostJoinRequests, reviewJoinRequest,
 } from "@/lib/payments";
 import { LegalNotice } from "@/components/LegalNotice";
 import { GAMES } from "@/lib/sample-data";
@@ -21,7 +22,7 @@ export const Route = createFileRoute("/payments")({
 function PaymentsHub() {
   const { user, loading } = useAuth();
   const nav = useNavigate();
-  const [tab, setTab] = useState<"methods" | "verify">("methods");
+  const [tab, setTab] = useState<"methods" | "verify" | "requests">("methods");
 
   useEffect(() => {
     if (!loading && !user) nav({ to: "/auth" });
@@ -42,16 +43,19 @@ function PaymentsHub() {
         </div>
       </div>
 
-      <div className="flex gap-2 mb-4 rounded-2xl bg-surface p-1 border border-border">
+      <div className="flex gap-1 mb-4 rounded-2xl bg-surface p-1 border border-border">
         <TabBtn active={tab === "methods"} onClick={() => setTab("methods")} icon={<SettingsIcon className="h-4 w-4" />}>
-          My methods
+          Methods
         </TabBtn>
         <TabBtn active={tab === "verify"} onClick={() => setTab("verify")} icon={<Inbox className="h-4 w-4" />}>
-          Verify payments
+          Verify
+        </TabBtn>
+        <TabBtn active={tab === "requests"} onClick={() => setTab("requests")} icon={<UserCheck className="h-4 w-4" />}>
+          Requests
         </TabBtn>
       </div>
 
-      {tab === "methods" ? <MethodsPanel /> : <VerifyPanel />}
+      {tab === "methods" ? <MethodsPanel /> : tab === "verify" ? <VerifyPanel /> : <RequestsPanel />}
 
       <div className="mt-6">
         <LegalNotice />
@@ -59,6 +63,7 @@ function PaymentsHub() {
     </div>
   );
 }
+
 
 function TabBtn({ active, onClick, icon, children }: { active: boolean; onClick: () => void; icon: React.ReactNode; children: React.ReactNode }) {
   return (
@@ -293,6 +298,71 @@ function SubmissionCard({ sub, onReviewed }: { sub: PaymentSubmission; onReviewe
           </button>
         </div>
       )}
+    </div>
+  );
+}
+
+// =============================================================
+function RequestsPanel() {
+  const [filter, setFilter] = useState<"pending" | "approved" | "rejected">("pending");
+  const [reqs, setReqs] = useState<JoinRequest[]>([]);
+  const refresh = () => listHostJoinRequests(filter).then(setReqs).catch((e) => toast.error(e.message));
+  useEffect(() => { refresh(); }, [filter]);
+
+  const review = async (id: string, status: "approved" | "rejected") => {
+    try {
+      await reviewJoinRequest(id, status);
+      toast.success(status === "approved" ? "Player approved" : "Request rejected");
+      refresh();
+    } catch (e: any) { toast.error(e.message); }
+  };
+
+  return (
+    <div className="space-y-3">
+      <div className="flex gap-2">
+        {(["pending", "approved", "rejected"] as const).map((s) => (
+          <button key={s} onClick={() => setFilter(s)}
+            className={`flex-1 rounded-full px-3 py-1.5 text-xs font-bold capitalize ${
+              filter === s ? "bg-lime text-primary-foreground" : "border border-border bg-surface text-muted-foreground"
+            }`}>
+            {s}
+          </button>
+        ))}
+      </div>
+      {reqs.length === 0 && (
+        <div className="rounded-2xl border border-dashed border-border bg-surface/40 p-6 text-center text-sm text-muted-foreground">
+          No {filter} requests.
+        </div>
+      )}
+      {reqs.map((r) => {
+        const game = GAMES.find((g) => g.id === r.game_id);
+        return (
+          <div key={r.id} className="rounded-2xl border border-border bg-surface p-4 space-y-3">
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <div className="font-semibold text-sm truncate">{game?.title ?? r.game_id}</div>
+                {game && <div className="text-[11px] text-muted-foreground">{formatWhen(game.date)} · {game.location}</div>}
+                <div className="text-[11px] text-muted-foreground mt-1">Player ID: {r.player_id.slice(0, 8)}… · {new Date(r.created_at).toLocaleString()}</div>
+                {r.message && <p className="text-xs mt-2 italic">"{r.message}"</p>}
+              </div>
+              <span className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase ${
+                r.status === "approved" ? "bg-lime/15 text-lime" :
+                r.status === "rejected" ? "bg-coral/15 text-coral" : "bg-secondary text-muted-foreground"
+              }`}>{r.status}</span>
+            </div>
+            {r.status === "pending" && (
+              <div className="flex gap-2">
+                <button onClick={() => review(r.id, "rejected")}
+                  className="flex-1 rounded-xl border border-coral/40 bg-coral/10 py-2 text-sm font-bold text-coral">Reject</button>
+                <button onClick={() => review(r.id, "approved")}
+                  className="flex-1 rounded-xl bg-lime-gradient py-2 text-sm font-bold text-primary-foreground inline-flex items-center justify-center gap-1">
+                  <ShieldCheck className="h-4 w-4" /> Approve
+                </button>
+              </div>
+            )}
+          </div>
+        );
+      })}
     </div>
   );
 }
