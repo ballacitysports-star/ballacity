@@ -1,6 +1,6 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { ArrowLeft, Check, X, LogIn } from "lucide-react";
-import { useState } from "react";
+import { ArrowLeft, Check, X } from "lucide-react";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { SPORTS, type Sport } from "@/lib/sample-data";
 import {

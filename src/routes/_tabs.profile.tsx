@@ -9,7 +9,7 @@ import { useMyOrgs } from "@/lib/org-store";
 import { HERO_IMAGE } from "@/lib/sample-data";
 import { computeReputation, useReviewsFor } from "@/lib/reviews";
 import { ReputationBadge } from "@/components/ReputationBadge";
-import { useMemo } from "react";
+import { useEffect, useMemo } from "react";
 import { useAuth, signOut } from "@/hooks/use-auth";
 import { toast } from "sonner";
 import { useJoinedGameIds } from "@/lib/games-store";
