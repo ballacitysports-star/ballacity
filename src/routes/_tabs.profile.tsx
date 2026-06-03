@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { motion } from "framer-motion";
-import { Settings, Trophy, Calendar, Video, Shield, Users, Plus, BarChart3 } from "lucide-react";
+import { Settings, Trophy, Calendar, Video, Shield, Users, Plus, BarChart3, LogIn, LogOut } from "lucide-react";
 import { ME, GAMES } from "@/lib/sample-data";
 import { GameCard } from "@/components/GameCard";
 import { OrgCard } from "@/components/OrgCard";
@@ -10,6 +10,8 @@ import { HERO_IMAGE } from "@/lib/sample-data";
 import { computeReputation, useReviewsFor } from "@/lib/reviews";
 import { ReputationBadge } from "@/components/ReputationBadge";
 import { useMemo } from "react";
+import { useAuth, signOut } from "@/hooks/use-auth";
+import { toast } from "sonner";
 
 export const Route = createFileRoute("/_tabs/profile")({
   head: () => ({ meta: [{ title: "Profile — OpenRun" }] }),
@@ -20,15 +22,33 @@ function Profile() {
   const myOrgs = useMyOrgs();
   const myReviews = useReviewsFor("me");
   const myRep = useMemo(() => computeReputation(myReviews, "player"), [myReviews]);
+  const { user } = useAuth();
   return (
     <div className="mx-auto max-w-md">
       {/* Cover */}
       <div className="relative h-44">
         <img src={HERO_IMAGE} alt="" className="h-full w-full object-cover" />
         <div className="absolute inset-0 bg-gradient-to-b from-transparent via-background/50 to-background" />
-        <button className="absolute top-4 right-4 grid h-10 w-10 place-items-center rounded-full border border-border bg-background/70 backdrop-blur">
-          <Settings className="h-4 w-4" />
-        </button>
+        <div className="absolute top-4 right-4 flex items-center gap-2">
+          {user ? (
+            <button
+              onClick={async () => { await signOut(); toast.success("Signed out"); }}
+              className="inline-flex items-center gap-1 rounded-full border border-border bg-background/70 px-3 py-2 text-xs font-bold backdrop-blur"
+            >
+              <LogOut className="h-3.5 w-3.5" /> Sign out
+            </button>
+          ) : (
+            <Link
+              to="/auth"
+              className="inline-flex items-center gap-1 rounded-full bg-lime-gradient px-3 py-2 text-xs font-bold text-primary-foreground"
+            >
+              <LogIn className="h-3.5 w-3.5" /> Sign in
+            </Link>
+          )}
+          <button className="grid h-10 w-10 place-items-center rounded-full border border-border bg-background/70 backdrop-blur">
+            <Settings className="h-4 w-4" />
+          </button>
+        </div>
       </div>
 
       {/* Identity */}
