@@ -14,6 +14,7 @@ import { useAuth, signOut } from "@/hooks/use-auth";
 import { toast } from "sonner";
 import { useJoinedGameIds } from "@/lib/games-store";
 import { useHostedGames } from "@/lib/hosted-games-store";
+import { useMyProfile } from "@/lib/user-prefs-store";
 
 export const Route = createFileRoute("/_tabs/profile")({
   head: () => ({ meta: [{ title: "Profile — OpenRun" }] }),
