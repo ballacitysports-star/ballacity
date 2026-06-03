@@ -99,7 +99,7 @@ function Feed() {
       </div>
 
       <div className="mb-5">
-        <SportChips selected={sport} onSelect={setSport} />
+        <SportChips selected={chipSport} onSelect={setChipSport} />
       </div>
 
       {prefs.sections.showUrgent && urgent.length > 0 && (
