@@ -1,4 +1,4 @@
-import { createFileRoute, Link, notFound, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { motion } from "framer-motion";
 import { ArrowLeft, Share2, Bookmark, MapPin, Clock, Users, Calendar, MessageCircle, Star, Check, CreditCard, Settings as SettingsIcon } from "lucide-react";
 import { GAMES, SPORTS } from "@/lib/sample-data";
