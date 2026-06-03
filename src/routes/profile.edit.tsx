@@ -129,27 +129,6 @@ function EditProfile() {
         </div>
       </Section>
 
-      <Section title="Badges">
-        <div className="flex flex-wrap gap-2">
-          {badges.map((b) => (
-            <span key={b} className="inline-flex items-center gap-1 rounded-full border border-border bg-surface px-3 py-1.5 text-xs font-semibold">
-              {b}
-              <button onClick={() => setBadges(badges.filter((x) => x !== b))} className="text-muted-foreground">
-                <X className="h-3 w-3" />
-              </button>
-            </span>
-          ))}
-        </div>
-        <div className="mt-3 flex gap-2">
-          <Input value={newBadge} onChange={setNewBadge} maxLength={40} placeholder="New badge" />
-          <button
-            onClick={() => { const v = newBadge.trim(); if (v && !badges.includes(v)) { setBadges([...badges, v]); setNewBadge(""); } }}
-            className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-lime-gradient text-primary-foreground"
-          >
-            <Plus className="h-4 w-4" />
-          </button>
-        </div>
-      </Section>
 
       <Section title="Feed preferences" right={<button onClick={reset} className="text-xs font-bold text-coral">Reset</button>}>
         <div className="text-xs text-muted-foreground mb-2">Preferred sports (empty = all)</div>
