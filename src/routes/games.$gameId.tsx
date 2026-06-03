@@ -250,6 +250,17 @@ function GameDetail() {
         </div>
       </div>
 
+      {/* Host-only payment setup link */}
+      <div className="mx-auto max-w-md px-4 mt-4">
+        <Link to="/games/$gameId/payment-setup" params={{ gameId: game.id }}
+          className="flex items-center gap-2 rounded-2xl border border-dashed border-border bg-surface/40 p-3 text-xs text-muted-foreground hover:border-lime/40">
+          <SettingsIcon className="h-4 w-4 text-lime" />
+          <span className="flex-1">Host of this game? Configure payment methods & fee.</span>
+          <span className="text-lime">→</span>
+        </Link>
+        <div className="mt-3"><LegalNotice compact /></div>
+      </div>
+
       {/* Sticky CTA */}
       <div className="fixed bottom-0 left-0 right-0 z-30 px-4 pb-[max(env(safe-area-inset-bottom),0.75rem)] pt-3 backdrop-blur-xl bg-background/80 border-t border-border">
         <div className="mx-auto max-w-md flex items-center gap-2">
@@ -259,19 +270,26 @@ function GameDetail() {
           <motion.button
             whileTap={{ scale: 0.97 }}
             onClick={handleJoin}
-            disabled={!joined && spotsLeft <= 0}
+            disabled={!joined && spotsLeft <= 0 && !isPaid}
             className={`flex-1 rounded-2xl py-3.5 font-bold inline-flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed ${
-              joined
-                ? "bg-surface border border-lime/40 text-lime"
-                : "bg-lime-gradient text-primary-foreground glow-lime"
+              isConfirmed ? "bg-lime/15 border border-lime/40 text-lime" :
+              isPending ? "bg-surface border border-coral/40 text-coral" :
+              joined ? "bg-surface border border-lime/40 text-lime" :
+              "bg-lime-gradient text-primary-foreground glow-lime"
             }`}
           >
-            {joined ? (
+            {isConfirmed ? (
+              <><Check className="h-4 w-4" /> Confirmed · You're in</>
+            ) : isPending ? (
+              <><Clock className="h-4 w-4" /> Payment pending verification</>
+            ) : joined && !isPaid ? (
               <><Check className="h-4 w-4" /> You're in · Tap to leave</>
             ) : spotsLeft <= 0 ? (
               <>Full</>
+            ) : isPaid ? (
+              <><CreditCard className="h-4 w-4" /> Pay host · ${fee.toFixed(2)}</>
             ) : (
-              <>{game.price === 0 ? "Join free · " : `Join · $${game.price} · `}{spotsLeft} spot{spotsLeft === 1 ? "" : "s"} left</>
+              <>Join free · {spotsLeft} spot{spotsLeft === 1 ? "" : "s"} left</>
             )}
           </motion.button>
         </div>
