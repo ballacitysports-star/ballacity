@@ -29,6 +29,9 @@ export function isJoined(id: string): boolean {
 }
 
 export function useIsJoined(id: string): boolean {
-  useSyncExternalStore(subscribe, () => version, () => version);
-  return joined.has(id);
+  return useSyncExternalStore(
+    subscribe,
+    () => joined.has(id),
+    () => false,
+  );
 }
