@@ -56,17 +56,29 @@ function GameDetail() {
   const joined = useIsJoined(game.id);
   const effectiveJoined = game.joined + (joined ? 1 : 0);
   const spotsLeft = Math.max(0, game.maxPlayers - effectiveJoined);
+  const nav = useNavigate();
+  const [settings, setSettings] = useState<GamePaymentSettings | null>(null);
+  const [mySubs, setMySubs] = useState<PaymentSubmission[]>([]);
+
+  useEffect(() => {
+    getGamePaymentSettings(game.id).then(setSettings).catch(() => {});
+    listMySubmissionsForGame(game.id).then(setMySubs).catch(() => {});
+  }, [game.id]);
+
+  const fee = Number(settings?.entry_fee ?? game.price);
+  const isPaid = fee > 0;
+  const latestSub = mySubs[0];
+  const isConfirmed = latestSub?.status === "verified";
+  const isPending = latestSub?.status === "pending";
 
   const handleJoin = () => {
-    if (joined) {
+    if (joined && !isPaid) {
       leaveGame(game.id);
       toast("You left the game.");
       return;
     }
-    if (spotsLeft <= 0) {
-      toast.error("This game is full.");
-      return;
-    }
+    if (spotsLeft <= 0) { toast.error("This game is full."); return; }
+    if (isPaid) { nav({ to: "/games/$gameId/pay", params: { gameId: game.id } }); return; }
     joinGame(game.id);
     toast.success(`You're in! See you at ${game.location}.`);
   };
