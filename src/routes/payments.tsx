@@ -22,7 +22,7 @@ export const Route = createFileRoute("/payments")({
 function PaymentsHub() {
   const { user, loading } = useAuth();
   const nav = useNavigate();
-  const [tab, setTab] = useState<"methods" | "verify">("methods");
+  const [tab, setTab] = useState<"methods" | "verify" | "requests">("methods");
 
   useEffect(() => {
     if (!loading && !user) nav({ to: "/auth" });
@@ -43,16 +43,19 @@ function PaymentsHub() {
         </div>
       </div>
 
-      <div className="flex gap-2 mb-4 rounded-2xl bg-surface p-1 border border-border">
+      <div className="flex gap-1 mb-4 rounded-2xl bg-surface p-1 border border-border">
         <TabBtn active={tab === "methods"} onClick={() => setTab("methods")} icon={<SettingsIcon className="h-4 w-4" />}>
-          My methods
+          Methods
         </TabBtn>
         <TabBtn active={tab === "verify"} onClick={() => setTab("verify")} icon={<Inbox className="h-4 w-4" />}>
-          Verify payments
+          Verify
+        </TabBtn>
+        <TabBtn active={tab === "requests"} onClick={() => setTab("requests")} icon={<UserCheck className="h-4 w-4" />}>
+          Requests
         </TabBtn>
       </div>
 
-      {tab === "methods" ? <MethodsPanel /> : <VerifyPanel />}
+      {tab === "methods" ? <MethodsPanel /> : tab === "verify" ? <VerifyPanel /> : <RequestsPanel />}
 
       <div className="mt-6">
         <LegalNotice />
@@ -60,6 +63,7 @@ function PaymentsHub() {
     </div>
   );
 }
+
 
 function TabBtn({ active, onClick, icon, children }: { active: boolean; onClick: () => void; icon: React.ReactNode; children: React.ReactNode }) {
   return (
