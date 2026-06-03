@@ -51,7 +51,23 @@ export const Route = createFileRoute("/games/$gameId")({
 
 function GameDetail() {
   const { game } = Route.useLoaderData();
-  const spotsLeft = game.maxPlayers - game.joined;
+  const joined = useIsJoined(game.id);
+  const effectiveJoined = game.joined + (joined ? 1 : 0);
+  const spotsLeft = Math.max(0, game.maxPlayers - effectiveJoined);
+
+  const handleJoin = () => {
+    if (joined) {
+      leaveGame(game.id);
+      toast("You left the game.");
+      return;
+    }
+    if (spotsLeft <= 0) {
+      toast.error("This game is full.");
+      return;
+    }
+    joinGame(game.id);
+    toast.success(`You're in! See you at ${game.location}.`);
+  };
 
   const hostReviews = useReviewsFor(hostIdFor(game.host.username));
   const hostRep = useMemo(() => computeReputation(hostReviews, "host"), [hostReviews]);
