@@ -118,7 +118,7 @@ function GameDetail() {
         <div className="grid grid-cols-2 gap-2">
           <Meta icon={<Clock className="h-4 w-4 text-lime" />} label="Starts" value={formatWhen(game.date)} />
           <Meta icon={<Calendar className="h-4 w-4 text-lime" />} label="Duration" value={game.duration} />
-          <Meta icon={<Users className="h-4 w-4 text-coral" />} label="Players" value={`${game.joined} / ${game.maxPlayers}`} />
+          <Meta icon={<Users className="h-4 w-4 text-coral" />} label="Players" value={`${effectiveJoined} / ${game.maxPlayers}`} />
           <Meta icon={<MapPin className="h-4 w-4 text-coral" />} label="Distance" value={`${game.distanceMi} mi`} />
         </div>
 
