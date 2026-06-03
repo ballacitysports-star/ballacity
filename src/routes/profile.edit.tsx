@@ -1,5 +1,5 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { ArrowLeft, Check, X } from "lucide-react";
+import { ArrowLeft, Check, X, LogIn } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 import { SPORTS, type Sport } from "@/lib/sample-data";
@@ -10,6 +10,7 @@ import {
   setFeedPrefs,
   DEFAULT_PREFS,
 } from "@/lib/user-prefs-store";
+import { useAuth } from "@/hooks/use-auth";
 
 export const Route = createFileRoute("/profile/edit")({
   head: () => ({ meta: [{ title: "Edit profile — OpenRun" }] }),
@@ -17,16 +18,17 @@ export const Route = createFileRoute("/profile/edit")({
 });
 
 function EditProfile() {
+  const { user, loading } = useAuth();
   const profile = useMyProfile();
   const prefs = useFeedPrefs();
   const nav = useNavigate();
 
-  const [name, setName] = useState(profile.name);
-  const [username, setUsername] = useState(profile.username);
-  const [avatar, setAvatar] = useState(profile.avatar);
-  const [city, setCity] = useState(profile.city);
-  const [bio, setBio] = useState(profile.bio);
-  const [sports, setSports] = useState(profile.sports);
+  const [name, setName] = useState(profile?.name ?? "");
+  const [username, setUsername] = useState(profile?.username ?? "");
+  const [avatar, setAvatar] = useState(profile?.avatar ?? "");
+  const [city, setCity] = useState(profile?.city ?? "");
+  const [bio, setBio] = useState(profile?.bio ?? "");
+  const [sports, setSports] = useState(profile?.sports ?? []);
 
   const [preferredSports, setPreferredSports] = useState<Sport[]>(prefs.preferredSports);
   const [sections, setSections] = useState(prefs.sections);
@@ -46,10 +48,24 @@ function EditProfile() {
   const setSkill = (s: Sport, skill: number) =>
     setSports(sports.map((x) => (x.name === s ? { ...x, skill } : x)));
 
+  if (!loading && !user) {
+    return (
+      <div className="mx-auto max-w-md px-4 py-10">
+        <div className="rounded-3xl border border-border bg-surface p-8 text-center">
+          <h1 className="font-display text-xl font-bold">Sign in to edit your profile</h1>
+          <Link to="/auth" className="mt-5 inline-flex items-center gap-2 rounded-full bg-lime-gradient px-5 py-2.5 text-sm font-bold text-primary-foreground">
+            <LogIn className="h-4 w-4" /> Sign in
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
   const save = () => {
+    if (!user) { toast.error("Sign in to save"); return; }
     const trimmedName = name.trim().slice(0, 60);
     if (!trimmedName) { toast.error("Name is required"); return; }
-    setProfileOverrides({
+    setProfileOverrides(user.id, {
       name: trimmedName,
       username: username.trim().slice(0, 30),
       avatar: (avatar.trim() || trimmedName.slice(0, 2)).toUpperCase().slice(0, 3),
@@ -66,6 +82,7 @@ function EditProfile() {
     setPreferredSports(DEFAULT_PREFS.preferredSports);
     setSections(DEFAULT_PREFS.sections);
   };
+
 
   return (
     <div className="mx-auto max-w-md px-4 py-6 pb-32">
