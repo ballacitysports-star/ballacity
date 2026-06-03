@@ -206,7 +206,7 @@ function GameDetail() {
         <div>
           <div className="flex items-center justify-between mb-2">
             <h2 className="font-display text-sm font-bold uppercase tracking-wider text-muted-foreground">
-              Roster ({game.joined}/{game.maxPlayers})
+              Roster ({effectiveJoined}/{game.maxPlayers})
             </h2>
             <button className="text-xs font-semibold text-lime">See all</button>
           </div>
@@ -217,7 +217,9 @@ function GameDetail() {
                 initial={{ scale: 0, opacity: 0 }}
                 animate={{ scale: 1, opacity: 1 }}
                 transition={{ delay: i * 0.04 }}
-                className="grid h-11 w-11 place-items-center rounded-full border border-border bg-surface text-xs font-bold"
+                className={`grid h-11 w-11 place-items-center rounded-full border text-xs font-bold ${
+                  p.isMe ? "border-lime bg-lime/15 text-lime" : "border-border bg-surface"
+                }`}
               >
                 {p.initials}
               </motion.div>
