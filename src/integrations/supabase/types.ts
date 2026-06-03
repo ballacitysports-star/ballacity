@@ -25,6 +25,7 @@ export type Database = {
           payment_deadline: string | null
           payment_instructions: string | null
           refund_policy: string | null
+          requires_approval: boolean
           updated_at: string
         }
         Insert: {
@@ -37,6 +38,7 @@ export type Database = {
           payment_deadline?: string | null
           payment_instructions?: string | null
           refund_policy?: string | null
+          requires_approval?: boolean
           updated_at?: string
         }
         Update: {
@@ -49,6 +51,7 @@ export type Database = {
           payment_deadline?: string | null
           payment_instructions?: string | null
           refund_policy?: string | null
+          requires_approval?: boolean
           updated_at?: string
         }
         Relationships: []
@@ -92,6 +95,42 @@ export type Database = {
           payment_url?: string | null
           updated_at?: string
           username?: string | null
+        }
+        Relationships: []
+      }
+      join_requests: {
+        Row: {
+          created_at: string
+          game_id: string
+          host_id: string
+          id: string
+          message: string | null
+          player_id: string
+          reviewed_at: string | null
+          reviewer_notes: string | null
+          status: string
+        }
+        Insert: {
+          created_at?: string
+          game_id: string
+          host_id: string
+          id?: string
+          message?: string | null
+          player_id: string
+          reviewed_at?: string | null
+          reviewer_notes?: string | null
+          status?: string
+        }
+        Update: {
+          created_at?: string
+          game_id?: string
+          host_id?: string
+          id?: string
+          message?: string | null
+          player_id?: string
+          reviewed_at?: string | null
+          reviewer_notes?: string | null
+          status?: string
         }
         Relationships: []
       }
