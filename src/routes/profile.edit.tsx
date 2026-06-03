@@ -27,8 +27,6 @@ function EditProfile() {
   const [city, setCity] = useState(profile.city);
   const [bio, setBio] = useState(profile.bio);
   const [sports, setSports] = useState(profile.sports);
-  const [badges, setBadges] = useState(profile.badges);
-  const [newBadge, setNewBadge] = useState("");
 
   const [preferredSports, setPreferredSports] = useState<Sport[]>(prefs.preferredSports);
   const [sections, setSections] = useState(prefs.sections);
