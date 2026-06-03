@@ -96,6 +96,24 @@ function SetupPage() {
       </section>
 
       <section>
+        <button type="button" onClick={() => setRequiresApproval((v) => !v)}
+          className={`w-full flex items-center justify-between gap-3 rounded-2xl border p-4 text-left ${
+            requiresApproval ? "border-lime bg-lime/5" : "border-border bg-surface"
+          }`}>
+          <div className="min-w-0">
+            <div className="font-semibold text-sm">Require my approval to join</div>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              Players send a request and you decide who's in. Useful for skill-matched or invite-only games.
+            </p>
+          </div>
+          <div className={`shrink-0 grid h-7 w-12 items-center rounded-full p-0.5 transition-colors ${requiresApproval ? "bg-lime" : "bg-secondary"}`}>
+            <div className={`h-6 w-6 rounded-full bg-background shadow transition-transform ${requiresApproval ? "translate-x-5" : ""}`} />
+          </div>
+        </button>
+      </section>
+
+
+      <section>
         <Label>Accepted payment methods</Label>
         {methods.length === 0 ? (
           <Link to="/payments" className="block rounded-2xl border border-dashed border-coral/40 bg-coral/5 p-4 text-sm">
