@@ -94,6 +94,16 @@ function Profile() {
           <ReputationBadge rep={myRep} />
         </div>
 
+        {/* Upcoming */}
+        <div className="mt-6">
+          <h2 className="font-display text-sm font-bold uppercase tracking-wider text-muted-foreground mb-2 flex items-center gap-1.5">
+            <Calendar className="h-4 w-4" /> Upcoming games
+          </h2>
+          <div className="space-y-3">
+            {GAMES.slice(0, 2).map((g, i) => <GameCard key={g.id} game={g} index={i} />)}
+          </div>
+        </div>
+
         {/* Sports & skill */}
         <div className="mt-6">
           <h2 className="font-display text-sm font-bold uppercase tracking-wider text-muted-foreground mb-2">Sports</h2>
@@ -192,15 +202,6 @@ function Profile() {
         {/* Reviews */}
         <ReviewsSection revieweeId="me" revieweeKind="player" revieweeName={ME.name} isOwner />
 
-        {/* Upcoming */}
-        <div className="mt-6">
-          <h2 className="font-display text-sm font-bold uppercase tracking-wider text-muted-foreground mb-2 flex items-center gap-1.5">
-            <Calendar className="h-4 w-4" /> Upcoming games
-          </h2>
-          <div className="space-y-3">
-            {GAMES.slice(0, 2).map((g, i) => <GameCard key={g.id} game={g} index={i} />)}
-          </div>
-        </div>
       </div>
     </div>
   );
