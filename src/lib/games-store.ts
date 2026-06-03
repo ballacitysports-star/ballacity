@@ -1,12 +1,10 @@
-import { useEffect, useState, useSyncExternalStore } from "react";
+import { useMemo, useSyncExternalStore } from "react";
 
 const joined = new Set<string>();
 const listeners = new Set<() => void>();
 const STORAGE_KEY = "openrun.joinedGameIds.v1";
-let version = 0;
 let loaded = false;
-
-const EMPTY_JOINED_IDS: string[] = [];
+const EMPTY_SNAPSHOT = "[]";
 
 function loadJoinedGames() {
   if (loaded || typeof window === "undefined") return false;
@@ -34,8 +32,12 @@ function saveJoinedGames() {
 }
 
 function emit() {
-  version++;
   listeners.forEach((l) => l());
+}
+
+function getSnapshot() {
+  loadJoinedGames();
+  return JSON.stringify(Array.from(joined).sort());
 }
 
 function subscribe(cb: () => void) {
@@ -63,27 +65,11 @@ export function isJoined(id: string): boolean {
 }
 
 export function useIsJoined(id: string): boolean {
-  const [ready, setReady] = useState(loaded);
-  useSyncExternalStore(subscribe, () => version, () => 0);
-
-  useEffect(() => {
-    const didLoad = loadJoinedGames();
-    setReady(true);
-    if (didLoad) emit();
-  }, []);
-
-  return ready ? joined.has(id) : false;
+  const snapshot = useSyncExternalStore(subscribe, getSnapshot, () => EMPTY_SNAPSHOT);
+  return useMemo(() => JSON.parse(snapshot).includes(id), [id, snapshot]);
 }
 
 export function useJoinedGameIds(): string[] {
-  const [ready, setReady] = useState(loaded);
-  useSyncExternalStore(subscribe, () => version, () => 0);
-
-  useEffect(() => {
-    const didLoad = loadJoinedGames();
-    setReady(true);
-    if (didLoad) emit();
-  }, []);
-
-  return ready ? Array.from(joined) : EMPTY_JOINED_IDS;
+  const snapshot = useSyncExternalStore(subscribe, getSnapshot, () => EMPTY_SNAPSHOT);
+  return useMemo(() => JSON.parse(snapshot), [snapshot]);
 }
