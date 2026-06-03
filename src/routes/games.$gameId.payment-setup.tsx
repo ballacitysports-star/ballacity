@@ -67,8 +67,9 @@ function SetupPage() {
         payment_deadline: deadline ? new Date(deadline).toISOString() : null,
         refund_policy: refundPolicy || null,
         payment_instructions: instructions || null,
+        requires_approval: requiresApproval,
       });
-      toast.success("Payment settings saved");
+      toast.success("Settings saved");
       nav({ to: "/games/$gameId", params: { gameId: game.id } });
     } catch (e: any) { toast.error(e.message); } finally { setSaving(false); }
   };
