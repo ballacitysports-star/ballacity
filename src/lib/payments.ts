@@ -145,6 +145,7 @@ export async function upsertGamePaymentSettings(input: {
   payment_deadline?: string | null;
   refund_policy?: string | null;
   payment_instructions?: string | null;
+  requires_approval?: boolean;
 }) {
   const { data: u } = await supabase.auth.getUser();
   if (!u.user) throw new Error("Sign in to configure payments.");
