@@ -53,8 +53,26 @@ export const Route = createFileRoute("/games/$gameId")({
 });
 
 function GameDetail() {
-  const { game } = Route.useLoaderData();
-  const joined = useIsJoined(game.id);
+  const { gameId } = Route.useLoaderData();
+  const hosted = useHostedGames();
+  const game = useMemo(
+    () => hosted.find((g) => g.id === gameId) ?? GAMES.find((g) => g.id === gameId),
+    [hosted, gameId],
+  );
+  const joined = useIsJoined(gameId);
+  if (!game) {
+    return (
+      <div className="min-h-dvh grid place-items-center px-6 text-center">
+        <div>
+          <h1 className="font-display text-3xl font-bold">Game not found</h1>
+          <p className="text-muted-foreground mt-2">It may have wrapped up or been cancelled.</p>
+          <Link to="/feed" className="inline-block mt-5 rounded-full bg-lime px-5 py-2.5 text-sm font-bold text-primary-foreground">
+            Back to feed
+          </Link>
+        </div>
+      </div>
+    );
+  }
   const effectiveJoined = game.joined + (joined ? 1 : 0);
   const spotsLeft = Math.max(0, game.maxPlayers - effectiveJoined);
   const nav = useNavigate();
