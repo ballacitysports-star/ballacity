@@ -231,3 +231,75 @@ export async function reviewSubmission(id: string, status: "verified" | "rejecte
     .eq("id", id);
   if (error) throw error;
 }
+
+// ----- Withdraw submission -----
+export async function deleteMyPendingSubmission(id: string) {
+  const { error } = await supabase.from("payment_submissions").delete().eq("id", id);
+  if (error) throw error;
+}
+
+// ----- Join requests -----
+export async function createJoinRequest(input: { game_id: string; host_id: string; message?: string | null }) {
+  const { data: u } = await supabase.auth.getUser();
+  if (!u.user) throw new Error("Sign in to request to join.");
+  const { error } = await supabase.from("join_requests").insert({
+    game_id: input.game_id,
+    host_id: input.host_id,
+    player_id: u.user.id,
+    message: input.message ?? null,
+  });
+  if (error) throw error;
+}
+
+export async function cancelMyJoinRequest(gameId: string) {
+  const { data: u } = await supabase.auth.getUser();
+  if (!u.user) return;
+  const { error } = await supabase
+    .from("join_requests")
+    .delete()
+    .eq("game_id", gameId)
+    .eq("player_id", u.user.id)
+    .eq("status", "pending");
+  if (error) throw error;
+}
+
+export async function getMyJoinRequest(gameId: string): Promise<JoinRequest | null> {
+  const { data: u } = await supabase.auth.getUser();
+  if (!u.user) return null;
+  const { data, error } = await supabase
+    .from("join_requests")
+    .select("*")
+    .eq("game_id", gameId)
+    .eq("player_id", u.user.id)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (error) throw error;
+  return (data as JoinRequest) ?? null;
+}
+
+export async function listHostJoinRequests(status?: "pending" | "approved" | "rejected"): Promise<JoinRequest[]> {
+  const { data: u } = await supabase.auth.getUser();
+  if (!u.user) return [];
+  let q = supabase
+    .from("join_requests")
+    .select("*")
+    .eq("host_id", u.user.id)
+    .order("created_at", { ascending: false });
+  if (status) q = q.eq("status", status);
+  const { data, error } = await q;
+  if (error) throw error;
+  return (data ?? []) as JoinRequest[];
+}
+
+export async function reviewJoinRequest(id: string, status: "approved" | "rejected", notes?: string) {
+  const { error } = await supabase
+    .from("join_requests")
+    .update({
+      status,
+      reviewer_notes: notes ?? null,
+      reviewed_at: new Date().toISOString(),
+    })
+    .eq("id", id);
+  if (error) throw error;
+}
