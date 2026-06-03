@@ -1,4 +1,4 @@
-import { createFileRoute, Link, notFound, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { motion } from "framer-motion";
 import { ArrowLeft, Share2, Bookmark, MapPin, Clock, Users, Calendar, MessageCircle, Star, Check, CreditCard, Settings as SettingsIcon } from "lucide-react";
 import { GAMES, SPORTS } from "@/lib/sample-data";
@@ -10,6 +10,8 @@ import { joinGame, leaveGame, useIsJoined } from "@/lib/games-store";
 import { toast } from "sonner";
 import { useEffect, useMemo, useState } from "react";
 import { getGamePaymentSettings, listMySubmissionsForGame, deleteMyPendingSubmission, getMyJoinRequest, createJoinRequest, cancelMyJoinRequest, type GamePaymentSettings, type PaymentSubmission, type JoinRequest } from "@/lib/payments";
+import { useHostedGames } from "@/lib/hosted-games-store";
+import type { Game } from "@/lib/sample-data";
 import { LegalNotice } from "@/components/LegalNotice";
 
 const emojiBySport: Record<string, string> = Object.fromEntries(SPORTS.map((s) => [s.name, s.emoji]));
@@ -18,17 +20,18 @@ const hostIdFor = (username: string) => `host-${username.replace(/^@/, "").toLow
 
 export const Route = createFileRoute("/games/$gameId")({
   loader: ({ params }) => {
-    const game = GAMES.find((g) => g.id === params.gameId);
-    if (!game) throw notFound();
-    return { game };
+    return { gameId: params.gameId };
   },
-  head: ({ loaderData }) => ({
-    meta: [
-      { title: `${loaderData?.game.title ?? "Game"} — OpenRun` },
-      { name: "description", content: loaderData?.game.description },
-      { property: "og:image", content: loaderData?.game.image },
-    ],
-  }),
+  head: ({ loaderData }) => {
+    const game = loaderData ? GAMES.find((g) => g.id === loaderData.gameId) : undefined;
+    return {
+      meta: [
+        { title: `${game?.title ?? "Game"} — OpenRun` },
+        { name: "description", content: game?.description },
+        { property: "og:image", content: game?.image },
+      ],
+    };
+  },
   notFoundComponent: () => (
     <div className="min-h-dvh grid place-items-center px-6 text-center">
       <div>
@@ -52,8 +55,26 @@ export const Route = createFileRoute("/games/$gameId")({
 });
 
 function GameDetail() {
-  const { game } = Route.useLoaderData();
-  const joined = useIsJoined(game.id);
+  const { gameId } = Route.useLoaderData();
+  const hosted = useHostedGames();
+  const game = useMemo<Game | undefined>(
+    () => hosted.find((g) => g.id === gameId) ?? GAMES.find((g) => g.id === gameId),
+    [hosted, gameId],
+  );
+  const joined = useIsJoined(gameId);
+  if (!game) {
+    return (
+      <div className="min-h-dvh grid place-items-center px-6 text-center">
+        <div>
+          <h1 className="font-display text-3xl font-bold">Game not found</h1>
+          <p className="text-muted-foreground mt-2">It may have wrapped up or been cancelled.</p>
+          <Link to="/feed" className="inline-block mt-5 rounded-full bg-lime px-5 py-2.5 text-sm font-bold text-primary-foreground">
+            Back to feed
+          </Link>
+        </div>
+      </div>
+    );
+  }
   const effectiveJoined = game.joined + (joined ? 1 : 0);
   const spotsLeft = Math.max(0, game.maxPlayers - effectiveJoined);
   const nav = useNavigate();

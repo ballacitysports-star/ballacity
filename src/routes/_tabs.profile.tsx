@@ -13,6 +13,7 @@ import { useMemo } from "react";
 import { useAuth, signOut } from "@/hooks/use-auth";
 import { toast } from "sonner";
 import { useJoinedGameIds } from "@/lib/games-store";
+import { useHostedGames } from "@/lib/hosted-games-store";
 
 export const Route = createFileRoute("/_tabs/profile")({
   head: () => ({ meta: [{ title: "Profile — OpenRun" }] }),
@@ -25,10 +26,16 @@ function Profile() {
   const myRep = useMemo(() => computeReputation(myReviews, "player"), [myReviews]);
   const { user } = useAuth();
   const joinedGameIds = useJoinedGameIds();
+  const hosted = useHostedGames();
   const upcomingGames = useMemo(() => {
     const ids = new Set(joinedGameIds);
-    return GAMES.filter((game) => ids.has(game.id));
-  }, [joinedGameIds]);
+    const pool = [...hosted, ...GAMES];
+    const seen = new Set<string>();
+    return pool
+      .filter((game) => ids.has(game.id))
+      .filter((g) => (seen.has(g.id) ? false : (seen.add(g.id), true)))
+      .sort((a, b) => +new Date(a.date) - +new Date(b.date));
+  }, [joinedGameIds, hosted]);
   return (
     <div className="mx-auto max-w-md">
       {/* Cover */}

@@ -3,6 +3,9 @@ import { useState } from "react";
 import { motion } from "framer-motion";
 import { ArrowLeft, Calendar, MapPin, Users, DollarSign, Lock, Home } from "lucide-react";
 import { SPORTS, type Sport } from "@/lib/sample-data";
+import { addHostedGame } from "@/lib/hosted-games-store";
+import { joinGame } from "@/lib/games-store";
+import { toast } from "sonner";
 
 export const Route = createFileRoute("/_tabs/create")({
   head: () => ({ meta: [{ title: "Host a game — OpenRun" }] }),
@@ -12,11 +15,15 @@ export const Route = createFileRoute("/_tabs/create")({
 function Create() {
   const nav = useNavigate();
   const [sport, setSport] = useState<Sport>("Basketball");
-  const [skill, setSkill] = useState("All Levels");
+  const [title, setTitle] = useState("");
+  const [when, setWhen] = useState("");
+  const [location, setLocation] = useState("");
+  const [skill, setSkill] = useState<"All Levels" | "Beginner" | "Intermediate" | "Advanced">("All Levels");
   const [size, setSize] = useState(10);
   const [price, setPrice] = useState(0);
   const [indoor, setIndoor] = useState(false);
   const [priv, setPriv] = useState(false);
+  const [description, setDescription] = useState("");
 
   return (
     <div className="mx-auto max-w-md px-4 pt-6">
@@ -30,7 +37,23 @@ function Create() {
       <form
         onSubmit={(e) => {
           e.preventDefault();
-          nav({ to: "/feed" });
+          const date = when ? new Date(when).toISOString() : new Date(Date.now() + 3600_000).toISOString();
+          const game = addHostedGame({
+            sport,
+            title,
+            date,
+            location,
+            skill,
+            maxPlayers: size,
+            price,
+            indoor,
+            isPrivate: priv,
+            description,
+          });
+          // Host counts as joined so it appears under their upcoming games
+          joinGame(game.id);
+          toast.success("Game published");
+          nav({ to: "/games/$gameId", params: { gameId: game.id } });
         }}
         className="space-y-5"
       >
@@ -60,6 +83,8 @@ function Create() {
         <Section title="Game title">
           <input
             required
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
             placeholder="Friday Night Run · 5v5 Full Court"
             className="w-full rounded-2xl border border-border bg-surface px-4 py-3 text-sm outline-none focus:border-lime"
           />
@@ -69,11 +94,15 @@ function Create() {
         <Section title="When & where" icon={<Calendar className="h-4 w-4" />}>
           <input
             type="datetime-local"
+            value={when}
+            onChange={(e) => setWhen(e.target.value)}
             className="w-full rounded-2xl border border-border bg-surface px-4 py-3 text-sm outline-none focus:border-lime [color-scheme:dark]"
           />
           <div className="flex items-center gap-2 rounded-2xl border border-border bg-surface px-4 py-3">
             <MapPin className="h-4 w-4 text-coral" />
             <input
+              value={location}
+              onChange={(e) => setLocation(e.target.value)}
               placeholder="Court, park or venue"
               className="flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
             />
@@ -83,7 +112,7 @@ function Create() {
         {/* Skill */}
         <Section title="Skill level">
           <div className="flex gap-2 overflow-x-auto scrollbar-hide">
-            {["All Levels", "Beginner", "Intermediate", "Advanced"].map((s) => (
+            {(["All Levels", "Beginner", "Intermediate", "Advanced"] as const).map((s) => (
               <button
                 type="button"
                 key={s}
@@ -143,6 +172,8 @@ function Create() {
         <Section title="Description">
           <textarea
             rows={4}
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
             placeholder="Format, vibe, what to bring..."
             className="w-full rounded-2xl border border-border bg-surface px-4 py-3 text-sm outline-none focus:border-lime resize-none"
           />
