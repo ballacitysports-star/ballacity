@@ -14,6 +14,7 @@ import { useAuth, signOut } from "@/hooks/use-auth";
 import { toast } from "sonner";
 import { useJoinedGameIds } from "@/lib/games-store";
 import { useHostedGames } from "@/lib/hosted-games-store";
+import { useMyProfile } from "@/lib/user-prefs-store";
 
 export const Route = createFileRoute("/_tabs/profile")({
   head: () => ({ meta: [{ title: "Profile — OpenRun" }] }),
@@ -25,6 +26,7 @@ function Profile() {
   const myReviews = useReviewsFor("me");
   const myRep = useMemo(() => computeReputation(myReviews, "player"), [myReviews]);
   const { user } = useAuth();
+  const me = useMyProfile();
   const joinedGameIds = useJoinedGameIds();
   const hosted = useHostedGames();
   const upcomingGames = useMemo(() => {
@@ -58,9 +60,9 @@ function Profile() {
               <LogIn className="h-3.5 w-3.5" /> Sign in
             </Link>
           )}
-          <button className="grid h-10 w-10 place-items-center rounded-full border border-border bg-background/70 backdrop-blur">
+          <Link to="/profile/edit" className="grid h-10 w-10 place-items-center rounded-full border border-border bg-background/70 backdrop-blur" aria-label="Edit profile">
             <Settings className="h-4 w-4" />
-          </button>
+          </Link>
         </div>
       </div>
 
@@ -72,28 +74,28 @@ function Profile() {
           transition={{ type: "spring", stiffness: 220, damping: 16 }}
           className="grid h-24 w-24 place-items-center rounded-3xl border-4 border-background bg-lime-gradient font-display text-3xl font-bold text-primary-foreground glow-lime"
         >
-          {ME.avatar}
+          {me.avatar}
         </motion.div>
         <div className="mt-3 flex items-start justify-between">
           <div>
             <h1 className="font-display text-2xl font-bold flex items-center gap-2">
-              {ME.name}
+              {me.name}
               <span className="inline-flex items-center gap-1 rounded-full bg-lime/15 px-2 py-0.5 text-xs font-bold text-lime">
                 <Shield className="h-3 w-3" /> Verified
               </span>
             </h1>
-            <div className="text-sm text-muted-foreground">{ME.username} · {ME.city}</div>
+            <div className="text-sm text-muted-foreground">{me.username} · {me.city}</div>
           </div>
         </div>
-        <p className="mt-3 text-sm text-foreground/90">{ME.bio}</p>
+        <p className="mt-3 text-sm text-foreground/90">{me.bio}</p>
 
         {/* Stats */}
         <div className="mt-5 grid grid-cols-4 gap-2">
           {[
-            { k: ME.stats.played, v: "Games" },
-            { k: ME.stats.reliability + "%", v: "Reliable" },
-            { k: ME.stats.sportsmanship, v: "Sport" },
-            { k: ME.stats.friends, v: "Crew" },
+            { k: me.stats.played, v: "Games" },
+            { k: me.stats.reliability + "%", v: "Reliable" },
+            { k: me.stats.sportsmanship, v: "Sport" },
+            { k: me.stats.friends, v: "Crew" },
           ].map((s) => (
             <div key={s.v} className="rounded-2xl border border-border bg-surface p-3 text-center">
               <div className="font-display text-lg font-bold">{s.k}</div>
@@ -131,7 +133,7 @@ function Profile() {
         <div className="mt-6">
           <h2 className="font-display text-sm font-bold uppercase tracking-wider text-muted-foreground mb-2">Sports</h2>
           <div className="space-y-2">
-            {ME.sports.map((s) => (
+            {me.sports.map((s) => (
               <div key={s.name} className="rounded-2xl border border-border bg-surface p-3">
                 <div className="flex items-center justify-between text-sm">
                   <span className="font-semibold">{s.name}</span>
@@ -156,7 +158,7 @@ function Profile() {
             <Trophy className="h-4 w-4" /> Badges
           </h2>
           <div className="flex flex-wrap gap-2">
-            {ME.badges.map((b) => (
+            {me.badges.map((b) => (
               <span key={b} className="rounded-full border border-border bg-surface px-3 py-1.5 text-xs font-semibold">
                 {b}
               </span>
@@ -234,7 +236,7 @@ function Profile() {
         </Link>
 
         {/* Reviews */}
-        <ReviewsSection revieweeId="me" revieweeKind="player" revieweeName={ME.name} isOwner />
+        <ReviewsSection revieweeId="me" revieweeKind="player" revieweeName={me.name} isOwner />
 
       </div>
     </div>
