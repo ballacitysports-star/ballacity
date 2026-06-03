@@ -238,10 +238,21 @@ function GameDetail() {
           </button>
           <motion.button
             whileTap={{ scale: 0.97 }}
-            className="flex-1 rounded-2xl bg-lime-gradient py-3.5 font-bold text-primary-foreground glow-lime"
+            onClick={handleJoin}
+            disabled={!joined && spotsLeft <= 0}
+            className={`flex-1 rounded-2xl py-3.5 font-bold inline-flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed ${
+              joined
+                ? "bg-surface border border-lime/40 text-lime"
+                : "bg-lime-gradient text-primary-foreground glow-lime"
+            }`}
           >
-            {game.price === 0 ? "Join free · " : `Join · $${game.price} · `}
-            {spotsLeft} spot{spotsLeft === 1 ? "" : "s"} left
+            {joined ? (
+              <><Check className="h-4 w-4" /> You're in · Tap to leave</>
+            ) : spotsLeft <= 0 ? (
+              <>Full</>
+            ) : (
+              <>{game.price === 0 ? "Join free · " : `Join · $${game.price} · `}{spotsLeft} spot{spotsLeft === 1 ? "" : "s"} left</>
+            )}
           </motion.button>
         </div>
       </div>
