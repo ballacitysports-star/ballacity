@@ -25,6 +25,19 @@ export type GamePaymentSettings = {
   payment_deadline: string | null;
   refund_policy: string | null;
   payment_instructions: string | null;
+  requires_approval: boolean;
+};
+
+export type JoinRequest = {
+  id: string;
+  game_id: string;
+  player_id: string;
+  host_id: string;
+  status: "pending" | "approved" | "rejected";
+  message: string | null;
+  reviewer_notes: string | null;
+  created_at: string;
+  reviewed_at: string | null;
 };
 
 export type PaymentSubmission = {
