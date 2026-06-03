@@ -137,22 +137,21 @@ function Feed() {
 
 function FilterSheet({ onClose }: { onClose: () => void }) {
   const prefs = useFeedPrefs();
-  const [preferredSports, setPreferredSports] = useState<Sport[]>(prefs.preferredSports);
-  const [sections, setSections] = useState(prefs.sections);
+  const preferredSports = prefs.preferredSports;
+  const sections = prefs.sections;
 
-  const toggleSport = (s: Sport) =>
-    setPreferredSports((prev) => prev.includes(s) ? prev.filter(x => x !== s) : [...prev, s]);
-  const toggleSection = (k: keyof typeof sections) =>
-    setSections((prev) => ({ ...prev, [k]: !prev[k] }));
+  const toggleSport = (s: Sport) => {
+    const next = preferredSports.includes(s)
+      ? preferredSports.filter((x) => x !== s)
+      : [...preferredSports, s];
+    setFeedPrefs({ ...prefs, preferredSports: next });
+  };
+  const toggleSection = (k: keyof typeof sections) => {
+    setFeedPrefs({ ...prefs, sections: { ...sections, [k]: !sections[k] } });
+  };
 
-  const apply = () => {
-    setFeedPrefs({ preferredSports, sections });
-    onClose();
-  };
-  const reset = () => {
-    setPreferredSports([]);
-    setSections(DEFAULT_PREFS.sections);
-  };
+  const reset = () => setFeedPrefs({ preferredSports: [], sections: DEFAULT_PREFS.sections });
+
 
   return (
     <motion.div
