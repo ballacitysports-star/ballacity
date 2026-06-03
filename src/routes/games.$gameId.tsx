@@ -20,13 +20,16 @@ export const Route = createFileRoute("/games/$gameId")({
   loader: ({ params }) => {
     return { gameId: params.gameId };
   },
-  head: ({ loaderData }) => ({
-    meta: [
-      { title: `${loaderData?.game.title ?? "Game"} — OpenRun` },
-      { name: "description", content: loaderData?.game.description },
-      { property: "og:image", content: loaderData?.game.image },
-    ],
-  }),
+  head: ({ loaderData }) => {
+    const game = loaderData ? GAMES.find((g) => g.id === loaderData.gameId) : undefined;
+    return {
+      meta: [
+        { title: `${game?.title ?? "Game"} — OpenRun` },
+        { name: "description", content: game?.description },
+        { property: "og:image", content: game?.image },
+      ],
+    };
+  },
   notFoundComponent: () => (
     <div className="min-h-dvh grid place-items-center px-6 text-center">
       <div>
