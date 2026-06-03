@@ -1,5 +1,7 @@
-import { useSyncExternalStore } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
+import type { User } from "@supabase/supabase-js";
 import { ME, type Sport } from "@/lib/sample-data";
+import { useAuth } from "@/hooks/use-auth";
 
 // ---------- Profile overrides ----------
 export type ProfileOverrides = {
@@ -23,7 +25,7 @@ export type MyProfile = {
   badges: string[];
 };
 
-const PROFILE_KEY = "openrun.profile.v1";
+const PROFILE_KEY_PREFIX = "openrun.profile.v2.";
 const PREFS_KEY = "openrun.feedPrefs.v1";
 
 // ---------- Feed prefs ----------
@@ -37,7 +39,7 @@ export type FeedSectionToggles = {
 };
 
 export type FeedPrefs = {
-  preferredSports: Sport[]; // empty = all
+  preferredSports: Sport[];
   sections: FeedSectionToggles;
 };
 
@@ -85,29 +87,80 @@ function makeStore<T>(key: string, fallback: T) {
   return { getSnapshot, subscribe, set, get };
 }
 
-const profileStore = makeStore<ProfileOverrides>(PROFILE_KEY, {});
 const prefsStore = makeStore<FeedPrefs>(PREFS_KEY, DEFAULT_PREFS);
 
-export function useProfileOverrides(): ProfileOverrides {
-  const s = useSyncExternalStore(profileStore.subscribe, profileStore.getSnapshot, () => "{}");
-  return JSON.parse(s) as ProfileOverrides;
+// ---------- Per-user profile overrides ----------
+function profileKey(userId: string) { return PROFILE_KEY_PREFIX + userId; }
+
+function readOverrides(userId: string | null): ProfileOverrides {
+  if (!userId || typeof window === "undefined") return {};
+  try {
+    const raw = window.localStorage.getItem(profileKey(userId));
+    return raw ? (JSON.parse(raw) as ProfileOverrides) : {};
+  } catch {
+    return {};
+  }
 }
 
-export function setProfileOverrides(next: ProfileOverrides) {
-  profileStore.set(next);
+const overrideListeners = new Set<() => void>();
+function notifyOverrides() { overrideListeners.forEach((l) => l()); }
+
+export function setProfileOverrides(userId: string, next: ProfileOverrides) {
+  if (typeof window === "undefined") return;
+  window.localStorage.setItem(profileKey(userId), JSON.stringify(next));
+  notifyOverrides();
 }
 
-export function useMyProfile(): MyProfile {
-  const o = useProfileOverrides();
+// ---------- Defaults derived from auth user ----------
+function initialsFrom(name: string): string {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return "U";
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+}
+
+function defaultsFromUser(user: User): MyProfile {
+  const meta = (user.user_metadata ?? {}) as Record<string, unknown>;
+  const name =
+    (meta.full_name as string) ||
+    (meta.name as string) ||
+    (user.email ? user.email.split("@")[0] : "Player");
+  const username = user.email ? "@" + user.email.split("@")[0] : "@" + (user.id.slice(0, 6));
   return {
-    name: o.name ?? ME.name,
-    username: o.username ?? ME.username,
-    avatar: o.avatar ?? ME.avatar,
-    bio: o.bio ?? ME.bio,
-    city: o.city ?? ME.city,
-    stats: ME.stats,
-    sports: o.sports ?? ME.sports,
-    badges: o.badges ?? ME.badges,
+    name,
+    username,
+    avatar: initialsFrom(name),
+    bio: "",
+    city: "",
+    stats: { played: 0, reliability: 100, sportsmanship: 5, friends: 0 },
+    sports: [],
+    badges: [],
+  };
+}
+
+// ---------- Hooks ----------
+export function useMyProfile(): MyProfile | null {
+  const { user } = useAuth();
+  const [tick, setTick] = useState(0);
+  useEffect(() => {
+    const cb = () => setTick((t) => t + 1);
+    overrideListeners.add(cb);
+    return () => { overrideListeners.delete(cb); };
+  }, []);
+  if (!user) return null;
+  const overrides = readOverrides(user.id);
+  const base = defaultsFromUser(user);
+  // touch tick so re-renders happen when overrides change
+  void tick;
+  return {
+    name: overrides.name ?? base.name,
+    username: overrides.username ?? base.username,
+    avatar: overrides.avatar ?? base.avatar,
+    bio: overrides.bio ?? base.bio,
+    city: overrides.city ?? base.city,
+    stats: base.stats,
+    sports: overrides.sports ?? base.sports,
+    badges: overrides.badges ?? base.badges,
   };
 }
 
