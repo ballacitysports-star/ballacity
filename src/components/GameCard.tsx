@@ -3,6 +3,7 @@ import { motion } from "framer-motion";
 import { MapPin, Users, Clock, Zap, Lock, Flame } from "lucide-react";
 import type { Game } from "@/lib/sample-data";
 import { formatWhen } from "@/lib/format";
+import { useIsJoined } from "@/lib/games-store";
 
 const sportEmoji: Record<string, string> = {
   Basketball: "🏀", Soccer: "⚽", Pickleball: "🥒", Volleyball: "🏐",
@@ -11,8 +12,10 @@ const sportEmoji: Record<string, string> = {
 };
 
 export function GameCard({ game, index = 0 }: { game: Game; index?: number }) {
-  const spotsLeft = game.maxPlayers - game.joined;
-  const fillPct = Math.round((game.joined / game.maxPlayers) * 100);
+  const joinedByMe = useIsJoined(game.id);
+  const joinedCount = Math.min(game.maxPlayers, game.joined + (joinedByMe ? 1 : 0));
+  const spotsLeft = game.maxPlayers - joinedCount;
+  const fillPct = Math.round((joinedCount / game.maxPlayers) * 100);
 
   return (
     <motion.div
@@ -40,6 +43,11 @@ export function GameCard({ game, index = 0 }: { game: Game; index?: number }) {
             {game.urgent && (
               <span className="inline-flex items-center gap-1 rounded-full bg-coral-gradient px-2.5 py-1 text-xs font-bold text-white">
                 <Zap className="h-3 w-3" /> Needs players
+              </span>
+            )}
+            {joinedByMe && (
+              <span className="inline-flex items-center gap-1 rounded-full bg-lime px-2.5 py-1 text-xs font-bold text-primary-foreground">
+                Joined
               </span>
             )}
             {game.trending && !game.urgent && (
@@ -76,7 +84,7 @@ export function GameCard({ game, index = 0 }: { game: Game; index?: number }) {
             </div>
             <div className="flex items-center gap-1.5 text-xs font-semibold">
               <Users className="h-4 w-4 text-lime" />
-              <span className="text-foreground">{game.joined}/{game.maxPlayers}</span>
+              <span className="text-foreground">{joinedCount}/{game.maxPlayers}</span>
               {spotsLeft > 0 && spotsLeft <= 3 && (
                 <span className="text-coral">· {spotsLeft} left</span>
               )}
