@@ -60,9 +60,9 @@ function Profile() {
               <LogIn className="h-3.5 w-3.5" /> Sign in
             </Link>
           )}
-          <button className="grid h-10 w-10 place-items-center rounded-full border border-border bg-background/70 backdrop-blur">
+          <Link to="/profile/edit" className="grid h-10 w-10 place-items-center rounded-full border border-border bg-background/70 backdrop-blur" aria-label="Edit profile">
             <Settings className="h-4 w-4" />
-          </button>
+          </Link>
         </div>
       </div>
 
