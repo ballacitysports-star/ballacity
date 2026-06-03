@@ -12,6 +12,7 @@ import { ReputationBadge } from "@/components/ReputationBadge";
 import { useMemo } from "react";
 import { useAuth, signOut } from "@/hooks/use-auth";
 import { toast } from "sonner";
+import { useJoinedGameIds } from "@/lib/games-store";
 
 export const Route = createFileRoute("/_tabs/profile")({
   head: () => ({ meta: [{ title: "Profile — OpenRun" }] }),
@@ -23,6 +24,11 @@ function Profile() {
   const myReviews = useReviewsFor("me");
   const myRep = useMemo(() => computeReputation(myReviews, "player"), [myReviews]);
   const { user } = useAuth();
+  const joinedGameIds = useJoinedGameIds();
+  const upcomingGames = useMemo(() => {
+    const ids = new Set(joinedGameIds);
+    return GAMES.filter((game) => ids.has(game.id));
+  }, [joinedGameIds]);
   return (
     <div className="mx-auto max-w-md">
       {/* Cover */}
@@ -99,9 +105,19 @@ function Profile() {
           <h2 className="font-display text-sm font-bold uppercase tracking-wider text-muted-foreground mb-2 flex items-center gap-1.5">
             <Calendar className="h-4 w-4" /> Upcoming games
           </h2>
-          <div className="space-y-3">
-            {GAMES.slice(0, 2).map((g, i) => <GameCard key={g.id} game={g} index={i} />)}
-          </div>
+          {upcomingGames.length > 0 ? (
+            <div className="space-y-3">
+              {upcomingGames.map((g, i) => <GameCard key={g.id} game={g} index={i} />)}
+            </div>
+          ) : (
+            <Link
+              to="/feed"
+              className="block rounded-3xl border border-dashed border-border bg-surface/40 p-5 text-center hover:border-lime/40"
+            >
+              <div className="font-display text-base font-bold">No games joined yet</div>
+              <p className="text-xs text-muted-foreground mt-1">Join a run to see it here.</p>
+            </Link>
+          )}
         </div>
 
         {/* Sports & skill */}
