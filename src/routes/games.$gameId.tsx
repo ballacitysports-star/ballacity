@@ -57,7 +57,7 @@ export const Route = createFileRoute("/games/$gameId")({
 function GameDetail() {
   const { gameId } = Route.useLoaderData();
   const hosted = useHostedGames();
-  const game = useMemo(
+  const game = useMemo<Game | undefined>(
     () => hosted.find((g) => g.id === gameId) ?? GAMES.find((g) => g.id === gameId),
     [hosted, gameId],
   );
