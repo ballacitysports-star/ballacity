@@ -62,7 +62,7 @@ export function GameCard({ game, index = 0 }: { game: Game; index?: number }) {
 
         <div className="p-4 space-y-3">
           <div className="flex items-center gap-3 text-sm text-muted-foreground">
-            <span className="inline-flex items-center gap-1.5"><Clock className="h-4 w-4 text-lime" />{formatWhen(game.date)}</span>
+            <span className="inline-flex items-center gap-1.5" suppressHydrationWarning><Clock className="h-4 w-4 text-lime" />{formatWhen(game.date)}</span>
             <span className="inline-flex items-center gap-1.5"><MapPin className="h-4 w-4 text-coral" />{game.distanceMi} mi</span>
             {game.isPrivate && <Lock className="h-4 w-4" />}
           </div>
