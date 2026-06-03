@@ -4,7 +4,7 @@ import { Search, SlidersHorizontal, Bell, X } from "lucide-react";
 import { Logo } from "@/components/Logo";
 import { SportChips } from "@/components/SportChips";
 import { GameCard } from "@/components/GameCard";
-import { GAMES, SPORTS, type Sport, ME } from "@/lib/sample-data";
+import { GAMES, SPORTS, type Sport } from "@/lib/sample-data";
 import { useHostedGames } from "@/lib/hosted-games-store";
 import { useJoinedGameIds } from "@/lib/games-store";
 import { useFeedPrefs, setFeedPrefs, DEFAULT_PREFS } from "@/lib/user-prefs-store";
