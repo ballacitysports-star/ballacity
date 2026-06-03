@@ -14,7 +14,122 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      profiles: {
+        Row: {
+          avatar_initials: string | null
+          bio: string | null
+          created_at: string
+          display_name: string
+          id: string
+          sport: string | null
+          updated_at: string
+          username: string | null
+        }
+        Insert: {
+          avatar_initials?: string | null
+          bio?: string | null
+          created_at?: string
+          display_name?: string
+          id: string
+          sport?: string | null
+          updated_at?: string
+          username?: string | null
+        }
+        Update: {
+          avatar_initials?: string | null
+          bio?: string | null
+          created_at?: string
+          display_name?: string
+          id?: string
+          sport?: string | null
+          updated_at?: string
+          username?: string | null
+        }
+        Relationships: []
+      }
+      review_helpfuls: {
+        Row: {
+          created_at: string
+          review_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          review_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          review_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "review_helpfuls_review_id_fkey"
+            columns: ["review_id"]
+            isOneToOne: false
+            referencedRelation: "reviews"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      reviews: {
+        Row: {
+          body: string
+          context: string | null
+          created_at: string
+          flagged: boolean
+          helpful_count: number
+          id: string
+          is_private: boolean
+          kind: string
+          rating: number
+          reviewee_id: string
+          reviewee_kind: string
+          reviewee_name: string
+          reviewer_id: string
+          scores: Json
+          title: string | null
+          verified: boolean
+        }
+        Insert: {
+          body: string
+          context?: string | null
+          created_at?: string
+          flagged?: boolean
+          helpful_count?: number
+          id?: string
+          is_private?: boolean
+          kind: string
+          rating: number
+          reviewee_id: string
+          reviewee_kind: string
+          reviewee_name: string
+          reviewer_id: string
+          scores?: Json
+          title?: string | null
+          verified?: boolean
+        }
+        Update: {
+          body?: string
+          context?: string | null
+          created_at?: string
+          flagged?: boolean
+          helpful_count?: number
+          id?: string
+          is_private?: boolean
+          kind?: string
+          rating?: number
+          reviewee_id?: string
+          reviewee_kind?: string
+          reviewee_name?: string
+          reviewer_id?: string
+          scores?: Json
+          title?: string | null
+          verified?: boolean
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
