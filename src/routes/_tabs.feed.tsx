@@ -219,5 +219,3 @@ function FilterSheet({ onClose }: { onClose: () => void }) {
   );
 }
 
-// Suppress unused import warnings when ME isn't directly referenced
-void ME;
