@@ -171,7 +171,7 @@ function Landing() {
             >
               <div className="text-3xl mb-2">{s.emoji}</div>
               <div className="font-semibold">{s.name}</div>
-              <div className="text-xs text-muted-foreground">{Math.floor(Math.random() * 80 + 20)} nearby</div>
+              <div className="text-xs text-muted-foreground">{20 + ((s.name.charCodeAt(0) * 7 + s.name.length * 13) % 80)} nearby</div>
             </motion.div>
           ))}
         </div>
