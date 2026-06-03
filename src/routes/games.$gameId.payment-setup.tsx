@@ -1,0 +1,162 @@
+import { createFileRoute, Link, notFound, useNavigate } from "@tanstack/react-router";
+import { useEffect, useState } from "react";
+import { ArrowLeft, Check, ShieldAlert } from "lucide-react";
+import { toast } from "sonner";
+import { GAMES } from "@/lib/sample-data";
+import { useAuth } from "@/hooks/use-auth";
+import {
+  type PaymentMethod, paymentTypeMeta,
+  listMyPaymentMethods, getMyGamePaymentSettings, upsertGamePaymentSettings,
+} from "@/lib/payments";
+import { LegalNotice } from "@/components/LegalNotice";
+
+export const Route = createFileRoute("/games/$gameId/payment-setup")({
+  loader: ({ params }) => {
+    const game = GAMES.find((g) => g.id === params.gameId);
+    if (!game) throw notFound();
+    return { game };
+  },
+  head: ({ loaderData }) => ({ meta: [{ title: `Payment setup — ${loaderData?.game.title ?? "game"}` }] }),
+  notFoundComponent: () => <div className="p-6 text-sm">Game not found.</div>,
+  errorComponent: ({ reset }) => <div className="p-6"><button onClick={reset} className="text-lime">Try again</button></div>,
+  component: SetupPage,
+});
+
+function SetupPage() {
+  const { game } = Route.useLoaderData();
+  const { user, loading } = useAuth();
+  const nav = useNavigate();
+  const [methods, setMethods] = useState<PaymentMethod[]>([]);
+  const [fee, setFee] = useState<string>(String(game.price || 0));
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [deadline, setDeadline] = useState("");
+  const [refundPolicy, setRefundPolicy] = useState("");
+  const [instructions, setInstructions] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => { if (!loading && !user) nav({ to: "/auth" }); }, [loading, user, nav]);
+
+  useEffect(() => {
+    if (!user) return;
+    (async () => {
+      const [m, s] = await Promise.all([listMyPaymentMethods(), getMyGamePaymentSettings(game.id)]);
+      setMethods(m.filter((x) => x.is_enabled));
+      if (s) {
+        setFee(String(s.entry_fee));
+        setSelected(new Set(s.accepted_method_ids));
+        setDeadline(s.payment_deadline ? s.payment_deadline.slice(0, 16) : "");
+        setRefundPolicy(s.refund_policy ?? "");
+        setInstructions(s.payment_instructions ?? "");
+      }
+    })();
+  }, [user, game.id]);
+
+  if (loading) return <div className="p-6 text-sm text-muted-foreground">Loading…</div>;
+  if (!user) return null;
+
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSaving(true);
+    try {
+      await upsertGamePaymentSettings({
+        game_id: game.id,
+        entry_fee: Number(fee) || 0,
+        accepted_method_ids: Array.from(selected),
+        payment_deadline: deadline ? new Date(deadline).toISOString() : null,
+        refund_policy: refundPolicy || null,
+        payment_instructions: instructions || null,
+      });
+      toast.success("Payment settings saved");
+      nav({ to: "/games/$gameId", params: { gameId: game.id } });
+    } catch (e: any) { toast.error(e.message); } finally { setSaving(false); }
+  };
+
+  return (
+    <form onSubmit={submit} className="mx-auto max-w-md px-4 pt-6 pb-24 space-y-5">
+      <div className="flex items-center gap-3">
+        <Link to="/games/$gameId" params={{ gameId: game.id }} className="grid h-10 w-10 place-items-center rounded-full border border-border bg-surface">
+          <ArrowLeft className="h-5 w-5" />
+        </Link>
+        <div>
+          <h1 className="font-display text-xl font-bold leading-tight">Payment setup</h1>
+          <div className="text-xs text-muted-foreground">{game.title}</div>
+        </div>
+      </div>
+
+      <section>
+        <Label>Entry fee</Label>
+        <div className="relative">
+          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">$</span>
+          <input type="number" min={0} step="0.01" value={fee} onChange={(e) => setFee(e.target.value)}
+            className="w-full rounded-xl border border-border bg-surface pl-7 pr-3 py-3 text-sm outline-none focus:border-lime" />
+        </div>
+      </section>
+
+      <section>
+        <Label>Accepted payment methods</Label>
+        {methods.length === 0 ? (
+          <Link to="/payments" className="block rounded-2xl border border-dashed border-coral/40 bg-coral/5 p-4 text-sm">
+            <div className="flex items-center gap-2 font-semibold text-coral"><ShieldAlert className="h-4 w-4" /> No payment methods yet</div>
+            <p className="text-xs text-muted-foreground mt-1">Add Venmo, Cash App, Zelle, or others before charging for games.</p>
+          </Link>
+        ) : (
+          <div className="space-y-2">
+            {methods.map((m) => {
+              const meta = paymentTypeMeta(m.payment_type);
+              const on = selected.has(m.id);
+              return (
+                <button type="button" key={m.id}
+                  onClick={() => {
+                    const n = new Set(selected); on ? n.delete(m.id) : n.add(m.id); setSelected(n);
+                  }}
+                  className={`w-full flex items-center gap-3 rounded-2xl border p-3 text-left ${
+                    on ? "border-lime bg-lime/5" : "border-border bg-surface"
+                  }`}>
+                  <div className="grid h-9 w-9 place-items-center rounded-xl bg-secondary text-base">{meta.emoji}</div>
+                  <div className="flex-1 min-w-0">
+                    <div className="font-semibold text-sm">{m.label || meta.name}</div>
+                    <div className="text-xs text-muted-foreground truncate">{m.username || m.contact_info}</div>
+                  </div>
+                  <div className={`grid h-6 w-6 place-items-center rounded-full ${on ? "bg-lime text-primary-foreground" : "border border-border"}`}>
+                    {on && <Check className="h-4 w-4" />}
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        )}
+      </section>
+
+      <section>
+        <Label>Payment deadline (optional)</Label>
+        <input type="datetime-local" value={deadline} onChange={(e) => setDeadline(e.target.value)}
+          className="w-full rounded-xl border border-border bg-surface px-3 py-3 text-sm outline-none focus:border-lime [color-scheme:dark]" />
+      </section>
+
+      <section>
+        <Label>Refund policy (optional)</Label>
+        <textarea rows={3} value={refundPolicy} onChange={(e) => setRefundPolicy(e.target.value)}
+          placeholder="e.g. Full refund up to 24h before tip-off."
+          className="w-full rounded-xl border border-border bg-surface px-3 py-3 text-sm outline-none focus:border-lime resize-none" />
+      </section>
+
+      <section>
+        <Label>Payment instructions (optional)</Label>
+        <textarea rows={3} value={instructions} onChange={(e) => setInstructions(e.target.value)}
+          placeholder="e.g. Include your full name in the payment note."
+          className="w-full rounded-xl border border-border bg-surface px-3 py-3 text-sm outline-none focus:border-lime resize-none" />
+      </section>
+
+      <LegalNotice />
+
+      <button type="submit" disabled={saving || (Number(fee) > 0 && selected.size === 0)}
+        className="w-full rounded-2xl bg-lime-gradient py-4 font-bold text-primary-foreground disabled:opacity-50">
+        {saving ? "Saving…" : "Save payment settings"}
+      </button>
+    </form>
+  );
+}
+
+function Label({ children }: { children: React.ReactNode }) {
+  return <div className="mb-1.5 text-xs font-bold uppercase tracking-wider text-muted-foreground">{children}</div>;
+}

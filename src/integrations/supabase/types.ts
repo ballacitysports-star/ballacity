@@ -14,6 +14,143 @@ export type Database = {
   }
   public: {
     Tables: {
+      game_payment_settings: {
+        Row: {
+          accepted_method_ids: string[]
+          created_at: string
+          entry_fee: number
+          game_id: string
+          host_id: string
+          id: string
+          payment_deadline: string | null
+          payment_instructions: string | null
+          refund_policy: string | null
+          updated_at: string
+        }
+        Insert: {
+          accepted_method_ids?: string[]
+          created_at?: string
+          entry_fee?: number
+          game_id: string
+          host_id: string
+          id?: string
+          payment_deadline?: string | null
+          payment_instructions?: string | null
+          refund_policy?: string | null
+          updated_at?: string
+        }
+        Update: {
+          accepted_method_ids?: string[]
+          created_at?: string
+          entry_fee?: number
+          game_id?: string
+          host_id?: string
+          id?: string
+          payment_deadline?: string | null
+          payment_instructions?: string | null
+          refund_policy?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      host_payment_methods: {
+        Row: {
+          contact_info: string | null
+          created_at: string
+          host_id: string
+          id: string
+          instructions: string | null
+          is_enabled: boolean
+          label: string | null
+          payment_type: string
+          payment_url: string | null
+          updated_at: string
+          username: string | null
+        }
+        Insert: {
+          contact_info?: string | null
+          created_at?: string
+          host_id: string
+          id?: string
+          instructions?: string | null
+          is_enabled?: boolean
+          label?: string | null
+          payment_type: string
+          payment_url?: string | null
+          updated_at?: string
+          username?: string | null
+        }
+        Update: {
+          contact_info?: string | null
+          created_at?: string
+          host_id?: string
+          id?: string
+          instructions?: string | null
+          is_enabled?: boolean
+          label?: string | null
+          payment_type?: string
+          payment_url?: string | null
+          updated_at?: string
+          username?: string | null
+        }
+        Relationships: []
+      }
+      payment_submissions: {
+        Row: {
+          game_id: string
+          host_id: string
+          id: string
+          notes: string | null
+          payment_method_id: string | null
+          payment_type: string | null
+          player_id: string
+          reviewed_at: string | null
+          reviewer_notes: string | null
+          screenshot_path: string | null
+          status: string
+          submitted_at: string
+          transaction_reference: string | null
+        }
+        Insert: {
+          game_id: string
+          host_id: string
+          id?: string
+          notes?: string | null
+          payment_method_id?: string | null
+          payment_type?: string | null
+          player_id: string
+          reviewed_at?: string | null
+          reviewer_notes?: string | null
+          screenshot_path?: string | null
+          status?: string
+          submitted_at?: string
+          transaction_reference?: string | null
+        }
+        Update: {
+          game_id?: string
+          host_id?: string
+          id?: string
+          notes?: string | null
+          payment_method_id?: string | null
+          payment_type?: string | null
+          player_id?: string
+          reviewed_at?: string | null
+          reviewer_notes?: string | null
+          screenshot_path?: string | null
+          status?: string
+          submitted_at?: string
+          transaction_reference?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payment_submissions_payment_method_id_fkey"
+            columns: ["payment_method_id"]
+            isOneToOne: false
+            referencedRelation: "host_payment_methods"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           avatar_initials: string | null

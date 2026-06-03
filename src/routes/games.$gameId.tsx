@@ -1,6 +1,6 @@
-import { createFileRoute, Link, notFound } from "@tanstack/react-router";
+import { createFileRoute, Link, notFound, useNavigate } from "@tanstack/react-router";
 import { motion } from "framer-motion";
-import { ArrowLeft, Share2, Bookmark, MapPin, Clock, Users, Calendar, MessageCircle, Star, Check } from "lucide-react";
+import { ArrowLeft, Share2, Bookmark, MapPin, Clock, Users, Calendar, MessageCircle, Star, Check, CreditCard, Settings as SettingsIcon } from "lucide-react";
 import { GAMES, SPORTS } from "@/lib/sample-data";
 import { formatWhen } from "@/lib/format";
 import { ReviewsSection } from "@/components/ReviewsSection";
@@ -8,7 +8,9 @@ import { computeReputation, useReviewsFor } from "@/lib/reviews";
 import { ReputationBadge } from "@/components/ReputationBadge";
 import { joinGame, leaveGame, useIsJoined } from "@/lib/games-store";
 import { toast } from "sonner";
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { getGamePaymentSettings, listMySubmissionsForGame, type GamePaymentSettings, type PaymentSubmission } from "@/lib/payments";
+import { LegalNotice } from "@/components/LegalNotice";
 
 const emojiBySport: Record<string, string> = Object.fromEntries(SPORTS.map((s) => [s.name, s.emoji]));
 
@@ -54,17 +56,29 @@ function GameDetail() {
   const joined = useIsJoined(game.id);
   const effectiveJoined = game.joined + (joined ? 1 : 0);
   const spotsLeft = Math.max(0, game.maxPlayers - effectiveJoined);
+  const nav = useNavigate();
+  const [settings, setSettings] = useState<GamePaymentSettings | null>(null);
+  const [mySubs, setMySubs] = useState<PaymentSubmission[]>([]);
+
+  useEffect(() => {
+    getGamePaymentSettings(game.id).then(setSettings).catch(() => {});
+    listMySubmissionsForGame(game.id).then(setMySubs).catch(() => {});
+  }, [game.id]);
+
+  const fee = Number(settings?.entry_fee ?? game.price);
+  const isPaid = fee > 0;
+  const latestSub = mySubs[0];
+  const isConfirmed = latestSub?.status === "verified";
+  const isPending = latestSub?.status === "pending";
 
   const handleJoin = () => {
-    if (joined) {
+    if (joined && !isPaid) {
       leaveGame(game.id);
       toast("You left the game.");
       return;
     }
-    if (spotsLeft <= 0) {
-      toast.error("This game is full.");
-      return;
-    }
+    if (spotsLeft <= 0) { toast.error("This game is full."); return; }
+    if (isPaid) { nav({ to: "/games/$gameId/pay", params: { gameId: game.id } }); return; }
     joinGame(game.id);
     toast.success(`You're in! See you at ${game.location}.`);
   };
@@ -236,6 +250,17 @@ function GameDetail() {
         </div>
       </div>
 
+      {/* Host-only payment setup link */}
+      <div className="mx-auto max-w-md px-4 mt-4">
+        <Link to="/games/$gameId/payment-setup" params={{ gameId: game.id }}
+          className="flex items-center gap-2 rounded-2xl border border-dashed border-border bg-surface/40 p-3 text-xs text-muted-foreground hover:border-lime/40">
+          <SettingsIcon className="h-4 w-4 text-lime" />
+          <span className="flex-1">Host of this game? Configure payment methods & fee.</span>
+          <span className="text-lime">→</span>
+        </Link>
+        <div className="mt-3"><LegalNotice compact /></div>
+      </div>
+
       {/* Sticky CTA */}
       <div className="fixed bottom-0 left-0 right-0 z-30 px-4 pb-[max(env(safe-area-inset-bottom),0.75rem)] pt-3 backdrop-blur-xl bg-background/80 border-t border-border">
         <div className="mx-auto max-w-md flex items-center gap-2">
@@ -245,19 +270,26 @@ function GameDetail() {
           <motion.button
             whileTap={{ scale: 0.97 }}
             onClick={handleJoin}
-            disabled={!joined && spotsLeft <= 0}
+            disabled={!joined && spotsLeft <= 0 && !isPaid}
             className={`flex-1 rounded-2xl py-3.5 font-bold inline-flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed ${
-              joined
-                ? "bg-surface border border-lime/40 text-lime"
-                : "bg-lime-gradient text-primary-foreground glow-lime"
+              isConfirmed ? "bg-lime/15 border border-lime/40 text-lime" :
+              isPending ? "bg-surface border border-coral/40 text-coral" :
+              joined ? "bg-surface border border-lime/40 text-lime" :
+              "bg-lime-gradient text-primary-foreground glow-lime"
             }`}
           >
-            {joined ? (
+            {isConfirmed ? (
+              <><Check className="h-4 w-4" /> Confirmed · You're in</>
+            ) : isPending ? (
+              <><Clock className="h-4 w-4" /> Payment pending verification</>
+            ) : joined && !isPaid ? (
               <><Check className="h-4 w-4" /> You're in · Tap to leave</>
             ) : spotsLeft <= 0 ? (
               <>Full</>
+            ) : isPaid ? (
+              <><CreditCard className="h-4 w-4" /> Pay host · ${fee.toFixed(2)}</>
             ) : (
-              <>{game.price === 0 ? "Join free · " : `Join · $${game.price} · `}{spotsLeft} spot{spotsLeft === 1 ? "" : "s"} left</>
+              <>Join free · {spotsLeft} spot{spotsLeft === 1 ? "" : "s"} left</>
             )}
           </motion.button>
         </div>
