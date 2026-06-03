@@ -65,7 +65,14 @@ export function imageFor(sport: Sport) {
   return sportImage[sport];
 }
 
-const now = Date.now();
+// Pinned to start-of-UTC-day so SSR and client hydration produce identical
+// ISO strings. Date.now() at module scope causes hydration mismatches because
+// the server and client evaluate the module at different instants.
+const now = (() => {
+  const d = new Date();
+  d.setUTCHours(12, 0, 0, 0);
+  return d.getTime();
+})();
 const inHours = (h: number) => new Date(now + h * 3600_000).toISOString();
 
 export const GAMES: Game[] = [
