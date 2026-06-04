@@ -19,7 +19,7 @@ export const Route = createFileRoute("/profile/edit")({
 
 function EditProfile() {
   const { user, loading } = useAuth();
-  const profile = useMyProfile();
+  const profile = useMyProfile(user);
   const prefs = useFeedPrefs();
   const nav = useNavigate();
 
@@ -54,7 +54,8 @@ function EditProfile() {
     }
   }, [loading, user, nav]);
 
-  if (!loading && !user) return null;
+  if (loading) return null;
+  if (!user) return null;
 
   const save = () => {
     if (!user) { toast.error("Sign in to save"); return; }
