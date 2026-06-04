@@ -9,6 +9,7 @@ type AuthState = {
 };
 
 const listeners = new Set<() => void>();
+const SERVER_AUTH_STATE: AuthState = { session: null, user: null, loading: true };
 let authState: AuthState = { session: null, user: null, loading: true };
 let initialized = false;
 
@@ -47,12 +48,11 @@ function subscribe(listener: () => void) {
 }
 
 function getSnapshot() {
-  initAuthStore();
   return authState;
 }
 
 function getServerSnapshot() {
-  return { session: null, user: null, loading: true };
+  return SERVER_AUTH_STATE;
 }
 
 export function useAuth() {
