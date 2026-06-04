@@ -62,3 +62,8 @@ export function useAuth() {
 export async function signOut() {
   await supabase.auth.signOut();
 }
+
+export async function getCurrentUser() {
+  const { data } = await supabase.auth.getSession();
+  return data.session?.user ?? null;
+}
