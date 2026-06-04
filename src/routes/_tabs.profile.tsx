@@ -41,9 +41,11 @@ function Profile() {
   }, [joinedGameIds, hosted]);
 
   useEffect(() => {
-    if (!loading && (!user || !me)) {
+    if (loading || user || me) return;
+    const redirect = window.setTimeout(() => {
       nav({ to: "/" });
-    }
+    }, 600);
+    return () => window.clearTimeout(redirect);
   }, [loading, user, me, nav]);
 
   if (loading) return null;
