@@ -139,8 +139,9 @@ function defaultsFromUser(user: User): MyProfile {
 }
 
 // ---------- Hooks ----------
-export function useMyProfile(): MyProfile | null {
-  const { user } = useAuth();
+export function useMyProfile(currentUser?: User | null): MyProfile | null {
+  const { user: authUser } = useAuth();
+  const user = currentUser === undefined ? authUser : currentUser;
   const [tick, setTick] = useState(0);
   useEffect(() => {
     const cb = () => setTick((t) => t + 1);
