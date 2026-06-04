@@ -10,7 +10,7 @@ import {
   setFeedPrefs,
   DEFAULT_PREFS,
 } from "@/lib/user-prefs-store";
-import { useAuth } from "@/hooks/use-auth";
+import { getCurrentUser, useAuth } from "@/hooks/use-auth";
 
 export const Route = createFileRoute("/profile/edit")({
   head: () => ({ meta: [{ title: "Edit profile — OpenRun" }] }),
@@ -50,10 +50,11 @@ function EditProfile() {
 
   useEffect(() => {
     if (loading || user) return;
-    const redirect = window.setTimeout(() => {
-      nav({ to: "/" });
-    }, 600);
-    return () => window.clearTimeout(redirect);
+    let cancelled = false;
+    getCurrentUser().then((currentUser) => {
+      if (!cancelled && !currentUser) nav({ to: "/" });
+    });
+    return () => { cancelled = true; };
   }, [loading, user, nav]);
 
   if (loading) return null;
