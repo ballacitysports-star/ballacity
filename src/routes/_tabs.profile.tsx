@@ -10,7 +10,7 @@ import { HERO_IMAGE } from "@/lib/sample-data";
 import { computeReputation, useReviewsFor } from "@/lib/reviews";
 import { ReputationBadge } from "@/components/ReputationBadge";
 import { useEffect, useMemo } from "react";
-import { useAuth, signOut } from "@/hooks/use-auth";
+import { getCurrentUser, useAuth, signOut } from "@/hooks/use-auth";
 import { toast } from "sonner";
 import { useJoinedGameIds } from "@/lib/games-store";
 import { useHostedGames } from "@/lib/hosted-games-store";
@@ -42,10 +42,11 @@ function Profile() {
 
   useEffect(() => {
     if (loading || user || me) return;
-    const redirect = window.setTimeout(() => {
-      nav({ to: "/" });
-    }, 600);
-    return () => window.clearTimeout(redirect);
+    let cancelled = false;
+    getCurrentUser().then((currentUser) => {
+      if (!cancelled && !currentUser) nav({ to: "/" });
+    });
+    return () => { cancelled = true; };
   }, [loading, user, me, nav]);
 
   if (loading) return null;
