@@ -85,7 +85,7 @@ function Profile() {
         <div className="absolute top-4 right-4 flex items-center gap-2">
           {user ? (
             <button
-              onClick={async () => { await signOut(); toast.success("Signed out"); }}
+              onClick={async () => { await signOut(); }}
               className="inline-flex items-center gap-1 rounded-full border border-border bg-background/70 px-3 py-2 text-xs font-bold backdrop-blur"
             >
               <LogOut className="h-3.5 w-3.5" /> Sign out
