@@ -1,4 +1,4 @@
-import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { motion } from "framer-motion";
 import { Settings, Trophy, Calendar, Video, Shield, Users, Plus, BarChart3, LogIn, LogOut, CreditCard } from "lucide-react";
 import { ME, GAMES } from "@/lib/sample-data";
@@ -23,7 +23,6 @@ export const Route = createFileRoute("/_tabs/profile")({
 });
 
 function Profile() {
-  const nav = useNavigate();
   const myOrgs = useMyOrgs();
   const myReviews = useReviewsFor("me");
   const myRep = useMemo(() => computeReputation(myReviews, "player"), [myReviews]);
@@ -52,13 +51,29 @@ function Profile() {
     let cancelled = false;
     getCurrentUser().then((currentUser) => {
       if (!cancelled && currentUser) setConfirmedUser(currentUser);
-      if (!cancelled && !currentUser) nav({ to: "/" });
+      if (!cancelled && !currentUser) setConfirmedUser(null);
     });
     return () => { cancelled = true; };
-  }, [loading, profileUser, me, nav]);
+  }, [loading, profileUser, me]);
 
   if (loading) return null;
-  if (!profileUser || !me) return null;
+  if (!profileUser || !me) {
+    return (
+      <div className="mx-auto flex min-h-dvh max-w-md flex-col items-center justify-center px-6 pb-28 text-center">
+        <div className="grid h-16 w-16 place-items-center rounded-3xl bg-lime-gradient font-display text-xl font-bold text-primary-foreground glow-lime">
+          O
+        </div>
+        <h1 className="mt-5 font-display text-3xl font-bold">Sign in to view your profile</h1>
+        <p className="mt-2 text-sm text-muted-foreground">Your games, reviews, and profile stay private until you sign in.</p>
+        <Link
+          to="/auth"
+          className="mt-6 inline-flex rounded-full bg-lime-gradient px-6 py-3 text-sm font-bold text-primary-foreground"
+        >
+          Sign in
+        </Link>
+      </div>
+    );
+  }
 
 
   return (

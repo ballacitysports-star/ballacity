@@ -60,13 +60,23 @@ function EditProfile() {
     let cancelled = false;
     getCurrentUser().then((currentUser) => {
       if (!cancelled && currentUser) setConfirmedUser(currentUser);
-      if (!cancelled && !currentUser) nav({ to: "/" });
+      if (!cancelled && !currentUser) setConfirmedUser(null);
     });
     return () => { cancelled = true; };
   }, [loading, profileUser, nav]);
 
   if (loading) return null;
-  if (!profileUser) return null;
+  if (!profileUser) {
+    return (
+      <div className="mx-auto flex min-h-dvh max-w-md flex-col items-center justify-center px-6 text-center">
+        <h1 className="font-display text-3xl font-bold">Sign in to edit your profile</h1>
+        <p className="mt-2 text-sm text-muted-foreground">Profile changes are saved to your account.</p>
+        <Link to="/auth" className="mt-6 rounded-full bg-lime-gradient px-6 py-3 text-sm font-bold text-primary-foreground">
+          Sign in
+        </Link>
+      </div>
+    );
+  }
 
   const save = () => {
     if (!profileUser) { toast.error("Sign in to save"); return; }
