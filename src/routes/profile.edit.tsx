@@ -1,6 +1,7 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { ArrowLeft, Check, X } from "lucide-react";
 import { useEffect, useState } from "react";
+import type { User } from "@supabase/supabase-js";
 import { toast } from "sonner";
 import { SPORTS, type Sport } from "@/lib/sample-data";
 import {
@@ -10,7 +11,7 @@ import {
   setFeedPrefs,
   DEFAULT_PREFS,
 } from "@/lib/user-prefs-store";
-import { useAuth } from "@/hooks/use-auth";
+import { getCurrentUser, useAuth } from "@/hooks/use-auth";
 
 export const Route = createFileRoute("/profile/edit")({
   head: () => ({ meta: [{ title: "Edit profile — OpenRun" }] }),
@@ -19,7 +20,9 @@ export const Route = createFileRoute("/profile/edit")({
 
 function EditProfile() {
   const { user, loading } = useAuth();
-  const profile = useMyProfile();
+  const [confirmedUser, setConfirmedUser] = useState<User | null>(null);
+  const profileUser = user ?? confirmedUser;
+  const profile = useMyProfile(profileUser);
   const prefs = useFeedPrefs();
   const nav = useNavigate();
 
@@ -49,18 +52,27 @@ function EditProfile() {
     setSports(sports.map((x) => (x.name === s ? { ...x, skill } : x)));
 
   useEffect(() => {
-    if (!loading && !user) {
-      nav({ to: "/" });
-    }
-  }, [loading, user, nav]);
+    if (user) setConfirmedUser(user);
+  }, [user]);
 
-  if (!loading && !user) return null;
+  useEffect(() => {
+    if (loading || profileUser) return;
+    let cancelled = false;
+    getCurrentUser().then((currentUser) => {
+      if (!cancelled && currentUser) setConfirmedUser(currentUser);
+      if (!cancelled && !currentUser) nav({ to: "/" });
+    });
+    return () => { cancelled = true; };
+  }, [loading, profileUser, nav]);
+
+  if (loading) return null;
+  if (!profileUser) return null;
 
   const save = () => {
-    if (!user) { toast.error("Sign in to save"); return; }
+    if (!profileUser) { toast.error("Sign in to save"); return; }
     const trimmedName = name.trim().slice(0, 60);
     if (!trimmedName) { toast.error("Name is required"); return; }
-    setProfileOverrides(user.id, {
+    setProfileOverrides(profileUser.id, {
       name: trimmedName,
       username: username.trim().slice(0, 30),
       avatar: (avatar.trim() || trimmedName.slice(0, 2)).toUpperCase().slice(0, 3),

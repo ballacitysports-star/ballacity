@@ -9,8 +9,9 @@ import { useMyOrgs } from "@/lib/org-store";
 import { HERO_IMAGE } from "@/lib/sample-data";
 import { computeReputation, useReviewsFor } from "@/lib/reviews";
 import { ReputationBadge } from "@/components/ReputationBadge";
-import { useEffect, useMemo } from "react";
-import { useAuth, signOut } from "@/hooks/use-auth";
+import { useEffect, useMemo, useState } from "react";
+import type { User } from "@supabase/supabase-js";
+import { getCurrentUser, useAuth, signOut } from "@/hooks/use-auth";
 import { toast } from "sonner";
 import { useJoinedGameIds } from "@/lib/games-store";
 import { useHostedGames } from "@/lib/hosted-games-store";
@@ -27,7 +28,9 @@ function Profile() {
   const myReviews = useReviewsFor("me");
   const myRep = useMemo(() => computeReputation(myReviews, "player"), [myReviews]);
   const { user, loading } = useAuth();
-  const me = useMyProfile();
+  const [confirmedUser, setConfirmedUser] = useState<User | null>(null);
+  const profileUser = user ?? confirmedUser;
+  const me = useMyProfile(profileUser);
   const joinedGameIds = useJoinedGameIds();
   const hosted = useHostedGames();
   const upcomingGames = useMemo(() => {
@@ -41,13 +44,21 @@ function Profile() {
   }, [joinedGameIds, hosted]);
 
   useEffect(() => {
-    if (!loading && (!user || !me)) {
-      nav({ to: "/" });
-    }
-  }, [loading, user, me, nav]);
+    if (user) setConfirmedUser(user);
+  }, [user]);
+
+  useEffect(() => {
+    if (loading || profileUser || me) return;
+    let cancelled = false;
+    getCurrentUser().then((currentUser) => {
+      if (!cancelled && currentUser) setConfirmedUser(currentUser);
+      if (!cancelled && !currentUser) nav({ to: "/" });
+    });
+    return () => { cancelled = true; };
+  }, [loading, profileUser, me, nav]);
 
   if (loading) return null;
-  if (!user || !me) return null;
+  if (!profileUser || !me) return null;
 
 
   return (
