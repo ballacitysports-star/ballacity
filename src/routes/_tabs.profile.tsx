@@ -26,7 +26,7 @@ function Profile() {
   const myOrgs = useMyOrgs();
   const myReviews = useReviewsFor("me");
   const myRep = useMemo(() => computeReputation(myReviews, "player"), [myReviews]);
-  const { user } = useAuth();
+  const { user, loading } = useAuth();
   const me = useMyProfile();
   const joinedGameIds = useJoinedGameIds();
   const hosted = useHostedGames();
@@ -41,12 +41,14 @@ function Profile() {
   }, [joinedGameIds, hosted]);
 
   useEffect(() => {
-    if (!user || !me) {
+    if (!loading && (!user || !me)) {
       nav({ to: "/" });
     }
-  }, [user, me, nav]);
+  }, [loading, user, me, nav]);
 
+  if (loading) return null;
   if (!user || !me) return null;
+
 
   return (
     <div className="mx-auto max-w-md">
