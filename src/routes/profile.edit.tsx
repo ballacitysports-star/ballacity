@@ -49,9 +49,11 @@ function EditProfile() {
     setSports(sports.map((x) => (x.name === s ? { ...x, skill } : x)));
 
   useEffect(() => {
-    if (!loading && !user) {
+    if (loading || user) return;
+    const redirect = window.setTimeout(() => {
       nav({ to: "/" });
-    }
+    }, 600);
+    return () => window.clearTimeout(redirect);
   }, [loading, user, nav]);
 
   if (loading) return null;
