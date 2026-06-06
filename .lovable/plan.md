@@ -1,55 +1,57 @@
-# Demo-Ready Stability Pass
+## Scope
 
-Scope you picked: fix the known hydration crash, walk every route end-to-end and repair anything that's broken, and enable Lovable Cloud so we have a real backend to migrate to next. Treating this as **Phase 1** of a multi-phase production push — backend migration of stores (reviews, joins, teams, orgs) is Phase 2.
+Fix four broken/missing flows. Each touches the database + UI.
 
-## Phase 1 — what I'll do this turn
+## 1. Notifications bell (header alert button)
 
-### 1. Fix the hydration crash (Critical)
-- Error: server rendered `52`, client rendered `50` inside the sports grid on `/`.
-- Cause: `SPORTS` counts in `src/lib/sample-data.ts` are derived from `Math.random()` or `Date.now()` at module init, so SSR and client compute different numbers.
-- Fix: make the count either a static seeded value, or render it client-only via `useHydrated()` / `<ClientOnly>` fallback.
+- Audit current bell icon usage in the header / bottom nav; make it a real `<Link to="/notifications">` (mapped to `_tabs.notifications.tsx`).
+- Build a `notifications` table (id, user_id, type, title, body, link, read_at, created_at) with RLS scoping to `auth.uid()`.
+- Realtime subscription on the bell to show an unread dot/count.
+- Notifications list page reads from the table, marks as read on click, deep-links to the related game/request/message.
 
-### 2. Route + interaction audit (every page)
-For each route I'll click every button, link, form, and tab in the browser tool at 390×844 (mobile) and note + fix anything broken. Routes to cover:
-- `/` (Landing)
-- `/feed`, `/discover`, `/create`, `/notifications`, `/profile`, `/teams`
-- `/games/$gameId`
-- `/teams/$teamId`, `/teams/$teamId/edit`, `/teams/create`
-- `/reviews`, `/review/new`
-- 404 / not-found fallback
+## 2. Host approve/decline pickups (join requests)
 
-Specific things I'll verify and repair:
-- All `<Link to=...>` targets resolve (no dead routes).
-- Bottom nav highlights match the active route.
-- Join / Leave game (already fixed — re-verify).
-- Write review flow from trainer, team, game host, player profile pre-fills correctly and submits.
-- Create team / edit team / delete team round-trip.
-- Profile reputation badge + reviews hub render with zero reviews (empty states).
-- No console errors or hydration warnings on any route.
+Join requests already exist in DB (`join_requests` table + RLS). What's missing is UI.
 
-### 3. Mobile polish (light)
-- Confirm sticky CTAs don't cover content on iPhone-sized viewports.
-- Tap targets ≥44px on icon-only buttons.
-- Fix any obvious overflow / clipped text spotted during the audit.
+- **Per-game section** on `games.$gameId.tsx`: if viewer is host, show pending join requests with Approve / Decline buttons + reviewer notes input.
+- **Host dashboard route** `/host/requests` listing all pending requests across the host's games (filter tabs: Pending / Approved / Rejected).
+- On approve/decline, insert a row into `notifications` for the player ("Your request to join X was approved/declined"), so the bell lights up.
+- Approved players auto-added to the game roster.
 
-### 4. Enable Lovable Cloud (foundation only)
-- Turn on Cloud so Phase 2 can migrate stores.
-- No schema or data migration yet — purely provisioning + verifying the integration files land cleanly.
+## 3. Messaging (build from scratch)
 
-## Phase 2 — next turn (not this one)
-Once you approve Phase 1's result, I'll:
-- Add auth (email/password + Google), profiles table, RLS.
-- Migrate `games-store`, `org-store`, `reviews`, joined-games from in-memory `Set`/arrays into Postgres tables with `createServerFn` + `requireSupabaseAuth`.
-- Wire the protected `_authenticated` subtree for create/edit flows.
-- Replace `sample-data.ts` reads with real queries (keep seed data as a one-time insert).
+- New tables:
+  - `conversations` (id, created_at, last_message_at, context game_id nullable)
+  - `conversation_participants` (conversation_id, user_id) — used for RLS membership
+  - `messages` (id, conversation_id, sender_id, body, created_at, read_at)
+- RLS: only participants can read/insert in a conversation.
+- Realtime on `messages` for live updates.
+- UI:
+  - `/messages` — inbox list (sorted by last_message_at).
+  - `/messages/$conversationId` — thread view with composer.
+  - "Message host" button on game detail page → finds-or-creates a 1:1 conversation, navigates to thread.
+- New-message arriving → notification row for the recipient.
 
-## Out of scope for this pass
-Payments, notifications, email, analytics, real search, performance profiling, full a11y audit, security scan. Those come after the data layer is real — auditing them on in-memory mocks would be wasted work.
+## 4. Payment feature
 
-## Deliverable at end of Phase 1
-- Hydration error gone.
-- Every visible button/link/form on every route either works or has a clear "coming soon" state.
-- Cloud enabled and reachable.
-- A short checklist in chat: ✅ fixed / ⚠️ needs Phase 2 / ⛔ blocked, plus a Production Readiness Score for where we are after Phase 1.
+The "Pay" CTA on the game detail page doesn't route to payment info. Fix:
 
-Approve and I'll execute Phase 1.
+- Audit `games.$gameId.tsx`: the Pay button should `<Link to="/games/$gameId/pay">` (route already exists at `games.$gameId.pay.tsx`).
+- If the host has no `game_payment_settings` yet, surface the existing empty-state instead of failing silently.
+- Host-side: ensure the "Set up payments" entry point on a hosted game routes to `games.$gameId.payment-setup.tsx`.
+- Verify the join → pay → submit-proof flow end-to-end once routed.
+
+## Tech notes
+
+- All new tables: explicit `GRANT` to `authenticated` + `service_role`, RLS enabled, policies scoped to `auth.uid()`.
+- Realtime via `ALTER PUBLICATION supabase_realtime ADD TABLE ...` for `messages` and `notifications`.
+- All data access from client uses the browser `supabase` client (RLS-scoped); no server functions needed for this scope.
+- No new design tokens; reuse existing `lime` / `coral` / `surface` styles.
+
+## Out of scope
+
+- Push notifications (browser/native) — in-app only.
+- Group chat (only 1:1 for now).
+- Editing/deleting sent messages.
+
+Shall I proceed?
