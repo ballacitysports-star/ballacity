@@ -1,6 +1,7 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
-import { Search, SlidersHorizontal, Bell, X } from "lucide-react";
+import { Search, SlidersHorizontal, Bell, MessageCircle, X } from "lucide-react";
+import { useUnreadNotificationCount } from "@/lib/notifications";
 import { Logo } from "@/components/Logo";
 import { SportChips } from "@/components/SportChips";
 import { GameCard } from "@/components/GameCard";
