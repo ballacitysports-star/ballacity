@@ -423,3 +423,51 @@ function Meta({ icon, label, value }: { icon: React.ReactNode; label: string; va
     </div>
   );
 }
+
+function HostRequestRow({ req, gameTitle, onChange }: { req: JoinRequest; gameTitle: string; onChange: () => void }) {
+  const [busy, setBusy] = useState(false);
+  const [name, setName] = useState<string>("Player");
+  useEffect(() => {
+    (async () => {
+      const { data } = await supabase.from("profiles").select("display_name, avatar_initials").eq("id", req.player_id).maybeSingle();
+      if (data) setName((data as any).display_name ?? "Player");
+    })();
+  }, [req.player_id]);
+
+  const act = async (status: "approved" | "rejected") => {
+    setBusy(true);
+    try {
+      await reviewJoinRequest(req.id, status);
+      await createNotification({
+        user_id: req.player_id,
+        type: status === "approved" ? "join_approved" : "join_declined",
+        title: status === "approved" ? `You're in: ${gameTitle}` : `Request declined: ${gameTitle}`,
+        body: status === "approved" ? "The host approved your request." : "The host declined your request.",
+        link: `/games/${req.game_id}`,
+      });
+      toast.success(status === "approved" ? "Approved" : "Declined");
+      onChange();
+    } catch (e: any) { toast.error(e.message); }
+    finally { setBusy(false); }
+  };
+
+  return (
+    <div className={`rounded-2xl border p-3 ${req.status === "pending" ? "border-border bg-surface" : "border-border/50 bg-surface/40 opacity-70"}`}>
+      <div className="flex items-center gap-2">
+        <div className="grid h-9 w-9 place-items-center rounded-full bg-lime-gradient text-xs font-bold text-primary-foreground">{name.slice(0, 2).toUpperCase()}</div>
+        <div className="flex-1 min-w-0">
+          <div className="text-sm font-semibold truncate">{name}</div>
+          {req.message && <div className="text-xs text-muted-foreground truncate">"{req.message}"</div>}
+        </div>
+        {req.status === "pending" ? (
+          <div className="flex gap-1.5">
+            <button disabled={busy} onClick={() => act("rejected")} className="grid h-9 w-9 place-items-center rounded-xl border border-coral/40 text-coral disabled:opacity-50"><XIcon className="h-4 w-4" /></button>
+            <button disabled={busy} onClick={() => act("approved")} className="grid h-9 w-9 place-items-center rounded-xl bg-lime-gradient text-primary-foreground disabled:opacity-50"><Check className="h-4 w-4" /></button>
+          </div>
+        ) : (
+          <span className="text-xs font-semibold uppercase">{req.status}</span>
+        )}
+      </div>
+    </div>
+  );
+}
