@@ -82,9 +82,14 @@ function GameDetail() {
   const effectiveJoined = game.joined + (joined ? 1 : 0);
   const spotsLeft = Math.max(0, game.maxPlayers - effectiveJoined);
   const nav = useNavigate();
+  const { user } = useAuth();
   const [settings, setSettings] = useState<GamePaymentSettings | null>(null);
   const [mySubs, setMySubs] = useState<PaymentSubmission[]>([]);
   const [myReq, setMyReq] = useState<JoinRequest | null>(null);
+  const [hostRequests, setHostRequests] = useState<JoinRequest[]>([]);
+  const [messaging, setMessaging] = useState(false);
+
+  const isHost = !!(user && settings && user.id === settings.host_id);
 
   const refreshStatus = async () => {
     try {
@@ -97,7 +102,17 @@ function GameDetail() {
       if (req?.status === "approved" && !joined) joinGame(game.id);
     } catch {}
   };
+
+  const refreshHostRequests = async () => {
+    if (!user || !settings || user.id !== settings.host_id) return;
+    try {
+      const all = await listHostJoinRequests();
+      setHostRequests(all.filter((r) => r.game_id === game.id));
+    } catch {}
+  };
+
   useEffect(() => { refreshStatus(); /* eslint-disable-next-line */ }, [game.id]);
+  useEffect(() => { refreshHostRequests(); /* eslint-disable-next-line */ }, [game.id, user?.id, settings?.host_id]);
 
   const fee = Number(settings?.entry_fee ?? game.price);
   const isPaid = fee > 0;
