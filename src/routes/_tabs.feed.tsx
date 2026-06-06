@@ -1,6 +1,7 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
-import { Search, SlidersHorizontal, Bell, X } from "lucide-react";
+import { Search, SlidersHorizontal, Bell, MessageCircle, X } from "lucide-react";
+import { useUnreadNotificationCount } from "@/lib/notifications";
 import { Logo } from "@/components/Logo";
 import { SportChips } from "@/components/SportChips";
 import { GameCard } from "@/components/GameCard";
@@ -60,10 +61,12 @@ function Feed() {
     <div className="mx-auto max-w-md px-4 pt-6">
       <div className="flex items-center justify-between mb-5">
         <Logo />
-        <button className="relative grid h-10 w-10 place-items-center rounded-full border border-border bg-surface">
-          <Bell className="h-5 w-5" />
-          <span className="absolute top-2 right-2 h-2 w-2 rounded-full bg-coral" />
-        </button>
+        <div className="flex items-center gap-2">
+          <Link to="/messages" className="grid h-10 w-10 place-items-center rounded-full border border-border bg-surface" aria-label="Messages">
+            <MessageCircle className="h-5 w-5" />
+          </Link>
+          <BellLink />
+        </div>
       </div>
 
       <motion.div
@@ -144,6 +147,18 @@ function Feed() {
         )}
       </AnimatePresence>
     </div>
+  );
+}
+
+function BellLink() {
+  const unread = useUnreadNotificationCount();
+  return (
+    <Link to="/notifications" className="relative grid h-10 w-10 place-items-center rounded-full border border-border bg-surface" aria-label="Notifications">
+      <Bell className="h-5 w-5" />
+      {unread > 0 && (
+        <span className="absolute -top-1 -right-1 grid h-4 min-w-4 px-1 place-items-center rounded-full bg-coral text-[10px] font-bold text-white">{unread > 9 ? "9+" : unread}</span>
+      )}
+    </Link>
   );
 }
 

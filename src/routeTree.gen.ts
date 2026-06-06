@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as ReviewsRouteImport } from './routes/reviews'
 import { Route as PaymentsRouteImport } from './routes/payments'
+import { Route as MessagesRouteImport } from './routes/messages'
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as TabsRouteImport } from './routes/_tabs'
 import { Route as IndexRouteImport } from './routes/index'
@@ -18,6 +19,7 @@ import { Route as TeamsCreateRouteImport } from './routes/teams.create'
 import { Route as TeamsTeamIdRouteImport } from './routes/teams.$teamId'
 import { Route as ReviewNewRouteImport } from './routes/review.new'
 import { Route as ProfileEditRouteImport } from './routes/profile.edit'
+import { Route as MessagesConversationIdRouteImport } from './routes/messages.$conversationId'
 import { Route as GamesGameIdRouteImport } from './routes/games.$gameId'
 import { Route as TabsTeamsRouteImport } from './routes/_tabs.teams'
 import { Route as TabsProfileRouteImport } from './routes/_tabs.profile'
@@ -37,6 +39,11 @@ const ReviewsRoute = ReviewsRouteImport.update({
 const PaymentsRoute = PaymentsRouteImport.update({
   id: '/payments',
   path: '/payments',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const MessagesRoute = MessagesRouteImport.update({
+  id: '/messages',
+  path: '/messages',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AuthRoute = AuthRouteImport.update({
@@ -72,6 +79,11 @@ const ProfileEditRoute = ProfileEditRouteImport.update({
   id: '/profile/edit',
   path: '/profile/edit',
   getParentRoute: () => rootRouteImport,
+} as any)
+const MessagesConversationIdRoute = MessagesConversationIdRouteImport.update({
+  id: '/$conversationId',
+  path: '/$conversationId',
+  getParentRoute: () => MessagesRoute,
 } as any)
 const GamesGameIdRoute = GamesGameIdRouteImport.update({
   id: '/games/$gameId',
@@ -127,6 +139,7 @@ const GamesGameIdPayRoute = GamesGameIdPayRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
+  '/messages': typeof MessagesRouteWithChildren
   '/payments': typeof PaymentsRoute
   '/reviews': typeof ReviewsRoute
   '/create': typeof TabsCreateRoute
@@ -136,6 +149,7 @@ export interface FileRoutesByFullPath {
   '/profile': typeof TabsProfileRoute
   '/teams': typeof TabsTeamsRoute
   '/games/$gameId': typeof GamesGameIdRouteWithChildren
+  '/messages/$conversationId': typeof MessagesConversationIdRoute
   '/profile/edit': typeof ProfileEditRoute
   '/review/new': typeof ReviewNewRoute
   '/teams/$teamId': typeof TeamsTeamIdRouteWithChildren
@@ -147,6 +161,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
+  '/messages': typeof MessagesRouteWithChildren
   '/payments': typeof PaymentsRoute
   '/reviews': typeof ReviewsRoute
   '/create': typeof TabsCreateRoute
@@ -156,6 +171,7 @@ export interface FileRoutesByTo {
   '/profile': typeof TabsProfileRoute
   '/teams': typeof TabsTeamsRoute
   '/games/$gameId': typeof GamesGameIdRouteWithChildren
+  '/messages/$conversationId': typeof MessagesConversationIdRoute
   '/profile/edit': typeof ProfileEditRoute
   '/review/new': typeof ReviewNewRoute
   '/teams/$teamId': typeof TeamsTeamIdRouteWithChildren
@@ -169,6 +185,7 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/_tabs': typeof TabsRouteWithChildren
   '/auth': typeof AuthRoute
+  '/messages': typeof MessagesRouteWithChildren
   '/payments': typeof PaymentsRoute
   '/reviews': typeof ReviewsRoute
   '/_tabs/create': typeof TabsCreateRoute
@@ -178,6 +195,7 @@ export interface FileRoutesById {
   '/_tabs/profile': typeof TabsProfileRoute
   '/_tabs/teams': typeof TabsTeamsRoute
   '/games/$gameId': typeof GamesGameIdRouteWithChildren
+  '/messages/$conversationId': typeof MessagesConversationIdRoute
   '/profile/edit': typeof ProfileEditRoute
   '/review/new': typeof ReviewNewRoute
   '/teams/$teamId': typeof TeamsTeamIdRouteWithChildren
@@ -191,6 +209,7 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/auth'
+    | '/messages'
     | '/payments'
     | '/reviews'
     | '/create'
@@ -200,6 +219,7 @@ export interface FileRouteTypes {
     | '/profile'
     | '/teams'
     | '/games/$gameId'
+    | '/messages/$conversationId'
     | '/profile/edit'
     | '/review/new'
     | '/teams/$teamId'
@@ -211,6 +231,7 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/auth'
+    | '/messages'
     | '/payments'
     | '/reviews'
     | '/create'
@@ -220,6 +241,7 @@ export interface FileRouteTypes {
     | '/profile'
     | '/teams'
     | '/games/$gameId'
+    | '/messages/$conversationId'
     | '/profile/edit'
     | '/review/new'
     | '/teams/$teamId'
@@ -232,6 +254,7 @@ export interface FileRouteTypes {
     | '/'
     | '/_tabs'
     | '/auth'
+    | '/messages'
     | '/payments'
     | '/reviews'
     | '/_tabs/create'
@@ -241,6 +264,7 @@ export interface FileRouteTypes {
     | '/_tabs/profile'
     | '/_tabs/teams'
     | '/games/$gameId'
+    | '/messages/$conversationId'
     | '/profile/edit'
     | '/review/new'
     | '/teams/$teamId'
@@ -254,6 +278,7 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   TabsRoute: typeof TabsRouteWithChildren
   AuthRoute: typeof AuthRoute
+  MessagesRoute: typeof MessagesRouteWithChildren
   PaymentsRoute: typeof PaymentsRoute
   ReviewsRoute: typeof ReviewsRoute
   GamesGameIdRoute: typeof GamesGameIdRouteWithChildren
@@ -277,6 +302,13 @@ declare module '@tanstack/react-router' {
       path: '/payments'
       fullPath: '/payments'
       preLoaderRoute: typeof PaymentsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/messages': {
+      id: '/messages'
+      path: '/messages'
+      fullPath: '/messages'
+      preLoaderRoute: typeof MessagesRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/auth': {
@@ -327,6 +359,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/profile/edit'
       preLoaderRoute: typeof ProfileEditRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/messages/$conversationId': {
+      id: '/messages/$conversationId'
+      path: '/$conversationId'
+      fullPath: '/messages/$conversationId'
+      preLoaderRoute: typeof MessagesConversationIdRouteImport
+      parentRoute: typeof MessagesRoute
     }
     '/games/$gameId': {
       id: '/games/$gameId'
@@ -421,6 +460,18 @@ const TabsRouteChildren: TabsRouteChildren = {
 
 const TabsRouteWithChildren = TabsRoute._addFileChildren(TabsRouteChildren)
 
+interface MessagesRouteChildren {
+  MessagesConversationIdRoute: typeof MessagesConversationIdRoute
+}
+
+const MessagesRouteChildren: MessagesRouteChildren = {
+  MessagesConversationIdRoute: MessagesConversationIdRoute,
+}
+
+const MessagesRouteWithChildren = MessagesRoute._addFileChildren(
+  MessagesRouteChildren,
+)
+
 interface GamesGameIdRouteChildren {
   GamesGameIdPayRoute: typeof GamesGameIdPayRoute
   GamesGameIdPaymentSetupRoute: typeof GamesGameIdPaymentSetupRoute
@@ -451,6 +502,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   TabsRoute: TabsRouteWithChildren,
   AuthRoute: AuthRoute,
+  MessagesRoute: MessagesRouteWithChildren,
   PaymentsRoute: PaymentsRoute,
   ReviewsRoute: ReviewsRoute,
   GamesGameIdRoute: GamesGameIdRouteWithChildren,
@@ -462,13 +514,3 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
-  }
-}

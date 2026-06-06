@@ -1,6 +1,6 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { motion } from "framer-motion";
-import { ArrowLeft, Share2, Bookmark, MapPin, Clock, Users, Calendar, MessageCircle, Star, Check, CreditCard, Settings as SettingsIcon } from "lucide-react";
+import { ArrowLeft, Share2, Bookmark, MapPin, Clock, Users, Calendar, MessageCircle, Star, Check, CreditCard, Settings as SettingsIcon, X as XIcon } from "lucide-react";
 import { GAMES, SPORTS } from "@/lib/sample-data";
 import { formatWhen } from "@/lib/format";
 import { ReviewsSection } from "@/components/ReviewsSection";
@@ -9,10 +9,14 @@ import { ReputationBadge } from "@/components/ReputationBadge";
 import { joinGame, leaveGame, useIsJoined } from "@/lib/games-store";
 import { toast } from "sonner";
 import { useEffect, useMemo, useState } from "react";
-import { getGamePaymentSettings, listMySubmissionsForGame, deleteMyPendingSubmission, getMyJoinRequest, createJoinRequest, cancelMyJoinRequest, type GamePaymentSettings, type PaymentSubmission, type JoinRequest } from "@/lib/payments";
+import { getGamePaymentSettings, listMySubmissionsForGame, deleteMyPendingSubmission, getMyJoinRequest, createJoinRequest, cancelMyJoinRequest, listHostJoinRequests, reviewJoinRequest, type GamePaymentSettings, type PaymentSubmission, type JoinRequest } from "@/lib/payments";
 import { useHostedGames } from "@/lib/hosted-games-store";
 import type { Game } from "@/lib/sample-data";
 import { LegalNotice } from "@/components/LegalNotice";
+import { useAuth } from "@/hooks/use-auth";
+import { getOrCreateDirectConversation } from "@/lib/messages";
+import { createNotification } from "@/lib/notifications";
+import { supabase } from "@/integrations/supabase/client";
 
 const emojiBySport: Record<string, string> = Object.fromEntries(SPORTS.map((s) => [s.name, s.emoji]));
 
@@ -78,9 +82,14 @@ function GameDetail() {
   const effectiveJoined = game.joined + (joined ? 1 : 0);
   const spotsLeft = Math.max(0, game.maxPlayers - effectiveJoined);
   const nav = useNavigate();
+  const { user } = useAuth();
   const [settings, setSettings] = useState<GamePaymentSettings | null>(null);
   const [mySubs, setMySubs] = useState<PaymentSubmission[]>([]);
   const [myReq, setMyReq] = useState<JoinRequest | null>(null);
+  const [hostRequests, setHostRequests] = useState<JoinRequest[]>([]);
+  const [messaging, setMessaging] = useState(false);
+
+  const isHost = !!(user && settings && user.id === settings.host_id);
 
   const refreshStatus = async () => {
     try {
@@ -93,7 +102,17 @@ function GameDetail() {
       if (req?.status === "approved" && !joined) joinGame(game.id);
     } catch {}
   };
+
+  const refreshHostRequests = async () => {
+    if (!user || !settings || user.id !== settings.host_id) return;
+    try {
+      const all = await listHostJoinRequests();
+      setHostRequests(all.filter((r) => r.game_id === game.id));
+    } catch {}
+  };
+
   useEffect(() => { refreshStatus(); /* eslint-disable-next-line */ }, [game.id]);
+  useEffect(() => { refreshHostRequests(); /* eslint-disable-next-line */ }, [game.id, user?.id, settings?.host_id]);
 
   const fee = Number(settings?.entry_fee ?? game.price);
   const isPaid = fee > 0;
@@ -134,6 +153,13 @@ function GameDetail() {
       if (!settings) { toast.error("Host hasn't enabled approvals yet."); return; }
       try {
         await createJoinRequest({ game_id: game.id, host_id: settings.host_id });
+        await createNotification({
+          user_id: settings.host_id,
+          type: "join_request",
+          title: `New request to join ${game.title}`,
+          body: "Tap to review.",
+          link: `/games/${game.id}`,
+        });
         toast.success("Request sent. The host will review it.");
         refreshStatus();
       } catch (e: any) { toast.error(e.message ?? "Could not send request."); }
@@ -310,6 +336,18 @@ function GameDetail() {
         </div>
       </div>
 
+      {/* Host approval panel */}
+      {isHost && hostRequests.length > 0 && (
+        <div className="mx-auto max-w-md px-4 mt-4">
+          <h2 className="font-display text-sm font-bold uppercase tracking-wider text-muted-foreground mb-2">Join requests</h2>
+          <div className="space-y-2">
+            {hostRequests.map((r) => (
+              <HostRequestRow key={r.id} req={r} gameTitle={game.title} onChange={refreshHostRequests} />
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Host-only payment setup link */}
       <div className="mx-auto max-w-md px-4 mt-4">
         <Link to="/games/$gameId/payment-setup" params={{ gameId: game.id }}
@@ -324,7 +362,21 @@ function GameDetail() {
       {/* Sticky CTA */}
       <div className="fixed bottom-0 left-0 right-0 z-30 px-4 pb-[max(env(safe-area-inset-bottom),0.75rem)] pt-3 backdrop-blur-xl bg-background/80 border-t border-border">
         <div className="mx-auto max-w-md flex items-center gap-2">
-          <button className="grid h-12 w-12 place-items-center rounded-2xl border border-border bg-surface">
+          <button
+            disabled={messaging}
+            onClick={async () => {
+              if (!user) { nav({ to: "/auth" }); return; }
+              const hostUid = settings?.host_id;
+              if (!hostUid) { toast.error("This host can't be messaged yet."); return; }
+              if (hostUid === user.id) { nav({ to: "/messages" }); return; }
+              setMessaging(true);
+              try {
+                const cid = await getOrCreateDirectConversation(hostUid, game.id);
+                nav({ to: "/messages/$conversationId", params: { conversationId: cid } });
+              } catch (e: any) { toast.error(e.message); }
+              finally { setMessaging(false); }
+            }}
+            className="grid h-12 w-12 place-items-center rounded-2xl border border-border bg-surface disabled:opacity-50">
             <MessageCircle className="h-5 w-5" />
           </button>
           <motion.button
@@ -368,6 +420,54 @@ function Meta({ icon, label, value }: { icon: React.ReactNode; label: string; va
         {icon}{label}
       </div>
       <div className="mt-0.5 font-semibold text-sm">{value}</div>
+    </div>
+  );
+}
+
+function HostRequestRow({ req, gameTitle, onChange }: { req: JoinRequest; gameTitle: string; onChange: () => void }) {
+  const [busy, setBusy] = useState(false);
+  const [name, setName] = useState<string>("Player");
+  useEffect(() => {
+    (async () => {
+      const { data } = await supabase.from("profiles").select("display_name, avatar_initials").eq("id", req.player_id).maybeSingle();
+      if (data) setName((data as any).display_name ?? "Player");
+    })();
+  }, [req.player_id]);
+
+  const act = async (status: "approved" | "rejected") => {
+    setBusy(true);
+    try {
+      await reviewJoinRequest(req.id, status);
+      await createNotification({
+        user_id: req.player_id,
+        type: status === "approved" ? "join_approved" : "join_declined",
+        title: status === "approved" ? `You're in: ${gameTitle}` : `Request declined: ${gameTitle}`,
+        body: status === "approved" ? "The host approved your request." : "The host declined your request.",
+        link: `/games/${req.game_id}`,
+      });
+      toast.success(status === "approved" ? "Approved" : "Declined");
+      onChange();
+    } catch (e: any) { toast.error(e.message); }
+    finally { setBusy(false); }
+  };
+
+  return (
+    <div className={`rounded-2xl border p-3 ${req.status === "pending" ? "border-border bg-surface" : "border-border/50 bg-surface/40 opacity-70"}`}>
+      <div className="flex items-center gap-2">
+        <div className="grid h-9 w-9 place-items-center rounded-full bg-lime-gradient text-xs font-bold text-primary-foreground">{name.slice(0, 2).toUpperCase()}</div>
+        <div className="flex-1 min-w-0">
+          <div className="text-sm font-semibold truncate">{name}</div>
+          {req.message && <div className="text-xs text-muted-foreground truncate">"{req.message}"</div>}
+        </div>
+        {req.status === "pending" ? (
+          <div className="flex gap-1.5">
+            <button disabled={busy} onClick={() => act("rejected")} className="grid h-9 w-9 place-items-center rounded-xl border border-coral/40 text-coral disabled:opacity-50"><XIcon className="h-4 w-4" /></button>
+            <button disabled={busy} onClick={() => act("approved")} className="grid h-9 w-9 place-items-center rounded-xl bg-lime-gradient text-primary-foreground disabled:opacity-50"><Check className="h-4 w-4" /></button>
+          </div>
+        ) : (
+          <span className="text-xs font-semibold uppercase">{req.status}</span>
+        )}
+      </div>
     </div>
   );
 }
