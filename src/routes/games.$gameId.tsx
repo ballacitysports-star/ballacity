@@ -336,6 +336,18 @@ function GameDetail() {
         </div>
       </div>
 
+      {/* Host approval panel */}
+      {isHost && hostRequests.length > 0 && (
+        <div className="mx-auto max-w-md px-4 mt-4">
+          <h2 className="font-display text-sm font-bold uppercase tracking-wider text-muted-foreground mb-2">Join requests</h2>
+          <div className="space-y-2">
+            {hostRequests.map((r) => (
+              <HostRequestRow key={r.id} req={r} gameTitle={game.title} onChange={refreshHostRequests} />
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Host-only payment setup link */}
       <div className="mx-auto max-w-md px-4 mt-4">
         <Link to="/games/$gameId/payment-setup" params={{ gameId: game.id }}
@@ -350,7 +362,21 @@ function GameDetail() {
       {/* Sticky CTA */}
       <div className="fixed bottom-0 left-0 right-0 z-30 px-4 pb-[max(env(safe-area-inset-bottom),0.75rem)] pt-3 backdrop-blur-xl bg-background/80 border-t border-border">
         <div className="mx-auto max-w-md flex items-center gap-2">
-          <button className="grid h-12 w-12 place-items-center rounded-2xl border border-border bg-surface">
+          <button
+            disabled={messaging}
+            onClick={async () => {
+              if (!user) { nav({ to: "/auth" }); return; }
+              const hostUid = settings?.host_id;
+              if (!hostUid) { toast.error("This host can't be messaged yet."); return; }
+              if (hostUid === user.id) { nav({ to: "/messages" }); return; }
+              setMessaging(true);
+              try {
+                const cid = await getOrCreateDirectConversation(hostUid, game.id);
+                nav({ to: "/messages/$conversationId", params: { conversationId: cid } });
+              } catch (e: any) { toast.error(e.message); }
+              finally { setMessaging(false); }
+            }}
+            className="grid h-12 w-12 place-items-center rounded-2xl border border-border bg-surface disabled:opacity-50">
             <MessageCircle className="h-5 w-5" />
           </button>
           <motion.button
