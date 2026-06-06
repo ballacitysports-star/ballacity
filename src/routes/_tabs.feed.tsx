@@ -150,6 +150,18 @@ function Feed() {
   );
 }
 
+function BellLink() {
+  const unread = useUnreadNotificationCount();
+  return (
+    <Link to="/notifications" className="relative grid h-10 w-10 place-items-center rounded-full border border-border bg-surface" aria-label="Notifications">
+      <Bell className="h-5 w-5" />
+      {unread > 0 && (
+        <span className="absolute -top-1 -right-1 grid h-4 min-w-4 px-1 place-items-center rounded-full bg-coral text-[10px] font-bold text-white">{unread > 9 ? "9+" : unread}</span>
+      )}
+    </Link>
+  );
+}
+
 function FilterSheet({ onClose }: { onClose: () => void }) {
   const prefs = useFeedPrefs();
   const preferredSports = prefs.preferredSports;
