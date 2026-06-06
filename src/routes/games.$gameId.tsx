@@ -1,6 +1,6 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { motion } from "framer-motion";
-import { ArrowLeft, Share2, Bookmark, MapPin, Clock, Users, Calendar, MessageCircle, Star, Check, CreditCard, Settings as SettingsIcon } from "lucide-react";
+import { ArrowLeft, Share2, Bookmark, MapPin, Clock, Users, Calendar, MessageCircle, Star, Check, CreditCard, Settings as SettingsIcon, X as XIcon } from "lucide-react";
 import { GAMES, SPORTS } from "@/lib/sample-data";
 import { formatWhen } from "@/lib/format";
 import { ReviewsSection } from "@/components/ReviewsSection";
@@ -9,10 +9,14 @@ import { ReputationBadge } from "@/components/ReputationBadge";
 import { joinGame, leaveGame, useIsJoined } from "@/lib/games-store";
 import { toast } from "sonner";
 import { useEffect, useMemo, useState } from "react";
-import { getGamePaymentSettings, listMySubmissionsForGame, deleteMyPendingSubmission, getMyJoinRequest, createJoinRequest, cancelMyJoinRequest, type GamePaymentSettings, type PaymentSubmission, type JoinRequest } from "@/lib/payments";
+import { getGamePaymentSettings, listMySubmissionsForGame, deleteMyPendingSubmission, getMyJoinRequest, createJoinRequest, cancelMyJoinRequest, listHostJoinRequests, reviewJoinRequest, type GamePaymentSettings, type PaymentSubmission, type JoinRequest } from "@/lib/payments";
 import { useHostedGames } from "@/lib/hosted-games-store";
 import type { Game } from "@/lib/sample-data";
 import { LegalNotice } from "@/components/LegalNotice";
+import { useAuth } from "@/hooks/use-auth";
+import { getOrCreateDirectConversation } from "@/lib/messages";
+import { createNotification } from "@/lib/notifications";
+import { supabase } from "@/integrations/supabase/client";
 
 const emojiBySport: Record<string, string> = Object.fromEntries(SPORTS.map((s) => [s.name, s.emoji]));
 
