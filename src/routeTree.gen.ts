@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as ReviewsRouteImport } from './routes/reviews'
 import { Route as PaymentsRouteImport } from './routes/payments'
+import { Route as MessagesRouteImport } from './routes/messages'
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as TabsRouteImport } from './routes/_tabs'
 import { Route as IndexRouteImport } from './routes/index'
@@ -37,6 +38,11 @@ const ReviewsRoute = ReviewsRouteImport.update({
 const PaymentsRoute = PaymentsRouteImport.update({
   id: '/payments',
   path: '/payments',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const MessagesRoute = MessagesRouteImport.update({
+  id: '/messages',
+  path: '/messages',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AuthRoute = AuthRouteImport.update({
@@ -127,6 +133,7 @@ const GamesGameIdPayRoute = GamesGameIdPayRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
+  '/messages': typeof MessagesRoute
   '/payments': typeof PaymentsRoute
   '/reviews': typeof ReviewsRoute
   '/create': typeof TabsCreateRoute
@@ -147,6 +154,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
+  '/messages': typeof MessagesRoute
   '/payments': typeof PaymentsRoute
   '/reviews': typeof ReviewsRoute
   '/create': typeof TabsCreateRoute
@@ -169,6 +177,7 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/_tabs': typeof TabsRouteWithChildren
   '/auth': typeof AuthRoute
+  '/messages': typeof MessagesRoute
   '/payments': typeof PaymentsRoute
   '/reviews': typeof ReviewsRoute
   '/_tabs/create': typeof TabsCreateRoute
@@ -191,6 +200,7 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/auth'
+    | '/messages'
     | '/payments'
     | '/reviews'
     | '/create'
@@ -211,6 +221,7 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/auth'
+    | '/messages'
     | '/payments'
     | '/reviews'
     | '/create'
@@ -232,6 +243,7 @@ export interface FileRouteTypes {
     | '/'
     | '/_tabs'
     | '/auth'
+    | '/messages'
     | '/payments'
     | '/reviews'
     | '/_tabs/create'
@@ -254,6 +266,7 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   TabsRoute: typeof TabsRouteWithChildren
   AuthRoute: typeof AuthRoute
+  MessagesRoute: typeof MessagesRoute
   PaymentsRoute: typeof PaymentsRoute
   ReviewsRoute: typeof ReviewsRoute
   GamesGameIdRoute: typeof GamesGameIdRouteWithChildren
@@ -277,6 +290,13 @@ declare module '@tanstack/react-router' {
       path: '/payments'
       fullPath: '/payments'
       preLoaderRoute: typeof PaymentsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/messages': {
+      id: '/messages'
+      path: '/messages'
+      fullPath: '/messages'
+      preLoaderRoute: typeof MessagesRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/auth': {
@@ -451,6 +471,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   TabsRoute: TabsRouteWithChildren,
   AuthRoute: AuthRoute,
+  MessagesRoute: MessagesRoute,
   PaymentsRoute: PaymentsRoute,
   ReviewsRoute: ReviewsRoute,
   GamesGameIdRoute: GamesGameIdRouteWithChildren,
@@ -462,3 +483,13 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { startInstance } from './start.ts'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
+  }
+}
