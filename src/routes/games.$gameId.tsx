@@ -153,6 +153,13 @@ function GameDetail() {
       if (!settings) { toast.error("Host hasn't enabled approvals yet."); return; }
       try {
         await createJoinRequest({ game_id: game.id, host_id: settings.host_id });
+        await createNotification({
+          user_id: settings.host_id,
+          type: "join_request",
+          title: `New request to join ${game.title}`,
+          body: "Tap to review.",
+          link: `/games/${game.id}`,
+        });
         toast.success("Request sent. The host will review it.");
         refreshStatus();
       } catch (e: any) { toast.error(e.message ?? "Could not send request."); }
