@@ -61,10 +61,12 @@ function Feed() {
     <div className="mx-auto max-w-md px-4 pt-6">
       <div className="flex items-center justify-between mb-5">
         <Logo />
-        <button className="relative grid h-10 w-10 place-items-center rounded-full border border-border bg-surface">
-          <Bell className="h-5 w-5" />
-          <span className="absolute top-2 right-2 h-2 w-2 rounded-full bg-coral" />
-        </button>
+        <div className="flex items-center gap-2">
+          <Link to="/messages" className="grid h-10 w-10 place-items-center rounded-full border border-border bg-surface" aria-label="Messages">
+            <MessageCircle className="h-5 w-5" />
+          </Link>
+          <BellLink />
+        </div>
       </div>
 
       <motion.div
