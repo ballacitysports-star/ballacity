@@ -1,0 +1,138 @@
+import { useEffect, useRef, useState } from "react";
+import { MapPin } from "lucide-react";
+
+declare global {
+  interface Window {
+    google?: any;
+    __gmapsLoading?: Promise<void>;
+  }
+}
+
+function loadGoogleMaps(): Promise<void> {
+  if (typeof window === "undefined") return Promise.resolve();
+  if (window.google?.maps?.importLibrary) return Promise.resolve();
+  if (window.__gmapsLoading) return window.__gmapsLoading;
+
+  const key = import.meta.env.VITE_LOVABLE_CONNECTOR_GOOGLE_MAPS_BROWSER_KEY;
+  const channel = import.meta.env.VITE_LOVABLE_CONNECTOR_GOOGLE_MAPS_TRACKING_ID;
+  if (!key) return Promise.reject(new Error("Maps key missing"));
+
+  window.__gmapsLoading = new Promise<void>((resolve, reject) => {
+    (window as any).__initGmaps = () => resolve();
+    const s = document.createElement("script");
+    s.src = `https://maps.googleapis.com/maps/api/js?key=${key}&loading=async&libraries=places&callback=__initGmaps${channel ? `&channel=${channel}` : ""}`;
+    s.async = true;
+    s.onerror = () => reject(new Error("Failed to load Google Maps"));
+    document.head.appendChild(s);
+  });
+  return window.__gmapsLoading;
+}
+
+type Suggestion = { id: string; primary: string; secondary: string };
+
+export function LocationAutocomplete({
+  value,
+  onChange,
+  placeholder = "Court, park or venue",
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  placeholder?: string;
+}) {
+  const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
+  const [open, setOpen] = useState(false);
+  const sessionRef = useRef<any>(null);
+  const placesRef = useRef<any>(null);
+  const timerRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    loadGoogleMaps()
+      .then(async () => {
+        if (cancelled) return;
+        const places = await window.google.maps.importLibrary("places");
+        placesRef.current = places;
+        sessionRef.current = new places.AutocompleteSessionToken();
+      })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, []);
+
+  const queryAutocomplete = (input: string) => {
+    if (!placesRef.current || !input.trim()) {
+      setSuggestions([]);
+      return;
+    }
+    placesRef.current.AutocompleteSuggestion.fetchAutocompleteSuggestions({
+      input,
+      sessionToken: sessionRef.current,
+    })
+      .then(({ suggestions: results }: any) => {
+        const mapped: Suggestion[] = (results || [])
+          .map((r: any) => r.placePrediction)
+          .filter(Boolean)
+          .slice(0, 5)
+          .map((p: any) => ({
+            id: p.placeId,
+            primary: p.structuredFormat?.mainText?.text || p.text?.text || "",
+            secondary: p.structuredFormat?.secondaryText?.text || "",
+          }));
+        setSuggestions(mapped);
+        setOpen(mapped.length > 0);
+      })
+      .catch(() => setSuggestions([]));
+  };
+
+  const handleChange = (v: string) => {
+    onChange(v);
+    if (timerRef.current) window.clearTimeout(timerRef.current);
+    timerRef.current = window.setTimeout(() => queryAutocomplete(v), 200);
+  };
+
+  const pick = (s: Suggestion) => {
+    const full = s.secondary ? `${s.primary}, ${s.secondary}` : s.primary;
+    onChange(full);
+    setOpen(false);
+    setSuggestions([]);
+    if (placesRef.current) {
+      sessionRef.current = new placesRef.current.AutocompleteSessionToken();
+    }
+  };
+
+  return (
+    <div className="relative">
+      <div className="flex items-center gap-2 rounded-2xl border border-border bg-surface px-4 py-3">
+        <MapPin className="h-4 w-4 text-coral" />
+        <input
+          value={value}
+          onChange={(e) => handleChange(e.target.value)}
+          onFocus={() => suggestions.length > 0 && setOpen(true)}
+          onBlur={() => setTimeout(() => setOpen(false), 150)}
+          placeholder={placeholder}
+          className="flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
+        />
+      </div>
+      {open && suggestions.length > 0 && (
+        <ul className="absolute z-20 mt-1 w-full overflow-hidden rounded-2xl border border-border bg-surface shadow-lg">
+          {suggestions.map((s) => (
+            <li key={s.id}>
+              <button
+                type="button"
+                onMouseDown={(e) => { e.preventDefault(); pick(s); }}
+                className="flex w-full items-start gap-2 px-4 py-2.5 text-left text-sm hover:bg-secondary"
+              >
+                <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-coral" />
+                <span className="min-w-0">
+                  <span className="block truncate font-medium">{s.primary}</span>
+                  {s.secondary && (
+                    <span className="block truncate text-xs text-muted-foreground">{s.secondary}</span>
+                  )}
+                </span>
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
