@@ -88,10 +88,20 @@ export function LocationAutocomplete({
       setSuggestions([]);
       return;
     }
-    placesRef.current.AutocompleteSuggestion.fetchAutocompleteSuggestions({
+    const req: any = {
       input,
       sessionToken: sessionRef.current,
-    })
+    };
+    if (biasRef.current) {
+      req.locationBias = {
+        circle: {
+          center: { lat: biasRef.current.lat, lng: biasRef.current.lng },
+          radius: 50000,
+        },
+      };
+      req.origin = { lat: biasRef.current.lat, lng: biasRef.current.lng };
+    }
+    placesRef.current.AutocompleteSuggestion.fetchAutocompleteSuggestions(req)
       .then(({ suggestions: results }: any) => {
         const mapped: Suggestion[] = (results || [])
           .map((r: any) => r.placePrediction)
