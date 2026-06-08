@@ -1,5 +1,8 @@
 import { useEffect, useRef, useState } from "react";
-import { MapPin } from "lucide-react";
+import { Loader2, LocateFixed, MapPin } from "lucide-react";
+import { useServerFn } from "@tanstack/react-start";
+import { reverseGeocode } from "@/lib/geocode.functions";
+import { toast } from "sonner";
 
 declare global {
   interface Window {
@@ -34,13 +37,18 @@ export function LocationAutocomplete({
   value,
   onChange,
   placeholder = "Court, park or venue",
+  mode = "place",
 }: {
   value: string;
   onChange: (v: string) => void;
   placeholder?: string;
+  /** "place" returns full venue address; "city" returns just city, region */
+  mode?: "place" | "city";
 }) {
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
   const [open, setOpen] = useState(false);
+  const [locating, setLocating] = useState(false);
+  const reverse = useServerFn(reverseGeocode);
   const sessionRef = useRef<any>(null);
   const placesRef = useRef<any>(null);
   const timerRef = useRef<number | null>(null);
