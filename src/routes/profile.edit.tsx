@@ -12,6 +12,7 @@ import {
   DEFAULT_PREFS,
 } from "@/lib/user-prefs-store";
 import { getCurrentUser, useAuth } from "@/hooks/use-auth";
+import { LocationAutocomplete } from "@/components/LocationAutocomplete";
 
 export const Route = createFileRoute("/profile/edit")({
   head: () => ({ meta: [{ title: "Edit profile — OpenRun" }] }),
@@ -117,7 +118,7 @@ function EditProfile() {
         <Field label="Display name"><Input value={name} onChange={setName} maxLength={60} /></Field>
         <Field label="Username"><Input value={username} onChange={setUsername} maxLength={30} placeholder="@you" /></Field>
         <Field label="Avatar initials"><Input value={avatar} onChange={setAvatar} maxLength={3} /></Field>
-        <Field label="City"><Input value={city} onChange={setCity} maxLength={80} /></Field>
+        <Field label="City"><LocationAutocomplete value={city} onChange={setCity} placeholder="Your city" mode="city" /></Field>
         <Field label="Bio">
           <textarea
             value={bio}
