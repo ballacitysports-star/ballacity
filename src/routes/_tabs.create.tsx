@@ -140,13 +140,44 @@ function Create() {
 
         {/* Toggles */}
         <Section title="Details">
-          <Toggle
-            icon={<DollarSign className="h-4 w-4" />}
-            label="Paid game"
-            value={price > 0}
-            onChange={(v) => setPrice(v ? 10 : 0)}
-            right={price > 0 ? `$${price}` : "Free"}
-          />
+          <div className="rounded-2xl border border-border bg-surface px-4 py-3">
+            <div className="flex items-center justify-between">
+              <span className="flex items-center gap-2.5 text-sm">
+                <DollarSign className={`h-4 w-4 ${price > 0 ? "text-lime" : "text-muted-foreground"}`} />
+                <span className="font-medium">Paid game</span>
+              </span>
+              <button
+                type="button"
+                onClick={() => setPrice(price > 0 ? 0 : 10)}
+                className={`relative h-6 w-10 rounded-full transition-colors ${price > 0 ? "bg-lime" : "bg-secondary"}`}
+                aria-label="Toggle paid game"
+              >
+                <motion.span
+                  layout
+                  transition={{ type: "spring", stiffness: 500, damping: 30 }}
+                  className="absolute top-0.5 h-5 w-5 rounded-full bg-background shadow"
+                  style={{ left: price > 0 ? "calc(100% - 1.375rem)" : "0.125rem" }}
+                />
+              </button>
+            </div>
+            {price > 0 && (
+              <div className="mt-3 flex items-center gap-2">
+                <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Entry fee</span>
+                <div className="relative flex-1">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">$</span>
+                  <input
+                    type="number"
+                    min={1}
+                    step="0.01"
+                    value={price}
+                    onChange={(e) => setPrice(Math.max(0, Number(e.target.value) || 0))}
+                    className="w-full rounded-xl border border-border bg-background pl-7 pr-3 py-2 text-sm outline-none focus:border-lime"
+                  />
+                </div>
+                <span className="text-xs text-muted-foreground">per player</span>
+              </div>
+            )}
+          </div>
           <Toggle
             icon={<Home className="h-4 w-4" />}
             label="Indoor venue"
