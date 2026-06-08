@@ -99,15 +99,7 @@ function Create() {
             onChange={(e) => setWhen(e.target.value)}
             className="w-full rounded-2xl border border-border bg-surface px-4 py-3 text-sm outline-none focus:border-lime [color-scheme:dark]"
           />
-          <div className="flex items-center gap-2 rounded-2xl border border-border bg-surface px-4 py-3">
-            <MapPin className="h-4 w-4 text-coral" />
-            <input
-              value={location}
-              onChange={(e) => setLocation(e.target.value)}
-              placeholder="Court, park or venue"
-              className="flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
-            />
-          </div>
+          <LocationAutocomplete value={location} onChange={setLocation} />
         </Section>
 
         {/* Skill */}
