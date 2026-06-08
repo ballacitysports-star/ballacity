@@ -52,6 +52,8 @@ export function LocationAutocomplete({
   const sessionRef = useRef<any>(null);
   const placesRef = useRef<any>(null);
   const timerRef = useRef<number | null>(null);
+  const biasRef = useRef<{ lat: number; lng: number } | null>(null);
+  const watchIdRef = useRef<number | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -64,6 +66,21 @@ export function LocationAutocomplete({
       })
       .catch(() => {});
     return () => { cancelled = true; };
+  }, []);
+
+  // Continuously track the user's location to bias autocomplete results in real time.
+  useEffect(() => {
+    if (typeof navigator === "undefined" || !navigator.geolocation) return;
+    watchIdRef.current = navigator.geolocation.watchPosition(
+      (pos) => {
+        biasRef.current = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+      },
+      () => {},
+      { enableHighAccuracy: true, maximumAge: 15000, timeout: 10000 },
+    );
+    return () => {
+      if (watchIdRef.current != null) navigator.geolocation.clearWatch(watchIdRef.current);
+    };
   }, []);
 
   const queryAutocomplete = (input: string) => {
