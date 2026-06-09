@@ -1,6 +1,8 @@
-import { useEffect, useRef, useState } from "react";
-import { LocateFixed, Loader2 } from "lucide-react";
+import { type FormEvent, useEffect, useRef, useState } from "react";
+import { LocateFixed, Loader2, Search } from "lucide-react";
+import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
+import { geocodeAddress } from "@/lib/geocode.functions";
 
 declare global {
   interface Window {
@@ -62,9 +64,16 @@ export function GamesMap({
   const mapRef = useRef<any>(null);
   const userMarkerRef = useRef<any>(null);
   const userCircleRef = useRef<any>(null);
+  const searchMarkerRef = useRef<any>(null);
   const pinMarkersRef = useRef<Map<string, any>>(new Map());
   const userPosRef = useRef<{ lat: number; lng: number } | null>(null);
+  const pinCenterRef = useRef<{ lat: number; lng: number } | null>(null);
+  const manualLocationRef = useRef(false);
   const [ready, setReady] = useState(false);
+  const [manualLocation, setManualLocation] = useState("");
+  const [resolvingLocation, setResolvingLocation] = useState(false);
+  const [manualError, setManualError] = useState<string | null>(null);
+  const geocode = useServerFn(geocodeAddress);
 
   // Convert a 0-100 pseudo coord to a real lat/lng offset around user.
   // Spread games across ~6km box.
@@ -134,11 +143,19 @@ export function GamesMap({
       userCircleRef.current.setCenter(center);
       userCircleRef.current.setRadius(pos.coords.accuracy || 50);
     }
+    if (recenter) {
+      manualLocationRef.current = false;
+      searchMarkerRef.current?.setMap(null);
+      searchMarkerRef.current = null;
+    }
+    if (!manualLocationRef.current) {
+      pinCenterRef.current = center;
+      repositionPins();
+    }
     if (firstFix || recenter) {
       mapRef.current.panTo(center);
       mapRef.current.setZoom(15);
     }
-    repositionPins();
   };
 
   const describeGeoError = (err: GeolocationPositionError) => {
@@ -190,10 +207,54 @@ export function GamesMap({
     );
   };
 
+  const changeMapLocation = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const query = manualLocation.trim();
+    if (query.length < 2) return;
+    setResolvingLocation(true);
+    setManualError(null);
+    try {
+      const result = await geocode({ data: { address: query } });
+      const center = { lat: result.lat, lng: result.lng };
+      manualLocationRef.current = true;
+      pinCenterRef.current = center;
+      setManualLocation(result.formatted || query);
+      if (mapRef.current && window.google?.maps) {
+        if (!searchMarkerRef.current) {
+          searchMarkerRef.current = new window.google.maps.Marker({
+            position: center,
+            map: mapRef.current,
+            zIndex: 998,
+            icon: {
+              path: window.google.maps.SymbolPath.CIRCLE,
+              scale: 7,
+              fillColor: "#ff6b6b",
+              fillOpacity: 1,
+              strokeColor: "#0f1420",
+              strokeWeight: 3,
+            },
+          });
+        } else {
+          searchMarkerRef.current.setPosition(center);
+          searchMarkerRef.current.setMap(mapRef.current);
+        }
+        mapRef.current.panTo(center);
+        mapRef.current.setZoom(14);
+      }
+      repositionPins();
+      toast.success("Map location changed");
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Couldn't find that location";
+      setManualError(message);
+      toast.error(message);
+    } finally {
+      setResolvingLocation(false);
+    }
+  };
 
 
   const repositionPins = () => {
-    const center = userPosRef.current || { lat: 40.7281, lng: -73.9842 };
+    const center = pinCenterRef.current || userPosRef.current || { lat: 40.7281, lng: -73.9842 };
     pins.forEach((p) => {
       const m = pinMarkersRef.current.get(p.id);
       if (m) m.setPosition(toLatLng(p.lng, p.lat, center));
@@ -248,8 +309,30 @@ export function GamesMap({
       >
         {locating ? <Loader2 className="h-5 w-5 animate-spin" /> : <LocateFixed className="h-5 w-5" />}
       </button>
+      <form onSubmit={changeMapLocation} className="absolute left-4 right-4 top-20 z-30">
+        <div className="flex items-center gap-2 rounded-2xl border border-border bg-surface/95 px-3 py-2 shadow-xl backdrop-blur-xl">
+          <Search className="h-4 w-4 shrink-0 text-muted-foreground" />
+          <input
+            value={manualLocation}
+            onChange={(event) => {
+              setManualLocation(event.target.value);
+              setManualError(null);
+            }}
+            placeholder="Change map location"
+            className="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
+          />
+          <button
+            type="submit"
+            disabled={resolvingLocation || manualLocation.trim().length < 2}
+            className="inline-flex h-8 min-w-16 items-center justify-center rounded-full bg-lime px-3 text-xs font-bold text-primary-foreground disabled:opacity-50"
+          >
+            {resolvingLocation ? <Loader2 className="h-4 w-4 animate-spin" /> : "Set"}
+          </button>
+        </div>
+        {manualError && <p className="mt-2 rounded-xl border border-red-500/40 bg-red-500/10 px-3 py-2 text-xs text-red-200 backdrop-blur-xl">{manualError}</p>}
+      </form>
       {geoError && (
-        <div className="absolute top-20 left-4 right-4 z-30 rounded-2xl border border-red-500/40 bg-red-500/10 backdrop-blur-xl px-3 py-2 text-xs text-red-200">
+        <div className="absolute top-40 left-4 right-4 z-30 rounded-2xl border border-red-500/40 bg-red-500/10 backdrop-blur-xl px-3 py-2 text-xs text-red-200">
           {geoError}. Tap the locate button to retry, and allow location access in your browser.
         </div>
       )}
