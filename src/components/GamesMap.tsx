@@ -313,11 +313,6 @@ export function GamesMap({
         </div>
         {manualError && <p className="mt-2 rounded-xl border border-red-500/40 bg-red-500/10 px-3 py-2 text-xs text-red-200 backdrop-blur-xl">{manualError}</p>}
       </form>
-      {geoError && !manualLocationRef.current && (
-        <div className="absolute top-40 left-4 right-4 z-30 rounded-2xl border border-red-500/40 bg-red-500/10 backdrop-blur-xl px-3 py-2 text-xs text-red-200">
-          {geoError}. Allow location access in your browser, or search a location above.
-        </div>
-      )}
     </>
   );
 }
