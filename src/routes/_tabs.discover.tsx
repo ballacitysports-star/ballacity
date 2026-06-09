@@ -1,9 +1,10 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { MapPin, Navigation } from "lucide-react";
 import { GAMES, SPORTS } from "@/lib/sample-data";
 import { formatWhen } from "@/lib/format";
+import { GamesMap, type MapPinItem } from "@/components/GamesMap";
 
 export const Route = createFileRoute("/_tabs/discover")({
   head: () => ({ meta: [{ title: "Discover — OpenRun" }] }),
@@ -18,77 +19,35 @@ function Discover() {
   const [active, setActive] = useState(GAMES[0].id);
   const activeGame = GAMES.find((g) => g.id === active)!;
 
+  const pins: MapPinItem[] = useMemo(
+    () =>
+      GAMES.map((g) => ({
+        id: g.id,
+        emoji: emojiBySport[g.sport] ?? "📍",
+        lat: g.lat,
+        lng: g.lng,
+        urgent: g.urgent,
+      })),
+    [],
+  );
+
   return (
     <div className="relative h-dvh overflow-hidden">
-      {/* Faux map background */}
-      <div className="absolute inset-0">
-        <div
-          className="absolute inset-0"
-          style={{
-            background:
-              "radial-gradient(60% 50% at 30% 30%, oklch(0.28 0.08 200 / 0.55), transparent 60%), radial-gradient(50% 40% at 80% 70%, oklch(0.30 0.08 145 / 0.45), transparent 60%), linear-gradient(180deg, oklch(0.18 0.03 240), oklch(0.14 0.03 250))",
-          }}
-        />
-        <svg className="absolute inset-0 h-full w-full opacity-25" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden>
-          <defs>
-            <pattern id="grid" width="6" height="6" patternUnits="userSpaceOnUse">
-              <path d="M 6 0 L 0 0 0 6" fill="none" stroke="oklch(1 0 0 / 0.08)" strokeWidth="0.3" />
-            </pattern>
-          </defs>
-          <rect width="100" height="100" fill="url(#grid)" />
-          {/* Faux roads */}
-          <path d="M 0 60 Q 30 50 60 55 T 100 50" stroke="oklch(1 0 0 / 0.15)" strokeWidth="2" fill="none" vectorEffect="non-scaling-stroke" />
-          <path d="M 30 0 Q 35 40 50 50 T 70 100" stroke="oklch(1 0 0 / 0.10)" strokeWidth="1.5" fill="none" vectorEffect="non-scaling-stroke" />
-          <path d="M 0 25 L 100 30" stroke="oklch(1 0 0 / 0.08)" strokeWidth="1" fill="none" vectorEffect="non-scaling-stroke" />
-        </svg>
-      </div>
+      {/* Real Google Map with live GPS */}
+      <GamesMap pins={pins} activeId={active} onSelect={setActive} />
 
       {/* Top overlay */}
       <div className="relative z-10 px-4 pt-6">
         <div className="rounded-2xl border border-border bg-surface/80 backdrop-blur-xl p-3 shadow-xl">
           <div className="flex items-center gap-2 text-sm">
             <Navigation className="h-4 w-4 text-lime" />
-            <span className="font-semibold">East Village, NY</span>
-            <span className="text-muted-foreground">· {GAMES.length} games within 5 mi</span>
+            <span className="font-semibold">Live location</span>
+            <span className="text-muted-foreground">· {GAMES.length} games nearby</span>
           </div>
         </div>
       </div>
 
-      {/* Pins */}
-      <div className="absolute inset-0 z-10 pointer-events-none">
-        {GAMES.map((g, i) => (
-          <motion.button
-            key={g.id}
-            initial={{ scale: 0, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            transition={{ delay: i * 0.05, type: "spring", stiffness: 250, damping: 15 }}
-            onClick={() => setActive(g.id)}
-            className="pointer-events-auto absolute -translate-x-1/2 -translate-y-1/2"
-            style={{ left: `${g.lng}%`, top: `${g.lat}%` }}
-          >
-            <div
-              className={`relative grid h-11 w-11 place-items-center rounded-full border-2 transition-all ${
-                active === g.id
-                  ? "bg-lime border-lime text-primary-foreground scale-110 glow-lime"
-                  : "bg-background/90 backdrop-blur border-border text-foreground hover:border-lime"
-              }`}
-            >
-              <span className="text-lg">{emojiBySport[g.sport]}</span>
-              {g.urgent && (
-                <span className="absolute -top-1 -right-1 h-3 w-3 rounded-full bg-coral animate-pulse border-2 border-background" />
-              )}
-            </div>
-            {active === g.id && (
-              <motion.span
-                initial={{ scale: 0 }}
-                animate={{ scale: [1, 1.6, 1], opacity: [0.6, 0, 0.6] }}
-                transition={{ duration: 2, repeat: Infinity }}
-                className="absolute inset-0 -z-10 rounded-full bg-lime/40"
-              />
-            )}
-          </motion.button>
-        ))}
-      </div>
+
 
       {/* Bottom card */}
       <div className="absolute bottom-24 left-0 right-0 z-20 px-4">
