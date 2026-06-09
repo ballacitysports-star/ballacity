@@ -18,6 +18,8 @@ const emojiBySport: Record<string, string> = Object.fromEntries(
 );
 
 function Discover() {
+  const { user } = useAuth();
+  const profile = useMyProfile(user);
   const [active, setActive] = useState(GAMES[0].id);
   const activeGame = GAMES.find((g) => g.id === active)!;
 
