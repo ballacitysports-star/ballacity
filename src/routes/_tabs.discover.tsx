@@ -38,7 +38,7 @@ function Discover() {
   return (
     <div className="relative h-dvh overflow-hidden">
       {/* Real Google Map with live GPS */}
-      <GamesMap pins={pins} activeId={active} onSelect={setActive} />
+      <GamesMap pins={pins} activeId={active} onSelect={setActive} defaultLocation={profile?.city} />
 
       {/* Top overlay */}
       <div className="relative z-10 px-4 pt-6">
