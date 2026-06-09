@@ -55,10 +55,12 @@ export function GamesMap({
   pins,
   activeId,
   onSelect,
+  defaultLocation,
 }: {
   pins: MapPinItem[];
   activeId: string;
   onSelect: (id: string) => void;
+  defaultLocation?: string | null;
 }) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<any>(null);
