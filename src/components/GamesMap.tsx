@@ -1,0 +1,207 @@
+import { useEffect, useRef, useState } from "react";
+
+declare global {
+  interface Window {
+    google?: any;
+    __gmapsLoading?: Promise<void>;
+  }
+}
+
+function loadGoogleMaps(): Promise<void> {
+  if (typeof window === "undefined") return Promise.resolve();
+  if (window.google?.maps?.importLibrary) return Promise.resolve();
+  if (window.__gmapsLoading) return window.__gmapsLoading;
+  const key = import.meta.env.VITE_LOVABLE_CONNECTOR_GOOGLE_MAPS_BROWSER_KEY;
+  const channel = import.meta.env.VITE_LOVABLE_CONNECTOR_GOOGLE_MAPS_TRACKING_ID;
+  if (!key) return Promise.reject(new Error("Maps key missing"));
+  window.__gmapsLoading = new Promise<void>((resolve, reject) => {
+    (window as any).__initGmaps = () => resolve();
+    const s = document.createElement("script");
+    s.src = `https://maps.googleapis.com/maps/api/js?key=${key}&loading=async&libraries=places&callback=__initGmaps${channel ? `&channel=${channel}` : ""}`;
+    s.async = true;
+    s.onerror = () => reject(new Error("Failed to load Google Maps"));
+    document.head.appendChild(s);
+  });
+  return window.__gmapsLoading;
+}
+
+// Dark mode map styling to match app theme
+const DARK_STYLE = [
+  { elementType: "geometry", stylers: [{ color: "#1a1f2e" }] },
+  { elementType: "labels.text.stroke", stylers: [{ color: "#1a1f2e" }] },
+  { elementType: "labels.text.fill", stylers: [{ color: "#8a93a6" }] },
+  { featureType: "road", elementType: "geometry", stylers: [{ color: "#2a3142" }] },
+  { featureType: "road", elementType: "geometry.stroke", stylers: [{ color: "#1a1f2e" }] },
+  { featureType: "water", elementType: "geometry", stylers: [{ color: "#0f1420" }] },
+  { featureType: "poi", elementType: "labels", stylers: [{ visibility: "off" }] },
+  { featureType: "transit", stylers: [{ visibility: "off" }] },
+  { featureType: "administrative", elementType: "geometry", stylers: [{ visibility: "off" }] },
+];
+
+export type MapPinItem = {
+  id: string;
+  emoji: string;
+  /** pseudo coord 0-100 from sample data (lat = y, lng = x) */
+  lat: number;
+  lng: number;
+  urgent?: boolean;
+};
+
+export function GamesMap({
+  pins,
+  activeId,
+  onSelect,
+}: {
+  pins: MapPinItem[];
+  activeId: string;
+  onSelect: (id: string) => void;
+}) {
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  const mapRef = useRef<any>(null);
+  const userMarkerRef = useRef<any>(null);
+  const userCircleRef = useRef<any>(null);
+  const pinMarkersRef = useRef<Map<string, any>>(new Map());
+  const userPosRef = useRef<{ lat: number; lng: number } | null>(null);
+  const [ready, setReady] = useState(false);
+
+  // Convert a 0-100 pseudo coord to a real lat/lng offset around user.
+  // Spread games across ~6km box.
+  const toLatLng = (px: number, py: number, center: { lat: number; lng: number }) => {
+    const dLat = ((50 - py) / 100) * 0.06;
+    const dLng = ((px - 50) / 100) * 0.08;
+    return { lat: center.lat + dLat, lng: center.lng + dLng };
+  };
+
+  // Initialize map
+  useEffect(() => {
+    let cancelled = false;
+    loadGoogleMaps()
+      .then(async () => {
+        if (cancelled || !containerRef.current) return;
+        const { Map } = await window.google.maps.importLibrary("maps");
+        mapRef.current = new Map(containerRef.current, {
+          center: { lat: 40.7281, lng: -73.9842 }, // NYC fallback
+          zoom: 14,
+          disableDefaultUI: true,
+          gestureHandling: "greedy",
+          clickableIcons: false,
+          styles: DARK_STYLE,
+        });
+        setReady(true);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // Watch user GPS in real time
+  useEffect(() => {
+    if (!navigator.geolocation) return;
+    const id = navigator.geolocation.watchPosition(
+      (pos) => {
+        const center = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+        const firstFix = !userPosRef.current;
+        userPosRef.current = center;
+        if (!mapRef.current || !window.google?.maps) return;
+
+        // user dot
+        if (!userMarkerRef.current) {
+          userMarkerRef.current = new window.google.maps.Marker({
+            position: center,
+            map: mapRef.current,
+            zIndex: 999,
+            icon: {
+              path: window.google.maps.SymbolPath.CIRCLE,
+              scale: 8,
+              fillColor: "#a3e635",
+              fillOpacity: 1,
+              strokeColor: "#0f1420",
+              strokeWeight: 3,
+            },
+          });
+          userCircleRef.current = new window.google.maps.Circle({
+            map: mapRef.current,
+            center,
+            radius: pos.coords.accuracy || 50,
+            fillColor: "#a3e635",
+            fillOpacity: 0.12,
+            strokeColor: "#a3e635",
+            strokeOpacity: 0.35,
+            strokeWeight: 1,
+          });
+        } else {
+          userMarkerRef.current.setPosition(center);
+          userCircleRef.current.setCenter(center);
+          userCircleRef.current.setRadius(pos.coords.accuracy || 50);
+        }
+
+        if (firstFix) mapRef.current.panTo(center);
+        repositionPins();
+      },
+      () => {},
+      { enableHighAccuracy: true, maximumAge: 5000, timeout: 10000 },
+    );
+    return () => navigator.geolocation.clearWatch(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ready]);
+
+  const repositionPins = () => {
+    const center = userPosRef.current || { lat: 40.7281, lng: -73.9842 };
+    pins.forEach((p) => {
+      const m = pinMarkersRef.current.get(p.id);
+      if (m) m.setPosition(toLatLng(p.lng, p.lat, center));
+    });
+  };
+
+  // Build pin markers
+  useEffect(() => {
+    if (!ready || !mapRef.current || !window.google?.maps) return;
+    const existing = pinMarkersRef.current;
+    const center = userPosRef.current || { lat: 40.7281, lng: -73.9842 };
+
+    pins.forEach((p) => {
+      if (existing.has(p.id)) return;
+      const marker = new window.google.maps.Marker({
+        position: toLatLng(p.lng, p.lat, center),
+        map: mapRef.current,
+        icon: makePinIcon(p.emoji, p.id === activeId, !!p.urgent),
+      });
+      marker.addListener("click", () => onSelect(p.id));
+      existing.set(p.id, marker);
+    });
+
+    // remove stale
+    Array.from(existing.keys()).forEach((id) => {
+      if (!pins.find((p) => p.id === id)) {
+        existing.get(id)?.setMap(null);
+        existing.delete(id);
+      }
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ready, pins]);
+
+  // Update active styling
+  useEffect(() => {
+    if (!ready) return;
+    pins.forEach((p) => {
+      const m = pinMarkersRef.current.get(p.id);
+      if (m) m.setIcon(makePinIcon(p.emoji, p.id === activeId, !!p.urgent));
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeId, ready]);
+
+  return <div ref={containerRef} className="absolute inset-0" />;
+}
+
+function makePinIcon(emoji: string, active: boolean, urgent: boolean) {
+  const bg = active ? "#a3e635" : "#1a1f2e";
+  const border = active ? "#a3e635" : "#3a4256";
+  const dot = urgent ? `<circle cx="36" cy="6" r="4" fill="#ff5a5f" stroke="#0f1420" stroke-width="1.5"/>` : "";
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="44" height="44" viewBox="0 0 44 44"><circle cx="22" cy="22" r="18" fill="${bg}" stroke="${border}" stroke-width="2"/><text x="22" y="28" text-anchor="middle" font-size="18">${emoji}</text>${dot}</svg>`;
+  return {
+    url: `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`,
+    scaledSize: new window.google.maps.Size(44, 44),
+    anchor: new window.google.maps.Point(22, 22),
+  };
+}
