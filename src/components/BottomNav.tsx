@@ -2,10 +2,10 @@ import { Link, useLocation } from "@tanstack/react-router";
 import { Home, Map, Plus, User, Users } from "lucide-react";
 import { motion } from "framer-motion";
 
-const items: { to: string; icon: typeof Home; label: string; primary?: boolean }[] = [
+const items: { to: string; icon: typeof Home; label: string }[] = [
   { to: "/feed", icon: Home, label: "Feed" },
   { to: "/teams", icon: Users, label: "Teams" },
-  { to: "/create", icon: Plus, label: "Host", primary: true },
+  { to: "/create", icon: Plus, label: "Host" },
   { to: "/discover", icon: Map, label: "Map" },
   { to: "/profile", icon: User, label: "Me" },
 ];
