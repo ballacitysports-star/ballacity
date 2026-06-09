@@ -5,6 +5,8 @@ import { MapPin, Navigation } from "lucide-react";
 import { GAMES, SPORTS } from "@/lib/sample-data";
 import { formatWhen } from "@/lib/format";
 import { GamesMap, type MapPinItem } from "@/components/GamesMap";
+import { useMyProfile } from "@/lib/user-prefs-store";
+import { useAuth } from "@/hooks/use-auth";
 
 export const Route = createFileRoute("/_tabs/discover")({
   head: () => ({ meta: [{ title: "Discover — OpenRun" }] }),
