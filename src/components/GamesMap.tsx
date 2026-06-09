@@ -190,8 +190,7 @@ export function GamesMap({
     );
   };
 
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ready]);
+
 
   const repositionPins = () => {
     const center = userPosRef.current || { lat: 40.7281, lng: -73.9842 };
