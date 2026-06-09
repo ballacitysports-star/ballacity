@@ -1,6 +1,8 @@
-import { useEffect, useRef, useState } from "react";
-import { LocateFixed, Loader2 } from "lucide-react";
+import { type FormEvent, useEffect, useRef, useState } from "react";
+import { LocateFixed, Loader2, Search } from "lucide-react";
+import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
+import { geocodeAddress } from "@/lib/geocode.functions";
 
 declare global {
   interface Window {
@@ -62,9 +64,16 @@ export function GamesMap({
   const mapRef = useRef<any>(null);
   const userMarkerRef = useRef<any>(null);
   const userCircleRef = useRef<any>(null);
+  const searchMarkerRef = useRef<any>(null);
   const pinMarkersRef = useRef<Map<string, any>>(new Map());
   const userPosRef = useRef<{ lat: number; lng: number } | null>(null);
+  const pinCenterRef = useRef<{ lat: number; lng: number } | null>(null);
+  const manualLocationRef = useRef(false);
   const [ready, setReady] = useState(false);
+  const [manualLocation, setManualLocation] = useState("");
+  const [resolvingLocation, setResolvingLocation] = useState(false);
+  const [manualError, setManualError] = useState<string | null>(null);
+  const geocode = useServerFn(geocodeAddress);
 
   // Convert a 0-100 pseudo coord to a real lat/lng offset around user.
   // Spread games across ~6km box.
@@ -134,11 +143,19 @@ export function GamesMap({
       userCircleRef.current.setCenter(center);
       userCircleRef.current.setRadius(pos.coords.accuracy || 50);
     }
+    if (recenter) {
+      manualLocationRef.current = false;
+      searchMarkerRef.current?.setMap(null);
+      searchMarkerRef.current = null;
+    }
+    if (!manualLocationRef.current) {
+      pinCenterRef.current = center;
+      repositionPins();
+    }
     if (firstFix || recenter) {
       mapRef.current.panTo(center);
       mapRef.current.setZoom(15);
     }
-    repositionPins();
   };
 
   const describeGeoError = (err: GeolocationPositionError) => {
@@ -190,10 +207,54 @@ export function GamesMap({
     );
   };
 
+  const changeMapLocation = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const query = manualLocation.trim();
+    if (query.length < 2) return;
+    setResolvingLocation(true);
+    setManualError(null);
+    try {
+      const result = await geocode({ data: { address: query } });
+      const center = { lat: result.lat, lng: result.lng };
+      manualLocationRef.current = true;
+      pinCenterRef.current = center;
+      setManualLocation(result.formatted || query);
+      if (mapRef.current && window.google?.maps) {
+        if (!searchMarkerRef.current) {
+          searchMarkerRef.current = new window.google.maps.Marker({
+            position: center,
+            map: mapRef.current,
+            zIndex: 998,
+            icon: {
+              path: window.google.maps.SymbolPath.CIRCLE,
+              scale: 7,
+              fillColor: "#ff6b6b",
+              fillOpacity: 1,
+              strokeColor: "#0f1420",
+              strokeWeight: 3,
+            },
+          });
+        } else {
+          searchMarkerRef.current.setPosition(center);
+          searchMarkerRef.current.setMap(mapRef.current);
+        }
+        mapRef.current.panTo(center);
+        mapRef.current.setZoom(14);
+      }
+      repositionPins();
+      toast.success("Map location changed");
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Couldn't find that location";
+      setManualError(message);
+      toast.error(message);
+    } finally {
+      setResolvingLocation(false);
+    }
+  };
 
 
   const repositionPins = () => {
-    const center = userPosRef.current || { lat: 40.7281, lng: -73.9842 };
+    const center = pinCenterRef.current || userPosRef.current || { lat: 40.7281, lng: -73.9842 };
     pins.forEach((p) => {
       const m = pinMarkersRef.current.get(p.id);
       if (m) m.setPosition(toLatLng(p.lng, p.lat, center));
