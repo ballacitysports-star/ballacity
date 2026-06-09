@@ -165,25 +165,6 @@ export function GamesMap({
     return "Couldn't get location";
   };
 
-  // Watch user GPS in real time (best-effort; may be blocked without gesture in some browsers)
-  useEffect(() => {
-    if (!ready) return;
-    if (!navigator.geolocation) {
-      setGeoError("Geolocation not supported");
-      return;
-    }
-    const id = navigator.geolocation.watchPosition(
-      (pos) => {
-        setGeoError(null);
-        applyPosition(pos, false);
-      },
-      (err) => setGeoError(describeGeoError(err)),
-      { enableHighAccuracy: true, maximumAge: 5000, timeout: 15000 },
-    );
-    return () => navigator.geolocation.clearWatch(id);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ready]);
-
   const locateMe = () => {
     if (!navigator.geolocation) {
       toast.error("Geolocation not supported");
@@ -218,6 +199,7 @@ export function GamesMap({
       const center = { lat: result.lat, lng: result.lng };
       manualLocationRef.current = true;
       pinCenterRef.current = center;
+      setGeoError(null);
       setManualLocation(result.formatted || query);
       if (mapRef.current && window.google?.maps) {
         if (!searchMarkerRef.current) {
