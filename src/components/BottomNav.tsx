@@ -19,20 +19,6 @@ export function BottomNav() {
           {items.map((it) => {
             const active = pathname === it.to || (it.to !== "/feed" && pathname.startsWith(it.to));
             const Icon = it.icon;
-            if (it.primary) {
-              return (
-                <li key={it.to} className="grid place-items-center -mt-6">
-                  <Link to={it.to} aria-label={it.label}>
-                    <motion.div
-                      whileTap={{ scale: 0.92 }}
-                      className="h-14 w-14 rounded-2xl bg-lime-gradient grid place-items-center text-primary-foreground glow-lime"
-                    >
-                      <Icon className="h-6 w-6" strokeWidth={2.5} />
-                    </motion.div>
-                  </Link>
-                </li>
-              );
-            }
             return (
               <li key={it.to}>
                 <Link to={it.to} className="flex flex-col items-center gap-1 py-3 text-[11px] font-medium">
