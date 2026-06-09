@@ -97,54 +97,99 @@ export function GamesMap({
     };
   }, []);
 
-  // Watch user GPS in real time
+  const [locating, setLocating] = useState(false);
+  const [geoError, setGeoError] = useState<string | null>(null);
+
+  const applyPosition = (pos: GeolocationPosition, recenter: boolean) => {
+    const center = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+    const firstFix = !userPosRef.current;
+    userPosRef.current = center;
+    if (!mapRef.current || !window.google?.maps) return;
+    if (!userMarkerRef.current) {
+      userMarkerRef.current = new window.google.maps.Marker({
+        position: center,
+        map: mapRef.current,
+        zIndex: 999,
+        icon: {
+          path: window.google.maps.SymbolPath.CIRCLE,
+          scale: 8,
+          fillColor: "#a3e635",
+          fillOpacity: 1,
+          strokeColor: "#0f1420",
+          strokeWeight: 3,
+        },
+      });
+      userCircleRef.current = new window.google.maps.Circle({
+        map: mapRef.current,
+        center,
+        radius: pos.coords.accuracy || 50,
+        fillColor: "#a3e635",
+        fillOpacity: 0.12,
+        strokeColor: "#a3e635",
+        strokeOpacity: 0.35,
+        strokeWeight: 1,
+      });
+    } else {
+      userMarkerRef.current.setPosition(center);
+      userCircleRef.current.setCenter(center);
+      userCircleRef.current.setRadius(pos.coords.accuracy || 50);
+    }
+    if (firstFix || recenter) {
+      mapRef.current.panTo(center);
+      mapRef.current.setZoom(15);
+    }
+    repositionPins();
+  };
+
+  const describeGeoError = (err: GeolocationPositionError) => {
+    if (err.code === 1) return "Location permission denied";
+    if (err.code === 2) return "Location unavailable";
+    if (err.code === 3) return "Location request timed out";
+    return "Couldn't get location";
+  };
+
+  // Watch user GPS in real time (best-effort; may be blocked without gesture in some browsers)
   useEffect(() => {
-    if (!navigator.geolocation) return;
+    if (!ready) return;
+    if (!navigator.geolocation) {
+      setGeoError("Geolocation not supported");
+      return;
+    }
     const id = navigator.geolocation.watchPosition(
       (pos) => {
-        const center = { lat: pos.coords.latitude, lng: pos.coords.longitude };
-        const firstFix = !userPosRef.current;
-        userPosRef.current = center;
-        if (!mapRef.current || !window.google?.maps) return;
-
-        // user dot
-        if (!userMarkerRef.current) {
-          userMarkerRef.current = new window.google.maps.Marker({
-            position: center,
-            map: mapRef.current,
-            zIndex: 999,
-            icon: {
-              path: window.google.maps.SymbolPath.CIRCLE,
-              scale: 8,
-              fillColor: "#a3e635",
-              fillOpacity: 1,
-              strokeColor: "#0f1420",
-              strokeWeight: 3,
-            },
-          });
-          userCircleRef.current = new window.google.maps.Circle({
-            map: mapRef.current,
-            center,
-            radius: pos.coords.accuracy || 50,
-            fillColor: "#a3e635",
-            fillOpacity: 0.12,
-            strokeColor: "#a3e635",
-            strokeOpacity: 0.35,
-            strokeWeight: 1,
-          });
-        } else {
-          userMarkerRef.current.setPosition(center);
-          userCircleRef.current.setCenter(center);
-          userCircleRef.current.setRadius(pos.coords.accuracy || 50);
-        }
-
-        if (firstFix) mapRef.current.panTo(center);
-        repositionPins();
+        setGeoError(null);
+        applyPosition(pos, false);
       },
-      () => {},
-      { enableHighAccuracy: true, maximumAge: 5000, timeout: 10000 },
+      (err) => setGeoError(describeGeoError(err)),
+      { enableHighAccuracy: true, maximumAge: 5000, timeout: 15000 },
     );
     return () => navigator.geolocation.clearWatch(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ready]);
+
+  const locateMe = () => {
+    if (!navigator.geolocation) {
+      toast.error("Geolocation not supported");
+      return;
+    }
+    setLocating(true);
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        setLocating(false);
+        setGeoError(null);
+        applyPosition(pos, true);
+        toast.success("Centered on your location");
+      },
+      (err) => {
+        setLocating(false);
+        const msg = describeGeoError(err);
+        setGeoError(msg);
+        toast.error(msg);
+      },
+      { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 },
+    );
+  };
+
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ready]);
 
