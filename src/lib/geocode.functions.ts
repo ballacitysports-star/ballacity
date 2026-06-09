@@ -37,3 +37,39 @@ export const reverseGeocode = createServerFn({ method: "POST" })
     const cityLine = [city, region].filter(Boolean).join(", ");
     return { formatted, city: cityLine };
   });
+
+export const geocodeAddress = createServerFn({ method: "POST" })
+  .inputValidator((data: { address: string }) => {
+    const address = String(data?.address ?? "").trim();
+    if (address.length < 2) throw new Error("address required");
+    if (address.length > 200) throw new Error("address too long");
+    return { address };
+  })
+  .handler(async ({ data }) => {
+    const lovableKey = process.env.LOVABLE_API_KEY;
+    const gKey = process.env.GOOGLE_MAPS_API_KEY;
+    if (!lovableKey || !gKey) throw new Error("Maps credentials missing");
+
+    const url = `${GATEWAY_URL}/maps/api/geocode/json?address=${encodeURIComponent(data.address)}`;
+    const res = await fetch(url, {
+      headers: {
+        Authorization: `Bearer ${lovableKey}`,
+        "X-Connection-Api-Key": gKey,
+      },
+    });
+    if (!res.ok) throw new Error(`Geocode failed: ${res.status}`);
+    const body = (await res.json()) as {
+      results?: Array<{
+        formatted_address?: string;
+        geometry?: { location?: { lat?: number; lng?: number } };
+      }>;
+      status?: string;
+    };
+    const first = body.results?.[0];
+    const lat = first?.geometry?.location?.lat;
+    const lng = first?.geometry?.location?.lng;
+    if (typeof lat !== "number" || typeof lng !== "number") {
+      throw new Error(body.status === "ZERO_RESULTS" ? "No location found" : "Invalid geocode response");
+    }
+    return { lat, lng, formatted: first?.formatted_address ?? data.address };
+  });
