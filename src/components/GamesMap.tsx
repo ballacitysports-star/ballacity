@@ -55,10 +55,12 @@ export function GamesMap({
   pins,
   activeId,
   onSelect,
+  defaultLocation,
 }: {
   pins: MapPinItem[];
   activeId: string;
   onSelect: (id: string) => void;
+  defaultLocation?: string | null;
 }) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<any>(null);
@@ -105,6 +107,28 @@ export function GamesMap({
       cancelled = true;
     };
   }, []);
+
+  // Geocode default profile location and center the map there before GPS
+  useEffect(() => {
+    if (!ready || !defaultLocation || !defaultLocation.trim()) return;
+    let cancelled = false;
+    geocode({ data: { address: defaultLocation.trim() } })
+      .then((result) => {
+        if (cancelled || !mapRef.current) return;
+        // Don't override if user already got a GPS fix or set a manual location
+        if (userPosRef.current || manualLocationRef.current) return;
+        const center = { lat: result.lat, lng: result.lng };
+        pinCenterRef.current = center;
+        mapRef.current.panTo(center);
+        mapRef.current.setZoom(13);
+        repositionPins();
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ready, defaultLocation]);
 
   const [locating, setLocating] = useState(false);
   const [geoError, setGeoError] = useState<string | null>(null);

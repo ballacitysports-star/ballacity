@@ -5,6 +5,8 @@ import { MapPin, Navigation } from "lucide-react";
 import { GAMES, SPORTS } from "@/lib/sample-data";
 import { formatWhen } from "@/lib/format";
 import { GamesMap, type MapPinItem } from "@/components/GamesMap";
+import { useMyProfile } from "@/lib/user-prefs-store";
+import { useAuth } from "@/hooks/use-auth";
 
 export const Route = createFileRoute("/_tabs/discover")({
   head: () => ({ meta: [{ title: "Discover — OpenRun" }] }),
@@ -16,6 +18,8 @@ const emojiBySport: Record<string, string> = Object.fromEntries(
 );
 
 function Discover() {
+  const { user } = useAuth();
+  const profile = useMyProfile(user);
   const [active, setActive] = useState(GAMES[0].id);
   const activeGame = GAMES.find((g) => g.id === active)!;
 
@@ -34,7 +38,7 @@ function Discover() {
   return (
     <div className="relative h-dvh overflow-hidden">
       {/* Real Google Map with live GPS */}
-      <GamesMap pins={pins} activeId={active} onSelect={setActive} />
+      <GamesMap pins={pins} activeId={active} onSelect={setActive} defaultLocation={profile?.city} />
 
       {/* Top overlay */}
       <div className="relative z-10 px-4 pt-6">
