@@ -237,7 +237,24 @@ export function GamesMap({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeId, ready]);
 
-  return <div ref={containerRef} className="absolute inset-0" />;
+  return (
+    <>
+      <div ref={containerRef} className="absolute inset-0" />
+      <button
+        type="button"
+        onClick={locateMe}
+        className="absolute bottom-48 right-4 z-30 inline-flex h-11 w-11 items-center justify-center rounded-full border border-border bg-surface/95 backdrop-blur-xl text-lime shadow-xl active:scale-95 transition"
+        title="Center on my location"
+      >
+        {locating ? <Loader2 className="h-5 w-5 animate-spin" /> : <LocateFixed className="h-5 w-5" />}
+      </button>
+      {geoError && (
+        <div className="absolute top-20 left-4 right-4 z-30 rounded-2xl border border-red-500/40 bg-red-500/10 backdrop-blur-xl px-3 py-2 text-xs text-red-200">
+          {geoError}. Tap the locate button to retry, and allow location access in your browser.
+        </div>
+      )}
+    </>
+  );
 }
 
 function makePinIcon(emoji: string, active: boolean, urgent: boolean) {
