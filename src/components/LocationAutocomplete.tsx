@@ -143,6 +143,7 @@ export function LocationAutocomplete({
 
   const handleChange = (v: string) => {
     onChange(v);
+    setSearchError(null);
     if (timerRef.current) window.clearTimeout(timerRef.current);
     timerRef.current = window.setTimeout(() => queryAutocomplete(v), 200);
   };
