@@ -1,5 +1,5 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import { ArrowLeft, Calendar, MapPin, Users, DollarSign, Lock, Home } from "lucide-react";
 import { SPORTS, type Sport } from "@/lib/sample-data";
@@ -23,12 +23,31 @@ function Create() {
   const [title, setTitle] = useState("");
   const [when, setWhen] = useState("");
   const [location, setLocation] = useState(profile?.city ?? "");
+  const previousProfileCityRef = useRef(profile?.city ?? "");
+  const locationEditedRef = useRef(false);
   const [skill, setSkill] = useState<"All Levels" | "Beginner" | "Intermediate" | "Advanced">("All Levels");
   const [size, setSize] = useState(10);
   const [price, setPrice] = useState(0);
   const [indoor, setIndoor] = useState(false);
   const [priv, setPriv] = useState(false);
   const [description, setDescription] = useState("");
+
+  useEffect(() => {
+    const nextCity = profile?.city?.trim() ?? "";
+    const previousCity = previousProfileCityRef.current;
+    previousProfileCityRef.current = nextCity;
+
+    if (!nextCity) return;
+    setLocation((current) => {
+      const canUseProfileCity = !locationEditedRef.current || !current.trim() || current.trim() === previousCity;
+      return canUseProfileCity ? nextCity : current;
+    });
+  }, [profile?.city]);
+
+  const handleLocationChange = (next: string) => {
+    locationEditedRef.current = true;
+    setLocation(next);
+  };
 
   return (
     <div className="mx-auto max-w-md px-4 pt-6">
@@ -109,7 +128,7 @@ function Create() {
         <Section title="Venue address" icon={<MapPin className="h-4 w-4" />}>
           <LocationAutocomplete
             value={location}
-            onChange={setLocation}
+            onChange={handleLocationChange}
             placeholder="Search court, park or venue"
           />
           {profile?.city && (
