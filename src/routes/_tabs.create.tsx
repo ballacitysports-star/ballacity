@@ -23,8 +23,6 @@ function Create() {
   const [title, setTitle] = useState("");
   const [when, setWhen] = useState("");
   const [location, setLocation] = useState(profile?.city ?? "");
-  const [when, setWhen] = useState("");
-  const [location, setLocation] = useState("");
   const [skill, setSkill] = useState<"All Levels" | "Beginner" | "Intermediate" | "Advanced">("All Levels");
   const [size, setSize] = useState(10);
   const [price, setPrice] = useState(0);
