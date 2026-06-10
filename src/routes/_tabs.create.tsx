@@ -37,14 +37,14 @@ function Create() {
   useEffect(() => {
     const nextCity = profile?.city?.trim() ?? "";
     const previousCity = previousProfileCityRef.current;
+    if (nextCity === previousCity) return;
     previousProfileCityRef.current = nextCity;
 
     if (!nextCity) return;
-    setLocation((current) => {
-      const canUseProfileCity =
-        !locationEditedRef.current || !current.trim() || current.trim() === previousCity;
-      return canUseProfileCity ? nextCity : current;
-    });
+    // Profile city changed — re-autopopulate and clear the manual-edit flag
+    // so subsequent profile changes keep working.
+    locationEditedRef.current = false;
+    setLocation(nextCity);
   }, [profile?.city]);
 
   const handleLocationChange = (next: string) => {
