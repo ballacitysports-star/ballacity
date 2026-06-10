@@ -76,6 +76,52 @@ async function handleSubscriptionDeleted(subscription: any, env: StripeEnv) {
     .eq("environment", env);
 }
 
+async function handleCheckoutCompleted(session: any, env: StripeEnv) {
+  // Only record one-time payments here; subscriptions are tracked via
+  // customer.subscription.* events on the subscriptions table.
+  if (session.mode !== "payment") return;
+  const userId = session.metadata?.userId ?? null;
+  const priceId = session.metadata?.priceId;
+  if (!priceId) {
+    console.error("checkout.session.completed missing priceId metadata", session.id);
+    return;
+  }
+
+  // Need line items to resolve product id
+  let productId: string | null = null;
+  try {
+    const { createStripeClient } = await import("@/lib/stripe.server");
+    const stripe = createStripeClient(env);
+    const items = await stripe.checkout.sessions.listLineItems(session.id, { limit: 1, expand: ["data.price.product"] });
+    const price = items.data[0]?.price as any;
+    productId = typeof price?.product === "string" ? price.product : price?.product?.id ?? null;
+  } catch (e) {
+    console.error("Failed to resolve product for session", session.id, e);
+  }
+
+  const shipping = session.shipping_details ?? session.collected_information?.shipping_details ?? null;
+
+  await getSupabase().from("purchases").upsert(
+    {
+      user_id: userId,
+      stripe_session_id: session.id,
+      stripe_payment_intent_id: session.payment_intent ?? null,
+      stripe_customer_id: session.customer ?? null,
+      product_id: productId ?? "unknown",
+      price_id: priceId,
+      amount_total: session.amount_total ?? 0,
+      currency: session.currency ?? "usd",
+      quantity: 1,
+      customer_email: session.customer_details?.email ?? null,
+      shipping_name: shipping?.name ?? null,
+      shipping_address: shipping?.address ?? null,
+      status: session.payment_status === "paid" ? "paid" : (session.payment_status ?? "pending"),
+      environment: env,
+    },
+    { onConflict: "stripe_session_id" }
+  );
+}
+
 async function handleWebhook(req: Request, env: StripeEnv) {
   const event = await verifyWebhook(req, env);
   switch (event.type) {
@@ -87,6 +133,9 @@ async function handleWebhook(req: Request, env: StripeEnv) {
       break;
     case "customer.subscription.deleted":
       await handleSubscriptionDeleted(event.data.object, env);
+      break;
+    case "checkout.session.completed":
+      await handleCheckoutCompleted(event.data.object, env);
       break;
     default:
       console.log("Unhandled event:", event.type);

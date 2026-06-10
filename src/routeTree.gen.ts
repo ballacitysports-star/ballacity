@@ -9,7 +9,9 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as ShopRouteImport } from './routes/shop'
 import { Route as ReviewsRouteImport } from './routes/reviews'
+import { Route as PlansRouteImport } from './routes/plans'
 import { Route as PaymentsRouteImport } from './routes/payments'
 import { Route as MessagesRouteImport } from './routes/messages'
 import { Route as AuthRouteImport } from './routes/auth'
@@ -34,9 +36,19 @@ import { Route as GamesGameIdPaymentSetupRouteImport } from './routes/games.$gam
 import { Route as GamesGameIdPayRouteImport } from './routes/games.$gameId.pay'
 import { Route as ApiPublicPaymentsWebhookRouteImport } from './routes/api/public/payments/webhook'
 
+const ShopRoute = ShopRouteImport.update({
+  id: '/shop',
+  path: '/shop',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ReviewsRoute = ReviewsRouteImport.update({
   id: '/reviews',
   path: '/reviews',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PlansRoute = PlansRouteImport.update({
+  id: '/plans',
+  path: '/plans',
   getParentRoute: () => rootRouteImport,
 } as any)
 const PaymentsRoute = PaymentsRouteImport.update({
@@ -160,7 +172,9 @@ export interface FileRoutesByFullPath {
   '/auth': typeof AuthRoute
   '/messages': typeof MessagesRouteWithChildren
   '/payments': typeof PaymentsRoute
+  '/plans': typeof PlansRoute
   '/reviews': typeof ReviewsRoute
+  '/shop': typeof ShopRoute
   '/create': typeof TabsCreateRoute
   '/discover': typeof TabsDiscoverRoute
   '/feed': typeof TabsFeedRoute
@@ -185,7 +199,9 @@ export interface FileRoutesByTo {
   '/auth': typeof AuthRoute
   '/messages': typeof MessagesRouteWithChildren
   '/payments': typeof PaymentsRoute
+  '/plans': typeof PlansRoute
   '/reviews': typeof ReviewsRoute
+  '/shop': typeof ShopRoute
   '/create': typeof TabsCreateRoute
   '/discover': typeof TabsDiscoverRoute
   '/feed': typeof TabsFeedRoute
@@ -212,7 +228,9 @@ export interface FileRoutesById {
   '/auth': typeof AuthRoute
   '/messages': typeof MessagesRouteWithChildren
   '/payments': typeof PaymentsRoute
+  '/plans': typeof PlansRoute
   '/reviews': typeof ReviewsRoute
+  '/shop': typeof ShopRoute
   '/_tabs/create': typeof TabsCreateRoute
   '/_tabs/discover': typeof TabsDiscoverRoute
   '/_tabs/feed': typeof TabsFeedRoute
@@ -239,7 +257,9 @@ export interface FileRouteTypes {
     | '/auth'
     | '/messages'
     | '/payments'
+    | '/plans'
     | '/reviews'
+    | '/shop'
     | '/create'
     | '/discover'
     | '/feed'
@@ -264,7 +284,9 @@ export interface FileRouteTypes {
     | '/auth'
     | '/messages'
     | '/payments'
+    | '/plans'
     | '/reviews'
+    | '/shop'
     | '/create'
     | '/discover'
     | '/feed'
@@ -290,7 +312,9 @@ export interface FileRouteTypes {
     | '/auth'
     | '/messages'
     | '/payments'
+    | '/plans'
     | '/reviews'
+    | '/shop'
     | '/_tabs/create'
     | '/_tabs/discover'
     | '/_tabs/feed'
@@ -317,7 +341,9 @@ export interface RootRouteChildren {
   AuthRoute: typeof AuthRoute
   MessagesRoute: typeof MessagesRouteWithChildren
   PaymentsRoute: typeof PaymentsRoute
+  PlansRoute: typeof PlansRoute
   ReviewsRoute: typeof ReviewsRoute
+  ShopRoute: typeof ShopRoute
   CheckoutReturnRoute: typeof CheckoutReturnRoute
   GamesGameIdRoute: typeof GamesGameIdRouteWithChildren
   ProfileEditRoute: typeof ProfileEditRoute
@@ -329,11 +355,25 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/shop': {
+      id: '/shop'
+      path: '/shop'
+      fullPath: '/shop'
+      preLoaderRoute: typeof ShopRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/reviews': {
       id: '/reviews'
       path: '/reviews'
       fullPath: '/reviews'
       preLoaderRoute: typeof ReviewsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/plans': {
+      id: '/plans'
+      path: '/plans'
+      fullPath: '/plans'
+      preLoaderRoute: typeof PlansRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/payments': {
@@ -566,7 +606,9 @@ const rootRouteChildren: RootRouteChildren = {
   AuthRoute: AuthRoute,
   MessagesRoute: MessagesRouteWithChildren,
   PaymentsRoute: PaymentsRoute,
+  PlansRoute: PlansRoute,
   ReviewsRoute: ReviewsRoute,
+  ShopRoute: ShopRoute,
   CheckoutReturnRoute: CheckoutReturnRoute,
   GamesGameIdRoute: GamesGameIdRouteWithChildren,
   ProfileEditRoute: ProfileEditRoute,

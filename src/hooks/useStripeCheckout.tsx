@@ -7,6 +7,7 @@ interface CheckoutOptions {
   customerEmail?: string;
   userId?: string;
   returnUrl?: string;
+  collectShipping?: boolean;
 }
 
 export function useStripeCheckout() {

@@ -374,6 +374,63 @@ export type Database = {
         }
         Relationships: []
       }
+      purchases: {
+        Row: {
+          amount_total: number
+          created_at: string
+          currency: string
+          customer_email: string | null
+          environment: string
+          id: string
+          price_id: string
+          product_id: string
+          quantity: number
+          shipping_address: Json | null
+          shipping_name: string | null
+          status: string
+          stripe_customer_id: string | null
+          stripe_payment_intent_id: string | null
+          stripe_session_id: string
+          user_id: string | null
+        }
+        Insert: {
+          amount_total: number
+          created_at?: string
+          currency?: string
+          customer_email?: string | null
+          environment?: string
+          id?: string
+          price_id: string
+          product_id: string
+          quantity?: number
+          shipping_address?: Json | null
+          shipping_name?: string | null
+          status?: string
+          stripe_customer_id?: string | null
+          stripe_payment_intent_id?: string | null
+          stripe_session_id: string
+          user_id?: string | null
+        }
+        Update: {
+          amount_total?: number
+          created_at?: string
+          currency?: string
+          customer_email?: string | null
+          environment?: string
+          id?: string
+          price_id?: string
+          product_id?: string
+          quantity?: number
+          shipping_address?: Json | null
+          shipping_name?: string | null
+          status?: string
+          stripe_customer_id?: string | null
+          stripe_payment_intent_id?: string | null
+          stripe_session_id?: string
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       review_helpfuls: {
         Row: {
           created_at: string
