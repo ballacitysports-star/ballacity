@@ -9,6 +9,7 @@ import {
 } from "@/lib/sample-data";
 import { addOrg } from "@/lib/org-store";
 import { OrgCard } from "@/components/OrgCard";
+import { LocationAutocomplete } from "@/components/LocationAutocomplete";
 
 export const Route = createFileRoute("/teams/create")({
   head: () => ({ meta: [{ title: "Create a profile — OpenRun" }] }),
