@@ -230,19 +230,18 @@ export function GamesMap({
     );
   };
 
-  const changeMapLocation = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    const query = manualLocation.trim();
-    if (query.length < 2) return;
+  const performGeocode = async (query: string) => {
+    const q = query.trim();
+    if (q.length < 2) return;
     setResolvingLocation(true);
     setManualError(null);
     try {
-      const result = await geocode({ data: { address: query } });
+      const result = await geocode({ data: { address: q } });
       const center = { lat: result.lat, lng: result.lng };
       manualLocationRef.current = true;
       pinCenterRef.current = center;
       setGeoError(null);
-      setManualLocation(result.formatted || query);
+      setManualLocation(result.formatted || q);
       if (mapRef.current && window.google?.maps) {
         if (!searchMarkerRef.current) {
           searchMarkerRef.current = new window.google.maps.Marker({
@@ -275,6 +274,12 @@ export function GamesMap({
       setResolvingLocation(false);
     }
   };
+
+  const changeMapLocation = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    void performGeocode(manualLocation);
+  };
+
 
 
   const repositionPins = () => {
