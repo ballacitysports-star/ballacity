@@ -7,6 +7,8 @@ import { addHostedGame } from "@/lib/hosted-games-store";
 import { joinGame } from "@/lib/games-store";
 import { toast } from "sonner";
 import { LocationAutocomplete } from "@/components/LocationAutocomplete";
+import { useMyProfile } from "@/lib/user-prefs-store";
+import { useAuth } from "@/hooks/use-auth";
 
 export const Route = createFileRoute("/_tabs/create")({
   head: () => ({ meta: [{ title: "Host a game — OpenRun" }] }),
@@ -15,10 +17,12 @@ export const Route = createFileRoute("/_tabs/create")({
 
 function Create() {
   const nav = useNavigate();
+  const { user } = useAuth();
+  const profile = useMyProfile(user);
   const [sport, setSport] = useState<Sport>("Basketball");
   const [title, setTitle] = useState("");
   const [when, setWhen] = useState("");
-  const [location, setLocation] = useState("");
+  const [location, setLocation] = useState(profile?.city ?? "");
   const [skill, setSkill] = useState<"All Levels" | "Beginner" | "Intermediate" | "Advanced">("All Levels");
   const [size, setSize] = useState(10);
   const [price, setPrice] = useState(0);
