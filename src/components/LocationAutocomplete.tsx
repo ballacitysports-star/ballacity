@@ -235,6 +235,11 @@ export function LocationAutocomplete({
           ))}
         </ul>
       )}
+      {(mapsError || searchError) && (
+        <p role="status" className="mt-1 px-1 text-[11px] text-muted-foreground">
+          {mapsError ?? searchError}
+        </p>
+      )}
     </div>
   );
 }
