@@ -9,6 +9,7 @@ import {
 } from "@/lib/sample-data";
 import { getOrgById, updateOrg, deleteOrg, isMyOrg } from "@/lib/org-store";
 import { OrgCard } from "@/components/OrgCard";
+import { LocationAutocomplete } from "@/components/LocationAutocomplete";
 
 export const Route = createFileRoute("/teams/$teamId/edit")({
   head: ({ params }) => {
