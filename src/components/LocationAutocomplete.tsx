@@ -132,8 +132,13 @@ export function LocationAutocomplete({
           }));
         setSuggestions(mapped);
         setOpen(mapped.length > 0);
+        setSearchError(mapped.length === 0 ? "No matches — keep typing or enter the address manually" : null);
       })
-      .catch(() => setSuggestions([]));
+      .catch(() => {
+        setSuggestions([]);
+        setOpen(false);
+        setSearchError("Couldn't load suggestions — you can still type the address manually");
+      });
   };
 
   const handleChange = (v: string) => {
