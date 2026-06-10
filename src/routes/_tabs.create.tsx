@@ -7,6 +7,8 @@ import { addHostedGame } from "@/lib/hosted-games-store";
 import { joinGame } from "@/lib/games-store";
 import { toast } from "sonner";
 import { LocationAutocomplete } from "@/components/LocationAutocomplete";
+import { useMyProfile } from "@/lib/user-prefs-store";
+import { useAuth } from "@/hooks/use-auth";
 
 export const Route = createFileRoute("/_tabs/create")({
   head: () => ({ meta: [{ title: "Host a game — OpenRun" }] }),
