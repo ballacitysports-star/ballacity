@@ -1,0 +1,241 @@
+import { createFileRoute } from "@tanstack/react-router";
+import { useEffect, useRef, useState } from "react";
+import { Sparkles, Upload, Video, Lock, Loader2, AlertTriangle, ExternalLink } from "lucide-react";
+import { toast } from "sonner";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/use-auth";
+import { useSubscription } from "@/hooks/useSubscription";
+import { useStripeCheckout } from "@/hooks/useStripeCheckout";
+import { PaymentTestModeBanner } from "@/components/PaymentTestModeBanner";
+import { getStripeEnvironment } from "@/lib/stripe";
+import { createPortalSession } from "@/utils/payments.functions";
+
+export const Route = createFileRoute("/_tabs/reels")({
+  component: ReelsPage,
+});
+
+type Reel = {
+  id: string;
+  title: string;
+  video_path: string;
+  status: string;
+  used_free: boolean;
+  created_at: string;
+};
+
+function ReelsPage() {
+  const { user } = useAuth();
+  const { isActive, isPastDue, freeUsed, freeRemaining, loading: subLoading } = useSubscription();
+  const { openCheckout, isOpen, checkoutElement, closeCheckout } = useStripeCheckout();
+  const fileRef = useRef<HTMLInputElement>(null);
+  const [reels, setReels] = useState<Reel[]>([]);
+  const [busy, setBusy] = useState(false);
+
+  const canGenerate = isActive || freeRemaining > 0;
+  const lockedReason = !user
+    ? "Sign in to create reels"
+    : !canGenerate
+      ? "You've used all 3 free reels. Subscribe to keep going."
+      : null;
+
+  useEffect(() => {
+    if (!user) return;
+    let env: string;
+    try { env = getStripeEnvironment(); } catch { return; }
+    supabase
+      .from("highlight_reels")
+      .select("*")
+      .eq("user_id", user.id)
+      .eq("environment", env)
+      .order("created_at", { ascending: false })
+      .then(({ data }) => setReels((data as Reel[]) ?? []));
+  }, [user, busy]);
+
+  async function handleUpload(file: File) {
+    if (!user) return;
+    if (!canGenerate) {
+      handleSubscribe();
+      return;
+    }
+    setBusy(true);
+    try {
+      const env = getStripeEnvironment();
+      const path = `${user.id}/${Date.now()}-${file.name.replace(/[^a-zA-Z0-9.-]/g, "_")}`;
+      const { error: upErr } = await supabase.storage
+        .from("highlight-videos")
+        .upload(path, file, { upsert: false });
+      if (upErr) throw upErr;
+
+      const usedFree = !isActive;
+      const { error: insErr } = await supabase.from("highlight_reels").insert({
+        user_id: user.id,
+        title: file.name.replace(/\.[^.]+$/, ""),
+        video_path: path,
+        status: "processing",
+        used_free: usedFree,
+        environment: env,
+      });
+      if (insErr) throw insErr;
+
+      toast.success("Reel queued — AI processing started");
+    } catch (e: any) {
+      toast.error(e?.message ?? "Upload failed");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  function handleSubscribe() {
+    if (!user) {
+      toast.error("Please sign in first");
+      return;
+    }
+    openCheckout({
+      priceId: "ai_highlight_reel_monthly",
+      customerEmail: user.email,
+      userId: user.id,
+      returnUrl: `${window.location.origin}/checkout/return?session_id={CHECKOUT_SESSION_ID}`,
+    });
+  }
+
+  async function handleManageBilling() {
+    try {
+      const result = await createPortalSession({
+        data: { environment: getStripeEnvironment(), returnUrl: window.location.href },
+      });
+      if ("error" in result) throw new Error(result.error);
+      window.open(result.url, "_blank");
+    } catch (e: any) {
+      toast.error(e?.message ?? "Could not open billing portal");
+    }
+  }
+
+  if (isOpen) {
+    return (
+      <div className="min-h-dvh">
+        <PaymentTestModeBanner />
+        <div className="px-4 py-4">
+          <button onClick={closeCheckout} className="text-sm text-muted-foreground underline">
+            ← Back
+          </button>
+        </div>
+        <div className="px-4 pb-12">{checkoutElement}</div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-dvh">
+      <PaymentTestModeBanner />
+      <header className="px-5 pt-6 pb-4">
+        <div className="flex items-center gap-2">
+          <Sparkles className="h-6 w-6 text-lime" />
+          <h1 className="text-2xl font-bold">AI Highlight Reels</h1>
+        </div>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Upload a clip and let AI generate your highlight.
+        </p>
+      </header>
+
+      {isPastDue && (
+        <div className="mx-5 mb-3 flex items-center gap-2 rounded-xl border border-amber-400/40 bg-amber-50/10 px-3 py-2 text-sm text-amber-300">
+          <AlertTriangle className="h-4 w-4" />
+          Payment past due — we're retrying. Update your card to avoid losing access.
+        </div>
+      )}
+
+      <section className="mx-5 mb-5 rounded-2xl border border-border bg-surface p-5">
+        {subLoading ? (
+          <p className="text-sm text-muted-foreground">Loading plan…</p>
+        ) : isActive ? (
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <p className="text-sm font-semibold text-lime">Pro · Unlimited reels</p>
+              <p className="text-xs text-muted-foreground">$15 / month</p>
+            </div>
+            <button
+              onClick={handleManageBilling}
+              className="inline-flex items-center gap-1 rounded-lg border border-border px-3 py-1.5 text-xs"
+            >
+              Manage <ExternalLink className="h-3 w-3" />
+            </button>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-semibold">Free trial</p>
+                <p className="text-xs text-muted-foreground">
+                  {freeRemaining} of 3 free reels left
+                </p>
+              </div>
+              <span className="text-xs text-muted-foreground">{freeUsed}/3 used</span>
+            </div>
+            <button
+              onClick={handleSubscribe}
+              className="w-full rounded-xl bg-lime py-2.5 font-semibold text-black"
+            >
+              {freeRemaining > 0 ? "Upgrade to unlimited · $15/mo" : "Subscribe · $15/mo"}
+            </button>
+          </div>
+        )}
+      </section>
+
+      <section className="mx-5 mb-6">
+        <input
+          ref={fileRef}
+          type="file"
+          accept="video/*"
+          className="hidden"
+          onChange={(e) => {
+            const f = e.target.files?.[0];
+            if (f) handleUpload(f);
+            e.target.value = "";
+          }}
+        />
+        <button
+          onClick={() => (canGenerate ? fileRef.current?.click() : handleSubscribe())}
+          disabled={busy || !user}
+          className="flex w-full items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-border bg-surface/50 py-8 text-sm font-medium disabled:opacity-50"
+        >
+          {busy ? (
+            <><Loader2 className="h-4 w-4 animate-spin" /> Uploading…</>
+          ) : canGenerate ? (
+            <><Upload className="h-5 w-5 text-lime" /> Upload a clip to generate a reel</>
+          ) : (
+            <><Lock className="h-5 w-5" /> Subscribe to create more reels</>
+          )}
+        </button>
+        {lockedReason && (
+          <p className="mt-2 text-center text-xs text-muted-foreground">{lockedReason}</p>
+        )}
+      </section>
+
+      <section className="mx-5 pb-24">
+        <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+          Your reels
+        </h2>
+        {reels.length === 0 ? (
+          <p className="text-sm text-muted-foreground">No reels yet — upload your first clip above.</p>
+        ) : (
+          <ul className="space-y-2">
+            {reels.map((r) => (
+              <li key={r.id} className="flex items-center gap-3 rounded-xl border border-border bg-surface p-3">
+                <div className="grid h-10 w-10 place-items-center rounded-lg bg-lime/10 text-lime">
+                  <Video className="h-5 w-5" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-medium">{r.title}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {r.status} · {new Date(r.created_at).toLocaleDateString()}
+                    {r.used_free && " · free"}
+                  </p>
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+    </div>
+  );
+}

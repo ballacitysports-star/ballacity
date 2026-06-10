@@ -273,6 +273,17 @@ function Profile() {
           <div className="text-lime text-xs font-bold">→</div>
         </Link>
 
+        <Link to="/reels" className="mt-3 flex items-center gap-3 rounded-2xl border border-border bg-surface p-3 hover:border-lime/40 transition-colors">
+          <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-lime/15 text-lime">
+            <Video className="h-5 w-5" />
+          </div>
+          <div className="min-w-0 flex-1">
+            <div className="font-semibold text-sm">AI Highlight Reels</div>
+            <div className="text-xs text-muted-foreground">3 free, then $15/mo unlimited</div>
+          </div>
+          <div className="text-lime text-xs font-bold">→</div>
+        </Link>
+
         {/* Reviews */}
         <ReviewsSection revieweeId="me" revieweeKind="player" revieweeName={me.name} isOwner />
 

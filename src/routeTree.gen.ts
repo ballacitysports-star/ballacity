@@ -21,7 +21,9 @@ import { Route as ReviewNewRouteImport } from './routes/review.new'
 import { Route as ProfileEditRouteImport } from './routes/profile.edit'
 import { Route as MessagesConversationIdRouteImport } from './routes/messages.$conversationId'
 import { Route as GamesGameIdRouteImport } from './routes/games.$gameId'
+import { Route as CheckoutReturnRouteImport } from './routes/checkout.return'
 import { Route as TabsTeamsRouteImport } from './routes/_tabs.teams'
+import { Route as TabsReelsRouteImport } from './routes/_tabs.reels'
 import { Route as TabsProfileRouteImport } from './routes/_tabs.profile'
 import { Route as TabsNotificationsRouteImport } from './routes/_tabs.notifications'
 import { Route as TabsFeedRouteImport } from './routes/_tabs.feed'
@@ -30,6 +32,7 @@ import { Route as TabsCreateRouteImport } from './routes/_tabs.create'
 import { Route as TeamsTeamIdEditRouteImport } from './routes/teams.$teamId.edit'
 import { Route as GamesGameIdPaymentSetupRouteImport } from './routes/games.$gameId.payment-setup'
 import { Route as GamesGameIdPayRouteImport } from './routes/games.$gameId.pay'
+import { Route as ApiPublicPaymentsWebhookRouteImport } from './routes/api/public/payments/webhook'
 
 const ReviewsRoute = ReviewsRouteImport.update({
   id: '/reviews',
@@ -90,9 +93,19 @@ const GamesGameIdRoute = GamesGameIdRouteImport.update({
   path: '/games/$gameId',
   getParentRoute: () => rootRouteImport,
 } as any)
+const CheckoutReturnRoute = CheckoutReturnRouteImport.update({
+  id: '/checkout/return',
+  path: '/checkout/return',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const TabsTeamsRoute = TabsTeamsRouteImport.update({
   id: '/teams',
   path: '/teams',
+  getParentRoute: () => TabsRoute,
+} as any)
+const TabsReelsRoute = TabsReelsRouteImport.update({
+  id: '/reels',
+  path: '/reels',
   getParentRoute: () => TabsRoute,
 } as any)
 const TabsProfileRoute = TabsProfileRouteImport.update({
@@ -135,6 +148,12 @@ const GamesGameIdPayRoute = GamesGameIdPayRouteImport.update({
   path: '/pay',
   getParentRoute: () => GamesGameIdRoute,
 } as any)
+const ApiPublicPaymentsWebhookRoute =
+  ApiPublicPaymentsWebhookRouteImport.update({
+    id: '/api/public/payments/webhook',
+    path: '/api/public/payments/webhook',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -147,7 +166,9 @@ export interface FileRoutesByFullPath {
   '/feed': typeof TabsFeedRoute
   '/notifications': typeof TabsNotificationsRoute
   '/profile': typeof TabsProfileRoute
+  '/reels': typeof TabsReelsRoute
   '/teams': typeof TabsTeamsRoute
+  '/checkout/return': typeof CheckoutReturnRoute
   '/games/$gameId': typeof GamesGameIdRouteWithChildren
   '/messages/$conversationId': typeof MessagesConversationIdRoute
   '/profile/edit': typeof ProfileEditRoute
@@ -157,6 +178,7 @@ export interface FileRoutesByFullPath {
   '/games/$gameId/pay': typeof GamesGameIdPayRoute
   '/games/$gameId/payment-setup': typeof GamesGameIdPaymentSetupRoute
   '/teams/$teamId/edit': typeof TeamsTeamIdEditRoute
+  '/api/public/payments/webhook': typeof ApiPublicPaymentsWebhookRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -169,7 +191,9 @@ export interface FileRoutesByTo {
   '/feed': typeof TabsFeedRoute
   '/notifications': typeof TabsNotificationsRoute
   '/profile': typeof TabsProfileRoute
+  '/reels': typeof TabsReelsRoute
   '/teams': typeof TabsTeamsRoute
+  '/checkout/return': typeof CheckoutReturnRoute
   '/games/$gameId': typeof GamesGameIdRouteWithChildren
   '/messages/$conversationId': typeof MessagesConversationIdRoute
   '/profile/edit': typeof ProfileEditRoute
@@ -179,6 +203,7 @@ export interface FileRoutesByTo {
   '/games/$gameId/pay': typeof GamesGameIdPayRoute
   '/games/$gameId/payment-setup': typeof GamesGameIdPaymentSetupRoute
   '/teams/$teamId/edit': typeof TeamsTeamIdEditRoute
+  '/api/public/payments/webhook': typeof ApiPublicPaymentsWebhookRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -193,7 +218,9 @@ export interface FileRoutesById {
   '/_tabs/feed': typeof TabsFeedRoute
   '/_tabs/notifications': typeof TabsNotificationsRoute
   '/_tabs/profile': typeof TabsProfileRoute
+  '/_tabs/reels': typeof TabsReelsRoute
   '/_tabs/teams': typeof TabsTeamsRoute
+  '/checkout/return': typeof CheckoutReturnRoute
   '/games/$gameId': typeof GamesGameIdRouteWithChildren
   '/messages/$conversationId': typeof MessagesConversationIdRoute
   '/profile/edit': typeof ProfileEditRoute
@@ -203,6 +230,7 @@ export interface FileRoutesById {
   '/games/$gameId/pay': typeof GamesGameIdPayRoute
   '/games/$gameId/payment-setup': typeof GamesGameIdPaymentSetupRoute
   '/teams/$teamId/edit': typeof TeamsTeamIdEditRoute
+  '/api/public/payments/webhook': typeof ApiPublicPaymentsWebhookRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -217,7 +245,9 @@ export interface FileRouteTypes {
     | '/feed'
     | '/notifications'
     | '/profile'
+    | '/reels'
     | '/teams'
+    | '/checkout/return'
     | '/games/$gameId'
     | '/messages/$conversationId'
     | '/profile/edit'
@@ -227,6 +257,7 @@ export interface FileRouteTypes {
     | '/games/$gameId/pay'
     | '/games/$gameId/payment-setup'
     | '/teams/$teamId/edit'
+    | '/api/public/payments/webhook'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -239,7 +270,9 @@ export interface FileRouteTypes {
     | '/feed'
     | '/notifications'
     | '/profile'
+    | '/reels'
     | '/teams'
+    | '/checkout/return'
     | '/games/$gameId'
     | '/messages/$conversationId'
     | '/profile/edit'
@@ -249,6 +282,7 @@ export interface FileRouteTypes {
     | '/games/$gameId/pay'
     | '/games/$gameId/payment-setup'
     | '/teams/$teamId/edit'
+    | '/api/public/payments/webhook'
   id:
     | '__root__'
     | '/'
@@ -262,7 +296,9 @@ export interface FileRouteTypes {
     | '/_tabs/feed'
     | '/_tabs/notifications'
     | '/_tabs/profile'
+    | '/_tabs/reels'
     | '/_tabs/teams'
+    | '/checkout/return'
     | '/games/$gameId'
     | '/messages/$conversationId'
     | '/profile/edit'
@@ -272,6 +308,7 @@ export interface FileRouteTypes {
     | '/games/$gameId/pay'
     | '/games/$gameId/payment-setup'
     | '/teams/$teamId/edit'
+    | '/api/public/payments/webhook'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -281,11 +318,13 @@ export interface RootRouteChildren {
   MessagesRoute: typeof MessagesRouteWithChildren
   PaymentsRoute: typeof PaymentsRoute
   ReviewsRoute: typeof ReviewsRoute
+  CheckoutReturnRoute: typeof CheckoutReturnRoute
   GamesGameIdRoute: typeof GamesGameIdRouteWithChildren
   ProfileEditRoute: typeof ProfileEditRoute
   ReviewNewRoute: typeof ReviewNewRoute
   TeamsTeamIdRoute: typeof TeamsTeamIdRouteWithChildren
   TeamsCreateRoute: typeof TeamsCreateRoute
+  ApiPublicPaymentsWebhookRoute: typeof ApiPublicPaymentsWebhookRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -374,11 +413,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof GamesGameIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/checkout/return': {
+      id: '/checkout/return'
+      path: '/checkout/return'
+      fullPath: '/checkout/return'
+      preLoaderRoute: typeof CheckoutReturnRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/_tabs/teams': {
       id: '/_tabs/teams'
       path: '/teams'
       fullPath: '/teams'
       preLoaderRoute: typeof TabsTeamsRouteImport
+      parentRoute: typeof TabsRoute
+    }
+    '/_tabs/reels': {
+      id: '/_tabs/reels'
+      path: '/reels'
+      fullPath: '/reels'
+      preLoaderRoute: typeof TabsReelsRouteImport
       parentRoute: typeof TabsRoute
     }
     '/_tabs/profile': {
@@ -437,6 +490,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof GamesGameIdPayRouteImport
       parentRoute: typeof GamesGameIdRoute
     }
+    '/api/public/payments/webhook': {
+      id: '/api/public/payments/webhook'
+      path: '/api/public/payments/webhook'
+      fullPath: '/api/public/payments/webhook'
+      preLoaderRoute: typeof ApiPublicPaymentsWebhookRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -446,6 +506,7 @@ interface TabsRouteChildren {
   TabsFeedRoute: typeof TabsFeedRoute
   TabsNotificationsRoute: typeof TabsNotificationsRoute
   TabsProfileRoute: typeof TabsProfileRoute
+  TabsReelsRoute: typeof TabsReelsRoute
   TabsTeamsRoute: typeof TabsTeamsRoute
 }
 
@@ -455,6 +516,7 @@ const TabsRouteChildren: TabsRouteChildren = {
   TabsFeedRoute: TabsFeedRoute,
   TabsNotificationsRoute: TabsNotificationsRoute,
   TabsProfileRoute: TabsProfileRoute,
+  TabsReelsRoute: TabsReelsRoute,
   TabsTeamsRoute: TabsTeamsRoute,
 }
 
@@ -505,22 +567,14 @@ const rootRouteChildren: RootRouteChildren = {
   MessagesRoute: MessagesRouteWithChildren,
   PaymentsRoute: PaymentsRoute,
   ReviewsRoute: ReviewsRoute,
+  CheckoutReturnRoute: CheckoutReturnRoute,
   GamesGameIdRoute: GamesGameIdRouteWithChildren,
   ProfileEditRoute: ProfileEditRoute,
   ReviewNewRoute: ReviewNewRoute,
   TeamsTeamIdRoute: TeamsTeamIdRouteWithChildren,
   TeamsCreateRoute: TeamsCreateRoute,
+  ApiPublicPaymentsWebhookRoute: ApiPublicPaymentsWebhookRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
-  }
-}
