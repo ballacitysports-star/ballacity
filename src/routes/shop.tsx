@@ -46,7 +46,7 @@ function ShopPage() {
     <div className="min-h-dvh">
       <PaymentTestModeBanner />
       <div className="mx-auto max-w-2xl px-4 pb-24 pt-6">
-        <Link to="/_tabs/profile" className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground">
+        <Link to="/profile" className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground">
           <ArrowLeft className="h-4 w-4" /> Profile
         </Link>
         <h1 className="mt-4 font-display text-3xl font-bold">Shop</h1>
