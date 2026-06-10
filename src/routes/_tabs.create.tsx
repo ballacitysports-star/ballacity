@@ -191,7 +191,9 @@ function Create() {
           <div className="rounded-2xl border border-border bg-surface px-4 py-3">
             <div className="flex items-center justify-between">
               <span className="flex items-center gap-2.5 text-sm">
-                <DollarSign className={`h-4 w-4 ${price > 0 ? "text-lime" : "text-muted-foreground"}`} />
+                <DollarSign
+                  className={`h-4 w-4 ${price > 0 ? "text-lime" : "text-muted-foreground"}`}
+                />
                 <span className="font-medium">Paid game</span>
               </span>
               <button
@@ -210,9 +212,13 @@ function Create() {
             </div>
             {price > 0 && (
               <div className="mt-3 flex items-center gap-2">
-                <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Entry fee</span>
+                <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                  Entry fee
+                </span>
                 <div className="relative flex-1">
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">$</span>
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">
+                    $
+                  </span>
                   <input
                     type="number"
                     min={1}
@@ -266,11 +272,20 @@ function Create() {
   );
 }
 
-function Section({ title, icon, children }: { title: string; icon?: React.ReactNode; children: React.ReactNode }) {
+function Section({
+  title,
+  icon,
+  children,
+}: {
+  title: string;
+  icon?: React.ReactNode;
+  children: React.ReactNode;
+}) {
   return (
     <div>
       <div className="mb-2 flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-muted-foreground">
-        {icon}{title}
+        {icon}
+        {title}
       </div>
       <div className="space-y-2">{children}</div>
     </div>
