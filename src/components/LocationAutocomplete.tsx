@@ -48,23 +48,41 @@ export function LocationAutocomplete({
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
   const [open, setOpen] = useState(false);
   const [locating, setLocating] = useState(false);
+  const [mapsError, setMapsError] = useState<string | null>(null);
+  const [searchError, setSearchError] = useState<string | null>(null);
   const reverse = useServerFn(reverseGeocode);
   const sessionRef = useRef<any>(null);
   const placesRef = useRef<any>(null);
   const timerRef = useRef<number | null>(null);
   const biasRef = useRef<{ lat: number; lng: number } | null>(null);
   const watchIdRef = useRef<number | null>(null);
+  const notifiedMapsErrorRef = useRef(false);
 
   useEffect(() => {
     let cancelled = false;
+    const fail = () => {
+      if (cancelled) return;
+      setMapsError("Map search unavailable — you can still type the address manually");
+      if (!notifiedMapsErrorRef.current) {
+        notifiedMapsErrorRef.current = true;
+        toast.error("Map search unavailable", {
+          description: "You can still enter the address manually.",
+        });
+      }
+    };
     loadGoogleMaps()
       .then(async () => {
         if (cancelled) return;
-        const places = await window.google.maps.importLibrary("places");
-        placesRef.current = places;
-        sessionRef.current = new places.AutocompleteSessionToken();
+        try {
+          const places = await window.google.maps.importLibrary("places");
+          placesRef.current = places;
+          sessionRef.current = new places.AutocompleteSessionToken();
+          setMapsError(null);
+        } catch {
+          fail();
+        }
       })
-      .catch(() => {});
+      .catch(fail);
     return () => { cancelled = true; };
   }, []);
 
@@ -114,12 +132,18 @@ export function LocationAutocomplete({
           }));
         setSuggestions(mapped);
         setOpen(mapped.length > 0);
+        setSearchError(mapped.length === 0 ? "No matches — keep typing or enter the address manually" : null);
       })
-      .catch(() => setSuggestions([]));
+      .catch(() => {
+        setSuggestions([]);
+        setOpen(false);
+        setSearchError("Couldn't load suggestions — you can still type the address manually");
+      });
   };
 
   const handleChange = (v: string) => {
     onChange(v);
+    setSearchError(null);
     if (timerRef.current) window.clearTimeout(timerRef.current);
     timerRef.current = window.setTimeout(() => queryAutocomplete(v), 200);
   };
@@ -210,6 +234,11 @@ export function LocationAutocomplete({
             </li>
           ))}
         </ul>
+      )}
+      {(mapsError || searchError) && (
+        <p role="status" className="mt-1 px-1 text-[11px] text-muted-foreground">
+          {mapsError ?? searchError}
+        </p>
       )}
     </div>
   );
