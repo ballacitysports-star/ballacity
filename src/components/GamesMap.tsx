@@ -339,21 +339,20 @@ export function GamesMap({
         {locating ? <Loader2 className="h-5 w-5 animate-spin" /> : <LocateFixed className="h-5 w-5" />}
       </button>
       <form onSubmit={changeMapLocation} className="absolute left-4 right-4 top-20 z-30">
-        <div className="flex items-center gap-2 rounded-2xl border border-border bg-surface/95 px-3 py-2 shadow-xl backdrop-blur-xl">
-          <Search className="h-4 w-4 shrink-0 text-muted-foreground" />
-          <input
-            value={manualLocation}
-            onChange={(event) => {
-              setManualLocation(event.target.value);
-              setManualError(null);
-            }}
-            placeholder="Change map location"
-            className="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
-          />
+        <div className="flex items-stretch gap-2">
+          <div className="flex-1 min-w-0 [&>div>div]:bg-surface/95 [&>div>div]:backdrop-blur-xl [&>div>div]:shadow-xl">
+            <LocationAutocomplete
+              value={manualLocation}
+              onChange={(v) => { setManualLocation(v); setManualError(null); }}
+              onPick={(v) => { void performGeocode(v); }}
+              placeholder="Change map location"
+              showCurrentButton={false}
+            />
+          </div>
           <button
             type="submit"
             disabled={resolvingLocation || manualLocation.trim().length < 2}
-            className="inline-flex h-8 min-w-16 items-center justify-center rounded-full bg-lime px-3 text-xs font-bold text-primary-foreground disabled:opacity-50"
+            className="inline-flex items-center justify-center rounded-2xl bg-lime px-4 text-xs font-bold text-primary-foreground shadow-xl disabled:opacity-50"
           >
             {resolvingLocation ? <Loader2 className="h-4 w-4 animate-spin" /> : "Set"}
           </button>
