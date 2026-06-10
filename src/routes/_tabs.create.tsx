@@ -293,8 +293,18 @@ function Section({
 }
 
 function Toggle({
-  icon, label, value, onChange, right,
-}: { icon: React.ReactNode; label: string; value: boolean; onChange: (v: boolean) => void; right?: string }) {
+  icon,
+  label,
+  value,
+  onChange,
+  right,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  value: boolean;
+  onChange: (v: boolean) => void;
+  right?: string;
+}) {
   return (
     <button
       type="button"
@@ -307,7 +317,9 @@ function Toggle({
       </span>
       <span className="flex items-center gap-2">
         {right && <span className="text-xs text-muted-foreground">{right}</span>}
-        <span className={`relative h-6 w-10 rounded-full transition-colors ${value ? "bg-lime" : "bg-secondary"}`}>
+        <span
+          className={`relative h-6 w-10 rounded-full transition-colors ${value ? "bg-lime" : "bg-secondary"}`}
+        >
           <motion.span
             layout
             transition={{ type: "spring", stiffness: 500, damping: 30 }}
