@@ -289,12 +289,7 @@ function EditOrg() {
               </Section>
 
               <Section title="City">
-                <input
-                  value={city}
-                  onChange={(e) => setCity(e.target.value)}
-                  placeholder="Brooklyn, NY"
-                  className="w-full rounded-2xl border border-border bg-surface px-4 py-3 text-sm outline-none focus:border-lime"
-                />
+                <LocationAutocomplete value={city} onChange={setCity} placeholder="Brooklyn, NY" mode="city" />
               </Section>
 
               <Section title="Sports">
