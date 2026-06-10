@@ -48,23 +48,41 @@ export function LocationAutocomplete({
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
   const [open, setOpen] = useState(false);
   const [locating, setLocating] = useState(false);
+  const [mapsError, setMapsError] = useState<string | null>(null);
+  const [searchError, setSearchError] = useState<string | null>(null);
   const reverse = useServerFn(reverseGeocode);
   const sessionRef = useRef<any>(null);
   const placesRef = useRef<any>(null);
   const timerRef = useRef<number | null>(null);
   const biasRef = useRef<{ lat: number; lng: number } | null>(null);
   const watchIdRef = useRef<number | null>(null);
+  const notifiedMapsErrorRef = useRef(false);
 
   useEffect(() => {
     let cancelled = false;
+    const fail = () => {
+      if (cancelled) return;
+      setMapsError("Map search unavailable — you can still type the address manually");
+      if (!notifiedMapsErrorRef.current) {
+        notifiedMapsErrorRef.current = true;
+        toast.error("Map search unavailable", {
+          description: "You can still enter the address manually.",
+        });
+      }
+    };
     loadGoogleMaps()
       .then(async () => {
         if (cancelled) return;
-        const places = await window.google.maps.importLibrary("places");
-        placesRef.current = places;
-        sessionRef.current = new places.AutocompleteSessionToken();
+        try {
+          const places = await window.google.maps.importLibrary("places");
+          placesRef.current = places;
+          sessionRef.current = new places.AutocompleteSessionToken();
+          setMapsError(null);
+        } catch {
+          fail();
+        }
       })
-      .catch(() => {});
+      .catch(fail);
     return () => { cancelled = true; };
   }, []);
 
