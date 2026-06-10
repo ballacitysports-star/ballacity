@@ -8,15 +8,16 @@ interface StripeEmbeddedCheckoutProps {
   customerEmail?: string;
   userId?: string;
   returnUrl?: string;
+  collectShipping?: boolean;
 }
 
 export function StripeEmbeddedCheckout({
-  priceId, quantity, customerEmail, userId, returnUrl,
+  priceId, quantity, customerEmail, userId, returnUrl, collectShipping,
 }: StripeEmbeddedCheckoutProps) {
   const fetchClientSecret = async (): Promise<string> => {
     const result = await createCheckoutSession({
       data: {
-        priceId, quantity, customerEmail, userId,
+        priceId, quantity, customerEmail, userId, collectShipping,
         returnUrl: returnUrl || window.location.href,
         environment: getStripeEnvironment(),
       },
