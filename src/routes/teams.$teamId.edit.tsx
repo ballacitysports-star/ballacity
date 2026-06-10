@@ -9,6 +9,7 @@ import {
 } from "@/lib/sample-data";
 import { getOrgById, updateOrg, deleteOrg, isMyOrg } from "@/lib/org-store";
 import { OrgCard } from "@/components/OrgCard";
+import { LocationAutocomplete } from "@/components/LocationAutocomplete";
 
 export const Route = createFileRoute("/teams/$teamId/edit")({
   head: ({ params }) => {
@@ -288,12 +289,7 @@ function EditOrg() {
               </Section>
 
               <Section title="City">
-                <input
-                  value={city}
-                  onChange={(e) => setCity(e.target.value)}
-                  placeholder="Brooklyn, NY"
-                  className="w-full rounded-2xl border border-border bg-surface px-4 py-3 text-sm outline-none focus:border-lime"
-                />
+                <LocationAutocomplete value={city} onChange={setCity} placeholder="Brooklyn, NY" mode="city" />
               </Section>
 
               <Section title="Sports">
