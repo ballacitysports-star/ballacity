@@ -155,6 +155,7 @@ export function LocationAutocomplete({
   const pick = (s: Suggestion) => {
     const full = s.secondary ? `${s.primary}, ${s.secondary}` : s.primary;
     onChange(full);
+    onPick?.(full);
     setOpen(false);
     setSuggestions([]);
     if (placesRef.current) {
