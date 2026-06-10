@@ -1,8 +1,9 @@
 import { type FormEvent, useEffect, useRef, useState } from "react";
-import { LocateFixed, Loader2, Search } from "lucide-react";
+import { LocateFixed, Loader2 } from "lucide-react";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
 import { geocodeAddress } from "@/lib/geocode.functions";
+import { LocationAutocomplete } from "@/components/LocationAutocomplete";
 
 declare global {
   interface Window {
