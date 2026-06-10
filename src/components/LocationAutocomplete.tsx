@@ -208,16 +208,18 @@ export function LocationAutocomplete({
           placeholder={placeholder}
           className="flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground min-w-0"
         />
-        <button
-          type="button"
-          onClick={useCurrentLocation}
-          disabled={locating}
-          title="Use current location"
-          className="inline-flex items-center gap-1 rounded-full border border-border bg-background px-2.5 py-1 text-[11px] font-semibold text-muted-foreground hover:border-lime hover:text-lime disabled:opacity-60"
-        >
-          {locating ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <LocateFixed className="h-3.5 w-3.5" />}
-          <span>Current</span>
-        </button>
+        {showCurrentButton && (
+          <button
+            type="button"
+            onClick={useCurrentLocation}
+            disabled={locating}
+            title="Use current location"
+            className="inline-flex items-center gap-1 rounded-full border border-border bg-background px-2.5 py-1 text-[11px] font-semibold text-muted-foreground hover:border-lime hover:text-lime disabled:opacity-60"
+          >
+            {locating ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <LocateFixed className="h-3.5 w-3.5" />}
+            <span>Current</span>
+          </button>
+        )}
       </div>
       {open && suggestions.length > 0 && (
         <ul className="absolute z-20 mt-1 w-full overflow-hidden rounded-2xl border border-border bg-surface shadow-lg">
