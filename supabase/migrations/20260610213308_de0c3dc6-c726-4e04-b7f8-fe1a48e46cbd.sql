@@ -1,0 +1,1 @@
+DROP POLICY IF EXISTS "Service role manages purchases" ON public.purchases;
