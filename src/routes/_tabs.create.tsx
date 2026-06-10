@@ -17,8 +17,12 @@ export const Route = createFileRoute("/_tabs/create")({
 
 function Create() {
   const nav = useNavigate();
+  const { user } = useAuth();
+  const profile = useMyProfile(user);
   const [sport, setSport] = useState<Sport>("Basketball");
   const [title, setTitle] = useState("");
+  const [when, setWhen] = useState("");
+  const [location, setLocation] = useState(profile?.city ?? "");
   const [when, setWhen] = useState("");
   const [location, setLocation] = useState("");
   const [skill, setSkill] = useState<"All Levels" | "Beginner" | "Intermediate" | "Advanced">("All Levels");
