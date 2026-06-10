@@ -46,6 +46,7 @@ export const createCheckoutSession = createServerFn({ method: "POST" })
     userId?: string;
     returnUrl: string;
     environment: StripeEnv;
+    collectShipping?: boolean;
   }) => {
     if (!/^[a-zA-Z0-9_-]+$/.test(data.priceId)) throw new Error("Invalid priceId");
     return data;
@@ -75,6 +76,10 @@ export const createCheckoutSession = createServerFn({ method: "POST" })
         productDescription = product.name;
       }
 
+      // Physical goods (merch) need shipping_address_collection, which
+      // conflicts with managed_payments. Use automatic_tax for those instead.
+      const isPhysical = !!data.collectShipping;
+
       const session = await stripe.checkout.sessions.create({
         line_items: [{ price: stripePrice.id, quantity: data.quantity || 1 }],
         mode: isRecurring ? "subscription" : "payment",
@@ -83,10 +88,15 @@ export const createCheckoutSession = createServerFn({ method: "POST" })
         ...(customerId && { customer: customerId }),
         ...(!isRecurring && { payment_intent_data: { description: productDescription } }),
         ...(data.userId && {
-          metadata: { userId: data.userId },
+          metadata: { userId: data.userId, priceId: data.priceId },
           ...(isRecurring && { subscription_data: { metadata: { userId: data.userId } } }),
         }),
-        managed_payments: { enabled: true },
+        ...(isPhysical
+          ? {
+              automatic_tax: { enabled: true },
+              shipping_address_collection: { allowed_countries: ["US", "CA", "GB", "AU"] },
+            }
+          : { managed_payments: { enabled: true } }),
       } as any);
 
       return { clientSecret: session.client_secret ?? "" };
