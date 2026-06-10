@@ -15,17 +15,22 @@ function CheckoutReturn() {
       <div className="max-w-md w-full rounded-2xl border border-border bg-surface p-8 text-center shadow-lg">
         <CheckCircle2 className="mx-auto h-12 w-12 text-lime" />
         <h1 className="mt-4 text-2xl font-bold">
-          {session_id ? "Subscription activated" : "Checkout complete"}
+          {session_id ? "Payment complete" : "Checkout complete"}
         </h1>
         <p className="mt-2 text-sm text-muted-foreground">
-          You now have unlimited AI Highlight Reels. Thanks for supporting OpenRun!
+          Thanks for supporting OpenRun! Subscriptions activate immediately. For merch orders, you'll receive a confirmation email with shipping details.
         </p>
-        <Link
-          to="/reels"
-          className="mt-6 inline-flex rounded-xl bg-lime px-5 py-2.5 font-semibold text-black"
-        >
-          Back to Reels
-        </Link>
+        <p className="mt-3 text-xs text-muted-foreground">
+          All sales are final. No refunds. Manage subscriptions anytime from the billing portal on the Plans page.
+        </p>
+        <div className="mt-6 flex gap-2 justify-center">
+          <Link to="/plans" className="rounded-xl border border-border px-4 py-2 text-sm font-semibold hover:border-lime/40">
+            Plans
+          </Link>
+          <Link to="/reels" className="rounded-xl bg-lime px-4 py-2 text-sm font-bold text-black">
+            Back to Reels
+          </Link>
+        </div>
       </div>
     </div>
   );
