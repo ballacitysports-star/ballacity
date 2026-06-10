@@ -25,7 +25,9 @@ function Create() {
   const [location, setLocation] = useState(profile?.city ?? "");
   const previousProfileCityRef = useRef(profile?.city ?? "");
   const locationEditedRef = useRef(false);
-  const [skill, setSkill] = useState<"All Levels" | "Beginner" | "Intermediate" | "Advanced">("All Levels");
+  const [skill, setSkill] = useState<"All Levels" | "Beginner" | "Intermediate" | "Advanced">(
+    "All Levels",
+  );
   const [size, setSize] = useState(10);
   const [price, setPrice] = useState(0);
   const [indoor, setIndoor] = useState(false);
@@ -39,7 +41,8 @@ function Create() {
 
     if (!nextCity) return;
     setLocation((current) => {
-      const canUseProfileCity = !locationEditedRef.current || !current.trim() || current.trim() === previousCity;
+      const canUseProfileCity =
+        !locationEditedRef.current || !current.trim() || current.trim() === previousCity;
       return canUseProfileCity ? nextCity : current;
     });
   }, [profile?.city]);
@@ -52,7 +55,10 @@ function Create() {
   return (
     <div className="mx-auto max-w-md px-4 pt-6">
       <div className="flex items-center gap-3 mb-5">
-        <Link to="/feed" className="grid h-10 w-10 place-items-center rounded-full border border-border bg-surface">
+        <Link
+          to="/feed"
+          className="grid h-10 w-10 place-items-center rounded-full border border-border bg-surface"
+        >
           <ArrowLeft className="h-5 w-5" />
         </Link>
         <h1 className="font-display text-2xl font-bold">Host a game</h1>
@@ -61,7 +67,9 @@ function Create() {
       <form
         onSubmit={(e) => {
           e.preventDefault();
-          const date = when ? new Date(when).toISOString() : new Date(Date.now() + 3600_000).toISOString();
+          const date = when
+            ? new Date(when).toISOString()
+            : new Date(Date.now() + 3600_000).toISOString();
           const game = addHostedGame({
             sport,
             title,
@@ -92,7 +100,9 @@ function Create() {
                   key={s.name}
                   onClick={() => setSport(s.name)}
                   className={`flex flex-col items-center gap-1 rounded-2xl border px-2 py-3 text-xs font-semibold transition-all ${
-                    active ? "border-lime bg-lime/10 text-lime" : "border-border bg-surface text-muted-foreground"
+                    active
+                      ? "border-lime bg-lime/10 text-lime"
+                      : "border-border bg-surface text-muted-foreground"
                   }`}
                 >
                   <span className="text-2xl">{s.emoji}</span>
@@ -138,7 +148,6 @@ function Create() {
           )}
         </Section>
 
-
         {/* Skill */}
         <Section title="Skill level">
           <div className="flex gap-2 overflow-x-auto scrollbar-hide">
@@ -148,7 +157,9 @@ function Create() {
                 key={s}
                 onClick={() => setSkill(s)}
                 className={`shrink-0 rounded-full border px-4 py-2 text-sm font-semibold ${
-                  skill === s ? "border-lime bg-lime text-primary-foreground" : "border-border bg-surface text-muted-foreground"
+                  skill === s
+                    ? "border-lime bg-lime text-primary-foreground"
+                    : "border-border bg-surface text-muted-foreground"
                 }`}
               >
                 {s}
