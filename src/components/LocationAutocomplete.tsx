@@ -38,12 +38,16 @@ export function LocationAutocomplete({
   onChange,
   placeholder = "Court, park or venue",
   mode = "place",
+  showCurrentButton = true,
+  onPick,
 }: {
   value: string;
   onChange: (v: string) => void;
   placeholder?: string;
   /** "place" returns full venue address; "city" returns just city, region */
   mode?: "place" | "city";
+  showCurrentButton?: boolean;
+  onPick?: (v: string) => void;
 }) {
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
   const [open, setOpen] = useState(false);
