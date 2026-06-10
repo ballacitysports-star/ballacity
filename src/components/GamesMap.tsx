@@ -71,8 +71,9 @@ export function GamesMap({
   const userPosRef = useRef<{ lat: number; lng: number } | null>(null);
   const pinCenterRef = useRef<{ lat: number; lng: number } | null>(null);
   const manualLocationRef = useRef(false);
+  const defaultLocationRef = useRef("");
   const [ready, setReady] = useState(false);
-  const [manualLocation, setManualLocation] = useState("");
+  const [manualLocation, setManualLocation] = useState(defaultLocation?.trim() ?? "");
   const [resolvingLocation, setResolvingLocation] = useState(false);
   const [manualError, setManualError] = useState<string | null>(null);
   const geocode = useServerFn(geocodeAddress);
@@ -108,15 +109,31 @@ export function GamesMap({
     };
   }, []);
 
-  // Geocode default profile location and center the map there before GPS
+  // Keep the map search field synced to profile/default location, even after manual map edits.
   useEffect(() => {
-    if (!ready || !defaultLocation || !defaultLocation.trim()) return;
+    if (!ready) return;
+    const nextLocation = defaultLocation?.trim() ?? "";
+    const defaultChanged = nextLocation !== defaultLocationRef.current;
+    defaultLocationRef.current = nextLocation;
+
+    if (!nextLocation) {
+      if (!manualLocationRef.current) setManualLocation("");
+      return;
+    }
+
+    if (defaultChanged) {
+      manualLocationRef.current = false;
+      setManualLocation(nextLocation);
+    } else {
+      setManualLocation((current) => current.trim() ? current : nextLocation);
+    }
+
     let cancelled = false;
-    geocode({ data: { address: defaultLocation.trim() } })
+    geocode({ data: { address: nextLocation } })
       .then((result) => {
         if (cancelled || !mapRef.current) return;
-        // Don't override if user already got a GPS fix or set a manual location
-        if (userPosRef.current || manualLocationRef.current) return;
+        // Preserve a live GPS/manual center unless the profile/default location just changed.
+        if (!defaultChanged && (userPosRef.current || manualLocationRef.current)) return;
         const center = { lat: result.lat, lng: result.lng };
         pinCenterRef.current = center;
         mapRef.current.panTo(center);
