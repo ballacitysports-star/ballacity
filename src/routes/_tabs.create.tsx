@@ -95,16 +95,30 @@ function Create() {
           />
         </Section>
 
-        {/* Date + Location */}
-        <Section title="When & where" icon={<Calendar className="h-4 w-4" />}>
+        {/* Date */}
+        <Section title="When" icon={<Calendar className="h-4 w-4" />}>
           <input
             type="datetime-local"
             value={when}
             onChange={(e) => setWhen(e.target.value)}
             className="w-full rounded-2xl border border-border bg-surface px-4 py-3 text-sm outline-none focus:border-lime [color-scheme:dark]"
           />
-          <LocationAutocomplete value={location} onChange={setLocation} />
         </Section>
+
+        {/* Venue address */}
+        <Section title="Venue address" icon={<MapPin className="h-4 w-4" />}>
+          <LocationAutocomplete
+            value={location}
+            onChange={setLocation}
+            placeholder="Search court, park or venue"
+          />
+          {profile?.city && (
+            <p className="px-1 text-[11px] text-muted-foreground">
+              Pre-filled from your profile city — refine with search above.
+            </p>
+          )}
+        </Section>
+
 
         {/* Skill */}
         <Section title="Skill level">
