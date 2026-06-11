@@ -12,6 +12,7 @@ import {
   adminListGames,
   adminListReels,
   adminRetryReel,
+  adminRunReelWorker,
 } from "@/lib/admin.functions";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
