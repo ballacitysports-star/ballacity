@@ -154,18 +154,14 @@ export const adminRetryReel = createServerFn({ method: "POST" })
   .handler(async ({ context, data }) => {
     await assertAdmin(context);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { data: row } = await supabaseAdmin
-      .from("highlight_reels")
-      .select("attempts")
-      .eq("id", data.id)
-      .single();
     await supabaseAdmin
       .from("highlight_reels")
       .update({
         status: "processing",
         error_message: null,
         failed_at: null,
-        attempts: (row?.attempts ?? 0) + 1,
+        attempts: 0,
+        processing_started_at: null,
       })
       .eq("id", data.id);
     return { ok: true };
@@ -184,4 +180,18 @@ export const adminMarkReelFailed = createServerFn({ method: "POST" })
       .update({ status: "failed", error_message: data.message, failed_at: new Date().toISOString() })
       .eq("id", data.id);
     return { ok: true };
+  });
+
+export const adminRunReelWorker = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    await assertAdmin(context);
+    const origin = "https://project--9bd576a8-703f-4180-84d6-2cd32f2a851b.lovable.app";
+    try {
+      const res = await fetch(`${origin}/api/public/reels/process`, { method: "POST" });
+      const body: any = await res.json().catch(() => ({}));
+      return { ok: res.ok, status: res.status, processed: body?.processed ?? 0 };
+    } catch (e: any) {
+      return { ok: false, error: e?.message ?? "Worker call failed" };
+    }
   });
