@@ -73,6 +73,7 @@ function AdminPage() {
 function ReelsPanel() {
   const list = useServerFn(adminListReels);
   const retry = useServerFn(adminRetryReel);
+  const run = useServerFn(adminRunReelWorker);
   const qc = useQueryClient();
   const { data, isLoading } = useQuery({ queryKey: ["admin-reels"], queryFn: () => list({}) });
   const mut = useMutation({
@@ -80,6 +81,15 @@ function ReelsPanel() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["admin-reels"] });
       toast.success("Reel re-queued");
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+  const runMut = useMutation({
+    mutationFn: () => run({}),
+    onSuccess: (res: any) => {
+      qc.invalidateQueries({ queryKey: ["admin-reels"] });
+      if (res?.ok) toast.success(`Worker ran — processed ${res.processed ?? 0}`);
+      else toast.error(res?.error ?? `Worker failed (${res?.status ?? "?"})`);
     },
     onError: (e: Error) => toast.error(e.message),
   });
@@ -93,10 +103,15 @@ function ReelsPanel() {
     <div className="space-y-4">
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">⚠ Generation worker status</CardTitle>
+          <CardTitle className="text-base flex items-center justify-between gap-3">
+            <span>Generation worker</span>
+            <Button size="sm" onClick={() => runMut.mutate()} disabled={runMut.isPending}>
+              {runMut.isPending ? "Running…" : "Run worker now"}
+            </Button>
+          </CardTitle>
         </CardHeader>
         <CardContent className="text-sm space-y-1">
-          <p>No background worker is currently processing reels — uploads sit in <code>processing</code> until one is built.</p>
+          <p>Worker runs automatically every minute via scheduled job. Use the button to trigger immediately.</p>
           <p className="text-muted-foreground text-xs">
             Stuck &gt;10 min: <strong>{stuck.length}</strong> · Total: {data?.reels.length ?? 0}
           </p>
