@@ -108,8 +108,11 @@ export type Database = {
       }
       highlight_reels: {
         Row: {
+          attempts: number
           created_at: string
           environment: string
+          error_message: string | null
+          failed_at: string | null
           id: string
           status: string
           title: string
@@ -118,8 +121,11 @@ export type Database = {
           video_path: string
         }
         Insert: {
+          attempts?: number
           created_at?: string
           environment?: string
+          error_message?: string | null
+          failed_at?: string | null
           id?: string
           status?: string
           title?: string
@@ -128,8 +134,11 @@ export type Database = {
           video_path: string
         }
         Update: {
+          attempts?: number
           created_at?: string
           environment?: string
+          error_message?: string | null
+          failed_at?: string | null
           id?: string
           status?: string
           title?: string

@@ -10,6 +10,8 @@ import {
   adminListReviews,
   adminDeleteReview,
   adminListGames,
+  adminListReels,
+  adminRetryReel,
 } from "@/lib/admin.functions";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -49,18 +51,93 @@ function AdminPage() {
         </Button>
       </div>
 
-      <Tabs defaultValue="users">
+      <Tabs defaultValue="reels">
         <TabsList>
+          <TabsTrigger value="reels">Reels</TabsTrigger>
           <TabsTrigger value="users">Users</TabsTrigger>
           <TabsTrigger value="payments">Payments</TabsTrigger>
           <TabsTrigger value="reviews">Reviews</TabsTrigger>
           <TabsTrigger value="games">Games</TabsTrigger>
         </TabsList>
+        <TabsContent value="reels"><ReelsPanel /></TabsContent>
         <TabsContent value="users"><UsersPanel /></TabsContent>
         <TabsContent value="payments"><PaymentsPanel /></TabsContent>
         <TabsContent value="reviews"><ReviewsPanel /></TabsContent>
         <TabsContent value="games"><GamesPanel /></TabsContent>
       </Tabs>
+    </div>
+  );
+}
+
+function ReelsPanel() {
+  const list = useServerFn(adminListReels);
+  const retry = useServerFn(adminRetryReel);
+  const qc = useQueryClient();
+  const { data, isLoading } = useQuery({ queryKey: ["admin-reels"], queryFn: () => list({}) });
+  const mut = useMutation({
+    mutationFn: (id: string) => retry({ data: { id } }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["admin-reels"] });
+      toast.success("Reel re-queued");
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+  if (isLoading) return <p className="text-sm text-muted-foreground p-4">Loading…</p>;
+
+  const stuck = (data?.reels ?? []).filter((r: any) =>
+    r.status === "processing" && Date.now() - new Date(r.created_at).getTime() > 10 * 60 * 1000
+  );
+
+  return (
+    <div className="space-y-4">
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">⚠ Generation worker status</CardTitle>
+        </CardHeader>
+        <CardContent className="text-sm space-y-1">
+          <p>No background worker is currently processing reels — uploads sit in <code>processing</code> until one is built.</p>
+          <p className="text-muted-foreground text-xs">
+            Stuck &gt;10 min: <strong>{stuck.length}</strong> · Total: {data?.reels.length ?? 0}
+          </p>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader><CardTitle>Reels ({data?.reels.length ?? 0})</CardTitle></CardHeader>
+        <CardContent className="space-y-2">
+          {data?.reels.map((r: any) => {
+            const ageMin = Math.floor((Date.now() - new Date(r.created_at).getTime()) / 60000);
+            const isStuck = r.status === "processing" && ageMin > 10;
+            const isFailed = r.status === "failed";
+            return (
+              <div key={r.id} className="border rounded-md p-3 text-sm flex items-start justify-between gap-3">
+                <div className="min-w-0 flex-1">
+                  <div className="font-medium flex items-center gap-2 flex-wrap">
+                    {r.title}
+                    <Badge variant={isFailed ? "destructive" : isStuck ? "outline" : "secondary"}>
+                      {r.status}{isStuck ? " (stuck)" : ""}
+                    </Badge>
+                    {r.attempts > 0 && <Badge variant="outline">attempt {r.attempts}</Badge>}
+                  </div>
+                  <div className="text-xs text-muted-foreground">
+                    user {r.user_id?.slice(0, 8)}… · {ageMin}m ago · {r.environment}
+                  </div>
+                  {r.error_message && (
+                    <pre className="mt-1 text-xs text-destructive bg-destructive/10 rounded p-2 whitespace-pre-wrap break-all">
+                      {r.error_message}
+                      {r.failed_at && <span className="block text-muted-foreground mt-1">at {new Date(r.failed_at).toLocaleString()}</span>}
+                    </pre>
+                  )}
+                </div>
+                {(isFailed || isStuck) && (
+                  <Button size="sm" variant="outline" onClick={() => mut.mutate(r.id)}>Retry</Button>
+                )}
+              </div>
+            );
+          })}
+          {!data?.reels.length && <p className="text-muted-foreground text-sm">No reels yet</p>}
+        </CardContent>
+      </Card>
     </div>
   );
 }
