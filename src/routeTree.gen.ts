@@ -35,6 +35,7 @@ import { Route as TabsCreateRouteImport } from './routes/_tabs.create'
 import { Route as TeamsTeamIdEditRouteImport } from './routes/teams.$teamId.edit'
 import { Route as GamesGameIdPaymentSetupRouteImport } from './routes/games.$gameId.payment-setup'
 import { Route as GamesGameIdPayRouteImport } from './routes/games.$gameId.pay'
+import { Route as ApiPublicReelsProcessRouteImport } from './routes/api/public/reels/process'
 import { Route as ApiPublicPaymentsWebhookRouteImport } from './routes/api/public/payments/webhook'
 
 const ShopRoute = ShopRouteImport.update({
@@ -166,6 +167,11 @@ const GamesGameIdPayRoute = GamesGameIdPayRouteImport.update({
   path: '/pay',
   getParentRoute: () => GamesGameIdRoute,
 } as any)
+const ApiPublicReelsProcessRoute = ApiPublicReelsProcessRouteImport.update({
+  id: '/api/public/reels/process',
+  path: '/api/public/reels/process',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiPublicPaymentsWebhookRoute =
   ApiPublicPaymentsWebhookRouteImport.update({
     id: '/api/public/payments/webhook',
@@ -200,6 +206,7 @@ export interface FileRoutesByFullPath {
   '/games/$gameId/payment-setup': typeof GamesGameIdPaymentSetupRoute
   '/teams/$teamId/edit': typeof TeamsTeamIdEditRoute
   '/api/public/payments/webhook': typeof ApiPublicPaymentsWebhookRoute
+  '/api/public/reels/process': typeof ApiPublicReelsProcessRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -228,6 +235,7 @@ export interface FileRoutesByTo {
   '/games/$gameId/payment-setup': typeof GamesGameIdPaymentSetupRoute
   '/teams/$teamId/edit': typeof TeamsTeamIdEditRoute
   '/api/public/payments/webhook': typeof ApiPublicPaymentsWebhookRoute
+  '/api/public/reels/process': typeof ApiPublicReelsProcessRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -258,6 +266,7 @@ export interface FileRoutesById {
   '/games/$gameId/payment-setup': typeof GamesGameIdPaymentSetupRoute
   '/teams/$teamId/edit': typeof TeamsTeamIdEditRoute
   '/api/public/payments/webhook': typeof ApiPublicPaymentsWebhookRoute
+  '/api/public/reels/process': typeof ApiPublicReelsProcessRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -288,6 +297,7 @@ export interface FileRouteTypes {
     | '/games/$gameId/payment-setup'
     | '/teams/$teamId/edit'
     | '/api/public/payments/webhook'
+    | '/api/public/reels/process'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -316,6 +326,7 @@ export interface FileRouteTypes {
     | '/games/$gameId/payment-setup'
     | '/teams/$teamId/edit'
     | '/api/public/payments/webhook'
+    | '/api/public/reels/process'
   id:
     | '__root__'
     | '/'
@@ -345,6 +356,7 @@ export interface FileRouteTypes {
     | '/games/$gameId/payment-setup'
     | '/teams/$teamId/edit'
     | '/api/public/payments/webhook'
+    | '/api/public/reels/process'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -364,6 +376,7 @@ export interface RootRouteChildren {
   TeamsTeamIdRoute: typeof TeamsTeamIdRouteWithChildren
   TeamsCreateRoute: typeof TeamsCreateRoute
   ApiPublicPaymentsWebhookRoute: typeof ApiPublicPaymentsWebhookRoute
+  ApiPublicReelsProcessRoute: typeof ApiPublicReelsProcessRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -550,6 +563,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof GamesGameIdPayRouteImport
       parentRoute: typeof GamesGameIdRoute
     }
+    '/api/public/reels/process': {
+      id: '/api/public/reels/process'
+      path: '/api/public/reels/process'
+      fullPath: '/api/public/reels/process'
+      preLoaderRoute: typeof ApiPublicReelsProcessRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/payments/webhook': {
       id: '/api/public/payments/webhook'
       path: '/api/public/payments/webhook'
@@ -637,6 +657,7 @@ const rootRouteChildren: RootRouteChildren = {
   TeamsTeamIdRoute: TeamsTeamIdRouteWithChildren,
   TeamsCreateRoute: TeamsCreateRoute,
   ApiPublicPaymentsWebhookRoute: ApiPublicPaymentsWebhookRoute,
+  ApiPublicReelsProcessRoute: ApiPublicReelsProcessRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
