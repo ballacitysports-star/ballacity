@@ -4,6 +4,8 @@ import { ArrowRight, MapPin, Sparkles, Trophy, Users, Video, Zap } from "lucide-
 import { Logo } from "@/components/Logo";
 import { HERO_IMAGE, SPORTS, GAMES } from "@/lib/sample-data";
 import { GameCard } from "@/components/GameCard";
+import { MERCH_ITEMS } from "@/lib/catalog";
+
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -223,7 +225,37 @@ function Landing() {
         </div>
       </section>
 
+      {/* Shop */}
+      <section id="shop" className="mx-auto max-w-6xl px-5 py-16">
+        <div className="flex items-end justify-between mb-6">
+          <div>
+            <h2 className="font-display text-3xl md:text-4xl font-bold">Shop the merch</h2>
+            <p className="text-muted-foreground mt-1">Rep OpenRun on and off the court.</p>
+          </div>
+          <Link to="/shop" className="text-sm font-semibold text-lime hover:underline inline-flex items-center gap-1">
+            Shop all <ArrowRight className="h-4 w-4" />
+          </Link>
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          {MERCH_ITEMS.map((m) => (
+            <Link
+              key={m.priceId}
+              to="/shop"
+              className="group rounded-3xl border border-border bg-surface p-6 hover:border-lime/40 transition-all hover:-translate-y-0.5"
+            >
+              <div className="text-5xl mb-3">{m.emoji}</div>
+              <div className="flex items-baseline justify-between">
+                <h3 className="font-display text-lg font-bold">{m.name}</h3>
+                <span className="text-lime font-bold">{m.priceLabel}</span>
+              </div>
+              <p className="text-sm text-muted-foreground mt-1">{m.description}</p>
+            </Link>
+          ))}
+        </div>
+      </section>
+
       {/* CTA */}
+
       <section className="mx-auto max-w-6xl px-5 pb-24">
         <div className="relative overflow-hidden rounded-[2rem] border border-border bg-surface p-10 md:p-16 text-center">
           <div className="absolute inset-0 bg-hero opacity-60" />
