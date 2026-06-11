@@ -134,3 +134,54 @@ export const adminListGames = createServerFn({ method: "GET" })
       .limit(100);
     return { games: data ?? [] };
   });
+
+export const adminListReels = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    await assertAdmin(context);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data } = await supabaseAdmin
+      .from("highlight_reels")
+      .select("id, user_id, title, video_path, status, attempts, error_message, failed_at, environment, created_at")
+      .order("created_at", { ascending: false })
+      .limit(200);
+    return { reels: data ?? [] };
+  });
+
+export const adminRetryReel = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { id: string }) => z.object({ id: z.string().uuid() }).parse(d))
+  .handler(async ({ context, data }) => {
+    await assertAdmin(context);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: row } = await supabaseAdmin
+      .from("highlight_reels")
+      .select("attempts")
+      .eq("id", data.id)
+      .single();
+    await supabaseAdmin
+      .from("highlight_reels")
+      .update({
+        status: "processing",
+        error_message: null,
+        failed_at: null,
+        attempts: (row?.attempts ?? 0) + 1,
+      })
+      .eq("id", data.id);
+    return { ok: true };
+  });
+
+export const adminMarkReelFailed = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { id: string; message: string }) =>
+    z.object({ id: z.string().uuid(), message: z.string().min(1).max(2000) }).parse(d),
+  )
+  .handler(async ({ context, data }) => {
+    await assertAdmin(context);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    await supabaseAdmin
+      .from("highlight_reels")
+      .update({ status: "failed", error_message: data.message, failed_at: new Date().toISOString() })
+      .eq("id", data.id);
+    return { ok: true };
+  });
