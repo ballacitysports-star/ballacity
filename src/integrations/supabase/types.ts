@@ -108,39 +108,57 @@ export type Database = {
       }
       highlight_reels: {
         Row: {
+          ai_caption: string | null
+          ai_hashtags: string[] | null
+          ai_title: string | null
           attempts: number
+          completed_at: string | null
           created_at: string
           environment: string
           error_message: string | null
           failed_at: string | null
           id: string
+          processing_started_at: string | null
           status: string
+          thumbnail_path: string | null
           title: string
           used_free: boolean
           user_id: string
           video_path: string
         }
         Insert: {
+          ai_caption?: string | null
+          ai_hashtags?: string[] | null
+          ai_title?: string | null
           attempts?: number
+          completed_at?: string | null
           created_at?: string
           environment?: string
           error_message?: string | null
           failed_at?: string | null
           id?: string
+          processing_started_at?: string | null
           status?: string
+          thumbnail_path?: string | null
           title?: string
           used_free?: boolean
           user_id: string
           video_path: string
         }
         Update: {
+          ai_caption?: string | null
+          ai_hashtags?: string[] | null
+          ai_title?: string | null
           attempts?: number
+          completed_at?: string | null
           created_at?: string
           environment?: string
           error_message?: string | null
           failed_at?: string | null
           id?: string
+          processing_started_at?: string | null
           status?: string
+          thumbnail_path?: string | null
           title?: string
           used_free?: boolean
           user_id?: string
