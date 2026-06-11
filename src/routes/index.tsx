@@ -4,6 +4,8 @@ import { ArrowRight, MapPin, Sparkles, Trophy, Users, Video, Zap } from "lucide-
 import { Logo } from "@/components/Logo";
 import { HERO_IMAGE, SPORTS, GAMES } from "@/lib/sample-data";
 import { GameCard } from "@/components/GameCard";
+import { MERCH_ITEMS } from "@/lib/catalog";
+
 
 export const Route = createFileRoute("/")({
   head: () => ({
