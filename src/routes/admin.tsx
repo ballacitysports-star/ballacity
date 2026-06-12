@@ -135,10 +135,19 @@ function ReelsPanel() {
                       {r.status}{isStuck ? " (stuck)" : ""}
                     </Badge>
                     {r.attempts > 0 && <Badge variant="outline">attempt {r.attempts}</Badge>}
+                    {r.processing_step && r.processing_step !== "pending" && (
+                      <Badge variant="outline">step: {r.processing_step}</Badge>
+                    )}
                   </div>
                   <div className="text-xs text-muted-foreground">
                     user {r.user_id?.slice(0, 8)}… · {ageMin}m ago · {r.environment}
+                    {r.last_step_at && ` · last step ${new Date(r.last_step_at).toLocaleTimeString()}`}
                   </div>
+                  {r.step_progress && Object.keys(r.step_progress).length > 0 && (
+                    <div className="text-xs text-muted-foreground mt-1">
+                      saved: {Object.keys(r.step_progress).join(", ")}
+                    </div>
+                  )}
                   {r.error_message && (
                     <pre className="mt-1 text-xs text-destructive bg-destructive/10 rounded p-2 whitespace-pre-wrap break-all">
                       {r.error_message}
@@ -147,7 +156,14 @@ function ReelsPanel() {
                   )}
                 </div>
                 {(isFailed || isStuck) && (
-                  <Button size="sm" variant="outline" onClick={() => mut.mutate(r.id)}>Retry</Button>
+                  <div className="flex flex-col gap-1">
+                    <Button size="sm" variant="outline" onClick={() => mut.mutate({ id: r.id })}>
+                      Resume
+                    </Button>
+                    <Button size="sm" variant="ghost" onClick={() => mut.mutate({ id: r.id, restart: true })}>
+                      Restart
+                    </Button>
+                  </div>
                 )}
               </div>
             );
