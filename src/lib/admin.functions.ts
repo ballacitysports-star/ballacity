@@ -142,7 +142,7 @@ export const adminListReels = createServerFn({ method: "GET" })
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { data } = await supabaseAdmin
       .from("highlight_reels")
-      .select("id, user_id, title, video_path, status, attempts, error_message, failed_at, environment, created_at")
+      .select("id, user_id, title, video_path, status, attempts, error_message, failed_at, environment, created_at, processing_step, step_progress, last_step_at")
       .order("created_at", { ascending: false })
       .limit(200);
     return { reels: data ?? [] };
@@ -150,21 +150,28 @@ export const adminListReels = createServerFn({ method: "GET" })
 
 export const adminRetryReel = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((d: { id: string }) => z.object({ id: z.string().uuid() }).parse(d))
+  .inputValidator((d: { id: string; restart?: boolean }) =>
+    z.object({ id: z.string().uuid(), restart: z.boolean().optional() }).parse(d),
+  )
   .handler(async ({ context, data }) => {
     await assertAdmin(context);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    await supabaseAdmin
-      .from("highlight_reels")
-      .update({
-        status: "processing",
-        error_message: null,
-        failed_at: null,
-        attempts: 0,
-        processing_started_at: null,
-      })
-      .eq("id", data.id);
-    return { ok: true };
+    // Default: resume from the last successful step (keep processing_step + step_progress).
+    // restart=true: full pipeline restart (clear progress).
+    const patch: Record<string, any> = {
+      status: "processing",
+      error_message: null,
+      failed_at: null,
+      attempts: 0,
+      processing_started_at: null,
+    };
+    if (data.restart) {
+      patch.processing_step = "pending";
+      patch.step_progress = {};
+      patch.last_step_at = null;
+    }
+    await supabaseAdmin.from("highlight_reels").update(patch as any).eq("id", data.id);
+    return { ok: true, resumed: !data.restart };
   });
 
 export const adminMarkReelFailed = createServerFn({ method: "POST" })

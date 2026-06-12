@@ -118,8 +118,11 @@ export type Database = {
           error_message: string | null
           failed_at: string | null
           id: string
+          last_step_at: string | null
           processing_started_at: string | null
+          processing_step: string
           status: string
+          step_progress: Json
           thumbnail_path: string | null
           title: string
           used_free: boolean
@@ -137,8 +140,11 @@ export type Database = {
           error_message?: string | null
           failed_at?: string | null
           id?: string
+          last_step_at?: string | null
           processing_started_at?: string | null
+          processing_step?: string
           status?: string
+          step_progress?: Json
           thumbnail_path?: string | null
           title?: string
           used_free?: boolean
@@ -156,8 +162,11 @@ export type Database = {
           error_message?: string | null
           failed_at?: string | null
           id?: string
+          last_step_at?: string | null
           processing_started_at?: string | null
+          processing_step?: string
           status?: string
+          step_progress?: Json
           thumbnail_path?: string | null
           title?: string
           used_free?: boolean
