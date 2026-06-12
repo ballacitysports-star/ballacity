@@ -170,7 +170,7 @@ export const adminRetryReel = createServerFn({ method: "POST" })
       patch.step_progress = {};
       patch.last_step_at = null;
     }
-    await supabaseAdmin.from("highlight_reels").update(patch).eq("id", data.id);
+    await supabaseAdmin.from("highlight_reels").update(patch as any).eq("id", data.id);
     return { ok: true, resumed: !data.restart };
   });
 
