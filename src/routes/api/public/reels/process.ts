@@ -4,96 +4,148 @@ const MAX_ATTEMPTS = 3;
 const STUCK_AFTER_MS = 10 * 60 * 1000;
 const BATCH_SIZE = 5;
 
+// Ordered pipeline. Each step reads/writes step_progress and advances processing_step.
+// Retries resume from the first step that hasn't completed.
+const STEPS = ["metadata", "hashtags", "thumbnail", "finalize"] as const;
+type Step = (typeof STEPS)[number];
+
 type Reel = {
   id: string;
   user_id: string;
   title: string;
   video_path: string;
   attempts: number;
+  processing_step: string;
+  step_progress: Record<string, any> | null;
 };
 
-async function callLovableAI(prompt: string, apiKey: string) {
+async function callLovableAI(prompt: string, system: string, apiKey: string) {
   const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
     method: "POST",
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      "Content-Type": "application/json",
-    },
+    headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
     body: JSON.stringify({
       model: "google/gemini-2.5-flash",
       messages: [
-        {
-          role: "system",
-          content:
-            'You are a social media expert generating catchy sports highlight reel metadata. Respond ONLY with JSON: {"title":"...","caption":"...","hashtags":["..."]}. Title max 60 chars, caption max 200 chars, 3-5 hashtags.',
-        },
+        { role: "system", content: system },
         { role: "user", content: prompt },
       ],
       response_format: { type: "json_object" },
     }),
   });
-  if (!res.ok) {
-    throw new Error(`AI gateway ${res.status}: ${await res.text().catch(() => "")}`);
-  }
+  if (!res.ok) throw new Error(`AI gateway ${res.status}: ${await res.text().catch(() => "")}`);
   const data = await res.json();
   const content = data?.choices?.[0]?.message?.content;
   if (!content) throw new Error("AI gateway returned no content");
-  const parsed = JSON.parse(content);
-  return {
-    title: String(parsed.title ?? "").slice(0, 120),
-    caption: String(parsed.caption ?? "").slice(0, 500),
-    hashtags: Array.isArray(parsed.hashtags)
-      ? parsed.hashtags.map((h: unknown) => String(h)).slice(0, 8)
-      : [],
-  };
+  return JSON.parse(content);
 }
 
-async function processReel(
-  reel: Reel,
-  supabaseAdmin: any,
-  apiKey: string,
-): Promise<{ id: string; status: "completed" | "failed"; error?: string }> {
-  try {
-    await supabaseAdmin
-      .from("highlight_reels")
-      .update({
-        attempts: reel.attempts + 1,
-        processing_started_at: new Date().toISOString(),
-        error_message: null,
-      })
-      .eq("id", reel.id);
-
-    const ai = await callLovableAI(
-      `Original filename/title: "${reel.title}". Generate engaging title, caption, and hashtags for this sports highlight clip.`,
+// Each step receives accumulated progress and returns a patch merged into step_progress.
+const STEP_RUNNERS: Record<Step, (reel: Reel, progress: any, apiKey: string) => Promise<any>> = {
+  metadata: async (reel, _p, apiKey) => {
+    const out = await callLovableAI(
+      `Original filename/title: "${reel.title}". Generate an engaging title and caption for this sports highlight clip.`,
+      'Respond ONLY with JSON: {"title":"...","caption":"..."}. Title max 60 chars, caption max 200 chars.',
       apiKey,
     );
+    return {
+      ai_title: String(out.title ?? "").slice(0, 120),
+      ai_caption: String(out.caption ?? "").slice(0, 500),
+    };
+  },
+  hashtags: async (_reel, progress, apiKey) => {
+    const out = await callLovableAI(
+      `Title: "${progress.ai_title}". Caption: "${progress.ai_caption}". Generate 3-5 trending hashtags.`,
+      'Respond ONLY with JSON: {"hashtags":["..."]}. Max 8 hashtags, no leading #.',
+      apiKey,
+    );
+    return {
+      ai_hashtags: Array.isArray(out.hashtags)
+        ? out.hashtags.map((h: unknown) => String(h)).slice(0, 8)
+        : [],
+    };
+  },
+  thumbnail: async (reel) => {
+    // Placeholder: derive a thumbnail path from the source video.
+    // Real thumbnail extraction would live here (ffmpeg/worker). Safe to retry.
+    return { thumbnail_path: reel.video_path.replace(/\.[^.]+$/, "") + ".jpg" };
+  },
+  finalize: async () => ({ finalized_at: new Date().toISOString() }),
+};
+
+function nextStep(current: string): Step | null {
+  if (current === "completed") return null;
+  const idx = STEPS.indexOf(current as Step);
+  return STEPS[idx + 1] ?? null;
+}
+
+function firstStep(current: string): Step {
+  // "pending" or unknown → start at first step; otherwise resume at the step AFTER the last completed one.
+  if (!STEPS.includes(current as Step)) return STEPS[0];
+  const idx = STEPS.indexOf(current as Step);
+  return STEPS[idx + 1] ?? STEPS[STEPS.length - 1];
+}
+
+async function processReel(reel: Reel, supabaseAdmin: any, apiKey: string) {
+  const progress: Record<string, any> = { ...(reel.step_progress ?? {}) };
+  const startStep = firstStep(reel.processing_step);
+  const startIdx = STEPS.indexOf(startStep);
+  const resumed = reel.processing_step !== "pending" && startIdx > 0;
+
+  await supabaseAdmin
+    .from("highlight_reels")
+    .update({
+      attempts: reel.attempts + 1,
+      processing_started_at: new Date().toISOString(),
+      error_message: null,
+    })
+    .eq("id", reel.id);
+
+  try {
+    for (let i = startIdx; i < STEPS.length; i++) {
+      const step = STEPS[i];
+      const patch = await STEP_RUNNERS[step](reel, progress, apiKey);
+      Object.assign(progress, patch);
+      await supabaseAdmin
+        .from("highlight_reels")
+        .update({
+          processing_step: step,
+          step_progress: progress,
+          last_step_at: new Date().toISOString(),
+        })
+        .eq("id", reel.id);
+    }
 
     await supabaseAdmin
       .from("highlight_reels")
       .update({
         status: "completed",
-        ai_title: ai.title,
-        ai_caption: ai.caption,
-        ai_hashtags: ai.hashtags,
+        processing_step: "completed",
+        ai_title: progress.ai_title ?? null,
+        ai_caption: progress.ai_caption ?? null,
+        ai_hashtags: progress.ai_hashtags ?? [],
+        thumbnail_path: progress.thumbnail_path ?? null,
         completed_at: new Date().toISOString(),
         error_message: null,
         failed_at: null,
       })
       .eq("id", reel.id);
 
-    return { id: reel.id, status: "completed" };
+    return { id: reel.id, status: "completed", resumedFrom: resumed ? startStep : null };
   } catch (e: any) {
     const msg = e?.message ?? String(e);
     const finalFail = reel.attempts + 1 >= MAX_ATTEMPTS;
+    // Persist progress so the next attempt resumes from the failed step (not from scratch).
     await supabaseAdmin
       .from("highlight_reels")
       .update({
         status: finalFail ? "failed" : "processing",
+        step_progress: progress,
         error_message: msg,
         failed_at: finalFail ? new Date().toISOString() : null,
+        processing_started_at: null,
       })
       .eq("id", reel.id);
-    return { id: reel.id, status: finalFail ? "failed" : "failed", error: msg };
+    return { id: reel.id, status: finalFail ? "failed" : "retry-pending", error: msg };
   }
 }
 
@@ -110,12 +162,10 @@ export const Route = createFileRoute("/api/public/reels/process")({
         }
 
         const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-
-        // Pick fresh processing reels OR reels stuck > STUCK_AFTER_MS
         const stuckBefore = new Date(Date.now() - STUCK_AFTER_MS).toISOString();
         const { data: reels, error } = await supabaseAdmin
           .from("highlight_reels")
-          .select("id,user_id,title,video_path,attempts")
+          .select("id,user_id,title,video_path,attempts,processing_step,step_progress")
           .eq("status", "processing")
           .lt("attempts", MAX_ATTEMPTS)
           .or(`processing_started_at.is.null,processing_started_at.lt.${stuckBefore}`)
@@ -134,10 +184,9 @@ export const Route = createFileRoute("/api/public/reels/process")({
           results.push(await processReel(r, supabaseAdmin, apiKey));
         }
 
-        return new Response(
-          JSON.stringify({ processed: results.length, results }),
-          { headers: { "Content-Type": "application/json" } },
-        );
+        return new Response(JSON.stringify({ processed: results.length, results }), {
+          headers: { "Content-Type": "application/json" },
+        });
       },
     },
   },
