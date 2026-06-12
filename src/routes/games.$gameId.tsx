@@ -66,21 +66,6 @@ function GameDetail() {
     [hosted, gameId],
   );
   const joined = useIsJoined(gameId);
-  if (!game) {
-    return (
-      <div className="min-h-dvh grid place-items-center px-6 text-center">
-        <div>
-          <h1 className="font-display text-3xl font-bold">Game not found</h1>
-          <p className="text-muted-foreground mt-2">It may have wrapped up or been cancelled.</p>
-          <Link to="/feed" className="inline-block mt-5 rounded-full bg-lime px-5 py-2.5 text-sm font-bold text-primary-foreground">
-            Back to feed
-          </Link>
-        </div>
-      </div>
-    );
-  }
-  const effectiveJoined = game.joined + (joined ? 1 : 0);
-  const spotsLeft = Math.max(0, game.maxPlayers - effectiveJoined);
   const nav = useNavigate();
   const { user } = useAuth();
   const [settings, setSettings] = useState<GamePaymentSettings | null>(null);
@@ -89,6 +74,8 @@ function GameDetail() {
   const [hostRequests, setHostRequests] = useState<JoinRequest[]>([]);
   const [messaging, setMessaging] = useState(false);
 
+  const effectiveJoined = (game?.joined ?? 0) + (joined ? 1 : 0);
+  const spotsLeft = game ? Math.max(0, game.maxPlayers - effectiveJoined) : 0;
   const isHost = !!(user && settings && user.id === settings.host_id);
 
   const refreshStatus = async () => {
