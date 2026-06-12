@@ -142,7 +142,7 @@ export const adminListReels = createServerFn({ method: "GET" })
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { data } = await supabaseAdmin
       .from("highlight_reels")
-      .select("id, user_id, title, video_path, status, attempts, error_message, failed_at, environment, created_at")
+      .select("id, user_id, title, video_path, status, attempts, error_message, failed_at, environment, created_at, processing_step, step_progress, last_step_at")
       .order("created_at", { ascending: false })
       .limit(200);
     return { reels: data ?? [] };
