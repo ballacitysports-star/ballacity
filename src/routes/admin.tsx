@@ -77,10 +77,11 @@ function ReelsPanel() {
   const qc = useQueryClient();
   const { data, isLoading } = useQuery({ queryKey: ["admin-reels"], queryFn: () => list({}) });
   const mut = useMutation({
-    mutationFn: (id: string) => retry({ data: { id } }),
-    onSuccess: () => {
+    mutationFn: (v: { id: string; restart?: boolean }) =>
+      retry({ data: { id: v.id, restart: v.restart } }),
+    onSuccess: (res: any) => {
       qc.invalidateQueries({ queryKey: ["admin-reels"] });
-      toast.success("Reel re-queued");
+      toast.success(res?.resumed ? "Resumed from last step" : "Reel restarted from scratch");
     },
     onError: (e: Error) => toast.error(e.message),
   });
