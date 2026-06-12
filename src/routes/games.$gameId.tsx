@@ -173,8 +173,8 @@ function GameDetail() {
     toast.success(`You're in! See you at ${game.location}.`);
   };
 
-  const hostReviews = useReviewsFor(hostIdFor(game.host.username));
-  const hostRep = useMemo(() => computeReputation(hostReviews, "host"), [hostReviews]);
+
+
 
   const players = [
     ...(joined ? [{ initials: "YOU", isMe: true }] : []),
