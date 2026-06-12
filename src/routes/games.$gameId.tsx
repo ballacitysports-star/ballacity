@@ -66,6 +66,21 @@ function GameDetail() {
     [hosted, gameId],
   );
   const joined = useIsJoined(gameId);
+  const nav = useNavigate();
+  const { user } = useAuth();
+  const [settings, setSettings] = useState<GamePaymentSettings | null>(null);
+  const [mySubs, setMySubs] = useState<PaymentSubmission[]>([]);
+  const [myReq, setMyReq] = useState<JoinRequest | null>(null);
+  const [hostRequests, setHostRequests] = useState<JoinRequest[]>([]);
+  const [messaging, setMessaging] = useState(false);
+
+  const effectiveJoined = (game?.joined ?? 0) + (joined ? 1 : 0);
+  const spotsLeft = game ? Math.max(0, game.maxPlayers - effectiveJoined) : 0;
+  const isHost = !!(user && settings && user.id === settings.host_id);
+
+  const hostReviews = useReviewsFor(hostIdFor(game?.host.username ?? ""));
+  const hostRep = useMemo(() => computeReputation(hostReviews, "host"), [hostReviews]);
+
   if (!game) {
     return (
       <div className="min-h-dvh grid place-items-center px-6 text-center">
@@ -79,17 +94,6 @@ function GameDetail() {
       </div>
     );
   }
-  const effectiveJoined = game.joined + (joined ? 1 : 0);
-  const spotsLeft = Math.max(0, game.maxPlayers - effectiveJoined);
-  const nav = useNavigate();
-  const { user } = useAuth();
-  const [settings, setSettings] = useState<GamePaymentSettings | null>(null);
-  const [mySubs, setMySubs] = useState<PaymentSubmission[]>([]);
-  const [myReq, setMyReq] = useState<JoinRequest | null>(null);
-  const [hostRequests, setHostRequests] = useState<JoinRequest[]>([]);
-  const [messaging, setMessaging] = useState(false);
-
-  const isHost = !!(user && settings && user.id === settings.host_id);
 
   const refreshStatus = async () => {
     try {
@@ -169,8 +173,8 @@ function GameDetail() {
     toast.success(`You're in! See you at ${game.location}.`);
   };
 
-  const hostReviews = useReviewsFor(hostIdFor(game.host.username));
-  const hostRep = useMemo(() => computeReputation(hostReviews, "host"), [hostReviews]);
+
+
 
   const players = [
     ...(joined ? [{ initials: "YOU", isMe: true }] : []),
