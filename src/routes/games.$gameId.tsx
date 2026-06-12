@@ -78,6 +78,23 @@ function GameDetail() {
   const spotsLeft = game ? Math.max(0, game.maxPlayers - effectiveJoined) : 0;
   const isHost = !!(user && settings && user.id === settings.host_id);
 
+  const hostReviews = useReviewsFor(hostIdFor(game?.host.username ?? ""));
+  const hostRep = useMemo(() => computeReputation(hostReviews, "host"), [hostReviews]);
+
+  if (!game) {
+    return (
+      <div className="min-h-dvh grid place-items-center px-6 text-center">
+        <div>
+          <h1 className="font-display text-3xl font-bold">Game not found</h1>
+          <p className="text-muted-foreground mt-2">It may have wrapped up or been cancelled.</p>
+          <Link to="/feed" className="inline-block mt-5 rounded-full bg-lime px-5 py-2.5 text-sm font-bold text-primary-foreground">
+            Back to feed
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
   const refreshStatus = async () => {
     try {
       const [s, subs, req] = await Promise.all([
