@@ -22,9 +22,13 @@ type Reel = {
 async function callLovableAI(prompt: string, system: string, apiKey: string) {
   const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
     method: "POST",
-    headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+    headers: {
+      "Lovable-API-Key": apiKey,
+      "X-Lovable-AIG-SDK": "manual-worker",
+      "Content-Type": "application/json",
+    },
     body: JSON.stringify({
-      model: "google/gemini-2.5-flash",
+      model: "google/gemini-3-flash-preview",
       messages: [
         { role: "system", content: system },
         { role: "user", content: prompt },
@@ -34,7 +38,10 @@ async function callLovableAI(prompt: string, system: string, apiKey: string) {
   });
   if (!res.ok) throw new Error(`AI gateway ${res.status}: ${await res.text().catch(() => "")}`);
   const data = await res.json();
-  const content = data?.choices?.[0]?.message?.content;
+  const content = String(data?.choices?.[0]?.message?.content ?? "")
+    .replace(/^```(?:json)?\s*/i, "")
+    .replace(/\s*```$/i, "")
+    .trim();
   if (!content) throw new Error("AI gateway returned no content");
   return JSON.parse(content);
 }
