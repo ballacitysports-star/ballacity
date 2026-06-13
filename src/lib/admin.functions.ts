@@ -1,4 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
+import { getRequest } from "@tanstack/react-start/server";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { z } from "zod";
 
@@ -193,11 +194,18 @@ export const adminRunReelWorker = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
     await assertAdmin(context);
-    const origin = "https://project--9bd576a8-703f-4180-84d6-2cd32f2a851b.lovable.app";
+    const request = getRequest();
+    const origin = request ? new URL(request.url).origin : "";
     try {
       const res = await fetch(`${origin}/api/public/reels/process`, { method: "POST" });
       const body: any = await res.json().catch(() => ({}));
-      return { ok: res.ok, status: res.status, processed: body?.processed ?? 0 };
+      return {
+        ok: res.ok,
+        status: res.status,
+        processed: body?.processed ?? 0,
+        error: body?.error,
+        results: body?.results ?? [],
+      };
     } catch (e: any) {
       return { ok: false, error: e?.message ?? "Worker call failed" };
     }
