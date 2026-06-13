@@ -19,8 +19,10 @@ import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
+import { supabase } from "@/integrations/supabase/client";
 
 export const Route = createFileRoute("/admin")({
+  ssr: false,
   head: () => ({ meta: [{ title: "Admin · Panel" }] }),
   component: AdminPage,
 });
@@ -28,16 +30,39 @@ export const Route = createFileRoute("/admin")({
 function AdminPage() {
   const navigate = useNavigate();
   const check = useServerFn(adminCheck);
-  const { data, isLoading } = useQuery({ queryKey: ["admin-check"], queryFn: () => check({}) });
+  const [authReady, setAuthReady] = useState(false);
+  const [hasSession, setHasSession] = useState(false);
 
   useEffect(() => {
+    supabase.auth.getSession().then(({ data }) => {
+      setHasSession(!!data.session);
+      setAuthReady(true);
+    });
+    const { data: sub } = supabase.auth.onAuthStateChange((_e, session) => {
+      setHasSession(!!session);
+      setAuthReady(true);
+    });
+    return () => sub.subscription.unsubscribe();
+  }, []);
+
+  const { data, isLoading } = useQuery({
+    queryKey: ["admin-check"],
+    queryFn: () => check({}),
+    enabled: authReady && hasSession,
+  });
+
+  useEffect(() => {
+    if (authReady && !hasSession) {
+      navigate({ to: "/auth" });
+      return;
+    }
     if (!isLoading && data && !data.isAdmin) {
       toast.error("Admin access required");
       navigate({ to: "/" });
     }
-  }, [data, isLoading, navigate]);
+  }, [data, isLoading, navigate, authReady, hasSession]);
 
-  if (isLoading) return <div className="p-6 text-sm text-muted-foreground">Loading…</div>;
+  if (!authReady || isLoading) return <div className="p-6 text-sm text-muted-foreground">Loading…</div>;
   if (!data?.isAdmin) return null;
 
   return (
