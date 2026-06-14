@@ -81,7 +81,11 @@ function Create() {
             indoor,
             isPrivate: priv,
             description,
+            host: profile
+              ? { name: profile.name, username: profile.username, avatar: profile.avatar, rating: profile.stats.sportsmanship }
+              : undefined,
           });
+
           // Host counts as joined so it appears under their upcoming games
           joinGame(game.id);
           toast.success("Game published");

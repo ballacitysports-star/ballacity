@@ -50,16 +50,21 @@ export type HostedGameInput = {
   indoor: boolean;
   isPrivate: boolean;
   description: string;
+  host?: { name: string; username: string; avatar: string; rating?: number };
 };
 
 export function addHostedGame(input: HostedGameInput): Game {
   load();
   const id = `host-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
+  const host = input.host
+    ? { name: input.host.name, username: input.host.username, avatar: input.host.avatar, rating: input.host.rating ?? 5 }
+    : { name: ME.name, username: ME.username, avatar: ME.avatar, rating: ME.stats.sportsmanship };
   const game: Game = {
     id,
     sport: input.sport,
     title: input.title || `${input.sport} pickup`,
-    host: { name: ME.name, username: ME.username, avatar: ME.avatar, rating: ME.stats.sportsmanship },
+    host,
+
     date: input.date,
     duration: "90 min",
     location: input.location || "TBD",
