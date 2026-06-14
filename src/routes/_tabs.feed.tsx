@@ -96,7 +96,14 @@ function Feed() {
         className="mb-4"
       >
         <h1 className="font-display text-3xl font-bold leading-tight">Tonight's run.</h1>
-        <p className="text-muted-foreground text-sm">{filtered.length} games matching your feed.</p>
+        <p className="text-muted-foreground text-sm inline-flex items-center gap-1">
+          {userCityToken ? (
+            <><MapPin className="h-3.5 w-3.5 text-lime" /> Nearest to {profile?.city} · {filtered.length} games</>
+          ) : (
+            <>{filtered.length} games · <Link to="/profile/edit" className="text-lime font-semibold">Set your city</Link> for nearby</>
+          )}
+        </p>
+
       </motion.div>
 
       <div className="flex gap-2 mb-4">
