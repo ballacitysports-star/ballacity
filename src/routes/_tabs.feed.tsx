@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
-import { Search, SlidersHorizontal, Bell, MessageCircle, X } from "lucide-react";
+import { Search, SlidersHorizontal, Bell, MessageCircle, X, MapPin } from "lucide-react";
 import { useUnreadNotificationCount } from "@/lib/notifications";
 import { Logo } from "@/components/Logo";
 import { SportChips } from "@/components/SportChips";
@@ -8,8 +8,9 @@ import { GameCard } from "@/components/GameCard";
 import { GAMES, SPORTS, type Sport } from "@/lib/sample-data";
 import { useHostedGames } from "@/lib/hosted-games-store";
 import { useJoinedGameIds } from "@/lib/games-store";
-import { useFeedPrefs, setFeedPrefs, DEFAULT_PREFS } from "@/lib/user-prefs-store";
+import { useFeedPrefs, setFeedPrefs, DEFAULT_PREFS, useMyProfile } from "@/lib/user-prefs-store";
 import { motion, AnimatePresence } from "framer-motion";
+
 
 export const Route = createFileRoute("/_tabs/feed")({
   head: () => ({ meta: [{ title: "Feed — OpenRun" }] }),
@@ -22,8 +23,19 @@ function Feed() {
   const hosted = useHostedGames();
   const joinedIds = useJoinedGameIds();
   const prefs = useFeedPrefs();
+  const profile = useMyProfile();
   const joinedSet = useMemo(() => new Set(joinedIds), [joinedIds]);
   const hostedIds = useMemo(() => new Set(hosted.map((g) => g.id)), [hosted]);
+
+  const userCityToken = useMemo(
+    () => (profile?.city ?? "").toLowerCase().split(",")[0].trim(),
+    [profile?.city],
+  );
+  const isLocal = (g: { location: string; neighborhood?: string }) => {
+    if (!userCityToken) return false;
+    const hay = `${g.location} ${g.neighborhood ?? ""}`.toLowerCase();
+    return hay.includes(userCityToken);
+  };
 
   // Quick chip = single-sport shortcut for preferredSports.
   // null/empty = All sports. Multi-select still possible via the filter sheet.
@@ -46,8 +58,17 @@ function Feed() {
           ? (g.title + g.location + g.host.name).toLowerCase().includes(q.toLowerCase())
           : true,
       )
-      .sort((a, b) => +new Date(a.date) - +new Date(b.date));
-  }, [q, hosted, prefs, joinedSet, hostedIds]);
+      .sort((a, b) => {
+        // Nearest first when we know the user's city; ties break on distanceMi then date.
+        const la = isLocal(a) ? 0 : 1;
+        const lb = isLocal(b) ? 0 : 1;
+        if (la !== lb) return la - lb;
+        if (a.distanceMi !== b.distanceMi) return a.distanceMi - b.distanceMi;
+        return +new Date(a.date) - +new Date(b.date);
+      });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [q, hosted, prefs, joinedSet, hostedIds, userCityToken]);
+
 
 
   const urgent = filtered.filter((g) => g.urgent);
@@ -75,7 +96,14 @@ function Feed() {
         className="mb-4"
       >
         <h1 className="font-display text-3xl font-bold leading-tight">Tonight's run.</h1>
-        <p className="text-muted-foreground text-sm">{filtered.length} games matching your feed.</p>
+        <p className="text-muted-foreground text-sm inline-flex items-center gap-1">
+          {userCityToken ? (
+            <><MapPin className="h-3.5 w-3.5 text-lime" /> Nearest to {profile?.city} · {filtered.length} games</>
+          ) : (
+            <>{filtered.length} games · <Link to="/profile/edit" className="text-lime font-semibold">Set your city</Link> for nearby</>
+          )}
+        </p>
+
       </motion.div>
 
       <div className="flex gap-2 mb-4">
