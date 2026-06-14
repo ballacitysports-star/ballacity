@@ -23,8 +23,19 @@ function Feed() {
   const hosted = useHostedGames();
   const joinedIds = useJoinedGameIds();
   const prefs = useFeedPrefs();
+  const profile = useMyProfile();
   const joinedSet = useMemo(() => new Set(joinedIds), [joinedIds]);
   const hostedIds = useMemo(() => new Set(hosted.map((g) => g.id)), [hosted]);
+
+  const userCityToken = useMemo(
+    () => (profile?.city ?? "").toLowerCase().split(",")[0].trim(),
+    [profile?.city],
+  );
+  const isLocal = (g: { location: string; neighborhood?: string }) => {
+    if (!userCityToken) return false;
+    const hay = `${g.location} ${g.neighborhood ?? ""}`.toLowerCase();
+    return hay.includes(userCityToken);
+  };
 
   // Quick chip = single-sport shortcut for preferredSports.
   // null/empty = All sports. Multi-select still possible via the filter sheet.
@@ -47,8 +58,17 @@ function Feed() {
           ? (g.title + g.location + g.host.name).toLowerCase().includes(q.toLowerCase())
           : true,
       )
-      .sort((a, b) => +new Date(a.date) - +new Date(b.date));
-  }, [q, hosted, prefs, joinedSet, hostedIds]);
+      .sort((a, b) => {
+        // Nearest first when we know the user's city; ties break on distanceMi then date.
+        const la = isLocal(a) ? 0 : 1;
+        const lb = isLocal(b) ? 0 : 1;
+        if (la !== lb) return la - lb;
+        if (a.distanceMi !== b.distanceMi) return a.distanceMi - b.distanceMi;
+        return +new Date(a.date) - +new Date(b.date);
+      });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [q, hosted, prefs, joinedSet, hostedIds, userCityToken]);
+
 
 
   const urgent = filtered.filter((g) => g.urgent);
