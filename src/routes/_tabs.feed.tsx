@@ -225,10 +225,10 @@ function FilterSheet({ onClose }: { onClose: () => void }) {
           {([
             ["showUrgent", "Needs players now"],
             ["showForYou", '"For you" list'],
-            ["hostedByMeOnly", "Only games I host"],
-            ["joinedOnly", "Only games I joined"],
-            ["freeOnly", "Free games only"],
-            ["paidOnly", "Paid games only"],
+            ["hostedByMeOnly", "Games I host"],
+            ["joinedOnly", "Games I joined"],
+            ["freeOnly", "Free games"],
+            ["paidOnly", "Paid games"],
           ] as const).map(([k, label]) => (
             <button
               key={k} onClick={() => toggleSection(k)}
