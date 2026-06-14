@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
-import { Search, SlidersHorizontal, Bell, MessageCircle, X } from "lucide-react";
+import { Search, SlidersHorizontal, Bell, MessageCircle, X, MapPin } from "lucide-react";
 import { useUnreadNotificationCount } from "@/lib/notifications";
 import { Logo } from "@/components/Logo";
 import { SportChips } from "@/components/SportChips";
@@ -8,8 +8,9 @@ import { GameCard } from "@/components/GameCard";
 import { GAMES, SPORTS, type Sport } from "@/lib/sample-data";
 import { useHostedGames } from "@/lib/hosted-games-store";
 import { useJoinedGameIds } from "@/lib/games-store";
-import { useFeedPrefs, setFeedPrefs, DEFAULT_PREFS } from "@/lib/user-prefs-store";
+import { useFeedPrefs, setFeedPrefs, DEFAULT_PREFS, useMyProfile } from "@/lib/user-prefs-store";
 import { motion, AnimatePresence } from "framer-motion";
+
 
 export const Route = createFileRoute("/_tabs/feed")({
   head: () => ({ meta: [{ title: "Feed — OpenRun" }] }),
