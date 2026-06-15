@@ -43,15 +43,24 @@ function Discover() {
   return (
     <div className="relative h-dvh overflow-hidden">
       {/* Real Google Map with live GPS */}
-      <GamesMap pins={pins} activeId={active} onSelect={setActive} defaultLocation={profile?.city} />
+      <GamesMap
+        pins={pins}
+        activeId={active}
+        onSelect={setActive}
+        defaultLocation={profile?.city}
+        onVisibleChange={(ids) => {
+          setVisibleIds(ids);
+          if (ids.length && !ids.includes(active)) setActive(ids[0]);
+        }}
+      />
 
       {/* Top overlay */}
       <div className="relative z-10 px-4 pt-6">
         <div className="rounded-2xl border border-border bg-surface/80 backdrop-blur-xl p-3 shadow-xl">
           <div className="flex items-center gap-2 text-sm">
             <Navigation className="h-4 w-4 text-lime" />
-            <span className="font-semibold">Live location</span>
-            <span className="text-muted-foreground">· {GAMES.length} games nearby</span>
+            <span className="font-semibold">{visibleIds ? "This area" : "Live location"}</span>
+            <span className="text-muted-foreground">· {visibleGames.length} games {visibleIds ? "in view" : "nearby"}</span>
           </div>
         </div>
       </div>
