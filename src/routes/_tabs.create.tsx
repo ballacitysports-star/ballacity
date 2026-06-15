@@ -1,7 +1,7 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
 import { motion } from "framer-motion";
-import { ArrowLeft, Calendar, MapPin, Users, DollarSign, Lock, Home } from "lucide-react";
+import { ArrowLeft, Calendar, MapPin, Users, DollarSign, Lock, Home, ShieldCheck } from "lucide-react";
 import { SPORTS, type Sport } from "@/lib/sample-data";
 import { addHostedGame } from "@/lib/hosted-games-store";
 import { joinGame } from "@/lib/games-store";
@@ -9,6 +9,7 @@ import { toast } from "sonner";
 import { LocationAutocomplete } from "@/components/LocationAutocomplete";
 import { useMyProfile } from "@/lib/user-prefs-store";
 import { useAuth } from "@/hooks/use-auth";
+import { upsertGamePaymentSettings } from "@/lib/payments";
 
 export const Route = createFileRoute("/_tabs/create")({
   head: () => ({ meta: [{ title: "Host a game — OpenRun" }] }),
