@@ -123,6 +123,8 @@ export function GamesMap({
           clickableIcons: false,
           styles: DARK_STYLE,
         });
+        mapRef.current.addListener("dragend", () => setAreaDirty(true));
+        mapRef.current.addListener("zoom_changed", () => setAreaDirty(true));
         setReady(true);
       })
       .catch(() => {});
