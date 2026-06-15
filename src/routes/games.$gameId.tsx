@@ -9,7 +9,7 @@ import { ReputationBadge } from "@/components/ReputationBadge";
 import { joinGame, leaveGame, useIsJoined } from "@/lib/games-store";
 import { toast } from "sonner";
 import { useEffect, useMemo, useState } from "react";
-import { getGamePaymentSettings, listMySubmissionsForGame, deleteMyPendingSubmission, getMyJoinRequest, createJoinRequest, cancelMyJoinRequest, listHostJoinRequests, reviewJoinRequest, type GamePaymentSettings, type PaymentSubmission, type JoinRequest } from "@/lib/payments";
+import { getGamePaymentSettings, listMySubmissionsForGame, deleteMyPendingSubmission, getMyJoinRequest, createJoinRequest, cancelMyJoinRequest, listHostJoinRequests, reviewJoinRequest, upsertGamePaymentSettings, type GamePaymentSettings, type PaymentSubmission, type JoinRequest } from "@/lib/payments";
 import { useHostedGames } from "@/lib/hosted-games-store";
 import type { Game } from "@/lib/sample-data";
 import { LegalNotice } from "@/components/LegalNotice";
