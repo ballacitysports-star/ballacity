@@ -55,7 +55,7 @@ function Feed() {
       .filter((g) => (prefs.sections.paidOnly ? g.price > 0 : true))
       .filter((g) =>
         q
-          ? (g.title + g.location + g.host.name).toLowerCase().includes(q.toLowerCase())
+          ? (g.title + " " + g.location + " " + g.host.name + " " + g.sport + " " + (g.neighborhood ?? "")).toLowerCase().includes(q.toLowerCase())
           : true,
       )
       .sort((a, b) => {
