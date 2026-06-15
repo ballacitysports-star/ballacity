@@ -21,7 +21,12 @@ function Discover() {
   const { user } = useAuth();
   const profile = useMyProfile(user);
   const [active, setActive] = useState(GAMES[0].id);
-  const activeGame = GAMES.find((g) => g.id === active)!;
+  const [visibleIds, setVisibleIds] = useState<string[] | null>(null);
+  const visibleGames = useMemo(
+    () => (visibleIds ? GAMES.filter((g) => visibleIds.includes(g.id)) : GAMES),
+    [visibleIds],
+  );
+  const activeGame = visibleGames.find((g) => g.id === active) ?? visibleGames[0] ?? GAMES[0];
 
   const pins: MapPinItem[] = useMemo(
     () =>
