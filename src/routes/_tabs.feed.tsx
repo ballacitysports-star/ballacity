@@ -106,7 +106,7 @@ function Feed() {
 
       </motion.div>
 
-      <div className="flex gap-2 mb-4">
+      <div className="flex gap-2 mb-4 relative">
         <div className="flex-1 flex items-center gap-2 rounded-full border border-border bg-surface px-4 py-2.5">
           <Search className="h-4 w-4 text-muted-foreground" />
           <input
@@ -115,6 +115,11 @@ function Feed() {
             placeholder="Search games, courts, players"
             className="flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
           />
+          {q && (
+            <button onClick={() => setQ("")} aria-label="Clear search">
+              <X className="h-4 w-4 text-muted-foreground" />
+            </button>
+          )}
         </div>
         <button
           onClick={() => setFiltersOpen(true)}
@@ -127,45 +132,77 @@ function Feed() {
             </span>
           )}
         </button>
+        {q && suggestions.length > 0 && (
+          <div className="absolute left-0 right-14 top-full mt-2 z-20 rounded-2xl border border-border bg-surface shadow-lg overflow-hidden">
+            {suggestions.map((s, idx) => (
+              <button
+                key={`${s.label}-${idx}`}
+                onClick={() => setQ(s.label)}
+                className="w-full text-left px-4 py-2.5 text-sm hover:bg-background border-b border-border last:border-b-0"
+              >
+                <div className="font-semibold truncate">{s.label}</div>
+                <div className="text-xs text-muted-foreground truncate">{s.sub}</div>
+              </button>
+            ))}
+          </div>
+        )}
       </div>
 
       <div className="mb-5">
         <SportChips selected={chipSport} onSelect={setChipSport} />
       </div>
 
-      {prefs.sections.showUrgent && urgent.length > 0 && (
-        <div className="mb-6">
-          <div className="flex items-center justify-between mb-2">
-            <h2 className="font-display text-sm font-bold uppercase tracking-wider text-coral">
-              ⚡ Needs players now
-            </h2>
-            <span className="text-xs text-muted-foreground">{urgent.length} games</span>
-          </div>
-          <div className="space-y-3">
-            {urgent.map((g, i) => <GameCard key={g.id} game={g} index={i} />)}
-          </div>
-        </div>
-      )}
-
-      {prefs.sections.showForYou && (
+      {q ? (
         <>
           <h2 className="font-display text-sm font-bold uppercase tracking-wider text-muted-foreground mb-2">
-            For you
+            {filtered.length} result{filtered.length === 1 ? "" : "s"} for "{q}"
           </h2>
           <div className="space-y-3">
             {filtered.map((g, i) => <GameCard key={g.id} game={g} index={i} />)}
             {filtered.length === 0 && (
-              <div className="rounded-2xl border border-border bg-surface p-8 text-center text-muted-foreground space-y-3">
-                <div>No games match your filters.</div>
-                <button
-                  onClick={() => setFeedPrefs(DEFAULT_PREFS)}
-                  className="inline-flex rounded-full bg-lime px-4 py-2 text-sm font-bold text-primary-foreground"
-                >
-                  Clear filters
-                </button>
+              <div className="rounded-2xl border border-border bg-surface p-8 text-center text-muted-foreground">
+                No games match "{q}".
               </div>
             )}
           </div>
+        </>
+      ) : (
+        <>
+          {prefs.sections.showUrgent && urgent.length > 0 && (
+            <div className="mb-6">
+              <div className="flex items-center justify-between mb-2">
+                <h2 className="font-display text-sm font-bold uppercase tracking-wider text-coral">
+                  ⚡ Needs players now
+                </h2>
+                <span className="text-xs text-muted-foreground">{urgent.length} games</span>
+              </div>
+              <div className="space-y-3">
+                {urgent.map((g, i) => <GameCard key={g.id} game={g} index={i} />)}
+              </div>
+            </div>
+          )}
+
+          {prefs.sections.showForYou && (
+            <>
+              <h2 className="font-display text-sm font-bold uppercase tracking-wider text-muted-foreground mb-2">
+                For you
+              </h2>
+              <div className="space-y-3">
+                {filtered.map((g, i) => <GameCard key={g.id} game={g} index={i} />)}
+                {filtered.length === 0 && (
+                  <div className="rounded-2xl border border-border bg-surface p-8 text-center text-muted-foreground space-y-3">
+                    <div>No games match your filters.</div>
+                    <button
+                      onClick={() => setFeedPrefs(DEFAULT_PREFS)}
+                      className="inline-flex rounded-full bg-lime px-4 py-2 text-sm font-bold text-primary-foreground"
+                    >
+                      Clear filters
+                    </button>
+                  </div>
+                )}
+              </div>
+            </>
+          )}
         </>
       )}
 
