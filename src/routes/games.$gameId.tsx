@@ -9,7 +9,7 @@ import { ReputationBadge } from "@/components/ReputationBadge";
 import { joinGame, leaveGame, useIsJoined } from "@/lib/games-store";
 import { toast } from "sonner";
 import { useEffect, useMemo, useState } from "react";
-import { getGamePaymentSettings, listMySubmissionsForGame, deleteMyPendingSubmission, getMyJoinRequest, createJoinRequest, cancelMyJoinRequest, listHostJoinRequests, reviewJoinRequest, type GamePaymentSettings, type PaymentSubmission, type JoinRequest } from "@/lib/payments";
+import { getGamePaymentSettings, listMySubmissionsForGame, deleteMyPendingSubmission, getMyJoinRequest, createJoinRequest, cancelMyJoinRequest, listHostJoinRequests, reviewJoinRequest, upsertGamePaymentSettings, type GamePaymentSettings, type PaymentSubmission, type JoinRequest } from "@/lib/payments";
 import { useHostedGames } from "@/lib/hosted-games-store";
 import type { Game } from "@/lib/sample-data";
 import { LegalNotice } from "@/components/LegalNotice";
@@ -76,7 +76,9 @@ function GameDetail() {
 
   const effectiveJoined = (game?.joined ?? 0) + (joined ? 1 : 0);
   const spotsLeft = game ? Math.max(0, game.maxPlayers - effectiveJoined) : 0;
-  const isHost = !!(user && settings && user.id === settings.host_id);
+  const hostsThisGame = !!(user && game && hosted.some((g) => g.id === game.id));
+  const isHost = hostsThisGame || !!(user && settings && user.id === settings.host_id);
+  const [approvalSaving, setApprovalSaving] = useState(false);
 
   const hostReviews = useReviewsFor(hostIdFor(game?.host.username ?? ""));
   const hostRep = useMemo(() => computeReputation(hostReviews, "host"), [hostReviews]);
@@ -95,15 +97,36 @@ function GameDetail() {
   };
 
   const refreshHostRequests = async () => {
-    if (!game || !user || !settings || user.id !== settings.host_id) return;
+    if (!game || !user) return;
+    if (!hostsThisGame && (!settings || user.id !== settings.host_id)) return;
     try {
       const all = await listHostJoinRequests();
       setHostRequests(all.filter((r) => r.game_id === game.id));
     } catch {}
   };
 
+  const toggleRequireApproval = async () => {
+    if (!game || !user) return;
+    setApprovalSaving(true);
+    try {
+      await upsertGamePaymentSettings({
+        game_id: game.id,
+        entry_fee: Number(settings?.entry_fee ?? game.price ?? 0),
+        accepted_method_ids: settings?.accepted_method_ids ?? [],
+        payment_deadline: settings?.payment_deadline ?? null,
+        refund_policy: settings?.refund_policy ?? null,
+        payment_instructions: settings?.payment_instructions ?? null,
+        requires_approval: !settings?.requires_approval,
+      });
+      toast.success(settings?.requires_approval ? "Approval disabled" : "Approval enabled");
+      await refreshStatus();
+      await refreshHostRequests();
+    } catch (e: any) { toast.error(e.message ?? "Could not update."); }
+    finally { setApprovalSaving(false); }
+  };
+
   useEffect(() => { refreshStatus(); /* eslint-disable-next-line */ }, [game?.id]);
-  useEffect(() => { refreshHostRequests(); /* eslint-disable-next-line */ }, [game?.id, user?.id, settings?.host_id]);
+  useEffect(() => { refreshHostRequests(); /* eslint-disable-next-line */ }, [game?.id, user?.id, settings?.host_id, hostsThisGame]);
 
   if (!game) {
     return (
@@ -342,15 +365,44 @@ function GameDetail() {
         </div>
       </div>
 
-      {/* Host approval panel */}
-      {isHost && hostRequests.length > 0 && (
-        <div className="mx-auto max-w-md px-4 mt-4">
-          <h2 className="font-display text-sm font-bold uppercase tracking-wider text-muted-foreground mb-2">Join requests</h2>
-          <div className="space-y-2">
-            {hostRequests.map((r) => (
-              <HostRequestRow key={r.id} req={r} gameTitle={game.title} onChange={refreshHostRequests} />
-            ))}
-          </div>
+      {/* Host controls */}
+      {isHost && (
+        <div className="mx-auto max-w-md px-4 mt-4 space-y-3">
+          <button
+            type="button"
+            onClick={toggleRequireApproval}
+            disabled={approvalSaving}
+            className={`w-full flex items-center justify-between gap-3 rounded-2xl border p-4 text-left disabled:opacity-60 ${
+              settings?.requires_approval ? "border-lime bg-lime/5" : "border-border bg-surface"
+            }`}
+          >
+            <div className="min-w-0">
+              <div className="font-semibold text-sm">Require my approval to join</div>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Players send a pickup request and you approve or decline each one.
+              </p>
+            </div>
+            <div className={`shrink-0 grid h-7 w-12 items-center rounded-full p-0.5 transition-colors ${settings?.requires_approval ? "bg-lime" : "bg-secondary"}`}>
+              <div className={`h-6 w-6 rounded-full bg-background shadow transition-transform ${settings?.requires_approval ? "translate-x-5" : ""}`} />
+            </div>
+          </button>
+
+          {hostRequests.length > 0 ? (
+            <div>
+              <h2 className="font-display text-sm font-bold uppercase tracking-wider text-muted-foreground mb-2">
+                Pickup requests · {hostRequests.filter((r) => r.status === "pending").length} pending
+              </h2>
+              <div className="space-y-2">
+                {hostRequests.map((r) => (
+                  <HostRequestRow key={r.id} req={r} gameTitle={game.title} onChange={refreshHostRequests} />
+                ))}
+              </div>
+            </div>
+          ) : settings?.requires_approval ? (
+            <div className="rounded-2xl border border-dashed border-border bg-surface/40 p-3 text-xs text-muted-foreground">
+              No pickup requests yet. You'll see them here as players ask to join.
+            </div>
+          ) : null}
         </div>
       )}
 
