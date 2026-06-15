@@ -79,7 +79,26 @@ export function GamesMap({
   const [manualLocation, setManualLocation] = useState(defaultLocation?.trim() ?? "");
   const [resolvingLocation, setResolvingLocation] = useState(false);
   const [manualError, setManualError] = useState<string | null>(null);
+  const [areaDirty, setAreaDirty] = useState(false);
   const geocode = useServerFn(geocodeAddress);
+
+  const computeVisibleIds = (): string[] => {
+    const map = mapRef.current;
+    if (!map || !window.google?.maps) return pins.map((p) => p.id);
+    const bounds = map.getBounds();
+    if (!bounds) return pins.map((p) => p.id);
+    const ids: string[] = [];
+    pinMarkersRef.current.forEach((marker, id) => {
+      const pos = marker.getPosition?.();
+      if (pos && bounds.contains(pos)) ids.push(id);
+    });
+    return ids;
+  };
+
+  const searchThisArea = () => {
+    onVisibleChange?.(computeVisibleIds());
+    setAreaDirty(false);
+  };
 
   // Convert a 0-100 pseudo coord to a real lat/lng offset around user.
   // Spread games across ~6km box.
