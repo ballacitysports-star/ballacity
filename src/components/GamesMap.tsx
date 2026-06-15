@@ -57,11 +57,13 @@ export function GamesMap({
   activeId,
   onSelect,
   defaultLocation,
+  onVisibleChange,
 }: {
   pins: MapPinItem[];
   activeId: string;
   onSelect: (id: string) => void;
   defaultLocation?: string | null;
+  onVisibleChange?: (ids: string[]) => void;
 }) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<any>(null);
@@ -77,7 +79,26 @@ export function GamesMap({
   const [manualLocation, setManualLocation] = useState(defaultLocation?.trim() ?? "");
   const [resolvingLocation, setResolvingLocation] = useState(false);
   const [manualError, setManualError] = useState<string | null>(null);
+  const [areaDirty, setAreaDirty] = useState(false);
   const geocode = useServerFn(geocodeAddress);
+
+  const computeVisibleIds = (): string[] => {
+    const map = mapRef.current;
+    if (!map || !window.google?.maps) return pins.map((p) => p.id);
+    const bounds = map.getBounds();
+    if (!bounds) return pins.map((p) => p.id);
+    const ids: string[] = [];
+    pinMarkersRef.current.forEach((marker, id) => {
+      const pos = marker.getPosition?.();
+      if (pos && bounds.contains(pos)) ids.push(id);
+    });
+    return ids;
+  };
+
+  const searchThisArea = () => {
+    onVisibleChange?.(computeVisibleIds());
+    setAreaDirty(false);
+  };
 
   // Convert a 0-100 pseudo coord to a real lat/lng offset around user.
   // Spread games across ~6km box.
@@ -102,6 +123,8 @@ export function GamesMap({
           clickableIcons: false,
           styles: DARK_STYLE,
         });
+        mapRef.current.addListener("dragend", () => setAreaDirty(true));
+        mapRef.current.addListener("zoom_changed", () => setAreaDirty(true));
         setReady(true);
       })
       .catch(() => {});
@@ -338,6 +361,15 @@ export function GamesMap({
       >
         {locating ? <Loader2 className="h-5 w-5 animate-spin" /> : <LocateFixed className="h-5 w-5" />}
       </button>
+      {areaDirty && (
+        <button
+          type="button"
+          onClick={searchThisArea}
+          className="absolute left-1/2 -translate-x-1/2 top-40 z-30 inline-flex items-center gap-2 rounded-full bg-lime px-4 py-2 text-xs font-bold text-primary-foreground shadow-xl glow-lime active:scale-95 transition"
+        >
+          Search this area
+        </button>
+      )}
       <form onSubmit={changeMapLocation} className="absolute left-4 right-4 top-20 z-30">
         <div className="flex items-stretch gap-2">
           <div className="flex-1 min-w-0 [&>div>div]:bg-surface/95 [&>div>div]:backdrop-blur-xl [&>div>div]:shadow-xl">

@@ -21,7 +21,12 @@ function Discover() {
   const { user } = useAuth();
   const profile = useMyProfile(user);
   const [active, setActive] = useState(GAMES[0].id);
-  const activeGame = GAMES.find((g) => g.id === active)!;
+  const [visibleIds, setVisibleIds] = useState<string[] | null>(null);
+  const visibleGames = useMemo(
+    () => (visibleIds ? GAMES.filter((g) => visibleIds.includes(g.id)) : GAMES),
+    [visibleIds],
+  );
+  const activeGame = visibleGames.find((g) => g.id === active) ?? visibleGames[0] ?? GAMES[0];
 
   const pins: MapPinItem[] = useMemo(
     () =>
@@ -38,15 +43,24 @@ function Discover() {
   return (
     <div className="relative h-dvh overflow-hidden">
       {/* Real Google Map with live GPS */}
-      <GamesMap pins={pins} activeId={active} onSelect={setActive} defaultLocation={profile?.city} />
+      <GamesMap
+        pins={pins}
+        activeId={active}
+        onSelect={setActive}
+        defaultLocation={profile?.city}
+        onVisibleChange={(ids) => {
+          setVisibleIds(ids);
+          if (ids.length && !ids.includes(active)) setActive(ids[0]);
+        }}
+      />
 
       {/* Top overlay */}
       <div className="relative z-10 px-4 pt-6">
         <div className="rounded-2xl border border-border bg-surface/80 backdrop-blur-xl p-3 shadow-xl">
           <div className="flex items-center gap-2 text-sm">
             <Navigation className="h-4 w-4 text-lime" />
-            <span className="font-semibold">Live location</span>
-            <span className="text-muted-foreground">· {GAMES.length} games nearby</span>
+            <span className="font-semibold">{visibleIds ? "This area" : "Live location"}</span>
+            <span className="text-muted-foreground">· {visibleGames.length} games {visibleIds ? "in view" : "nearby"}</span>
           </div>
         </div>
       </div>
