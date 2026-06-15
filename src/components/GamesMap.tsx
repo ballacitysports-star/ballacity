@@ -365,7 +365,7 @@ export function GamesMap({
         <button
           type="button"
           onClick={searchThisArea}
-          className="absolute left-1/2 -translate-x-1/2 top-40 z-30 inline-flex items-center gap-2 rounded-full bg-lime px-4 py-2 text-xs font-bold text-primary-foreground shadow-xl glow-lime active:scale-95 transition"
+          className="absolute left-1/2 -translate-x-1/2 top-36 z-30 inline-flex items-center gap-2 rounded-full bg-lime px-4 py-2 text-xs font-bold text-primary-foreground shadow-xl glow-lime active:scale-95 transition"
         >
           Search this area
         </button>

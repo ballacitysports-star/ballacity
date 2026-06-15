@@ -451,7 +451,8 @@ function GameDetail() {
             {isConfirmed ? (
               <><Check className="h-4 w-4" /> Confirmed · Tap to leave</>
             ) : isPending ? (
-              <><Clock className="h-4 w-4" /> {requiresApproval && !isPaid ? "Request pending · Tap to cancel" : "Payment pending · Tap to withdraw"}</>
+              <><Clock className="h-4 w-4" /> {latestSub?.status === "pending" ? "Payment pending · Tap to withdraw" : "Request pending · Tap to cancel"}</>
+
             ) : joined && !isPaid ? (
               <><Check className="h-4 w-4" /> You're in · Tap to leave</>
             ) : spotsLeft <= 0 ? (
