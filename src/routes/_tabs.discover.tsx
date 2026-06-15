@@ -60,10 +60,14 @@ function Discover() {
           <div className="flex items-center gap-2 text-sm">
             <Navigation className="h-4 w-4 text-lime" />
             <span className="font-semibold">{visibleIds ? "This area" : "Live location"}</span>
-            <span className="text-muted-foreground">· {visibleGames.length} games {visibleIds ? "in view" : "nearby"}</span>
+            <span className="text-muted-foreground">· {visibleGames.length} game{visibleGames.length === 1 ? "" : "s"} {visibleIds ? "in view" : "nearby"}</span>
+            {visibleIds && (
+              <button onClick={() => setVisibleIds(null)} className="ml-auto text-xs font-bold text-lime">Reset</button>
+            )}
           </div>
         </div>
       </div>
+
 
 
 
