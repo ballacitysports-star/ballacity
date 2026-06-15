@@ -365,15 +365,44 @@ function GameDetail() {
         </div>
       </div>
 
-      {/* Host approval panel */}
-      {isHost && hostRequests.length > 0 && (
-        <div className="mx-auto max-w-md px-4 mt-4">
-          <h2 className="font-display text-sm font-bold uppercase tracking-wider text-muted-foreground mb-2">Join requests</h2>
-          <div className="space-y-2">
-            {hostRequests.map((r) => (
-              <HostRequestRow key={r.id} req={r} gameTitle={game.title} onChange={refreshHostRequests} />
-            ))}
-          </div>
+      {/* Host controls */}
+      {isHost && (
+        <div className="mx-auto max-w-md px-4 mt-4 space-y-3">
+          <button
+            type="button"
+            onClick={toggleRequireApproval}
+            disabled={approvalSaving}
+            className={`w-full flex items-center justify-between gap-3 rounded-2xl border p-4 text-left disabled:opacity-60 ${
+              settings?.requires_approval ? "border-lime bg-lime/5" : "border-border bg-surface"
+            }`}
+          >
+            <div className="min-w-0">
+              <div className="font-semibold text-sm">Require my approval to join</div>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Players send a pickup request and you approve or decline each one.
+              </p>
+            </div>
+            <div className={`shrink-0 grid h-7 w-12 items-center rounded-full p-0.5 transition-colors ${settings?.requires_approval ? "bg-lime" : "bg-secondary"}`}>
+              <div className={`h-6 w-6 rounded-full bg-background shadow transition-transform ${settings?.requires_approval ? "translate-x-5" : ""}`} />
+            </div>
+          </button>
+
+          {hostRequests.length > 0 ? (
+            <div>
+              <h2 className="font-display text-sm font-bold uppercase tracking-wider text-muted-foreground mb-2">
+                Pickup requests · {hostRequests.filter((r) => r.status === "pending").length} pending
+              </h2>
+              <div className="space-y-2">
+                {hostRequests.map((r) => (
+                  <HostRequestRow key={r.id} req={r} gameTitle={game.title} onChange={refreshHostRequests} />
+                ))}
+              </div>
+            </div>
+          ) : settings?.requires_approval ? (
+            <div className="rounded-2xl border border-dashed border-border bg-surface/40 p-3 text-xs text-muted-foreground">
+              No pickup requests yet. You'll see them here as players ask to join.
+            </div>
+          ) : null}
         </div>
       )}
 
