@@ -68,31 +68,51 @@ function Create() {
       </div>
 
       <form
-        onSubmit={(e) => {
+        onSubmit={async (e) => {
           e.preventDefault();
-          const date = when
-            ? new Date(when).toISOString()
-            : new Date(Date.now() + 3600_000).toISOString();
-          const game = addHostedGame({
-            sport,
-            title,
-            date,
-            location,
-            skill,
-            maxPlayers: size,
-            price,
-            indoor,
-            isPrivate: priv,
-            description,
-            host: profile
-              ? { name: profile.name, username: profile.username, avatar: profile.avatar, rating: profile.stats.sportsmanship }
-              : undefined,
-          });
+          if (publishing) return;
+          setPublishing(true);
+          try {
+            const date = when
+              ? new Date(when).toISOString()
+              : new Date(Date.now() + 3600_000).toISOString();
+            const game = addHostedGame({
+              sport,
+              title,
+              date,
+              location,
+              skill,
+              maxPlayers: size,
+              price,
+              indoor,
+              isPrivate: priv,
+              description,
+              host: profile
+                ? { name: profile.name, username: profile.username, avatar: profile.avatar, rating: profile.stats.sportsmanship }
+                : undefined,
+            });
 
-          // Host counts as joined so it appears under their upcoming games
-          joinGame(game.id);
-          toast.success("Game published");
-          nav({ to: "/games/$gameId", params: { gameId: game.id } });
+            // Persist approval/fee preferences so the host & players see them on the detail page
+            if (user && (requiresApproval || price > 0)) {
+              try {
+                await upsertGamePaymentSettings({
+                  game_id: game.id,
+                  entry_fee: price,
+                  accepted_method_ids: [],
+                  requires_approval: requiresApproval,
+                });
+              } catch (err: any) {
+                toast.error(err?.message ?? "Saved game, but couldn't save approval setting.");
+              }
+            }
+
+            // Host counts as joined so it appears under their upcoming games
+            joinGame(game.id);
+            toast.success("Game published");
+            nav({ to: "/games/$gameId", params: { gameId: game.id } });
+          } finally {
+            setPublishing(false);
+          }
         }}
         className="space-y-5"
       >
