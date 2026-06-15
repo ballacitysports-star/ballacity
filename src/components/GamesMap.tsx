@@ -361,6 +361,15 @@ export function GamesMap({
       >
         {locating ? <Loader2 className="h-5 w-5 animate-spin" /> : <LocateFixed className="h-5 w-5" />}
       </button>
+      {areaDirty && (
+        <button
+          type="button"
+          onClick={searchThisArea}
+          className="absolute left-1/2 -translate-x-1/2 top-40 z-30 inline-flex items-center gap-2 rounded-full bg-lime px-4 py-2 text-xs font-bold text-primary-foreground shadow-xl glow-lime active:scale-95 transition"
+        >
+          Search this area
+        </button>
+      )}
       <form onSubmit={changeMapLocation} className="absolute left-4 right-4 top-20 z-30">
         <div className="flex items-stretch gap-2">
           <div className="flex-1 min-w-0 [&>div>div]:bg-surface/95 [&>div>div]:backdrop-blur-xl [&>div>div]:shadow-xl">
