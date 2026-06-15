@@ -1,7 +1,7 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
 import { motion } from "framer-motion";
-import { ArrowLeft, Calendar, MapPin, Users, DollarSign, Lock, Home } from "lucide-react";
+import { ArrowLeft, Calendar, MapPin, Users, DollarSign, Lock, Home, ShieldCheck } from "lucide-react";
 import { SPORTS, type Sport } from "@/lib/sample-data";
 import { addHostedGame } from "@/lib/hosted-games-store";
 import { joinGame } from "@/lib/games-store";
@@ -9,6 +9,7 @@ import { toast } from "sonner";
 import { LocationAutocomplete } from "@/components/LocationAutocomplete";
 import { useMyProfile } from "@/lib/user-prefs-store";
 import { useAuth } from "@/hooks/use-auth";
+import { upsertGamePaymentSettings } from "@/lib/payments";
 
 export const Route = createFileRoute("/_tabs/create")({
   head: () => ({ meta: [{ title: "Host a game — OpenRun" }] }),
@@ -33,6 +34,8 @@ function Create() {
   const [indoor, setIndoor] = useState(false);
   const [priv, setPriv] = useState(false);
   const [description, setDescription] = useState("");
+  const [requiresApproval, setRequiresApproval] = useState(false);
+  const [publishing, setPublishing] = useState(false);
 
   useEffect(() => {
     const nextCity = profile?.city?.trim() ?? "";
@@ -65,31 +68,51 @@ function Create() {
       </div>
 
       <form
-        onSubmit={(e) => {
+        onSubmit={async (e) => {
           e.preventDefault();
-          const date = when
-            ? new Date(when).toISOString()
-            : new Date(Date.now() + 3600_000).toISOString();
-          const game = addHostedGame({
-            sport,
-            title,
-            date,
-            location,
-            skill,
-            maxPlayers: size,
-            price,
-            indoor,
-            isPrivate: priv,
-            description,
-            host: profile
-              ? { name: profile.name, username: profile.username, avatar: profile.avatar, rating: profile.stats.sportsmanship }
-              : undefined,
-          });
+          if (publishing) return;
+          setPublishing(true);
+          try {
+            const date = when
+              ? new Date(when).toISOString()
+              : new Date(Date.now() + 3600_000).toISOString();
+            const game = addHostedGame({
+              sport,
+              title,
+              date,
+              location,
+              skill,
+              maxPlayers: size,
+              price,
+              indoor,
+              isPrivate: priv,
+              description,
+              host: profile
+                ? { name: profile.name, username: profile.username, avatar: profile.avatar, rating: profile.stats.sportsmanship }
+                : undefined,
+            });
 
-          // Host counts as joined so it appears under their upcoming games
-          joinGame(game.id);
-          toast.success("Game published");
-          nav({ to: "/games/$gameId", params: { gameId: game.id } });
+            // Persist approval/fee preferences so the host & players see them on the detail page
+            if (user && (requiresApproval || price > 0)) {
+              try {
+                await upsertGamePaymentSettings({
+                  game_id: game.id,
+                  entry_fee: price,
+                  accepted_method_ids: [],
+                  requires_approval: requiresApproval,
+                });
+              } catch (err: any) {
+                toast.error(err?.message ?? "Saved game, but couldn't save approval setting.");
+              }
+            }
+
+            // Host counts as joined so it appears under their upcoming games
+            joinGame(game.id);
+            toast.success("Game published");
+            nav({ to: "/games/$gameId", params: { gameId: game.id } });
+          } finally {
+            setPublishing(false);
+          }
         }}
         className="space-y-5"
       >
@@ -248,6 +271,18 @@ function Create() {
             value={priv}
             onChange={setPriv}
           />
+          <Toggle
+            icon={<ShieldCheck className="h-4 w-4" />}
+            label="Require my approval to join"
+            value={requiresApproval}
+            onChange={setRequiresApproval}
+            right={user ? undefined : "Sign in"}
+          />
+          {requiresApproval && (
+            <p className="px-1 text-[11px] text-muted-foreground">
+              Players send a pickup request and you approve or decline each one from the game page.
+            </p>
+          )}
         </Section>
 
         {/* Description */}
@@ -264,9 +299,10 @@ function Create() {
         <motion.button
           whileTap={{ scale: 0.98 }}
           type="submit"
-          className="w-full rounded-2xl bg-lime-gradient py-4 font-bold text-primary-foreground glow-lime"
+          disabled={publishing}
+          className="w-full rounded-2xl bg-lime-gradient py-4 font-bold text-primary-foreground glow-lime disabled:opacity-60"
         >
-          Publish game
+          {publishing ? "Publishing…" : "Publish game"}
         </motion.button>
         <p className="text-center text-xs text-muted-foreground pb-6">
           Hosting is free. Pro hosts get unlimited games + analytics.
