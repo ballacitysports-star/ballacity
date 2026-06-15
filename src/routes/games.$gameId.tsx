@@ -81,6 +81,30 @@ function GameDetail() {
   const hostReviews = useReviewsFor(hostIdFor(game?.host.username ?? ""));
   const hostRep = useMemo(() => computeReputation(hostReviews, "host"), [hostReviews]);
 
+  const refreshStatus = async () => {
+    if (!game) return;
+    try {
+      const [s, subs, req] = await Promise.all([
+        getGamePaymentSettings(game.id),
+        listMySubmissionsForGame(game.id),
+        getMyJoinRequest(game.id),
+      ]);
+      setSettings(s); setMySubs(subs); setMyReq(req);
+      if (req?.status === "approved" && !joined) joinGame(game.id);
+    } catch {}
+  };
+
+  const refreshHostRequests = async () => {
+    if (!game || !user || !settings || user.id !== settings.host_id) return;
+    try {
+      const all = await listHostJoinRequests();
+      setHostRequests(all.filter((r) => r.game_id === game.id));
+    } catch {}
+  };
+
+  useEffect(() => { refreshStatus(); /* eslint-disable-next-line */ }, [game?.id]);
+  useEffect(() => { refreshHostRequests(); /* eslint-disable-next-line */ }, [game?.id, user?.id, settings?.host_id]);
+
   if (!game) {
     return (
       <div className="min-h-dvh grid place-items-center px-6 text-center">
@@ -95,28 +119,6 @@ function GameDetail() {
     );
   }
 
-  const refreshStatus = async () => {
-    try {
-      const [s, subs, req] = await Promise.all([
-        getGamePaymentSettings(game.id),
-        listMySubmissionsForGame(game.id),
-        getMyJoinRequest(game.id),
-      ]);
-      setSettings(s); setMySubs(subs); setMyReq(req);
-      if (req?.status === "approved" && !joined) joinGame(game.id);
-    } catch {}
-  };
-
-  const refreshHostRequests = async () => {
-    if (!user || !settings || user.id !== settings.host_id) return;
-    try {
-      const all = await listHostJoinRequests();
-      setHostRequests(all.filter((r) => r.game_id === game.id));
-    } catch {}
-  };
-
-  useEffect(() => { refreshStatus(); /* eslint-disable-next-line */ }, [game.id]);
-  useEffect(() => { refreshHostRequests(); /* eslint-disable-next-line */ }, [game.id, user?.id, settings?.host_id]);
 
   const fee = Number(settings?.entry_fee ?? game.price);
   const isPaid = fee > 0;
