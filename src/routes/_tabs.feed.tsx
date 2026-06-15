@@ -69,6 +69,29 @@ function Feed() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [q, hosted, prefs, joinedSet, hostedIds, userCityToken]);
 
+  const suggestions = useMemo(() => {
+    if (!q) return [] as { label: string; sub: string }[];
+    const needle = q.toLowerCase();
+    const seen = new Set<string>();
+    const out: { label: string; sub: string }[] = [];
+    for (const g of [...hosted, ...GAMES]) {
+      for (const cand of [
+        { label: g.title, sub: g.location },
+        { label: g.location, sub: g.sport },
+        { label: g.host.name, sub: "Host" },
+      ]) {
+        if (out.length >= 5) break;
+        if (!cand.label.toLowerCase().includes(needle)) continue;
+        const key = cand.label.toLowerCase();
+        if (seen.has(key)) continue;
+        seen.add(key);
+        out.push(cand);
+      }
+      if (out.length >= 5) break;
+    }
+    return out;
+  }, [q, hosted]);
+
 
 
   const urgent = filtered.filter((g) => g.urgent);
