@@ -271,6 +271,18 @@ function Create() {
             value={priv}
             onChange={setPriv}
           />
+          <Toggle
+            icon={<ShieldCheck className="h-4 w-4" />}
+            label="Require my approval to join"
+            value={requiresApproval}
+            onChange={setRequiresApproval}
+            right={user ? undefined : "Sign in"}
+          />
+          {requiresApproval && (
+            <p className="px-1 text-[11px] text-muted-foreground">
+              Players send a pickup request and you approve or decline each one from the game page.
+            </p>
+          )}
         </Section>
 
         {/* Description */}
