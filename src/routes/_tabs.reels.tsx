@@ -21,7 +21,76 @@ type Reel = {
   status: string;
   used_free: boolean;
   created_at: string;
+  ai_title: string | null;
+  ai_caption: string | null;
+  ai_hashtags: string[] | null;
+  thumbnail_path: string | null;
+  error_message: string | null;
 };
+
+function ReelCard({ reel }: { reel: Reel }) {
+  const [thumb, setThumb] = useState<string | null>(null);
+  const [videoUrl, setVideoUrl] = useState<string | null>(null);
+  const [open, setOpen] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    if (reel.thumbnail_path) {
+      supabase.storage
+        .from("highlight-videos")
+        .createSignedUrl(reel.thumbnail_path, 3600)
+        .then(({ data }) => { if (!cancelled) setThumb(data?.signedUrl ?? null); });
+    }
+    return () => { cancelled = true; };
+  }, [reel.thumbnail_path]);
+
+  async function handlePlay() {
+    if (!videoUrl) {
+      const { data } = await supabase.storage
+        .from("highlight-videos")
+        .createSignedUrl(reel.video_path, 3600);
+      if (data?.signedUrl) setVideoUrl(data.signedUrl);
+    }
+    setOpen(true);
+  }
+
+  const isDone = reel.status === "completed";
+  const displayTitle = reel.ai_title || reel.title;
+
+  return (
+    <li className="rounded-xl border border-border bg-surface p-3">
+      <div className="flex items-center gap-3">
+        <button
+          onClick={isDone ? handlePlay : undefined}
+          className="relative h-14 w-14 shrink-0 overflow-hidden rounded-lg bg-lime/10"
+        >
+          {thumb ? (
+            <img src={thumb} alt="" className="h-full w-full object-cover" />
+          ) : (
+            <div className="grid h-full w-full place-items-center text-lime">
+              <Video className="h-5 w-5" />
+            </div>
+          )}
+        </button>
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-sm font-medium">{displayTitle}</p>
+          <p className="text-xs text-muted-foreground">
+            {reel.status} · {new Date(reel.created_at).toLocaleDateString()}
+            {reel.used_free && " · free"}
+          </p>
+          {reel.ai_caption && (
+            <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">{reel.ai_caption}</p>
+          )}
+        </div>
+      </div>
+      {open && videoUrl && (
+        <div className="mt-3">
+          <video src={videoUrl} controls className="w-full rounded-lg" />
+        </div>
+      )}
+    </li>
+  );
+}
 
 function ReelsPage() {
   const { user } = useAuth();
@@ -220,18 +289,7 @@ function ReelsPage() {
         ) : (
           <ul className="space-y-2">
             {reels.map((r) => (
-              <li key={r.id} className="flex items-center gap-3 rounded-xl border border-border bg-surface p-3">
-                <div className="grid h-10 w-10 place-items-center rounded-lg bg-lime/10 text-lime">
-                  <Video className="h-5 w-5" />
-                </div>
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-medium">{r.title}</p>
-                  <p className="text-xs text-muted-foreground">
-                    {r.status} · {new Date(r.created_at).toLocaleDateString()}
-                    {r.used_free && " · free"}
-                  </p>
-                </div>
-              </li>
+              <ReelCard key={r.id} reel={r} />
             ))}
           </ul>
         )}
