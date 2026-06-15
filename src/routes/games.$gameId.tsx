@@ -76,7 +76,9 @@ function GameDetail() {
 
   const effectiveJoined = (game?.joined ?? 0) + (joined ? 1 : 0);
   const spotsLeft = game ? Math.max(0, game.maxPlayers - effectiveJoined) : 0;
-  const isHost = !!(user && settings && user.id === settings.host_id);
+  const hostsThisGame = !!(user && game && hosted.some((g) => g.id === game.id));
+  const isHost = hostsThisGame || !!(user && settings && user.id === settings.host_id);
+  const [approvalSaving, setApprovalSaving] = useState(false);
 
   const hostReviews = useReviewsFor(hostIdFor(game?.host.username ?? ""));
   const hostRep = useMemo(() => computeReputation(hostReviews, "host"), [hostReviews]);
@@ -95,15 +97,36 @@ function GameDetail() {
   };
 
   const refreshHostRequests = async () => {
-    if (!game || !user || !settings || user.id !== settings.host_id) return;
+    if (!game || !user) return;
+    if (!hostsThisGame && (!settings || user.id !== settings.host_id)) return;
     try {
       const all = await listHostJoinRequests();
       setHostRequests(all.filter((r) => r.game_id === game.id));
     } catch {}
   };
 
+  const toggleRequireApproval = async () => {
+    if (!game || !user) return;
+    setApprovalSaving(true);
+    try {
+      await upsertGamePaymentSettings({
+        game_id: game.id,
+        entry_fee: Number(settings?.entry_fee ?? game.price ?? 0),
+        accepted_method_ids: settings?.accepted_method_ids ?? [],
+        payment_deadline: settings?.payment_deadline ?? null,
+        refund_policy: settings?.refund_policy ?? null,
+        payment_instructions: settings?.payment_instructions ?? null,
+        requires_approval: !settings?.requires_approval,
+      });
+      toast.success(settings?.requires_approval ? "Approval disabled" : "Approval enabled");
+      await refreshStatus();
+      await refreshHostRequests();
+    } catch (e: any) { toast.error(e.message ?? "Could not update."); }
+    finally { setApprovalSaving(false); }
+  };
+
   useEffect(() => { refreshStatus(); /* eslint-disable-next-line */ }, [game?.id]);
-  useEffect(() => { refreshHostRequests(); /* eslint-disable-next-line */ }, [game?.id, user?.id, settings?.host_id]);
+  useEffect(() => { refreshHostRequests(); /* eslint-disable-next-line */ }, [game?.id, user?.id, settings?.host_id, hostsThisGame]);
 
   if (!game) {
     return (
