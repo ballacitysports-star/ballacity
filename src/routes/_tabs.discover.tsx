@@ -26,7 +26,7 @@ function Discover() {
     () => (visibleIds ? GAMES.filter((g) => visibleIds.includes(g.id)) : GAMES),
     [visibleIds],
   );
-  const activeGame = visibleGames.find((g) => g.id === active) ?? visibleGames[0] ?? GAMES[0];
+  const activeGame = visibleGames.find((g) => g.id === active) ?? visibleGames[0] ?? null;
 
   const pins: MapPinItem[] = useMemo(
     () =>
