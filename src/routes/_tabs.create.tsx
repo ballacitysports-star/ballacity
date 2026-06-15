@@ -34,6 +34,8 @@ function Create() {
   const [indoor, setIndoor] = useState(false);
   const [priv, setPriv] = useState(false);
   const [description, setDescription] = useState("");
+  const [requiresApproval, setRequiresApproval] = useState(false);
+  const [publishing, setPublishing] = useState(false);
 
   useEffect(() => {
     const nextCity = profile?.city?.trim() ?? "";
