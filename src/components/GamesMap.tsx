@@ -57,11 +57,13 @@ export function GamesMap({
   activeId,
   onSelect,
   defaultLocation,
+  onVisibleChange,
 }: {
   pins: MapPinItem[];
   activeId: string;
   onSelect: (id: string) => void;
   defaultLocation?: string | null;
+  onVisibleChange?: (ids: string[]) => void;
 }) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<any>(null);
