@@ -14,6 +14,7 @@ import { DebugModeToggle } from "@/components/DebugModeToggle";
 import { ClientOnly } from "@tanstack/react-router";
 import { supabase } from "@/integrations/supabase/client";
 import { Toaster } from "@/components/ui/sonner";
+import { runLegacyHostMigration } from "@/lib/legacy-host-migration";
 
 function NotFoundComponent() {
   return (
