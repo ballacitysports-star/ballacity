@@ -87,10 +87,25 @@ function Create() {
               indoor,
               isPrivate: priv,
               description,
+              hostUserId: user?.id,
               host: profile
                 ? { name: profile.name, username: profile.username, avatar: profile.avatar, rating: profile.stats.sportsmanship }
                 : undefined,
             });
+
+            // Persist host ownership + approval/fee preferences so the host & players see them on the detail page
+            if (user) {
+              try {
+                await upsertGamePaymentSettings({
+                  game_id: game.id,
+                  entry_fee: price,
+                  accepted_method_ids: [],
+                  requires_approval: requiresApproval,
+                });
+              } catch (err: any) {
+                toast.error(err?.message ?? "Saved game, but couldn't lock host ownership.");
+              }
+            }
 
             // Persist approval/fee preferences so the host & players see them on the detail page
             if (user && (requiresApproval || price > 0)) {
