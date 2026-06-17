@@ -76,8 +76,17 @@ function GameDetail() {
 
   const effectiveJoined = (game?.joined ?? 0) + (joined ? 1 : 0);
   const spotsLeft = game ? Math.max(0, game.maxPlayers - effectiveJoined) : 0;
-  const hostsThisGame = !!(user && game && hosted.some((g) => g.id === game.id));
-  const isHost = hostsThisGame || !!(user && settings && user.id === settings.host_id);
+  // Ownership is locked to the original host's auth user id.
+  // DB host_id (from game_payment_settings) is the source of truth; fall back to
+  // the locally-stored hostUserId, and finally to the legacy local-only case
+  // (a game published before ownership was tracked, with no DB record yet).
+  const ownsViaDb = !!(user && settings && user.id === settings.host_id);
+  const ownsViaGame = !!(user && game?.hostUserId && user.id === game.hostUserId);
+  const legacyLocalHost = !!(
+    user && game && !game.hostUserId && !settings && hosted.some((g) => g.id === game.id)
+  );
+  const hostsThisGame = ownsViaDb || ownsViaGame || legacyLocalHost;
+  const isHost = hostsThisGame;
   const [approvalSaving, setApprovalSaving] = useState(false);
 
   const hostReviews = useReviewsFor(hostIdFor(game?.host.username ?? ""));
