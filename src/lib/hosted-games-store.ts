@@ -95,6 +95,30 @@ export function getHostedGame(id: string): Game | undefined {
   return cache.find((g) => g.id === id);
 }
 
+/** List locally-hosted games that have no hostUserId yet. */
+export function listUnclaimedHostedGames(): Game[] {
+  load();
+  return cache.filter((g) => !g.hostUserId);
+}
+
+/** Stamp a single locally-hosted game with the given user id. */
+export function claimHostedGame(gameId: string, userId: string): void {
+  load();
+  if (!userId) return;
+  let changed = false;
+  cache = cache.map((g) => {
+    if (g.id === gameId && !g.hostUserId) {
+      changed = true;
+      return { ...g, hostUserId: userId };
+    }
+    return g;
+  });
+  if (changed) {
+    save();
+    emit();
+  }
+}
+
 export function useHostedGames(): Game[] {
   const snap = useSyncExternalStore(subscribe, getSnapshot, () => EMPTY);
   return snap === EMPTY ? [] : (JSON.parse(snap) as Game[]);
