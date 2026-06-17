@@ -87,13 +87,14 @@ function Create() {
               indoor,
               isPrivate: priv,
               description,
+              hostUserId: user?.id,
               host: profile
                 ? { name: profile.name, username: profile.username, avatar: profile.avatar, rating: profile.stats.sportsmanship }
                 : undefined,
             });
 
-            // Persist approval/fee preferences so the host & players see them on the detail page
-            if (user && (requiresApproval || price > 0)) {
+            // Persist host ownership + approval/fee preferences so the host & players see them on the detail page
+            if (user) {
               try {
                 await upsertGamePaymentSettings({
                   game_id: game.id,
@@ -102,9 +103,11 @@ function Create() {
                   requires_approval: requiresApproval,
                 });
               } catch (err: any) {
-                toast.error(err?.message ?? "Saved game, but couldn't save approval setting.");
+                toast.error(err?.message ?? "Saved game, but couldn't lock host ownership.");
               }
             }
+
+
 
             // Host counts as joined so it appears under their upcoming games
             joinGame(game.id);

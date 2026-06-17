@@ -27,6 +27,7 @@ export type Game = {
   sport: Sport;
   title: string;
   host: { name: string; username: string; avatar: string; rating: number };
+  hostUserId?: string;  // auth user id of the host (locks ownership)
   date: string;       // ISO
   duration: string;   // "90 min"
   location: string;
