@@ -107,19 +107,7 @@ function Create() {
               }
             }
 
-            // Persist approval/fee preferences so the host & players see them on the detail page
-            if (user && (requiresApproval || price > 0)) {
-              try {
-                await upsertGamePaymentSettings({
-                  game_id: game.id,
-                  entry_fee: price,
-                  accepted_method_ids: [],
-                  requires_approval: requiresApproval,
-                });
-              } catch (err: any) {
-                toast.error(err?.message ?? "Saved game, but couldn't save approval setting.");
-              }
-            }
+
 
             // Host counts as joined so it appears under their upcoming games
             joinGame(game.id);
