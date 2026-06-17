@@ -51,6 +51,7 @@ export type HostedGameInput = {
   isPrivate: boolean;
   description: string;
   host?: { name: string; username: string; avatar: string; rating?: number };
+  hostUserId?: string;
 };
 
 export function addHostedGame(input: HostedGameInput): Game {
