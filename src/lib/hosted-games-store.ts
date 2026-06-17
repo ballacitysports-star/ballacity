@@ -65,6 +65,7 @@ export function addHostedGame(input: HostedGameInput): Game {
     sport: input.sport,
     title: input.title || `${input.sport} pickup`,
     host,
+    hostUserId: input.hostUserId,
 
     date: input.date,
     duration: "90 min",
