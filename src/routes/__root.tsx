@@ -119,9 +119,16 @@ function RootComponent() {
   const router = useRouter();
 
   useEffect(() => {
-    const { data: sub } = supabase.auth.onAuthStateChange(() => {
+    // Run once on mount for already-signed-in users.
+    supabase.auth.getUser().then(({ data }) => {
+      if (data.user) runLegacyHostMigration(data.user.id);
+    });
+    const { data: sub } = supabase.auth.onAuthStateChange((event, session) => {
       queryClient.invalidateQueries();
       router.invalidate();
+      if ((event === "SIGNED_IN" || event === "INITIAL_SESSION") && session?.user) {
+        runLegacyHostMigration(session.user.id);
+      }
     });
     return () => sub.subscription.unsubscribe();
   }, [queryClient, router]);
