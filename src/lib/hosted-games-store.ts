@@ -95,20 +95,19 @@ export function getHostedGame(id: string): Game | undefined {
   return cache.find((g) => g.id === id);
 }
 
-/**
- * Stamp any locally-hosted games that lack a hostUserId with the given user id.
- * Returns the list of game ids that were migrated (had no prior hostUserId).
- * This locks ownership for legacy games published before hostUserId tracking,
- * so the legacyLocalHost fallback is no longer needed.
- */
-export function migrateLegacyHostOwnership(userId: string): string[] {
+/** List locally-hosted games that have no hostUserId yet. */
+export function listUnclaimedHostedGames(): Game[] {
   load();
-  if (!userId) return [];
-  const migrated: string[] = [];
+  return cache.filter((g) => !g.hostUserId);
+}
+
+/** Stamp a single locally-hosted game with the given user id. */
+export function claimHostedGame(gameId: string, userId: string): void {
+  load();
+  if (!userId) return;
   let changed = false;
   cache = cache.map((g) => {
-    if (!g.hostUserId) {
-      migrated.push(g.id);
+    if (g.id === gameId && !g.hostUserId) {
       changed = true;
       return { ...g, hostUserId: userId };
     }
@@ -118,7 +117,6 @@ export function migrateLegacyHostOwnership(userId: string): string[] {
     save();
     emit();
   }
-  return migrated;
 }
 
 export function useHostedGames(): Game[] {
