@@ -25,14 +25,19 @@ export async function runLegacyHostMigration(
   }
 
   inFlight = (async () => {
+    let claimed = 0;
+    let scanned = 0;
     try {
       const unclaimed = listUnclaimedHostedGames();
       for (const game of unclaimed) {
+        scanned++;
         try {
           const existing = await getGamePaymentSettings(game.id);
           if (existing) {
-            // DB already records an owner. Only stamp locally if it matches.
-            if (existing.host_id === userId) claimHostedGame(game.id, userId);
+            if (existing.host_id === userId) {
+              claimHostedGame(game.id, userId);
+              claimed++;
+            }
             continue;
           }
           await upsertGamePaymentSettings({
@@ -42,11 +47,13 @@ export async function runLegacyHostMigration(
             requires_approval: false,
           });
           claimHostedGame(game.id, userId);
+          claimed++;
         } catch {
           // best-effort; skip and let the next session retry
         }
       }
       window.localStorage.setItem(key, "1");
+      return { claimed, scanned };
     } finally {
       inFlight = null;
     }
