@@ -326,21 +326,46 @@ function ReviewsPanel() {
 function GamesPanel() {
   const list = useServerFn(adminListGames);
   const { data, isLoading } = useQuery({ queryKey: ["admin-games"], queryFn: () => list({}) });
+  const backfill = useMutation({
+    mutationFn: async () => {
+      const { data: s } = await supabase.auth.getUser();
+      if (!s.user) throw new Error("Sign in required");
+      const { runLegacyHostMigration } = await import("@/lib/legacy-host-migration");
+      return runLegacyHostMigration(s.user.id, { force: true });
+    },
+    onSuccess: (res) => toast.success(`Backfill complete — claimed ${res.claimed}/${res.scanned} local games`),
+    onError: (e: Error) => toast.error(e.message),
+  });
   if (isLoading) return <p className="text-sm text-muted-foreground p-4">Loading…</p>;
   return (
-    <Card>
-      <CardHeader><CardTitle>Games with payment settings ({data?.games.length ?? 0})</CardTitle></CardHeader>
-      <CardContent className="space-y-2 text-sm">
-        {data?.games.map((g: any) => (
-          <div key={g.id} className="border rounded-md p-3">
-            <div className="font-medium">Game {g.game_id}</div>
-            <div className="text-xs text-muted-foreground">
-              Host {g.host_id?.slice(0, 8)}… · fee ${Number(g.entry_fee).toFixed(2)} · approval: {g.requires_approval ? "yes" : "no"}
+    <div className="space-y-4">
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base flex items-center justify-between gap-3">
+            <span>Host backfill (this device)</span>
+            <Button size="sm" onClick={() => backfill.mutate()} disabled={backfill.isPending}>
+              {backfill.isPending ? "Running…" : "Run host backfill now"}
+            </Button>
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="text-xs text-muted-foreground">
+          Locally-hosted games live in each user's browser. This re-stamps unclaimed games on this device with your user id and creates any missing payment-settings rows. Run it on each device that needs it.
+        </CardContent>
+      </Card>
+      <Card>
+        <CardHeader><CardTitle>Games with payment settings ({data?.games.length ?? 0})</CardTitle></CardHeader>
+        <CardContent className="space-y-2 text-sm">
+          {data?.games.map((g: any) => (
+            <div key={g.id} className="border rounded-md p-3">
+              <div className="font-medium">Game {g.game_id}</div>
+              <div className="text-xs text-muted-foreground">
+                Host {g.host_id?.slice(0, 8)}… · fee ${Number(g.entry_fee).toFixed(2)} · approval: {g.requires_approval ? "yes" : "no"}
+              </div>
             </div>
-          </div>
-        ))}
-        {!data?.games.length && <p className="text-muted-foreground">No paid games yet</p>}
-      </CardContent>
-    </Card>
+          ))}
+          {!data?.games.length && <p className="text-muted-foreground">No paid games yet</p>}
+        </CardContent>
+      </Card>
+    </div>
   );
 }
