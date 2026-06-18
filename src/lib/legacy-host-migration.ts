@@ -13,11 +13,17 @@ let inFlight: Promise<void> | null = null;
  * If a settings row already exists with a different host_id, the local game is
  * left unstamped so we never steal ownership from the original DB host.
  */
-export async function runLegacyHostMigration(userId: string): Promise<void> {
-  if (!userId || typeof window === "undefined") return;
+export async function runLegacyHostMigration(
+  userId: string,
+  opts: { force?: boolean } = {},
+): Promise<{ claimed: number; scanned: number }> {
+  if (!userId || typeof window === "undefined") return { claimed: 0, scanned: 0 };
   const key = `${RUN_KEY}:${userId}`;
-  if (window.localStorage.getItem(key) === "1") return;
-  if (inFlight) return inFlight;
+  if (!opts.force && window.localStorage.getItem(key) === "1") return { claimed: 0, scanned: 0 };
+  if (inFlight && !opts.force) {
+    await inFlight;
+    return { claimed: 0, scanned: 0 };
+  }
 
   inFlight = (async () => {
     try {
