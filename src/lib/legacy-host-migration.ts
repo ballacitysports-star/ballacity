@@ -1,8 +1,7 @@
 import { listUnclaimedHostedGames, claimHostedGame } from "@/lib/hosted-games-store";
 import { getGamePaymentSettings, upsertGamePaymentSettings } from "@/lib/payments";
-
 const RUN_KEY = "openrun.legacyHostMigration.v1";
-let inFlight: Promise<void> | null = null;
+let inFlight: Promise<{ claimed: number; scanned: number }> | null = null;
 
 /**
  * One-shot per signed-in user: for every locally-hosted game with no hostUserId
