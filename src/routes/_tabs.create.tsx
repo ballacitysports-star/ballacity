@@ -103,6 +103,11 @@ function Create() {
         onSubmit={async (e) => {
           e.preventDefault();
           if (publishing) return;
+          if (!user) {
+            toast.error("Sign in to host a game");
+            nav({ to: "/auth", search: { redirect: "/create" } as any });
+            return;
+          }
           setPublishing(true);
           try {
             const date = when
