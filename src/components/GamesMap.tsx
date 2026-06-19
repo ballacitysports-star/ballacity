@@ -415,6 +415,16 @@ export function GamesMap({
           </button>
         </div>
         {manualError && <p className="mt-2 rounded-xl border border-red-500/40 bg-red-500/10 px-3 py-2 text-xs text-red-200 backdrop-blur-xl">{manualError}</p>}
+        {autoLocateDenied && (
+          <button
+            type="button"
+            onClick={locateMe}
+            className="mt-2 flex w-full items-center gap-2 rounded-xl border border-border bg-surface/80 px-3 py-2 text-left text-xs text-muted-foreground backdrop-blur-xl transition hover:bg-surface"
+          >
+            <MapPin className="h-3.5 w-3.5 shrink-0 text-lime" />
+            <span>Location permission denied — tap to try again</span>
+          </button>
+        )}
       </form>
     </>
   );
