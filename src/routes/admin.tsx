@@ -343,66 +343,154 @@ function ReviewsPanel() {
   );
 }
 
+function actionLabel(a: PlanEntry["action"]) {
+  if (a === "claim-new-settings") return { text: "Will claim (new settings row)", variant: "default" as const };
+  if (a === "claim-matching-settings") return { text: "Will claim (settings already yours)", variant: "secondary" as const };
+  return { text: "Skip — owned by another host", variant: "outline" as const };
+}
+
 function GamesPanel() {
   const list = useServerFn(adminListGames);
   const { data, isLoading } = useQuery({ queryKey: ["admin-games"], queryFn: () => list({}) });
   const [confirmOpen, setConfirmOpen] = useState(false);
-  const backfill = useMutation({
-    mutationFn: async () => {
-      const { data: s } = await supabase.auth.getUser();
-      if (!s.user) throw new Error("Sign in required");
-      const { runLegacyHostMigration } = await import("@/lib/legacy-host-migration");
-      return runLegacyHostMigration(s.user.id, { force: true });
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const [preview, setPreview] = useState<MigrationResult | null>(null);
+
+  const runMigration = async (dryRun: boolean) => {
+    const { data: s } = await supabase.auth.getUser();
+    if (!s.user) throw new Error("Sign in required");
+    const { runLegacyHostMigration } = await import("@/lib/legacy-host-migration");
+    return runLegacyHostMigration(s.user.id, { force: true, dryRun });
+  };
+
+  const dryRunMut = useMutation({
+    mutationFn: () => runMigration(true),
+    onSuccess: (res) => {
+      setPreview(res);
+      setPreviewOpen(true);
     },
+    onError: (e: Error) => toast.error(e.message),
+  });
+  const backfill = useMutation({
+    mutationFn: () => runMigration(false),
     onSuccess: (res) => {
       setConfirmOpen(false);
+      setPreviewOpen(false);
       toast.success(`Backfill complete — claimed ${res.claimed}/${res.scanned} local games`);
     },
     onError: (e: Error) => toast.error(e.message),
   });
+
   if (isLoading) return <p className="text-sm text-muted-foreground p-4">Loading…</p>;
+  const willClaim = preview?.plan.filter((p) => p.action !== "skip-other-host") ?? [];
+  const willSkip = preview?.plan.filter((p) => p.action === "skip-other-host") ?? [];
+
   return (
     <div className="space-y-4">
       <Card>
         <CardHeader>
-          <CardTitle className="text-base flex items-center justify-between gap-3">
+          <CardTitle className="text-base flex items-center justify-between gap-3 flex-wrap">
             <span>Host backfill (this device)</span>
-            <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
-              <AlertDialogTrigger asChild>
-                <Button size="sm" disabled={backfill.isPending}>
-                  {backfill.isPending ? "Running…" : "Run host backfill now"}
-                </Button>
-              </AlertDialogTrigger>
-              <AlertDialogContent>
-                <AlertDialogHeader>
-                  <AlertDialogTitle>Run host backfill?</AlertDialogTitle>
-                  <AlertDialogDescription className="space-y-2">
-                    <p>
-                      This will scan every locally-hosted game on this device and stamp unclaimed
-                      games with your user ID as host. It also creates any missing
-                      payment-settings rows.
-                    </p>
-                    <p className="text-destructive font-medium">
-                      Warning: if any game already has a different host in the database,
-                      this will <strong>overwrite</strong> that ownership and permanently
-                      transfer host controls to you.
-                    </p>
-                  </AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                  <AlertDialogCancel onClick={() => setConfirmOpen(false)}>Cancel</AlertDialogCancel>
-                  <AlertDialogAction onClick={() => backfill.mutate()} disabled={backfill.isPending}>
-                    {backfill.isPending ? "Running…" : "Run backfill"}
-                  </AlertDialogAction>
-                </AlertDialogFooter>
-              </AlertDialogContent>
-            </AlertDialog>
+            <div className="flex gap-2">
+              <Button size="sm" variant="outline" onClick={() => dryRunMut.mutate()} disabled={dryRunMut.isPending}>
+                {dryRunMut.isPending ? "Scanning…" : "Preview (dry run)"}
+              </Button>
+              <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
+                <AlertDialogTrigger asChild>
+                  <Button size="sm" disabled={backfill.isPending}>
+                    {backfill.isPending ? "Running…" : "Run host backfill now"}
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Run host backfill?</AlertDialogTitle>
+                    <AlertDialogDescription className="space-y-2">
+                      <p>
+                        This will scan every locally-hosted game on this device and stamp unclaimed
+                        games with your user ID as host. It also creates any missing
+                        payment-settings rows.
+                      </p>
+                      <p className="text-destructive font-medium">
+                        Warning: if any game already has a different host in the database,
+                        this will <strong>overwrite</strong> that ownership and permanently
+                        transfer host controls to you.
+                      </p>
+                      <p>Tip: click "Preview (dry run)" first to see exactly which games will change.</p>
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel onClick={() => setConfirmOpen(false)}>Cancel</AlertDialogCancel>
+                    <AlertDialogAction onClick={() => backfill.mutate()} disabled={backfill.isPending}>
+                      {backfill.isPending ? "Running…" : "Run backfill"}
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            </div>
           </CardTitle>
         </CardHeader>
         <CardContent className="text-xs text-muted-foreground">
-          Locally-hosted games live in each user's browser. This re-stamps unclaimed games on this device with your user id and creates any missing payment-settings rows. Run it on each device that needs it.
+          Locally-hosted games live in each user's browser. "Preview" shows the exact plan without writing anything. "Run backfill" stamps unclaimed games on this device with your user id and creates any missing payment-settings rows.
         </CardContent>
       </Card>
+
+      <Dialog open={previewOpen} onOpenChange={setPreviewOpen}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Backfill preview (dry run)</DialogTitle>
+            <DialogDescription>
+              Scanned {preview?.scanned ?? 0} local games. {willClaim.length} would be claimed, {willSkip.length} would be skipped. Nothing has been written.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="max-h-[50vh] overflow-y-auto space-y-2">
+            {preview?.plan.length ? (
+              preview.plan.map((p) => {
+                const label = actionLabel(p.action);
+                return (
+                  <div key={p.gameId} className="border rounded-md p-3 text-sm space-y-1">
+                    <div className="flex items-center justify-between gap-2 flex-wrap">
+                      <div className="font-medium truncate">{p.title}</div>
+                      <Badge variant={label.variant}>{label.text}</Badge>
+                    </div>
+                    <div className="text-xs text-muted-foreground font-mono break-all">id: {p.gameId}</div>
+                    <div className="text-xs">
+                      <div>
+                        local hostUserId:{" "}
+                        <span className="font-mono">{p.currentHostUserId ?? "—"}</span>
+                        {p.newHostUserId !== p.currentHostUserId && (
+                          <> → <span className="font-mono text-foreground font-medium">{p.newHostUserId ?? "—"}</span></>
+                        )}
+                      </div>
+                      <div>
+                        settings.host_id:{" "}
+                        <span className="font-mono">{p.currentSettingsHostId ?? "—"}</span>
+                        {p.newSettingsHostId !== p.currentSettingsHostId && (
+                          <> → <span className="font-mono text-foreground font-medium">{p.newSettingsHostId ?? "—"}</span></>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })
+            ) : (
+              <p className="text-sm text-muted-foreground">No unclaimed local games on this device.</p>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setPreviewOpen(false)}>Close</Button>
+            <Button
+              onClick={() => {
+                setPreviewOpen(false);
+                setConfirmOpen(true);
+              }}
+              disabled={!willClaim.length}
+            >
+              Proceed to run…
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       <Card>
         <CardHeader><CardTitle>Games with payment settings ({data?.games.length ?? 0})</CardTitle></CardHeader>
         <CardContent className="space-y-2 text-sm">
