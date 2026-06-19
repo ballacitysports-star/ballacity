@@ -137,8 +137,9 @@ export function GamesMap({
               if (cancelled) return;
               applyPosition(pos, true);
             },
-            () => {
-              // Silently fail — user can still tap the locate button
+            (err) => {
+              if (cancelled) return;
+              if (err.code === 1) setAutoLocateDenied(true);
             },
             { enableHighAccuracy: true, timeout: 15000, maximumAge: 60000 },
           );
