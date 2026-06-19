@@ -77,6 +77,7 @@ export function GamesMap({
   const pinCenterRef = useRef<{ lat: number; lng: number } | null>(null);
   const manualLocationRef = useRef(false);
   const defaultLocationRef = useRef("");
+  const initialLoadDoneRef = useRef(false);
   const [ready, setReady] = useState(false);
   const [manualLocation, setManualLocation] = useState(defaultLocation?.trim() ?? "");
   const [resolvingLocation, setResolvingLocation] = useState(false);
