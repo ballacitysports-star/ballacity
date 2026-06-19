@@ -264,6 +264,7 @@ export function GamesMap({
       (pos) => {
         setLocating(false);
         setGeoError(null);
+        setAutoLocateDenied(false);
         applyPosition(pos, true);
         toast.success("Centered on your location");
       },
