@@ -326,6 +326,7 @@ function ReviewsPanel() {
 function GamesPanel() {
   const list = useServerFn(adminListGames);
   const { data, isLoading } = useQuery({ queryKey: ["admin-games"], queryFn: () => list({}) });
+  const [confirmOpen, setConfirmOpen] = useState(false);
   const backfill = useMutation({
     mutationFn: async () => {
       const { data: s } = await supabase.auth.getUser();
@@ -333,7 +334,10 @@ function GamesPanel() {
       const { runLegacyHostMigration } = await import("@/lib/legacy-host-migration");
       return runLegacyHostMigration(s.user.id, { force: true });
     },
-    onSuccess: (res) => toast.success(`Backfill complete — claimed ${res.claimed}/${res.scanned} local games`),
+    onSuccess: (res) => {
+      setConfirmOpen(false);
+      toast.success(`Backfill complete — claimed ${res.claimed}/${res.scanned} local games`);
+    },
     onError: (e: Error) => toast.error(e.message),
   });
   if (isLoading) return <p className="text-sm text-muted-foreground p-4">Loading…</p>;
@@ -343,9 +347,36 @@ function GamesPanel() {
         <CardHeader>
           <CardTitle className="text-base flex items-center justify-between gap-3">
             <span>Host backfill (this device)</span>
-            <Button size="sm" onClick={() => backfill.mutate()} disabled={backfill.isPending}>
-              {backfill.isPending ? "Running…" : "Run host backfill now"}
-            </Button>
+            <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
+              <AlertDialogTrigger asChild>
+                <Button size="sm" disabled={backfill.isPending}>
+                  {backfill.isPending ? "Running…" : "Run host backfill now"}
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Run host backfill?</AlertDialogTitle>
+                  <AlertDialogDescription className="space-y-2">
+                    <p>
+                      This will scan every locally-hosted game on this device and stamp unclaimed
+                      games with your user ID as host. It also creates any missing
+                      payment-settings rows.
+                    </p>
+                    <p className="text-destructive font-medium">
+                      Warning: if any game already has a different host in the database,
+                      this will <strong>overwrite</strong> that ownership and permanently
+                      transfer host controls to you.
+                    </p>
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel onClick={() => setConfirmOpen(false)}>Cancel</AlertDialogCancel>
+                  <AlertDialogAction onClick={() => backfill.mutate()} disabled={backfill.isPending}>
+                    {backfill.isPending ? "Running…" : "Run backfill"}
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
           </CardTitle>
         </CardHeader>
         <CardContent className="text-xs text-muted-foreground">
