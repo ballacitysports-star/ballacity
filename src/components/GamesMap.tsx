@@ -83,6 +83,7 @@ export function GamesMap({
   const [resolvingLocation, setResolvingLocation] = useState(false);
   const [manualError, setManualError] = useState<string | null>(null);
   const [areaDirty, setAreaDirty] = useState(false);
+  const [autoLocateDenied, setAutoLocateDenied] = useState(false);
   const geocode = useServerFn(geocodeAddress);
 
   const computeVisibleIds = (): string[] => {
