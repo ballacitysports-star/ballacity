@@ -172,6 +172,12 @@ export function GamesMap({
     geocode({ data: { address: nextLocation } })
       .then((result) => {
         if (cancelled || !mapRef.current) return;
+        // On first load, preserve a live GPS fix obtained before the geocode resolves.
+        if (!initialLoadDoneRef.current && userPosRef.current) {
+          initialLoadDoneRef.current = true;
+          return;
+        }
+        initialLoadDoneRef.current = true;
         // Preserve a live GPS/manual center unless the profile/default location just changed.
         if (!defaultChanged && (userPosRef.current || manualLocationRef.current)) return;
         const center = { lat: result.lat, lng: result.lng };
