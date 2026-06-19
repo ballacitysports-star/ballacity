@@ -58,12 +58,14 @@ export function GamesMap({
   onSelect,
   defaultLocation,
   onVisibleChange,
+  autoLocate = true,
 }: {
   pins: MapPinItem[];
   activeId: string;
   onSelect: (id: string) => void;
   defaultLocation?: string | null;
   onVisibleChange?: (ids: string[]) => void;
+  autoLocate?: boolean;
 }) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<any>(null);
@@ -75,6 +77,7 @@ export function GamesMap({
   const pinCenterRef = useRef<{ lat: number; lng: number } | null>(null);
   const manualLocationRef = useRef(false);
   const defaultLocationRef = useRef("");
+  const initialLoadDoneRef = useRef(false);
   const [ready, setReady] = useState(false);
   const [manualLocation, setManualLocation] = useState(defaultLocation?.trim() ?? "");
   const [resolvingLocation, setResolvingLocation] = useState(false);
@@ -126,6 +129,19 @@ export function GamesMap({
         mapRef.current.addListener("dragend", () => setAreaDirty(true));
         mapRef.current.addListener("zoom_changed", () => setAreaDirty(true));
         setReady(true);
+        // Auto-locate on mount (silent — no toast or spinner)
+        if (autoLocate && navigator.geolocation) {
+          navigator.geolocation.getCurrentPosition(
+            (pos) => {
+              if (cancelled) return;
+              applyPosition(pos, true);
+            },
+            () => {
+              // Silently fail — user can still tap the locate button
+            },
+            { enableHighAccuracy: true, timeout: 15000, maximumAge: 60000 },
+          );
+        }
       })
       .catch(() => {});
     return () => {
@@ -156,6 +172,12 @@ export function GamesMap({
     geocode({ data: { address: nextLocation } })
       .then((result) => {
         if (cancelled || !mapRef.current) return;
+        // On first load, preserve a live GPS fix obtained before the geocode resolves.
+        if (!initialLoadDoneRef.current && userPosRef.current) {
+          initialLoadDoneRef.current = true;
+          return;
+        }
+        initialLoadDoneRef.current = true;
         // Preserve a live GPS/manual center unless the profile/default location just changed.
         if (!defaultChanged && (userPosRef.current || manualLocationRef.current)) return;
         const center = { lat: result.lat, lng: result.lng };
