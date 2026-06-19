@@ -55,6 +55,38 @@ function Create() {
     setLocation(next);
   };
 
+  if (!user) {
+    return (
+      <div className="mx-auto max-w-md px-4 pt-6">
+        <div className="flex items-center gap-3 mb-5">
+          <Link
+            to="/feed"
+            className="grid h-10 w-10 place-items-center rounded-full border border-border bg-surface"
+          >
+            <ArrowLeft className="h-5 w-5" />
+          </Link>
+          <h1 className="font-display text-2xl font-bold">Host a game</h1>
+        </div>
+        <div className="rounded-2xl border border-border bg-surface p-6 text-center space-y-4">
+          <ShieldCheck className="h-8 w-8 mx-auto text-lime" />
+          <div>
+            <h2 className="font-display text-lg font-bold">Sign in to host</h2>
+            <p className="text-sm text-muted-foreground mt-1">
+              You need an account so we can lock in host controls and let players contact you.
+            </p>
+          </div>
+          <Link
+            to="/auth"
+            search={{ redirect: "/create" } as any}
+            className="inline-block w-full rounded-2xl bg-lime-gradient py-3 font-bold text-primary-foreground glow-lime"
+          >
+            Sign in to host a game
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="mx-auto max-w-md px-4 pt-6">
       <div className="flex items-center gap-3 mb-5">
