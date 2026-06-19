@@ -129,6 +129,19 @@ export function GamesMap({
         mapRef.current.addListener("dragend", () => setAreaDirty(true));
         mapRef.current.addListener("zoom_changed", () => setAreaDirty(true));
         setReady(true);
+        // Auto-locate on mount (silent — no toast or spinner)
+        if (autoLocate && navigator.geolocation) {
+          navigator.geolocation.getCurrentPosition(
+            (pos) => {
+              if (cancelled) return;
+              applyPosition(pos, true);
+            },
+            () => {
+              // Silently fail — user can still tap the locate button
+            },
+            { enableHighAccuracy: true, timeout: 15000, maximumAge: 60000 },
+          );
+        }
       })
       .catch(() => {});
     return () => {
