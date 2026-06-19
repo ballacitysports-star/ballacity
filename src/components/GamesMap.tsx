@@ -58,12 +58,14 @@ export function GamesMap({
   onSelect,
   defaultLocation,
   onVisibleChange,
+  autoLocate = true,
 }: {
   pins: MapPinItem[];
   activeId: string;
   onSelect: (id: string) => void;
   defaultLocation?: string | null;
   onVisibleChange?: (ids: string[]) => void;
+  autoLocate?: boolean;
 }) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<any>(null);
