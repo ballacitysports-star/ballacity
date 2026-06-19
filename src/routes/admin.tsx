@@ -37,7 +37,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Badge as UiBadge } from "@/components/ui/badge";
 import type { PlanEntry, MigrationResult } from "@/lib/legacy-host-migration";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
