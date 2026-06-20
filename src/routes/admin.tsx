@@ -92,9 +92,14 @@ function AdminPage() {
           <h1 className="text-2xl font-semibold">Admin Panel</h1>
           <p className="text-sm text-muted-foreground">Manage users, payments, content</p>
         </div>
-        <Button variant="outline" asChild>
-          <Link to="/">Back</Link>
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="outline" asChild>
+            <Link to="/admin/location-analytics">Location analytics</Link>
+          </Button>
+          <Button variant="outline" asChild>
+            <Link to="/">Back</Link>
+          </Button>
+        </div>
       </div>
 
       <Tabs defaultValue="reels">
