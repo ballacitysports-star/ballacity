@@ -147,7 +147,12 @@ export function GamesMap({
             },
             (err) => {
               if (cancelled) return;
-              if (err.code === 1) setAutoLocateDenied(true);
+              void recordDenial(err).then((rec) => {
+                if (cancelled) return;
+                setDenialReason(rec.reason);
+                setDenialRepeatCount(getDenialStats().counts[rec.reason] ?? 1);
+                setAutoLocateDenied(true);
+              });
             },
             { enableHighAccuracy: true, timeout: 15000, maximumAge: 60000 },
           );
