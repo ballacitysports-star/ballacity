@@ -4,6 +4,12 @@ import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
 import { geocodeAddress } from "@/lib/geocode.functions";
 import { LocationAutocomplete } from "@/components/LocationAutocomplete";
+import {
+  type DenialReason,
+  getDenialStats,
+  promptCopyFor,
+  recordDenial,
+} from "@/lib/location-denial-telemetry";
 
 declare global {
   interface Window {
@@ -84,6 +90,8 @@ export function GamesMap({
   const [manualError, setManualError] = useState<string | null>(null);
   const [areaDirty, setAreaDirty] = useState(false);
   const [autoLocateDenied, setAutoLocateDenied] = useState(false);
+  const [denialReason, setDenialReason] = useState<DenialReason | null>(null);
+  const [denialRepeatCount, setDenialRepeatCount] = useState(1);
   const geocode = useServerFn(geocodeAddress);
 
   const computeVisibleIds = (): string[] => {
@@ -139,7 +147,12 @@ export function GamesMap({
             },
             (err) => {
               if (cancelled) return;
-              if (err.code === 1) setAutoLocateDenied(true);
+              void recordDenial(err).then((rec) => {
+                if (cancelled) return;
+                setDenialReason(rec.reason);
+                setDenialRepeatCount(getDenialStats().counts[rec.reason] ?? 1);
+                setAutoLocateDenied(true);
+              });
             },
             { enableHighAccuracy: true, timeout: 15000, maximumAge: 60000 },
           );
@@ -265,6 +278,7 @@ export function GamesMap({
         setLocating(false);
         setGeoError(null);
         setAutoLocateDenied(false);
+        setDenialReason(null);
         applyPosition(pos, true);
         toast.success("Centered on your location");
       },
@@ -273,6 +287,11 @@ export function GamesMap({
         const msg = describeGeoError(err);
         setGeoError(msg);
         toast.error(msg);
+        void recordDenial(err).then((rec) => {
+          setDenialReason(rec.reason);
+          setDenialRepeatCount(getDenialStats().counts[rec.reason] ?? 1);
+          setAutoLocateDenied(true);
+        });
       },
       { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 },
     );
@@ -415,16 +434,25 @@ export function GamesMap({
           </button>
         </div>
         {manualError && <p className="mt-2 rounded-xl border border-red-500/40 bg-red-500/10 px-3 py-2 text-xs text-red-200 backdrop-blur-xl">{manualError}</p>}
-        {autoLocateDenied && (
-          <button
-            type="button"
-            onClick={locateMe}
-            className="mt-2 flex w-full items-center gap-2 rounded-xl border border-border bg-surface/80 px-3 py-2 text-left text-xs text-muted-foreground backdrop-blur-xl transition hover:bg-surface"
-          >
-            <MapPin className="h-3.5 w-3.5 shrink-0 text-lime" />
-            <span>Location permission denied — tap to try again</span>
-          </button>
-        )}
+        {autoLocateDenied && (() => {
+          const copy = promptCopyFor(denialReason ?? "permission_denied", denialRepeatCount);
+          return (
+            <button
+              type="button"
+              onClick={locateMe}
+              className="mt-2 flex w-full items-start gap-2 rounded-xl border border-border bg-surface/80 px-3 py-2 text-left text-xs text-muted-foreground backdrop-blur-xl transition hover:bg-surface"
+              aria-label={`${copy.title}. ${copy.hint}`}
+              data-denial-reason={denialReason ?? "unknown"}
+            >
+              <MapPin className="mt-0.5 h-3.5 w-3.5 shrink-0 text-lime" />
+              <span className="flex-1">
+                <span className="block font-semibold text-foreground">{copy.title}</span>
+                <span className="block">{copy.hint}</span>
+                <span className="mt-1 block text-lime">{copy.cta} →</span>
+              </span>
+            </button>
+          );
+        })()}
       </form>
     </>
   );
