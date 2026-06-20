@@ -434,16 +434,25 @@ export function GamesMap({
           </button>
         </div>
         {manualError && <p className="mt-2 rounded-xl border border-red-500/40 bg-red-500/10 px-3 py-2 text-xs text-red-200 backdrop-blur-xl">{manualError}</p>}
-        {autoLocateDenied && (
-          <button
-            type="button"
-            onClick={locateMe}
-            className="mt-2 flex w-full items-center gap-2 rounded-xl border border-border bg-surface/80 px-3 py-2 text-left text-xs text-muted-foreground backdrop-blur-xl transition hover:bg-surface"
-          >
-            <MapPin className="h-3.5 w-3.5 shrink-0 text-lime" />
-            <span>Location permission denied — tap to try again</span>
-          </button>
-        )}
+        {autoLocateDenied && (() => {
+          const copy = promptCopyFor(denialReason ?? "permission_denied", denialRepeatCount);
+          return (
+            <button
+              type="button"
+              onClick={locateMe}
+              className="mt-2 flex w-full items-start gap-2 rounded-xl border border-border bg-surface/80 px-3 py-2 text-left text-xs text-muted-foreground backdrop-blur-xl transition hover:bg-surface"
+              aria-label={`${copy.title}. ${copy.hint}`}
+              data-denial-reason={denialReason ?? "unknown"}
+            >
+              <MapPin className="mt-0.5 h-3.5 w-3.5 shrink-0 text-lime" />
+              <span className="flex-1">
+                <span className="block font-semibold text-foreground">{copy.title}</span>
+                <span className="block">{copy.hint}</span>
+                <span className="mt-1 block text-lime">{copy.cta} →</span>
+              </span>
+            </button>
+          );
+        })()}
       </form>
     </>
   );
