@@ -4,6 +4,12 @@ import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
 import { geocodeAddress } from "@/lib/geocode.functions";
 import { LocationAutocomplete } from "@/components/LocationAutocomplete";
+import {
+  type DenialReason,
+  getDenialStats,
+  promptCopyFor,
+  recordDenial,
+} from "@/lib/location-denial-telemetry";
 
 declare global {
   interface Window {
