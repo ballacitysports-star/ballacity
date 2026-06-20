@@ -1,8 +1,11 @@
 // Lightweight client-side instrumentation for geolocation denials.
 // We capture the reason a GPS auto-center failed so the inline prompt can
 // be fine-tuned to the actual failure mode (browser block vs. user dismiss
-// vs. signal unavailable vs. timeout). All data is kept in localStorage —
-// nothing is sent off-device.
+// vs. signal unavailable vs. timeout). Data is kept in localStorage for
+// the in-app prompt AND mirrored to the backend `location_denial_events`
+// table so admins can track denial trends across users/devices.
+
+import { supabase } from "@/integrations/supabase/client";
 
 export type DenialReason =
   | "permission_blocked" // Permissions API reports 'denied' — browser/site setting
