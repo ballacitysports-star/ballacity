@@ -84,6 +84,7 @@ export async function classifyGeoError(
 
 export async function recordDenial(
   err: GeolocationPositionError | null,
+  context: { sport?: string | null } = {},
 ): Promise<DenialRecord> {
   const { reason, permissionState } = await classifyGeoError(err);
   const record: DenialRecord = {
@@ -99,14 +100,12 @@ export async function recordDenial(
   store.counts[reason] = (store.counts[reason] ?? 0) + 1;
   writeStore(store);
 
-  // Fire-and-forget backend event. RLS allows anon + authenticated inserts;
-  // signed-in users get their user_id attached so admins can segment trends.
-  void sendDenialEvent(record);
+  void sendDenialEvent(record, context.sport ?? null);
 
   return record;
 }
 
-async function sendDenialEvent(record: DenialRecord) {
+async function sendDenialEvent(record: DenialRecord, sport: string | null) {
   try {
     const { data: userData } = await supabase.auth.getUser();
     const userId = userData?.user?.id ?? null;
@@ -117,10 +116,22 @@ async function sendDenialEvent(record: DenialRecord) {
       message: record.message?.slice(0, 500) ?? null,
       permission_state: record.permissionState,
       user_agent: record.userAgent?.slice(0, 500) ?? null,
+      sport,
     });
   } catch {
     /* network/offline — telemetry is best-effort */
   }
+}
+
+export function parseBrowser(ua: string | null | undefined): string {
+  if (!ua) return "Unknown";
+  const s = ua;
+  if (/Edg\//.test(s)) return "Edge";
+  if (/OPR\/|Opera/.test(s)) return "Opera";
+  if (/Firefox\//.test(s)) return "Firefox";
+  if (/Chrome\//.test(s) && !/Edg\//.test(s)) return "Chrome";
+  if (/Safari\//.test(s) && /Version\//.test(s)) return "Safari";
+  return "Other";
 }
 
 export function getDenialStats(): Store {
