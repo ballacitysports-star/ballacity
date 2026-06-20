@@ -98,11 +98,29 @@ export async function recordDenial(
   store.records = [record, ...store.records].slice(0, MAX_RECORDS);
   store.counts[reason] = (store.counts[reason] ?? 0) + 1;
   writeStore(store);
+
+  // Fire-and-forget backend event. RLS allows anon + authenticated inserts;
+  // signed-in users get their user_id attached so admins can segment trends.
+  void sendDenialEvent(record);
+
   return record;
 }
 
-export function getDenialStats(): Store {
-  return readStore();
+async function sendDenialEvent(record: DenialRecord) {
+  try {
+    const { data: userData } = await supabase.auth.getUser();
+    const userId = userData?.user?.id ?? null;
+    await supabase.from("location_denial_events").insert({
+      user_id: userId,
+      reason: record.reason,
+      code: record.code,
+      message: record.message?.slice(0, 500) ?? null,
+      permission_state: record.permissionState,
+      user_agent: record.userAgent?.slice(0, 500) ?? null,
+    });
+  } catch {
+    /* network/offline — telemetry is best-effort */
+  }
 }
 
 export function clearDenialStats() {
