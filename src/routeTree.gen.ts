@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as ShopRouteImport } from './routes/shop'
 import { Route as ReviewsRouteImport } from './routes/reviews'
+import { Route as ResetPasswordRouteImport } from './routes/reset-password'
 import { Route as PlansRouteImport } from './routes/plans'
 import { Route as PaymentsRouteImport } from './routes/payments'
 import { Route as MessagesRouteImport } from './routes/messages'
@@ -47,6 +48,11 @@ const ShopRoute = ShopRouteImport.update({
 const ReviewsRoute = ReviewsRouteImport.update({
   id: '/reviews',
   path: '/reviews',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ResetPasswordRoute = ResetPasswordRouteImport.update({
+  id: '/reset-password',
+  path: '/reset-password',
   getParentRoute: () => rootRouteImport,
 } as any)
 const PlansRoute = PlansRouteImport.update({
@@ -192,6 +198,7 @@ export interface FileRoutesByFullPath {
   '/messages': typeof MessagesRouteWithChildren
   '/payments': typeof PaymentsRoute
   '/plans': typeof PlansRoute
+  '/reset-password': typeof ResetPasswordRoute
   '/reviews': typeof ReviewsRoute
   '/shop': typeof ShopRoute
   '/create': typeof TabsCreateRoute
@@ -222,6 +229,7 @@ export interface FileRoutesByTo {
   '/messages': typeof MessagesRouteWithChildren
   '/payments': typeof PaymentsRoute
   '/plans': typeof PlansRoute
+  '/reset-password': typeof ResetPasswordRoute
   '/reviews': typeof ReviewsRoute
   '/shop': typeof ShopRoute
   '/create': typeof TabsCreateRoute
@@ -254,6 +262,7 @@ export interface FileRoutesById {
   '/messages': typeof MessagesRouteWithChildren
   '/payments': typeof PaymentsRoute
   '/plans': typeof PlansRoute
+  '/reset-password': typeof ResetPasswordRoute
   '/reviews': typeof ReviewsRoute
   '/shop': typeof ShopRoute
   '/_tabs/create': typeof TabsCreateRoute
@@ -286,6 +295,7 @@ export interface FileRouteTypes {
     | '/messages'
     | '/payments'
     | '/plans'
+    | '/reset-password'
     | '/reviews'
     | '/shop'
     | '/create'
@@ -316,6 +326,7 @@ export interface FileRouteTypes {
     | '/messages'
     | '/payments'
     | '/plans'
+    | '/reset-password'
     | '/reviews'
     | '/shop'
     | '/create'
@@ -347,6 +358,7 @@ export interface FileRouteTypes {
     | '/messages'
     | '/payments'
     | '/plans'
+    | '/reset-password'
     | '/reviews'
     | '/shop'
     | '/_tabs/create'
@@ -379,6 +391,7 @@ export interface RootRouteChildren {
   MessagesRoute: typeof MessagesRouteWithChildren
   PaymentsRoute: typeof PaymentsRoute
   PlansRoute: typeof PlansRoute
+  ResetPasswordRoute: typeof ResetPasswordRoute
   ReviewsRoute: typeof ReviewsRoute
   ShopRoute: typeof ShopRoute
   CheckoutReturnRoute: typeof CheckoutReturnRoute
@@ -405,6 +418,13 @@ declare module '@tanstack/react-router' {
       path: '/reviews'
       fullPath: '/reviews'
       preLoaderRoute: typeof ReviewsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/reset-password': {
+      id: '/reset-password'
+      path: '/reset-password'
+      fullPath: '/reset-password'
+      preLoaderRoute: typeof ResetPasswordRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/plans': {
@@ -677,6 +697,7 @@ const rootRouteChildren: RootRouteChildren = {
   MessagesRoute: MessagesRouteWithChildren,
   PaymentsRoute: PaymentsRoute,
   PlansRoute: PlansRoute,
+  ResetPasswordRoute: ResetPasswordRoute,
   ReviewsRoute: ReviewsRoute,
   ShopRoute: ShopRoute,
   CheckoutReturnRoute: CheckoutReturnRoute,
