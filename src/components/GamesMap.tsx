@@ -90,6 +90,8 @@ export function GamesMap({
   const [manualError, setManualError] = useState<string | null>(null);
   const [areaDirty, setAreaDirty] = useState(false);
   const [autoLocateDenied, setAutoLocateDenied] = useState(false);
+  const [denialReason, setDenialReason] = useState<DenialReason | null>(null);
+  const [denialRepeatCount, setDenialRepeatCount] = useState(1);
   const geocode = useServerFn(geocodeAddress);
 
   const computeVisibleIds = (): string[] => {
