@@ -25,6 +25,7 @@ import { Route as ProfileEditRouteImport } from './routes/profile.edit'
 import { Route as MessagesConversationIdRouteImport } from './routes/messages.$conversationId'
 import { Route as GamesGameIdRouteImport } from './routes/games.$gameId'
 import { Route as CheckoutReturnRouteImport } from './routes/checkout.return'
+import { Route as AdminLocationAnalyticsRouteImport } from './routes/admin.location-analytics'
 import { Route as TabsTeamsRouteImport } from './routes/_tabs.teams'
 import { Route as TabsReelsRouteImport } from './routes/_tabs.reels'
 import { Route as TabsProfileRouteImport } from './routes/_tabs.profile'
@@ -117,6 +118,11 @@ const CheckoutReturnRoute = CheckoutReturnRouteImport.update({
   path: '/checkout/return',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AdminLocationAnalyticsRoute = AdminLocationAnalyticsRouteImport.update({
+  id: '/location-analytics',
+  path: '/location-analytics',
+  getParentRoute: () => AdminRoute,
+} as any)
 const TabsTeamsRoute = TabsTeamsRouteImport.update({
   id: '/teams',
   path: '/teams',
@@ -181,7 +187,7 @@ const ApiPublicPaymentsWebhookRoute =
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
-  '/admin': typeof AdminRoute
+  '/admin': typeof AdminRouteWithChildren
   '/auth': typeof AuthRoute
   '/messages': typeof MessagesRouteWithChildren
   '/payments': typeof PaymentsRoute
@@ -195,6 +201,7 @@ export interface FileRoutesByFullPath {
   '/profile': typeof TabsProfileRoute
   '/reels': typeof TabsReelsRoute
   '/teams': typeof TabsTeamsRoute
+  '/admin/location-analytics': typeof AdminLocationAnalyticsRoute
   '/checkout/return': typeof CheckoutReturnRoute
   '/games/$gameId': typeof GamesGameIdRouteWithChildren
   '/messages/$conversationId': typeof MessagesConversationIdRoute
@@ -210,7 +217,7 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
-  '/admin': typeof AdminRoute
+  '/admin': typeof AdminRouteWithChildren
   '/auth': typeof AuthRoute
   '/messages': typeof MessagesRouteWithChildren
   '/payments': typeof PaymentsRoute
@@ -224,6 +231,7 @@ export interface FileRoutesByTo {
   '/profile': typeof TabsProfileRoute
   '/reels': typeof TabsReelsRoute
   '/teams': typeof TabsTeamsRoute
+  '/admin/location-analytics': typeof AdminLocationAnalyticsRoute
   '/checkout/return': typeof CheckoutReturnRoute
   '/games/$gameId': typeof GamesGameIdRouteWithChildren
   '/messages/$conversationId': typeof MessagesConversationIdRoute
@@ -241,7 +249,7 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/_tabs': typeof TabsRouteWithChildren
-  '/admin': typeof AdminRoute
+  '/admin': typeof AdminRouteWithChildren
   '/auth': typeof AuthRoute
   '/messages': typeof MessagesRouteWithChildren
   '/payments': typeof PaymentsRoute
@@ -255,6 +263,7 @@ export interface FileRoutesById {
   '/_tabs/profile': typeof TabsProfileRoute
   '/_tabs/reels': typeof TabsReelsRoute
   '/_tabs/teams': typeof TabsTeamsRoute
+  '/admin/location-analytics': typeof AdminLocationAnalyticsRoute
   '/checkout/return': typeof CheckoutReturnRoute
   '/games/$gameId': typeof GamesGameIdRouteWithChildren
   '/messages/$conversationId': typeof MessagesConversationIdRoute
@@ -286,6 +295,7 @@ export interface FileRouteTypes {
     | '/profile'
     | '/reels'
     | '/teams'
+    | '/admin/location-analytics'
     | '/checkout/return'
     | '/games/$gameId'
     | '/messages/$conversationId'
@@ -315,6 +325,7 @@ export interface FileRouteTypes {
     | '/profile'
     | '/reels'
     | '/teams'
+    | '/admin/location-analytics'
     | '/checkout/return'
     | '/games/$gameId'
     | '/messages/$conversationId'
@@ -345,6 +356,7 @@ export interface FileRouteTypes {
     | '/_tabs/profile'
     | '/_tabs/reels'
     | '/_tabs/teams'
+    | '/admin/location-analytics'
     | '/checkout/return'
     | '/games/$gameId'
     | '/messages/$conversationId'
@@ -362,7 +374,7 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   TabsRoute: typeof TabsRouteWithChildren
-  AdminRoute: typeof AdminRoute
+  AdminRoute: typeof AdminRouteWithChildren
   AuthRoute: typeof AuthRoute
   MessagesRoute: typeof MessagesRouteWithChildren
   PaymentsRoute: typeof PaymentsRoute
@@ -493,6 +505,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof CheckoutReturnRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/admin/location-analytics': {
+      id: '/admin/location-analytics'
+      path: '/location-analytics'
+      fullPath: '/admin/location-analytics'
+      preLoaderRoute: typeof AdminLocationAnalyticsRouteImport
+      parentRoute: typeof AdminRoute
+    }
     '/_tabs/teams': {
       id: '/_tabs/teams'
       path: '/teams'
@@ -602,6 +621,16 @@ const TabsRouteChildren: TabsRouteChildren = {
 
 const TabsRouteWithChildren = TabsRoute._addFileChildren(TabsRouteChildren)
 
+interface AdminRouteChildren {
+  AdminLocationAnalyticsRoute: typeof AdminLocationAnalyticsRoute
+}
+
+const AdminRouteChildren: AdminRouteChildren = {
+  AdminLocationAnalyticsRoute: AdminLocationAnalyticsRoute,
+}
+
+const AdminRouteWithChildren = AdminRoute._addFileChildren(AdminRouteChildren)
+
 interface MessagesRouteChildren {
   MessagesConversationIdRoute: typeof MessagesConversationIdRoute
 }
@@ -643,7 +672,7 @@ const TeamsTeamIdRouteWithChildren = TeamsTeamIdRoute._addFileChildren(
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   TabsRoute: TabsRouteWithChildren,
-  AdminRoute: AdminRoute,
+  AdminRoute: AdminRouteWithChildren,
   AuthRoute: AuthRoute,
   MessagesRoute: MessagesRouteWithChildren,
   PaymentsRoute: PaymentsRoute,
