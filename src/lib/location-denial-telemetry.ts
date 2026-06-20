@@ -123,6 +123,12 @@ async function sendDenialEvent(record: DenialRecord) {
   }
 }
 
+export function getDenialStats(): Store {
+  return readStore();
+}
+
+
+
 export function clearDenialStats() {
   if (typeof window === "undefined") return;
   try {
