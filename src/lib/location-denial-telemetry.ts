@@ -1,8 +1,11 @@
 // Lightweight client-side instrumentation for geolocation denials.
 // We capture the reason a GPS auto-center failed so the inline prompt can
 // be fine-tuned to the actual failure mode (browser block vs. user dismiss
-// vs. signal unavailable vs. timeout). All data is kept in localStorage —
-// nothing is sent off-device.
+// vs. signal unavailable vs. timeout). Data is kept in localStorage for
+// the in-app prompt AND mirrored to the backend `location_denial_events`
+// table so admins can track denial trends across users/devices.
+
+import { supabase } from "@/integrations/supabase/client";
 
 export type DenialReason =
   | "permission_blocked" // Permissions API reports 'denied' — browser/site setting
@@ -95,12 +98,36 @@ export async function recordDenial(
   store.records = [record, ...store.records].slice(0, MAX_RECORDS);
   store.counts[reason] = (store.counts[reason] ?? 0) + 1;
   writeStore(store);
+
+  // Fire-and-forget backend event. RLS allows anon + authenticated inserts;
+  // signed-in users get their user_id attached so admins can segment trends.
+  void sendDenialEvent(record);
+
   return record;
+}
+
+async function sendDenialEvent(record: DenialRecord) {
+  try {
+    const { data: userData } = await supabase.auth.getUser();
+    const userId = userData?.user?.id ?? null;
+    await supabase.from("location_denial_events").insert({
+      user_id: userId,
+      reason: record.reason,
+      code: record.code,
+      message: record.message?.slice(0, 500) ?? null,
+      permission_state: record.permissionState,
+      user_agent: record.userAgent?.slice(0, 500) ?? null,
+    });
+  } catch {
+    /* network/offline — telemetry is best-effort */
+  }
 }
 
 export function getDenialStats(): Store {
   return readStore();
 }
+
+
 
 export function clearDenialStats() {
   if (typeof window === "undefined") return;

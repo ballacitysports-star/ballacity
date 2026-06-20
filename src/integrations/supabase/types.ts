@@ -253,6 +253,39 @@ export type Database = {
         }
         Relationships: []
       }
+      location_denial_events: {
+        Row: {
+          code: number | null
+          created_at: string
+          id: string
+          message: string | null
+          permission_state: string | null
+          reason: string
+          user_agent: string | null
+          user_id: string | null
+        }
+        Insert: {
+          code?: number | null
+          created_at?: string
+          id?: string
+          message?: string | null
+          permission_state?: string | null
+          reason: string
+          user_agent?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          code?: number | null
+          created_at?: string
+          id?: string
+          message?: string | null
+          permission_state?: string | null
+          reason?: string
+          user_agent?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       messages: {
         Row: {
           body: string
