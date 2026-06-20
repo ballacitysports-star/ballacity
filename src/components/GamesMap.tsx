@@ -278,6 +278,7 @@ export function GamesMap({
         setLocating(false);
         setGeoError(null);
         setAutoLocateDenied(false);
+        setDenialReason(null);
         applyPosition(pos, true);
         toast.success("Centered on your location");
       },
@@ -286,6 +287,11 @@ export function GamesMap({
         const msg = describeGeoError(err);
         setGeoError(msg);
         toast.error(msg);
+        void recordDenial(err).then((rec) => {
+          setDenialReason(rec.reason);
+          setDenialRepeatCount(getDenialStats().counts[rec.reason] ?? 1);
+          setAutoLocateDenied(true);
+        });
       },
       { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 },
     );
