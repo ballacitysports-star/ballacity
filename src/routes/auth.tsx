@@ -52,12 +52,47 @@ function AuthPage() {
         }
       } else {
         const { error } = await supabase.auth.signInWithPassword({ email, password });
-        if (error) throw error;
+        if (error) {
+          const msg = error.message?.toLowerCase() ?? "";
+          if (msg.includes("invalid login") || msg.includes("invalid credentials")) {
+            toast.error("Email or password is incorrect.", {
+              description:
+                "If you signed up with Google, continue with Google and set a password under Profile → Security, or use Forgot password to set one now.",
+              action: {
+                label: "Forgot password",
+                onClick: () => void sendReset(email),
+              },
+              duration: 8000,
+            });
+            return;
+          }
+          if (msg.includes("email not confirmed")) {
+            toast.error("Confirm your email first, then sign in.");
+            return;
+          }
+          throw error;
+        }
       }
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Auth failed");
     } finally {
       setBusy(false);
+    }
+  };
+
+  const sendReset = async (addr: string) => {
+    if (!addr) {
+      toast.error("Enter your email above first.");
+      return;
+    }
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(addr, {
+        redirectTo: `${window.location.origin}/reset-password`,
+      });
+      if (error) throw error;
+      toast.success("Check your email for a reset link.");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Could not send reset email");
     }
   };
 
@@ -158,19 +193,9 @@ function AuthPage() {
         {mode === "signin" && (
           <button
             onClick={async () => {
-              if (!email) {
-                toast.error("Enter your email above first.");
-                return;
-              }
               setBusy(true);
               try {
-                const { error } = await supabase.auth.resetPasswordForEmail(email, {
-                  redirectTo: `${window.location.origin}/reset-password`,
-                });
-                if (error) throw error;
-                toast.success("Check your email for a reset link.");
-              } catch (err) {
-                toast.error(err instanceof Error ? err.message : "Could not send reset email");
+                await sendReset(email);
               } finally {
                 setBusy(false);
               }
