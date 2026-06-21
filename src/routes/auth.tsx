@@ -193,19 +193,9 @@ function AuthPage() {
         {mode === "signin" && (
           <button
             onClick={async () => {
-              if (!email) {
-                toast.error("Enter your email above first.");
-                return;
-              }
               setBusy(true);
               try {
-                const { error } = await supabase.auth.resetPasswordForEmail(email, {
-                  redirectTo: `${window.location.origin}/reset-password`,
-                });
-                if (error) throw error;
-                toast.success("Check your email for a reset link.");
-              } catch (err) {
-                toast.error(err instanceof Error ? err.message : "Could not send reset email");
+                await sendReset(email);
               } finally {
                 setBusy(false);
               }
