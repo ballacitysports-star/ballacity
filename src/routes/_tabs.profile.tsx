@@ -98,6 +98,14 @@ function Profile() {
               <LogIn className="h-3.5 w-3.5" /> Sign in
             </Link>
           )}
+          {user && (
+            <Link
+              to="/account/security"
+              className="inline-flex items-center gap-1 rounded-full border border-border bg-background/70 px-3 py-2 text-xs font-bold backdrop-blur"
+            >
+              <Shield className="h-3.5 w-3.5" /> Security
+            </Link>
+          )}
           <Link to="/profile/edit" className="grid h-10 w-10 place-items-center rounded-full border border-border bg-background/70 backdrop-blur" aria-label="Edit profile">
             <Settings className="h-4 w-4" />
           </Link>
