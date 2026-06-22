@@ -218,7 +218,7 @@ function PlayersFilterSheet({ sport, setSport, skill, setSkill, maxDistance, set
           </button>
         </div>
 
-        <div className="text-xs font-semibold text-muted-foreground mb-2 uppercase tracking-wider">Sport</div>
+        <div className="text-xs font-semibold text-muted-foreground mb-2 uppercase tracking-wider">Sport (Players)</div>
         <div className="flex flex-wrap gap-2 mb-5">
           <Chip active={!sport} onClick={() => setSport("")}>All sports</Chip>
           {SPORTS.map((s) => (
