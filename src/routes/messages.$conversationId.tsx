@@ -15,7 +15,7 @@ function Thread() {
   const { conversationId } = Route.useParams();
   const { user, loading } = useAuth();
   const [msgs, setMsgs] = useState<Message[]>([]);
-  const [other, setOther] = useState<{ display_name: string; avatar_initials: string | null } | null>(null);
+  const [other, setOther] = useState<{ user_id: string; display_name: string; avatar_initials: string | null } | null>(null);
   const [text, setText] = useState("");
   const [sending, setSending] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -67,11 +67,31 @@ function Thread() {
         <Link to="/messages" className="grid h-10 w-10 place-items-center rounded-full border border-border bg-surface">
           <ArrowLeft className="h-5 w-5" />
         </Link>
-        <div className="grid h-10 w-10 place-items-center rounded-2xl bg-lime-gradient text-sm font-bold text-primary-foreground">
-          {other?.avatar_initials ?? "PL"}
-        </div>
+        {other?.user_id ? (
+          <Link
+            to="/players/$userId"
+            params={{ userId: other.user_id }}
+            className="grid h-10 w-10 place-items-center rounded-2xl bg-lime-gradient text-sm font-bold text-primary-foreground"
+          >
+            {other.avatar_initials ?? "PL"}
+          </Link>
+        ) : (
+          <div className="grid h-10 w-10 place-items-center rounded-2xl bg-lime-gradient text-sm font-bold text-primary-foreground">
+            {other?.avatar_initials ?? "PL"}
+          </div>
+        )}
         <div className="flex-1 min-w-0">
-          <div className="font-semibold text-sm truncate">{other?.display_name ?? "Loading…"}</div>
+          {other?.user_id ? (
+            <Link
+              to="/players/$userId"
+              params={{ userId: other.user_id }}
+              className="font-semibold text-sm truncate hover:text-lime hover:underline block"
+            >
+              {other.display_name}
+            </Link>
+          ) : (
+            <div className="font-semibold text-sm truncate">{other?.display_name ?? "Loading…"}</div>
+          )}
         </div>
       </header>
 
