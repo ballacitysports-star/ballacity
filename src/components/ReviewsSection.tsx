@@ -182,6 +182,7 @@ export function ReviewsSection({
   );
 
   const rep = useMemo(() => computeReputation(all, revieweeKind), [all, revieweeKind]);
+  const eligible = useCanReview(revieweeId);
 
   const list = useMemo(() => {
     let xs = publicReviews;
