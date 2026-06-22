@@ -413,7 +413,9 @@ function PostAvailabilityDialog({ onClose, onPosted }: { onClose: () => void; on
     try {
       await createAvailability({
         sports, skill_level: skill,
-        starts_on: starts || null, ends_on: ends || null,
+        // datetime-local gives "YYYY-MM-DDTHH:mm"; DB columns are DATE → store date portion only.
+        starts_on: starts ? starts.slice(0, 10) : null,
+        ends_on: ends ? ends.slice(0, 10) : null,
         recurring_days: days, city, travel_radius_km: radius, note,
       });
       onPosted();
@@ -447,11 +449,23 @@ function PostAvailabilityDialog({ onClose, onPosted }: { onClose: () => void; on
           <div className="grid grid-cols-2 gap-2">
             <div>
               <Label htmlFor="starts">From</Label>
-              <Input id="starts" type="date" value={starts} onChange={(e) => setStarts(e.target.value)} />
+              <input
+                id="starts"
+                type="datetime-local"
+                value={starts}
+                onChange={(e) => setStarts(e.target.value)}
+                className="w-full rounded-2xl border border-border bg-surface px-4 py-3 text-sm outline-none focus:border-lime [color-scheme:dark]"
+              />
             </div>
             <div>
               <Label htmlFor="ends">Until</Label>
-              <Input id="ends" type="date" value={ends} onChange={(e) => setEnds(e.target.value)} />
+              <input
+                id="ends"
+                type="datetime-local"
+                value={ends}
+                onChange={(e) => setEnds(e.target.value)}
+                className="w-full rounded-2xl border border-border bg-surface px-4 py-3 text-sm outline-none focus:border-lime [color-scheme:dark]"
+              />
             </div>
           </div>
           <div>
