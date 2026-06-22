@@ -60,7 +60,7 @@ function PlayersPage() {
     const needle = q.trim().toLowerCase();
     return list.filter((a) => {
       if (skill && a.skill_level !== skill) return false;
-      if (maxDistance > 0 && (a.travel_radius_km ?? 0) > maxDistance) return false;
+      if (maxDistance > 0 && kmToMi(a.travel_radius_km) > maxDistance) return false;
       if (needle) {
         const hay = (a.author_name + " " + (a.city ?? "") + " " + (a.note ?? "") + " " + a.sports.join(" ")).toLowerCase();
         if (!hay.includes(needle)) return false;
