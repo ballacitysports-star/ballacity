@@ -84,9 +84,20 @@ export function GameCard({ game, index = 0 }: { game: Game; index?: number }) {
           </div>
           <div className="flex items-center justify-between gap-3">
             <div className="flex items-center gap-2 text-xs text-muted-foreground">
-              <span className="grid h-6 w-6 place-items-center rounded-full bg-secondary text-[10px] font-bold">
-                {game.host.avatar}
-              </span>
+              {hostUserId ? (
+                <button
+                  type="button"
+                  onClick={goToHost}
+                  className="grid h-6 w-6 place-items-center rounded-full bg-secondary text-[10px] font-bold hover:ring-2 hover:ring-lime"
+                  aria-label={`View ${game.host.name}'s profile`}
+                >
+                  {game.host.avatar}
+                </button>
+              ) : (
+                <span className="grid h-6 w-6 place-items-center rounded-full bg-secondary text-[10px] font-bold">
+                  {game.host.avatar}
+                </span>
+              )}
               {hostUserId ? (
                 <button
                   type="button"
