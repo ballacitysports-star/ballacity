@@ -1,14 +1,18 @@
-import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
-import { ArrowLeft, MessageCircle, Loader2, Calendar, MapPin } from "lucide-react";
+import { createFileRoute, Link, useNavigate, Navigate } from "@tanstack/react-router";
+import { useEffect, useMemo, useState } from "react";
+import { motion } from "framer-motion";
+import { ArrowLeft, MessageCircle, Loader2, Calendar, MapPin, Shield, Trophy } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
 import { getOrCreateDirectConversation } from "@/lib/messages";
 import { Button } from "@/components/ui/button";
-import { SPORTS } from "@/lib/sample-data";
+import { SPORTS, HERO_IMAGE } from "@/lib/sample-data";
 import { kmToMi } from "@/lib/distance";
 import type { PlayerAvailability } from "@/lib/availability";
+import { ReviewsSection } from "@/components/ReviewsSection";
+import { ReputationBadge } from "@/components/ReputationBadge";
+import { computeReputation, useReviewsFor } from "@/lib/reviews";
 
 export const Route = createFileRoute("/players/$userId")({
   head: () => ({ meta: [{ title: "Player profile — OpenRun" }] }),
@@ -32,6 +36,9 @@ function PlayerProfilePage() {
   const [availability, setAvailability] = useState<PlayerAvailability | null>(null);
   const [loading, setLoading] = useState(true);
   const [opening, setOpening] = useState(false);
+
+  const reviews = useReviewsFor(userId);
+  const rep = useMemo(() => computeReputation(reviews, "player"), [reviews]);
 
   useEffect(() => {
     let cancelled = false;
@@ -60,6 +67,11 @@ function PlayerProfilePage() {
     return () => { cancelled = true; };
   }, [userId]);
 
+  // If viewing your own card, redirect to the full profile page
+  if (user && user.id === userId) {
+    return <Navigate to="/profile" />;
+  }
+
   const handleMessage = async () => {
     if (!user) { toast.error("Sign in to message this player."); return; }
     setOpening(true);
@@ -71,59 +83,124 @@ function PlayerProfilePage() {
     } finally { setOpening(false); }
   };
 
-  return (
-    <div className="mx-auto max-w-md px-4 pt-6 pb-24">
-      <Link to="/players" className="inline-flex items-center gap-1 text-sm text-muted-foreground mb-4">
-        <ArrowLeft className="h-4 w-4" /> Back to players
-      </Link>
+  if (loading) {
+    return (
+      <div className="mx-auto max-w-md px-4 pt-6 pb-24">
+        <div className="h-44 animate-pulse rounded-2xl bg-surface/40" />
+        <div className="mt-4 h-40 animate-pulse rounded-2xl border border-border bg-surface/40" />
+      </div>
+    );
+  }
 
-      {loading ? (
-        <div className="h-40 animate-pulse rounded-2xl border border-border bg-surface/40" />
-      ) : !profile ? (
+  if (!profile) {
+    return (
+      <div className="mx-auto max-w-md px-4 pt-6 pb-24">
+        <Link to="/players" className="inline-flex items-center gap-1 text-sm text-muted-foreground mb-4">
+          <ArrowLeft className="h-4 w-4" /> Back to players
+        </Link>
         <div className="rounded-2xl border border-dashed border-border bg-surface/40 p-8 text-center">
           <p className="font-semibold">Player not found</p>
           <p className="text-sm text-muted-foreground mt-1">This profile may have been removed.</p>
         </div>
-      ) : (
-        <>
-          <div className="rounded-2xl border border-border bg-surface p-5">
-            <div className="flex items-center gap-4">
-              <div className="grid h-16 w-16 shrink-0 place-items-center rounded-2xl bg-lime-gradient font-bold text-primary-foreground text-lg">
-                {profile.avatar_initials ?? profile.display_name.slice(0, 2).toUpperCase()}
-              </div>
-              <div className="min-w-0">
-                <h1 className="font-display text-xl font-bold truncate">{profile.display_name}</h1>
-                {profile.username && <p className="text-xs text-muted-foreground">@{profile.username}</p>}
-                {profile.sport && (
-                  <p className="text-xs text-muted-foreground mt-1">Plays {profile.sport}</p>
-                )}
-              </div>
-            </div>
-            {profile.bio && (
-              <p className="mt-4 text-sm leading-snug whitespace-pre-wrap">{profile.bio}</p>
-            )}
-            {user?.id !== profile.id && (
-              <Button
-                onClick={handleMessage}
-                disabled={opening}
-                className="mt-5 w-full rounded-full bg-lime-gradient text-primary-foreground"
-              >
-                {opening ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <MessageCircle className="h-4 w-4 mr-1" />}
-                Message
-              </Button>
-            )}
-          </div>
+      </div>
+    );
+  }
 
-          {availability && (
-            <>
-              <h2 className="mt-6 mb-2 font-display text-sm font-bold uppercase tracking-wider text-muted-foreground">
-                Open availability
-              </h2>
-              <PlayerCard a={availability} />
-            </>
-          )}
-        </>
-      )}
+  const initials = profile.avatar_initials ?? profile.display_name.slice(0, 2).toUpperCase();
+  const username = profile.username ? `@${profile.username.replace(/^@/, "")}` : "";
+
+  return (
+    <div className="mx-auto max-w-md pb-28">
+      {/* Cover */}
+      <div className="relative h-44">
+        <img src={HERO_IMAGE} alt="" className="h-full w-full object-cover" />
+        <div className="absolute inset-0 bg-gradient-to-b from-transparent via-background/50 to-background" />
+        <div className="absolute top-4 left-4">
+          <Link
+            to="/players"
+            className="grid h-10 w-10 place-items-center rounded-full border border-border bg-background/70 backdrop-blur"
+            aria-label="Back to players"
+          >
+            <ArrowLeft className="h-4 w-4" />
+          </Link>
+        </div>
+      </div>
+
+      {/* Identity */}
+      <div className="px-4 -mt-12 relative">
+        <motion.div
+          initial={{ scale: 0, rotate: -10 }}
+          animate={{ scale: 1, rotate: 0 }}
+          transition={{ type: "spring", stiffness: 220, damping: 16 }}
+          className="grid h-24 w-24 place-items-center overflow-hidden rounded-3xl border-4 border-background bg-lime-gradient font-display text-3xl font-bold text-primary-foreground glow-lime"
+        >
+          {initials}
+        </motion.div>
+        <div className="mt-3 flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <h1 className="font-display text-2xl font-bold flex items-center gap-2">
+              <span className="truncate">{profile.display_name}</span>
+              <span className="inline-flex items-center gap-1 rounded-full bg-lime/15 px-2 py-0.5 text-xs font-bold text-lime shrink-0">
+                <Shield className="h-3 w-3" /> Verified
+              </span>
+            </h1>
+            <div className="text-sm text-muted-foreground truncate">
+              {username}
+              {profile.sport ? `${username ? " · " : ""}${profile.sport}` : ""}
+            </div>
+          </div>
+          <Button
+            onClick={handleMessage}
+            disabled={opening}
+            className="shrink-0 rounded-full bg-lime-gradient text-primary-foreground"
+            size="sm"
+          >
+            {opening ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <MessageCircle className="h-4 w-4 mr-1" />}
+            Message
+          </Button>
+        </div>
+
+        {profile.bio && (
+          <p className="mt-3 text-sm text-foreground/90 whitespace-pre-wrap">{profile.bio}</p>
+        )}
+
+        {/* Reputation badge */}
+        <div className="mt-4">
+          <ReputationBadge rep={rep} />
+        </div>
+
+        {/* Open availability */}
+        {availability && (
+          <div className="mt-6">
+            <h2 className="font-display text-sm font-bold uppercase tracking-wider text-muted-foreground mb-2 flex items-center gap-1.5">
+              <Calendar className="h-4 w-4" /> Open availability
+            </h2>
+            <PlayerCard a={availability} />
+          </div>
+        )}
+
+        {/* Sport */}
+        {profile.sport && (
+          <div className="mt-6">
+            <h2 className="font-display text-sm font-bold uppercase tracking-wider text-muted-foreground mb-2 flex items-center gap-1.5">
+              <Trophy className="h-4 w-4" /> Sport
+            </h2>
+            <span className="inline-flex items-center gap-1 rounded-full border border-border bg-surface px-3 py-1.5 text-xs font-semibold">
+              {SPORTS.find((s) => s.name === profile.sport)?.emoji ?? "🎯"} {profile.sport}
+            </span>
+          </div>
+        )}
+
+        {/* Reviews */}
+        <div className="mt-6">
+          <ReviewsSection
+            revieweeId={userId}
+            revieweeKind="player"
+            revieweeName={profile.display_name}
+            isOwner={false}
+          />
+        </div>
+      </div>
     </div>
   );
 }
