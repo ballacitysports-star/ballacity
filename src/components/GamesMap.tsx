@@ -198,15 +198,22 @@ export function GamesMap({
     geocode({ data: { address: nextLocation } })
       .then((result) => {
         if (cancelled || !mapRef.current) return;
-        // On first load, preserve a live GPS fix obtained before the geocode resolves.
-        if (!initialLoadDoneRef.current && userPosRef.current) {
+        const center = { lat: result.lat, lng: result.lng };
+        pendingDefaultGeocodeRef.current = center;
+        // On first load, let live GPS win unless it has already failed.
+        if (!initialLoadDoneRef.current) {
+          if (userPosRef.current) {
+            initialLoadDoneRef.current = true;
+            return;
+          }
+          if (autoLocate && !autoLocateFailedRef.current && !defaultChanged) {
+            // Wait for GPS to resolve or deny — don't pan yet.
+            return;
+          }
           initialLoadDoneRef.current = true;
-          return;
         }
-        initialLoadDoneRef.current = true;
         // Preserve a live GPS/manual center unless the profile/default location just changed.
         if (!defaultChanged && (userPosRef.current || manualLocationRef.current)) return;
-        const center = { lat: result.lat, lng: result.lng };
         pinCenterRef.current = center;
         mapRef.current.panTo(center);
         mapRef.current.setZoom(13);
