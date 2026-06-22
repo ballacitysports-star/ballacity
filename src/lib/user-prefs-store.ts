@@ -24,6 +24,7 @@ export type ProfileOverrides = {
   name?: string;
   username?: string;
   avatar?: string; // initials
+  avatarUrl?: string; // data URL or remote URL
   bio?: string;
   city?: string;
   sports?: { name: Sport; skill: number }[];
@@ -35,6 +36,7 @@ export type MyProfile = {
   name: string;
   username: string;
   avatar: string;
+  avatarUrl?: string;
   bio: string;
   city: string;
   stats: typeof ME.stats;
@@ -178,6 +180,7 @@ export function useMyProfile(currentUser?: User | null): MyProfile | null {
     name: overrides.name ?? base.name,
     username: overrides.username ?? base.username,
     avatar: overrides.avatar ?? base.avatar,
+    avatarUrl: overrides.avatarUrl,
     bio: overrides.bio ?? base.bio,
     city: overrides.city ?? base.city,
     stats: base.stats,

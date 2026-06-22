@@ -117,9 +117,13 @@ function Profile() {
           initial={{ scale: 0, rotate: -10 }}
           animate={{ scale: 1, rotate: 0 }}
           transition={{ type: "spring", stiffness: 220, damping: 16 }}
-          className="grid h-24 w-24 place-items-center rounded-3xl border-4 border-background bg-lime-gradient font-display text-3xl font-bold text-primary-foreground glow-lime"
+          className="grid h-24 w-24 place-items-center overflow-hidden rounded-3xl border-4 border-background bg-lime-gradient font-display text-3xl font-bold text-primary-foreground glow-lime"
         >
-          {me.avatar}
+          {me.avatarUrl ? (
+            <img src={me.avatarUrl} alt={me.name} className="h-full w-full object-cover" />
+          ) : (
+            me.avatar
+          )}
         </motion.div>
         <div className="mt-3 flex items-start justify-between">
           <div>

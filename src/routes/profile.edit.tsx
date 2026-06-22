@@ -38,10 +38,22 @@ function EditProfile() {
   const [name, setName] = useState(profile?.name ?? "");
   const [username, setUsername] = useState(profile?.username ?? "");
   const [avatar, setAvatar] = useState(profile?.avatar ?? "");
+  const [avatarUrl, setAvatarUrl] = useState<string | undefined>(profile?.avatarUrl);
   const [city, setCity] = useState(profile?.city ?? "");
   const [bio, setBio] = useState(profile?.bio ?? "");
   const [sports, setSports] = useState(profile?.sports ?? []);
   const [links, setLinks] = useState<ProfileLink[]>(profile?.links ?? []);
+
+  const onPickAvatar = async (file: File | null) => {
+    if (!file) return;
+    if (!file.type.startsWith("image/")) { toast.error("Please choose an image"); return; }
+    try {
+      const dataUrl = await resizeImageToDataUrl(file, 256);
+      setAvatarUrl(dataUrl);
+    } catch {
+      toast.error("Couldn't load that image");
+    }
+  };
 
   const addLink = (type: ProfileLinkType) => {
     setLinks((prev) => [...prev, { type, url: "" }]);
@@ -105,6 +117,7 @@ function EditProfile() {
       name: trimmedName,
       username: username.trim().slice(0, 30),
       avatar: (avatar.trim() || trimmedName.slice(0, 2)).toUpperCase().slice(0, 3),
+      avatarUrl,
       city: city.trim().slice(0, 80),
       bio: bio.trim().slice(0, 280),
       sports,
@@ -137,9 +150,40 @@ function EditProfile() {
       </div>
 
       <Section title="Basics">
+        <Field label="Photo">
+          <div className="flex items-center gap-3">
+            <div className="grid h-16 w-16 place-items-center overflow-hidden rounded-2xl border border-border bg-lime-gradient font-display text-lg font-bold text-primary-foreground">
+              {avatarUrl ? (
+                <img src={avatarUrl} alt="Avatar preview" className="h-full w-full object-cover" />
+              ) : (
+                (avatar || name.slice(0, 2) || "U").toUpperCase().slice(0, 3)
+              )}
+            </div>
+            <div className="flex flex-col gap-2">
+              <label className="inline-flex cursor-pointer items-center gap-1 rounded-full border border-border bg-surface px-3 py-1.5 text-xs font-semibold hover:border-lime/40">
+                <input
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={(e) => onPickAvatar(e.target.files?.[0] ?? null)}
+                />
+                {avatarUrl ? "Change photo" : "Upload photo"}
+              </label>
+              {avatarUrl && (
+                <button
+                  type="button"
+                  onClick={() => setAvatarUrl(undefined)}
+                  className="text-xs font-semibold text-coral text-left"
+                >
+                  Remove photo
+                </button>
+              )}
+            </div>
+          </div>
+        </Field>
         <Field label="Display name"><Input value={name} onChange={setName} maxLength={60} /></Field>
         <Field label="Username"><Input value={username} onChange={setUsername} maxLength={30} placeholder="@you" /></Field>
-        <Field label="Avatar initials"><Input value={avatar} onChange={setAvatar} maxLength={3} /></Field>
+        <Field label="Avatar initials (fallback)"><Input value={avatar} onChange={setAvatar} maxLength={3} /></Field>
         <Field label="City"><LocationAutocomplete value={city} onChange={setCity} placeholder="Your city" mode="city" /></Field>
         <Field label="Bio">
           <textarea
@@ -418,4 +462,29 @@ function Toggle({ label, checked, onChange }: { label: string; checked: boolean;
       </span>
     </button>
   );
+}
+
+async function resizeImageToDataUrl(file: File, maxSize: number): Promise<string> {
+  const dataUrl = await new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result as string);
+    reader.onerror = () => reject(reader.error);
+    reader.readAsDataURL(file);
+  });
+  const img = await new Promise<HTMLImageElement>((resolve, reject) => {
+    const el = new Image();
+    el.onload = () => resolve(el);
+    el.onerror = () => reject(new Error("image load failed"));
+    el.src = dataUrl;
+  });
+  const scale = Math.min(1, maxSize / Math.max(img.width, img.height));
+  const w = Math.max(1, Math.round(img.width * scale));
+  const h = Math.max(1, Math.round(img.height * scale));
+  const canvas = document.createElement("canvas");
+  canvas.width = w;
+  canvas.height = h;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) return dataUrl;
+  ctx.drawImage(img, 0, 0, w, h);
+  return canvas.toDataURL("image/jpeg", 0.85);
 }
