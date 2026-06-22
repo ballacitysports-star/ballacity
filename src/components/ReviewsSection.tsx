@@ -13,6 +13,7 @@ import {
   type RevieweeKind,
 } from "@/lib/reviews";
 import { ReputationCard } from "@/components/ReputationCard";
+import { useCanReview } from "@/lib/transactions";
 import { toast } from "sonner";
 
 type Sort = "recent" | "top" | "lowest" | "helpful";
