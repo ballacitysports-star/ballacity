@@ -194,6 +194,7 @@ export function useMyProfile(currentUser?: User | null): MyProfile | null {
     username: overrides.username ?? base.username,
     avatar: overrides.avatar ?? base.avatar,
     avatarUrl: overrides.avatarUrl,
+    coverUrl: overrides.coverUrl,
     bio: overrides.bio ?? base.bio,
     city: overrides.city ?? base.city,
     stats: base.stats,
