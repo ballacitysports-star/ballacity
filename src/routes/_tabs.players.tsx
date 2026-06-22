@@ -185,7 +185,70 @@ function PlayersPage() {
         />
       )}
       {contactFor && <ContactDialog availability={contactFor} onClose={() => setContactFor(null)} />}
+
+      <AnimatePresence>
+        {filtersOpen && (
+          <PlayersFilterSheet
+            skill={skill} setSkill={setSkill}
+            maxDistance={maxDistance} setMaxDistance={setMaxDistance}
+            onClose={() => setFiltersOpen(false)}
+            onReset={() => { setSkill(""); setMaxDistance(0); }}
+          />
+        )}
+      </AnimatePresence>
     </div>
+  );
+}
+
+function PlayersFilterSheet({ skill, setSkill, maxDistance, setMaxDistance, onClose, onReset }: {
+  skill: string; setSkill: (v: string) => void;
+  maxDistance: number; setMaxDistance: (v: number) => void;
+  onClose: () => void; onReset: () => void;
+}) {
+  const SKILLS = ["All Levels", "Beginner", "Intermediate", "Advanced"];
+  const DISTANCES = [0, 5, 10, 25, 50, 100];
+  return (
+    <motion.div
+      initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+      className="fixed inset-0 z-50 bg-background/70 backdrop-blur flex items-end justify-center"
+      onClick={onClose}
+    >
+      <motion.div
+        initial={{ y: "100%" }} animate={{ y: 0 }} exit={{ y: "100%" }}
+        transition={{ type: "spring", stiffness: 280, damping: 30 }}
+        onClick={(e) => e.stopPropagation()}
+        className="w-full max-w-md rounded-t-3xl border-t border-border bg-background p-5 max-h-[85vh] overflow-y-auto pb-10"
+      >
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="font-display text-lg font-bold">Filter players</h2>
+          <button onClick={onClose} className="grid h-9 w-9 place-items-center rounded-full border border-border" aria-label="Close">
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+
+        <div className="text-xs font-semibold text-muted-foreground mb-2 uppercase tracking-wider">Skill level</div>
+        <div className="flex flex-wrap gap-2 mb-5">
+          <Chip active={!skill} onClick={() => setSkill("")}>Any</Chip>
+          {SKILLS.map((s) => (
+            <Chip key={s} active={skill === s} onClick={() => setSkill(s)}>{s}</Chip>
+          ))}
+        </div>
+
+        <div className="text-xs font-semibold text-muted-foreground mb-2 uppercase tracking-wider">Max travel distance</div>
+        <div className="flex flex-wrap gap-2 mb-5">
+          {DISTANCES.map((d) => (
+            <Chip key={d} active={maxDistance === d} onClick={() => setMaxDistance(d)}>
+              {d === 0 ? "Any" : `≤ ${d} km`}
+            </Chip>
+          ))}
+        </div>
+
+        <div className="flex gap-2">
+          <button onClick={onReset} className="flex-1 rounded-full border border-border py-3 text-sm font-bold">Reset</button>
+          <button onClick={onClose} className="flex-1 rounded-full bg-lime-gradient py-3 text-sm font-bold text-primary-foreground">Done</button>
+        </div>
+      </motion.div>
+    </motion.div>
   );
 }
 
