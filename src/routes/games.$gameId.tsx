@@ -286,14 +286,35 @@ function GameDetail() {
 
         {/* Host */}
         <div className="flex items-center gap-3 rounded-3xl border border-border bg-surface p-4">
-          <div className="grid h-12 w-12 place-items-center rounded-2xl bg-lime-gradient font-bold text-primary-foreground">
-            {game.host.avatar}
-          </div>
-          <div className="flex-1">
-            <div className="text-xs uppercase tracking-wider text-muted-foreground">Hosted by</div>
-            <div className="font-semibold">{game.host.name} <span className="text-muted-foreground font-normal text-sm">{game.host.username}</span></div>
-            <div className="text-xs text-lime font-semibold">★ {game.host.rating} host rating</div>
-          </div>
+          {(() => {
+            const hostId = settings?.host_id ?? game.hostUserId;
+            const AvatarTag: any = hostId ? Link : "div";
+            const avatarProps = hostId
+              ? { to: "/players/$userId", params: { userId: hostId } }
+              : {};
+            const NameTag: any = hostId ? Link : "span";
+            const nameProps = hostId
+              ? { to: "/players/$userId", params: { userId: hostId }, className: "hover:text-lime hover:underline" }
+              : {};
+            return (
+              <>
+                <AvatarTag
+                  {...avatarProps}
+                  className="grid h-12 w-12 place-items-center rounded-2xl bg-lime-gradient font-bold text-primary-foreground"
+                >
+                  {game.host.avatar}
+                </AvatarTag>
+                <div className="flex-1">
+                  <div className="text-xs uppercase tracking-wider text-muted-foreground">Hosted by</div>
+                  <div className="font-semibold">
+                    <NameTag {...nameProps}>{game.host.name}</NameTag>{" "}
+                    <span className="text-muted-foreground font-normal text-sm">{game.host.username}</span>
+                  </div>
+                  <div className="text-xs text-lime font-semibold">★ {game.host.rating} host rating</div>
+                </div>
+              </>
+            );
+          })()}
           <Link
             to="/review/new"
             search={{

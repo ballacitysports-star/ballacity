@@ -1,4 +1,4 @@
-import { Link } from "@tanstack/react-router";
+import { Link, useNavigate } from "@tanstack/react-router";
 import { motion } from "framer-motion";
 import { MapPin, Users, Clock, Zap, Lock, Flame } from "lucide-react";
 import type { Game } from "@/lib/sample-data";
@@ -16,6 +16,14 @@ export function GameCard({ game, index = 0 }: { game: Game; index?: number }) {
   const joinedCount = Math.min(game.maxPlayers, game.joined + (joinedByMe ? 1 : 0));
   const spotsLeft = game.maxPlayers - joinedCount;
   const fillPct = Math.round((joinedCount / game.maxPlayers) * 100);
+  const navigate = useNavigate();
+  const hostUserId = (game as { hostUserId?: string }).hostUserId;
+  const goToHost = (e: React.MouseEvent) => {
+    if (!hostUserId) return;
+    e.preventDefault();
+    e.stopPropagation();
+    navigate({ to: "/players/$userId", params: { userId: hostUserId } });
+  };
 
   return (
     <motion.div
@@ -79,7 +87,17 @@ export function GameCard({ game, index = 0 }: { game: Game; index?: number }) {
               <span className="grid h-6 w-6 place-items-center rounded-full bg-secondary text-[10px] font-bold">
                 {game.host.avatar}
               </span>
-              <span>{game.host.name}</span>
+              {hostUserId ? (
+                <button
+                  type="button"
+                  onClick={goToHost}
+                  className="font-semibold text-foreground hover:text-lime hover:underline"
+                >
+                  {game.host.name}
+                </button>
+              ) : (
+                <span>{game.host.name}</span>
+              )}
               <span className="text-foreground">· {game.skill}</span>
             </div>
             <div className="flex items-center gap-1.5 text-xs font-semibold">
