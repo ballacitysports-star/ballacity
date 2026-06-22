@@ -1,5 +1,6 @@
 import { ExternalLink, Globe, Instagram, Youtube, Facebook, Linkedin, Twitch, Github, Music } from "lucide-react";
 import type { ProfileLink, ProfileLinkType } from "@/lib/user-prefs-store";
+import perfectGameLogo from "@/assets/perfect-game-logo.png.asset.json";
 
 export const LINK_TYPES: { type: ProfileLinkType; label: string; placeholder: string }[] = [
   { type: "perfect_game", label: "Perfect Game", placeholder: "https://perfectgame.org/players/..." },
@@ -79,6 +80,8 @@ function detectBrandFromUrl(url: string): BrandKey | null {
 
 function BrandIcon({ brand, className = "h-4 w-4" }: { brand: BrandKey; className?: string }) {
   switch (brand) {
+    case "perfect_game":
+      return <img src={perfectGameLogo.url} alt="" className={`${className} object-contain dark:invert`} />;
     case "instagram": return <Instagram className={className} />;
     case "youtube": return <Youtube className={className} />;
     case "twitter": return <XIcon className={className} />;
