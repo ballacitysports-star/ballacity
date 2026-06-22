@@ -13,6 +13,8 @@ import type { PlayerAvailability } from "@/lib/availability";
 import { ReviewsSection } from "@/components/ReviewsSection";
 import { ReputationBadge } from "@/components/ReputationBadge";
 import { computeReputation, useReviewsFor } from "@/lib/reviews";
+import { useProfileOverrides } from "@/lib/user-prefs-store";
+import { ProfileLinksList } from "@/components/ProfileLinks";
 
 export const Route = createFileRoute("/players/$userId")({
   head: () => ({ meta: [{ title: "Player profile — OpenRun" }] }),
