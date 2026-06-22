@@ -14,6 +14,47 @@ export type Database = {
   }
   public: {
     Tables: {
+      availability_contact_requests: {
+        Row: {
+          availability_id: string
+          created_at: string
+          from_user_id: string
+          id: string
+          message: string | null
+          status: string
+          to_user_id: string
+          updated_at: string
+        }
+        Insert: {
+          availability_id: string
+          created_at?: string
+          from_user_id: string
+          id?: string
+          message?: string | null
+          status?: string
+          to_user_id: string
+          updated_at?: string
+        }
+        Update: {
+          availability_id?: string
+          created_at?: string
+          from_user_id?: string
+          id?: string
+          message?: string | null
+          status?: string
+          to_user_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "availability_contact_requests_availability_id_fkey"
+            columns: ["availability_id"]
+            isOneToOne: false
+            referencedRelation: "player_availabilities"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       conversation_participants: {
         Row: {
           conversation_id: string
@@ -412,6 +453,54 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      player_availabilities: {
+        Row: {
+          city: string | null
+          created_at: string
+          ends_on: string | null
+          id: string
+          note: string | null
+          recurring_days: string[]
+          skill_level: string
+          sports: string[]
+          starts_on: string | null
+          status: string
+          travel_radius_km: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          city?: string | null
+          created_at?: string
+          ends_on?: string | null
+          id?: string
+          note?: string | null
+          recurring_days?: string[]
+          skill_level?: string
+          sports?: string[]
+          starts_on?: string | null
+          status?: string
+          travel_radius_km?: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          city?: string | null
+          created_at?: string
+          ends_on?: string | null
+          id?: string
+          note?: string | null
+          recurring_days?: string[]
+          skill_level?: string
+          sports?: string[]
+          starts_on?: string | null
+          status?: string
+          travel_radius_km?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
       }
       profiles: {
         Row: {
