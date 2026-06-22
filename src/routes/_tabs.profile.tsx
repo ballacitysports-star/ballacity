@@ -134,10 +134,17 @@ function Profile() {
         </div>
         <p className="mt-3 text-sm text-foreground/90">{me.bio}</p>
 
-        {me.links.length > 0 && (
+        {me.links && me.links.length > 0 ? (
           <div className="mt-3">
             <ProfileLinksList links={me.links} />
           </div>
+        ) : (
+          <Link
+            to="/profile/edit"
+            className="mt-3 inline-flex items-center gap-1 rounded-full border border-dashed border-border bg-surface/40 px-3 py-1.5 text-xs font-semibold text-muted-foreground hover:border-lime/40 hover:text-foreground"
+          >
+            + Add profile links
+          </Link>
         )}
 
 
