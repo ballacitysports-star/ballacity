@@ -52,7 +52,7 @@ function PlayersPage() {
     return () => { cancelled = true; };
   }, [sport, reloadTick]);
 
-  const activeFilterCount = (skill ? 1 : 0) + (maxDistance > 0 ? 1 : 0);
+  const activeFilterCount = (sport ? 1 : 0) + (skill ? 1 : 0) + (maxDistance > 0 ? 1 : 0);
 
   const filtered = useMemo(() => {
     if (!list) return null;
@@ -124,16 +124,6 @@ function PlayersPage() {
         </button>
       </div>
 
-      <div className="-mx-4 overflow-x-auto px-4 mb-5">
-        <div className="flex gap-2 pb-1">
-          <Chip active={!sport} onClick={() => setSport("")}>All sports</Chip>
-          {SPORTS.map((s) => (
-            <Chip key={s.name} active={sport === s.name} onClick={() => setSport(s.name)}>
-              <span className="mr-1">{s.emoji}</span>{s.name}
-            </Chip>
-          ))}
-        </div>
-      </div>
 
 
       <div className="-mx-4 overflow-x-auto px-4 mb-5">
