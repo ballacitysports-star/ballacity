@@ -251,7 +251,7 @@ function AvailabilityCard({ a, isMine, onContact }: { a: AvailabilityWithAuthor;
           {(a.city || a.travel_radius_km) && (
             <p className="mt-1 flex items-center gap-1 text-xs text-muted-foreground">
               <MapPin className="h-3.5 w-3.5" />
-              {a.city || "Anywhere"} · up to {a.travel_radius_km} km
+              {a.city || "Anywhere"} · up to {a.travel_radius_km} mi
             </p>
           )}
           {a.note && <p className="mt-2 text-sm leading-snug">{a.note}</p>}
@@ -372,7 +372,7 @@ function PostAvailabilityDialog({ onClose, onPosted }: { onClose: () => void; on
               <Input id="city" value={city} onChange={(e) => setCity(e.target.value)} placeholder="e.g. Austin" />
             </div>
             <div>
-              <Label htmlFor="radius">Radius (km)</Label>
+              <Label htmlFor="radius">Radius (mi)</Label>
               <Input id="radius" type="number" min={1} max={500} value={radius} onChange={(e) => setRadius(Number(e.target.value) || 0)} />
             </div>
           </div>

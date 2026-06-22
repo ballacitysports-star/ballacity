@@ -241,7 +241,7 @@ function PlayersFilterSheet({ sport, setSport, skill, setSkill, maxDistance, set
         <div className="flex flex-wrap gap-2 mb-5">
           {DISTANCES.map((d) => (
             <Chip key={d} active={maxDistance === d} onClick={() => setMaxDistance(d)}>
-              {d === 0 ? "Any" : `≤ ${d} km`}
+              {d === 0 ? "Any" : `≤ ${d} mi`}
             </Chip>
           ))}
         </div>
@@ -320,12 +320,23 @@ function AvailabilityCard({ a, isMine, onContact, onChanged }: {
   return (
     <li className="rounded-2xl border border-border bg-surface p-4">
       <div className="flex items-start gap-3">
-        <div className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-lime-gradient font-bold text-primary-foreground">
+        <Link
+          to="/players/$userId"
+          params={{ userId: a.user_id }}
+          className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-lime-gradient font-bold text-primary-foreground"
+          aria-label={`View ${a.author_name}'s profile`}
+        >
           {initials}
-        </div>
+        </Link>
         <div className="flex-1 min-w-0">
           <div className="flex items-center justify-between gap-2">
-            <p className="font-semibold truncate">{a.author_name}</p>
+            <Link
+              to="/players/$userId"
+              params={{ userId: a.user_id }}
+              className="font-semibold truncate hover:underline"
+            >
+              {a.author_name}
+            </Link>
             <span className="shrink-0 rounded-full bg-lime/15 px-2 py-0.5 text-[10px] font-bold text-lime">{a.skill_level}</span>
           </div>
           <div className="mt-1 flex flex-wrap gap-1">
@@ -348,7 +359,7 @@ function AvailabilityCard({ a, isMine, onContact, onChanged }: {
           {(a.city || a.travel_radius_km) && (
             <p className="mt-1 flex items-center gap-1 text-xs text-muted-foreground">
               <MapPin className="h-3.5 w-3.5" />
-              {a.city || "Anywhere"} · up to {a.travel_radius_km} km
+              {a.city || "Anywhere"} · up to {a.travel_radius_km} mi
             </p>
           )}
           {a.note && <p className="mt-2 text-sm leading-snug">{a.note}</p>}
@@ -482,7 +493,7 @@ function PostAvailabilityDialog({ onClose, onPosted }: { onClose: () => void; on
               <Input id="city" value={city} onChange={(e) => setCity(e.target.value)} placeholder="e.g. Austin" />
             </div>
             <div>
-              <Label htmlFor="radius">Radius (km)</Label>
+              <Label htmlFor="radius">Radius (mi)</Label>
               <Input id="radius" type="number" min={1} max={500} value={radius} onChange={(e) => setRadius(Number(e.target.value) || 0)} />
             </div>
           </div>
