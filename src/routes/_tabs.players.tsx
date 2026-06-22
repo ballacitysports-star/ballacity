@@ -241,7 +241,7 @@ function PlayersFilterSheet({ sport, setSport, skill, setSkill, maxDistance, set
         <div className="flex flex-wrap gap-2 mb-5">
           {DISTANCES.map((d) => (
             <Chip key={d} active={maxDistance === d} onClick={() => setMaxDistance(d)}>
-              {d === 0 ? "Any" : `≤ ${d} km`}
+              {d === 0 ? "Any" : `≤ ${d} mi`}
             </Chip>
           ))}
         </div>
