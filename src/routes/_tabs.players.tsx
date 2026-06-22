@@ -52,7 +52,7 @@ function PlayersPage() {
     return () => { cancelled = true; };
   }, [sport, reloadTick]);
 
-  const activeFilterCount = (skill ? 1 : 0) + (maxDistance > 0 ? 1 : 0);
+  const activeFilterCount = (sport ? 1 : 0) + (skill ? 1 : 0) + (maxDistance > 0 ? 1 : 0);
 
   const filtered = useMemo(() => {
     if (!list) return null;
