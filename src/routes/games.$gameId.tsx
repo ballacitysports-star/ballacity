@@ -17,6 +17,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { getOrCreateDirectConversation } from "@/lib/messages";
 import { createNotification } from "@/lib/notifications";
 import { supabase } from "@/integrations/supabase/client";
+import { useCanReview } from "@/lib/transactions";
 
 const emojiBySport: Record<string, string> = Object.fromEntries(SPORTS.map((s) => [s.name, s.emoji]));
 
@@ -88,6 +89,7 @@ function GameDetail() {
 
   const hostReviews = useReviewsFor(hostIdFor(game?.host.username ?? ""));
   const hostRep = useMemo(() => computeReputation(hostReviews, "host"), [hostReviews]);
+  const canReviewHost = useCanReview(hostIdFor(game?.host.username ?? ""));
 
   const refreshStatus = async () => {
     if (!game) return;
@@ -315,19 +317,21 @@ function GameDetail() {
               </>
             );
           })()}
-          <Link
-            to="/review/new"
-            search={{
-              revieweeId: hostIdFor(game.host.username),
-              revieweeKind: "host",
-              revieweeName: game.host.name,
-              kind: "player",
-              context: game.title,
-            } as any}
-            className="inline-flex items-center gap-1 rounded-full border border-lime/40 bg-lime/10 px-3 py-1.5 text-xs font-bold text-lime"
-          >
-            <Star className="h-3 w-3" /> Write review
-          </Link>
+          {canReviewHost ? (
+            <Link
+              to="/review/new"
+              search={{
+                revieweeId: hostIdFor(game.host.username),
+                revieweeKind: "host",
+                revieweeName: game.host.name,
+                kind: "player",
+                context: game.title,
+              } as any}
+              className="inline-flex items-center gap-1 rounded-full border border-lime/40 bg-lime/10 px-3 py-1.5 text-xs font-bold text-lime"
+            >
+              <Star className="h-3 w-3" /> Write review
+            </Link>
+          ) : null}
         </div>
 
         {/* Host reputation (above the fold) */}

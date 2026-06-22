@@ -11,6 +11,7 @@ import {
   type RevieweeKind,
 } from "@/lib/reviews";
 import { ME } from "@/lib/sample-data";
+import { useCanReview, useTransactionsWith } from "@/lib/transactions";
 import { toast } from "sonner";
 
 type Search = {
@@ -57,8 +58,10 @@ function ReviewNew() {
   const revieweeMeta = REVIEWEE_META[revieweeKind];
 
   const criteria = useMemo(() => CRITERIA[revieweeKind], [revieweeKind]);
+  const eligible = useCanReview(search.revieweeId ?? "");
+  const sharedTxns = useTransactionsWith(search.revieweeId ?? "");
   const verified = context.trim().length > 0;
-  const canSubmit = body.trim().length >= 8 && rating > 0;
+  const canSubmit = eligible && body.trim().length >= 8 && rating > 0;
 
   const submit = () => {
     if (!canSubmit) return;
@@ -133,6 +136,37 @@ function ReviewNew() {
             </span>
           )}
         </div>
+
+        {/* Eligibility gate: only allow reviews between users who've closed a shared transaction */}
+        {!eligible ? (
+          <div className="rounded-2xl border border-coral/40 bg-coral/10 p-4 text-sm">
+            <div className="flex items-center gap-2 font-bold text-coral">
+              <Lock className="h-4 w-4" /> Reviews are verified-only
+            </div>
+            <p className="mt-2 text-foreground/80">
+              You can only review {search.revieweeName ?? "this user"} after a
+              completed transaction together — a game played, a training
+              session, a team tryout, or a hosted event you paid for.
+            </p>
+            <Link
+              to="/profile"
+              className="mt-3 inline-flex items-center gap-1 rounded-full border border-border bg-surface px-3 py-1.5 text-xs font-bold"
+            >
+              Back to profile
+            </Link>
+          </div>
+        ) : (
+          <div className="rounded-2xl border border-lime/30 bg-lime/10 p-3 text-xs">
+            <div className="flex items-center gap-1.5 font-bold text-lime">
+              <ShieldCheck className="h-3.5 w-3.5" /> Verified transaction
+            </div>
+            <p className="mt-1 text-foreground/80">
+              {sharedTxns.length === 1
+                ? `Based on: ${sharedTxns[0].context}`
+                : `Based on ${sharedTxns.length} shared activities — most recent: ${sharedTxns[0]?.context ?? ""}`}
+            </p>
+          </div>
+        )}
 
         {/* Reviewer role */}
         {!lockReviewerToPlayer && (

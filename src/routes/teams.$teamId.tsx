@@ -12,6 +12,7 @@ import { GameCard } from "@/components/GameCard";
 import { ReviewsSection } from "@/components/ReviewsSection";
 import { computeReputation, useReviewsFor } from "@/lib/reviews";
 import { ReputationBadge } from "@/components/ReputationBadge";
+import { useCanReview } from "@/lib/transactions";
 
 export const Route = createFileRoute("/teams/$teamId")({
   head: ({ params }) => {
@@ -95,18 +96,20 @@ function TeamPage() {
                 <Pencil className="h-3.5 w-3.5" /> Edit
               </Link>
             )}
-            <Link
-              to="/review/new"
-              search={{
-                revieweeId: org.id,
-                revieweeKind: org.kind === "coach" ? "trainer" : "team",
-                revieweeName: org.name,
-                kind: "player",
-              } as any}
-              className="rounded-full border border-lime/40 bg-lime/10 px-4 py-2.5 text-sm font-bold inline-flex items-center gap-1.5 text-lime"
-            >
-              <Star className="h-3.5 w-3.5" /> Write review
-            </Link>
+            {useCanReview(org.id) && (
+              <Link
+                to="/review/new"
+                search={{
+                  revieweeId: org.id,
+                  revieweeKind: org.kind === "coach" ? "trainer" : "team",
+                  revieweeName: org.name,
+                  kind: "player",
+                } as any}
+                className="rounded-full border border-lime/40 bg-lime/10 px-4 py-2.5 text-sm font-bold inline-flex items-center gap-1.5 text-lime"
+              >
+                <Star className="h-3.5 w-3.5" /> Write review
+              </Link>
+            )}
             <motion.button
               whileTap={{ scale: 0.95 }}
               onClick={() => setFollowing((f) => !f)}

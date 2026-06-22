@@ -13,6 +13,7 @@ import {
   type RevieweeKind,
 } from "@/lib/reviews";
 import { ReputationCard } from "@/components/ReputationCard";
+import { useCanReview } from "@/lib/transactions";
 import { toast } from "sonner";
 
 type Sort = "recent" | "top" | "lowest" | "helpful";
@@ -181,6 +182,7 @@ export function ReviewsSection({
   );
 
   const rep = useMemo(() => computeReputation(all, revieweeKind), [all, revieweeKind]);
+  const eligible = useCanReview(revieweeId);
 
   const list = useMemo(() => {
     let xs = publicReviews;
@@ -199,13 +201,22 @@ export function ReviewsSection({
         <h2 className="font-display text-sm font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
           <Star className="h-4 w-4" /> Reviews
         </h2>
-        <Link
-          to="/review/new"
-          search={{ revieweeId, revieweeKind, revieweeName, kind: "player" } as any}
-          className="inline-flex items-center gap-1 text-xs font-bold text-lime"
-        >
-          <MessageSquarePlus className="h-3.5 w-3.5" /> Write
-        </Link>
+        {eligible ? (
+          <Link
+            to="/review/new"
+            search={{ revieweeId, revieweeKind, revieweeName, kind: "player" } as any}
+            className="inline-flex items-center gap-1 text-xs font-bold text-lime"
+          >
+            <MessageSquarePlus className="h-3.5 w-3.5" /> Write
+          </Link>
+        ) : (
+          <span
+            className="inline-flex items-center gap-1 text-xs font-semibold text-muted-foreground"
+            title="Only available after a completed game, training, or event together"
+          >
+            <Lock className="h-3.5 w-3.5" /> Verified only
+          </span>
+        )}
       </div>
 
       <ReputationCard rep={rep} />
