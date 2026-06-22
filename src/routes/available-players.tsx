@@ -372,7 +372,7 @@ function PostAvailabilityDialog({ onClose, onPosted }: { onClose: () => void; on
               <Input id="city" value={city} onChange={(e) => setCity(e.target.value)} placeholder="e.g. Austin" />
             </div>
             <div>
-              <Label htmlFor="radius">Radius (km)</Label>
+              <Label htmlFor="radius">Radius (mi)</Label>
               <Input id="radius" type="number" min={1} max={500} value={radius} onChange={(e) => setRadius(Number(e.target.value) || 0)} />
             </div>
           </div>
