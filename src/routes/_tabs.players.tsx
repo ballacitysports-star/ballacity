@@ -428,7 +428,7 @@ function PostAvailabilityDialog({ onClose, onPosted }: { onClose: () => void; on
         // datetime-local gives "YYYY-MM-DDTHH:mm"; DB columns are DATE → store date portion only.
         starts_on: starts ? starts.slice(0, 10) : null,
         ends_on: ends ? ends.slice(0, 10) : null,
-        recurring_days: days, city, travel_radius_km: radius, note,
+        recurring_days: days, city, travel_radius_km: miToKm(radius), note,
       });
       onPosted();
     } catch (e: any) { toast.error(e.message); }
