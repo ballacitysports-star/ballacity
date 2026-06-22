@@ -87,7 +87,17 @@ export function GameCard({ game, index = 0 }: { game: Game; index?: number }) {
               <span className="grid h-6 w-6 place-items-center rounded-full bg-secondary text-[10px] font-bold">
                 {game.host.avatar}
               </span>
-              <span>{game.host.name}</span>
+              {hostUserId ? (
+                <button
+                  type="button"
+                  onClick={goToHost}
+                  className="font-semibold text-foreground hover:text-lime hover:underline"
+                >
+                  {game.host.name}
+                </button>
+              ) : (
+                <span>{game.host.name}</span>
+              )}
               <span className="text-foreground">· {game.skill}</span>
             </div>
             <div className="flex items-center gap-1.5 text-xs font-semibold">
