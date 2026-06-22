@@ -150,9 +150,40 @@ function EditProfile() {
       </div>
 
       <Section title="Basics">
+        <Field label="Photo">
+          <div className="flex items-center gap-3">
+            <div className="grid h-16 w-16 place-items-center overflow-hidden rounded-2xl border border-border bg-lime-gradient font-display text-lg font-bold text-primary-foreground">
+              {avatarUrl ? (
+                <img src={avatarUrl} alt="Avatar preview" className="h-full w-full object-cover" />
+              ) : (
+                (avatar || name.slice(0, 2) || "U").toUpperCase().slice(0, 3)
+              )}
+            </div>
+            <div className="flex flex-col gap-2">
+              <label className="inline-flex cursor-pointer items-center gap-1 rounded-full border border-border bg-surface px-3 py-1.5 text-xs font-semibold hover:border-lime/40">
+                <input
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={(e) => onPickAvatar(e.target.files?.[0] ?? null)}
+                />
+                {avatarUrl ? "Change photo" : "Upload photo"}
+              </label>
+              {avatarUrl && (
+                <button
+                  type="button"
+                  onClick={() => setAvatarUrl(undefined)}
+                  className="text-xs font-semibold text-coral text-left"
+                >
+                  Remove photo
+                </button>
+              )}
+            </div>
+          </div>
+        </Field>
         <Field label="Display name"><Input value={name} onChange={setName} maxLength={60} /></Field>
         <Field label="Username"><Input value={username} onChange={setUsername} maxLength={30} placeholder="@you" /></Field>
-        <Field label="Avatar initials"><Input value={avatar} onChange={setAvatar} maxLength={3} /></Field>
+        <Field label="Avatar initials (fallback)"><Input value={avatar} onChange={setAvatar} maxLength={3} /></Field>
         <Field label="City"><LocationAutocomplete value={city} onChange={setCity} placeholder="Your city" mode="city" /></Field>
         <Field label="Bio">
           <textarea
