@@ -109,8 +109,21 @@ function PlayerProfilePage() {
     );
   }
 
-  const initials = profile.avatar_initials ?? profile.display_name.slice(0, 2).toUpperCase();
-  const username = profile.username ? `@${profile.username.replace(/^@/, "")}` : "";
+  const initials = overrides.avatar || profile.avatar_initials || profile.display_name.slice(0, 2).toUpperCase();
+  const displayName = overrides.name || profile.display_name;
+  const username = (overrides.username || (profile.username ? `@${profile.username.replace(/^@/, "")}` : "")).trim();
+  const bio = overrides.bio ?? profile.bio ?? "";
+  const city = overrides.city ?? "";
+  const sportsList = overrides.sports?.length
+    ? overrides.sports
+    : availability?.sports?.length
+      ? availability.sports.map((name) => ({ name, skill: 3 }))
+      : profile.sport
+        ? [{ name: profile.sport as any, skill: 3 }]
+        : [];
+  const badges = overrides.badges ?? [];
+  const links = overrides.links ?? [];
+  const stats = { played: 0, reliability: 100, sportsmanship: 5, friends: 0 };
 
   return (
     <div className="mx-auto max-w-md pb-28">
@@ -137,19 +150,22 @@ function PlayerProfilePage() {
           transition={{ type: "spring", stiffness: 220, damping: 16 }}
           className="grid h-24 w-24 place-items-center overflow-hidden rounded-3xl border-4 border-background bg-lime-gradient font-display text-3xl font-bold text-primary-foreground glow-lime"
         >
-          {initials}
+          {overrides.avatarUrl ? (
+            <img src={overrides.avatarUrl} alt={displayName} className="h-full w-full object-cover" />
+          ) : (
+            initials
+          )}
         </motion.div>
         <div className="mt-3 flex items-start justify-between gap-3">
           <div className="min-w-0">
             <h1 className="font-display text-2xl font-bold flex items-center gap-2">
-              <span className="truncate">{profile.display_name}</span>
+              <span className="truncate">{displayName}</span>
               <span className="inline-flex items-center gap-1 rounded-full bg-lime/15 px-2 py-0.5 text-xs font-bold text-lime shrink-0">
                 <Shield className="h-3 w-3" /> Verified
               </span>
             </h1>
             <div className="text-sm text-muted-foreground truncate">
-              {username}
-              {profile.sport ? `${username ? " · " : ""}${profile.sport}` : ""}
+              {[username, city].filter(Boolean).join(" · ")}
             </div>
           </div>
           <Button
@@ -163,9 +179,31 @@ function PlayerProfilePage() {
           </Button>
         </div>
 
-        {profile.bio && (
-          <p className="mt-3 text-sm text-foreground/90 whitespace-pre-wrap">{profile.bio}</p>
+        {bio && (
+          <p className="mt-3 text-sm text-foreground/90 whitespace-pre-wrap">{bio}</p>
         )}
+
+        {/* Profile links */}
+        {links.length > 0 && (
+          <div className="mt-3">
+            <ProfileLinksList links={links} />
+          </div>
+        )}
+
+        {/* Stats */}
+        <div className="mt-5 grid grid-cols-4 gap-2">
+          {[
+            { k: stats.played, v: "Games" },
+            { k: stats.reliability + "%", v: "Reliable" },
+            { k: stats.sportsmanship, v: "Sport" },
+            { k: stats.friends, v: "Crew" },
+          ].map((s) => (
+            <div key={s.v} className="rounded-2xl border border-border bg-surface p-3 text-center">
+              <div className="font-display text-lg font-bold">{s.k}</div>
+              <div className="text-[10px] uppercase tracking-wider text-muted-foreground">{s.v}</div>
+            </div>
+          ))}
+        </div>
 
         {/* Reputation badge */}
         <div className="mt-4">
@@ -182,15 +220,46 @@ function PlayerProfilePage() {
           </div>
         )}
 
-        {/* Sport */}
-        {profile.sport && (
+        {/* Sports & skill */}
+        {sportsList.length > 0 && (
+          <div className="mt-6">
+            <h2 className="font-display text-sm font-bold uppercase tracking-wider text-muted-foreground mb-2">Sports</h2>
+            <div className="space-y-2">
+              {sportsList.map((s) => (
+                <div key={s.name} className="rounded-2xl border border-border bg-surface p-3">
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="font-semibold">
+                      {SPORTS.find((sp) => sp.name === s.name)?.emoji ?? "🎯"} {s.name}
+                    </span>
+                    <span className="text-lime font-bold">{s.skill.toFixed(1)} / 5</span>
+                  </div>
+                  <div className="mt-2 h-1.5 rounded-full bg-secondary overflow-hidden">
+                    <motion.div
+                      initial={{ width: 0 }}
+                      animate={{ width: `${(s.skill / 5) * 100}%` }}
+                      transition={{ duration: 0.8 }}
+                      className="h-full bg-lime-gradient"
+                    />
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Badges */}
+        {badges.length > 0 && (
           <div className="mt-6">
             <h2 className="font-display text-sm font-bold uppercase tracking-wider text-muted-foreground mb-2 flex items-center gap-1.5">
-              <Trophy className="h-4 w-4" /> Sport
+              <Trophy className="h-4 w-4" /> Badges
             </h2>
-            <span className="inline-flex items-center gap-1 rounded-full border border-border bg-surface px-3 py-1.5 text-xs font-semibold">
-              {SPORTS.find((s) => s.name === profile.sport)?.emoji ?? "🎯"} {profile.sport}
-            </span>
+            <div className="flex flex-wrap gap-2">
+              {badges.map((b) => (
+                <span key={b} className="rounded-full border border-border bg-surface px-3 py-1.5 text-xs font-semibold">
+                  {b}
+                </span>
+              ))}
+            </div>
           </div>
         )}
 
@@ -199,7 +268,7 @@ function PlayerProfilePage() {
           <ReviewsSection
             revieweeId={userId}
             revieweeKind="player"
-            revieweeName={profile.display_name}
+            revieweeName={displayName}
             isOwner={false}
           />
         </div>
@@ -207,6 +276,7 @@ function PlayerProfilePage() {
     </div>
   );
 }
+
 
 function PlayerCard({ a }: { a: PlayerAvailability }) {
   const window = formatWindow(a);
