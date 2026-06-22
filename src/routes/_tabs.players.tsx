@@ -438,12 +438,7 @@ function PostAvailabilityDialog({ onClose, onPosted }: { onClose: () => void; on
   return (
     <Dialog open onOpenChange={(o) => !o && onClose()}>
       <DialogContent className="max-w-md max-h-[90dvh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle>Post availability</DialogTitle>
-          <Link to="/profile" onClick={onClose} className="text-xs text-lime hover:underline w-fit">
-            View your profile →
-          </Link>
-        </DialogHeader>
+        <DialogHeader><DialogTitle>Post availability</DialogTitle></DialogHeader>
         <div className="space-y-4">
           <div>
             <Label className="mb-2 block">Sports</Label>
