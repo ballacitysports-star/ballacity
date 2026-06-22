@@ -1,5 +1,5 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { ArrowLeft, Check, Plus, X } from "lucide-react";
+import { ArrowLeft, Check, Plus, X, Users, Trophy } from "lucide-react";
 import { useEffect, useState } from "react";
 import type { User } from "@supabase/supabase-js";
 import { toast } from "sonner";
@@ -13,6 +13,8 @@ import {
   type ProfileLink,
   type ProfileLinkType,
 } from "@/lib/user-prefs-store";
+import { useMyOrgs } from "@/lib/org-store";
+import { OrgCard } from "@/components/OrgCard";
 import { getCurrentUser, useAuth } from "@/hooks/use-auth";
 import { LocationAutocomplete } from "@/components/LocationAutocomplete";
 import { LINK_TYPES, LinkIcon } from "@/components/ProfileLinks";
