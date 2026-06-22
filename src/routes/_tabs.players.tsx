@@ -22,6 +22,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
+import { kmToMi, miToKm } from "@/lib/distance";
 
 export const Route = createFileRoute("/_tabs/players")({
   head: () => ({ meta: [{ title: "Players — OpenRun" }] }),
@@ -59,7 +60,7 @@ function PlayersPage() {
     const needle = q.trim().toLowerCase();
     return list.filter((a) => {
       if (skill && a.skill_level !== skill) return false;
-      if (maxDistance > 0 && (a.travel_radius_km ?? 0) > maxDistance) return false;
+      if (maxDistance > 0 && kmToMi(a.travel_radius_km) > maxDistance) return false;
       if (needle) {
         const hay = (a.author_name + " " + (a.city ?? "") + " " + (a.note ?? "") + " " + a.sports.join(" ")).toLowerCase();
         if (!hay.includes(needle)) return false;
@@ -359,7 +360,7 @@ function AvailabilityCard({ a, isMine, onContact, onChanged }: {
           {(a.city || a.travel_radius_km) && (
             <p className="mt-1 flex items-center gap-1 text-xs text-muted-foreground">
               <MapPin className="h-3.5 w-3.5" />
-              {a.city || "Anywhere"} · up to {a.travel_radius_km} mi
+              {a.city || "Anywhere"} · up to {kmToMi(a.travel_radius_km)} mi
             </p>
           )}
           {a.note && <p className="mt-2 text-sm leading-snug">{a.note}</p>}
@@ -427,7 +428,7 @@ function PostAvailabilityDialog({ onClose, onPosted }: { onClose: () => void; on
         // datetime-local gives "YYYY-MM-DDTHH:mm"; DB columns are DATE → store date portion only.
         starts_on: starts ? starts.slice(0, 10) : null,
         ends_on: ends ? ends.slice(0, 10) : null,
-        recurring_days: days, city, travel_radius_km: radius, note,
+        recurring_days: days, city, travel_radius_km: miToKm(radius), note,
       });
       onPosted();
     } catch (e: any) { toast.error(e.message); }

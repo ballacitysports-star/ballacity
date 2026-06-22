@@ -22,6 +22,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
+import { kmToMi, miToKm } from "@/lib/distance";
 
 export const Route = createFileRoute("/available-players")({
   head: () => ({
@@ -251,7 +252,7 @@ function AvailabilityCard({ a, isMine, onContact }: { a: AvailabilityWithAuthor;
           {(a.city || a.travel_radius_km) && (
             <p className="mt-1 flex items-center gap-1 text-xs text-muted-foreground">
               <MapPin className="h-3.5 w-3.5" />
-              {a.city || "Anywhere"} · up to {a.travel_radius_km} mi
+              {a.city || "Anywhere"} · up to {kmToMi(a.travel_radius_km)} mi
             </p>
           )}
           {a.note && <p className="mt-2 text-sm leading-snug">{a.note}</p>}
@@ -318,7 +319,7 @@ function PostAvailabilityDialog({ onClose, onPosted }: { onClose: () => void; on
       await createAvailability({
         sports, skill_level: skill,
         starts_on: starts || null, ends_on: ends || null,
-        recurring_days: days, city, travel_radius_km: radius, note,
+        recurring_days: days, city, travel_radius_km: miToKm(radius), note,
       });
       onPosted();
     } catch (e: any) { toast.error(e.message); }
