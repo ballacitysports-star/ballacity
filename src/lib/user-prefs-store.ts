@@ -25,6 +25,7 @@ export type ProfileOverrides = {
   username?: string;
   avatar?: string; // initials
   avatarUrl?: string; // data URL or remote URL
+  coverUrl?: string; // hero/cover image data URL or remote URL
   bio?: string;
   city?: string;
   sports?: { name: Sport; skill: number }[];
@@ -37,6 +38,7 @@ export type MyProfile = {
   username: string;
   avatar: string;
   avatarUrl?: string;
+  coverUrl?: string;
   bio: string;
   city: string;
   stats: typeof ME.stats;
