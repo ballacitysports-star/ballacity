@@ -15,7 +15,7 @@ function Thread() {
   const { conversationId } = Route.useParams();
   const { user, loading } = useAuth();
   const [msgs, setMsgs] = useState<Message[]>([]);
-  const [other, setOther] = useState<{ display_name: string; avatar_initials: string | null } | null>(null);
+  const [other, setOther] = useState<{ user_id: string; display_name: string; avatar_initials: string | null } | null>(null);
   const [text, setText] = useState("");
   const [sending, setSending] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
