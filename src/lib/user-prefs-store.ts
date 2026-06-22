@@ -183,6 +183,8 @@ export function useMyProfile(currentUser?: User | null): MyProfile | null {
     stats: base.stats,
     sports: overrides.sports ?? base.sports,
     badges: overrides.badges ?? base.badges,
+    links: overrides.links ?? base.links,
+
   };
 }
 
