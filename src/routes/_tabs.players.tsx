@@ -1,6 +1,7 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
-import { Search, X, Plus, MessageCircle, Send, Calendar, MapPin, Bell, Inbox, Loader2 } from "lucide-react";
+import { Search, X, Plus, MessageCircle, Send, Calendar, MapPin, Bell, Inbox, Loader2, SlidersHorizontal } from "lucide-react";
+import { AnimatePresence } from "framer-motion";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
 import { Logo } from "@/components/Logo";
@@ -103,6 +104,18 @@ function PlayersPage() {
           )}
         </div>
         <button
+          onClick={() => setFiltersOpen(true)}
+          className={`relative grid h-11 w-11 place-items-center rounded-full border bg-surface ${activeFilterCount ? "border-lime" : "border-border"}`}
+          aria-label="Filters"
+        >
+          <SlidersHorizontal className="h-4 w-4" />
+          {activeFilterCount > 0 && (
+            <span className="absolute -top-1 -right-1 grid h-4 w-4 place-items-center rounded-full bg-lime text-[10px] font-bold text-primary-foreground">
+              {activeFilterCount}
+            </span>
+          )}
+        </button>
+        <button
           onClick={() => user ? setPostOpen(true) : toast.error("Sign in to post your availability.")}
           className="grid h-11 w-11 place-items-center rounded-full bg-lime-gradient text-primary-foreground glow-lime"
           aria-label="Post availability"
@@ -110,6 +123,18 @@ function PlayersPage() {
           <Plus className="h-5 w-5" strokeWidth={2.5} />
         </button>
       </div>
+
+      <div className="-mx-4 overflow-x-auto px-4 mb-5">
+        <div className="flex gap-2 pb-1">
+          <Chip active={!sport} onClick={() => setSport("")}>All sports</Chip>
+          {SPORTS.map((s) => (
+            <Chip key={s.name} active={sport === s.name} onClick={() => setSport(s.name)}>
+              <span className="mr-1">{s.emoji}</span>{s.name}
+            </Chip>
+          ))}
+        </div>
+      </div>
+
 
       <div className="-mx-4 overflow-x-auto px-4 mb-5">
         <div className="flex gap-2 pb-1">
