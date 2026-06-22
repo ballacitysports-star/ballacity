@@ -1,5 +1,5 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { ArrowLeft, Check, Plus, X, Users, Trophy, BarChart3 } from "lucide-react";
+import { ArrowLeft, Check, Plus, X, Users, Trophy, BarChart3, CreditCard, Video } from "lucide-react";
 import { useEffect, useState } from "react";
 import type { User } from "@supabase/supabase-js";
 import { toast } from "sonner";
@@ -278,6 +278,32 @@ function EditProfile() {
           <div className="min-w-0 flex-1">
             <div className="font-semibold text-sm">Reviews Hub</div>
             <div className="text-xs text-muted-foreground">Trust scores and AI insights across OpenRun</div>
+          </div>
+          <div className="text-lime text-xs font-bold">→</div>
+        </Link>
+      </Section>
+
+      <Section title="Payments">
+        <Link to="/payments" className="flex items-center gap-3 rounded-2xl border border-border bg-surface p-3 hover:border-lime/40 transition-colors">
+          <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-lime/15 text-lime">
+            <CreditCard className="h-5 w-5" />
+          </div>
+          <div className="min-w-0 flex-1">
+            <div className="font-semibold text-sm">Payments</div>
+            <div className="text-xs text-muted-foreground">Manage payout methods & verify player payments</div>
+          </div>
+          <div className="text-lime text-xs font-bold">→</div>
+        </Link>
+      </Section>
+
+      <Section title="AI Highlight Reels">
+        <Link to="/reels" className="flex items-center gap-3 rounded-2xl border border-border bg-surface p-3 hover:border-lime/40 transition-colors">
+          <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-lime/15 text-lime">
+            <Video className="h-5 w-5" />
+          </div>
+          <div className="min-w-0 flex-1">
+            <div className="font-semibold text-sm">AI Highlight Reels</div>
+            <div className="text-xs text-muted-foreground">3 free, then $15/mo unlimited</div>
           </div>
           <div className="text-lime text-xs font-bold">→</div>
         </Link>
