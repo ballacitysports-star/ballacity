@@ -189,10 +189,11 @@ function PlayersPage() {
       <AnimatePresence>
         {filtersOpen && (
           <PlayersFilterSheet
+            sport={sport} setSport={setSport}
             skill={skill} setSkill={setSkill}
             maxDistance={maxDistance} setMaxDistance={setMaxDistance}
             onClose={() => setFiltersOpen(false)}
-            onReset={() => { setSkill(""); setMaxDistance(0); }}
+            onReset={() => { setSport(""); setSkill(""); setMaxDistance(0); }}
           />
         )}
       </AnimatePresence>
@@ -200,7 +201,8 @@ function PlayersPage() {
   );
 }
 
-function PlayersFilterSheet({ skill, setSkill, maxDistance, setMaxDistance, onClose, onReset }: {
+function PlayersFilterSheet({ sport, setSport, skill, setSkill, maxDistance, setMaxDistance, onClose, onReset }: {
+  sport: string; setSport: (v: string) => void;
   skill: string; setSkill: (v: string) => void;
   maxDistance: number; setMaxDistance: (v: number) => void;
   onClose: () => void; onReset: () => void;
@@ -226,6 +228,16 @@ function PlayersFilterSheet({ skill, setSkill, maxDistance, setMaxDistance, onCl
           </button>
         </div>
 
+        <div className="text-xs font-semibold text-muted-foreground mb-2 uppercase tracking-wider">Sport</div>
+        <div className="flex flex-wrap gap-2 mb-5">
+          <Chip active={!sport} onClick={() => setSport("")}>All sports</Chip>
+          {SPORTS.map((s) => (
+            <Chip key={s.name} active={sport === s.name} onClick={() => setSport(s.name)}>
+              <span className="mr-1">{s.emoji}</span>{s.name}
+            </Chip>
+          ))}
+        </div>
+
         <div className="text-xs font-semibold text-muted-foreground mb-2 uppercase tracking-wider">Skill level</div>
         <div className="flex flex-wrap gap-2 mb-5">
           <Chip active={!skill} onClick={() => setSkill("")}>Any</Chip>
@@ -233,6 +245,7 @@ function PlayersFilterSheet({ skill, setSkill, maxDistance, setMaxDistance, onCl
             <Chip key={s} active={skill === s} onClick={() => setSkill(s)}>{s}</Chip>
           ))}
         </div>
+
 
         <div className="text-xs font-semibold text-muted-foreground mb-2 uppercase tracking-wider">Max travel distance</div>
         <div className="flex flex-wrap gap-2 mb-5">
