@@ -154,7 +154,9 @@ function defaultsFromUser(user: User): MyProfile {
     stats: { played: 0, reliability: 100, sportsmanship: 5, friends: 0 },
     sports: [],
     badges: [],
+    links: [],
   };
+
 }
 
 // ---------- Hooks ----------
