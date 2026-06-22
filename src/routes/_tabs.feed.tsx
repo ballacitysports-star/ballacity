@@ -293,7 +293,7 @@ function FilterSheet({ onClose }: { onClose: () => void }) {
           </button>
         </div>
 
-        <div className="text-xs font-semibold text-muted-foreground mb-2 uppercase tracking-wider">Preferred sports</div>
+        <div className="text-xs font-semibold text-muted-foreground mb-2 uppercase tracking-wider">Sport (Games)</div>
         <div className="flex flex-wrap gap-2 mb-5">
           {SPORTS.map((s) => {
             const active = preferredSports.includes(s.name);
