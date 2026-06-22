@@ -117,6 +117,7 @@ function EditProfile() {
       name: trimmedName,
       username: username.trim().slice(0, 30),
       avatar: (avatar.trim() || trimmedName.slice(0, 2)).toUpperCase().slice(0, 3),
+      avatarUrl,
       city: city.trim().slice(0, 80),
       bio: bio.trim().slice(0, 280),
       sports,
