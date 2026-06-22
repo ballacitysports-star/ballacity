@@ -252,7 +252,7 @@ function AvailabilityCard({ a, isMine, onContact }: { a: AvailabilityWithAuthor;
           {(a.city || a.travel_radius_km) && (
             <p className="mt-1 flex items-center gap-1 text-xs text-muted-foreground">
               <MapPin className="h-3.5 w-3.5" />
-              {a.city || "Anywhere"} · up to {a.travel_radius_km} mi
+              {a.city || "Anywhere"} · up to {kmToMi(a.travel_radius_km)} mi
             </p>
           )}
           {a.note && <p className="mt-2 text-sm leading-snug">{a.note}</p>}
