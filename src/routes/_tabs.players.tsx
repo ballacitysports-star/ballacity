@@ -34,6 +34,9 @@ function PlayersPage() {
   const { user } = useAuth();
   const [q, setQ] = useState("");
   const [sport, setSport] = useState("");
+  const [skill, setSkill] = useState<string>("");
+  const [maxDistance, setMaxDistance] = useState<number>(0); // 0 = any
+  const [filtersOpen, setFiltersOpen] = useState(false);
   const [list, setList] = useState<AvailabilityWithAuthor[] | null>(null);
   const [postOpen, setPostOpen] = useState(false);
   const [contactFor, setContactFor] = useState<AvailabilityWithAuthor | null>(null);
@@ -48,16 +51,22 @@ function PlayersPage() {
     return () => { cancelled = true; };
   }, [sport, reloadTick]);
 
+  const activeFilterCount = (skill ? 1 : 0) + (maxDistance > 0 ? 1 : 0);
+
   const filtered = useMemo(() => {
     if (!list) return null;
-    if (!q.trim()) return list;
-    const needle = q.toLowerCase();
-    return list.filter((a) =>
-      (a.author_name + " " + (a.city ?? "") + " " + (a.note ?? "") + " " + a.sports.join(" "))
-        .toLowerCase()
-        .includes(needle),
-    );
-  }, [list, q]);
+    const needle = q.trim().toLowerCase();
+    return list.filter((a) => {
+      if (skill && a.skill_level !== skill) return false;
+      if (maxDistance > 0 && (a.travel_radius_km ?? 0) > maxDistance) return false;
+      if (needle) {
+        const hay = (a.author_name + " " + (a.city ?? "") + " " + (a.note ?? "") + " " + a.sports.join(" ")).toLowerCase();
+        if (!hay.includes(needle)) return false;
+      }
+      return true;
+    });
+  }, [list, q, skill, maxDistance]);
+
 
   return (
     <div className="mx-auto max-w-md px-4 pt-6">
