@@ -244,7 +244,47 @@ function EditProfile() {
 
 
 
+      <Section
+        title="My organizations"
+        right={
+          <Link to="/teams/create" className="inline-flex items-center gap-1 text-xs font-bold text-lime">
+            <Plus className="h-3.5 w-3.5" /> New
+          </Link>
+        }
+      >
+        {myOrgs.length === 0 ? (
+          <Link
+            to="/teams/create"
+            className="block rounded-3xl border border-dashed border-border bg-surface/40 p-5 text-center hover:border-lime/40"
+          >
+            <div className="mx-auto grid h-12 w-12 place-items-center rounded-2xl bg-lime/15 text-lime mb-2">
+              <Users className="h-6 w-6" />
+            </div>
+            <div className="font-display text-base font-bold">Start a team or coach profile</div>
+            <p className="text-xs text-muted-foreground mt-1">Post tryouts, run pickups, build your following.</p>
+          </Link>
+        ) : (
+          <div className="space-y-3">
+            {myOrgs.map((o, i) => <OrgCard key={o.id} org={o} index={i} />)}
+          </div>
+        )}
+      </Section>
+
+      <Section title="Plans & subscriptions">
+        <Link to="/plans" className="flex items-center gap-3 rounded-2xl border border-border bg-surface p-3 hover:border-lime/40 transition-colors">
+          <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-lime/15 text-lime">
+            <Trophy className="h-5 w-5" />
+          </div>
+          <div className="min-w-0 flex-1">
+            <div className="font-semibold text-sm">Plans & Subscriptions</div>
+            <div className="text-xs text-muted-foreground">Host, Team, Org & Reel plans</div>
+          </div>
+          <div className="text-lime text-xs font-bold">→</div>
+        </Link>
+      </Section>
+
       <Section title="Feed preferences" right={<button onClick={reset} className="text-xs font-bold text-coral">Reset</button>}>
+
         <div className="text-xs text-muted-foreground mb-2">Preferred sports (empty = all)</div>
         <div className="flex flex-wrap gap-2 mb-4">
           {SPORTS.map((s) => {
