@@ -58,8 +58,10 @@ function ReviewNew() {
   const revieweeMeta = REVIEWEE_META[revieweeKind];
 
   const criteria = useMemo(() => CRITERIA[revieweeKind], [revieweeKind]);
+  const eligible = useCanReview(search.revieweeId ?? "");
+  const sharedTxns = useTransactionsWith(search.revieweeId ?? "");
   const verified = context.trim().length > 0;
-  const canSubmit = body.trim().length >= 8 && rating > 0;
+  const canSubmit = eligible && body.trim().length >= 8 && rating > 0;
 
   const submit = () => {
     if (!canSubmit) return;
