@@ -16,6 +16,8 @@ import { toast } from "sonner";
 import { useJoinedGameIds } from "@/lib/games-store";
 import { useHostedGames } from "@/lib/hosted-games-store";
 import { useMyProfile } from "@/lib/user-prefs-store";
+import { ProfileLinksList } from "@/components/ProfileLinks";
+
 
 export const Route = createFileRoute("/_tabs/profile")({
   head: () => ({ meta: [{ title: "Profile — OpenRun" }] }),
@@ -134,6 +136,14 @@ function Profile() {
           </div>
         </div>
         <p className="mt-3 text-sm text-foreground/90">{me.bio}</p>
+
+        {me.links.length > 0 && (
+          <div className="mt-3">
+            <ProfileLinksList links={me.links} />
+          </div>
+        )}
+
+
 
         {/* Stats */}
         <div className="mt-5 grid grid-cols-4 gap-2">

@@ -1,5 +1,5 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { ArrowLeft, Check, X } from "lucide-react";
+import { ArrowLeft, Check, Plus, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import type { User } from "@supabase/supabase-js";
 import { toast } from "sonner";
@@ -10,9 +10,13 @@ import {
   useFeedPrefs,
   setFeedPrefs,
   DEFAULT_PREFS,
+  type ProfileLink,
+  type ProfileLinkType,
 } from "@/lib/user-prefs-store";
 import { getCurrentUser, useAuth } from "@/hooks/use-auth";
 import { LocationAutocomplete } from "@/components/LocationAutocomplete";
+import { LINK_TYPES, LinkIcon } from "@/components/ProfileLinks";
+
 
 export const Route = createFileRoute("/profile/edit")({
   head: () => ({ meta: [{ title: "Edit profile — OpenRun" }] }),
@@ -33,6 +37,16 @@ function EditProfile() {
   const [city, setCity] = useState(profile?.city ?? "");
   const [bio, setBio] = useState(profile?.bio ?? "");
   const [sports, setSports] = useState(profile?.sports ?? []);
+  const [links, setLinks] = useState<ProfileLink[]>(profile?.links ?? []);
+
+  const addLink = (type: ProfileLinkType) => {
+    setLinks((prev) => [...prev, { type, url: "" }]);
+  };
+  const updateLink = (i: number, patch: Partial<ProfileLink>) => {
+    setLinks((prev) => prev.map((l, idx) => (idx === i ? { ...l, ...patch } : l)));
+  };
+  const removeLink = (i: number) => setLinks((prev) => prev.filter((_, idx) => idx !== i));
+
 
   const [preferredSports, setPreferredSports] = useState<Sport[]>(prefs.preferredSports);
   const [sections, setSections] = useState(prefs.sections);
@@ -90,7 +104,11 @@ function EditProfile() {
       city: city.trim().slice(0, 80),
       bio: bio.trim().slice(0, 280),
       sports,
+      links: links
+        .map((l) => ({ ...l, url: l.url.trim(), label: l.label?.trim() || undefined }))
+        .filter((l) => l.url),
     });
+
     setFeedPrefs({ preferredSports, sections });
     toast.success("Profile saved");
     nav({ to: "/profile" });
@@ -163,6 +181,64 @@ function EditProfile() {
           </div>
         </div>
       </Section>
+
+      <Section title="Profile links">
+        <p className="text-xs text-muted-foreground mb-2">
+          Add links to Perfect Game, PBR, Hudl, socials, or your own site.
+        </p>
+        <div className="space-y-2">
+          {links.map((l, i) => (
+            <div key={i} className="rounded-2xl border border-border bg-surface p-3">
+              <div className="flex items-center justify-between gap-2 mb-2">
+                <div className="inline-flex items-center gap-1.5 text-xs font-semibold text-muted-foreground">
+                  <LinkIcon type={l.type} className="h-3.5 w-3.5" />
+                  <select
+                    value={l.type}
+                    onChange={(e) => updateLink(i, { type: e.target.value as ProfileLinkType })}
+                    className="bg-transparent text-xs font-semibold outline-none"
+                  >
+                    {LINK_TYPES.map((opt) => (
+                      <option key={opt.type} value={opt.type}>{opt.label}</option>
+                    ))}
+                  </select>
+                </div>
+                <button onClick={() => removeLink(i)} className="grid h-7 w-7 place-items-center rounded-full border border-border text-muted-foreground">
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              </div>
+              <Input
+                value={l.url}
+                onChange={(v) => updateLink(i, { url: v })}
+                placeholder={LINK_TYPES.find((t) => t.type === l.type)?.placeholder ?? "https://"}
+              />
+              <div className="mt-2">
+                <Input
+                  value={l.label ?? ""}
+                  onChange={(v) => updateLink(i, { label: v })}
+                  maxLength={40}
+                  placeholder="Optional label (e.g. @handle)"
+                />
+              </div>
+            </div>
+          ))}
+        </div>
+        <div className="mt-3">
+          <div className="text-xs text-muted-foreground mb-1.5">Add link</div>
+          <div className="flex flex-wrap gap-2">
+            {LINK_TYPES.map((t) => (
+              <button
+                key={t.type}
+                onClick={() => addLink(t.type)}
+                className="inline-flex items-center gap-1 rounded-full border border-border bg-surface px-3 py-1.5 text-xs font-semibold hover:border-lime/40"
+              >
+                <Plus className="h-3 w-3" /> {t.label}
+              </button>
+            ))}
+          </div>
+        </div>
+      </Section>
+
+
 
 
       <Section title="Feed preferences" right={<button onClick={reset} className="text-xs font-bold text-coral">Reset</button>}>
