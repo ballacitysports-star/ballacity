@@ -1,6 +1,7 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
-import { Search, X, Plus, MessageCircle, Send, Calendar, MapPin, Bell, Inbox, Loader2 } from "lucide-react";
+import { Search, X, Plus, MessageCircle, Send, Calendar, MapPin, Bell, Inbox, Loader2, SlidersHorizontal } from "lucide-react";
+import { AnimatePresence } from "framer-motion";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
 import { Logo } from "@/components/Logo";
@@ -34,6 +35,9 @@ function PlayersPage() {
   const { user } = useAuth();
   const [q, setQ] = useState("");
   const [sport, setSport] = useState("");
+  const [skill, setSkill] = useState<string>("");
+  const [maxDistance, setMaxDistance] = useState<number>(0); // 0 = any
+  const [filtersOpen, setFiltersOpen] = useState(false);
   const [list, setList] = useState<AvailabilityWithAuthor[] | null>(null);
   const [postOpen, setPostOpen] = useState(false);
   const [contactFor, setContactFor] = useState<AvailabilityWithAuthor | null>(null);
@@ -48,16 +52,22 @@ function PlayersPage() {
     return () => { cancelled = true; };
   }, [sport, reloadTick]);
 
+  const activeFilterCount = (skill ? 1 : 0) + (maxDistance > 0 ? 1 : 0);
+
   const filtered = useMemo(() => {
     if (!list) return null;
-    if (!q.trim()) return list;
-    const needle = q.toLowerCase();
-    return list.filter((a) =>
-      (a.author_name + " " + (a.city ?? "") + " " + (a.note ?? "") + " " + a.sports.join(" "))
-        .toLowerCase()
-        .includes(needle),
-    );
-  }, [list, q]);
+    const needle = q.trim().toLowerCase();
+    return list.filter((a) => {
+      if (skill && a.skill_level !== skill) return false;
+      if (maxDistance > 0 && (a.travel_radius_km ?? 0) > maxDistance) return false;
+      if (needle) {
+        const hay = (a.author_name + " " + (a.city ?? "") + " " + (a.note ?? "") + " " + a.sports.join(" ")).toLowerCase();
+        if (!hay.includes(needle)) return false;
+      }
+      return true;
+    });
+  }, [list, q, skill, maxDistance]);
+
 
   return (
     <div className="mx-auto max-w-md px-4 pt-6">
@@ -94,6 +104,18 @@ function PlayersPage() {
           )}
         </div>
         <button
+          onClick={() => setFiltersOpen(true)}
+          className={`relative grid h-11 w-11 place-items-center rounded-full border bg-surface ${activeFilterCount ? "border-lime" : "border-border"}`}
+          aria-label="Filters"
+        >
+          <SlidersHorizontal className="h-4 w-4" />
+          {activeFilterCount > 0 && (
+            <span className="absolute -top-1 -right-1 grid h-4 w-4 place-items-center rounded-full bg-lime text-[10px] font-bold text-primary-foreground">
+              {activeFilterCount}
+            </span>
+          )}
+        </button>
+        <button
           onClick={() => user ? setPostOpen(true) : toast.error("Sign in to post your availability.")}
           className="grid h-11 w-11 place-items-center rounded-full bg-lime-gradient text-primary-foreground glow-lime"
           aria-label="Post availability"
@@ -101,6 +123,18 @@ function PlayersPage() {
           <Plus className="h-5 w-5" strokeWidth={2.5} />
         </button>
       </div>
+
+      <div className="-mx-4 overflow-x-auto px-4 mb-5">
+        <div className="flex gap-2 pb-1">
+          <Chip active={!sport} onClick={() => setSport("")}>All sports</Chip>
+          {SPORTS.map((s) => (
+            <Chip key={s.name} active={sport === s.name} onClick={() => setSport(s.name)}>
+              <span className="mr-1">{s.emoji}</span>{s.name}
+            </Chip>
+          ))}
+        </div>
+      </div>
+
 
       <div className="-mx-4 overflow-x-auto px-4 mb-5">
         <div className="flex gap-2 pb-1">
@@ -151,7 +185,70 @@ function PlayersPage() {
         />
       )}
       {contactFor && <ContactDialog availability={contactFor} onClose={() => setContactFor(null)} />}
+
+      <AnimatePresence>
+        {filtersOpen && (
+          <PlayersFilterSheet
+            skill={skill} setSkill={setSkill}
+            maxDistance={maxDistance} setMaxDistance={setMaxDistance}
+            onClose={() => setFiltersOpen(false)}
+            onReset={() => { setSkill(""); setMaxDistance(0); }}
+          />
+        )}
+      </AnimatePresence>
     </div>
+  );
+}
+
+function PlayersFilterSheet({ skill, setSkill, maxDistance, setMaxDistance, onClose, onReset }: {
+  skill: string; setSkill: (v: string) => void;
+  maxDistance: number; setMaxDistance: (v: number) => void;
+  onClose: () => void; onReset: () => void;
+}) {
+  const SKILLS = ["All Levels", "Beginner", "Intermediate", "Advanced"];
+  const DISTANCES = [0, 5, 10, 25, 50, 100];
+  return (
+    <motion.div
+      initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+      className="fixed inset-0 z-50 bg-background/70 backdrop-blur flex items-end justify-center"
+      onClick={onClose}
+    >
+      <motion.div
+        initial={{ y: "100%" }} animate={{ y: 0 }} exit={{ y: "100%" }}
+        transition={{ type: "spring", stiffness: 280, damping: 30 }}
+        onClick={(e) => e.stopPropagation()}
+        className="w-full max-w-md rounded-t-3xl border-t border-border bg-background p-5 max-h-[85vh] overflow-y-auto pb-10"
+      >
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="font-display text-lg font-bold">Filter players</h2>
+          <button onClick={onClose} className="grid h-9 w-9 place-items-center rounded-full border border-border" aria-label="Close">
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+
+        <div className="text-xs font-semibold text-muted-foreground mb-2 uppercase tracking-wider">Skill level</div>
+        <div className="flex flex-wrap gap-2 mb-5">
+          <Chip active={!skill} onClick={() => setSkill("")}>Any</Chip>
+          {SKILLS.map((s) => (
+            <Chip key={s} active={skill === s} onClick={() => setSkill(s)}>{s}</Chip>
+          ))}
+        </div>
+
+        <div className="text-xs font-semibold text-muted-foreground mb-2 uppercase tracking-wider">Max travel distance</div>
+        <div className="flex flex-wrap gap-2 mb-5">
+          {DISTANCES.map((d) => (
+            <Chip key={d} active={maxDistance === d} onClick={() => setMaxDistance(d)}>
+              {d === 0 ? "Any" : `≤ ${d} km`}
+            </Chip>
+          ))}
+        </div>
+
+        <div className="flex gap-2">
+          <button onClick={onReset} className="flex-1 rounded-full border border-border py-3 text-sm font-bold">Reset</button>
+          <button onClick={onClose} className="flex-1 rounded-full bg-lime-gradient py-3 text-sm font-bold text-primary-foreground">Done</button>
+        </div>
+      </motion.div>
+    </motion.div>
   );
 }
 
