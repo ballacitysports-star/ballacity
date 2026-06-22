@@ -27,6 +27,7 @@ export const Route = createFileRoute("/profile/edit")({
 
 function EditProfile() {
   const { user, loading } = useAuth();
+  const myOrgs = useMyOrgs();
   const [confirmedUser, setConfirmedUser] = useState<User | null>(null);
   const profileUser = user ?? confirmedUser;
   const profile = useMyProfile(profileUser);
