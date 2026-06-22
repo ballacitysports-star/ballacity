@@ -1,5 +1,5 @@
 import { Link, useLocation } from "@tanstack/react-router";
-import { Home, Map, Plus, User, Users, UserCheck, Dribbble } from "lucide-react";
+import { Home, Map, Plus, IdCard, Users, UserCheck, Dribbble } from "lucide-react";
 import { motion } from "framer-motion";
 
 const items: { to: string; icon: typeof Home; label: string }[] = [
@@ -8,7 +8,7 @@ const items: { to: string; icon: typeof Home; label: string }[] = [
   { to: "/teams", icon: Users, label: "Teams" },
   { to: "/create", icon: Plus, label: "Host" },
   { to: "/discover", icon: Map, label: "Map" },
-  { to: "/profile", icon: User, label: "Me" },
+  { to: "/profile", icon: IdCard, label: "My Card" },
 ];
 
 export function BottomNav() {
