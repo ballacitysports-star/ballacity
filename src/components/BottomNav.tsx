@@ -1,9 +1,10 @@
 import { Link, useLocation } from "@tanstack/react-router";
-import { Home, Map, Plus, User, Users } from "lucide-react";
+import { Home, Map, Plus, User, Users, UserCheck } from "lucide-react";
 import { motion } from "framer-motion";
 
 const items: { to: string; icon: typeof Home; label: string }[] = [
   { to: "/feed", icon: Home, label: "Feed" },
+  { to: "/players", icon: UserCheck, label: "Players" },
   { to: "/teams", icon: Users, label: "Teams" },
   { to: "/create", icon: Plus, label: "Host" },
   { to: "/discover", icon: Map, label: "Map" },
@@ -15,7 +16,7 @@ export function BottomNav() {
   return (
     <nav className="fixed bottom-0 left-0 right-0 z-40 pb-[max(env(safe-area-inset-bottom),0.5rem)] pt-2 px-3">
       <div className="mx-auto max-w-md rounded-3xl border border-border bg-surface/85 backdrop-blur-xl shadow-2xl">
-        <ul className="grid grid-cols-5">
+        <ul className="grid grid-cols-6">
           {items.map((it) => {
             const active = pathname === it.to || (it.to !== "/feed" && pathname.startsWith(it.to));
             const Icon = it.icon;
