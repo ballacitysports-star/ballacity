@@ -32,6 +32,7 @@ import { Route as AccountSecurityRouteImport } from './routes/account.security'
 import { Route as TabsTeamsRouteImport } from './routes/_tabs.teams'
 import { Route as TabsReelsRouteImport } from './routes/_tabs.reels'
 import { Route as TabsProfileRouteImport } from './routes/_tabs.profile'
+import { Route as TabsPlayersRouteImport } from './routes/_tabs.players'
 import { Route as TabsNotificationsRouteImport } from './routes/_tabs.notifications'
 import { Route as TabsFeedRouteImport } from './routes/_tabs.feed'
 import { Route as TabsDiscoverRouteImport } from './routes/_tabs.discover'
@@ -156,6 +157,11 @@ const TabsProfileRoute = TabsProfileRouteImport.update({
   path: '/profile',
   getParentRoute: () => TabsRoute,
 } as any)
+const TabsPlayersRoute = TabsPlayersRouteImport.update({
+  id: '/players',
+  path: '/players',
+  getParentRoute: () => TabsRoute,
+} as any)
 const TabsNotificationsRoute = TabsNotificationsRouteImport.update({
   id: '/notifications',
   path: '/notifications',
@@ -218,6 +224,7 @@ export interface FileRoutesByFullPath {
   '/discover': typeof TabsDiscoverRoute
   '/feed': typeof TabsFeedRoute
   '/notifications': typeof TabsNotificationsRoute
+  '/players': typeof TabsPlayersRoute
   '/profile': typeof TabsProfileRoute
   '/reels': typeof TabsReelsRoute
   '/teams': typeof TabsTeamsRoute
@@ -251,6 +258,7 @@ export interface FileRoutesByTo {
   '/discover': typeof TabsDiscoverRoute
   '/feed': typeof TabsFeedRoute
   '/notifications': typeof TabsNotificationsRoute
+  '/players': typeof TabsPlayersRoute
   '/profile': typeof TabsProfileRoute
   '/reels': typeof TabsReelsRoute
   '/teams': typeof TabsTeamsRoute
@@ -286,6 +294,7 @@ export interface FileRoutesById {
   '/_tabs/discover': typeof TabsDiscoverRoute
   '/_tabs/feed': typeof TabsFeedRoute
   '/_tabs/notifications': typeof TabsNotificationsRoute
+  '/_tabs/players': typeof TabsPlayersRoute
   '/_tabs/profile': typeof TabsProfileRoute
   '/_tabs/reels': typeof TabsReelsRoute
   '/_tabs/teams': typeof TabsTeamsRoute
@@ -321,6 +330,7 @@ export interface FileRouteTypes {
     | '/discover'
     | '/feed'
     | '/notifications'
+    | '/players'
     | '/profile'
     | '/reels'
     | '/teams'
@@ -354,6 +364,7 @@ export interface FileRouteTypes {
     | '/discover'
     | '/feed'
     | '/notifications'
+    | '/players'
     | '/profile'
     | '/reels'
     | '/teams'
@@ -388,6 +399,7 @@ export interface FileRouteTypes {
     | '/_tabs/discover'
     | '/_tabs/feed'
     | '/_tabs/notifications'
+    | '/_tabs/players'
     | '/_tabs/profile'
     | '/_tabs/reels'
     | '/_tabs/teams'
@@ -593,6 +605,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof TabsProfileRouteImport
       parentRoute: typeof TabsRoute
     }
+    '/_tabs/players': {
+      id: '/_tabs/players'
+      path: '/players'
+      fullPath: '/players'
+      preLoaderRoute: typeof TabsPlayersRouteImport
+      parentRoute: typeof TabsRoute
+    }
     '/_tabs/notifications': {
       id: '/_tabs/notifications'
       path: '/notifications'
@@ -664,6 +683,7 @@ interface TabsRouteChildren {
   TabsDiscoverRoute: typeof TabsDiscoverRoute
   TabsFeedRoute: typeof TabsFeedRoute
   TabsNotificationsRoute: typeof TabsNotificationsRoute
+  TabsPlayersRoute: typeof TabsPlayersRoute
   TabsProfileRoute: typeof TabsProfileRoute
   TabsReelsRoute: typeof TabsReelsRoute
   TabsTeamsRoute: typeof TabsTeamsRoute
@@ -674,6 +694,7 @@ const TabsRouteChildren: TabsRouteChildren = {
   TabsDiscoverRoute: TabsDiscoverRoute,
   TabsFeedRoute: TabsFeedRoute,
   TabsNotificationsRoute: TabsNotificationsRoute,
+  TabsPlayersRoute: TabsPlayersRoute,
   TabsProfileRoute: TabsProfileRoute,
   TabsReelsRoute: TabsReelsRoute,
   TabsTeamsRoute: TabsTeamsRoute,
