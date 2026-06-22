@@ -80,6 +80,8 @@ function detectBrandFromUrl(url: string): BrandKey | null {
 
 function BrandIcon({ brand, className = "h-4 w-4" }: { brand: BrandKey; className?: string }) {
   switch (brand) {
+    case "perfect_game":
+      return <img src={perfectGameLogo.url} alt="" className={`${className} object-contain dark:invert`} />;
     case "instagram": return <Instagram className={className} />;
     case "youtube": return <Youtube className={className} />;
     case "twitter": return <XIcon className={className} />;
