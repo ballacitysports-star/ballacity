@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { motion } from "framer-motion";
-import { Settings, Trophy, Calendar, Video, Shield, LogIn, LogOut, CreditCard, BarChart3 } from "lucide-react";
+import { Settings, Trophy, Calendar, Video, Shield, LogIn, LogOut, CreditCard } from "lucide-react";
 import { ME, GAMES } from "@/lib/sample-data";
 import { GameCard } from "@/components/GameCard";
 import { ReviewsSection } from "@/components/ReviewsSection";
@@ -235,20 +235,6 @@ function Profile() {
           </button>
         </motion.div>
 
-        {/* Reviews Hub link */}
-        <Link
-          to="/reviews"
-          className="mt-4 flex items-center gap-3 rounded-2xl border border-border bg-surface p-3 hover:border-lime/40 transition-colors"
-        >
-          <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-lime/15 text-lime">
-            <BarChart3 className="h-5 w-5" />
-          </div>
-          <div className="min-w-0 flex-1">
-            <div className="font-semibold text-sm">Reviews Hub</div>
-            <div className="text-xs text-muted-foreground">Trust scores and AI insights across OpenRun</div>
-          </div>
-          <div className="text-lime text-xs font-bold">→</div>
-        </Link>
 
         <Link to="/payments" className="mt-3 flex items-center gap-3 rounded-2xl border border-border bg-surface p-3 hover:border-lime/40 transition-colors">
           <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-lime/15 text-lime">

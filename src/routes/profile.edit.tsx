@@ -1,5 +1,5 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { ArrowLeft, Check, Plus, X, Users, Trophy } from "lucide-react";
+import { ArrowLeft, Check, Plus, X, Users, Trophy, BarChart3 } from "lucide-react";
 import { useEffect, useState } from "react";
 import type { User } from "@supabase/supabase-js";
 import { toast } from "sonner";
@@ -268,6 +268,19 @@ function EditProfile() {
             {myOrgs.map((o, i) => <OrgCard key={o.id} org={o} index={i} />)}
           </div>
         )}
+      </Section>
+
+      <Section title="Reviews">
+        <Link to="/reviews" className="flex items-center gap-3 rounded-2xl border border-border bg-surface p-3 hover:border-lime/40 transition-colors">
+          <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-lime/15 text-lime">
+            <BarChart3 className="h-5 w-5" />
+          </div>
+          <div className="min-w-0 flex-1">
+            <div className="font-semibold text-sm">Reviews Hub</div>
+            <div className="text-xs text-muted-foreground">Trust scores and AI insights across OpenRun</div>
+          </div>
+          <div className="text-lime text-xs font-bold">→</div>
+        </Link>
       </Section>
 
       <Section title="Plans & subscriptions">
