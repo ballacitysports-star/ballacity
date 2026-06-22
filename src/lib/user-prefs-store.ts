@@ -113,7 +113,7 @@ const prefsStore = makeStore<FeedPrefs>(PREFS_KEY, DEFAULT_PREFS);
 // ---------- Per-user profile overrides ----------
 function profileKey(userId: string) { return PROFILE_KEY_PREFIX + userId; }
 
-function readOverrides(userId: string | null): ProfileOverrides {
+export function readOverrides(userId: string | null): ProfileOverrides {
   if (!userId || typeof window === "undefined") return {};
   try {
     const raw = window.localStorage.getItem(profileKey(userId));
@@ -121,6 +121,17 @@ function readOverrides(userId: string | null): ProfileOverrides {
   } catch {
     return {};
   }
+}
+
+export function useProfileOverrides(userId: string | null | undefined): ProfileOverrides {
+  const [tick, setTick] = useState(0);
+  useEffect(() => {
+    const cb = () => setTick((t) => t + 1);
+    overrideListeners.add(cb);
+    return () => { overrideListeners.delete(cb); };
+  }, []);
+  void tick;
+  return readOverrides(userId ?? null);
 }
 
 const overrideListeners = new Set<() => void>();
