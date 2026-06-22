@@ -39,6 +39,7 @@ function EditProfile() {
   const [username, setUsername] = useState(profile?.username ?? "");
   const [avatar, setAvatar] = useState(profile?.avatar ?? "");
   const [avatarUrl, setAvatarUrl] = useState<string | undefined>(profile?.avatarUrl);
+  const [coverUrl, setCoverUrl] = useState<string | undefined>(profile?.coverUrl);
   const [city, setCity] = useState(profile?.city ?? "");
   const [bio, setBio] = useState(profile?.bio ?? "");
   const [sports, setSports] = useState(profile?.sports ?? []);
@@ -50,6 +51,17 @@ function EditProfile() {
     try {
       const dataUrl = await resizeImageToDataUrl(file, 256);
       setAvatarUrl(dataUrl);
+    } catch {
+      toast.error("Couldn't load that image");
+    }
+  };
+
+  const onPickCover = async (file: File | null) => {
+    if (!file) return;
+    if (!file.type.startsWith("image/")) { toast.error("Please choose an image"); return; }
+    try {
+      const dataUrl = await resizeImageToDataUrl(file, 1600);
+      setCoverUrl(dataUrl);
     } catch {
       toast.error("Couldn't load that image");
     }
@@ -118,6 +130,7 @@ function EditProfile() {
       username: username.trim().slice(0, 30),
       avatar: (avatar.trim() || trimmedName.slice(0, 2)).toUpperCase().slice(0, 3),
       avatarUrl,
+      coverUrl,
       city: city.trim().slice(0, 80),
       bio: bio.trim().slice(0, 280),
       sports,
@@ -150,6 +163,37 @@ function EditProfile() {
       </div>
 
       <Section title="Basics">
+        <Field label="Cover photo">
+          <div className="relative h-32 w-full overflow-hidden rounded-2xl border border-border bg-surface">
+            {coverUrl ? (
+              <img src={coverUrl} alt="Cover preview" className="h-full w-full object-cover" />
+            ) : (
+              <div className="grid h-full w-full place-items-center text-xs text-muted-foreground">
+                No cover yet
+              </div>
+            )}
+            <div className="absolute bottom-2 right-2 flex gap-2">
+              <label className="inline-flex cursor-pointer items-center gap-1 rounded-full border border-border bg-background/80 backdrop-blur px-3 py-1.5 text-xs font-semibold hover:border-lime/40">
+                <input
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={(e) => onPickCover(e.target.files?.[0] ?? null)}
+                />
+                {coverUrl ? "Change cover" : "Upload cover"}
+              </label>
+              {coverUrl && (
+                <button
+                  type="button"
+                  onClick={() => setCoverUrl(undefined)}
+                  className="rounded-full border border-border bg-background/80 backdrop-blur px-3 py-1.5 text-xs font-semibold text-coral"
+                >
+                  Remove
+                </button>
+              )}
+            </div>
+          </div>
+        </Field>
         <Field label="Photo">
           <div className="flex items-center gap-3">
             <div className="grid h-16 w-16 place-items-center overflow-hidden rounded-2xl border border-border bg-lime-gradient font-display text-lg font-bold text-primary-foreground">

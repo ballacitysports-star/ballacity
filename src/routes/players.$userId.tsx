@@ -129,7 +129,7 @@ function PlayerProfilePage() {
     <div className="mx-auto max-w-md pb-28">
       {/* Cover */}
       <div className="relative h-44">
-        <img src={HERO_IMAGE} alt="" className="h-full w-full object-cover" />
+        <img src={overrides.coverUrl ?? HERO_IMAGE} alt="" className="h-full w-full object-cover" />
         <div className="absolute inset-0 bg-gradient-to-b from-transparent via-background/50 to-background" />
         <div className="absolute top-4 left-4">
           <Link
