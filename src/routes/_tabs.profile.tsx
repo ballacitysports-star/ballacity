@@ -79,7 +79,7 @@ function Profile() {
     <div className="mx-auto max-w-md">
       {/* Cover */}
       <div className="relative h-44">
-        <img src={HERO_IMAGE} alt="" className="h-full w-full object-cover" />
+        <img src={me.coverUrl ?? HERO_IMAGE} alt="" className="h-full w-full object-cover" />
         <div className="absolute inset-0 bg-gradient-to-b from-transparent via-background/50 to-background" />
         <div className="absolute top-4 right-4 flex items-center gap-2">
           {user ? (
