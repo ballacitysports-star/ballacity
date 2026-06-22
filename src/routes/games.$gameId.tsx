@@ -89,6 +89,7 @@ function GameDetail() {
 
   const hostReviews = useReviewsFor(hostIdFor(game?.host.username ?? ""));
   const hostRep = useMemo(() => computeReputation(hostReviews, "host"), [hostReviews]);
+  const canReviewHost = useCanReview(hostIdFor(game?.host.username ?? ""));
 
   const refreshStatus = async () => {
     if (!game) return;
