@@ -544,9 +544,22 @@ function HostRequestRow({ req, gameTitle, onChange }: { req: JoinRequest; gameTi
   return (
     <div className={`rounded-2xl border p-3 ${req.status === "pending" ? "border-border bg-surface" : "border-border/50 bg-surface/40 opacity-70"}`}>
       <div className="flex items-center gap-2">
-        <div className="grid h-9 w-9 place-items-center rounded-full bg-lime-gradient text-xs font-bold text-primary-foreground">{name.slice(0, 2).toUpperCase()}</div>
+        <Link
+          to="/players/$userId"
+          params={{ userId: req.player_id }}
+          className="grid h-9 w-9 place-items-center rounded-full bg-lime-gradient text-xs font-bold text-primary-foreground hover:ring-2 hover:ring-lime"
+          aria-label={`View ${name}'s profile`}
+        >
+          {name.slice(0, 2).toUpperCase()}
+        </Link>
         <div className="flex-1 min-w-0">
-          <div className="text-sm font-semibold truncate">{name}</div>
+          <Link
+            to="/players/$userId"
+            params={{ userId: req.player_id }}
+            className="text-sm font-semibold truncate hover:text-lime hover:underline block"
+          >
+            {name}
+          </Link>
           {req.message && <div className="text-xs text-muted-foreground truncate">"{req.message}"</div>}
         </div>
         {req.status === "pending" ? (
