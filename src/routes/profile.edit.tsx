@@ -39,6 +39,7 @@ function EditProfile() {
   const [username, setUsername] = useState(profile?.username ?? "");
   const [avatar, setAvatar] = useState(profile?.avatar ?? "");
   const [avatarUrl, setAvatarUrl] = useState<string | undefined>(profile?.avatarUrl);
+  const [coverUrl, setCoverUrl] = useState<string | undefined>(profile?.coverUrl);
   const [city, setCity] = useState(profile?.city ?? "");
   const [bio, setBio] = useState(profile?.bio ?? "");
   const [sports, setSports] = useState(profile?.sports ?? []);
@@ -50,6 +51,17 @@ function EditProfile() {
     try {
       const dataUrl = await resizeImageToDataUrl(file, 256);
       setAvatarUrl(dataUrl);
+    } catch {
+      toast.error("Couldn't load that image");
+    }
+  };
+
+  const onPickCover = async (file: File | null) => {
+    if (!file) return;
+    if (!file.type.startsWith("image/")) { toast.error("Please choose an image"); return; }
+    try {
+      const dataUrl = await resizeImageToDataUrl(file, 1600);
+      setCoverUrl(dataUrl);
     } catch {
       toast.error("Couldn't load that image");
     }
