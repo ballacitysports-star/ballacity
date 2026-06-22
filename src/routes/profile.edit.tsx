@@ -104,7 +104,11 @@ function EditProfile() {
       city: city.trim().slice(0, 80),
       bio: bio.trim().slice(0, 280),
       sports,
+      links: links
+        .map((l) => ({ ...l, url: l.url.trim(), label: l.label?.trim() || undefined }))
+        .filter((l) => l.url),
     });
+
     setFeedPrefs({ preferredSports, sections });
     toast.success("Profile saved");
     nav({ to: "/profile" });
