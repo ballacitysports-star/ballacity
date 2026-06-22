@@ -319,7 +319,7 @@ function PostAvailabilityDialog({ onClose, onPosted }: { onClose: () => void; on
       await createAvailability({
         sports, skill_level: skill,
         starts_on: starts || null, ends_on: ends || null,
-        recurring_days: days, city, travel_radius_km: radius, note,
+        recurring_days: days, city, travel_radius_km: miToKm(radius), note,
       });
       onPosted();
     } catch (e: any) { toast.error(e.message); }
