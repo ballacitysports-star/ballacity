@@ -4,6 +4,22 @@ import { ME, type Sport } from "@/lib/sample-data";
 import { useAuth } from "@/hooks/use-auth";
 
 // ---------- Profile overrides ----------
+export type ProfileLinkType =
+  | "perfect_game"
+  | "pbr"
+  | "hudl"
+  | "instagram"
+  | "twitter"
+  | "tiktok"
+  | "youtube"
+  | "website";
+
+export type ProfileLink = {
+  type: ProfileLinkType;
+  url: string;
+  label?: string;
+};
+
 export type ProfileOverrides = {
   name?: string;
   username?: string;
@@ -12,6 +28,7 @@ export type ProfileOverrides = {
   city?: string;
   sports?: { name: Sport; skill: number }[];
   badges?: string[];
+  links?: ProfileLink[];
 };
 
 export type MyProfile = {
@@ -23,7 +40,9 @@ export type MyProfile = {
   stats: typeof ME.stats;
   sports: { name: Sport; skill: number }[];
   badges: string[];
+  links: ProfileLink[];
 };
+
 
 const PROFILE_KEY_PREFIX = "openrun.profile.v2.";
 const PREFS_KEY = "openrun.feedPrefs.v1";
