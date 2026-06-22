@@ -38,10 +38,22 @@ function EditProfile() {
   const [name, setName] = useState(profile?.name ?? "");
   const [username, setUsername] = useState(profile?.username ?? "");
   const [avatar, setAvatar] = useState(profile?.avatar ?? "");
+  const [avatarUrl, setAvatarUrl] = useState<string | undefined>(profile?.avatarUrl);
   const [city, setCity] = useState(profile?.city ?? "");
   const [bio, setBio] = useState(profile?.bio ?? "");
   const [sports, setSports] = useState(profile?.sports ?? []);
   const [links, setLinks] = useState<ProfileLink[]>(profile?.links ?? []);
+
+  const onPickAvatar = async (file: File | null) => {
+    if (!file) return;
+    if (!file.type.startsWith("image/")) { toast.error("Please choose an image"); return; }
+    try {
+      const dataUrl = await resizeImageToDataUrl(file, 256);
+      setAvatarUrl(dataUrl);
+    } catch {
+      toast.error("Couldn't load that image");
+    }
+  };
 
   const addLink = (type: ProfileLinkType) => {
     setLinks((prev) => [...prev, { type, url: "" }]);
