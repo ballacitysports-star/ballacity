@@ -12,6 +12,7 @@ import { GameCard } from "@/components/GameCard";
 import { ReviewsSection } from "@/components/ReviewsSection";
 import { computeReputation, useReviewsFor } from "@/lib/reviews";
 import { ReputationBadge } from "@/components/ReputationBadge";
+import { useCanReview } from "@/lib/transactions";
 
 export const Route = createFileRoute("/teams/$teamId")({
   head: ({ params }) => {
