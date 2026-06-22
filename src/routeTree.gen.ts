@@ -15,6 +15,7 @@ import { Route as ResetPasswordRouteImport } from './routes/reset-password'
 import { Route as PlansRouteImport } from './routes/plans'
 import { Route as PaymentsRouteImport } from './routes/payments'
 import { Route as MessagesRouteImport } from './routes/messages'
+import { Route as AvailablePlayersRouteImport } from './routes/available-players'
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as AdminRouteImport } from './routes/admin'
 import { Route as TabsRouteImport } from './routes/_tabs'
@@ -69,6 +70,11 @@ const PaymentsRoute = PaymentsRouteImport.update({
 const MessagesRoute = MessagesRouteImport.update({
   id: '/messages',
   path: '/messages',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AvailablePlayersRoute = AvailablePlayersRouteImport.update({
+  id: '/available-players',
+  path: '/available-players',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AuthRoute = AuthRouteImport.update({
@@ -201,6 +207,7 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/admin': typeof AdminRouteWithChildren
   '/auth': typeof AuthRoute
+  '/available-players': typeof AvailablePlayersRoute
   '/messages': typeof MessagesRouteWithChildren
   '/payments': typeof PaymentsRoute
   '/plans': typeof PlansRoute
@@ -233,6 +240,7 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/admin': typeof AdminRouteWithChildren
   '/auth': typeof AuthRoute
+  '/available-players': typeof AvailablePlayersRoute
   '/messages': typeof MessagesRouteWithChildren
   '/payments': typeof PaymentsRoute
   '/plans': typeof PlansRoute
@@ -267,6 +275,7 @@ export interface FileRoutesById {
   '/_tabs': typeof TabsRouteWithChildren
   '/admin': typeof AdminRouteWithChildren
   '/auth': typeof AuthRoute
+  '/available-players': typeof AvailablePlayersRoute
   '/messages': typeof MessagesRouteWithChildren
   '/payments': typeof PaymentsRoute
   '/plans': typeof PlansRoute
@@ -301,6 +310,7 @@ export interface FileRouteTypes {
     | '/'
     | '/admin'
     | '/auth'
+    | '/available-players'
     | '/messages'
     | '/payments'
     | '/plans'
@@ -333,6 +343,7 @@ export interface FileRouteTypes {
     | '/'
     | '/admin'
     | '/auth'
+    | '/available-players'
     | '/messages'
     | '/payments'
     | '/plans'
@@ -366,6 +377,7 @@ export interface FileRouteTypes {
     | '/_tabs'
     | '/admin'
     | '/auth'
+    | '/available-players'
     | '/messages'
     | '/payments'
     | '/plans'
@@ -400,6 +412,7 @@ export interface RootRouteChildren {
   TabsRoute: typeof TabsRouteWithChildren
   AdminRoute: typeof AdminRouteWithChildren
   AuthRoute: typeof AuthRoute
+  AvailablePlayersRoute: typeof AvailablePlayersRoute
   MessagesRoute: typeof MessagesRouteWithChildren
   PaymentsRoute: typeof PaymentsRoute
   PlansRoute: typeof PlansRoute
@@ -459,6 +472,13 @@ declare module '@tanstack/react-router' {
       path: '/messages'
       fullPath: '/messages'
       preLoaderRoute: typeof MessagesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/available-players': {
+      id: '/available-players'
+      path: '/available-players'
+      fullPath: '/available-players'
+      preLoaderRoute: typeof AvailablePlayersRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/auth': {
@@ -714,6 +734,7 @@ const rootRouteChildren: RootRouteChildren = {
   TabsRoute: TabsRouteWithChildren,
   AdminRoute: AdminRouteWithChildren,
   AuthRoute: AuthRoute,
+  AvailablePlayersRoute: AvailablePlayersRoute,
   MessagesRoute: MessagesRouteWithChildren,
   PaymentsRoute: PaymentsRoute,
   PlansRoute: PlansRoute,
