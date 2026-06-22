@@ -1,5 +1,6 @@
 import { ExternalLink, Globe, Instagram, Youtube, Facebook, Linkedin, Twitch, Github, Music } from "lucide-react";
 import type { ProfileLink, ProfileLinkType } from "@/lib/user-prefs-store";
+import perfectGameLogo from "@/assets/perfect-game-logo.png.asset.json";
 
 export const LINK_TYPES: { type: ProfileLinkType; label: string; placeholder: string }[] = [
   { type: "perfect_game", label: "Perfect Game", placeholder: "https://perfectgame.org/players/..." },
