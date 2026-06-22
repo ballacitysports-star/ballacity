@@ -222,33 +222,6 @@ function Profile() {
           </div>
         </div>
 
-        {/* My organizations */}
-        <div className="mt-6">
-          <div className="mb-2 flex items-center justify-between">
-            <h2 className="font-display text-sm font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
-              <Users className="h-4 w-4" /> My organizations
-            </h2>
-            <Link to="/teams/create" className="inline-flex items-center gap-1 text-xs font-bold text-lime">
-              <Plus className="h-3.5 w-3.5" /> New
-            </Link>
-          </div>
-          {myOrgs.length === 0 ? (
-            <Link
-              to="/teams/create"
-              className="block rounded-3xl border border-dashed border-border bg-surface/40 p-5 text-center hover:border-lime/40"
-            >
-              <div className="mx-auto grid h-12 w-12 place-items-center rounded-2xl bg-lime/15 text-lime mb-2">
-                <Plus className="h-6 w-6" />
-              </div>
-              <div className="font-display text-base font-bold">Start a team or coach profile</div>
-              <p className="text-xs text-muted-foreground mt-1">Post tryouts, run pickups, build your following.</p>
-            </Link>
-          ) : (
-            <div className="space-y-3">
-              {myOrgs.map((o, i) => <OrgCard key={o.id} org={o} index={i} />)}
-            </div>
-          )}
-        </div>
 
         {/* Pro upsell */}
 
