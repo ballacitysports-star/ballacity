@@ -16,6 +16,14 @@ export function GameCard({ game, index = 0 }: { game: Game; index?: number }) {
   const joinedCount = Math.min(game.maxPlayers, game.joined + (joinedByMe ? 1 : 0));
   const spotsLeft = game.maxPlayers - joinedCount;
   const fillPct = Math.round((joinedCount / game.maxPlayers) * 100);
+  const navigate = useNavigate();
+  const hostUserId = (game as { hostUserId?: string }).hostUserId;
+  const goToHost = (e: React.MouseEvent) => {
+    if (!hostUserId) return;
+    e.preventDefault();
+    e.stopPropagation();
+    navigate({ to: "/players/$userId", params: { userId: hostUserId } });
+  };
 
   return (
     <motion.div
