@@ -74,13 +74,6 @@ function TeamsPage() {
       >
         <h1 className="font-display text-3xl font-bold leading-tight">{meta.title}</h1>
         <p className="text-muted-foreground text-sm">{meta.subtitle}</p>
-        <Link
-          to="/available-players"
-          className="mt-3 flex items-center justify-between rounded-2xl border border-lime/30 bg-lime/10 px-4 py-2.5 text-sm font-semibold hover:bg-lime/15"
-        >
-          <span>🙋 Available players board</span>
-          <span className="text-xs text-lime">Browse →</span>
-        </Link>
       </motion.div>
 
       {/* Kind segmented control — primary split */}
