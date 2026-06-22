@@ -182,6 +182,64 @@ function EditProfile() {
         </div>
       </Section>
 
+      <Section title="Profile links">
+        <p className="text-xs text-muted-foreground mb-2">
+          Add links to Perfect Game, PBR, Hudl, socials, or your own site.
+        </p>
+        <div className="space-y-2">
+          {links.map((l, i) => (
+            <div key={i} className="rounded-2xl border border-border bg-surface p-3">
+              <div className="flex items-center justify-between gap-2 mb-2">
+                <div className="inline-flex items-center gap-1.5 text-xs font-semibold text-muted-foreground">
+                  <LinkIcon type={l.type} className="h-3.5 w-3.5" />
+                  <select
+                    value={l.type}
+                    onChange={(e) => updateLink(i, { type: e.target.value as ProfileLinkType })}
+                    className="bg-transparent text-xs font-semibold outline-none"
+                  >
+                    {LINK_TYPES.map((opt) => (
+                      <option key={opt.type} value={opt.type}>{opt.label}</option>
+                    ))}
+                  </select>
+                </div>
+                <button onClick={() => removeLink(i)} className="grid h-7 w-7 place-items-center rounded-full border border-border text-muted-foreground">
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              </div>
+              <Input
+                value={l.url}
+                onChange={(v) => updateLink(i, { url: v })}
+                placeholder={LINK_TYPES.find((t) => t.type === l.type)?.placeholder ?? "https://"}
+              />
+              <div className="mt-2">
+                <Input
+                  value={l.label ?? ""}
+                  onChange={(v) => updateLink(i, { label: v })}
+                  maxLength={40}
+                  placeholder="Optional label (e.g. @handle)"
+                />
+              </div>
+            </div>
+          ))}
+        </div>
+        <div className="mt-3">
+          <div className="text-xs text-muted-foreground mb-1.5">Add link</div>
+          <div className="flex flex-wrap gap-2">
+            {LINK_TYPES.map((t) => (
+              <button
+                key={t.type}
+                onClick={() => addLink(t.type)}
+                className="inline-flex items-center gap-1 rounded-full border border-border bg-surface px-3 py-1.5 text-xs font-semibold hover:border-lime/40"
+              >
+                <Plus className="h-3 w-3" /> {t.label}
+              </button>
+            ))}
+          </div>
+        </div>
+      </Section>
+
+
+
 
       <Section title="Feed preferences" right={<button onClick={reset} className="text-xs font-bold text-coral">Reset</button>}>
         <div className="text-xs text-muted-foreground mb-2">Preferred sports (empty = all)</div>
