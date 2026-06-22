@@ -1,5 +1,5 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { ArrowLeft, Check, Plus, X, Users, Trophy } from "lucide-react";
+import { ArrowLeft, Check, Plus, X, Users, Trophy, BarChart3 } from "lucide-react";
 import { useEffect, useState } from "react";
 import type { User } from "@supabase/supabase-js";
 import { toast } from "sonner";
