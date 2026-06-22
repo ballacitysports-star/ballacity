@@ -114,11 +114,43 @@ function RootShell({ children }: { children: React.ReactNode }) {
   );
 }
 
+const CHUNK_RELOAD_KEY = "__openrun_chunk_reloaded_at";
+
+function isChunkLoadError(reason: unknown): boolean {
+  const msg =
+    (reason as { message?: string } | null | undefined)?.message ??
+    (typeof reason === "string" ? reason : "");
+  if (!msg) return false;
+  return (
+    /Importing a module script failed/i.test(msg) ||
+    /Failed to fetch dynamically imported module/i.test(msg) ||
+    /Loading chunk [\w-]+ failed/i.test(msg) ||
+    /error loading dynamically imported module/i.test(msg)
+  );
+}
+
+function maybeReloadForStaleChunk(reason: unknown) {
+  if (!isChunkLoadError(reason)) return;
+  try {
+    const last = Number(sessionStorage.getItem(CHUNK_RELOAD_KEY) ?? "0");
+    if (Date.now() - last < 10_000) return; // avoid reload loops
+    sessionStorage.setItem(CHUNK_RELOAD_KEY, String(Date.now()));
+  } catch {
+    // ignore storage errors
+  }
+  window.location.reload();
+}
+
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
   const router = useRouter();
 
   useEffect(() => {
+    const onError = (event: ErrorEvent) => maybeReloadForStaleChunk(event.error ?? event.message);
+    const onRejection = (event: PromiseRejectionEvent) => maybeReloadForStaleChunk(event.reason);
+    window.addEventListener("error", onError);
+    window.addEventListener("unhandledrejection", onRejection);
+
     // Run once on mount for already-signed-in users.
     supabase.auth.getUser().then(({ data }) => {
       if (data.user) runLegacyHostMigration(data.user.id);
@@ -130,7 +162,11 @@ function RootComponent() {
         runLegacyHostMigration(session.user.id);
       }
     });
-    return () => sub.subscription.unsubscribe();
+    return () => {
+      sub.subscription.unsubscribe();
+      window.removeEventListener("error", onError);
+      window.removeEventListener("unhandledrejection", onRejection);
+    };
   }, [queryClient, router]);
 
   return (
