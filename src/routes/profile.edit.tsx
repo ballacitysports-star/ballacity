@@ -37,6 +37,16 @@ function EditProfile() {
   const [city, setCity] = useState(profile?.city ?? "");
   const [bio, setBio] = useState(profile?.bio ?? "");
   const [sports, setSports] = useState(profile?.sports ?? []);
+  const [links, setLinks] = useState<ProfileLink[]>(profile?.links ?? []);
+
+  const addLink = (type: ProfileLinkType) => {
+    setLinks((prev) => [...prev, { type, url: "" }]);
+  };
+  const updateLink = (i: number, patch: Partial<ProfileLink>) => {
+    setLinks((prev) => prev.map((l, idx) => (idx === i ? { ...l, ...patch } : l)));
+  };
+  const removeLink = (i: number) => setLinks((prev) => prev.filter((_, idx) => idx !== i));
+
 
   const [preferredSports, setPreferredSports] = useState<Sport[]>(prefs.preferredSports);
   const [sections, setSections] = useState(prefs.sections);
