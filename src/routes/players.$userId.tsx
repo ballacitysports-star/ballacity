@@ -39,6 +39,7 @@ function PlayerProfilePage() {
   const [loading, setLoading] = useState(true);
   const [opening, setOpening] = useState(false);
 
+  const overrides = useProfileOverrides(userId);
   const reviews = useReviewsFor(userId);
   const rep = useMemo(() => computeReputation(reviews, "player"), [reviews]);
 
