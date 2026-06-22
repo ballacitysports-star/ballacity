@@ -1,4 +1,4 @@
-import { Link } from "@tanstack/react-router";
+import { Link, useNavigate } from "@tanstack/react-router";
 import { motion } from "framer-motion";
 import { MapPin, Users, Clock, Zap, Lock, Flame } from "lucide-react";
 import type { Game } from "@/lib/sample-data";
