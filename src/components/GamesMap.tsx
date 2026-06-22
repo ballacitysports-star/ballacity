@@ -149,6 +149,15 @@ export function GamesMap({
             },
             (err) => {
               if (cancelled) return;
+              autoLocateFailedRef.current = true;
+              // Fall back to profile/default city if it geocoded while we were waiting.
+              const fallback = pendingDefaultGeocodeRef.current;
+              if (fallback && mapRef.current && !userPosRef.current && !manualLocationRef.current) {
+                pinCenterRef.current = fallback;
+                mapRef.current.panTo(fallback);
+                mapRef.current.setZoom(13);
+                repositionPins();
+              }
               void recordDenial(err).then((rec) => {
                 if (cancelled) return;
                 setDenialReason(rec.reason);
