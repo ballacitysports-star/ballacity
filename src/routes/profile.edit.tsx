@@ -326,7 +326,12 @@ function EditProfile() {
                 value={l.url}
                 onChange={(v) => updateLink(i, { url: v })}
                 placeholder={LINK_TYPES.find((t) => t.type === l.type)?.placeholder ?? "https://"}
+                aria-invalid={linkErrors[i] ? true : undefined}
+                className={linkErrors[i] ? "border-destructive focus-visible:ring-destructive" : undefined}
               />
+              {linkErrors[i] && (
+                <p className="mt-1 text-xs text-destructive">{linkErrors[i]}</p>
+              )}
               <div className="mt-2">
                 <Input
                   value={l.label ?? ""}
