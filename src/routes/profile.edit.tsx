@@ -1,5 +1,5 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { ArrowLeft, Check, Plus, X, Users, Trophy, BarChart3, CreditCard, Video } from "lucide-react";
+import { ArrowLeft, Check, Plus, X, Users, Trophy, BarChart3, CreditCard, Video, ExternalLink } from "lucide-react";
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import type { User } from "@supabase/supabase-js";
@@ -332,6 +332,30 @@ function EditProfile() {
               {linkErrors[i] && (
                 <p className="mt-1 text-xs text-destructive">{linkErrors[i]}</p>
               )}
+              {!linkErrors[i] && l.url.trim() && (() => {
+                const href = normalizeUrl(l.url);
+                let host = "";
+                try { host = new URL(href).hostname.replace(/^www\./, ""); } catch { /* noop */ }
+                return (
+                  <a
+                    href={href}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="mt-2 inline-flex max-w-full items-center gap-2 rounded-full border border-border bg-background px-2.5 py-1 text-xs text-muted-foreground hover:border-lime/40 hover:text-foreground transition-colors"
+                  >
+                    <img
+                      src={`https://www.google.com/s2/favicons?domain=${host}&sz=32`}
+                      alt=""
+                      width={14}
+                      height={14}
+                      className="h-3.5 w-3.5 rounded-sm"
+                      onError={(e) => { (e.currentTarget as HTMLImageElement).style.visibility = "hidden"; }}
+                    />
+                    <span className="truncate font-medium">{host}</span>
+                    <ExternalLink className="h-3 w-3 shrink-0 opacity-70" />
+                  </a>
+                );
+              })()}
               <div className="mt-2">
                 <Input
                   value={l.label ?? ""}
