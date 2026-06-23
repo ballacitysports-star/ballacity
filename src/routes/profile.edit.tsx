@@ -121,10 +121,34 @@ function EditProfile() {
     );
   }
 
+  const normalizeUrl = (raw: string): string => {
+    const t = raw.trim();
+    if (!t) return "";
+    return /^https?:\/\//i.test(t) ? t : `https://${t}`;
+  };
+  const validateUrl = (raw: string): string | null => {
+    const t = raw.trim();
+    if (!t) return "URL is required";
+    if (t.length > 500) return "URL is too long";
+    try {
+      const u = new URL(normalizeUrl(t));
+      if (u.protocol !== "http:" && u.protocol !== "https:") return "Must be http(s)";
+      if (!u.hostname.includes(".")) return "Enter a valid domain";
+      return null;
+    } catch {
+      return "Enter a valid URL";
+    }
+  };
+  const linkErrors = links.map((l) => validateUrl(l.url));
+
   const save = () => {
     if (!profileUser) { toast.error("Sign in to save"); return; }
     const trimmedName = name.trim().slice(0, 60);
     if (!trimmedName) { toast.error("Name is required"); return; }
+    if (linkErrors.some((e) => e !== null)) {
+      toast.error("Fix invalid profile links before saving");
+      return;
+    }
     setProfileOverrides(profileUser.id, {
       name: trimmedName,
       username: username.trim().slice(0, 30),
@@ -135,7 +159,7 @@ function EditProfile() {
       bio: bio.trim().slice(0, 280),
       sports,
       links: links
-        .map((l) => ({ ...l, url: l.url.trim(), label: l.label?.trim() || undefined }))
+        .map((l) => ({ ...l, url: normalizeUrl(l.url), label: l.label?.trim() || undefined }))
         .filter((l) => l.url),
     });
 
@@ -302,7 +326,12 @@ function EditProfile() {
                 value={l.url}
                 onChange={(v) => updateLink(i, { url: v })}
                 placeholder={LINK_TYPES.find((t) => t.type === l.type)?.placeholder ?? "https://"}
+                aria-invalid={linkErrors[i] ? true : undefined}
+                className={linkErrors[i] ? "border-destructive focus-visible:ring-destructive" : undefined}
               />
+              {linkErrors[i] && (
+                <p className="mt-1 text-xs text-destructive">{linkErrors[i]}</p>
+              )}
               <div className="mt-2">
                 <Input
                   value={l.label ?? ""}
