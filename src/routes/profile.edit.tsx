@@ -1,5 +1,5 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { ArrowLeft, Check, Plus, X, Users, Trophy, BarChart3, CreditCard, Video } from "lucide-react";
+import { ArrowLeft, Check, Plus, X, Users, Trophy, BarChart3, CreditCard, Video, ExternalLink } from "lucide-react";
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import type { User } from "@supabase/supabase-js";
