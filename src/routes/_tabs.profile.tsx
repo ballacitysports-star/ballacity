@@ -36,10 +36,10 @@ function Profile() {
     const pool = [...hosted, ...GAMES];
     const seen = new Set<string>();
     return pool
-      .filter((game) => ids.has(game.id))
+      .filter((game) => ids.has(game.id) || (profileUser && (game as { hostUserId?: string }).hostUserId === profileUser.id))
       .filter((g) => (seen.has(g.id) ? false : (seen.add(g.id), true)))
       .sort((a, b) => +new Date(a.date) - +new Date(b.date));
-  }, [joinedGameIds, hosted]);
+  }, [joinedGameIds, hosted, profileUser]);
 
   useEffect(() => {
     if (user) setConfirmedUser(user);

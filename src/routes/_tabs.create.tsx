@@ -4,7 +4,7 @@ import { motion } from "framer-motion";
 import { ArrowLeft, Calendar, MapPin, Users, DollarSign, Lock, Home, ShieldCheck } from "lucide-react";
 import { SPORTS, type Sport } from "@/lib/sample-data";
 import { addHostedGame } from "@/lib/hosted-games-store";
-import { joinGame } from "@/lib/games-store";
+
 import { toast } from "sonner";
 import { LocationAutocomplete } from "@/components/LocationAutocomplete";
 import { useMyProfile } from "@/lib/user-prefs-store";
@@ -146,8 +146,8 @@ function Create() {
 
 
 
-            // Host counts as joined so it appears under their upcoming games
-            joinGame(game.id);
+            // Note: do NOT auto-join the host. Hosting ≠ playing; the host
+            // sees their published games in the profile's hosted section.
             toast.success("Game published");
             nav({ to: "/games/$gameId", params: { gameId: game.id } });
           } finally {
