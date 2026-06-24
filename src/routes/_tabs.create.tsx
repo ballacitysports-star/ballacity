@@ -4,7 +4,7 @@ import { motion } from "framer-motion";
 import { ArrowLeft, Calendar, MapPin, Users, DollarSign, Lock, Home, ShieldCheck } from "lucide-react";
 import { SPORTS, type Sport } from "@/lib/sample-data";
 import { addHostedGame } from "@/lib/hosted-games-store";
-import { joinGame } from "@/lib/games-store";
+
 import { toast } from "sonner";
 import { LocationAutocomplete } from "@/components/LocationAutocomplete";
 import { useMyProfile } from "@/lib/user-prefs-store";
