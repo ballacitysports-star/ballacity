@@ -146,8 +146,8 @@ function Create() {
 
 
 
-            // Host counts as joined so it appears under their upcoming games
-            joinGame(game.id);
+            // Note: do NOT auto-join the host. Hosting ≠ playing; the host
+            // sees their published games in the profile's hosted section.
             toast.success("Game published");
             nav({ to: "/games/$gameId", params: { gameId: game.id } });
           } finally {
