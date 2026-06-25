@@ -142,20 +142,21 @@ function maybeReloadForStaleChunk(reason: unknown) {
   window.location.reload();
 }
 
-const PUBLIC_ROUTES = ["/auth", "/reset-password"];
+const PUBLIC_ROUTES = ["/", "/auth", "/reset-password"];
 
 function AuthGate({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const pathname = router.state.location.pathname;
   const { user, loading } = useAuth();
-  const isPublic = PUBLIC_ROUTES.some((p) => pathname === p || pathname.startsWith(`${p}/`));
+  const isPublic = pathname === "/" || PUBLIC_ROUTES.some((p) => p !== "/" && (pathname === p || pathname.startsWith(`${p}/`)));
 
   useEffect(() => {
     if (loading) return;
     if (!user && !isPublic) {
-      router.navigate({ to: "/auth", replace: true });
+      router.navigate({ to: "/", replace: true });
     }
   }, [loading, user, isPublic, router, pathname]);
+
 
   if (isPublic) return <>{children}</>;
   if (loading || !user) {
