@@ -15,6 +15,7 @@ import { ClientOnly } from "@tanstack/react-router";
 import { supabase } from "@/integrations/supabase/client";
 import { Toaster } from "@/components/ui/sonner";
 import { runLegacyHostMigration } from "@/lib/legacy-host-migration";
+import { useAuth } from "@/hooks/use-auth";
 
 function NotFoundComponent() {
   return (
@@ -141,6 +142,32 @@ function maybeReloadForStaleChunk(reason: unknown) {
   window.location.reload();
 }
 
+const PUBLIC_ROUTES = ["/auth", "/reset-password"];
+
+function AuthGate({ children }: { children: React.ReactNode }) {
+  const router = useRouter();
+  const pathname = router.state.location.pathname;
+  const { user, loading } = useAuth();
+  const isPublic = PUBLIC_ROUTES.some((p) => pathname === p || pathname.startsWith(`${p}/`));
+
+  useEffect(() => {
+    if (loading) return;
+    if (!user && !isPublic) {
+      router.navigate({ to: "/auth", replace: true });
+    }
+  }, [loading, user, isPublic, router, pathname]);
+
+  if (isPublic) return <>{children}</>;
+  if (loading || !user) {
+    return (
+      <div className="grid min-h-dvh place-items-center bg-background">
+        <div className="h-8 w-8 animate-spin rounded-full border-2 border-muted border-t-foreground" />
+      </div>
+    );
+  }
+  return <>{children}</>;
+}
+
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
   const router = useRouter();
@@ -171,7 +198,17 @@ function RootComponent() {
 
   return (
     <QueryClientProvider client={queryClient}>
-      <Outlet />
+      <ClientOnly
+        fallback={
+          <div className="grid min-h-dvh place-items-center bg-background">
+            <div className="h-8 w-8 animate-spin rounded-full border-2 border-muted border-t-foreground" />
+          </div>
+        }
+      >
+        <AuthGate>
+          <Outlet />
+        </AuthGate>
+      </ClientOnly>
       <Toaster position="top-center" richColors />
       <ClientOnly fallback={null}>
         <DebugModeToggle />
@@ -179,3 +216,4 @@ function RootComponent() {
     </QueryClientProvider>
   );
 }
+
