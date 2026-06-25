@@ -55,6 +55,37 @@ function Profile() {
     return () => { cancelled = true; };
   }, [loading, profileUser, me]);
 
+  // One-time sync of locally stored profile overrides up to the server profiles row,
+  // so other users can see this user's avatar, cover, city, bio, and external links.
+  useEffect(() => {
+    if (!profileUser || !me) return;
+    const key = `openrun.profileSync.v1.${profileUser.id}`;
+    if (typeof window === "undefined") return;
+    if (window.localStorage.getItem(key)) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const { supabase } = await import("@/integrations/supabase/client");
+        const { error } = await supabase
+          .from("profiles")
+          .update({
+            display_name: me.name,
+            avatar_initials: me.avatar,
+            bio: me.bio || null,
+            city: me.city || null,
+            avatar_url: me.avatarUrl ?? null,
+            cover_url: me.coverUrl ?? null,
+            links: (me.links ?? []) as any,
+          } as any)
+          .eq("id", profileUser.id);
+        if (!cancelled && !error) window.localStorage.setItem(key, String(Date.now()));
+      } catch {
+        /* ignore */
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [profileUser, me]);
+
   if (loading) return null;
   if (!profileUser || !me) {
     return (
