@@ -117,7 +117,7 @@ function PlayerProfilePage() {
   const displayName = overrides.name || profile.display_name;
   const username = (overrides.username || (profile.username ? `@${profile.username.replace(/^@/, "")}` : "")).trim();
   const bio = overrides.bio ?? profile.bio ?? "";
-  const city = overrides.city ?? "";
+  const city = overrides.city ?? profile.city ?? "";
   const sportsList = overrides.sports?.length
     ? overrides.sports
     : availability?.sports?.length
@@ -126,7 +126,10 @@ function PlayerProfilePage() {
         ? [{ name: profile.sport as any, skill: 3 }]
         : [];
   const badges = overrides.badges ?? [];
-  const links = overrides.links ?? [];
+  const dbLinks = Array.isArray(profile.links) ? (profile.links as any[]) : [];
+  const links = overrides.links?.length ? overrides.links : dbLinks;
+  const avatarUrl = overrides.avatarUrl ?? profile.avatar_url ?? undefined;
+  const coverUrl = overrides.coverUrl ?? profile.cover_url ?? undefined;
   const stats = { played: 0, reliability: 100, sportsmanship: 5, friends: 0 };
 
   return (
