@@ -53,7 +53,7 @@ function PlayerProfilePage() {
     Promise.all([
       supabase
         .from("profiles")
-        .select("id, display_name, avatar_initials, bio, sport, username")
+        .select("id, display_name, avatar_initials, bio, sport, username, city, avatar_url, cover_url, links")
         .eq("id", userId)
         .maybeSingle(),
       supabase
