@@ -28,6 +28,10 @@ type ProfileRow = {
   bio: string | null;
   sport: string | null;
   username: string | null;
+  city: string | null;
+  avatar_url: string | null;
+  cover_url: string | null;
+  links: any;
 };
 
 function PlayerProfilePage() {
