@@ -28,6 +28,10 @@ type ProfileRow = {
   bio: string | null;
   sport: string | null;
   username: string | null;
+  city: string | null;
+  avatar_url: string | null;
+  cover_url: string | null;
+  links: any;
 };
 
 function PlayerProfilePage() {
@@ -49,7 +53,7 @@ function PlayerProfilePage() {
     Promise.all([
       supabase
         .from("profiles")
-        .select("id, display_name, avatar_initials, bio, sport, username")
+        .select("id, display_name, avatar_initials, bio, sport, username, city, avatar_url, cover_url, links")
         .eq("id", userId)
         .maybeSingle(),
       supabase
@@ -113,7 +117,7 @@ function PlayerProfilePage() {
   const displayName = overrides.name || profile.display_name;
   const username = (overrides.username || (profile.username ? `@${profile.username.replace(/^@/, "")}` : "")).trim();
   const bio = overrides.bio ?? profile.bio ?? "";
-  const city = overrides.city ?? "";
+  const city = overrides.city ?? profile.city ?? "";
   const sportsList = overrides.sports?.length
     ? overrides.sports
     : availability?.sports?.length
@@ -122,14 +126,17 @@ function PlayerProfilePage() {
         ? [{ name: profile.sport as any, skill: 3 }]
         : [];
   const badges = overrides.badges ?? [];
-  const links = overrides.links ?? [];
+  const dbLinks = Array.isArray(profile.links) ? (profile.links as any[]) : [];
+  const links = overrides.links?.length ? overrides.links : dbLinks;
+  const avatarUrl = overrides.avatarUrl ?? profile.avatar_url ?? undefined;
+  const coverUrl = overrides.coverUrl ?? profile.cover_url ?? undefined;
   const stats = { played: 0, reliability: 100, sportsmanship: 5, friends: 0 };
 
   return (
     <div className="mx-auto max-w-md pb-28">
       {/* Cover */}
       <div className="relative h-44">
-        <img src={overrides.coverUrl ?? HERO_IMAGE} alt="" className="h-full w-full object-cover" />
+        <img src={coverUrl ?? HERO_IMAGE} alt="" className="h-full w-full object-cover" />
         <div className="absolute inset-0 bg-gradient-to-b from-transparent via-background/50 to-background" />
         <div className="absolute top-4 left-4">
           <Link
@@ -150,8 +157,8 @@ function PlayerProfilePage() {
           transition={{ type: "spring", stiffness: 220, damping: 16 }}
           className="grid h-24 w-24 place-items-center overflow-hidden rounded-3xl border-4 border-background bg-lime-gradient font-display text-3xl font-bold text-primary-foreground glow-lime"
         >
-          {overrides.avatarUrl ? (
-            <img src={overrides.avatarUrl} alt={displayName} className="h-full w-full object-cover" />
+          {avatarUrl ? (
+            <img src={avatarUrl} alt={displayName} className="h-full w-full object-cover" />
           ) : (
             initials
           )}

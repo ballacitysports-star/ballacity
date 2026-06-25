@@ -141,7 +141,7 @@ function EditProfile() {
   };
   const linkErrors = links.map((l) => validateUrl(l.url));
 
-  const save = () => {
+  const save = async () => {
     if (!profileUser) { toast.error("Sign in to save"); return; }
     const trimmedName = name.trim().slice(0, 60);
     if (!trimmedName) { toast.error("Name is required"); return; }
@@ -149,19 +149,41 @@ function EditProfile() {
       toast.error("Fix invalid profile links before saving");
       return;
     }
+    const cleanedLinks = links
+      .map((l) => ({ ...l, url: normalizeUrl(l.url), label: l.label?.trim() || undefined }))
+      .filter((l) => l.url);
+    const trimmedCity = city.trim().slice(0, 80);
     setProfileOverrides(profileUser.id, {
       name: trimmedName,
       username: username.trim().slice(0, 30),
       avatar: (avatar.trim() || trimmedName.slice(0, 2)).toUpperCase().slice(0, 3),
       avatarUrl,
       coverUrl,
-      city: city.trim().slice(0, 80),
+      city: trimmedCity,
       bio: bio.trim().slice(0, 280),
       sports,
-      links: links
-        .map((l) => ({ ...l, url: normalizeUrl(l.url), label: l.label?.trim() || undefined }))
-        .filter((l) => l.url),
+      links: cleanedLinks,
     });
+
+    // Persist publicly visible fields to the profiles table so other users can see them
+    try {
+      const { supabase } = await import("@/integrations/supabase/client");
+      await supabase
+        .from("profiles")
+        .update({
+          display_name: trimmedName,
+          username: username.trim().replace(/^@/, "").slice(0, 30) || null,
+          avatar_initials: (avatar.trim() || trimmedName.slice(0, 2)).toUpperCase().slice(0, 3),
+          bio: bio.trim().slice(0, 280) || null,
+          city: trimmedCity || null,
+          avatar_url: avatarUrl ?? null,
+          cover_url: coverUrl ?? null,
+          links: cleanedLinks as any,
+        } as any)
+        .eq("id", profileUser.id);
+    } catch (e: any) {
+      console.error("Failed to sync profile to server", e);
+    }
 
     setFeedPrefs({ preferredSports, sections });
     toast.success("Profile saved");
