@@ -157,8 +157,8 @@ function PlayerProfilePage() {
           transition={{ type: "spring", stiffness: 220, damping: 16 }}
           className="grid h-24 w-24 place-items-center overflow-hidden rounded-3xl border-4 border-background bg-lime-gradient font-display text-3xl font-bold text-primary-foreground glow-lime"
         >
-          {overrides.avatarUrl ? (
-            <img src={overrides.avatarUrl} alt={displayName} className="h-full w-full object-cover" />
+          {avatarUrl ? (
+            <img src={avatarUrl} alt={displayName} className="h-full w-full object-cover" />
           ) : (
             initials
           )}
