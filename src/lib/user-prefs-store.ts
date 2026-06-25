@@ -180,29 +180,48 @@ export function useMyProfile(currentUser?: User | null): MyProfile | null {
   const { user: authUser } = useAuth();
   const user = currentUser === undefined ? authUser : currentUser;
   const [tick, setTick] = useState(0);
+  const [dbProfile, setDbProfile] = useState<{
+    display_name?: string | null;
+    avatar_initials?: string | null;
+    bio?: string | null;
+    city?: string | null;
+    avatar_url?: string | null;
+    cover_url?: string | null;
+    links?: unknown;
+  } | null>(null);
   useEffect(() => {
     const cb = () => setTick((t) => t + 1);
     overrideListeners.add(cb);
     return () => { overrideListeners.delete(cb); };
   }, []);
+  useEffect(() => {
+    if (!user) { setDbProfile(null); return; }
+    let cancelled = false;
+    supabase
+      .from("profiles")
+      .select("display_name, avatar_initials, bio, city, avatar_url, cover_url, links")
+      .eq("id", user.id)
+      .maybeSingle()
+      .then(({ data }) => { if (!cancelled) setDbProfile(data as any); });
+    return () => { cancelled = true; };
+  }, [user?.id]);
   if (!user) return null;
   const overrides = readOverrides(user.id);
   const base = defaultsFromUser(user);
-  // touch tick so re-renders happen when overrides change
   void tick;
+  const dbLinks: ProfileLink[] = Array.isArray(dbProfile?.links) ? (dbProfile!.links as ProfileLink[]) : [];
   return {
-    name: overrides.name ?? base.name,
+    name: overrides.name ?? dbProfile?.display_name ?? base.name,
     username: overrides.username ?? base.username,
-    avatar: overrides.avatar ?? base.avatar,
-    avatarUrl: overrides.avatarUrl,
-    coverUrl: overrides.coverUrl,
-    bio: overrides.bio ?? base.bio,
-    city: overrides.city ?? base.city,
+    avatar: overrides.avatar ?? dbProfile?.avatar_initials ?? base.avatar,
+    avatarUrl: overrides.avatarUrl ?? dbProfile?.avatar_url ?? undefined,
+    coverUrl: overrides.coverUrl ?? dbProfile?.cover_url ?? undefined,
+    bio: overrides.bio ?? dbProfile?.bio ?? base.bio,
+    city: overrides.city ?? dbProfile?.city ?? base.city,
     stats: base.stats,
     sports: overrides.sports ?? base.sports,
     badges: overrides.badges ?? base.badges,
-    links: overrides.links ?? base.links,
-
+    links: overrides.links?.length ? overrides.links : dbLinks,
   };
 }
 
