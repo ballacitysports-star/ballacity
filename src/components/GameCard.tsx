@@ -21,12 +21,30 @@ export function GameCard({ game, index = 0 }: { game: Game; index?: number }) {
   const spotsLeft = game.maxPlayers - joinedCount;
   const fillPct = Math.round((joinedCount / game.maxPlayers) * 100);
   const navigate = useNavigate();
+  const { user } = useAuth();
+  const [opening, setOpening] = useState(false);
   const hostUserId = (game as { hostUserId?: string }).hostUserId;
   const goToHost = (e: React.MouseEvent) => {
     if (!hostUserId) return;
     e.preventDefault();
     e.stopPropagation();
     navigate({ to: "/players/$userId", params: { userId: hostUserId } });
+  };
+  const messageHost = async (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!hostUserId) return;
+    if (!user) { toast.error("Sign in to message the host."); return; }
+    if (hostUserId === user.id) { navigate({ to: "/messages" }); return; }
+    setOpening(true);
+    try {
+      const id = await getOrCreateDirectConversation(hostUserId, game.id);
+      navigate({ to: "/messages/$conversationId", params: { conversationId: id } });
+    } catch (err: any) {
+      toast.error(err?.message ?? "Couldn't open chat");
+    } finally {
+      setOpening(false);
+    }
   };
 
   return (
