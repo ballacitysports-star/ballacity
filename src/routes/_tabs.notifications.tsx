@@ -14,6 +14,15 @@ import {
   isPushPromptDismissed,
   type Notification,
 } from "@/lib/notifications";
+import {
+  CATEGORY_META,
+  setNotifPref,
+  useNotifPrefs,
+  type NotifCategory,
+  type NotifChannel,
+} from "@/lib/notification-prefs";
+import { Switch } from "@/components/ui/switch";
+
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
