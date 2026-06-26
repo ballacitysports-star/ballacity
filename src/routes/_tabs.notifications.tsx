@@ -96,6 +96,23 @@ function Notifications() {
     }
   };
 
+  const removeItem = async (n: Notification) => {
+    const prev = items;
+    setItems((curr) => curr.filter((x) => x.id !== n.id));
+    try {
+      await deleteNotification(n.id);
+      toast.success("Notification deleted", {
+        action: {
+          label: "Undo",
+          onClick: () => setItems(prev), // visual only; server row is gone
+        },
+      });
+    } catch {
+      setItems(prev);
+      toast.error("Couldn't delete notification");
+    }
+  };
+
   const handleMarkAll = async () => {
     if (unreadCount === 0) return;
     const stamp = new Date().toISOString();
