@@ -2,11 +2,12 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { MapPin, Navigation } from "lucide-react";
-import { GAMES, SPORTS } from "@/lib/sample-data";
+import { GAMES, SPORTS, type Game } from "@/lib/sample-data";
 import { formatWhen } from "@/lib/format";
 import { GamesMap, type MapPinItem } from "@/components/GamesMap";
 import { useMyProfile } from "@/lib/user-prefs-store";
 import { useAuth } from "@/hooks/use-auth";
+import { useHostedGames } from "@/lib/hosted-games-store";
 
 export const Route = createFileRoute("/_tabs/discover")({
   head: () => ({ meta: [{ title: "Discover — OpenRun" }] }),
@@ -17,27 +18,45 @@ const emojiBySport: Record<string, string> = Object.fromEntries(
   SPORTS.map((s) => [s.name, s.emoji]),
 );
 
+// Deterministic 0-100 pseudo coord from a string id so hosted games
+// spread across the map instead of stacking at the center.
+function hashTo100(seed: string, salt: string): number {
+  let h = 0;
+  const s = `${seed}:${salt}`;
+  for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0;
+  return ((Math.abs(h) % 1000) / 1000) * 100;
+}
+
 function Discover() {
   const { user } = useAuth();
   const profile = useMyProfile(user);
-  const [active, setActive] = useState(GAMES[0].id);
+  const hosted = useHostedGames();
+  const allGames: Game[] = useMemo(() => {
+    const placedHosted = hosted.map((g) => ({
+      ...g,
+      lat: g.lat && g.lat !== 50 ? g.lat : hashTo100(g.id, "lat"),
+      lng: g.lng && g.lng !== 50 ? g.lng : hashTo100(g.id, "lng"),
+    }));
+    return [...placedHosted, ...GAMES];
+  }, [hosted]);
+  const [active, setActive] = useState(GAMES[0]?.id ?? "");
   const [visibleIds, setVisibleIds] = useState<string[] | null>(null);
   const visibleGames = useMemo(
-    () => (visibleIds ? GAMES.filter((g) => visibleIds.includes(g.id)) : GAMES),
-    [visibleIds],
+    () => (visibleIds ? allGames.filter((g) => visibleIds.includes(g.id)) : allGames),
+    [visibleIds, allGames],
   );
   const activeGame = visibleGames.find((g) => g.id === active) ?? visibleGames[0] ?? null;
 
   const pins: MapPinItem[] = useMemo(
     () =>
-      GAMES.map((g) => ({
+      allGames.map((g) => ({
         id: g.id,
         emoji: emojiBySport[g.sport] ?? "📍",
         lat: g.lat,
         lng: g.lng,
         urgent: g.urgent,
       })),
-    [],
+    [allGames],
   );
 
   return (
