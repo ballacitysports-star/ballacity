@@ -131,6 +131,53 @@ function Notifications() {
   );
 }
 
+function NotificationPreferences() {
+  const prefs = useNotifPrefs();
+  const categories: NotifCategory[] = ["approvals", "messages", "general"];
+  return (
+    <details className="mb-4 rounded-2xl border border-border bg-surface/40 group">
+      <summary className="cursor-pointer list-none p-3 flex items-center justify-between">
+        <div>
+          <div className="text-sm font-semibold">Notification preferences</div>
+          <div className="text-xs text-muted-foreground">Choose what fires in-app vs. as a push alert.</div>
+        </div>
+        <span className="text-xs text-muted-foreground group-open:hidden">Edit</span>
+        <span className="text-xs text-muted-foreground hidden group-open:inline">Close</span>
+      </summary>
+      <div className="border-t border-border px-3 py-3 space-y-4">
+        <div className="grid grid-cols-[1fr_auto_auto] gap-x-4 gap-y-1 items-center">
+          <div />
+          <div className="text-[10px] uppercase tracking-wide text-muted-foreground text-center">In-app</div>
+          <div className="text-[10px] uppercase tracking-wide text-muted-foreground text-center">Push</div>
+          {categories.map((cat) => (
+            <PrefRow key={cat} category={cat} prefs={prefs} />
+          ))}
+        </div>
+      </div>
+    </details>
+  );
+}
+
+function PrefRow({ category, prefs }: { category: NotifCategory; prefs: ReturnType<typeof useNotifPrefs> }) {
+  const meta = CATEGORY_META[category];
+  const toggle = (channel: NotifChannel, value: boolean) => setNotifPref(category, channel, value);
+  return (
+    <>
+      <div className="py-2">
+        <div className="text-sm font-medium">{meta.label}</div>
+        <div className="text-xs text-muted-foreground">{meta.description}</div>
+      </div>
+      <div className="grid place-items-center">
+        <Switch checked={prefs[category].inApp} onCheckedChange={(v) => toggle("inApp", v)} aria-label={`${meta.label} in-app`} />
+      </div>
+      <div className="grid place-items-center">
+        <Switch checked={prefs[category].push} onCheckedChange={(v) => toggle("push", v)} aria-label={`${meta.label} push`} />
+      </div>
+    </>
+  );
+}
+
+
 function PushPrompt() {
   const [perm, setPerm] = useState<"granted" | "denied" | "default" | "unsupported">("default");
   const [dismissed, setDismissed] = useState(false);
