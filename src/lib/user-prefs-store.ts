@@ -182,6 +182,7 @@ export function useMyProfile(currentUser?: User | null): MyProfile | null {
   const [tick, setTick] = useState(0);
   const [dbProfile, setDbProfile] = useState<{
     display_name?: string | null;
+    username?: string | null;
     avatar_initials?: string | null;
     bio?: string | null;
     city?: string | null;
@@ -199,7 +200,7 @@ export function useMyProfile(currentUser?: User | null): MyProfile | null {
     let cancelled = false;
     supabase
       .from("profiles")
-      .select("display_name, avatar_initials, bio, city, avatar_url, cover_url, links")
+      .select("display_name, username, avatar_initials, bio, city, avatar_url, cover_url, links")
       .eq("id", user.id)
       .maybeSingle()
       .then(({ data }) => { if (!cancelled) setDbProfile(data as any); });
@@ -212,7 +213,7 @@ export function useMyProfile(currentUser?: User | null): MyProfile | null {
   const dbLinks: ProfileLink[] = Array.isArray(dbProfile?.links) ? (dbProfile!.links as ProfileLink[]) : [];
   return {
     name: overrides.name ?? dbProfile?.display_name ?? base.name,
-    username: overrides.username ?? base.username,
+    username: overrides.username ?? (dbProfile?.username ? `@${dbProfile.username.replace(/^@/, "")}` : base.username),
     avatar: overrides.avatar ?? dbProfile?.avatar_initials ?? base.avatar,
     avatarUrl: overrides.avatarUrl ?? dbProfile?.avatar_url ?? undefined,
     coverUrl: overrides.coverUrl ?? dbProfile?.cover_url ?? undefined,

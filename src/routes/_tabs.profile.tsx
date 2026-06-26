@@ -13,7 +13,7 @@ import { getCurrentUser, useAuth, signOut } from "@/hooks/use-auth";
 import { toast } from "sonner";
 import { useJoinedGameIds } from "@/lib/games-store";
 import { useHostedGames } from "@/lib/hosted-games-store";
-import { useMyProfile } from "@/lib/user-prefs-store";
+import { readOverrides, useMyProfile } from "@/lib/user-prefs-store";
 import { ProfileLinksList } from "@/components/ProfileLinks";
 
 
@@ -55,30 +55,38 @@ function Profile() {
     return () => { cancelled = true; };
   }, [loading, profileUser, me]);
 
-  // One-time sync of locally stored profile overrides up to the server profiles row,
+  // Sync locally stored profile overrides up to the server profiles row,
   // so other users can see this user's avatar, cover, city, bio, and external links.
   useEffect(() => {
     if (!profileUser || !me) return;
     const key = `openrun.profileSync.v1.${profileUser.id}`;
     if (typeof window === "undefined") return;
-    if (window.localStorage.getItem(key)) return;
+    const local = readOverrides(profileUser.id);
+    const hasLocalData = ["name", "username", "avatar", "bio", "city", "avatarUrl", "coverUrl", "links"].some((field) =>
+      Object.prototype.hasOwnProperty.call(local, field),
+    );
+    if (!hasLocalData) return;
+    const payload = {
+      id: profileUser.id,
+      display_name: local.name ?? me.name,
+      username: (local.username ?? me.username).replace(/^@/, "") || null,
+      avatar_initials: local.avatar ?? me.avatar,
+      bio: (local.bio ?? me.bio) || null,
+      city: (local.city ?? me.city) || null,
+      avatar_url: local.avatarUrl ?? me.avatarUrl ?? null,
+      cover_url: local.coverUrl ?? me.coverUrl ?? null,
+      links: Array.isArray(local.links) ? local.links : (me.links ?? []),
+    };
+    const signature = JSON.stringify(payload);
+    if (window.localStorage.getItem(key) === signature) return;
     let cancelled = false;
     (async () => {
       try {
         const { supabase } = await import("@/integrations/supabase/client");
         const { error } = await supabase
           .from("profiles")
-          .update({
-            display_name: me.name,
-            avatar_initials: me.avatar,
-            bio: me.bio || null,
-            city: me.city || null,
-            avatar_url: me.avatarUrl ?? null,
-            cover_url: me.coverUrl ?? null,
-            links: (me.links ?? []) as any,
-          } as any)
-          .eq("id", profileUser.id);
-        if (!cancelled && !error) window.localStorage.setItem(key, String(Date.now()));
+          .upsert(payload as any, { onConflict: "id" });
+        if (!cancelled && !error) window.localStorage.setItem(key, signature);
       } catch {
         /* ignore */
       }

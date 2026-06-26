@@ -44,9 +44,25 @@ function EditProfile() {
   const [bio, setBio] = useState(profile?.bio ?? "");
   const [sports, setSports] = useState(profile?.sports ?? []);
   const [links, setLinks] = useState<ProfileLink[]>(profile?.links ?? []);
+  const [isDirty, setIsDirty] = useState(false);
+  const [linksDirty, setLinksDirty] = useState(false);
+  const profileSignature = profile ? JSON.stringify({
+    name: profile.name,
+    username: profile.username,
+    avatar: profile.avatar,
+    avatarUrl: profile.avatarUrl,
+    coverUrl: profile.coverUrl,
+    city: profile.city,
+    bio: profile.bio,
+    sports: profile.sports,
+    links: profile.links,
+  }) : "";
+
+  const markDirty = () => setIsDirty(true);
 
   const onPickAvatar = async (file: File | null) => {
     if (!file) return;
+    markDirty();
     if (!file.type.startsWith("image/")) { toast.error("Please choose an image"); return; }
     try {
       const dataUrl = await resizeImageToDataUrl(file, 256);
@@ -58,6 +74,7 @@ function EditProfile() {
 
   const onPickCover = async (file: File | null) => {
     if (!file) return;
+    markDirty();
     if (!file.type.startsWith("image/")) { toast.error("Please choose an image"); return; }
     try {
       const dataUrl = await resizeImageToDataUrl(file, 1600);
@@ -68,35 +85,64 @@ function EditProfile() {
   };
 
   const addLink = (type: ProfileLinkType) => {
+    markDirty();
+    setLinksDirty(true);
     setLinks((prev) => [...prev, { type, url: "" }]);
   };
   const updateLink = (i: number, patch: Partial<ProfileLink>) => {
+    markDirty();
+    setLinksDirty(true);
     setLinks((prev) => prev.map((l, idx) => (idx === i ? { ...l, ...patch } : l)));
   };
-  const removeLink = (i: number) => setLinks((prev) => prev.filter((_, idx) => idx !== i));
+  const removeLink = (i: number) => {
+    markDirty();
+    setLinksDirty(true);
+    setLinks((prev) => prev.filter((_, idx) => idx !== i));
+  };
 
 
   const [preferredSports, setPreferredSports] = useState<Sport[]>(prefs.preferredSports);
   const [sections, setSections] = useState(prefs.sections);
 
   const toggleSport = (s: Sport) => {
+    markDirty();
     setPreferredSports((prev) => prev.includes(s) ? prev.filter(x => x !== s) : [...prev, s]);
   };
   const toggleSection = (k: keyof typeof sections) => {
+    markDirty();
     setSections((prev) => ({ ...prev, [k]: !prev[k] }));
   };
 
   const addSport = (s: Sport) => {
     if (sports.some((x) => x.name === s)) return;
+    markDirty();
     setSports([...sports, { name: s, skill: 3 }]);
   };
-  const removeSport = (s: Sport) => setSports(sports.filter((x) => x.name !== s));
-  const setSkill = (s: Sport, skill: number) =>
+  const removeSport = (s: Sport) => {
+    markDirty();
+    setSports(sports.filter((x) => x.name !== s));
+  };
+  const setSkill = (s: Sport, skill: number) => {
+    markDirty();
     setSports(sports.map((x) => (x.name === s ? { ...x, skill } : x)));
+  };
 
   useEffect(() => {
     if (user) setConfirmedUser(user);
   }, [user]);
+
+  useEffect(() => {
+    if (!profile || isDirty) return;
+    setName(profile.name);
+    setUsername(profile.username);
+    setAvatar(profile.avatar);
+    setAvatarUrl(profile.avatarUrl);
+    setCoverUrl(profile.coverUrl);
+    setCity(profile.city);
+    setBio(profile.bio);
+    setSports(profile.sports);
+    setLinks(profile.links);
+  }, [profileUser?.id, profileSignature, isDirty]);
 
   useEffect(() => {
     if (loading || profileUser) return;
@@ -189,19 +235,20 @@ function EditProfile() {
     let syncedToServer = false;
     try {
       const { supabase } = await import("@/integrations/supabase/client");
+      const profilePayload = {
+        id: profileUser.id,
+        display_name: trimmedName,
+        username: username.trim().replace(/^@/, "").slice(0, 30) || null,
+        avatar_initials: (avatar.trim() || trimmedName.slice(0, 2)).toUpperCase().slice(0, 3),
+        bio: bio.trim().slice(0, 280) || null,
+        city: trimmedCity || null,
+        avatar_url: avatarUrl ?? null,
+        cover_url: coverUrl ?? null,
+        ...(linksDirty ? { links: cleanedLinks as any } : {}),
+      };
       const { error } = await supabase
         .from("profiles")
-        .update({
-          display_name: trimmedName,
-          username: username.trim().replace(/^@/, "").slice(0, 30) || null,
-          avatar_initials: (avatar.trim() || trimmedName.slice(0, 2)).toUpperCase().slice(0, 3),
-          bio: bio.trim().slice(0, 280) || null,
-          city: trimmedCity || null,
-          avatar_url: avatarUrl ?? null,
-          cover_url: coverUrl ?? null,
-          links: cleanedLinks as any,
-        } as any)
-        .eq("id", profileUser.id);
+        .upsert(profilePayload as any, { onConflict: "id" });
       if (error) throw error;
       syncedToServer = true;
     } catch (e: any) {
@@ -216,6 +263,7 @@ function EditProfile() {
 
 
   const reset = () => {
+    markDirty();
     setPreferredSports(DEFAULT_PREFS.preferredSports);
     setSections(DEFAULT_PREFS.sections);
   };
@@ -256,7 +304,7 @@ function EditProfile() {
               {coverUrl && (
                 <button
                   type="button"
-                  onClick={() => setCoverUrl(undefined)}
+                  onClick={() => { markDirty(); setCoverUrl(undefined); }}
                   className="rounded-full border border-border bg-background/80 backdrop-blur px-3 py-1.5 text-xs font-semibold text-coral"
                 >
                   Remove
@@ -287,7 +335,7 @@ function EditProfile() {
               {avatarUrl && (
                 <button
                   type="button"
-                  onClick={() => setAvatarUrl(undefined)}
+                  onClick={() => { markDirty(); setAvatarUrl(undefined); }}
                   className="text-xs font-semibold text-coral text-left"
                 >
                   Remove photo
@@ -296,14 +344,14 @@ function EditProfile() {
             </div>
           </div>
         </Field>
-        <Field label="Display name"><Input value={name} onChange={setName} maxLength={60} /></Field>
-        <Field label="Username"><Input value={username} onChange={setUsername} maxLength={30} placeholder="@you" /></Field>
-        <Field label="Avatar initials (fallback)"><Input value={avatar} onChange={setAvatar} maxLength={3} /></Field>
-        <Field label="City"><LocationAutocomplete value={city} onChange={setCity} placeholder="Your city" mode="city" /></Field>
+        <Field label="Display name"><Input value={name} onChange={(v) => { markDirty(); setName(v); }} maxLength={60} /></Field>
+        <Field label="Username"><Input value={username} onChange={(v) => { markDirty(); setUsername(v); }} maxLength={30} placeholder="@you" /></Field>
+        <Field label="Avatar initials (fallback)"><Input value={avatar} onChange={(v) => { markDirty(); setAvatar(v); }} maxLength={3} /></Field>
+        <Field label="City"><LocationAutocomplete value={city} onChange={(v) => { markDirty(); setCity(v); }} placeholder="Your city" mode="city" /></Field>
         <Field label="Bio">
           <textarea
             value={bio}
-            onChange={(e) => setBio(e.target.value)}
+            onChange={(e) => { markDirty(); setBio(e.target.value); }}
             maxLength={280}
             rows={3}
             className="w-full rounded-2xl border border-border bg-surface px-3 py-2 text-sm outline-none focus:border-lime"
