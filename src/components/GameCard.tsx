@@ -133,12 +133,25 @@ export function GameCard({ game, index = 0 }: { game: Game; index?: number }) {
               )}
               <span className="text-foreground">· {game.skill}</span>
             </div>
-            <div className="flex items-center gap-1.5 text-xs font-semibold">
-              <Users className="h-4 w-4 text-lime" />
-              <span className="text-foreground">{joinedCount}/{game.maxPlayers}</span>
-              {spotsLeft > 0 && spotsLeft <= 3 && (
-                <span className="text-coral">· {spotsLeft} left</span>
+            <div className="flex items-center gap-2">
+              {hostUserId && (
+                <button
+                  type="button"
+                  onClick={messageHost}
+                  disabled={opening}
+                  aria-label={`Message ${game.host.name}`}
+                  className="grid h-8 w-8 place-items-center rounded-full border border-border bg-surface text-muted-foreground hover:border-lime/40 hover:text-lime disabled:opacity-50"
+                >
+                  <MessageCircle className="h-4 w-4" />
+                </button>
               )}
+              <div className="flex items-center gap-1.5 text-xs font-semibold">
+                <Users className="h-4 w-4 text-lime" />
+                <span className="text-foreground">{joinedCount}/{game.maxPlayers}</span>
+                {spotsLeft > 0 && spotsLeft <= 3 && (
+                  <span className="text-coral">· {spotsLeft} left</span>
+                )}
+              </div>
             </div>
           </div>
           <div className="h-1.5 overflow-hidden rounded-full bg-secondary">
