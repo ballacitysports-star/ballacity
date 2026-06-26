@@ -150,6 +150,7 @@ function AuthGate({ children }: { children: React.ReactNode }) {
   const pathname = router.state.location.pathname;
   const { user, loading } = useAuth();
   const isPublic = pathname === "/" || PUBLIC_ROUTES.some((p) => p !== "/" && (pathname === p || pathname.startsWith(`${p}/`)));
+  useNotificationPush();
 
   useEffect(() => {
     if (loading) return;
