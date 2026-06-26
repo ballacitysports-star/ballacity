@@ -77,6 +77,10 @@ function Notifications() {
       <h1 className="font-display text-3xl font-bold leading-tight mb-1">Alerts</h1>
       <p className="text-muted-foreground text-sm mb-5">Real-time updates from your games & crew.</p>
 
+      <PushPrompt />
+
+
+
       {fetching ? (
         <div className="text-sm text-muted-foreground">Loading…</div>
       ) : items.length === 0 ? (
