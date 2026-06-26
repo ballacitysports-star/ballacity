@@ -79,21 +79,52 @@ function Notifications() {
     );
   }
 
+  const unreadCount = useMemo(() => items.filter((n) => !n.read_at).length, [items]);
+
+  const toggleRead = async (n: Notification) => {
+    const willMarkRead = !n.read_at;
+    const next = willMarkRead ? new Date().toISOString() : null;
+    setItems((prev) => prev.map((x) => (x.id === n.id ? { ...x, read_at: next } : x)));
+    try {
+      if (willMarkRead) await markNotificationRead(n.id);
+      else await markNotificationUnread(n.id);
+    } catch {
+      // revert on failure
+      setItems((prev) => prev.map((x) => (x.id === n.id ? { ...x, read_at: n.read_at } : x)));
+      toast.error("Couldn't update notification");
+    }
+  };
+
+  const handleMarkAll = async () => {
+    if (unreadCount === 0) return;
+    const stamp = new Date().toISOString();
+    setItems((prev) => prev.map((n) => ({ ...n, read_at: n.read_at ?? stamp })));
+    try {
+      await markAllNotificationsRead();
+      toast.success(`Marked ${unreadCount} as read`);
+    } catch {
+      toast.error("Couldn't mark all as read");
+    }
+  };
+
   return (
     <div className="mx-auto max-w-md px-4 pt-6">
       <div className="flex items-center justify-between mb-5">
         <Logo />
-        <button onClick={async () => { await markAllNotificationsRead(); setItems((prev) => prev.map((n) => ({ ...n, read_at: n.read_at ?? new Date().toISOString() }))); }}
-          className="text-xs font-semibold text-muted-foreground hover:text-lime">Mark all read</button>
+        <button
+          onClick={handleMarkAll}
+          disabled={unreadCount === 0}
+          className="inline-flex items-center gap-1.5 rounded-full border border-border bg-surface px-3 py-1.5 text-xs font-semibold text-foreground hover:border-lime/60 hover:text-lime disabled:opacity-40 disabled:hover:border-border disabled:hover:text-foreground"
+        >
+          <CheckCheck className="h-3.5 w-3.5" />
+          Mark all read{unreadCount > 0 ? ` (${unreadCount})` : ""}
+        </button>
       </div>
       <h1 className="font-display text-3xl font-bold leading-tight mb-1">Alerts</h1>
       <p className="text-muted-foreground text-sm mb-5">Real-time updates from your games & crew.</p>
 
       <PushPrompt />
       <NotificationPreferences />
-
-
-
 
       {fetching ? (
         <div className="text-sm text-muted-foreground">Loading…</div>
@@ -107,25 +138,42 @@ function Notifications() {
             const Icon = iconFor(n.type);
             const unread = !n.read_at;
             return (
-              <motion.button
+              <motion.div
                 key={n.id}
-                onClick={() => handleClick(n)}
                 initial={{ opacity: 0, x: -8 }}
                 animate={{ opacity: 1, x: 0 }}
                 transition={{ delay: Math.min(i * 0.03, 0.3) }}
-                className={`w-full text-left flex gap-3 rounded-2xl border p-3 ${unread ? "border-lime/40 bg-lime/5" : "border-border bg-surface"}`}
+                className={`relative flex gap-3 rounded-2xl border p-3 ${unread ? "border-lime/40 bg-lime/5" : "border-border bg-surface"}`}
               >
-                <div className={`grid h-10 w-10 shrink-0 place-items-center rounded-xl ${unread ? "bg-lime/15 text-lime" : "bg-muted/30 text-muted-foreground"}`}>
-                  <Icon className="h-5 w-5" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-start justify-between gap-2">
-                    <h3 className="font-semibold text-sm leading-tight">{n.title}</h3>
-                    <span className="text-[10px] text-muted-foreground shrink-0">{timeAgo(n.created_at)}</span>
+                <button
+                  type="button"
+                  onClick={() => handleClick(n)}
+                  className="flex flex-1 min-w-0 gap-3 text-left"
+                >
+                  <div className={`grid h-10 w-10 shrink-0 place-items-center rounded-xl ${unread ? "bg-lime/15 text-lime" : "bg-muted/30 text-muted-foreground"}`}>
+                    <Icon className="h-5 w-5" />
                   </div>
-                  {n.body && <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{n.body}</p>}
-                </div>
-              </motion.button>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-start justify-between gap-2">
+                      <h3 className="font-semibold text-sm leading-tight flex items-center gap-1">
+                        {unread && <Dot className="h-4 w-4 -ml-1 text-lime" />}
+                        {n.title}
+                      </h3>
+                      <span className="text-[10px] text-muted-foreground shrink-0">{timeAgo(n.created_at)}</span>
+                    </div>
+                    {n.body && <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{n.body}</p>}
+                  </div>
+                </button>
+                <button
+                  type="button"
+                  onClick={(e) => { e.stopPropagation(); toggleRead(n); }}
+                  aria-label={unread ? "Mark as read" : "Mark as unread"}
+                  title={unread ? "Mark as read" : "Mark as unread"}
+                  className="shrink-0 self-start rounded-full p-1.5 text-muted-foreground hover:bg-muted/30 hover:text-lime"
+                >
+                  {unread ? <Check className="h-4 w-4" /> : <Dot className="h-4 w-4" />}
+                </button>
+              </motion.div>
             );
           })}
         </div>
