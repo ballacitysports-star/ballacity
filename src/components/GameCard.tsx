@@ -1,9 +1,13 @@
 import { Link, useNavigate } from "@tanstack/react-router";
 import { motion } from "framer-motion";
-import { MapPin, Users, Clock, Zap, Lock, Flame } from "lucide-react";
+import { MapPin, Users, Clock, Zap, Lock, Flame, MessageCircle } from "lucide-react";
 import type { Game } from "@/lib/sample-data";
 import { formatWhen } from "@/lib/format";
 import { useIsJoined } from "@/lib/games-store";
+import { getOrCreateDirectConversation } from "@/lib/messages";
+import { useAuth } from "@/hooks/use-auth";
+import { useState } from "react";
+import { toast } from "sonner";
 
 const sportEmoji: Record<string, string> = {
   Basketball: "🏀", Soccer: "⚽", Pickleball: "🥒", Volleyball: "🏐",
@@ -17,12 +21,30 @@ export function GameCard({ game, index = 0 }: { game: Game; index?: number }) {
   const spotsLeft = game.maxPlayers - joinedCount;
   const fillPct = Math.round((joinedCount / game.maxPlayers) * 100);
   const navigate = useNavigate();
+  const { user } = useAuth();
+  const [opening, setOpening] = useState(false);
   const hostUserId = (game as { hostUserId?: string }).hostUserId;
   const goToHost = (e: React.MouseEvent) => {
     if (!hostUserId) return;
     e.preventDefault();
     e.stopPropagation();
     navigate({ to: "/players/$userId", params: { userId: hostUserId } });
+  };
+  const messageHost = async (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!hostUserId) return;
+    if (!user) { toast.error("Sign in to message the host."); return; }
+    if (hostUserId === user.id) { navigate({ to: "/messages" }); return; }
+    setOpening(true);
+    try {
+      const id = await getOrCreateDirectConversation(hostUserId, game.id);
+      navigate({ to: "/messages/$conversationId", params: { conversationId: id } });
+    } catch (err: any) {
+      toast.error(err?.message ?? "Couldn't open chat");
+    } finally {
+      setOpening(false);
+    }
   };
 
   return (
@@ -111,12 +133,25 @@ export function GameCard({ game, index = 0 }: { game: Game; index?: number }) {
               )}
               <span className="text-foreground">· {game.skill}</span>
             </div>
-            <div className="flex items-center gap-1.5 text-xs font-semibold">
-              <Users className="h-4 w-4 text-lime" />
-              <span className="text-foreground">{joinedCount}/{game.maxPlayers}</span>
-              {spotsLeft > 0 && spotsLeft <= 3 && (
-                <span className="text-coral">· {spotsLeft} left</span>
+            <div className="flex items-center gap-2">
+              {hostUserId && (
+                <button
+                  type="button"
+                  onClick={messageHost}
+                  disabled={opening}
+                  aria-label={`Message ${game.host.name}`}
+                  className="grid h-8 w-8 place-items-center rounded-full border border-border bg-surface text-muted-foreground hover:border-lime/40 hover:text-lime disabled:opacity-50"
+                >
+                  <MessageCircle className="h-4 w-4" />
+                </button>
               )}
+              <div className="flex items-center gap-1.5 text-xs font-semibold">
+                <Users className="h-4 w-4 text-lime" />
+                <span className="text-foreground">{joinedCount}/{game.maxPlayers}</span>
+                {spotsLeft > 0 && spotsLeft <= 3 && (
+                  <span className="text-coral">· {spotsLeft} left</span>
+                )}
+              </div>
             </div>
           </div>
           <div className="h-1.5 overflow-hidden rounded-full bg-secondary">
