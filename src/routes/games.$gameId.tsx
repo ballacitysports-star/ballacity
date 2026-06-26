@@ -269,7 +269,7 @@ function GameDetail() {
             ) : myReq.status === "approved" ? (
               <Check className="h-5 w-5 text-lime shrink-0 mt-0.5" />
             ) : (
-              <X className="h-5 w-5 text-muted-foreground shrink-0 mt-0.5" />
+              <XIcon className="h-5 w-5 text-muted-foreground shrink-0 mt-0.5" />
             )}
             <div className="min-w-0">
               <div className="font-display text-sm font-bold">
