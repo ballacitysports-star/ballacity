@@ -26,7 +26,9 @@ function MessagesInbox() {
     load();
     const channel = supabase
       .channel(`inbox-${user.id}`)
-      .on("postgres_changes", { event: "*", schema: "public", table: "messages" }, load)
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "messages" }, load)
+      .on("postgres_changes", { event: "UPDATE", schema: "public", table: "messages" }, load)
+      .on("postgres_changes", { event: "UPDATE", schema: "public", table: "conversations" }, load)
       .subscribe();
     return () => { cancelled = true; supabase.removeChannel(channel); };
   }, [user?.id, loading]);
