@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
+import { isAllowed } from "@/lib/notification-prefs";
+
 
 export type Notification = {
   id: string;
@@ -108,6 +110,8 @@ function showBrowserNotification(n: Pick<Notification, "title" | "body" | "link"
   if (typeof window === "undefined" || !("Notification" in window)) return;
   if (window.Notification.permission !== "granted") return;
   if (typeof document !== "undefined" && document.visibilityState === "visible") return; // don't double-notify
+  if (!isAllowed(n.type, "push")) return;
+
   try {
     const native = new window.Notification(n.title, {
       body: n.body ?? undefined,
@@ -144,18 +148,21 @@ export function useNotificationPush() {
           if (!active) return;
           const n = payload.new as Notification;
           // Lazy import to avoid SSR issues
-          import("sonner").then(({ toast }) => {
-            const isApproval = n.type === "join_approved" || n.type === "join_declined";
-            const fn = n.type === "join_approved" ? toast.success : n.type === "join_declined" ? toast.error : toast;
-            fn(n.title, {
-              description: n.body ?? undefined,
-              action: n.link
-                ? { label: "Open", onClick: () => { if (n.link) window.location.assign(n.link); } }
-                : undefined,
-              duration: isApproval ? 8000 : 5000,
+          if (isAllowed(n.type, "inApp")) {
+            import("sonner").then(({ toast }) => {
+              const isApproval = n.type === "join_approved" || n.type === "join_declined";
+              const fn = n.type === "join_approved" ? toast.success : n.type === "join_declined" ? toast.error : toast;
+              fn(n.title, {
+                description: n.body ?? undefined,
+                action: n.link
+                  ? { label: "Open", onClick: () => { if (n.link) window.location.assign(n.link); } }
+                  : undefined,
+                duration: isApproval ? 8000 : 5000,
+              });
             });
-          });
+          }
           showBrowserNotification(n);
+
         },
       )
       .subscribe();
