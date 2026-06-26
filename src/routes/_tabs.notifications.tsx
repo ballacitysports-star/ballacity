@@ -1,11 +1,21 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { motion } from "framer-motion";
 import { Logo } from "@/components/Logo";
-import { Bell, MessageCircle, Users, CreditCard, Zap } from "lucide-react";
+import { Bell, BellRing, MessageCircle, Users, CreditCard, Zap, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useAuth } from "@/hooks/use-auth";
-import { listMyNotifications, markAllNotificationsRead, markNotificationRead, type Notification } from "@/lib/notifications";
+import {
+  listMyNotifications,
+  markAllNotificationsRead,
+  markNotificationRead,
+  pushPermissionState,
+  requestPushPermission,
+  dismissPushPrompt,
+  isPushPromptDismissed,
+  type Notification,
+} from "@/lib/notifications";
 import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
 
 export const Route = createFileRoute("/_tabs/notifications")({
   head: () => ({ meta: [{ title: "Alerts — OpenRun" }] }),
