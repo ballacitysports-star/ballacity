@@ -233,6 +233,80 @@ function Profile() {
           <ReputationBadge rep={myRep} />
         </div>
 
+        {/* Join request status (pending approvals + recent decisions) */}
+        {(pendingRequests.length > 0 || recentlyReviewed.length > 0) && (
+          <div className="mt-6">
+            <h2 className="font-display text-sm font-bold uppercase tracking-wider text-muted-foreground mb-2 flex items-center gap-1.5">
+              <Clock className="h-4 w-4" /> Pending approvals
+              {pendingRequests.length > 0 && (
+                <span className="ml-1 rounded-full bg-coral/15 px-2 py-0.5 text-[10px] font-bold text-coral">
+                  {pendingRequests.length}
+                </span>
+              )}
+            </h2>
+            <div className="space-y-2">
+              {pendingRequests.map((r) => {
+                const g = gameLookup.get(r.game_id);
+                return (
+                  <div key={r.id} className="rounded-2xl border border-coral/40 bg-coral/10 p-3 flex items-start gap-3">
+                    <Clock className="h-4 w-4 text-coral shrink-0 mt-0.5" />
+                    <div className="min-w-0 flex-1">
+                      <Link
+                        to="/games/$gameId"
+                        params={{ gameId: r.game_id }}
+                        className="font-semibold text-sm hover:text-lime hover:underline truncate block"
+                      >
+                        {g?.title ?? "Pickup game"}
+                      </Link>
+                      <p className="text-xs text-muted-foreground mt-0.5">
+                        Waiting for host approval · {new Date(r.created_at).toLocaleDateString()}
+                      </p>
+                    </div>
+                    <button
+                      onClick={async () => {
+                        try {
+                          await cancelMyJoinRequest(r.game_id);
+                          toast("Request canceled.");
+                          refreshRequests();
+                        } catch (e: any) { toast.error(e.message ?? "Could not cancel."); }
+                      }}
+                      className="rounded-full border border-border bg-background px-3 py-1 text-xs font-semibold hover:border-coral/40"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                );
+              })}
+              {recentlyReviewed.map((r) => {
+                const g = gameLookup.get(r.game_id);
+                const approved = r.status === "approved";
+                return (
+                  <Link
+                    key={r.id}
+                    to="/games/$gameId"
+                    params={{ gameId: r.game_id }}
+                    className={`rounded-2xl border p-3 flex items-start gap-3 ${
+                      approved ? "border-lime/40 bg-lime/10" : "border-border bg-surface"
+                    }`}
+                  >
+                    {approved ? (
+                      <Check className="h-4 w-4 text-lime shrink-0 mt-0.5" />
+                    ) : (
+                      <XIcon className="h-4 w-4 text-muted-foreground shrink-0 mt-0.5" />
+                    )}
+                    <div className="min-w-0 flex-1">
+                      <div className="font-semibold text-sm truncate">{g?.title ?? "Pickup game"}</div>
+                      <p className="text-xs text-muted-foreground mt-0.5">
+                        {approved ? "Approved — you're on the roster." : "Declined by host."}
+                      </p>
+                    </div>
+                  </Link>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
         {/* Upcoming */}
         <div className="mt-6">
           <h2 className="font-display text-sm font-bold uppercase tracking-wider text-muted-foreground mb-2 flex items-center gap-1.5">
