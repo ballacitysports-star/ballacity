@@ -138,10 +138,15 @@ export function LocationAutocomplete({
         setOpen(mapped.length > 0);
         setSearchError(mapped.length === 0 ? "No matches — keep typing or enter the address manually" : null);
       })
-      .catch(() => {
+      .catch((err: any) => {
+        console.error("[LocationAutocomplete] Places autocomplete failed:", err);
         setSuggestions([]);
         setOpen(false);
-        setSearchError("Couldn't load suggestions — you can still type the address manually");
+        const msg = err?.message || String(err || "");
+        const friendly = /referer|referrer|API key|denied|REQUEST_DENIED|403/i.test(msg)
+          ? "Address search is disabled for this site (API key restriction). Type the address manually."
+          : "Couldn't load suggestions — you can still type the address manually";
+        setSearchError(friendly);
       });
   };
 
