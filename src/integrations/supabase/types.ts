@@ -782,6 +782,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      create_direct_conversation: {
+        Args: { _game_id?: string; _other_user: string }
+        Returns: string
+      }
       free_reels_used: {
         Args: { check_env?: string; user_uuid: string }
         Returns: number

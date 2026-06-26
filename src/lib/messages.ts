@@ -33,55 +33,23 @@ export type ConversationWithMeta = Conversation & {
 
 // Find or create a 1:1 conversation between current user and otherUserId
 export async function getOrCreateDirectConversation(otherUserId: string, gameId: string | null = null): Promise<string> {
-  // Verify identity by hitting the Auth server with the current JWT.
-  // If this doesn't return a user, our Authorization header is stale/missing
-  // and PostgREST will treat us as anon → auth.uid() is NULL → RLS denies insert.
-  const { data: userData, error: userErr } = await supabase.auth.getUser();
-  if (userErr || !userData.user) {
-    const refreshed = await supabase.auth.refreshSession();
-    if (!refreshed.data.session?.user) throw new Error("Sign in to send messages.");
-  }
-  const { data: u2 } = await supabase.auth.getUser();
-  if (!u2.user) throw new Error("Sign in to send messages.");
-  const me = u2.user.id;
-  if (me === otherUserId) throw new Error("You can't message yourself.");
-  console.log("[messages] creating conversation as", me, "with", otherUserId);
-
-
-
-  // Find existing: conversations where both users are participants
-  const { data: mine } = await supabase
-    .from("conversation_participants" as any)
-    .select("conversation_id")
-    .eq("user_id", me);
-  const myConvIds = ((mine ?? []) as any[]).map((r) => r.conversation_id);
-  if (myConvIds.length > 0) {
-    const { data: shared } = await supabase
-      .from("conversation_participants" as any)
-      .select("conversation_id")
-      .eq("user_id", otherUserId)
-      .in("conversation_id", myConvIds);
-    const sharedIds = ((shared ?? []) as any[]).map((r) => r.conversation_id);
-    if (sharedIds.length > 0) return sharedIds[0];
+  if (!otherUserId) throw new Error("Missing recipient.");
+  const { data: u } = await supabase.auth.getUser();
+  if (!u.user) {
+    await supabase.auth.refreshSession();
+    const { data: u2 } = await supabase.auth.getUser();
+    if (!u2.user) throw new Error("Sign in to send messages.");
   }
 
-  // Create new
-  const { data: conv, error } = await supabase
-    .from("conversations" as any)
-    .insert({ created_by: me, game_id: gameId } as any)
-    .select("id")
-    .single();
+  const { data, error } = await supabase.rpc("create_direct_conversation" as any, {
+    _other_user: otherUserId,
+    _game_id: gameId,
+  });
   if (error) {
-    console.error("[messages] create conversation failed", error);
+    console.error("[messages] create_direct_conversation failed", error);
     throw new Error(error.message || "Could not start conversation.");
   }
-
-  const convId = (conv as any).id as string;
-  const { error: pErr } = await supabase
-    .from("conversation_participants" as any)
-    .insert([{ conversation_id: convId, user_id: me }, { conversation_id: convId, user_id: otherUserId }] as any);
-  if (pErr) throw pErr;
-  return convId;
+  return data as unknown as string;
 }
 
 export async function listMyConversations(): Promise<ConversationWithMeta[]> {
