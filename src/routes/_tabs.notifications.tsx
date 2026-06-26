@@ -18,9 +18,11 @@ import {
   CATEGORY_META,
   setNotifPref,
   useNotifPrefs,
+  useHydrateNotifPrefs,
   type NotifCategory,
   type NotifChannel,
 } from "@/lib/notification-prefs";
+
 import { Switch } from "@/components/ui/switch";
 
 import { supabase } from "@/integrations/supabase/client";
@@ -133,7 +135,10 @@ function Notifications() {
 
 function NotificationPreferences() {
   const prefs = useNotifPrefs();
+  const { user } = useAuth();
+  useHydrateNotifPrefs(user?.id);
   const categories: NotifCategory[] = ["approvals", "messages", "general"];
+
   return (
     <details className="mb-4 rounded-2xl border border-border bg-surface/40 group">
       <summary className="cursor-pointer list-none p-3 flex items-center justify-between">
