@@ -45,6 +45,7 @@ function EditProfile() {
   const [sports, setSports] = useState(profile?.sports ?? []);
   const [links, setLinks] = useState<ProfileLink[]>(profile?.links ?? []);
   const [isDirty, setIsDirty] = useState(false);
+  const [linksDirty, setLinksDirty] = useState(false);
   const profileSignature = profile ? JSON.stringify({
     name: profile.name,
     username: profile.username,
@@ -85,14 +86,17 @@ function EditProfile() {
 
   const addLink = (type: ProfileLinkType) => {
     markDirty();
+    setLinksDirty(true);
     setLinks((prev) => [...prev, { type, url: "" }]);
   };
   const updateLink = (i: number, patch: Partial<ProfileLink>) => {
     markDirty();
+    setLinksDirty(true);
     setLinks((prev) => prev.map((l, idx) => (idx === i ? { ...l, ...patch } : l)));
   };
   const removeLink = (i: number) => {
     markDirty();
+    setLinksDirty(true);
     setLinks((prev) => prev.filter((_, idx) => idx !== i));
   };
 
@@ -231,19 +235,20 @@ function EditProfile() {
     let syncedToServer = false;
     try {
       const { supabase } = await import("@/integrations/supabase/client");
+      const profilePayload = {
+        id: profileUser.id,
+        display_name: trimmedName,
+        username: username.trim().replace(/^@/, "").slice(0, 30) || null,
+        avatar_initials: (avatar.trim() || trimmedName.slice(0, 2)).toUpperCase().slice(0, 3),
+        bio: bio.trim().slice(0, 280) || null,
+        city: trimmedCity || null,
+        avatar_url: avatarUrl ?? null,
+        cover_url: coverUrl ?? null,
+        ...(linksDirty ? { links: cleanedLinks as any } : {}),
+      };
       const { error } = await supabase
         .from("profiles")
-        .upsert({
-          id: profileUser.id,
-          display_name: trimmedName,
-          username: username.trim().replace(/^@/, "").slice(0, 30) || null,
-          avatar_initials: (avatar.trim() || trimmedName.slice(0, 2)).toUpperCase().slice(0, 3),
-          bio: bio.trim().slice(0, 280) || null,
-          city: trimmedCity || null,
-          avatar_url: avatarUrl ?? null,
-          cover_url: coverUrl ?? null,
-          links: cleanedLinks as any,
-        } as any, { onConflict: "id" });
+        .upsert(profilePayload as any, { onConflict: "id" });
       if (error) throw error;
       syncedToServer = true;
     } catch (e: any) {
