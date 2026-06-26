@@ -40,6 +40,10 @@ export async function markNotificationRead(id: string) {
   await supabase.from("notifications" as any).update({ read_at: new Date().toISOString() } as any).eq("id", id);
 }
 
+export async function markNotificationUnread(id: string) {
+  await supabase.from("notifications" as any).update({ read_at: null } as any).eq("id", id);
+}
+
 export async function markAllNotificationsRead() {
   const { data: u } = await supabase.auth.getUser();
   if (!u.user) return;
