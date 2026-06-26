@@ -1,11 +1,21 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { motion } from "framer-motion";
 import { Logo } from "@/components/Logo";
-import { Bell, MessageCircle, Users, CreditCard, Zap } from "lucide-react";
+import { Bell, BellRing, MessageCircle, Users, CreditCard, Zap, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useAuth } from "@/hooks/use-auth";
-import { listMyNotifications, markAllNotificationsRead, markNotificationRead, type Notification } from "@/lib/notifications";
+import {
+  listMyNotifications,
+  markAllNotificationsRead,
+  markNotificationRead,
+  pushPermissionState,
+  requestPushPermission,
+  dismissPushPrompt,
+  isPushPromptDismissed,
+  type Notification,
+} from "@/lib/notifications";
 import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
 
 export const Route = createFileRoute("/_tabs/notifications")({
   head: () => ({ meta: [{ title: "Alerts — OpenRun" }] }),
@@ -67,6 +77,10 @@ function Notifications() {
       <h1 className="font-display text-3xl font-bold leading-tight mb-1">Alerts</h1>
       <p className="text-muted-foreground text-sm mb-5">Real-time updates from your games & crew.</p>
 
+      <PushPrompt />
+
+
+
       {fetching ? (
         <div className="text-sm text-muted-foreground">Loading…</div>
       ) : items.length === 0 ? (
@@ -102,6 +116,61 @@ function Notifications() {
           })}
         </div>
       )}
+    </div>
+  );
+}
+
+function PushPrompt() {
+  const [perm, setPerm] = useState<"granted" | "denied" | "default" | "unsupported">("default");
+  const [dismissed, setDismissed] = useState(false);
+
+  useEffect(() => {
+    setPerm(pushPermissionState());
+    setDismissed(isPushPromptDismissed());
+  }, []);
+
+  if (perm === "unsupported" || perm === "granted") return null;
+  if (perm === "default" && dismissed) return null;
+
+  const enable = async () => {
+    const result = await requestPushPermission();
+    if (result === "granted") {
+      setPerm("granted");
+      toast.success("Push notifications enabled");
+    } else if (result === "denied") {
+      setPerm("denied");
+      toast("Push blocked. Enable it from your browser site settings.");
+    }
+  };
+
+  return (
+    <div className="mb-4 rounded-2xl border border-lime/40 bg-lime/10 p-3 flex items-start gap-3">
+      <BellRing className="h-5 w-5 text-lime shrink-0 mt-0.5" />
+      <div className="min-w-0 flex-1">
+        <div className="font-semibold text-sm">
+          {perm === "denied" ? "Push notifications blocked" : "Get push alerts for approvals"}
+        </div>
+        <p className="text-xs text-muted-foreground mt-0.5">
+          {perm === "denied"
+            ? "Re-enable notifications for this site in your browser settings to get instant approval alerts."
+            : "Know the moment a host approves or declines your join request — even when OpenRun isn't open."}
+        </p>
+        {perm !== "denied" && (
+          <button
+            onClick={enable}
+            className="mt-2 inline-flex items-center rounded-full bg-lime-gradient px-4 py-1.5 text-xs font-bold text-primary-foreground"
+          >
+            Turn on push
+          </button>
+        )}
+      </div>
+      <button
+        onClick={() => { dismissPushPrompt(); setDismissed(true); }}
+        className="shrink-0 rounded-full p-1 text-muted-foreground hover:text-foreground"
+        aria-label="Dismiss"
+      >
+        <X className="h-4 w-4" />
+      </button>
     </div>
   );
 }
