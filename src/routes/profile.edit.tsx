@@ -166,9 +166,10 @@ function EditProfile() {
     });
 
     // Persist publicly visible fields to the profiles table so other users can see them
+    let syncedToServer = false;
     try {
       const { supabase } = await import("@/integrations/supabase/client");
-      await supabase
+      const { error } = await supabase
         .from("profiles")
         .update({
           display_name: trimmedName,
@@ -181,14 +182,18 @@ function EditProfile() {
           links: cleanedLinks as any,
         } as any)
         .eq("id", profileUser.id);
+      if (error) throw error;
+      syncedToServer = true;
     } catch (e: any) {
       console.error("Failed to sync profile to server", e);
+      toast.error(`Saved locally, but couldn't sync to server: ${e?.message ?? "unknown error"}`);
     }
 
     setFeedPrefs({ preferredSports, sections });
-    toast.success("Profile saved");
+    if (syncedToServer) toast.success("Profile saved & synced");
     nav({ to: "/profile" });
   };
+
 
   const reset = () => {
     setPreferredSports(DEFAULT_PREFS.preferredSports);
