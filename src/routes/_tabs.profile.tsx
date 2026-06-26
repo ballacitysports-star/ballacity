@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { motion } from "framer-motion";
-import { Settings, Trophy, Calendar, Shield, LogIn, LogOut } from "lucide-react";
+import { Settings, Trophy, Calendar, Shield, LogIn, LogOut, Clock, Check, X as XIcon } from "lucide-react";
 import { ME, GAMES } from "@/lib/sample-data";
 import { GameCard } from "@/components/GameCard";
 import { ReviewsSection } from "@/components/ReviewsSection";
@@ -15,6 +15,8 @@ import { useJoinedGameIds } from "@/lib/games-store";
 import { useHostedGames } from "@/lib/hosted-games-store";
 import { readOverrides, useMyProfile } from "@/lib/user-prefs-store";
 import { ProfileLinksList } from "@/components/ProfileLinks";
+import { listMyJoinRequests, cancelMyJoinRequest, type JoinRequest } from "@/lib/payments";
+import { supabase } from "@/integrations/supabase/client";
 
 
 export const Route = createFileRoute("/_tabs/profile")({
