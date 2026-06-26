@@ -1,9 +1,13 @@
 import { Link, useNavigate } from "@tanstack/react-router";
 import { motion } from "framer-motion";
-import { MapPin, Users, Clock, Zap, Lock, Flame } from "lucide-react";
+import { MapPin, Users, Clock, Zap, Lock, Flame, MessageCircle } from "lucide-react";
 import type { Game } from "@/lib/sample-data";
 import { formatWhen } from "@/lib/format";
 import { useIsJoined } from "@/lib/games-store";
+import { getOrCreateDirectConversation } from "@/lib/messages";
+import { useAuth } from "@/hooks/use-auth";
+import { useState } from "react";
+import { toast } from "sonner";
 
 const sportEmoji: Record<string, string> = {
   Basketball: "🏀", Soccer: "⚽", Pickleball: "🥒", Volleyball: "🏐",
