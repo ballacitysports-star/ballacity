@@ -45,11 +45,23 @@ function EditProfile() {
   const [sports, setSports] = useState(profile?.sports ?? []);
   const [links, setLinks] = useState<ProfileLink[]>(profile?.links ?? []);
   const [isDirty, setIsDirty] = useState(false);
+  const profileSignature = profile ? JSON.stringify({
+    name: profile.name,
+    username: profile.username,
+    avatar: profile.avatar,
+    avatarUrl: profile.avatarUrl,
+    coverUrl: profile.coverUrl,
+    city: profile.city,
+    bio: profile.bio,
+    sports: profile.sports,
+    links: profile.links,
+  }) : "";
 
   const markDirty = () => setIsDirty(true);
 
   const onPickAvatar = async (file: File | null) => {
     if (!file) return;
+    markDirty();
     if (!file.type.startsWith("image/")) { toast.error("Please choose an image"); return; }
     try {
       const dataUrl = await resizeImageToDataUrl(file, 256);
@@ -61,6 +73,7 @@ function EditProfile() {
 
   const onPickCover = async (file: File | null) => {
     if (!file) return;
+    markDirty();
     if (!file.type.startsWith("image/")) { toast.error("Please choose an image"); return; }
     try {
       const dataUrl = await resizeImageToDataUrl(file, 1600);
@@ -88,19 +101,27 @@ function EditProfile() {
   const [sections, setSections] = useState(prefs.sections);
 
   const toggleSport = (s: Sport) => {
+    markDirty();
     setPreferredSports((prev) => prev.includes(s) ? prev.filter(x => x !== s) : [...prev, s]);
   };
   const toggleSection = (k: keyof typeof sections) => {
+    markDirty();
     setSections((prev) => ({ ...prev, [k]: !prev[k] }));
   };
 
   const addSport = (s: Sport) => {
     if (sports.some((x) => x.name === s)) return;
+    markDirty();
     setSports([...sports, { name: s, skill: 3 }]);
   };
-  const removeSport = (s: Sport) => setSports(sports.filter((x) => x.name !== s));
-  const setSkill = (s: Sport, skill: number) =>
+  const removeSport = (s: Sport) => {
+    markDirty();
+    setSports(sports.filter((x) => x.name !== s));
+  };
+  const setSkill = (s: Sport, skill: number) => {
+    markDirty();
     setSports(sports.map((x) => (x.name === s ? { ...x, skill } : x)));
+  };
 
   useEffect(() => {
     if (user) setConfirmedUser(user);
@@ -117,7 +138,7 @@ function EditProfile() {
     setBio(profile.bio);
     setSports(profile.sports);
     setLinks(profile.links);
-  }, [profile, isDirty]);
+  }, [profileUser?.id, profileSignature, isDirty]);
 
   useEffect(() => {
     if (loading || profileUser) return;
@@ -237,6 +258,7 @@ function EditProfile() {
 
 
   const reset = () => {
+    markDirty();
     setPreferredSports(DEFAULT_PREFS.preferredSports);
     setSections(DEFAULT_PREFS.sections);
   };
