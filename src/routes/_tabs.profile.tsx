@@ -67,6 +67,7 @@ function Profile() {
     );
     if (!hasLocalData) return;
     const payload = {
+      id: profileUser.id,
       display_name: local.name ?? me.name,
       username: (local.username ?? me.username).replace(/^@/, "") || null,
       avatar_initials: local.avatar ?? me.avatar,
@@ -84,8 +85,7 @@ function Profile() {
         const { supabase } = await import("@/integrations/supabase/client");
         const { error } = await supabase
           .from("profiles")
-          .update(payload as any)
-          .eq("id", profileUser.id);
+          .upsert(payload as any, { onConflict: "id" });
         if (!cancelled && !error) window.localStorage.setItem(key, signature);
       } catch {
         /* ignore */

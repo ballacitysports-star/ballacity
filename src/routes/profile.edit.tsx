@@ -233,7 +233,8 @@ function EditProfile() {
       const { supabase } = await import("@/integrations/supabase/client");
       const { error } = await supabase
         .from("profiles")
-        .update({
+        .upsert({
+          id: profileUser.id,
           display_name: trimmedName,
           username: username.trim().replace(/^@/, "").slice(0, 30) || null,
           avatar_initials: (avatar.trim() || trimmedName.slice(0, 2)).toUpperCase().slice(0, 3),
@@ -242,8 +243,7 @@ function EditProfile() {
           avatar_url: avatarUrl ?? null,
           cover_url: coverUrl ?? null,
           links: cleanedLinks as any,
-        } as any)
-        .eq("id", profileUser.id);
+        } as any, { onConflict: "id" });
       if (error) throw error;
       syncedToServer = true;
     } catch (e: any) {
