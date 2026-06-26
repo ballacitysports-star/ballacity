@@ -171,6 +171,125 @@ function Notifications() {
   );
 }
 
+const SWIPE_THRESHOLD = 80;
+const ACTION_WIDTH = 96;
+
+function SwipeableAlert({
+  n,
+  index,
+  onOpen,
+  onToggleRead,
+  onDelete,
+}: {
+  n: Notification;
+  index: number;
+  onOpen: (n: Notification) => void;
+  onToggleRead: (n: Notification) => void;
+  onDelete: (n: Notification) => void;
+}) {
+  const Icon = iconFor(n.type);
+  const unread = !n.read_at;
+  const x = useMotionValue(0);
+  const leftActionOpacity = useTransform(x, [0, 20, SWIPE_THRESHOLD], [0, 0.4, 1]);
+  const rightActionOpacity = useTransform(x, [-SWIPE_THRESHOLD, -20, 0], [1, 0.4, 0]);
+  const [dragging, setDragging] = useState(false);
+
+  const snap = (to: number) => animate(x, to, { type: "spring", stiffness: 400, damping: 38 });
+
+  const onDragEnd = (_: unknown, info: { offset: { x: number }; velocity: { x: number } }) => {
+    setDragging(false);
+    const dx = info.offset.x;
+    const v = info.velocity.x;
+    if (dx > SWIPE_THRESHOLD || v > 500) {
+      snap(0);
+      onToggleRead(n);
+    } else if (dx < -SWIPE_THRESHOLD || v < -500) {
+      animate(x, -400, { duration: 0.2 }).then(() => onDelete(n));
+    } else {
+      snap(0);
+    }
+  };
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 6 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay: Math.min(index * 0.03, 0.3) }}
+      className="relative overflow-hidden rounded-2xl"
+    >
+      {/* Left underlay: mark read/unread */}
+      <motion.div
+        style={{ opacity: leftActionOpacity, width: ACTION_WIDTH }}
+        className="absolute inset-y-0 left-0 flex items-center justify-start pl-4 bg-lime/20 text-lime"
+      >
+        {unread ? <MailOpen className="h-5 w-5" /> : <Mail className="h-5 w-5" />}
+        <span className="ml-2 text-xs font-semibold">{unread ? "Read" : "Unread"}</span>
+      </motion.div>
+
+      {/* Right underlay: delete */}
+      <motion.div
+        style={{ opacity: rightActionOpacity, width: ACTION_WIDTH }}
+        className="absolute inset-y-0 right-0 flex items-center justify-end pr-4 bg-destructive/20 text-destructive"
+      >
+        <span className="mr-2 text-xs font-semibold">Delete</span>
+        <Trash2 className="h-5 w-5" />
+      </motion.div>
+
+      <motion.div
+        drag="x"
+        dragConstraints={{ left: -160, right: 160 }}
+        dragElastic={0.15}
+        style={{ x }}
+        onDragStart={() => setDragging(true)}
+        onDragEnd={onDragEnd}
+        className={`relative flex gap-3 rounded-2xl border p-3 touch-pan-y ${unread ? "border-lime/40 bg-lime/5" : "border-border bg-surface"}`}
+      >
+        <button
+          type="button"
+          onClick={() => { if (!dragging) onOpen(n); }}
+          className="flex flex-1 min-w-0 gap-3 text-left"
+        >
+          <div className={`grid h-10 w-10 shrink-0 place-items-center rounded-xl ${unread ? "bg-lime/15 text-lime" : "bg-muted/30 text-muted-foreground"}`}>
+            <Icon className="h-5 w-5" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <div className="flex items-start justify-between gap-2">
+              <h3 className="font-semibold text-sm leading-tight flex items-center gap-1">
+                {unread && <Dot className="h-4 w-4 -ml-1 text-lime" />}
+                {n.title}
+              </h3>
+              <span className="text-[10px] text-muted-foreground shrink-0">{timeAgo(n.created_at)}</span>
+            </div>
+            {n.body && <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{n.body}</p>}
+          </div>
+        </button>
+        <div className="shrink-0 flex flex-col gap-1">
+          <button
+            type="button"
+            onClick={(e) => { e.stopPropagation(); onToggleRead(n); }}
+            aria-label={unread ? "Mark as read" : "Mark as unread"}
+            title={unread ? "Mark as read" : "Mark as unread"}
+            className="rounded-full p-1.5 text-muted-foreground hover:bg-muted/30 hover:text-lime"
+          >
+            {unread ? <Check className="h-4 w-4" /> : <Dot className="h-4 w-4" />}
+          </button>
+          <button
+            type="button"
+            onClick={(e) => { e.stopPropagation(); onDelete(n); }}
+            aria-label="Delete notification"
+            title="Delete"
+            className="rounded-full p-1.5 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+          >
+            <Trash2 className="h-4 w-4" />
+          </button>
+        </div>
+      </motion.div>
+    </motion.div>
+  );
+}
+
+
+
 function NotificationPreferences() {
   const prefs = useNotifPrefs();
   const { user } = useAuth();
