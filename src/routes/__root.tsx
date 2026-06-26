@@ -16,6 +16,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Toaster } from "@/components/ui/sonner";
 import { runLegacyHostMigration } from "@/lib/legacy-host-migration";
 import { useAuth } from "@/hooks/use-auth";
+import { useNotificationPush } from "@/lib/notifications";
 
 function NotFoundComponent() {
   return (
