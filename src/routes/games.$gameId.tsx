@@ -251,6 +251,45 @@ function GameDetail() {
       </div>
 
       <div className="mx-auto max-w-md px-4 mt-5 space-y-5">
+        {/* Approval status banner (player view) */}
+        {!isHost && requiresApproval && myReq && (
+          <div
+            className={`rounded-2xl border p-4 flex items-start gap-3 ${
+              myReq.status === "pending"
+                ? "border-coral/40 bg-coral/10"
+                : myReq.status === "approved"
+                ? "border-lime/40 bg-lime/10"
+                : "border-border bg-surface"
+            }`}
+            role="status"
+            aria-live="polite"
+          >
+            {myReq.status === "pending" ? (
+              <Clock className="h-5 w-5 text-coral shrink-0 mt-0.5" />
+            ) : myReq.status === "approved" ? (
+              <Check className="h-5 w-5 text-lime shrink-0 mt-0.5" />
+            ) : (
+              <XIcon className="h-5 w-5 text-muted-foreground shrink-0 mt-0.5" />
+            )}
+            <div className="min-w-0">
+              <div className="font-display text-sm font-bold">
+                {myReq.status === "pending"
+                  ? "Waiting for host approval"
+                  : myReq.status === "approved"
+                  ? "You're approved — see you there!"
+                  : "Request declined"}
+              </div>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                {myReq.status === "pending"
+                  ? "Your spot isn't held until the host approves. You'll get a notification when they respond."
+                  : myReq.status === "approved"
+                  ? "The host approved your request. You're on the roster."
+                  : (myReq.reviewer_notes || "The host declined this request. You can message them or find another run.")}
+              </p>
+            </div>
+          </div>
+        )}
+
         {/* Meta */}
         <div className="grid grid-cols-2 gap-2">
           <Meta icon={<Clock className="h-4 w-4 text-lime" />} label="Starts" value={formatWhen(game.date)} />

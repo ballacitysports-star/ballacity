@@ -292,6 +292,20 @@ export async function listHostJoinRequests(status?: "pending" | "approved" | "re
   return (data ?? []) as JoinRequest[];
 }
 
+export async function listMyJoinRequests(status?: "pending" | "approved" | "rejected"): Promise<JoinRequest[]> {
+  const { data: u } = await supabase.auth.getUser();
+  if (!u.user) return [];
+  let q = supabase
+    .from("join_requests")
+    .select("*")
+    .eq("player_id", u.user.id)
+    .order("created_at", { ascending: false });
+  if (status) q = q.eq("status", status);
+  const { data, error } = await q;
+  if (error) throw error;
+  return (data ?? []) as JoinRequest[];
+}
+
 export async function reviewJoinRequest(id: string, status: "approved" | "rejected", notes?: string) {
   const { error } = await supabase
     .from("join_requests")

@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { motion } from "framer-motion";
-import { Settings, Trophy, Calendar, Shield, LogIn, LogOut } from "lucide-react";
+import { Settings, Trophy, Calendar, Shield, LogIn, LogOut, Clock, Check, X as XIcon } from "lucide-react";
 import { ME, GAMES } from "@/lib/sample-data";
 import { GameCard } from "@/components/GameCard";
 import { ReviewsSection } from "@/components/ReviewsSection";
@@ -15,6 +15,8 @@ import { useJoinedGameIds } from "@/lib/games-store";
 import { useHostedGames } from "@/lib/hosted-games-store";
 import { readOverrides, useMyProfile } from "@/lib/user-prefs-store";
 import { ProfileLinksList } from "@/components/ProfileLinks";
+import { listMyJoinRequests, cancelMyJoinRequest, type JoinRequest } from "@/lib/payments";
+import { supabase } from "@/integrations/supabase/client";
 
 
 export const Route = createFileRoute("/_tabs/profile")({
@@ -40,6 +42,32 @@ function Profile() {
       .filter((g) => (seen.has(g.id) ? false : (seen.add(g.id), true)))
       .sort((a, b) => +new Date(a.date) - +new Date(b.date));
   }, [joinedGameIds, hosted, profileUser]);
+
+  // Pending / recently-reviewed join requests for player view
+  const [myRequests, setMyRequests] = useState<JoinRequest[]>([]);
+  const refreshRequests = async () => {
+    if (!profileUser) { setMyRequests([]); return; }
+    try { setMyRequests(await listMyJoinRequests()); } catch { /* ignore */ }
+  };
+  useEffect(() => { refreshRequests(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [profileUser?.id]);
+  useEffect(() => {
+    if (!profileUser) return;
+    const ch = supabase
+      .channel(`profile-join-requests-${profileUser.id}`)
+      .on("postgres_changes", { event: "*", schema: "public", table: "join_requests", filter: `player_id=eq.${profileUser.id}` }, () => refreshRequests())
+      .subscribe();
+    return () => { supabase.removeChannel(ch); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [profileUser?.id]);
+
+  const gameLookup = useMemo(() => {
+    const m = new Map<string, { title: string; date: string; location: string }>();
+    [...hosted, ...GAMES].forEach((g) => { if (!m.has(g.id)) m.set(g.id, { title: g.title, date: g.date, location: g.location }); });
+    return m;
+  }, [hosted]);
+
+  const pendingRequests = myRequests.filter((r) => r.status === "pending");
+  const recentlyReviewed = myRequests.filter((r) => r.status !== "pending").slice(0, 3);
 
   useEffect(() => {
     if (user) setConfirmedUser(user);
@@ -204,6 +232,80 @@ function Profile() {
         <div className="mt-4">
           <ReputationBadge rep={myRep} />
         </div>
+
+        {/* Join request status (pending approvals + recent decisions) */}
+        {(pendingRequests.length > 0 || recentlyReviewed.length > 0) && (
+          <div className="mt-6">
+            <h2 className="font-display text-sm font-bold uppercase tracking-wider text-muted-foreground mb-2 flex items-center gap-1.5">
+              <Clock className="h-4 w-4" /> Pending approvals
+              {pendingRequests.length > 0 && (
+                <span className="ml-1 rounded-full bg-coral/15 px-2 py-0.5 text-[10px] font-bold text-coral">
+                  {pendingRequests.length}
+                </span>
+              )}
+            </h2>
+            <div className="space-y-2">
+              {pendingRequests.map((r) => {
+                const g = gameLookup.get(r.game_id);
+                return (
+                  <div key={r.id} className="rounded-2xl border border-coral/40 bg-coral/10 p-3 flex items-start gap-3">
+                    <Clock className="h-4 w-4 text-coral shrink-0 mt-0.5" />
+                    <div className="min-w-0 flex-1">
+                      <Link
+                        to="/games/$gameId"
+                        params={{ gameId: r.game_id }}
+                        className="font-semibold text-sm hover:text-lime hover:underline truncate block"
+                      >
+                        {g?.title ?? "Pickup game"}
+                      </Link>
+                      <p className="text-xs text-muted-foreground mt-0.5">
+                        Waiting for host approval · {new Date(r.created_at).toLocaleDateString()}
+                      </p>
+                    </div>
+                    <button
+                      onClick={async () => {
+                        try {
+                          await cancelMyJoinRequest(r.game_id);
+                          toast("Request canceled.");
+                          refreshRequests();
+                        } catch (e: any) { toast.error(e.message ?? "Could not cancel."); }
+                      }}
+                      className="rounded-full border border-border bg-background px-3 py-1 text-xs font-semibold hover:border-coral/40"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                );
+              })}
+              {recentlyReviewed.map((r) => {
+                const g = gameLookup.get(r.game_id);
+                const approved = r.status === "approved";
+                return (
+                  <Link
+                    key={r.id}
+                    to="/games/$gameId"
+                    params={{ gameId: r.game_id }}
+                    className={`rounded-2xl border p-3 flex items-start gap-3 ${
+                      approved ? "border-lime/40 bg-lime/10" : "border-border bg-surface"
+                    }`}
+                  >
+                    {approved ? (
+                      <Check className="h-4 w-4 text-lime shrink-0 mt-0.5" />
+                    ) : (
+                      <XIcon className="h-4 w-4 text-muted-foreground shrink-0 mt-0.5" />
+                    )}
+                    <div className="min-w-0 flex-1">
+                      <div className="font-semibold text-sm truncate">{g?.title ?? "Pickup game"}</div>
+                      <p className="text-xs text-muted-foreground mt-0.5">
+                        {approved ? "Approved — you're on the roster." : "Declined by host."}
+                      </p>
+                    </div>
+                  </Link>
+                );
+              })}
+            </div>
+          </div>
+        )}
 
         {/* Upcoming */}
         <div className="mt-6">
