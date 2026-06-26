@@ -33,16 +33,19 @@ export type ConversationWithMeta = Conversation & {
 
 // Find or create a 1:1 conversation between current user and otherUserId
 export async function getOrCreateDirectConversation(otherUserId: string, gameId: string | null = null): Promise<string> {
-  // Ensure we have a fresh session so auth.uid() on the server matches `me`.
-  // A stale/expired JWT causes "new row violates row-level security policy".
-  let { data: sess } = await supabase.auth.getSession();
-  if (!sess.session) {
+  // Verify identity by hitting the Auth server with the current JWT.
+  // If this doesn't return a user, our Authorization header is stale/missing
+  // and PostgREST will treat us as anon → auth.uid() is NULL → RLS denies insert.
+  const { data: userData, error: userErr } = await supabase.auth.getUser();
+  if (userErr || !userData.user) {
     const refreshed = await supabase.auth.refreshSession();
-    sess = { session: refreshed.data.session } as any;
+    if (!refreshed.data.session?.user) throw new Error("Sign in to send messages.");
   }
-  if (!sess.session?.user) throw new Error("Sign in to send messages.");
-  const me = sess.session.user.id;
+  const { data: u2 } = await supabase.auth.getUser();
+  if (!u2.user) throw new Error("Sign in to send messages.");
+  const me = u2.user.id;
   if (me === otherUserId) throw new Error("You can't message yourself.");
+  console.log("[messages] creating conversation as", me, "with", otherUserId);
 
 
 
