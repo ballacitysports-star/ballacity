@@ -44,6 +44,9 @@ function EditProfile() {
   const [bio, setBio] = useState(profile?.bio ?? "");
   const [sports, setSports] = useState(profile?.sports ?? []);
   const [links, setLinks] = useState<ProfileLink[]>(profile?.links ?? []);
+  const [isDirty, setIsDirty] = useState(false);
+
+  const markDirty = () => setIsDirty(true);
 
   const onPickAvatar = async (file: File | null) => {
     if (!file) return;
@@ -68,12 +71,17 @@ function EditProfile() {
   };
 
   const addLink = (type: ProfileLinkType) => {
+    markDirty();
     setLinks((prev) => [...prev, { type, url: "" }]);
   };
   const updateLink = (i: number, patch: Partial<ProfileLink>) => {
+    markDirty();
     setLinks((prev) => prev.map((l, idx) => (idx === i ? { ...l, ...patch } : l)));
   };
-  const removeLink = (i: number) => setLinks((prev) => prev.filter((_, idx) => idx !== i));
+  const removeLink = (i: number) => {
+    markDirty();
+    setLinks((prev) => prev.filter((_, idx) => idx !== i));
+  };
 
 
   const [preferredSports, setPreferredSports] = useState<Sport[]>(prefs.preferredSports);
@@ -97,6 +105,19 @@ function EditProfile() {
   useEffect(() => {
     if (user) setConfirmedUser(user);
   }, [user]);
+
+  useEffect(() => {
+    if (!profile || isDirty) return;
+    setName(profile.name);
+    setUsername(profile.username);
+    setAvatar(profile.avatar);
+    setAvatarUrl(profile.avatarUrl);
+    setCoverUrl(profile.coverUrl);
+    setCity(profile.city);
+    setBio(profile.bio);
+    setSports(profile.sports);
+    setLinks(profile.links);
+  }, [profile, isDirty]);
 
   useEffect(() => {
     if (loading || profileUser) return;
