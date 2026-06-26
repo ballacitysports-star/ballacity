@@ -379,30 +379,6 @@ function EditProfile() {
               {linkErrors[i] && (
                 <p className="mt-1 text-xs text-destructive">{linkErrors[i]}</p>
               )}
-              {!linkErrors[i] && l.url.trim() && (() => {
-                const href = normalizeUrl(l.url);
-                let host = "";
-                try { host = new URL(href).hostname.replace(/^www\./, ""); } catch { /* noop */ }
-                return (
-                  <a
-                    href={href}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="mt-2 inline-flex max-w-full items-center gap-2 rounded-full border border-border bg-background px-2.5 py-1 text-xs text-muted-foreground hover:border-lime/40 hover:text-foreground transition-colors"
-                  >
-                    <img
-                      src={`https://www.google.com/s2/favicons?domain=${host}&sz=32`}
-                      alt=""
-                      width={14}
-                      height={14}
-                      className="h-3.5 w-3.5 rounded-sm"
-                      onError={(e) => { (e.currentTarget as HTMLImageElement).style.visibility = "hidden"; }}
-                    />
-                    <span className="truncate font-medium">{host}</span>
-                    <ExternalLink className="h-3 w-3 shrink-0 opacity-70" />
-                  </a>
-                );
-              })()}
               <div className="mt-2">
                 <Input
                   value={l.label ?? ""}
@@ -411,6 +387,40 @@ function EditProfile() {
                   placeholder="Optional label (e.g. @handle)"
                 />
               </div>
+              {!linkErrors[i] && l.url.trim() && (() => {
+                const href = normalizeUrl(l.url);
+                let host = "";
+                let path = "";
+                try {
+                  const u = new URL(href);
+                  host = u.hostname.replace(/^www\./, "");
+                  path = (u.pathname === "/" ? "" : u.pathname) + u.search + u.hash;
+                } catch { /* noop */ }
+                const title = l.label?.trim() || (LINK_TYPES.find((t) => t.type === l.type)?.label ?? host);
+                return (
+                  <div className="mt-3">
+                    <div className="text-[10px] uppercase tracking-wide text-muted-foreground mb-1">Preview</div>
+                    <a
+                      href={href}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center gap-3 rounded-2xl border border-border bg-background p-3 hover:border-lime/40 transition-colors"
+                    >
+                      <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-border bg-surface overflow-hidden">
+                        <LinkIcon type={l.type} url={href} className="h-5 w-5" />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <div className="truncate text-sm font-semibold">{title}</div>
+                        <div className="truncate text-xs text-muted-foreground">
+                          <span className="font-medium text-foreground/80">{host}</span>
+                          {path && <span className="opacity-70">{path}</span>}
+                        </div>
+                      </div>
+                      <ExternalLink className="h-4 w-4 shrink-0 text-muted-foreground" />
+                    </a>
+                  </div>
+                );
+              })()}
             </div>
           ))}
         </div>
