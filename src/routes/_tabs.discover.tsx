@@ -6,6 +6,7 @@ import { GAMES, SPORTS } from "@/lib/sample-data";
 import { formatWhen } from "@/lib/format";
 import { GamesMap, type MapPinItem } from "@/components/GamesMap";
 import { useMyProfile } from "@/lib/user-prefs-store";
+import { useHostedGames } from "@/lib/hosted-games-store";
 import { useAuth } from "@/hooks/use-auth";
 
 export const Route = createFileRoute("/_tabs/discover")({
@@ -20,25 +21,28 @@ const emojiBySport: Record<string, string> = Object.fromEntries(
 function Discover() {
   const { user } = useAuth();
   const profile = useMyProfile(user);
-  const [active, setActive] = useState(GAMES[0].id);
+  const hosted = useHostedGames();
+  const allGames = useMemo(() => [...hosted, ...GAMES], [hosted]);
+  const [active, setActive] = useState<string>(allGames[0]?.id ?? "");
   const [visibleIds, setVisibleIds] = useState<string[] | null>(null);
   const visibleGames = useMemo(
-    () => (visibleIds ? GAMES.filter((g) => visibleIds.includes(g.id)) : GAMES),
-    [visibleIds],
+    () => (visibleIds ? allGames.filter((g) => visibleIds.includes(g.id)) : allGames),
+    [visibleIds, allGames],
   );
   const activeGame = visibleGames.find((g) => g.id === active) ?? visibleGames[0] ?? null;
 
   const pins: MapPinItem[] = useMemo(
     () =>
-      GAMES.map((g) => ({
+      allGames.map((g) => ({
         id: g.id,
         emoji: emojiBySport[g.sport] ?? "📍",
         lat: g.lat,
         lng: g.lng,
         urgent: g.urgent,
       })),
-    [],
+    [allGames],
   );
+
 
   return (
     <div className="relative h-dvh overflow-hidden">
