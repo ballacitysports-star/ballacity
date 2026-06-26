@@ -33,10 +33,18 @@ export type ConversationWithMeta = Conversation & {
 
 // Find or create a 1:1 conversation between current user and otherUserId
 export async function getOrCreateDirectConversation(otherUserId: string, gameId: string | null = null): Promise<string> {
-  const { data: u } = await supabase.auth.getUser();
-  if (!u.user) throw new Error("Sign in to send messages.");
-  const me = u.user.id;
+  // Ensure we have a fresh session so auth.uid() on the server matches `me`.
+  // A stale/expired JWT causes "new row violates row-level security policy".
+  let { data: sess } = await supabase.auth.getSession();
+  if (!sess.session) {
+    const refreshed = await supabase.auth.refreshSession();
+    sess = { session: refreshed.data.session } as any;
+  }
+  if (!sess.session?.user) throw new Error("Sign in to send messages.");
+  const me = sess.session.user.id;
   if (me === otherUserId) throw new Error("You can't message yourself.");
+
+
 
   // Find existing: conversations where both users are participants
   const { data: mine } = await supabase
@@ -60,7 +68,12 @@ export async function getOrCreateDirectConversation(otherUserId: string, gameId:
     .insert({ created_by: me, game_id: gameId } as any)
     .select("id")
     .single();
-  if (error) throw error;
+  if (error) {
+    if (/row-level security/i.test(error.message)) {
+      throw new Error("Your session expired. Please sign out and sign back in to start a conversation.");
+    }
+    throw error;
+  }
   const convId = (conv as any).id as string;
   const { error: pErr } = await supabase
     .from("conversation_participants" as any)
