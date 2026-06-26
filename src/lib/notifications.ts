@@ -148,18 +148,21 @@ export function useNotificationPush() {
           if (!active) return;
           const n = payload.new as Notification;
           // Lazy import to avoid SSR issues
-          import("sonner").then(({ toast }) => {
-            const isApproval = n.type === "join_approved" || n.type === "join_declined";
-            const fn = n.type === "join_approved" ? toast.success : n.type === "join_declined" ? toast.error : toast;
-            fn(n.title, {
-              description: n.body ?? undefined,
-              action: n.link
-                ? { label: "Open", onClick: () => { if (n.link) window.location.assign(n.link); } }
-                : undefined,
-              duration: isApproval ? 8000 : 5000,
+          if (isAllowed(n.type, "inApp")) {
+            import("sonner").then(({ toast }) => {
+              const isApproval = n.type === "join_approved" || n.type === "join_declined";
+              const fn = n.type === "join_approved" ? toast.success : n.type === "join_declined" ? toast.error : toast;
+              fn(n.title, {
+                description: n.body ?? undefined,
+                action: n.link
+                  ? { label: "Open", onClick: () => { if (n.link) window.location.assign(n.link); } }
+                  : undefined,
+                duration: isApproval ? 8000 : 5000,
+              });
             });
-          });
+          }
           showBrowserNotification(n);
+
         },
       )
       .subscribe();
