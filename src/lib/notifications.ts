@@ -74,3 +74,91 @@ export function useUnreadNotificationCount() {
 
   return count;
 }
+
+// ----- Browser push notifications (Web Notifications API) -----
+
+const PUSH_DISMISS_KEY = "openrun.pushPromptDismissed.v1";
+
+export function pushPermissionState(): "granted" | "denied" | "default" | "unsupported" {
+  if (typeof window === "undefined" || !("Notification" in window)) return "unsupported";
+  return Notification.permission;
+}
+
+export async function requestPushPermission(): Promise<NotificationPermission | "unsupported"> {
+  if (typeof window === "undefined" || !("Notification" in window)) return "unsupported";
+  if (Notification.permission !== "default") return Notification.permission;
+  try {
+    return await Notification.requestPermission();
+  } catch {
+    return Notification.permission;
+  }
+}
+
+export function dismissPushPrompt() {
+  if (typeof window === "undefined") return;
+  try { window.localStorage.setItem(PUSH_DISMISS_KEY, "1"); } catch { /* ignore */ }
+}
+
+export function isPushPromptDismissed(): boolean {
+  if (typeof window === "undefined") return true;
+  try { return window.localStorage.getItem(PUSH_DISMISS_KEY) === "1"; } catch { return false; }
+}
+
+function showBrowserNotification(n: Pick<Notification, "title" | "body" | "link" | "type">) {
+  if (typeof window === "undefined" || !("Notification" in window)) return;
+  if (Notification.permission !== "granted") return;
+  if (typeof document !== "undefined" && document.visibilityState === "visible") return; // don't double-notify
+  try {
+    const native = new window.Notification(n.title, {
+      body: n.body ?? undefined,
+      icon: "/favicon.ico",
+      badge: "/favicon.ico",
+      tag: `openrun-${n.type}`,
+    });
+    native.onclick = () => {
+      window.focus();
+      if (n.link) window.location.assign(n.link);
+      native.close();
+    };
+  } catch {
+    /* ignore */
+  }
+}
+
+/**
+ * Subscribes to inserted notifications for the signed-in user and surfaces
+ * them as toast + (when permitted) native browser push notifications.
+ * Mount this once near the app root.
+ */
+export function useNotificationPush() {
+  const { user } = useAuth();
+  useEffect(() => {
+    if (!user) return;
+    let active = true;
+    const channel = supabase
+      .channel(`notif-push-${user.id}`)
+      .on(
+        "postgres_changes",
+        { event: "INSERT", schema: "public", table: "notifications", filter: `user_id=eq.${user.id}` },
+        (payload) => {
+          if (!active) return;
+          const n = payload.new as Notification;
+          // Lazy import to avoid SSR issues
+          import("sonner").then(({ toast }) => {
+            const isApproval = n.type === "join_approved" || n.type === "join_declined";
+            const fn = n.type === "join_approved" ? toast.success : n.type === "join_declined" ? toast.error : toast;
+            fn(n.title, {
+              description: n.body ?? undefined,
+              action: n.link
+                ? { label: "Open", onClick: () => { if (n.link) window.location.assign(n.link); } }
+                : undefined,
+              duration: isApproval ? 8000 : 5000,
+            });
+          });
+          showBrowserNotification(n);
+        },
+      )
+      .subscribe();
+    return () => { active = false; supabase.removeChannel(channel); };
+  }, [user?.id]);
+}
