@@ -1,7 +1,7 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { motion } from "framer-motion";
+import { motion, useMotionValue, useTransform, animate } from "framer-motion";
 import { Logo } from "@/components/Logo";
-import { Bell, BellRing, MessageCircle, Users, CreditCard, Zap, X, CheckCheck, Check, Dot } from "lucide-react";
+import { Bell, BellRing, MessageCircle, Users, CreditCard, Zap, X, CheckCheck, Check, Dot, Trash2, Mail, MailOpen } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import {
@@ -9,6 +9,7 @@ import {
   markAllNotificationsRead,
   markNotificationRead,
   markNotificationUnread,
+  deleteNotification,
   pushPermissionState,
   requestPushPermission,
   dismissPushPrompt,
@@ -63,6 +64,8 @@ function Notifications() {
     return () => { cancelled = true; supabase.removeChannel(channel); };
   }, [user?.id, loading]);
 
+  const unreadCount = useMemo(() => items.filter((n) => !n.read_at).length, [items]);
+
   const handleClick = async (n: Notification) => {
     if (!n.read_at) await markNotificationRead(n.id);
     if (n.link) nav({ to: n.link as any });
@@ -79,7 +82,6 @@ function Notifications() {
     );
   }
 
-  const unreadCount = useMemo(() => items.filter((n) => !n.read_at).length, [items]);
 
   const toggleRead = async (n: Notification) => {
     const willMarkRead = !n.read_at;
@@ -92,6 +94,23 @@ function Notifications() {
       // revert on failure
       setItems((prev) => prev.map((x) => (x.id === n.id ? { ...x, read_at: n.read_at } : x)));
       toast.error("Couldn't update notification");
+    }
+  };
+
+  const removeItem = async (n: Notification) => {
+    const prev = items;
+    setItems((curr) => curr.filter((x) => x.id !== n.id));
+    try {
+      await deleteNotification(n.id);
+      toast.success("Notification deleted", {
+        action: {
+          label: "Undo",
+          onClick: () => setItems(prev), // visual only; server row is gone
+        },
+      });
+    } catch {
+      setItems(prev);
+      toast.error("Couldn't delete notification");
     }
   };
 
@@ -134,53 +153,143 @@ function Notifications() {
         </div>
       ) : (
         <div className="space-y-2">
-          {items.map((n, i) => {
-            const Icon = iconFor(n.type);
-            const unread = !n.read_at;
-            return (
-              <motion.div
-                key={n.id}
-                initial={{ opacity: 0, x: -8 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: Math.min(i * 0.03, 0.3) }}
-                className={`relative flex gap-3 rounded-2xl border p-3 ${unread ? "border-lime/40 bg-lime/5" : "border-border bg-surface"}`}
-              >
-                <button
-                  type="button"
-                  onClick={() => handleClick(n)}
-                  className="flex flex-1 min-w-0 gap-3 text-left"
-                >
-                  <div className={`grid h-10 w-10 shrink-0 place-items-center rounded-xl ${unread ? "bg-lime/15 text-lime" : "bg-muted/30 text-muted-foreground"}`}>
-                    <Icon className="h-5 w-5" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-start justify-between gap-2">
-                      <h3 className="font-semibold text-sm leading-tight flex items-center gap-1">
-                        {unread && <Dot className="h-4 w-4 -ml-1 text-lime" />}
-                        {n.title}
-                      </h3>
-                      <span className="text-[10px] text-muted-foreground shrink-0">{timeAgo(n.created_at)}</span>
-                    </div>
-                    {n.body && <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{n.body}</p>}
-                  </div>
-                </button>
-                <button
-                  type="button"
-                  onClick={(e) => { e.stopPropagation(); toggleRead(n); }}
-                  aria-label={unread ? "Mark as read" : "Mark as unread"}
-                  title={unread ? "Mark as read" : "Mark as unread"}
-                  className="shrink-0 self-start rounded-full p-1.5 text-muted-foreground hover:bg-muted/30 hover:text-lime"
-                >
-                  {unread ? <Check className="h-4 w-4" /> : <Dot className="h-4 w-4" />}
-                </button>
-              </motion.div>
-            );
-          })}
+          <p className="text-[10px] text-muted-foreground/70 px-1 mb-1">
+            Tip: swipe right to toggle read · swipe left to delete
+          </p>
+          {items.map((n, i) => (
+            <SwipeableAlert
+              key={n.id}
+              n={n}
+              index={i}
+              onOpen={handleClick}
+              onToggleRead={toggleRead}
+              onDelete={removeItem}
+            />
+          ))}
         </div>
       )}
     </div>
   );
 }
+
+const SWIPE_THRESHOLD = 80;
+const ACTION_WIDTH = 96;
+
+function SwipeableAlert({
+  n,
+  index,
+  onOpen,
+  onToggleRead,
+  onDelete,
+}: {
+  n: Notification;
+  index: number;
+  onOpen: (n: Notification) => void;
+  onToggleRead: (n: Notification) => void;
+  onDelete: (n: Notification) => void;
+}) {
+  const Icon = iconFor(n.type);
+  const unread = !n.read_at;
+  const x = useMotionValue(0);
+  const leftActionOpacity = useTransform(x, [0, 20, SWIPE_THRESHOLD], [0, 0.4, 1]);
+  const rightActionOpacity = useTransform(x, [-SWIPE_THRESHOLD, -20, 0], [1, 0.4, 0]);
+  const [dragging, setDragging] = useState(false);
+
+  const snap = (to: number) => animate(x, to, { type: "spring", stiffness: 400, damping: 38 });
+
+  const onDragEnd = (_: unknown, info: { offset: { x: number }; velocity: { x: number } }) => {
+    setDragging(false);
+    const dx = info.offset.x;
+    const v = info.velocity.x;
+    if (dx > SWIPE_THRESHOLD || v > 500) {
+      snap(0);
+      onToggleRead(n);
+    } else if (dx < -SWIPE_THRESHOLD || v < -500) {
+      animate(x, -400, { duration: 0.2 }).then(() => onDelete(n));
+    } else {
+      snap(0);
+    }
+  };
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 6 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay: Math.min(index * 0.03, 0.3) }}
+      className="relative overflow-hidden rounded-2xl"
+    >
+      {/* Left underlay: mark read/unread */}
+      <motion.div
+        style={{ opacity: leftActionOpacity, width: ACTION_WIDTH }}
+        className="absolute inset-y-0 left-0 flex items-center justify-start pl-4 bg-lime/20 text-lime"
+      >
+        {unread ? <MailOpen className="h-5 w-5" /> : <Mail className="h-5 w-5" />}
+        <span className="ml-2 text-xs font-semibold">{unread ? "Read" : "Unread"}</span>
+      </motion.div>
+
+      {/* Right underlay: delete */}
+      <motion.div
+        style={{ opacity: rightActionOpacity, width: ACTION_WIDTH }}
+        className="absolute inset-y-0 right-0 flex items-center justify-end pr-4 bg-destructive/20 text-destructive"
+      >
+        <span className="mr-2 text-xs font-semibold">Delete</span>
+        <Trash2 className="h-5 w-5" />
+      </motion.div>
+
+      <motion.div
+        drag="x"
+        dragConstraints={{ left: -160, right: 160 }}
+        dragElastic={0.15}
+        style={{ x }}
+        onDragStart={() => setDragging(true)}
+        onDragEnd={onDragEnd}
+        className={`relative flex gap-3 rounded-2xl border p-3 touch-pan-y ${unread ? "border-lime/40 bg-lime/5" : "border-border bg-surface"}`}
+      >
+        <button
+          type="button"
+          onClick={() => { if (!dragging) onOpen(n); }}
+          className="flex flex-1 min-w-0 gap-3 text-left"
+        >
+          <div className={`grid h-10 w-10 shrink-0 place-items-center rounded-xl ${unread ? "bg-lime/15 text-lime" : "bg-muted/30 text-muted-foreground"}`}>
+            <Icon className="h-5 w-5" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <div className="flex items-start justify-between gap-2">
+              <h3 className="font-semibold text-sm leading-tight flex items-center gap-1">
+                {unread && <Dot className="h-4 w-4 -ml-1 text-lime" />}
+                {n.title}
+              </h3>
+              <span className="text-[10px] text-muted-foreground shrink-0">{timeAgo(n.created_at)}</span>
+            </div>
+            {n.body && <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{n.body}</p>}
+          </div>
+        </button>
+        <div className="shrink-0 flex flex-col gap-1">
+          <button
+            type="button"
+            onClick={(e) => { e.stopPropagation(); onToggleRead(n); }}
+            aria-label={unread ? "Mark as read" : "Mark as unread"}
+            title={unread ? "Mark as read" : "Mark as unread"}
+            className="rounded-full p-1.5 text-muted-foreground hover:bg-muted/30 hover:text-lime"
+          >
+            {unread ? <Check className="h-4 w-4" /> : <Dot className="h-4 w-4" />}
+          </button>
+          <button
+            type="button"
+            onClick={(e) => { e.stopPropagation(); onDelete(n); }}
+            aria-label="Delete notification"
+            title="Delete"
+            className="rounded-full p-1.5 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+          >
+            <Trash2 className="h-4 w-4" />
+          </button>
+        </div>
+      </motion.div>
+    </motion.div>
+  );
+}
+
+
 
 function NotificationPreferences() {
   const prefs = useNotifPrefs();
