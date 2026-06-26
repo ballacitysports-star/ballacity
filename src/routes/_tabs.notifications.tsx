@@ -9,6 +9,7 @@ import {
   markAllNotificationsRead,
   markNotificationRead,
   markNotificationUnread,
+  deleteNotification,
   pushPermissionState,
   requestPushPermission,
   dismissPushPrompt,
