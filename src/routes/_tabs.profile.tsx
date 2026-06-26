@@ -43,6 +43,32 @@ function Profile() {
       .sort((a, b) => +new Date(a.date) - +new Date(b.date));
   }, [joinedGameIds, hosted, profileUser]);
 
+  // Pending / recently-reviewed join requests for player view
+  const [myRequests, setMyRequests] = useState<JoinRequest[]>([]);
+  const refreshRequests = async () => {
+    if (!profileUser) { setMyRequests([]); return; }
+    try { setMyRequests(await listMyJoinRequests()); } catch { /* ignore */ }
+  };
+  useEffect(() => { refreshRequests(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [profileUser?.id]);
+  useEffect(() => {
+    if (!profileUser) return;
+    const ch = supabase
+      .channel(`profile-join-requests-${profileUser.id}`)
+      .on("postgres_changes", { event: "*", schema: "public", table: "join_requests", filter: `player_id=eq.${profileUser.id}` }, () => refreshRequests())
+      .subscribe();
+    return () => { supabase.removeChannel(ch); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [profileUser?.id]);
+
+  const gameLookup = useMemo(() => {
+    const m = new Map<string, { title: string; date: string; location: string }>();
+    [...hosted, ...GAMES].forEach((g) => { if (!m.has(g.id)) m.set(g.id, { title: g.title, date: g.date, location: g.location }); });
+    return m;
+  }, [hosted]);
+
+  const pendingRequests = myRequests.filter((r) => r.status === "pending");
+  const recentlyReviewed = myRequests.filter((r) => r.status !== "pending").slice(0, 3);
+
   useEffect(() => {
     if (user) setConfirmedUser(user);
   }, [user]);
