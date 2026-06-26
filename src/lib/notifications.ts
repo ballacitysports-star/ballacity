@@ -44,6 +44,11 @@ export async function markNotificationUnread(id: string) {
   await supabase.from("notifications" as any).update({ read_at: null } as any).eq("id", id);
 }
 
+export async function deleteNotification(id: string) {
+  const { error } = await supabase.from("notifications" as any).delete().eq("id", id);
+  if (error) throw error;
+}
+
 export async function markAllNotificationsRead() {
   const { data: u } = await supabase.auth.getUser();
   if (!u.user) return;
