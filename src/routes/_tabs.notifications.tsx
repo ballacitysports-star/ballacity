@@ -64,6 +64,8 @@ function Notifications() {
     return () => { cancelled = true; supabase.removeChannel(channel); };
   }, [user?.id, loading]);
 
+  const unreadCount = useMemo(() => items.filter((n) => !n.read_at).length, [items]);
+
   const handleClick = async (n: Notification) => {
     if (!n.read_at) await markNotificationRead(n.id);
     if (n.link) nav({ to: n.link as any });
@@ -80,7 +82,6 @@ function Notifications() {
     );
   }
 
-  const unreadCount = useMemo(() => items.filter((n) => !n.read_at).length, [items]);
 
   const toggleRead = async (n: Notification) => {
     const willMarkRead = !n.read_at;
