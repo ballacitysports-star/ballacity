@@ -152,48 +152,19 @@ function Notifications() {
         </div>
       ) : (
         <div className="space-y-2">
-          {items.map((n, i) => {
-            const Icon = iconFor(n.type);
-            const unread = !n.read_at;
-            return (
-              <motion.div
-                key={n.id}
-                initial={{ opacity: 0, x: -8 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: Math.min(i * 0.03, 0.3) }}
-                className={`relative flex gap-3 rounded-2xl border p-3 ${unread ? "border-lime/40 bg-lime/5" : "border-border bg-surface"}`}
-              >
-                <button
-                  type="button"
-                  onClick={() => handleClick(n)}
-                  className="flex flex-1 min-w-0 gap-3 text-left"
-                >
-                  <div className={`grid h-10 w-10 shrink-0 place-items-center rounded-xl ${unread ? "bg-lime/15 text-lime" : "bg-muted/30 text-muted-foreground"}`}>
-                    <Icon className="h-5 w-5" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-start justify-between gap-2">
-                      <h3 className="font-semibold text-sm leading-tight flex items-center gap-1">
-                        {unread && <Dot className="h-4 w-4 -ml-1 text-lime" />}
-                        {n.title}
-                      </h3>
-                      <span className="text-[10px] text-muted-foreground shrink-0">{timeAgo(n.created_at)}</span>
-                    </div>
-                    {n.body && <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{n.body}</p>}
-                  </div>
-                </button>
-                <button
-                  type="button"
-                  onClick={(e) => { e.stopPropagation(); toggleRead(n); }}
-                  aria-label={unread ? "Mark as read" : "Mark as unread"}
-                  title={unread ? "Mark as read" : "Mark as unread"}
-                  className="shrink-0 self-start rounded-full p-1.5 text-muted-foreground hover:bg-muted/30 hover:text-lime"
-                >
-                  {unread ? <Check className="h-4 w-4" /> : <Dot className="h-4 w-4" />}
-                </button>
-              </motion.div>
-            );
-          })}
+          <p className="text-[10px] text-muted-foreground/70 px-1 mb-1">
+            Tip: swipe right to toggle read · swipe left to delete
+          </p>
+          {items.map((n, i) => (
+            <SwipeableAlert
+              key={n.id}
+              n={n}
+              index={i}
+              onOpen={handleClick}
+              onToggleRead={toggleRead}
+              onDelete={removeItem}
+            />
+          ))}
         </div>
       )}
     </div>
