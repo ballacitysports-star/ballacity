@@ -68,7 +68,12 @@ export async function getOrCreateDirectConversation(otherUserId: string, gameId:
     .insert({ created_by: me, game_id: gameId } as any)
     .select("id")
     .single();
-  if (error) throw error;
+  if (error) {
+    if (/row-level security/i.test(error.message)) {
+      throw new Error("Your session expired. Please sign out and sign back in to start a conversation.");
+    }
+    throw error;
+  }
   const convId = (conv as any).id as string;
   const { error: pErr } = await supabase
     .from("conversation_participants" as any)
