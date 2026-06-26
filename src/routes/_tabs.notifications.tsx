@@ -87,6 +87,8 @@ function Notifications() {
       <p className="text-muted-foreground text-sm mb-5">Real-time updates from your games & crew.</p>
 
       <PushPrompt />
+      <NotificationPreferences />
+
 
 
 
