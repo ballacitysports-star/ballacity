@@ -110,6 +110,8 @@ function showBrowserNotification(n: Pick<Notification, "title" | "body" | "link"
   if (typeof window === "undefined" || !("Notification" in window)) return;
   if (window.Notification.permission !== "granted") return;
   if (typeof document !== "undefined" && document.visibilityState === "visible") return; // don't double-notify
+  if (!isAllowed(n.type, "push")) return;
+
   try {
     const native = new window.Notification(n.title, {
       body: n.body ?? undefined,
