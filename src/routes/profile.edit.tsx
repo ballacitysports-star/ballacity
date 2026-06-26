@@ -299,7 +299,7 @@ function EditProfile() {
               {coverUrl && (
                 <button
                   type="button"
-                  onClick={() => setCoverUrl(undefined)}
+                  onClick={() => { markDirty(); setCoverUrl(undefined); }}
                   className="rounded-full border border-border bg-background/80 backdrop-blur px-3 py-1.5 text-xs font-semibold text-coral"
                 >
                   Remove
@@ -330,7 +330,7 @@ function EditProfile() {
               {avatarUrl && (
                 <button
                   type="button"
-                  onClick={() => setAvatarUrl(undefined)}
+                  onClick={() => { markDirty(); setAvatarUrl(undefined); }}
                   className="text-xs font-semibold text-coral text-left"
                 >
                   Remove photo
@@ -339,14 +339,14 @@ function EditProfile() {
             </div>
           </div>
         </Field>
-        <Field label="Display name"><Input value={name} onChange={setName} maxLength={60} /></Field>
-        <Field label="Username"><Input value={username} onChange={setUsername} maxLength={30} placeholder="@you" /></Field>
-        <Field label="Avatar initials (fallback)"><Input value={avatar} onChange={setAvatar} maxLength={3} /></Field>
-        <Field label="City"><LocationAutocomplete value={city} onChange={setCity} placeholder="Your city" mode="city" /></Field>
+        <Field label="Display name"><Input value={name} onChange={(v) => { markDirty(); setName(v); }} maxLength={60} /></Field>
+        <Field label="Username"><Input value={username} onChange={(v) => { markDirty(); setUsername(v); }} maxLength={30} placeholder="@you" /></Field>
+        <Field label="Avatar initials (fallback)"><Input value={avatar} onChange={(v) => { markDirty(); setAvatar(v); }} maxLength={3} /></Field>
+        <Field label="City"><LocationAutocomplete value={city} onChange={(v) => { markDirty(); setCity(v); }} placeholder="Your city" mode="city" /></Field>
         <Field label="Bio">
           <textarea
             value={bio}
-            onChange={(e) => setBio(e.target.value)}
+            onChange={(e) => { markDirty(); setBio(e.target.value); }}
             maxLength={280}
             rows={3}
             className="w-full rounded-2xl border border-border bg-surface px-3 py-2 text-sm outline-none focus:border-lime"
