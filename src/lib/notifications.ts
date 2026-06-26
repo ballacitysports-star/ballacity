@@ -81,16 +81,16 @@ const PUSH_DISMISS_KEY = "openrun.pushPromptDismissed.v1";
 
 export function pushPermissionState(): "granted" | "denied" | "default" | "unsupported" {
   if (typeof window === "undefined" || !("Notification" in window)) return "unsupported";
-  return Notification.permission;
+  return window.Notification.permission;
 }
 
 export async function requestPushPermission(): Promise<NotificationPermission | "unsupported"> {
   if (typeof window === "undefined" || !("Notification" in window)) return "unsupported";
-  if (Notification.permission !== "default") return Notification.permission;
+  if (window.Notification.permission !== "default") return window.Notification.permission;
   try {
-    return await Notification.requestPermission();
+    return await window.Notification.requestPermission();
   } catch {
-    return Notification.permission;
+    return window.Notification.permission;
   }
 }
 
@@ -106,7 +106,7 @@ export function isPushPromptDismissed(): boolean {
 
 function showBrowserNotification(n: Pick<Notification, "title" | "body" | "link" | "type">) {
   if (typeof window === "undefined" || !("Notification" in window)) return;
-  if (Notification.permission !== "granted") return;
+  if (window.Notification.permission !== "granted") return;
   if (typeof document !== "undefined" && document.visibilityState === "visible") return; // don't double-notify
   try {
     const native = new window.Notification(n.title, {
