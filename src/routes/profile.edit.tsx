@@ -122,22 +122,42 @@ function EditProfile() {
   }
 
   const normalizeUrl = (raw: string): string => {
-    const t = raw.trim();
+    const t = raw.trim().replace(/\s+/g, "");
     if (!t) return "";
-    return /^https?:\/\//i.test(t) ? t : `https://${t}`;
+    const withProto = /^https?:\/\//i.test(t) ? t : `https://${t}`;
+    try {
+      const u = new URL(withProto);
+      u.hostname = u.hostname.toLowerCase();
+      if ((u.protocol === "https:" && u.port === "443") || (u.protocol === "http:" && u.port === "80")) {
+        u.port = "";
+      }
+      let out = u.toString();
+      if (u.pathname === "/" && !u.search && !u.hash) out = out.replace(/\/$/, "");
+      return out;
+    } catch {
+      return withProto;
+    }
   };
   const validateUrl = (raw: string): string | null => {
     const t = raw.trim();
     if (!t) return "URL is required";
-    if (t.length > 500) return "URL is too long";
+    if (t.length > 500) return "URL is too long (max 500 chars)";
+    if (/\s/.test(t)) return "URL cannot contain spaces";
+    let u: URL;
     try {
-      const u = new URL(normalizeUrl(t));
-      if (u.protocol !== "http:" && u.protocol !== "https:") return "Must be http(s)";
-      if (!u.hostname.includes(".")) return "Enter a valid domain";
-      return null;
+      u = new URL(normalizeUrl(t));
     } catch {
       return "Enter a valid URL";
     }
+    if (u.protocol !== "http:" && u.protocol !== "https:") return "Must start with http:// or https://";
+    const host = u.hostname;
+    if (!host || host.length > 253) return "Enter a valid domain";
+    if (!/^[a-z0-9.-]+$/i.test(host)) return "Domain has invalid characters";
+    if (!host.includes(".")) return "Enter a valid domain (missing .com, .org, etc.)";
+    const tld = host.split(".").pop() ?? "";
+    if (tld.length < 2 || !/^[a-z]+$/i.test(tld)) return "Enter a valid domain extension";
+    if (host === "localhost" || /^\d+\.\d+\.\d+\.\d+$/.test(host)) return "Use a public website URL";
+    return null;
   };
   const linkErrors = links.map((l) => validateUrl(l.url));
 
