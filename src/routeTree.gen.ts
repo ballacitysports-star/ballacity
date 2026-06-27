@@ -15,12 +15,12 @@ import { Route as ResetPasswordRouteImport } from './routes/reset-password'
 import { Route as PlansRouteImport } from './routes/plans'
 import { Route as PickupRouteImport } from './routes/pickup'
 import { Route as PaymentsRouteImport } from './routes/payments'
-import { Route as MessagesRouteImport } from './routes/messages'
 import { Route as AvailablePlayersRouteImport } from './routes/available-players'
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as AdminRouteImport } from './routes/admin'
 import { Route as TabsRouteImport } from './routes/_tabs'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as MessagesIndexRouteImport } from './routes/messages.index'
 import { Route as TeamsCreateRouteImport } from './routes/teams.create'
 import { Route as TeamsTeamIdRouteImport } from './routes/teams.$teamId'
 import { Route as ReviewNewRouteImport } from './routes/review.new'
@@ -75,11 +75,6 @@ const PaymentsRoute = PaymentsRouteImport.update({
   path: '/payments',
   getParentRoute: () => rootRouteImport,
 } as any)
-const MessagesRoute = MessagesRouteImport.update({
-  id: '/messages',
-  path: '/messages',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const AvailablePlayersRoute = AvailablePlayersRouteImport.update({
   id: '/available-players',
   path: '/available-players',
@@ -102,6 +97,11 @@ const TabsRoute = TabsRouteImport.update({
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const MessagesIndexRoute = MessagesIndexRouteImport.update({
+  id: '/messages/',
+  path: '/messages/',
   getParentRoute: () => rootRouteImport,
 } as any)
 const TeamsCreateRoute = TeamsCreateRouteImport.update({
@@ -130,9 +130,9 @@ const PlayersUserIdRoute = PlayersUserIdRouteImport.update({
   getParentRoute: () => rootRouteImport,
 } as any)
 const MessagesConversationIdRoute = MessagesConversationIdRouteImport.update({
-  id: '/$conversationId',
-  path: '/$conversationId',
-  getParentRoute: () => MessagesRoute,
+  id: '/messages/$conversationId',
+  path: '/messages/$conversationId',
+  getParentRoute: () => rootRouteImport,
 } as any)
 const GamesGameIdRoute = GamesGameIdRouteImport.update({
   id: '/games/$gameId',
@@ -226,7 +226,6 @@ export interface FileRoutesByFullPath {
   '/admin': typeof AdminRouteWithChildren
   '/auth': typeof AuthRoute
   '/available-players': typeof AvailablePlayersRoute
-  '/messages': typeof MessagesRouteWithChildren
   '/payments': typeof PaymentsRoute
   '/pickup': typeof PickupRoute
   '/plans': typeof PlansRoute
@@ -251,6 +250,7 @@ export interface FileRoutesByFullPath {
   '/review/new': typeof ReviewNewRoute
   '/teams/$teamId': typeof TeamsTeamIdRouteWithChildren
   '/teams/create': typeof TeamsCreateRoute
+  '/messages/': typeof MessagesIndexRoute
   '/games/$gameId/pay': typeof GamesGameIdPayRoute
   '/games/$gameId/payment-setup': typeof GamesGameIdPaymentSetupRoute
   '/teams/$teamId/edit': typeof TeamsTeamIdEditRoute
@@ -262,7 +262,6 @@ export interface FileRoutesByTo {
   '/admin': typeof AdminRouteWithChildren
   '/auth': typeof AuthRoute
   '/available-players': typeof AvailablePlayersRoute
-  '/messages': typeof MessagesRouteWithChildren
   '/payments': typeof PaymentsRoute
   '/pickup': typeof PickupRoute
   '/plans': typeof PlansRoute
@@ -287,6 +286,7 @@ export interface FileRoutesByTo {
   '/review/new': typeof ReviewNewRoute
   '/teams/$teamId': typeof TeamsTeamIdRouteWithChildren
   '/teams/create': typeof TeamsCreateRoute
+  '/messages': typeof MessagesIndexRoute
   '/games/$gameId/pay': typeof GamesGameIdPayRoute
   '/games/$gameId/payment-setup': typeof GamesGameIdPaymentSetupRoute
   '/teams/$teamId/edit': typeof TeamsTeamIdEditRoute
@@ -300,7 +300,6 @@ export interface FileRoutesById {
   '/admin': typeof AdminRouteWithChildren
   '/auth': typeof AuthRoute
   '/available-players': typeof AvailablePlayersRoute
-  '/messages': typeof MessagesRouteWithChildren
   '/payments': typeof PaymentsRoute
   '/pickup': typeof PickupRoute
   '/plans': typeof PlansRoute
@@ -325,6 +324,7 @@ export interface FileRoutesById {
   '/review/new': typeof ReviewNewRoute
   '/teams/$teamId': typeof TeamsTeamIdRouteWithChildren
   '/teams/create': typeof TeamsCreateRoute
+  '/messages/': typeof MessagesIndexRoute
   '/games/$gameId/pay': typeof GamesGameIdPayRoute
   '/games/$gameId/payment-setup': typeof GamesGameIdPaymentSetupRoute
   '/teams/$teamId/edit': typeof TeamsTeamIdEditRoute
@@ -338,7 +338,6 @@ export interface FileRouteTypes {
     | '/admin'
     | '/auth'
     | '/available-players'
-    | '/messages'
     | '/payments'
     | '/pickup'
     | '/plans'
@@ -363,6 +362,7 @@ export interface FileRouteTypes {
     | '/review/new'
     | '/teams/$teamId'
     | '/teams/create'
+    | '/messages/'
     | '/games/$gameId/pay'
     | '/games/$gameId/payment-setup'
     | '/teams/$teamId/edit'
@@ -374,7 +374,6 @@ export interface FileRouteTypes {
     | '/admin'
     | '/auth'
     | '/available-players'
-    | '/messages'
     | '/payments'
     | '/pickup'
     | '/plans'
@@ -399,6 +398,7 @@ export interface FileRouteTypes {
     | '/review/new'
     | '/teams/$teamId'
     | '/teams/create'
+    | '/messages'
     | '/games/$gameId/pay'
     | '/games/$gameId/payment-setup'
     | '/teams/$teamId/edit'
@@ -411,7 +411,6 @@ export interface FileRouteTypes {
     | '/admin'
     | '/auth'
     | '/available-players'
-    | '/messages'
     | '/payments'
     | '/pickup'
     | '/plans'
@@ -436,6 +435,7 @@ export interface FileRouteTypes {
     | '/review/new'
     | '/teams/$teamId'
     | '/teams/create'
+    | '/messages/'
     | '/games/$gameId/pay'
     | '/games/$gameId/payment-setup'
     | '/teams/$teamId/edit'
@@ -449,7 +449,6 @@ export interface RootRouteChildren {
   AdminRoute: typeof AdminRouteWithChildren
   AuthRoute: typeof AuthRoute
   AvailablePlayersRoute: typeof AvailablePlayersRoute
-  MessagesRoute: typeof MessagesRouteWithChildren
   PaymentsRoute: typeof PaymentsRoute
   PickupRoute: typeof PickupRoute
   PlansRoute: typeof PlansRoute
@@ -459,11 +458,13 @@ export interface RootRouteChildren {
   AccountSecurityRoute: typeof AccountSecurityRoute
   CheckoutReturnRoute: typeof CheckoutReturnRoute
   GamesGameIdRoute: typeof GamesGameIdRouteWithChildren
+  MessagesConversationIdRoute: typeof MessagesConversationIdRoute
   PlayersUserIdRoute: typeof PlayersUserIdRoute
   ProfileEditRoute: typeof ProfileEditRoute
   ReviewNewRoute: typeof ReviewNewRoute
   TeamsTeamIdRoute: typeof TeamsTeamIdRouteWithChildren
   TeamsCreateRoute: typeof TeamsCreateRoute
+  MessagesIndexRoute: typeof MessagesIndexRoute
   ApiPublicPaymentsWebhookRoute: typeof ApiPublicPaymentsWebhookRoute
   ApiPublicReelsProcessRoute: typeof ApiPublicReelsProcessRoute
 }
@@ -512,13 +513,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof PaymentsRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/messages': {
-      id: '/messages'
-      path: '/messages'
-      fullPath: '/messages'
-      preLoaderRoute: typeof MessagesRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/available-players': {
       id: '/available-players'
       path: '/available-players'
@@ -552,6 +546,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/messages/': {
+      id: '/messages/'
+      path: '/messages'
+      fullPath: '/messages/'
+      preLoaderRoute: typeof MessagesIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/teams/create': {
@@ -591,10 +592,10 @@ declare module '@tanstack/react-router' {
     }
     '/messages/$conversationId': {
       id: '/messages/$conversationId'
-      path: '/$conversationId'
+      path: '/messages/$conversationId'
       fullPath: '/messages/$conversationId'
       preLoaderRoute: typeof MessagesConversationIdRouteImport
-      parentRoute: typeof MessagesRoute
+      parentRoute: typeof rootRouteImport
     }
     '/games/$gameId': {
       id: '/games/$gameId'
@@ -752,18 +753,6 @@ const AdminRouteChildren: AdminRouteChildren = {
 
 const AdminRouteWithChildren = AdminRoute._addFileChildren(AdminRouteChildren)
 
-interface MessagesRouteChildren {
-  MessagesConversationIdRoute: typeof MessagesConversationIdRoute
-}
-
-const MessagesRouteChildren: MessagesRouteChildren = {
-  MessagesConversationIdRoute: MessagesConversationIdRoute,
-}
-
-const MessagesRouteWithChildren = MessagesRoute._addFileChildren(
-  MessagesRouteChildren,
-)
-
 interface GamesGameIdRouteChildren {
   GamesGameIdPayRoute: typeof GamesGameIdPayRoute
   GamesGameIdPaymentSetupRoute: typeof GamesGameIdPaymentSetupRoute
@@ -796,7 +785,6 @@ const rootRouteChildren: RootRouteChildren = {
   AdminRoute: AdminRouteWithChildren,
   AuthRoute: AuthRoute,
   AvailablePlayersRoute: AvailablePlayersRoute,
-  MessagesRoute: MessagesRouteWithChildren,
   PaymentsRoute: PaymentsRoute,
   PickupRoute: PickupRoute,
   PlansRoute: PlansRoute,
@@ -806,11 +794,13 @@ const rootRouteChildren: RootRouteChildren = {
   AccountSecurityRoute: AccountSecurityRoute,
   CheckoutReturnRoute: CheckoutReturnRoute,
   GamesGameIdRoute: GamesGameIdRouteWithChildren,
+  MessagesConversationIdRoute: MessagesConversationIdRoute,
   PlayersUserIdRoute: PlayersUserIdRoute,
   ProfileEditRoute: ProfileEditRoute,
   ReviewNewRoute: ReviewNewRoute,
   TeamsTeamIdRoute: TeamsTeamIdRouteWithChildren,
   TeamsCreateRoute: TeamsCreateRoute,
+  MessagesIndexRoute: MessagesIndexRoute,
   ApiPublicPaymentsWebhookRoute: ApiPublicPaymentsWebhookRoute,
   ApiPublicReelsProcessRoute: ApiPublicReelsProcessRoute,
 }
