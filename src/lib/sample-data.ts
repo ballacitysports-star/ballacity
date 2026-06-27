@@ -57,7 +57,6 @@ const sportImage: Record<Sport, string> = {
   "Flag Football": soccerImg,
   Baseball: tennisImg,
   Softball: tennisImg,
-  Hockey: volleyballImg,
   Running: runningImg,
 };
 
