@@ -41,7 +41,8 @@ function Thread() {
   }, [conversationId, user?.id, loading]);
 
   useEffect(() => {
-    window.scrollTo({ top: document.body.scrollHeight, behavior: "smooth" });
+    const el = scrollRef.current;
+    if (el) el.scrollTop = el.scrollHeight;
   }, [msgs.length]);
 
   if (!loading && !user) {
@@ -62,8 +63,8 @@ function Thread() {
   };
 
   return (
-    <div className="min-h-dvh bg-background pb-[calc(env(safe-area-inset-bottom)+5.5rem)]">
-      <header className="flex items-center gap-3 px-4 pt-4 pb-3 border-b border-border bg-background sticky top-0 z-10">
+    <div className="flex h-dvh flex-col bg-background">
+      <header className="flex items-center gap-3 px-4 pt-4 pb-3 border-b border-border bg-background shrink-0">
         <Link to="/messages" className="grid h-10 w-10 place-items-center rounded-full border border-border bg-surface">
           <ArrowLeft className="h-5 w-5" />
         </Link>
@@ -95,7 +96,7 @@ function Thread() {
         </div>
       </header>
 
-      <div ref={scrollRef} className="px-4 py-4 space-y-2">
+      <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 py-4 space-y-2">
         {msgs.length === 0 ? (
           <div className="text-center text-xs text-muted-foreground mt-10">No messages yet. Say hi 👋</div>
         ) : msgs.map((m) => {
@@ -113,7 +114,7 @@ function Thread() {
 
       <form
         onSubmit={submit}
-        className="fixed inset-x-0 bottom-0 z-20 flex items-center gap-2 border-t border-border bg-background px-4 py-3 pb-[max(env(safe-area-inset-bottom),0.75rem)]"
+        className="shrink-0 flex items-center gap-2 border-t border-border bg-background px-4 py-3 pb-[max(env(safe-area-inset-bottom),0.75rem)]"
       >
         <input
           value={text}
