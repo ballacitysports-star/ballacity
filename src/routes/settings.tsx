@@ -7,12 +7,16 @@ import {
   IdCard,
   LogOut,
   Lock,
+  Moon,
   Shield,
+  Sun,
   UserCog,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
+import { Switch } from "@/components/ui/switch";
+import { useTheme } from "@/lib/theme";
 
 export const Route = createFileRoute("/settings")({
   component: SettingsHubPage,
@@ -66,6 +70,9 @@ const SECTIONS: Section[] = [
 ];
 
 function SettingsHubPage() {
+  const [theme, setTheme] = useTheme();
+  const isDark = theme === "dark";
+
   const handleSignOut = async () => {
     try {
       await supabase.auth.signOut();
@@ -75,6 +82,7 @@ function SettingsHubPage() {
       toast.error("Couldn't sign out");
     }
   };
+
 
   return (
     <div className="min-h-screen bg-background pb-24">
@@ -86,6 +94,28 @@ function SettingsHubPage() {
       </header>
 
       <main className="mx-auto max-w-xl px-4 py-4 space-y-6">
+        <section>
+          <h2 className="px-1 pb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+            Appearance
+          </h2>
+          <div className="flex items-center gap-3 rounded-xl border bg-card px-4 py-3">
+            <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-muted">
+              {isDark ? <Moon className="h-4 w-4" /> : <Sun className="h-4 w-4" />}
+            </span>
+            <span className="min-w-0 flex-1">
+              <span className="block truncate text-sm font-medium">Dark mode</span>
+              <span className="block truncate text-xs text-muted-foreground">
+                {isDark ? "Using dark theme" : "Using light theme"}
+              </span>
+            </span>
+            <Switch
+              checked={isDark}
+              onCheckedChange={(checked) => setTheme(checked ? "dark" : "light")}
+              aria-label="Toggle dark mode"
+            />
+          </div>
+        </section>
+
         {SECTIONS.map((section) => (
           <section key={section.title}>
             <h2 className="px-1 pb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
