@@ -7,12 +7,16 @@ import {
   IdCard,
   LogOut,
   Lock,
+  Moon,
   Shield,
+  Sun,
   UserCog,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
+import { Switch } from "@/components/ui/switch";
+import { useTheme } from "@/lib/theme";
 
 export const Route = createFileRoute("/settings")({
   component: SettingsHubPage,
