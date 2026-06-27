@@ -204,14 +204,67 @@ function Thread() {
         className="sticky bottom-0 left-0 right-0 shrink-0 border-t border-border bg-background/95 backdrop-blur px-4 pt-3 pb-[max(env(safe-area-inset-bottom),0.75rem)] z-20"
       >
         {pendingFile && (
-          <div className="mb-2 flex items-center gap-2 rounded-xl border border-border bg-surface px-3 py-2 text-xs">
-            <Paperclip className="h-3.5 w-3.5 shrink-0" />
-            <span className="flex-1 truncate font-medium">{pendingFile.name}</span>
-            <span className="opacity-60">{(pendingFile.size / 1024).toFixed(0)} KB</span>
-            <button type="button" onClick={() => { setPendingFile(null); if (fileInputRef.current) fileInputRef.current.value = ""; }}
-              className="grid h-6 w-6 place-items-center rounded-full hover:bg-background">
-              <X className="h-3.5 w-3.5" />
-            </button>
+          <div className="mb-2 rounded-xl border border-border bg-surface px-3 py-2 text-xs space-y-1.5">
+            <div className="flex items-center gap-2">
+              <Paperclip className="h-3.5 w-3.5 shrink-0" />
+              <span className="flex-1 truncate font-medium">{pendingFile.name}</span>
+              <span className="opacity-60 shrink-0">
+                {uploading
+                  ? `${uploadPct}%`
+                  : uploadError
+                    ? "Failed"
+                    : `${(pendingFile.size / 1024).toFixed(0)} KB`}
+              </span>
+              {uploading ? (
+                <button
+                  type="button"
+                  onClick={cancelUpload}
+                  aria-label="Cancel upload"
+                  className="grid h-6 w-6 place-items-center rounded-full hover:bg-background"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              ) : uploadError ? (
+                <>
+                  <button
+                    type="button"
+                    onClick={retryUpload}
+                    aria-label="Retry upload"
+                    className="grid h-6 w-6 place-items-center rounded-full hover:bg-background text-lime"
+                  >
+                    <RotateCw className="h-3.5 w-3.5" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={clearPending}
+                    aria-label="Remove attachment"
+                    className="grid h-6 w-6 place-items-center rounded-full hover:bg-background"
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </button>
+                </>
+              ) : (
+                <button
+                  type="button"
+                  onClick={clearPending}
+                  aria-label="Remove attachment"
+                  className="grid h-6 w-6 place-items-center rounded-full hover:bg-background"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              )}
+            </div>
+            {(uploading || uploadPct > 0) && !uploadError && (
+              <div className="h-1 w-full overflow-hidden rounded-full bg-background">
+                <div
+                  className="h-full bg-lime-gradient transition-[width] duration-150"
+                  style={{ width: `${uploadPct}%` }}
+                />
+              </div>
+            )}
+            {uploadError && (
+              <div className="text-[11px] text-destructive">{uploadError}. Tap retry to try again.</div>
+            )}
           </div>
         )}
         <div className="flex items-end gap-2">
