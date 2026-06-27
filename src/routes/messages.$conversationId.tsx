@@ -41,7 +41,8 @@ function Thread() {
   }, [conversationId, user?.id, loading]);
 
   useEffect(() => {
-    window.scrollTo({ top: document.body.scrollHeight, behavior: "smooth" });
+    const el = scrollRef.current;
+    if (el) el.scrollTop = el.scrollHeight;
   }, [msgs.length]);
 
   if (!loading && !user) {
