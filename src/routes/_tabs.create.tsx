@@ -64,22 +64,26 @@ function Create() {
     let cancelled = false;
     navigator.geolocation.getCurrentPosition(
       async (pos) => {
+        console.log("[create] geo ok", pos.coords.latitude, pos.coords.longitude, "cancelled?", cancelled, "edited?", locationEditedRef.current);
         if (cancelled || locationEditedRef.current) return;
         try {
-          const { formatted, city } = await reverse({
+          const res = await reverse({
             data: { lat: pos.coords.latitude, lng: pos.coords.longitude },
           });
-          const next = formatted || city;
+          console.log("[create] reverse result", res);
+          const next = res?.formatted || res?.city;
           if (next && !cancelled && !locationEditedRef.current) {
+            console.log("[create] setLocation", next);
             setLocation(next);
           }
-        } catch {
-          /* silent — user can still type manually */
+        } catch (e) {
+          console.log("[create] reverse failed", e);
         }
       },
-      () => {},
+      (err) => console.log("[create] geo err", err),
       { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 },
     );
+
     return () => { cancelled = true; };
     // Intentionally run once on mount.
     // eslint-disable-next-line react-hooks/exhaustive-deps
