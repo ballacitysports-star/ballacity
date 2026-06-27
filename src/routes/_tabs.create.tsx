@@ -40,9 +40,11 @@ function Create() {
   const [requiresApproval, setRequiresApproval] = useState(false);
   const [publishing, setPublishing] = useState(false);
 
+  console.log("[create] render location=", JSON.stringify(location), "profile.city=", JSON.stringify(profile?.city));
   useEffect(() => {
     const nextCity = profile?.city?.trim() ?? "";
     const previousCity = previousProfileCityRef.current;
+    console.log("[create] profile.city effect next=", JSON.stringify(nextCity), "prev=", JSON.stringify(previousCity));
     if (nextCity === previousCity) return;
     previousProfileCityRef.current = nextCity;
 
@@ -50,8 +52,10 @@ function Create() {
     // Profile city changed — re-autopopulate and clear the manual-edit flag
     // so subsequent profile changes keep working.
     locationEditedRef.current = false;
+    console.log("[create] profile.city effect setLocation", nextCity);
     setLocation(nextCity);
   }, [profile?.city]);
+
 
   // Auto-fill the venue address from the device's current GPS location when
   // the user hasn't typed anything yet and has no saved profile city. Runs
