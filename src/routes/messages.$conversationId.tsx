@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
-import { ArrowLeft, Send, Paperclip, X, Loader2 } from "lucide-react";
+import { ArrowLeft, Send, Paperclip, X, Loader2, RotateCw } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/use-auth";
 import { getConversationOther, listMessages, markConversationRead, sendMessage, uploadMessageAttachment, type Message } from "@/lib/messages";
