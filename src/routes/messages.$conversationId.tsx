@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
-import { ArrowLeft, Send, Paperclip, X, Loader2 } from "lucide-react";
+import { ArrowLeft, Send, Paperclip, X, Loader2, RotateCw } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/use-auth";
 import { getConversationOther, listMessages, markConversationRead, sendMessage, uploadMessageAttachment, type Message } from "@/lib/messages";
@@ -22,6 +22,9 @@ function Thread() {
   const [sending, setSending] = useState(false);
   const [pendingFile, setPendingFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
+  const [uploadPct, setUploadPct] = useState(0);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  const abortRef = useRef<AbortController | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -63,27 +66,78 @@ function Thread() {
     if (!file) return;
     if (file.size > 20 * 1024 * 1024) { toast.error("Max attachment size is 20MB."); return; }
     setPendingFile(file);
+    setUploadError(null);
+    setUploadPct(0);
+  };
+
+  const cancelUpload = () => {
+    abortRef.current?.abort();
+    abortRef.current = null;
+    setUploading(false);
+    setUploadPct(0);
+  };
+
+  const clearPending = () => {
+    cancelUpload();
+    setPendingFile(null);
+    setUploadError(null);
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  };
+
+  const doUpload = async (file: File) => {
+    const ctrl = new AbortController();
+    abortRef.current = ctrl;
+    setUploading(true);
+    setUploadError(null);
+    setUploadPct(0);
+    try {
+      const attachment = await uploadMessageAttachment(conversationId, file, {
+        signal: ctrl.signal,
+        onProgress: (p) => setUploadPct(p),
+      });
+      return attachment;
+    } finally {
+      abortRef.current = null;
+      setUploading(false);
+    }
+  };
+
+  const retryUpload = async () => {
+    if (!pendingFile) return;
+    try { await doUpload(pendingFile); }
+    catch (e: any) {
+      if (e?.name !== "AbortError") setUploadError(e?.message ?? "Upload failed");
+    }
   };
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!text.trim() && !pendingFile) return;
+    if (uploading) return;
     setSending(true);
     try {
       let attachment = null;
       if (pendingFile) {
-        setUploading(true);
-        attachment = await uploadMessageAttachment(conversationId, pendingFile);
-        setUploading(false);
+        attachment = await doUpload(pendingFile);
       }
       await sendMessage(conversationId, text, attachment);
       setText("");
       setPendingFile(null);
+      setUploadError(null);
+      setUploadPct(0);
       if (fileInputRef.current) fileInputRef.current.value = "";
     }
-    catch (e: any) { toast.error(e.message); }
-    finally { setSending(false); setUploading(false); }
+    catch (e: any) {
+      if (e?.name === "AbortError") {
+        toast.message("Upload cancelled");
+      } else {
+        setUploadError(e?.message ?? "Send failed");
+        toast.error(e.message);
+      }
+    }
+    finally { setSending(false); }
   };
+
 
 
   return (
@@ -150,14 +204,67 @@ function Thread() {
         className="sticky bottom-0 left-0 right-0 shrink-0 border-t border-border bg-background/95 backdrop-blur px-4 pt-3 pb-[max(env(safe-area-inset-bottom),0.75rem)] z-20"
       >
         {pendingFile && (
-          <div className="mb-2 flex items-center gap-2 rounded-xl border border-border bg-surface px-3 py-2 text-xs">
-            <Paperclip className="h-3.5 w-3.5 shrink-0" />
-            <span className="flex-1 truncate font-medium">{pendingFile.name}</span>
-            <span className="opacity-60">{(pendingFile.size / 1024).toFixed(0)} KB</span>
-            <button type="button" onClick={() => { setPendingFile(null); if (fileInputRef.current) fileInputRef.current.value = ""; }}
-              className="grid h-6 w-6 place-items-center rounded-full hover:bg-background">
-              <X className="h-3.5 w-3.5" />
-            </button>
+          <div className="mb-2 rounded-xl border border-border bg-surface px-3 py-2 text-xs space-y-1.5">
+            <div className="flex items-center gap-2">
+              <Paperclip className="h-3.5 w-3.5 shrink-0" />
+              <span className="flex-1 truncate font-medium">{pendingFile.name}</span>
+              <span className="opacity-60 shrink-0">
+                {uploading
+                  ? `${uploadPct}%`
+                  : uploadError
+                    ? "Failed"
+                    : `${(pendingFile.size / 1024).toFixed(0)} KB`}
+              </span>
+              {uploading ? (
+                <button
+                  type="button"
+                  onClick={cancelUpload}
+                  aria-label="Cancel upload"
+                  className="grid h-6 w-6 place-items-center rounded-full hover:bg-background"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              ) : uploadError ? (
+                <>
+                  <button
+                    type="button"
+                    onClick={retryUpload}
+                    aria-label="Retry upload"
+                    className="grid h-6 w-6 place-items-center rounded-full hover:bg-background text-lime"
+                  >
+                    <RotateCw className="h-3.5 w-3.5" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={clearPending}
+                    aria-label="Remove attachment"
+                    className="grid h-6 w-6 place-items-center rounded-full hover:bg-background"
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </button>
+                </>
+              ) : (
+                <button
+                  type="button"
+                  onClick={clearPending}
+                  aria-label="Remove attachment"
+                  className="grid h-6 w-6 place-items-center rounded-full hover:bg-background"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              )}
+            </div>
+            {(uploading || uploadPct > 0) && !uploadError && (
+              <div className="h-1 w-full overflow-hidden rounded-full bg-background">
+                <div
+                  className="h-full bg-lime-gradient transition-[width] duration-150"
+                  style={{ width: `${uploadPct}%` }}
+                />
+              </div>
+            )}
+            {uploadError && (
+              <div className="text-[11px] text-destructive">{uploadError}. Tap retry to try again.</div>
+            )}
           </div>
         )}
         <div className="flex items-end gap-2">

@@ -161,19 +161,59 @@ export async function listMessages(convId: string): Promise<Message[]> {
   return (data ?? []) as unknown as Message[];
 }
 
-export async function uploadMessageAttachment(convId: string, file: File): Promise<Attachment> {
+export type UploadOptions = {
+  onProgress?: (pct: number) => void;
+  signal?: AbortSignal;
+};
+
+export async function uploadMessageAttachment(
+  convId: string,
+  file: File,
+  opts: UploadOptions = {},
+): Promise<Attachment> {
   const { data: u } = await supabase.auth.getUser();
   if (!u.user) throw new Error("Sign in to send attachments.");
   const MAX = 20 * 1024 * 1024;
   if (file.size > MAX) throw new Error("Attachment too large (max 20MB).");
   const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_").slice(0, 120);
   const path = `${convId}/${u.user.id}/${Date.now()}-${safeName}`;
-  const { error } = await supabase.storage.from("message-attachments").upload(path, file, {
-    contentType: file.type || "application/octet-stream",
-    upsert: false,
+  const contentType = file.type || "application/octet-stream";
+
+  // Use a signed upload URL so we can PUT via XHR and report progress / support cancel.
+  const { data: signed, error: signErr } = await supabase
+    .storage
+    .from("message-attachments")
+    .createSignedUploadUrl(path);
+  if (signErr || !signed) throw signErr ?? new Error("Could not start upload.");
+
+  await new Promise<void>((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open("PUT", signed.signedUrl, true);
+    xhr.setRequestHeader("Content-Type", contentType);
+    xhr.setRequestHeader("x-upsert", "false");
+    xhr.upload.onprogress = (ev) => {
+      if (ev.lengthComputable && opts.onProgress) {
+        opts.onProgress(Math.round((ev.loaded / ev.total) * 100));
+      }
+    };
+    xhr.onload = () => {
+      if (xhr.status >= 200 && xhr.status < 300) {
+        opts.onProgress?.(100);
+        resolve();
+      } else {
+        reject(new Error(`Upload failed (${xhr.status})`));
+      }
+    };
+    xhr.onerror = () => reject(new Error("Network error during upload."));
+    xhr.onabort = () => reject(new DOMException("Upload cancelled", "AbortError"));
+    if (opts.signal) {
+      if (opts.signal.aborted) { xhr.abort(); return; }
+      opts.signal.addEventListener("abort", () => xhr.abort(), { once: true });
+    }
+    xhr.send(file);
   });
-  if (error) throw error;
-  return { path, type: file.type || "application/octet-stream", name: file.name, size: file.size };
+
+  return { path, type: contentType, name: file.name, size: file.size };
 }
 
 export async function getAttachmentUrl(path: string): Promise<string | null> {
