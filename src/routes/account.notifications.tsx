@@ -32,11 +32,15 @@ function NotificationSettingsPage() {
   const [saved, setSaved] = useState(false);
 
   const onToggle = async (cat: NotifCategory, ch: NotifChannel, val: boolean) => {
-    if (ch === "push" && val) {
+    if (ch === "push" && val && typeof window !== "undefined" && "Notification" in window) {
       try {
-        const ok = await ensurePushPermission?.();
-        if (ok === false) {
-          toast.error("Enable push notifications in your browser settings to receive alerts.");
+        if (Notification.permission === "default") {
+          const res = await Notification.requestPermission();
+          if (res !== "granted") {
+            toast.error("Enable notifications in your browser settings to receive push alerts.");
+          }
+        } else if (Notification.permission === "denied") {
+          toast.error("Notifications are blocked. Enable them in your browser settings.");
         }
       } catch { /* ignore */ }
     }
