@@ -1,7 +1,7 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { motion, useMotionValue, useTransform, animate } from "framer-motion";
 import { Logo } from "@/components/Logo";
-import { Bell, BellRing, MessageCircle, Users, CreditCard, Zap, X, CheckCheck, Check, Dot, Trash2, Mail, MailOpen } from "lucide-react";
+import { Bell, BellRing, MessageCircle, Users, CreditCard, Zap, X, CheckCheck, Check, Dot, Trash2, Mail, MailOpen, Settings } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import {
@@ -130,14 +130,24 @@ function Notifications() {
     <div className="mx-auto max-w-md px-4 pt-6">
       <div className="flex items-center justify-between mb-5">
         <Logo />
-        <button
-          onClick={handleMarkAll}
-          disabled={unreadCount === 0}
-          className="inline-flex items-center gap-1.5 rounded-full border border-border bg-surface px-3 py-1.5 text-xs font-semibold text-foreground hover:border-lime/60 hover:text-lime disabled:opacity-40 disabled:hover:border-border disabled:hover:text-foreground"
-        >
-          <CheckCheck className="h-3.5 w-3.5" />
-          Mark all read{unreadCount > 0 ? ` (${unreadCount})` : ""}
-        </button>
+        <div className="flex items-center gap-2">
+          <Link
+            to="/account/notifications"
+            className="inline-flex items-center gap-1.5 rounded-full border border-border bg-surface px-3 py-1.5 text-xs font-semibold text-foreground hover:border-lime/60 hover:text-lime"
+            aria-label="Notification settings"
+          >
+            <Settings className="h-3.5 w-3.5" />
+            Settings
+          </Link>
+          <button
+            onClick={handleMarkAll}
+            disabled={unreadCount === 0}
+            className="inline-flex items-center gap-1.5 rounded-full border border-border bg-surface px-3 py-1.5 text-xs font-semibold text-foreground hover:border-lime/60 hover:text-lime disabled:opacity-40 disabled:hover:border-border disabled:hover:text-foreground"
+          >
+            <CheckCheck className="h-3.5 w-3.5" />
+            Mark all read{unreadCount > 0 ? ` (${unreadCount})` : ""}
+          </button>
+        </div>
       </div>
       <h1 className="font-display text-3xl font-bold leading-tight mb-1">Alerts</h1>
       <p className="text-muted-foreground text-sm mb-5">Real-time updates from your games & crew.</p>
