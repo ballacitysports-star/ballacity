@@ -176,6 +176,8 @@ export function useNotificationPush() {
   useEffect(() => {
     if (!user) return;
     let active = true;
+    // Track grouped message counts per conversation (resets on unmount/page reload)
+    const messageGroups = new Map<string, number>();
     const channel = supabase
       .channel(`notif-push-${user.id}`)
       .on(
@@ -184,25 +186,64 @@ export function useNotificationPush() {
         (payload) => {
           if (!active) return;
           const n = payload.new as Notification;
-          // Lazy import to avoid SSR issues
+
+          // For message notifications, suppress popup when already viewing that thread
+          let convId: string | null = null;
+          if (n.type === "message" && n.link) {
+            const m = n.link.match(/\/messages\/([^/?#]+)/);
+            convId = m ? m[1] : null;
+            if (typeof window !== "undefined" && convId) {
+              const viewingThisThread =
+                window.location.pathname.startsWith(`/messages/${convId}`) &&
+                document.visibilityState === "visible";
+              if (viewingThisThread) return; // skip toast + native push entirely
+            }
+          }
+
           if (isAllowed(n.type, "inApp")) {
             import("sonner").then(({ toast }) => {
               const isApproval = n.type === "join_approved" || n.type === "join_declined";
               const fn = n.type === "join_approved" ? toast.success : n.type === "join_declined" ? toast.error : toast;
-              fn(n.title, {
-                description: n.body ?? undefined,
-                action: n.link
-                  ? { label: "Open", onClick: () => { if (n.link) window.location.assign(n.link); } }
-                  : undefined,
-                duration: isApproval ? 8000 : 5000,
-              });
+
+              // Group consecutive messages from the same conversation under one toast
+              if (n.type === "message" && convId) {
+                const prev = messageGroups.get(convId) ?? 0;
+                const next = prev + 1;
+                messageGroups.set(convId, next);
+                const toastId = `msg-${convId}`;
+                const title = next > 1 ? `${next} new messages` : n.title;
+                const description = next > 1
+                  ? `${n.title}${n.body ? `: ${n.body}` : ""}`
+                  : (n.body ?? undefined);
+                toast(title, {
+                  id: toastId,
+                  description,
+                  action: n.link
+                    ? { label: "Open", onClick: () => {
+                        messageGroups.delete(convId!);
+                        if (n.link) window.location.assign(n.link);
+                      } }
+                    : undefined,
+                  duration: 5000,
+                  onDismiss: () => messageGroups.delete(convId!),
+                  onAutoClose: () => messageGroups.delete(convId!),
+                });
+              } else {
+                fn(n.title, {
+                  description: n.body ?? undefined,
+                  action: n.link
+                    ? { label: "Open", onClick: () => { if (n.link) window.location.assign(n.link); } }
+                    : undefined,
+                  duration: isApproval ? 8000 : 5000,
+                });
+              }
             });
           }
           showBrowserNotification(n);
-
         },
       )
       .subscribe();
     return () => { active = false; supabase.removeChannel(channel); };
   }, [user?.id]);
 }
+
