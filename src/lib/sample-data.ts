@@ -7,7 +7,7 @@ import heroImg from "@/assets/hero-court.jpg";
 
 export type Sport =
   | "Basketball" | "Soccer" | "Pickleball" | "Volleyball" | "Tennis"
-  | "Flag Football" | "Baseball" | "Softball" | "Hockey" | "Running";
+  | "Flag Football" | "Baseball" | "Softball" | "Running";
 
 export const SPORTS: { name: Sport; emoji: string; color: string }[] = [
   { name: "Basketball", emoji: "🏀", color: "#ff8a3d" },
