@@ -87,7 +87,7 @@ function SettingsHubPage() {
   return (
     <div className="min-h-screen bg-background pb-24">
       <header className="sticky top-0 z-10 flex items-center gap-3 border-b bg-background/95 px-4 py-3 backdrop-blur">
-        <Link to="/_tabs/profile" className="rounded-md p-2 hover:bg-muted" aria-label="Back">
+        <Link to="/profile" className="rounded-md p-2 hover:bg-muted" aria-label="Back">
           <ArrowLeft className="h-5 w-5" />
         </Link>
         <h1 className="text-lg font-semibold">Settings</h1>

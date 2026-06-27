@@ -141,7 +141,7 @@ function Thread() {
 
 
   return (
-    <div className="flex h-dvh flex-col bg-background">
+    <div className="flex h-dvh flex-col bg-background pb-[calc(env(safe-area-inset-bottom)+6rem)]">
       <header className="flex items-center gap-3 px-4 pt-4 pb-3 border-b border-border bg-background shrink-0">
         <Link to="/messages" className="grid h-10 w-10 place-items-center rounded-full border border-border bg-surface">
           <ArrowLeft className="h-5 w-5" />

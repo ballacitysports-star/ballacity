@@ -11,6 +11,7 @@ import { useEffect } from "react";
 
 import appCss from "../styles.css?url";
 import { DebugModeToggle } from "@/components/DebugModeToggle";
+import { BottomNav } from "@/components/BottomNav";
 import { ClientOnly } from "@tanstack/react-router";
 import { supabase } from "@/integrations/supabase/client";
 import { Toaster } from "@/components/ui/sonner";
@@ -149,15 +150,16 @@ function maybeReloadForStaleChunk(reason: unknown) {
 }
 
 const PUBLIC_ROUTES = ["/", "/auth", "/reset-password"];
+const TAB_PATHS = ["/feed", "/players", "/teams", "/create", "/discover", "/profile", "/notifications", "/reels"];
 
 function AuthGate({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const pathname = router.state.location.pathname;
   const { user, loading } = useAuth();
   const isPublic = pathname === "/" || PUBLIC_ROUTES.some((p) => p !== "/" && (pathname === p || pathname.startsWith(`${p}/`)));
+  const isTab = TAB_PATHS.includes(pathname);
   useNotificationPush();
   useOneSignal();
-
 
   useEffect(() => {
     if (loading) return;
@@ -166,7 +168,16 @@ function AuthGate({ children }: { children: React.ReactNode }) {
     }
   }, [loading, user, isPublic, router, pathname]);
 
-
+  useEffect(() => {
+    if (user && !isPublic && !isTab) {
+      document.body.style.paddingBottom = "calc(env(safe-area-inset-bottom) + 6rem)";
+    } else {
+      document.body.style.paddingBottom = "";
+    }
+    return () => {
+      document.body.style.paddingBottom = "";
+    };
+  }, [user, isPublic, isTab]);
 
   if (isPublic) return <>{children}</>;
   if (loading || !user) {
@@ -176,7 +187,12 @@ function AuthGate({ children }: { children: React.ReactNode }) {
       </div>
     );
   }
-  return <>{children}</>;
+  return (
+    <>
+      {children}
+      <BottomNav />
+    </>
+  );
 }
 
 function RootComponent() {
