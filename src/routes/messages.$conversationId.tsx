@@ -20,7 +20,11 @@ function Thread() {
   const [other, setOther] = useState<{ user_id: string; display_name: string; avatar_initials: string | null } | null>(null);
   const [text, setText] = useState("");
   const [sending, setSending] = useState(false);
+  const [pendingFile, setPendingFile] = useState<File | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
+
 
   useEffect(() => {
     if (loading || !user) return;
