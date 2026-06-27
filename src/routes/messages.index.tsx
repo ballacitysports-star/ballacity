@@ -5,7 +5,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { listMyConversations, type ConversationWithMeta } from "@/lib/messages";
 import { supabase } from "@/integrations/supabase/client";
 
-export const Route = createFileRoute("/messages")({
+export const Route = createFileRoute("/messages/")({
   head: () => ({ meta: [{ title: "Messages — OpenRun" }] }),
   component: MessagesInbox,
 });
