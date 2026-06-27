@@ -1,7 +1,7 @@
 import { useEffect, useSyncExternalStore } from "react";
 import { supabase } from "@/integrations/supabase/client";
 
-export type NotifCategory = "approvals" | "messages" | "general";
+export type NotifCategory = "approvals" | "messages" | "joinRequests" | "general";
 export type NotifChannel = "inApp" | "push";
 
 export type NotifPrefs = Record<NotifCategory, Record<NotifChannel, boolean>>;
@@ -9,19 +9,22 @@ export type NotifPrefs = Record<NotifCategory, Record<NotifChannel, boolean>>;
 export const DEFAULT_NOTIF_PREFS: NotifPrefs = {
   approvals: { inApp: true, push: true },
   messages: { inApp: true, push: true },
+  joinRequests: { inApp: true, push: true },
   general: { inApp: true, push: false },
 };
 
 export const CATEGORY_META: Record<NotifCategory, { label: string; description: string }> = {
-  approvals: { label: "Approvals", description: "Join request approved, declined, or new requests on your games." },
   messages: { label: "Messages", description: "New direct messages from players and hosts." },
+  approvals: { label: "Approvals", description: "When your join request is approved or declined." },
+  joinRequests: { label: "Join requests", description: "When a player requests to join a game you host." },
   general: { label: "General updates", description: "Payments, reminders, and other activity." },
 };
 
-const KEY = "openrun.notifPrefs.v1";
+const KEY = "openrun.notifPrefs.v2";
 
 export function categoryFor(type: string): NotifCategory {
-  if (type === "join_request" || type === "join_approved" || type === "join_declined") return "approvals";
+  if (type === "join_request") return "joinRequests";
+  if (type === "join_approved" || type === "join_declined") return "approvals";
   if (type === "message") return "messages";
   return "general";
 }
