@@ -75,8 +75,8 @@ function GameDetail() {
   const [hostRequests, setHostRequests] = useState<JoinRequest[]>([]);
   const [messaging, setMessaging] = useState(false);
 
-  const effectiveJoined = (game?.joined ?? 0) + (joined ? 1 : 0);
-  const spotsLeft = game ? Math.max(0, game.maxPlayers - effectiveJoined) : 0;
+  // effectiveJoined is computed below, after settings/myReq/isHost resolve.
+  // Placeholder removed — see definition near line 161.
   // Ownership is locked to the original host's auth user id.
   // DB host_id (from game_payment_settings) is the source of truth; we also
   // accept the locally-stored hostUserId stamped at publish time (or by the
@@ -158,6 +158,17 @@ function GameDetail() {
   const isConfirmed = latestSub?.status === "verified" || myReq?.status === "approved";
   const isPending = latestSub?.status === "pending" || (requiresApproval && myReq?.status === "pending");
 
+  // The viewer counts as a roster player only when:
+  //  - they're not the host (hosts run the game, they don't take a player slot), AND
+  //  - either there's no approval gate and they've joined locally, OR
+  //    the host has confirmed/approved them (paid-verified or approved request).
+  const viewerCountsAsJoined = !isHost && (
+    isConfirmed || (joined && !requiresApproval && !isPaid)
+  );
+  const effectiveJoined = (game.joined ?? 0) + (viewerCountsAsJoined ? 1 : 0);
+  const spotsLeft = Math.max(0, game.maxPlayers - effectiveJoined);
+
+
   const handleJoin = async () => {
     // Confirmed → leave / withdraw
     if (isConfirmed || joined) {
@@ -210,7 +221,7 @@ function GameDetail() {
 
 
   const players = [
-    ...(joined ? [{ initials: "YOU", isMe: true }] : []),
+    ...(viewerCountsAsJoined ? [{ initials: "YOU", isMe: true }] : []),
     ...Array.from({ length: game.joined }, (_, i) => ({
       initials: ["MC", "AG", "JK", "RC", "TB", "SO", "PN", "DP", "EL", "VM"][i % 10],
       isMe: false,
