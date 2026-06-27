@@ -66,27 +66,78 @@ function Thread() {
     if (!file) return;
     if (file.size > 20 * 1024 * 1024) { toast.error("Max attachment size is 20MB."); return; }
     setPendingFile(file);
+    setUploadError(null);
+    setUploadPct(0);
+  };
+
+  const cancelUpload = () => {
+    abortRef.current?.abort();
+    abortRef.current = null;
+    setUploading(false);
+    setUploadPct(0);
+  };
+
+  const clearPending = () => {
+    cancelUpload();
+    setPendingFile(null);
+    setUploadError(null);
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  };
+
+  const doUpload = async (file: File) => {
+    const ctrl = new AbortController();
+    abortRef.current = ctrl;
+    setUploading(true);
+    setUploadError(null);
+    setUploadPct(0);
+    try {
+      const attachment = await uploadMessageAttachment(conversationId, file, {
+        signal: ctrl.signal,
+        onProgress: (p) => setUploadPct(p),
+      });
+      return attachment;
+    } finally {
+      abortRef.current = null;
+      setUploading(false);
+    }
+  };
+
+  const retryUpload = async () => {
+    if (!pendingFile) return;
+    try { await doUpload(pendingFile); }
+    catch (e: any) {
+      if (e?.name !== "AbortError") setUploadError(e?.message ?? "Upload failed");
+    }
   };
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!text.trim() && !pendingFile) return;
+    if (uploading) return;
     setSending(true);
     try {
       let attachment = null;
       if (pendingFile) {
-        setUploading(true);
-        attachment = await uploadMessageAttachment(conversationId, pendingFile);
-        setUploading(false);
+        attachment = await doUpload(pendingFile);
       }
       await sendMessage(conversationId, text, attachment);
       setText("");
       setPendingFile(null);
+      setUploadError(null);
+      setUploadPct(0);
       if (fileInputRef.current) fileInputRef.current.value = "";
     }
-    catch (e: any) { toast.error(e.message); }
-    finally { setSending(false); setUploading(false); }
+    catch (e: any) {
+      if (e?.name === "AbortError") {
+        toast.message("Upload cancelled");
+      } else {
+        setUploadError(e?.message ?? "Send failed");
+        toast.error(e.message);
+      }
+    }
+    finally { setSending(false); }
   };
+
 
 
   return (
