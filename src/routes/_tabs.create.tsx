@@ -58,9 +58,11 @@ function Create() {
   // once on mount; manual edits or a later profile-city sync take precedence.
   const reverse = useServerFn(reverseGeocode);
   useEffect(() => {
+    console.log("[create] gps effect run; edited?", locationEditedRef.current, "loc?", JSON.stringify(location));
     if (locationEditedRef.current) return;
     if (location.trim()) return;
-    if (typeof navigator === "undefined" || !navigator.geolocation) return;
+    if (typeof navigator === "undefined" || !navigator.geolocation) { console.log("[create] no geolocation"); return; }
+
     let cancelled = false;
     navigator.geolocation.getCurrentPosition(
       async (pos) => {
