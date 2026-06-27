@@ -10,6 +10,7 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as ShopRouteImport } from './routes/shop'
+import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as ReviewsRouteImport } from './routes/reviews'
 import { Route as ResetPasswordRouteImport } from './routes/reset-password'
 import { Route as PlansRouteImport } from './routes/plans'
@@ -49,6 +50,11 @@ import { Route as ApiPublicPaymentsWebhookRouteImport } from './routes/api/publi
 const ShopRoute = ShopRouteImport.update({
   id: '/shop',
   path: '/shop',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SettingsRoute = SettingsRouteImport.update({
+  id: '/settings',
+  path: '/settings',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ReviewsRoute = ReviewsRouteImport.update({
@@ -237,6 +243,7 @@ export interface FileRoutesByFullPath {
   '/plans': typeof PlansRoute
   '/reset-password': typeof ResetPasswordRoute
   '/reviews': typeof ReviewsRoute
+  '/settings': typeof SettingsRoute
   '/shop': typeof ShopRoute
   '/create': typeof TabsCreateRoute
   '/discover': typeof TabsDiscoverRoute
@@ -274,6 +281,7 @@ export interface FileRoutesByTo {
   '/plans': typeof PlansRoute
   '/reset-password': typeof ResetPasswordRoute
   '/reviews': typeof ReviewsRoute
+  '/settings': typeof SettingsRoute
   '/shop': typeof ShopRoute
   '/create': typeof TabsCreateRoute
   '/discover': typeof TabsDiscoverRoute
@@ -313,6 +321,7 @@ export interface FileRoutesById {
   '/plans': typeof PlansRoute
   '/reset-password': typeof ResetPasswordRoute
   '/reviews': typeof ReviewsRoute
+  '/settings': typeof SettingsRoute
   '/shop': typeof ShopRoute
   '/_tabs/create': typeof TabsCreateRoute
   '/_tabs/discover': typeof TabsDiscoverRoute
@@ -352,6 +361,7 @@ export interface FileRouteTypes {
     | '/plans'
     | '/reset-password'
     | '/reviews'
+    | '/settings'
     | '/shop'
     | '/create'
     | '/discover'
@@ -389,6 +399,7 @@ export interface FileRouteTypes {
     | '/plans'
     | '/reset-password'
     | '/reviews'
+    | '/settings'
     | '/shop'
     | '/create'
     | '/discover'
@@ -427,6 +438,7 @@ export interface FileRouteTypes {
     | '/plans'
     | '/reset-password'
     | '/reviews'
+    | '/settings'
     | '/shop'
     | '/_tabs/create'
     | '/_tabs/discover'
@@ -466,6 +478,7 @@ export interface RootRouteChildren {
   PlansRoute: typeof PlansRoute
   ResetPasswordRoute: typeof ResetPasswordRoute
   ReviewsRoute: typeof ReviewsRoute
+  SettingsRoute: typeof SettingsRoute
   ShopRoute: typeof ShopRoute
   AccountNotificationsRoute: typeof AccountNotificationsRoute
   AccountSecurityRoute: typeof AccountSecurityRoute
@@ -489,6 +502,13 @@ declare module '@tanstack/react-router' {
       path: '/shop'
       fullPath: '/shop'
       preLoaderRoute: typeof ShopRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/settings': {
+      id: '/settings'
+      path: '/settings'
+      fullPath: '/settings'
+      preLoaderRoute: typeof SettingsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/reviews': {
@@ -810,6 +830,7 @@ const rootRouteChildren: RootRouteChildren = {
   PlansRoute: PlansRoute,
   ResetPasswordRoute: ResetPasswordRoute,
   ReviewsRoute: ReviewsRoute,
+  SettingsRoute: SettingsRoute,
   ShopRoute: ShopRoute,
   AccountNotificationsRoute: AccountNotificationsRoute,
   AccountSecurityRoute: AccountSecurityRoute,
