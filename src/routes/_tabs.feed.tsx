@@ -102,6 +102,31 @@ function Feed() {
       k in DEFAULT_PREFS.sections && v !== (DEFAULT_PREFS.sections as any)[k],
     ).length;
 
+  // Infinite scroll: paginate the main filtered list. Page size scales with
+  // viewport so tablets/desktops fill their wider grids in one batch.
+  const PAGE_SIZE = 12;
+  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
+  const sentinelRef = useRef<HTMLDivElement | null>(null);
+  const filterKey = `${q}|${JSON.stringify(prefs)}|${hosted.length}`;
+  useEffect(() => { setVisibleCount(PAGE_SIZE); }, [filterKey]);
+  const hasMore = visibleCount < filtered.length;
+  useEffect(() => {
+    if (!hasMore) return;
+    const el = sentinelRef.current;
+    if (!el) return;
+    const io = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((e) => e.isIntersecting)) {
+          setVisibleCount((c) => Math.min(c + PAGE_SIZE, filtered.length));
+        }
+      },
+      { rootMargin: "600px 0px" },
+    );
+    io.observe(el);
+    return () => io.disconnect();
+  }, [hasMore, filtered.length]);
+  const visible = useMemo(() => filtered.slice(0, visibleCount), [filtered, visibleCount]);
+
   return (
     <div className="mx-auto w-full max-w-md sm:max-w-2xl lg:max-w-5xl xl:max-w-6xl px-4 pt-6">
       <div className="flex items-center justify-between mb-5">
