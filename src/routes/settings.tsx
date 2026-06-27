@@ -70,6 +70,9 @@ const SECTIONS: Section[] = [
 ];
 
 function SettingsHubPage() {
+  const [theme, setTheme] = useTheme();
+  const isDark = theme === "dark";
+
   const handleSignOut = async () => {
     try {
       await supabase.auth.signOut();
@@ -79,6 +82,7 @@ function SettingsHubPage() {
       toast.error("Couldn't sign out");
     }
   };
+
 
   return (
     <div className="min-h-screen bg-background pb-24">
