@@ -86,6 +86,34 @@ export function useUnreadNotificationCount() {
   return count;
 }
 
+export function useUnreadMessageCount() {
+  const { user } = useAuth();
+  const [count, setCount] = useState(0);
+
+  useEffect(() => {
+    if (!user) { setCount(0); return; }
+    let cancelled = false;
+    const fetchCount = async () => {
+      const { count: c } = await supabase
+        .from("notifications" as any)
+        .select("*", { count: "exact", head: true })
+        .eq("user_id", user.id)
+        .eq("type", "message")
+        .is("read_at", null);
+      if (!cancelled) setCount(c ?? 0);
+    };
+    fetchCount();
+
+    const channel = supabase
+      .channel(`notif-msg-count-${user.id}`)
+      .on("postgres_changes", { event: "*", schema: "public", table: "notifications", filter: `user_id=eq.${user.id}` }, fetchCount)
+      .subscribe();
+    return () => { cancelled = true; supabase.removeChannel(channel); };
+  }, [user?.id]);
+
+  return count;
+}
+
 // ----- Browser push notifications (Web Notifications API) -----
 
 const PUSH_DISMISS_KEY = "openrun.pushPromptDismissed.v1";
