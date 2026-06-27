@@ -18,10 +18,22 @@ export type Message = {
   id: string;
   conversation_id: string;
   sender_id: string;
-  body: string;
+  body: string | null;
   read_at: string | null;
   created_at: string;
+  attachment_path?: string | null;
+  attachment_type?: string | null;
+  attachment_name?: string | null;
+  attachment_size?: number | null;
 };
+
+export type Attachment = {
+  path: string;
+  type: string;
+  name: string;
+  size: number;
+};
+
 
 export type ConversationWithMeta = Conversation & {
   other_user_id: string | null;
