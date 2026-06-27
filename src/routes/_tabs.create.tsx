@@ -57,7 +57,7 @@ function Create() {
 
   if (!user) {
     return (
-      <div className="mx-auto max-w-md px-4 pt-6">
+      <div className="mx-auto w-full max-w-md sm:max-w-2xl lg:max-w-4xl px-4 pt-6">
         <div className="flex items-center gap-3 mb-5">
           <Link
             to="/feed"
@@ -88,7 +88,7 @@ function Create() {
   }
 
   return (
-    <div className="mx-auto max-w-md px-4 pt-6">
+    <div className="mx-auto w-full max-w-md sm:max-w-2xl lg:max-w-4xl px-4 pt-6">
       <div className="flex items-center gap-3 mb-5">
         <Link
           to="/feed"

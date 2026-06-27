@@ -250,7 +250,7 @@ function GameDetail() {
         </div>
       </div>
 
-      <div className="mx-auto max-w-md px-4 mt-5 space-y-5">
+      <div className="mx-auto w-full max-w-md sm:max-w-2xl lg:max-w-4xl px-4 mt-5 space-y-5">
         {/* Approval status banner (player view) */}
         {!isHost && requiresApproval && myReq && (
           <div
@@ -437,7 +437,7 @@ function GameDetail() {
 
       {/* Host controls */}
       {isHost && (
-        <div className="mx-auto max-w-md px-4 mt-4 space-y-3">
+        <div className="mx-auto w-full max-w-md sm:max-w-2xl lg:max-w-4xl px-4 mt-4 space-y-3">
           <button
             type="button"
             onClick={toggleRequireApproval}
@@ -477,7 +477,7 @@ function GameDetail() {
       )}
 
       {/* Host-only payment setup link */}
-      <div className="mx-auto max-w-md px-4 mt-4">
+      <div className="mx-auto w-full max-w-md sm:max-w-2xl lg:max-w-4xl px-4 mt-4">
         <Link to="/games/$gameId/payment-setup" params={{ gameId: game.id }}
           className="flex items-center gap-2 rounded-2xl border border-dashed border-border bg-surface/40 p-3 text-xs text-muted-foreground hover:border-lime/40">
           <SettingsIcon className="h-4 w-4 text-lime" />

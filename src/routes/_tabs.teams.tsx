@@ -65,7 +65,7 @@ function TeamsPage() {
     orgs.find((o) => o.kind === kind);
 
   return (
-    <div className="mx-auto max-w-md px-4 pt-6">
+    <div className="mx-auto w-full max-w-md sm:max-w-2xl lg:max-w-4xl px-4 pt-6">
       <motion.div
         key={kind + "-header"}
         initial={{ opacity: 0, y: 8 }}

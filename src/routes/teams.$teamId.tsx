@@ -21,7 +21,7 @@ export const Route = createFileRoute("/teams/$teamId")({
   },
   component: TeamPage,
   notFoundComponent: () => (
-    <div className="mx-auto max-w-md px-6 pt-24 text-center">
+    <div className="mx-auto w-full max-w-md sm:max-w-2xl lg:max-w-4xl px-6 pt-24 text-center">
       <p className="text-muted-foreground">Team not found.</p>
       <Link to="/teams" className="mt-4 inline-block rounded-full bg-lime px-4 py-2 text-sm font-bold text-primary-foreground">
         Back to Teams
@@ -60,7 +60,7 @@ function TeamPage() {
   const upcomingGames = GAMES.filter((g) => org.upcoming.includes(g.id));
 
   return (
-    <div className="mx-auto max-w-md pb-32">
+    <div className="mx-auto w-full max-w-md sm:max-w-2xl lg:max-w-4xl pb-32">
       {/* Cover */}
       <div className="relative h-56">
         <img src={org.cover} alt="" className="h-full w-full object-cover" />
