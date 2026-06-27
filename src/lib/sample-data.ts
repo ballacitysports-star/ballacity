@@ -7,7 +7,7 @@ import heroImg from "@/assets/hero-court.jpg";
 
 export type Sport =
   | "Basketball" | "Soccer" | "Pickleball" | "Volleyball" | "Tennis"
-  | "Flag Football" | "Baseball" | "Softball" | "Hockey" | "Running";
+  | "Flag Football" | "Baseball" | "Softball" | "Running";
 
 export const SPORTS: { name: Sport; emoji: string; color: string }[] = [
   { name: "Basketball", emoji: "🏀", color: "#ff8a3d" },
@@ -18,7 +18,6 @@ export const SPORTS: { name: Sport; emoji: string; color: string }[] = [
   { name: "Flag Football", emoji: "🏈", color: "#ff6b35" },
   { name: "Baseball", emoji: "⚾", color: "#ffffff" },
   { name: "Softball", emoji: "🥎", color: "#ffe27a" },
-  { name: "Hockey", emoji: "🏒", color: "#8ad6ff" },
   { name: "Running", emoji: "🏃", color: "#ff3d68" },
 ];
 
@@ -58,7 +57,6 @@ const sportImage: Record<Sport, string> = {
   "Flag Football": soccerImg,
   Baseball: tennisImg,
   Softball: tennisImg,
-  Hockey: volleyballImg,
   Running: runningImg,
 };
 

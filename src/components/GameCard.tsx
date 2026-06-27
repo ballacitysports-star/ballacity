@@ -12,7 +12,7 @@ import { toast } from "sonner";
 const sportEmoji: Record<string, string> = {
   Basketball: "🏀", Soccer: "⚽", Pickleball: "🥒", Volleyball: "🏐",
   Tennis: "🎾", "Flag Football": "🏈", Baseball: "⚾", Softball: "🥎",
-  Hockey: "🏒", Running: "🏃",
+  Running: "🏃",
 };
 
 export function GameCard({ game, index = 0 }: { game: Game; index?: number }) {
