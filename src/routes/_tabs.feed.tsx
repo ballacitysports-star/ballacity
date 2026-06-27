@@ -180,10 +180,10 @@ function Feed() {
           <h2 className="font-display text-sm font-bold uppercase tracking-wider text-muted-foreground mb-2">
             {filtered.length} result{filtered.length === 1 ? "" : "s"} for "{q}"
           </h2>
-          <div className="space-y-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {filtered.map((g, i) => <GameCard key={g.id} game={g} index={i} />)}
             {filtered.length === 0 && (
-              <div className="rounded-2xl border border-border bg-surface p-8 text-center text-muted-foreground">
+              <div className="sm:col-span-2 lg:col-span-3 rounded-2xl border border-border bg-surface p-8 text-center text-muted-foreground">
                 No games match "{q}".
               </div>
             )}
