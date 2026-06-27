@@ -59,14 +59,32 @@ function Thread() {
     );
   }
 
+  const onPickFile = (file: File | null) => {
+    if (!file) return;
+    if (file.size > 20 * 1024 * 1024) { toast.error("Max attachment size is 20MB."); return; }
+    setPendingFile(file);
+  };
+
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!text.trim()) return;
+    if (!text.trim() && !pendingFile) return;
     setSending(true);
-    try { await sendMessage(conversationId, text); setText(""); }
+    try {
+      let attachment = null;
+      if (pendingFile) {
+        setUploading(true);
+        attachment = await uploadMessageAttachment(conversationId, pendingFile);
+        setUploading(false);
+      }
+      await sendMessage(conversationId, text, attachment);
+      setText("");
+      setPendingFile(null);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
     catch (e: any) { toast.error(e.message); }
-    finally { setSending(false); }
+    finally { setSending(false); setUploading(false); }
   };
+
 
   return (
     <div className="flex h-dvh flex-col bg-background">
