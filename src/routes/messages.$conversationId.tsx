@@ -114,16 +114,23 @@ function Thread() {
 
       <form
         onSubmit={submit}
-        className="shrink-0 flex items-center gap-2 border-t border-border bg-background px-4 py-3 pb-[max(env(safe-area-inset-bottom),0.75rem)]"
+        className="sticky bottom-0 left-0 right-0 shrink-0 flex items-end gap-2 border-t border-border bg-background/95 backdrop-blur px-4 pt-3 pb-[max(env(safe-area-inset-bottom),0.75rem)] z-20"
       >
-        <input
+        <textarea
           value={text}
           onChange={(e) => setText(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && !e.shiftKey) {
+              e.preventDefault();
+              submit(e as unknown as React.FormEvent);
+            }
+          }}
           placeholder="Type a message…"
-          className="flex-1 rounded-full border border-border bg-surface px-4 py-2.5 text-sm outline-none focus:border-lime"
+          rows={1}
+          className="flex-1 max-h-32 resize-none rounded-2xl border border-border bg-surface px-4 py-2.5 text-sm outline-none focus:border-lime"
         />
         <button type="submit" disabled={sending || !text.trim()}
-          className="grid h-11 w-11 place-items-center rounded-full bg-lime-gradient text-primary-foreground disabled:opacity-50">
+          className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-lime-gradient text-primary-foreground disabled:opacity-50">
           <Send className="h-4 w-4" />
         </button>
       </form>
