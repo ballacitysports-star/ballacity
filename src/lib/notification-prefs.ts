@@ -34,6 +34,7 @@ function merge(partial: Partial<NotifPrefs> | null | undefined): NotifPrefs {
   return {
     approvals: { ...DEFAULT_NOTIF_PREFS.approvals, ...(p.approvals ?? {}) },
     messages: { ...DEFAULT_NOTIF_PREFS.messages, ...(p.messages ?? {}) },
+    joinRequests: { ...DEFAULT_NOTIF_PREFS.joinRequests, ...(p.joinRequests ?? {}) },
     general: { ...DEFAULT_NOTIF_PREFS.general, ...(p.general ?? {}) },
   };
 }
