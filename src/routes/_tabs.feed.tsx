@@ -1,5 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { Loader2 } from "lucide-react";
 import { Search, SlidersHorizontal, Bell, MessageCircle, X, MapPin } from "lucide-react";
 import { useUnreadNotificationCount } from "@/lib/notifications";
 import { Logo } from "@/components/Logo";
@@ -101,6 +102,31 @@ function Feed() {
       k in DEFAULT_PREFS.sections && v !== (DEFAULT_PREFS.sections as any)[k],
     ).length;
 
+  // Infinite scroll: paginate the main filtered list. Page size scales with
+  // viewport so tablets/desktops fill their wider grids in one batch.
+  const PAGE_SIZE = 12;
+  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
+  const sentinelRef = useRef<HTMLDivElement | null>(null);
+  const filterKey = `${q}|${JSON.stringify(prefs)}|${hosted.length}`;
+  useEffect(() => { setVisibleCount(PAGE_SIZE); }, [filterKey]);
+  const hasMore = visibleCount < filtered.length;
+  useEffect(() => {
+    if (!hasMore) return;
+    const el = sentinelRef.current;
+    if (!el) return;
+    const io = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((e) => e.isIntersecting)) {
+          setVisibleCount((c) => Math.min(c + PAGE_SIZE, filtered.length));
+        }
+      },
+      { rootMargin: "600px 0px" },
+    );
+    io.observe(el);
+    return () => io.disconnect();
+  }, [hasMore, filtered.length]);
+  const visible = useMemo(() => filtered.slice(0, visibleCount), [filtered, visibleCount]);
+
   return (
     <div className="mx-auto w-full max-w-md sm:max-w-2xl lg:max-w-5xl xl:max-w-6xl px-4 pt-6">
       <div className="flex items-center justify-between mb-5">
@@ -181,13 +207,14 @@ function Feed() {
             {filtered.length} result{filtered.length === 1 ? "" : "s"} for "{q}"
           </h2>
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {filtered.map((g, i) => <GameCard key={g.id} game={g} index={i} />)}
+            {visible.map((g, i) => <GameCard key={g.id} game={g} index={i} />)}
             {filtered.length === 0 && (
               <div className="sm:col-span-2 lg:col-span-3 rounded-2xl border border-border bg-surface p-8 text-center text-muted-foreground">
                 No games match "{q}".
               </div>
             )}
           </div>
+          <InfiniteSentinel ref={sentinelRef} hasMore={hasMore} total={filtered.length} />
         </>
       ) : (
         <>
@@ -211,7 +238,7 @@ function Feed() {
                 For you
               </h2>
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                {filtered.map((g, i) => <GameCard key={g.id} game={g} index={i} />)}
+                {visible.map((g, i) => <GameCard key={g.id} game={g} index={i} />)}
                 {filtered.length === 0 && (
                   <div className="sm:col-span-2 lg:col-span-3 rounded-2xl border border-border bg-surface p-8 text-center text-muted-foreground space-y-3">
                     <div>No games match your filters.</div>
@@ -224,6 +251,7 @@ function Feed() {
                   </div>
                 )}
               </div>
+              <InfiniteSentinel ref={sentinelRef} hasMore={hasMore} total={filtered.length} />
             </>
           )}
         </>
@@ -237,6 +265,36 @@ function Feed() {
     </div>
   );
 }
+
+const InfiniteSentinel = ({
+  ref,
+  hasMore,
+  total,
+}: {
+  ref: React.Ref<HTMLDivElement>;
+  hasMore: boolean;
+  total: number;
+}) => {
+  if (total === 0) return null;
+  return (
+    <div ref={ref} className="mt-4 flex items-center justify-center py-6">
+      {hasMore ? (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          className="inline-flex items-center gap-2 rounded-full border border-border bg-surface px-4 py-2 text-xs font-semibold text-muted-foreground"
+          aria-live="polite"
+        >
+          <Loader2 className="h-3.5 w-3.5 animate-spin text-lime" />
+          Loading more games…
+        </motion.div>
+      ) : (
+        <span className="text-xs text-muted-foreground">You're all caught up · {total} games</span>
+      )}
+    </div>
+  );
+};
+
 
 function BellLink() {
   const unread = useUnreadNotificationCount();
