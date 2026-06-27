@@ -81,7 +81,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
   head: () => ({
     meta: [
       { charSet: "utf-8" },
-      { name: "viewport", content: "width=device-width, initial-scale=1" },
+      { name: "viewport", content: "width=device-width, initial-scale=1, viewport-fit=cover" },
       { title: "OpenRun — Pickup sports, on demand" },
       { name: "description", content: "Find and host pickup sports games near you. Basketball, soccer, pickleball, tennis and more — join a game in seconds." },
       { name: "author", content: "OpenRun" },
