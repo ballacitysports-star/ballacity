@@ -2,36 +2,16 @@ import { useEffect, useRef, useState } from "react";
 import { Loader2, LocateFixed, MapPin } from "lucide-react";
 import { useServerFn } from "@tanstack/react-start";
 import { reverseGeocode } from "@/lib/geocode.functions";
+import { autocompletePlaces, type PlaceSuggestion } from "@/lib/places.functions";
 import { toast } from "sonner";
 
-declare global {
-  interface Window {
-    google?: any;
-    __gmapsLoading?: Promise<void>;
+function randomToken(): string {
+  try {
+    return crypto.randomUUID();
+  } catch {
+    return Math.random().toString(36).slice(2) + Date.now().toString(36);
   }
 }
-
-function loadGoogleMaps(): Promise<void> {
-  if (typeof window === "undefined") return Promise.resolve();
-  if (window.google?.maps?.importLibrary) return Promise.resolve();
-  if (window.__gmapsLoading) return window.__gmapsLoading;
-
-  const key = import.meta.env.VITE_LOVABLE_CONNECTOR_GOOGLE_MAPS_BROWSER_KEY;
-  const channel = import.meta.env.VITE_LOVABLE_CONNECTOR_GOOGLE_MAPS_TRACKING_ID;
-  if (!key) return Promise.reject(new Error("Maps key missing"));
-
-  window.__gmapsLoading = new Promise<void>((resolve, reject) => {
-    (window as any).__initGmaps = () => resolve();
-    const s = document.createElement("script");
-    s.src = `https://maps.googleapis.com/maps/api/js?key=${key}&loading=async&libraries=places&callback=__initGmaps${channel ? `&channel=${channel}` : ""}`;
-    s.async = true;
-    s.onerror = () => reject(new Error("Failed to load Google Maps"));
-    document.head.appendChild(s);
-  });
-  return window.__gmapsLoading;
-}
-
-type Suggestion = { id: string; primary: string; secondary: string };
 
 export function LocationAutocomplete({
   value,
@@ -49,48 +29,19 @@ export function LocationAutocomplete({
   showCurrentButton?: boolean;
   onPick?: (v: string) => void;
 }) {
-  const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
+  const [suggestions, setSuggestions] = useState<PlaceSuggestion[]>([]);
   const [open, setOpen] = useState(false);
   const [locating, setLocating] = useState(false);
-  const [mapsError, setMapsError] = useState<string | null>(null);
   const [searchError, setSearchError] = useState<string | null>(null);
   const reverse = useServerFn(reverseGeocode);
-  const sessionRef = useRef<any>(null);
-  const placesRef = useRef<any>(null);
+  const autocomplete = useServerFn(autocompletePlaces);
+  const sessionTokenRef = useRef<string>(randomToken());
   const timerRef = useRef<number | null>(null);
   const biasRef = useRef<{ lat: number; lng: number } | null>(null);
   const watchIdRef = useRef<number | null>(null);
-  const notifiedMapsErrorRef = useRef(false);
+  const reqIdRef = useRef(0);
 
-  useEffect(() => {
-    let cancelled = false;
-    const fail = () => {
-      if (cancelled) return;
-      setMapsError("Map search unavailable — you can still type the address manually");
-      if (!notifiedMapsErrorRef.current) {
-        notifiedMapsErrorRef.current = true;
-        toast.error("Map search unavailable", {
-          description: "You can still enter the address manually.",
-        });
-      }
-    };
-    loadGoogleMaps()
-      .then(async () => {
-        if (cancelled) return;
-        try {
-          const places = await window.google.maps.importLibrary("places");
-          placesRef.current = places;
-          sessionRef.current = new places.AutocompleteSessionToken();
-          setMapsError(null);
-        } catch {
-          fail();
-        }
-      })
-      .catch(fail);
-    return () => { cancelled = true; };
-  }, []);
-
-  // Continuously track the user's location to bias autocomplete results in real time.
+  // Bias autocomplete results to the user's current location when available.
   useEffect(() => {
     if (typeof navigator === "undefined" || !navigator.geolocation) return;
     watchIdRef.current = navigator.geolocation.watchPosition(
@@ -105,67 +56,53 @@ export function LocationAutocomplete({
     };
   }, []);
 
-  const queryAutocomplete = (input: string) => {
-    if (!placesRef.current || !input.trim()) {
+  const queryAutocomplete = async (input: string) => {
+    if (!input.trim() || input.trim().length < 2) {
       setSuggestions([]);
+      setOpen(false);
+      setSearchError(null);
       return;
     }
-    const req: any = {
-      input,
-      sessionToken: sessionRef.current,
-    };
-    if (biasRef.current) {
-      req.locationBias = {
-        circle: {
-          center: { lat: biasRef.current.lat, lng: biasRef.current.lng },
-          radius: 50000,
+    const reqId = ++reqIdRef.current;
+    try {
+      const { suggestions: results } = await autocomplete({
+        data: {
+          input,
+          lat: biasRef.current?.lat ?? null,
+          lng: biasRef.current?.lng ?? null,
+          sessionToken: sessionTokenRef.current,
         },
-      };
-      req.origin = { lat: biasRef.current.lat, lng: biasRef.current.lng };
-    }
-    placesRef.current.AutocompleteSuggestion.fetchAutocompleteSuggestions(req)
-      .then(({ suggestions: results }: any) => {
-        const mapped: Suggestion[] = (results || [])
-          .map((r: any) => r.placePrediction)
-          .filter(Boolean)
-          .slice(0, 5)
-          .map((p: any) => ({
-            id: p.placeId,
-            primary: p.structuredFormat?.mainText?.text || p.text?.text || "",
-            secondary: p.structuredFormat?.secondaryText?.text || "",
-          }));
-        setSuggestions(mapped);
-        setOpen(mapped.length > 0);
-        setSearchError(mapped.length === 0 ? "No matches — keep typing or enter the address manually" : null);
-      })
-      .catch((err: any) => {
-        console.error("[LocationAutocomplete] Places autocomplete failed:", err);
-        setSuggestions([]);
-        setOpen(false);
-        const msg = err?.message || String(err || "");
-        const friendly = /referer|referrer|API key|denied|REQUEST_DENIED|403/i.test(msg)
-          ? "Address search is disabled for this site (API key restriction). Type the address manually."
-          : "Couldn't load suggestions — you can still type the address manually";
-        setSearchError(friendly);
       });
+      if (reqId !== reqIdRef.current) return;
+      setSuggestions(results);
+      setOpen(results.length > 0);
+      setSearchError(
+        results.length === 0 ? "No matches — keep typing or enter the address manually" : null,
+      );
+    } catch (err) {
+      if (reqId !== reqIdRef.current) return;
+      console.error("[LocationAutocomplete] autocomplete failed:", err);
+      setSuggestions([]);
+      setOpen(false);
+      setSearchError("Couldn't load suggestions — you can still type the address manually");
+    }
   };
 
   const handleChange = (v: string) => {
     onChange(v);
     setSearchError(null);
     if (timerRef.current) window.clearTimeout(timerRef.current);
-    timerRef.current = window.setTimeout(() => queryAutocomplete(v), 200);
+    timerRef.current = window.setTimeout(() => queryAutocomplete(v), 250);
   };
 
-  const pick = (s: Suggestion) => {
+  const pick = (s: PlaceSuggestion) => {
     const full = s.secondary ? `${s.primary}, ${s.secondary}` : s.primary;
     onChange(full);
     onPick?.(full);
     setOpen(false);
     setSuggestions([]);
-    if (placesRef.current) {
-      sessionRef.current = new placesRef.current.AutocompleteSessionToken();
-    }
+    // Rotate session token after a selection (Places billing convention).
+    sessionTokenRef.current = randomToken();
   };
 
   const useCurrentLocation = () => {
@@ -247,9 +184,9 @@ export function LocationAutocomplete({
           ))}
         </ul>
       )}
-      {(mapsError || searchError) && (
+      {searchError && (
         <p role="status" className="mt-1 px-1 text-[11px] text-muted-foreground">
-          {mapsError ?? searchError}
+          {searchError}
         </p>
       )}
     </div>
