@@ -157,9 +157,11 @@ function initialsFrom(name: string): string {
 function defaultsFromUser(user: User): MyProfile {
   const meta = (user.user_metadata ?? {}) as Record<string, unknown>;
   const name =
+    (meta.display_name as string) ||
     (meta.full_name as string) ||
     (meta.name as string) ||
     (user.email ? user.email.split("@")[0] : "Player");
+
   const username = user.email ? "@" + user.email.split("@")[0] : "@" + (user.id.slice(0, 6));
   return {
     name,
