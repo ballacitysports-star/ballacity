@@ -36,7 +36,7 @@ export function BottomNav() {
                       </span>
                     )}
                   </span>
-                  <span className={active ? "text-foreground" : "text-muted-foreground"}>{it.label}</span>
+                  <span className={`truncate max-w-full ${active ? "text-foreground" : "text-muted-foreground"}`}>{it.label}</span>
                   {active && (
                     <motion.span
                       layoutId="nav-dot"
