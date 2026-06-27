@@ -17,6 +17,8 @@ import { Toaster } from "@/components/ui/sonner";
 import { runLegacyHostMigration } from "@/lib/legacy-host-migration";
 import { useAuth } from "@/hooks/use-auth";
 import { useNotificationPush } from "@/lib/notifications";
+import { useOneSignal } from "@/lib/onesignal";
+
 
 function NotFoundComponent() {
   return (
@@ -151,6 +153,8 @@ function AuthGate({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
   const isPublic = pathname === "/" || PUBLIC_ROUTES.some((p) => p !== "/" && (pathname === p || pathname.startsWith(`${p}/`)));
   useNotificationPush();
+  useOneSignal();
+
 
   useEffect(() => {
     if (loading) return;
