@@ -127,8 +127,17 @@ function Thread() {
           const mine = m.sender_id === user?.id;
           return (
             <div key={m.id} className={`flex ${mine ? "justify-end" : "justify-start"}`}>
-              <div className={`max-w-[75%] rounded-2xl px-3 py-2 text-sm ${mine ? "bg-lime-gradient text-primary-foreground" : "bg-surface border border-border"}`}>
-                {m.body}
+              <div className={`max-w-[75%] rounded-2xl px-3 py-2 text-sm space-y-2 ${mine ? "bg-lime-gradient text-primary-foreground" : "bg-surface border border-border"}`}>
+                {m.attachment_path && (
+                  <MessageAttachment
+                    path={m.attachment_path}
+                    type={m.attachment_type}
+                    name={m.attachment_name}
+                    size={m.attachment_size}
+                    mine={mine}
+                  />
+                )}
+                {m.body && <div className="whitespace-pre-wrap break-words">{m.body}</div>}
                 <div className={`text-[10px] mt-1 opacity-70 ${mine ? "text-primary-foreground" : "text-muted-foreground"}`}>{timeShort(m.created_at)}</div>
               </div>
             </div>
@@ -138,29 +147,58 @@ function Thread() {
 
       <form
         onSubmit={submit}
-        className="sticky bottom-0 left-0 right-0 shrink-0 flex items-end gap-2 border-t border-border bg-background/95 backdrop-blur px-4 pt-3 pb-[max(env(safe-area-inset-bottom),0.75rem)] z-20"
+        className="sticky bottom-0 left-0 right-0 shrink-0 border-t border-border bg-background/95 backdrop-blur px-4 pt-3 pb-[max(env(safe-area-inset-bottom),0.75rem)] z-20"
       >
-        <textarea
-          value={text}
-          onChange={(e) => setText(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter" && !e.shiftKey) {
-              e.preventDefault();
-              submit(e as unknown as React.FormEvent);
-            }
-          }}
-          placeholder="Type a message…"
-          rows={1}
-          className="flex-1 max-h-32 resize-none rounded-2xl border border-border bg-surface px-4 py-2.5 text-sm outline-none focus:border-lime"
-        />
-        <button type="submit" disabled={sending || !text.trim()}
-          className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-lime-gradient text-primary-foreground disabled:opacity-50">
-          <Send className="h-4 w-4" />
-        </button>
+        {pendingFile && (
+          <div className="mb-2 flex items-center gap-2 rounded-xl border border-border bg-surface px-3 py-2 text-xs">
+            <Paperclip className="h-3.5 w-3.5 shrink-0" />
+            <span className="flex-1 truncate font-medium">{pendingFile.name}</span>
+            <span className="opacity-60">{(pendingFile.size / 1024).toFixed(0)} KB</span>
+            <button type="button" onClick={() => { setPendingFile(null); if (fileInputRef.current) fileInputRef.current.value = ""; }}
+              className="grid h-6 w-6 place-items-center rounded-full hover:bg-background">
+              <X className="h-3.5 w-3.5" />
+            </button>
+          </div>
+        )}
+        <div className="flex items-end gap-2">
+          <input
+            ref={fileInputRef}
+            type="file"
+            className="hidden"
+            onChange={(e) => onPickFile(e.target.files?.[0] ?? null)}
+          />
+          <button
+            type="button"
+            onClick={() => fileInputRef.current?.click()}
+            disabled={sending}
+            aria-label="Attach file"
+            className="grid h-11 w-11 shrink-0 place-items-center rounded-full border border-border bg-surface text-foreground disabled:opacity-50"
+          >
+            <Paperclip className="h-4 w-4" />
+          </button>
+          <textarea
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && !e.shiftKey) {
+                e.preventDefault();
+                submit(e as unknown as React.FormEvent);
+              }
+            }}
+            placeholder="Type a message…"
+            rows={1}
+            className="flex-1 max-h-32 resize-none rounded-2xl border border-border bg-surface px-4 py-2.5 text-sm outline-none focus:border-lime"
+          />
+          <button type="submit" disabled={sending || (!text.trim() && !pendingFile)}
+            className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-lime-gradient text-primary-foreground disabled:opacity-50">
+            {uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+          </button>
+        </div>
       </form>
     </div>
   );
 }
+
 
 function timeShort(iso: string) {
   return new Date(iso).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
