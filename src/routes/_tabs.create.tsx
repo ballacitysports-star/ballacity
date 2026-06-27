@@ -50,6 +50,39 @@ function Create() {
     setLocation(nextCity);
   }, [profile?.city]);
 
+  // Auto-fill the venue address from the device's current GPS location when
+  // the user hasn't typed anything yet and has no saved profile city. Runs
+  // once on mount; manual edits or a later profile-city sync take precedence.
+  const reverse = useServerFn(reverseGeocode);
+  useEffect(() => {
+    if (locationEditedRef.current) return;
+    if (location.trim()) return;
+    if (typeof navigator === "undefined" || !navigator.geolocation) return;
+    let cancelled = false;
+    navigator.geolocation.getCurrentPosition(
+      async (pos) => {
+        if (cancelled || locationEditedRef.current) return;
+        try {
+          const { formatted, city } = await reverse({
+            data: { lat: pos.coords.latitude, lng: pos.coords.longitude },
+          });
+          const next = formatted || city;
+          if (next && !cancelled && !locationEditedRef.current) {
+            setLocation(next);
+          }
+        } catch {
+          /* silent — user can still type manually */
+        }
+      },
+      () => {},
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 },
+    );
+    return () => { cancelled = true; };
+    // Intentionally run once on mount.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+
   const handleLocationChange = (next: string) => {
     locationEditedRef.current = true;
     setLocation(next);
