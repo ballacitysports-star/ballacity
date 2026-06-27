@@ -221,7 +221,7 @@ function GameDetail() {
 
 
   const players = [
-    ...(joined ? [{ initials: "YOU", isMe: true }] : []),
+    ...(viewerCountsAsJoined ? [{ initials: "YOU", isMe: true }] : []),
     ...Array.from({ length: game.joined }, (_, i) => ({
       initials: ["MC", "AG", "JK", "RC", "TB", "SO", "PN", "DP", "EL", "VM"][i % 10],
       isMe: false,
