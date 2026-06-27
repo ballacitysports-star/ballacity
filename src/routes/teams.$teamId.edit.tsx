@@ -616,7 +616,7 @@ function EditOrg() {
       </AnimatePresence>
 
       {/* Footer nav */}
-      <div className="fixed bottom-0 left-0 right-0 z-30 px-4 pb-[max(env(safe-area-inset-bottom),0.75rem)] pt-3 bg-gradient-to-t from-background via-background/90 to-transparent">
+      <div className="fixed bottom-[calc(env(safe-area-inset-bottom)+6rem)] left-0 right-0 z-30 px-4 pb-[max(env(safe-area-inset-bottom),0.75rem)] pt-3 bg-gradient-to-t from-background via-background/90 to-transparent">
         <div className="mx-auto max-w-md flex gap-2">
           {step > 1 && (
             <button

@@ -16,6 +16,9 @@ const items: { to: string; icon: typeof Home; label: string; key?: string }[] = 
 export function BottomNav() {
   const { pathname } = useLocation();
   const unreadMessages = useUnreadMessageCount();
+  const PUBLIC_PATHS = ["/auth", "/reset-password"];
+  const isPublic = PUBLIC_PATHS.some((p) => pathname === p || pathname.startsWith(`${p}/`));
+  if (isPublic) return null;
   return (
     <nav className="fixed bottom-0 left-0 right-0 z-40 pb-[max(env(safe-area-inset-bottom),0.5rem)] pt-2 px-3">
       <div className="mx-auto max-w-md sm:max-w-xl lg:max-w-2xl rounded-3xl border border-border bg-surface/85 backdrop-blur-xl shadow-2xl">
