@@ -327,6 +327,27 @@ function Feed() {
   );
 }
 
+function PullIndicator({ offset, progress, refreshing }: { offset: number; progress: number; refreshing: boolean }) {
+  if (offset <= 0 && !refreshing) return null;
+  return (
+    <div
+      className="pointer-events-none absolute left-0 right-0 -top-12 flex justify-center"
+      aria-hidden={!refreshing}
+    >
+      <div
+        className="grid h-10 w-10 place-items-center rounded-full border border-border bg-surface shadow-md"
+        style={{ opacity: Math.max(progress, refreshing ? 1 : 0) }}
+      >
+        <RefreshCw
+          className={`h-4 w-4 text-lime ${refreshing ? "animate-spin" : ""}`}
+          style={{ transform: refreshing ? undefined : `rotate(${progress * 270}deg)` }}
+        />
+      </div>
+    </div>
+  );
+}
+
+
 const InfiniteSentinel = ({
   ref,
   hasMore,
