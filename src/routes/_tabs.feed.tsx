@@ -238,7 +238,7 @@ function Feed() {
                 For you
               </h2>
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                {filtered.map((g, i) => <GameCard key={g.id} game={g} index={i} />)}
+                {visible.map((g, i) => <GameCard key={g.id} game={g} index={i} />)}
                 {filtered.length === 0 && (
                   <div className="sm:col-span-2 lg:col-span-3 rounded-2xl border border-border bg-surface p-8 text-center text-muted-foreground space-y-3">
                     <div>No games match your filters.</div>
@@ -251,6 +251,7 @@ function Feed() {
                   </div>
                 )}
               </div>
+              <InfiniteSentinel ref={sentinelRef} hasMore={hasMore} total={filtered.length} />
             </>
           )}
         </>
