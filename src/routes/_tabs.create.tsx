@@ -159,19 +159,31 @@ function Create() {
               ? new Date(when).toISOString()
               : new Date(Date.now() + 3600_000).toISOString();
 
-            // Fetch the freshest profile so the host snapshot never falls back
-            // to an email-prefix default when the in-memory profile hasn't loaded yet.
+            // Build the host snapshot from the freshest profile available so
+            // it never falls back to an email-prefix default when the
+            // in-memory profile hasn't loaded yet. See host-snapshot.test.ts.
             const { supabase } = await import("@/integrations/supabase/client");
-            const { data: freshProfile } = await supabase
-              .from("profiles")
-              .select("display_name, username, avatar_initials, avatar_url")
-              .eq("id", user.id)
-              .maybeSingle();
-            const hostName = (freshProfile as any)?.display_name || profile?.name;
-            const hostUsername = (freshProfile as any)?.username
-              ? `@${String((freshProfile as any).username).replace(/^@/, "")}`
-              : profile?.username;
-            const hostAvatar = (freshProfile as any)?.avatar_initials || profile?.avatar;
+            const { resolveHostSnapshot } = await import("@/lib/host-snapshot");
+            const hostSnap = await resolveHostSnapshot({
+              userId: user.id,
+              userEmail: user.email,
+              fallback: profile
+                ? {
+                    name: profile.name,
+                    username: profile.username,
+                    avatar: profile.avatar,
+                    rating: profile.stats.sportsmanship,
+                  }
+                : null,
+              fetchDbProfile: async (id) => {
+                const { data } = await supabase
+                  .from("profiles")
+                  .select("display_name, username, avatar_initials, avatar_url")
+                  .eq("id", id)
+                  .maybeSingle();
+                return data as any;
+              },
+            });
 
             const game = addHostedGame({
               sport,
@@ -185,10 +197,9 @@ function Create() {
               isPrivate: priv,
               description,
               hostUserId: user?.id,
-              host: hostName
-                ? { name: hostName, username: hostUsername ?? "", avatar: hostAvatar ?? "", rating: profile?.stats.sportsmanship }
-                : undefined,
+              host: hostSnap,
             });
+
 
 
             // Persist host ownership + approval/fee preferences so the host & players see them on the detail page
