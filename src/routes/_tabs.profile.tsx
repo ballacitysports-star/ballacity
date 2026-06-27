@@ -143,7 +143,7 @@ function Profile() {
 
 
   return (
-    <div className="mx-auto max-w-md">
+    <div className="mx-auto w-full max-w-md sm:max-w-2xl lg:max-w-4xl">
       {/* Cover */}
       <div className="relative h-44">
         <img src={me.coverUrl ?? HERO_IMAGE} alt="" className="h-full w-full object-cover" />
