@@ -158,6 +158,17 @@ function GameDetail() {
   const isConfirmed = latestSub?.status === "verified" || myReq?.status === "approved";
   const isPending = latestSub?.status === "pending" || (requiresApproval && myReq?.status === "pending");
 
+  // The viewer counts as a roster player only when:
+  //  - they're not the host (hosts run the game, they don't take a player slot), AND
+  //  - either there's no approval gate and they've joined locally, OR
+  //    the host has confirmed/approved them (paid-verified or approved request).
+  const viewerCountsAsJoined = !isHost && (
+    isConfirmed || (joined && !requiresApproval && !isPaid)
+  );
+  const effectiveJoined = (game.joined ?? 0) + (viewerCountsAsJoined ? 1 : 0);
+  const spotsLeft = Math.max(0, game.maxPlayers - effectiveJoined);
+
+
   const handleJoin = async () => {
     // Confirmed → leave / withdraw
     if (isConfirmed || joined) {
