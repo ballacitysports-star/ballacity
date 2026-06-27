@@ -18,10 +18,22 @@ export type Message = {
   id: string;
   conversation_id: string;
   sender_id: string;
-  body: string;
+  body: string | null;
   read_at: string | null;
   created_at: string;
+  attachment_path?: string | null;
+  attachment_type?: string | null;
+  attachment_name?: string | null;
+  attachment_size?: number | null;
 };
+
+export type Attachment = {
+  path: string;
+  type: string;
+  name: string;
+  size: number;
+};
+
 
 export type ConversationWithMeta = Conversation & {
   other_user_id: string | null;
@@ -149,16 +161,41 @@ export async function listMessages(convId: string): Promise<Message[]> {
   return (data ?? []) as unknown as Message[];
 }
 
-export async function sendMessage(convId: string, body: string) {
+export async function uploadMessageAttachment(convId: string, file: File): Promise<Attachment> {
+  const { data: u } = await supabase.auth.getUser();
+  if (!u.user) throw new Error("Sign in to send attachments.");
+  const MAX = 20 * 1024 * 1024;
+  if (file.size > MAX) throw new Error("Attachment too large (max 20MB).");
+  const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_").slice(0, 120);
+  const path = `${convId}/${u.user.id}/${Date.now()}-${safeName}`;
+  const { error } = await supabase.storage.from("message-attachments").upload(path, file, {
+    contentType: file.type || "application/octet-stream",
+    upsert: false,
+  });
+  if (error) throw error;
+  return { path, type: file.type || "application/octet-stream", name: file.name, size: file.size };
+}
+
+export async function getAttachmentUrl(path: string): Promise<string | null> {
+  const { data, error } = await supabase.storage.from("message-attachments").createSignedUrl(path, 60 * 60);
+  if (error) return null;
+  return data?.signedUrl ?? null;
+}
+
+export async function sendMessage(convId: string, body: string, attachment?: Attachment | null) {
   const { data: u } = await supabase.auth.getUser();
   if (!u.user) throw new Error("Sign in to send messages.");
   const me = u.user.id;
-  const trimmed = body.trim();
-  if (!trimmed) return;
+  const trimmed = (body ?? "").trim();
+  if (!trimmed && !attachment) return;
   const { error } = await supabase.from("messages" as any).insert({
     conversation_id: convId,
     sender_id: me,
-    body: trimmed.slice(0, 4000),
+    body: trimmed ? trimmed.slice(0, 4000) : null,
+    attachment_path: attachment?.path ?? null,
+    attachment_type: attachment?.type ?? null,
+    attachment_name: attachment?.name ?? null,
+    attachment_size: attachment?.size ?? null,
   } as any);
   if (error) throw error;
 
@@ -170,12 +207,13 @@ export async function sendMessage(convId: string, body: string) {
   const others = ((parts ?? []) as any[]).map((p) => p.user_id).filter((id) => id !== me);
   const { data: meProf } = await supabase.from("profiles").select("display_name").eq("id", me).maybeSingle();
   const name = (meProf as any)?.display_name ?? "Someone";
+  const preview = trimmed ? trimmed.slice(0, 140) : `📎 ${attachment?.name ?? "Attachment"}`;
   await Promise.all(others.map((uid) =>
     createNotification({
       user_id: uid,
       type: "message",
       title: `New message from ${name}`,
-      body: trimmed.slice(0, 140),
+      body: preview,
       link: `/messages/${convId}`,
     })
   ));
@@ -191,3 +229,4 @@ export async function markConversationRead(convId: string) {
     .neq("sender_id", u.user.id)
     .is("read_at", null);
 }
+
