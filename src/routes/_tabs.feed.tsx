@@ -127,8 +127,69 @@ function Feed() {
   }, [hasMore, filtered.length]);
   const visible = useMemo(() => filtered.slice(0, visibleCount), [filtered, visibleCount]);
 
+  // Pull-to-refresh: drag from the top of the page when scrollY === 0.
+  const router = useRouter();
+  const [pull, setPull] = useState(0); // px pulled (clamped)
+  const [refreshing, setRefreshing] = useState(false);
+  const startYRef = useRef<number | null>(null);
+  const PULL_MAX = 96;
+  const PULL_THRESHOLD = 64;
+  const runRefresh = useCallback(async () => {
+    setRefreshing(true);
+    setVisibleCount(PAGE_SIZE);
+    try {
+      await router.invalidate();
+      await new Promise((r) => setTimeout(r, 450));
+    } finally {
+      setRefreshing(false);
+      setPull(0);
+      startYRef.current = null;
+    }
+  }, [router]);
+  useEffect(() => {
+    const onTouchStart = (e: TouchEvent) => {
+      if (window.scrollY > 0 || refreshing) return;
+      startYRef.current = e.touches[0].clientY;
+    };
+    const onTouchMove = (e: TouchEvent) => {
+      if (startYRef.current == null || refreshing) return;
+      const dy = e.touches[0].clientY - startYRef.current;
+      if (dy <= 0) { setPull(0); return; }
+      if (window.scrollY > 0) { startYRef.current = null; setPull(0); return; }
+      // Rubber-band resistance.
+      const resisted = Math.min(PULL_MAX, dy * 0.5);
+      setPull(resisted);
+      if (e.cancelable) e.preventDefault();
+    };
+    const onTouchEnd = () => {
+      if (startYRef.current == null) return;
+      if (pull >= PULL_THRESHOLD) {
+        void runRefresh();
+      } else {
+        setPull(0);
+        startYRef.current = null;
+      }
+    };
+    window.addEventListener("touchstart", onTouchStart, { passive: true });
+    window.addEventListener("touchmove", onTouchMove, { passive: false });
+    window.addEventListener("touchend", onTouchEnd);
+    window.addEventListener("touchcancel", onTouchEnd);
+    return () => {
+      window.removeEventListener("touchstart", onTouchStart);
+      window.removeEventListener("touchmove", onTouchMove);
+      window.removeEventListener("touchend", onTouchEnd);
+      window.removeEventListener("touchcancel", onTouchEnd);
+    };
+  }, [pull, refreshing, runRefresh]);
+  const indicatorOffset = refreshing ? 56 : pull;
+  const indicatorProgress = Math.min(1, pull / PULL_THRESHOLD);
+
   return (
-    <div className="mx-auto w-full max-w-md sm:max-w-2xl lg:max-w-5xl xl:max-w-6xl px-4 pt-6">
+    <div
+      className="mx-auto w-full max-w-md sm:max-w-2xl lg:max-w-5xl xl:max-w-6xl px-4 pt-6"
+      style={{ transform: `translateY(${indicatorOffset}px)`, transition: pull === 0 || refreshing ? "transform 200ms ease" : "none" }}
+    >
+      <PullIndicator offset={indicatorOffset} progress={indicatorProgress} refreshing={refreshing} />
       <div className="flex items-center justify-between mb-5">
         <Logo />
         <div className="flex items-center gap-2">
