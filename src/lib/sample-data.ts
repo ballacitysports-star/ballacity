@@ -18,7 +18,6 @@ export const SPORTS: { name: Sport; emoji: string; color: string }[] = [
   { name: "Flag Football", emoji: "🏈", color: "#ff6b35" },
   { name: "Baseball", emoji: "⚾", color: "#ffffff" },
   { name: "Softball", emoji: "🥎", color: "#ffe27a" },
-  { name: "Hockey", emoji: "🏒", color: "#8ad6ff" },
   { name: "Running", emoji: "🏃", color: "#ff3d68" },
 ];
 
