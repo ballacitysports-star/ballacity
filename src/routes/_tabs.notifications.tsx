@@ -1,7 +1,7 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { motion, useMotionValue, useTransform, animate } from "framer-motion";
 import { Logo } from "@/components/Logo";
-import { Bell, BellRing, MessageCircle, Users, CreditCard, Zap, X, CheckCheck, Check, Dot, Trash2, Mail, MailOpen } from "lucide-react";
+import { Bell, BellRing, MessageCircle, Users, CreditCard, Zap, X, CheckCheck, Check, Dot, Trash2, Mail, MailOpen, Settings } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import {
