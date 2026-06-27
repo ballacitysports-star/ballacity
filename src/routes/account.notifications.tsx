@@ -14,7 +14,7 @@ import {
   type NotifChannel,
   type NotifPrefs,
 } from "@/lib/notification-prefs";
-import { ensurePushPermission } from "@/lib/onesignal";
+
 
 export const Route = createFileRoute("/account/notifications")({
   component: NotificationSettingsPage,
