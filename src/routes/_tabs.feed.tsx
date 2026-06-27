@@ -1,5 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { Loader2 } from "lucide-react";
 import { Search, SlidersHorizontal, Bell, MessageCircle, X, MapPin } from "lucide-react";
 import { useUnreadNotificationCount } from "@/lib/notifications";
 import { Logo } from "@/components/Logo";
