@@ -157,7 +157,7 @@ function EditProfile() {
   if (loading) return null;
   if (!profileUser) {
     return (
-      <div className="mx-auto flex min-h-dvh max-w-md flex-col items-center justify-center px-6 text-center">
+      <div className="mx-auto flex min-h-dvh w-full max-w-md sm:max-w-2xl lg:max-w-4xl flex-col items-center justify-center px-6 text-center">
         <h1 className="font-display text-3xl font-bold">Sign in to edit your profile</h1>
         <p className="mt-2 text-sm text-muted-foreground">Profile changes are saved to your account.</p>
         <Link to="/auth" className="mt-6 rounded-full bg-lime-gradient px-6 py-3 text-sm font-bold text-primary-foreground">
@@ -270,7 +270,7 @@ function EditProfile() {
 
 
   return (
-    <div className="mx-auto max-w-md px-4 py-6 pb-32">
+    <div className="mx-auto w-full max-w-md sm:max-w-2xl lg:max-w-4xl px-4 py-6 pb-32">
       <div className="flex items-center justify-between mb-5">
         <Link to="/profile" className="grid h-10 w-10 place-items-center rounded-full border border-border bg-surface">
           <ArrowLeft className="h-4 w-4" />

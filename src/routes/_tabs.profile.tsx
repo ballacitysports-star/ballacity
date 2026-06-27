@@ -125,7 +125,7 @@ function Profile() {
   if (loading) return null;
   if (!profileUser || !me) {
     return (
-      <div className="mx-auto flex min-h-dvh max-w-md flex-col items-center justify-center px-6 pb-28 text-center">
+      <div className="mx-auto flex min-h-dvh w-full max-w-md sm:max-w-2xl lg:max-w-4xl flex-col items-center justify-center px-6 pb-28 text-center">
         <div className="grid h-16 w-16 place-items-center rounded-3xl bg-lime-gradient font-display text-xl font-bold text-primary-foreground glow-lime">
           O
         </div>
@@ -143,7 +143,7 @@ function Profile() {
 
 
   return (
-    <div className="mx-auto max-w-md">
+    <div className="mx-auto w-full max-w-md sm:max-w-2xl lg:max-w-4xl">
       {/* Cover */}
       <div className="relative h-44">
         <img src={me.coverUrl ?? HERO_IMAGE} alt="" className="h-full w-full object-cover" />

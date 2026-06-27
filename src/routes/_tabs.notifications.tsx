@@ -73,7 +73,7 @@ function Notifications() {
 
   if (!loading && !user) {
     return (
-      <div className="mx-auto max-w-md px-4 pt-10 text-center">
+      <div className="mx-auto w-full max-w-md sm:max-w-2xl lg:max-w-4xl px-4 pt-10 text-center">
         <Bell className="mx-auto h-10 w-10 text-muted-foreground mb-3" />
         <h1 className="font-display text-2xl font-bold mb-2">Sign in for alerts</h1>
         <p className="text-sm text-muted-foreground mb-4">Stay on top of join requests, payments, and messages.</p>
@@ -127,7 +127,7 @@ function Notifications() {
   };
 
   return (
-    <div className="mx-auto max-w-md px-4 pt-6">
+    <div className="mx-auto w-full max-w-md sm:max-w-2xl lg:max-w-4xl px-4 pt-6">
       <div className="flex items-center justify-between mb-5">
         <Logo />
         <div className="flex items-center gap-2">

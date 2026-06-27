@@ -102,7 +102,7 @@ function Feed() {
     ).length;
 
   return (
-    <div className="mx-auto max-w-md px-4 pt-6">
+    <div className="mx-auto w-full max-w-md sm:max-w-2xl lg:max-w-4xl px-4 pt-6">
       <div className="flex items-center justify-between mb-5">
         <Logo />
         <div className="flex items-center gap-2">
