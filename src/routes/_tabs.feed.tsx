@@ -108,6 +108,11 @@ function Feed() {
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
   const sentinelRef = useRef<HTMLDivElement | null>(null);
   const filterKey = `${q}|${JSON.stringify(prefs)}|${hosted.length}`;
+  // Locks: prevent overlapping refresh and pagination so the same cards
+  // never get appended twice when the user pulls while a fetch is mid-flight
+  // (or the IO sentinel fires multiple times during a single scroll).
+  const loadingMoreRef = useRef(false);
+  const refreshingRef = useRef(false);
   useEffect(() => { setVisibleCount(PAGE_SIZE); }, [filterKey]);
   const hasMore = visibleCount < filtered.length;
   useEffect(() => {
@@ -116,9 +121,12 @@ function Feed() {
     if (!el) return;
     const io = new IntersectionObserver(
       (entries) => {
-        if (entries.some((e) => e.isIntersecting)) {
-          setVisibleCount((c) => Math.min(c + PAGE_SIZE, filtered.length));
-        }
+        if (!entries.some((e) => e.isIntersecting)) return;
+        if (loadingMoreRef.current || refreshingRef.current) return;
+        loadingMoreRef.current = true;
+        setVisibleCount((c) => Math.min(c + PAGE_SIZE, filtered.length));
+        // Release on next frame so a single sentinel crossing yields a single page bump.
+        requestAnimationFrame(() => { loadingMoreRef.current = false; });
       },
       { rootMargin: "600px 0px" },
     );
@@ -135,6 +143,8 @@ function Feed() {
   const PULL_MAX = 96;
   const PULL_THRESHOLD = 64;
   const runRefresh = useCallback(async () => {
+    if (refreshingRef.current) return; // ignore overlapping pulls
+    refreshingRef.current = true;
     setRefreshing(true);
     setVisibleCount(PAGE_SIZE);
     try {
@@ -142,10 +152,12 @@ function Feed() {
       await new Promise((r) => setTimeout(r, 450));
     } finally {
       setRefreshing(false);
+      refreshingRef.current = false;
       setPull(0);
       startYRef.current = null;
     }
   }, [router]);
+
   useEffect(() => {
     const onTouchStart = (e: TouchEvent) => {
       if (window.scrollY > 0 || refreshing) return;
