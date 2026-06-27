@@ -88,24 +88,26 @@ export const seedTestAccounts = createServerFn({ method: "POST" })
     // Player availabilities: one per player, tagged in notes so we can find/replace.
     for (const p of players) {
       const acct = TEST_ACCOUNTS.find((a) => a.key === p.key)!;
-      const startsAt = new Date(Date.now() + 24 * 3600 * 1000).toISOString();
-      const endsAt = new Date(Date.now() + 27 * 3600 * 1000).toISOString();
+      const today = new Date();
+      const inAWeek = new Date(Date.now() + 7 * 24 * 3600 * 1000);
+      const isoDate = (d: Date) => d.toISOString().slice(0, 10);
 
       const { data: existing } = await supabaseAdmin
         .from("player_availabilities")
         .select("id")
         .eq("user_id", p.userId)
-        .like("notes", "%[e2e-fixture]%")
+        .like("note", "%[e2e-fixture]%")
         .limit(1);
 
       const payload = {
         user_id: p.userId,
-        sport: acct.sport,
+        sports: [acct.sport],
         skill_level: acct.skill,
         city: acct.city,
-        starts_at: startsAt,
-        ends_at: endsAt,
-        notes: "Looking to play — [e2e-fixture]",
+        starts_on: isoDate(today),
+        ends_on: isoDate(inAWeek),
+        note: "Looking to play — [e2e-fixture]",
+        status: "open",
       };
 
       if (existing && existing.length > 0) {
