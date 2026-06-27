@@ -82,7 +82,6 @@ export const seedTestAccounts = createServerFn({ method: "POST" })
     }
 
     // Seed a hosted game for the host + availabilities for players (idempotent by tag)
-    const host = results.find((r) => r.key === "host")!;
     const players = results.filter((r) => r.key.startsWith("player"));
 
     // Player availabilities: one per player, tagged in notes so we can find/replace.
