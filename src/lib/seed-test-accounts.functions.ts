@@ -40,23 +40,35 @@ export const seedTestAccounts = createServerFn({ method: "POST" })
       let user = list.users.find((u) => u.email?.toLowerCase() === acct.email.toLowerCase());
       let created = false;
 
+      // Always include both `display_name` and `name` so every consumer
+      // (handle_new_user trigger, host snapshot resolver, E2E specs that read
+      // user_metadata.display_name) finds a non-empty value — and never
+      // degrades to the email prefix.
+      const metadata = {
+        display_name: acct.displayName,
+        name: acct.displayName,
+        full_name: acct.displayName,
+      };
+
       if (!user) {
         const { data: createRes, error: createErr } =
           await supabaseAdmin.auth.admin.createUser({
             email: acct.email,
             password: acct.password,
             email_confirm: true,
-            user_metadata: { display_name: acct.displayName },
+            user_metadata: metadata,
           });
         if (createErr) throw new Error(`createUser ${acct.email}: ${createErr.message}`);
         user = createRes.user!;
         created = true;
       } else {
-        // Ensure password matches fixture so tests can sign in deterministically.
+        // Merge with any existing metadata so we never strip unrelated fields,
+        // but force the display_name keys to the fixture values.
+        const merged = { ...(user.user_metadata ?? {}), ...metadata };
         await supabaseAdmin.auth.admin.updateUserById(user.id, {
           password: acct.password,
           email_confirm: true,
-          user_metadata: { display_name: acct.displayName },
+          user_metadata: merged,
         });
       }
 
