@@ -584,6 +584,19 @@ function EditProfile() {
         </Link>
       </Section>
 
+      <Section title="Notifications">
+        <Link to="/account/notifications" className="flex items-center gap-3 rounded-2xl border border-border bg-surface p-3 hover:border-lime/40 transition-colors">
+          <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-lime/15 text-lime">
+            <span className="text-lg">🔔</span>
+          </div>
+          <div className="min-w-0 flex-1">
+            <div className="font-semibold text-sm">Notification settings</div>
+            <div className="text-xs text-muted-foreground">Push & in-app alerts per type</div>
+          </div>
+          <div className="text-lime text-xs font-bold">→</div>
+        </Link>
+      </Section>
+
       <Section title="Feed preferences" right={<button onClick={reset} className="text-xs font-bold text-coral">Reset</button>}>
 
         <div className="text-xs text-muted-foreground mb-2">Preferred sports (empty = all)</div>

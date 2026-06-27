@@ -31,6 +31,7 @@ import { Route as GamesGameIdRouteImport } from './routes/games.$gameId'
 import { Route as CheckoutReturnRouteImport } from './routes/checkout.return'
 import { Route as AdminLocationAnalyticsRouteImport } from './routes/admin.location-analytics'
 import { Route as AccountSecurityRouteImport } from './routes/account.security'
+import { Route as AccountNotificationsRouteImport } from './routes/account.notifications'
 import { Route as TabsTeamsRouteImport } from './routes/_tabs.teams'
 import { Route as TabsReelsRouteImport } from './routes/_tabs.reels'
 import { Route as TabsProfileRouteImport } from './routes/_tabs.profile'
@@ -154,6 +155,11 @@ const AccountSecurityRoute = AccountSecurityRouteImport.update({
   path: '/account/security',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AccountNotificationsRoute = AccountNotificationsRouteImport.update({
+  id: '/account/notifications',
+  path: '/account/notifications',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const TabsTeamsRoute = TabsTeamsRouteImport.update({
   id: '/teams',
   path: '/teams',
@@ -240,6 +246,7 @@ export interface FileRoutesByFullPath {
   '/profile': typeof TabsProfileRoute
   '/reels': typeof TabsReelsRoute
   '/teams': typeof TabsTeamsRoute
+  '/account/notifications': typeof AccountNotificationsRoute
   '/account/security': typeof AccountSecurityRoute
   '/admin/location-analytics': typeof AdminLocationAnalyticsRoute
   '/checkout/return': typeof CheckoutReturnRoute
@@ -276,6 +283,7 @@ export interface FileRoutesByTo {
   '/profile': typeof TabsProfileRoute
   '/reels': typeof TabsReelsRoute
   '/teams': typeof TabsTeamsRoute
+  '/account/notifications': typeof AccountNotificationsRoute
   '/account/security': typeof AccountSecurityRoute
   '/admin/location-analytics': typeof AdminLocationAnalyticsRoute
   '/checkout/return': typeof CheckoutReturnRoute
@@ -314,6 +322,7 @@ export interface FileRoutesById {
   '/_tabs/profile': typeof TabsProfileRoute
   '/_tabs/reels': typeof TabsReelsRoute
   '/_tabs/teams': typeof TabsTeamsRoute
+  '/account/notifications': typeof AccountNotificationsRoute
   '/account/security': typeof AccountSecurityRoute
   '/admin/location-analytics': typeof AdminLocationAnalyticsRoute
   '/checkout/return': typeof CheckoutReturnRoute
@@ -352,6 +361,7 @@ export interface FileRouteTypes {
     | '/profile'
     | '/reels'
     | '/teams'
+    | '/account/notifications'
     | '/account/security'
     | '/admin/location-analytics'
     | '/checkout/return'
@@ -388,6 +398,7 @@ export interface FileRouteTypes {
     | '/profile'
     | '/reels'
     | '/teams'
+    | '/account/notifications'
     | '/account/security'
     | '/admin/location-analytics'
     | '/checkout/return'
@@ -425,6 +436,7 @@ export interface FileRouteTypes {
     | '/_tabs/profile'
     | '/_tabs/reels'
     | '/_tabs/teams'
+    | '/account/notifications'
     | '/account/security'
     | '/admin/location-analytics'
     | '/checkout/return'
@@ -455,6 +467,7 @@ export interface RootRouteChildren {
   ResetPasswordRoute: typeof ResetPasswordRoute
   ReviewsRoute: typeof ReviewsRoute
   ShopRoute: typeof ShopRoute
+  AccountNotificationsRoute: typeof AccountNotificationsRoute
   AccountSecurityRoute: typeof AccountSecurityRoute
   CheckoutReturnRoute: typeof CheckoutReturnRoute
   GamesGameIdRoute: typeof GamesGameIdRouteWithChildren
@@ -625,6 +638,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AccountSecurityRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/account/notifications': {
+      id: '/account/notifications'
+      path: '/account/notifications'
+      fullPath: '/account/notifications'
+      preLoaderRoute: typeof AccountNotificationsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/_tabs/teams': {
       id: '/_tabs/teams'
       path: '/teams'
@@ -791,6 +811,7 @@ const rootRouteChildren: RootRouteChildren = {
   ResetPasswordRoute: ResetPasswordRoute,
   ReviewsRoute: ReviewsRoute,
   ShopRoute: ShopRoute,
+  AccountNotificationsRoute: AccountNotificationsRoute,
   AccountSecurityRoute: AccountSecurityRoute,
   CheckoutReturnRoute: CheckoutReturnRoute,
   GamesGameIdRoute: GamesGameIdRouteWithChildren,
