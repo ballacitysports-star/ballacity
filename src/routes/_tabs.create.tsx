@@ -40,53 +40,51 @@ function Create() {
   const [requiresApproval, setRequiresApproval] = useState(false);
   const [publishing, setPublishing] = useState(false);
 
-  console.log("[create] render location=", JSON.stringify(location), "profile.city=", JSON.stringify(profile?.city));
   useEffect(() => {
     const nextCity = profile?.city?.trim() ?? "";
     const previousCity = previousProfileCityRef.current;
-    console.log("[create] profile.city effect next=", JSON.stringify(nextCity), "prev=", JSON.stringify(previousCity));
     if (nextCity === previousCity) return;
     previousProfileCityRef.current = nextCity;
 
     if (!nextCity) return;
-    // Profile city changed — re-autopopulate and clear the manual-edit flag
-    // so subsequent profile changes keep working.
-    locationEditedRef.current = false;
-    console.log("[create] profile.city effect setLocation", nextCity);
+    // Don't clobber an address the user already typed or that GPS auto-filled.
+    if (locationEditedRef.current) return;
+    if (location.trim()) return;
     setLocation(nextCity);
+    // location intentionally read at effect-time only; we don't want the
+    // effect to re-fire whenever location changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [profile?.city]);
 
 
   // Auto-fill the venue address from the device's current GPS location when
-  // the user hasn't typed anything yet and has no saved profile city. Runs
-  // once on mount; manual edits or a later profile-city sync take precedence.
+  // the user hasn't typed anything yet. Runs once on mount; manual edits or
+  // a profile-city value present at mount take precedence.
   const reverse = useServerFn(reverseGeocode);
   useEffect(() => {
-    console.log("[create] gps effect run; edited?", locationEditedRef.current, "loc?", JSON.stringify(location));
     if (locationEditedRef.current) return;
     if (location.trim()) return;
-    if (typeof navigator === "undefined" || !navigator.geolocation) { console.log("[create] no geolocation"); return; }
+    if (typeof navigator === "undefined" || !navigator.geolocation) return;
 
     let cancelled = false;
     navigator.geolocation.getCurrentPosition(
       async (pos) => {
-        console.log("[create] geo ok", pos.coords.latitude, pos.coords.longitude, "cancelled?", cancelled, "edited?", locationEditedRef.current);
         if (cancelled || locationEditedRef.current) return;
         try {
           const res = await reverse({
             data: { lat: pos.coords.latitude, lng: pos.coords.longitude },
           });
-          console.log("[create] reverse result", res);
           const next = res?.formatted || res?.city;
           if (next && !cancelled && !locationEditedRef.current) {
-            console.log("[create] setLocation", next);
+            // Mark as edited so a late-loading profile.city doesn't overwrite.
+            locationEditedRef.current = true;
             setLocation(next);
           }
-        } catch (e) {
-          console.log("[create] reverse failed", e);
+        } catch {
+          /* silent — user can still type manually */
         }
       },
-      (err) => console.log("[create] geo err", err),
+      () => {},
       { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 },
     );
 
@@ -94,6 +92,7 @@ function Create() {
     // Intentionally run once on mount.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
 
 
   const handleLocationChange = (next: string) => {
