@@ -76,8 +76,7 @@ function GameDetail() {
   const [messaging, setMessaging] = useState(false);
 
   // Hosts are never counted as joined players on their own game.
-  // Joining only counts once it's confirmed: free games (no approval) join
-  // immediately; approval-gated games count only after the host approves.
+  // Approval-gated games only count the viewer once the host approves.
   const spotsLeft = game ? Math.max(0, game.maxPlayers - effectiveJoined) : 0;
   // Ownership is locked to the original host's auth user id.
   // DB host_id (from game_payment_settings) is the source of truth; we also
