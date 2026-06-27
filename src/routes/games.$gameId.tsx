@@ -75,9 +75,8 @@ function GameDetail() {
   const [hostRequests, setHostRequests] = useState<JoinRequest[]>([]);
   const [messaging, setMessaging] = useState(false);
 
-  // Hosts are never counted as joined players on their own game.
-  // Approval-gated games only count the viewer once the host approves.
-  const spotsLeft = game ? Math.max(0, game.maxPlayers - effectiveJoined) : 0;
+  // effectiveJoined is computed below, after settings/myReq/isHost resolve.
+  // Placeholder removed — see definition near line 161.
   // Ownership is locked to the original host's auth user id.
   // DB host_id (from game_payment_settings) is the source of truth; we also
   // accept the locally-stored hostUserId stamped at publish time (or by the
