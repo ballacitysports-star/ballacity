@@ -47,30 +47,37 @@ function Create() {
     previousProfileCityRef.current = nextCity;
 
     if (!nextCity) return;
-    // Profile city changed — re-autopopulate and clear the manual-edit flag
-    // so subsequent profile changes keep working.
-    locationEditedRef.current = false;
+    // Don't clobber an address the user already typed or that GPS auto-filled.
+    if (locationEditedRef.current) return;
+    if (location.trim()) return;
     setLocation(nextCity);
+    // location intentionally read at effect-time only; we don't want the
+    // effect to re-fire whenever location changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [profile?.city]);
 
+
   // Auto-fill the venue address from the device's current GPS location when
-  // the user hasn't typed anything yet and has no saved profile city. Runs
-  // once on mount; manual edits or a later profile-city sync take precedence.
+  // the user hasn't typed anything yet. Runs once on mount; manual edits or
+  // a profile-city value present at mount take precedence.
   const reverse = useServerFn(reverseGeocode);
   useEffect(() => {
     if (locationEditedRef.current) return;
     if (location.trim()) return;
     if (typeof navigator === "undefined" || !navigator.geolocation) return;
+
     let cancelled = false;
     navigator.geolocation.getCurrentPosition(
       async (pos) => {
         if (cancelled || locationEditedRef.current) return;
         try {
-          const { formatted, city } = await reverse({
+          const res = await reverse({
             data: { lat: pos.coords.latitude, lng: pos.coords.longitude },
           });
-          const next = formatted || city;
+          const next = res?.formatted || res?.city;
           if (next && !cancelled && !locationEditedRef.current) {
+            // Mark as edited so a late-loading profile.city doesn't overwrite.
+            locationEditedRef.current = true;
             setLocation(next);
           }
         } catch {
@@ -80,10 +87,12 @@ function Create() {
       () => {},
       { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 },
     );
+
     return () => { cancelled = true; };
     // Intentionally run once on mount.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
 
 
   const handleLocationChange = (next: string) => {
