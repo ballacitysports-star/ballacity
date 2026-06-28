@@ -221,16 +221,22 @@ function GameDetail() {
 
 
   const viewerPending = !isHost && requiresApproval && myReq?.status === "pending" && !viewerCountsAsJoined;
-  const pendingCount = isHost ? hostRequests.filter((r) => r.status === "pending").length : 0;
-  const players = [
-    ...(viewerCountsAsJoined ? [{ initials: "YOU", isMe: true, pending: false }] : []),
+  const hostPendingReqs = isHost ? hostRequests.filter((r) => r.status === "pending") : [];
+  const pendingCount = hostPendingReqs.length;
+  type RosterEntry =
+    | { kind: "player"; initials: string; isMe: boolean; pending: false }
+    | { kind: "viewerPending"; initials: "YOU"; isMe: true; pending: true }
+    | { kind: "hostPending"; req: JoinRequest; pending: true };
+  const players: RosterEntry[] = [
+    ...(viewerCountsAsJoined ? [{ kind: "player" as const, initials: "YOU", isMe: true, pending: false as const }] : []),
     ...Array.from({ length: game.joined }, (_, i) => ({
+      kind: "player" as const,
       initials: ["MC", "AG", "JK", "RC", "TB", "SO", "PN", "DP", "EL", "VM"][i % 10],
       isMe: false,
-      pending: false,
+      pending: false as const,
     })),
-    ...(viewerPending ? [{ initials: "YOU", isMe: true, pending: true }] : []),
-    ...Array.from({ length: pendingCount }, () => ({ initials: "?", isMe: false, pending: true })),
+    ...(viewerPending ? [{ kind: "viewerPending" as const, initials: "YOU" as const, isMe: true as const, pending: true as const }] : []),
+    ...hostPendingReqs.map((r) => ({ kind: "hostPending" as const, req: r, pending: true as const })),
   ];
 
   return (
@@ -432,29 +438,42 @@ function GameDetail() {
             <button className="text-xs font-semibold text-lime">See all</button>
           </div>
           <div className="flex flex-wrap gap-2">
-            {players.map((p, i) => (
-              <motion.div
-                key={i}
-                initial={{ scale: 0, opacity: 0 }}
-                animate={{ scale: 1, opacity: 1 }}
-                transition={{ delay: i * 0.04 }}
-                title={p.pending ? "Pending host approval" : undefined}
-                className={`relative grid h-11 w-11 place-items-center rounded-full border text-xs font-bold ${
-                  p.pending
-                    ? "border-dashed border-coral/60 bg-coral/10 text-coral"
-                    : p.isMe
-                    ? "border-lime bg-lime/15 text-lime"
-                    : "border-border bg-surface"
-                }`}
-              >
-                {p.initials}
-                {p.pending && (
-                  <span className="absolute -bottom-1 -right-1 grid h-4 w-4 place-items-center rounded-full bg-coral text-[8px] text-white">
-                    <Clock className="h-2.5 w-2.5" />
-                  </span>
-                )}
-              </motion.div>
-            ))}
+            {players.map((p, i) => {
+              if (p.kind === "hostPending") {
+                return (
+                  <HostPendingChip
+                    key={`pending-${p.req.id}`}
+                    req={p.req}
+                    gameTitle={game.title}
+                    onChange={() => { refreshHostRequests(); refreshStatus(); }}
+                    index={i}
+                  />
+                );
+              }
+              return (
+                <motion.div
+                  key={i}
+                  initial={{ scale: 0, opacity: 0 }}
+                  animate={{ scale: 1, opacity: 1 }}
+                  transition={{ delay: i * 0.04 }}
+                  title={p.pending ? "Pending host approval" : undefined}
+                  className={`relative grid h-11 w-11 place-items-center rounded-full border text-xs font-bold ${
+                    p.pending
+                      ? "border-dashed border-coral/60 bg-coral/10 text-coral"
+                      : p.isMe
+                      ? "border-lime bg-lime/15 text-lime"
+                      : "border-border bg-surface"
+                  }`}
+                >
+                  {p.initials}
+                  {p.pending && (
+                    <span className="absolute -bottom-1 -right-1 grid h-4 w-4 place-items-center rounded-full bg-coral text-[8px] text-white">
+                      <Clock className="h-2.5 w-2.5" />
+                    </span>
+                  )}
+                </motion.div>
+              );
+            })}
             {Array.from({ length: Math.max(0, spotsLeft - (viewerPending ? 1 : 0) - pendingCount) }).map((_, i) => (
               <div
                 key={`empty-${i}`}
@@ -466,7 +485,9 @@ function GameDetail() {
           </div>
           {(viewerPending || pendingCount > 0) && (
             <p className="mt-2 text-[11px] text-muted-foreground">
-              Dashed coral avatars = awaiting host approval. They don't hold a confirmed spot until approved.
+              {isHost && pendingCount > 0
+                ? "Tap a dashed coral avatar to approve or decline that pickup request."
+                : "Dashed coral avatars = awaiting host approval. They don't hold a confirmed spot until approved."}
             </p>
           )}
         </div>
@@ -647,6 +668,101 @@ function HostRequestRow({ req, gameTitle, onChange }: { req: JoinRequest; gameTi
           <span className="text-xs font-semibold uppercase">{req.status}</span>
         )}
       </div>
+    </div>
+  );
+}
+
+function HostPendingChip({ req, gameTitle, onChange, index }: { req: JoinRequest; gameTitle: string; onChange: () => void; index: number }) {
+  const [open, setOpen] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [name, setName] = useState<string>("Player");
+  const [initials, setInitials] = useState<string>("?");
+  useEffect(() => {
+    (async () => {
+      const { data } = await supabase
+        .from("profiles")
+        .select("display_name, avatar_initials")
+        .eq("id", req.player_id)
+        .maybeSingle();
+      if (data) {
+        const dn = (data as any).display_name ?? "Player";
+        setName(dn);
+        setInitials(((data as any).avatar_initials ?? dn.slice(0, 2)).toUpperCase());
+      }
+    })();
+  }, [req.player_id]);
+
+  const act = async (status: "approved" | "rejected") => {
+    setBusy(true);
+    try {
+      await reviewJoinRequest(req.id, status);
+      await createNotification({
+        user_id: req.player_id,
+        type: status === "approved" ? "join_approved" : "join_declined",
+        title: status === "approved" ? `You're in: ${gameTitle}` : `Request declined: ${gameTitle}`,
+        body: status === "approved" ? "The host approved your request." : "The host declined your request.",
+        link: `/games/${req.game_id}`,
+      });
+      toast.success(status === "approved" ? `Approved ${name}` : `Declined ${name}`);
+      setOpen(false);
+      onChange();
+    } catch (e: any) { toast.error(e.message); }
+    finally { setBusy(false); }
+  };
+
+  return (
+    <div className="relative">
+      <motion.button
+        type="button"
+        initial={{ scale: 0, opacity: 0 }}
+        animate={{ scale: 1, opacity: 1 }}
+        transition={{ delay: index * 0.04 }}
+        onClick={() => setOpen((v) => !v)}
+        title={`${name} — tap to approve or decline`}
+        aria-label={`Review ${name}'s pickup request`}
+        className={`relative grid h-11 w-11 place-items-center rounded-full border border-dashed text-xs font-bold transition ${
+          open ? "border-coral bg-coral/20 text-coral ring-2 ring-coral/40" : "border-coral/60 bg-coral/10 text-coral hover:bg-coral/20"
+        }`}
+      >
+        {initials}
+        <span className="absolute -bottom-1 -right-1 grid h-4 w-4 place-items-center rounded-full bg-coral text-[8px] text-white">
+          <Clock className="h-2.5 w-2.5" />
+        </span>
+      </motion.button>
+      {open && (
+        <motion.div
+          initial={{ opacity: 0, y: -4 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="absolute z-20 left-1/2 top-[calc(100%+6px)] -translate-x-1/2 w-56 rounded-2xl border border-border bg-background shadow-lg p-2"
+        >
+          <Link
+            to="/players/$userId"
+            params={{ userId: req.player_id }}
+            className="block px-2 py-1 text-sm font-semibold truncate hover:text-lime"
+          >
+            {name}
+          </Link>
+          {req.message && (
+            <div className="px-2 pb-2 text-[11px] text-muted-foreground line-clamp-3">"{req.message}"</div>
+          )}
+          <div className="flex gap-1.5 mt-1">
+            <button
+              disabled={busy}
+              onClick={() => act("rejected")}
+              className="flex-1 inline-flex items-center justify-center gap-1 rounded-xl border border-coral/40 text-coral py-1.5 text-xs font-semibold disabled:opacity-50"
+            >
+              <XIcon className="h-3.5 w-3.5" /> Decline
+            </button>
+            <button
+              disabled={busy}
+              onClick={() => act("approved")}
+              className="flex-1 inline-flex items-center justify-center gap-1 rounded-xl bg-lime-gradient text-primary-foreground py-1.5 text-xs font-semibold disabled:opacity-50"
+            >
+              <Check className="h-3.5 w-3.5" /> Approve
+            </button>
+          </div>
+        </motion.div>
+      )}
     </div>
   );
 }
