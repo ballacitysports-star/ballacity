@@ -671,3 +671,98 @@ function HostRequestRow({ req, gameTitle, onChange }: { req: JoinRequest; gameTi
     </div>
   );
 }
+
+function HostPendingChip({ req, gameTitle, onChange, index }: { req: JoinRequest; gameTitle: string; onChange: () => void; index: number }) {
+  const [open, setOpen] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [name, setName] = useState<string>("Player");
+  const [initials, setInitials] = useState<string>("?");
+  useEffect(() => {
+    (async () => {
+      const { data } = await supabase
+        .from("profiles")
+        .select("display_name, avatar_initials")
+        .eq("id", req.player_id)
+        .maybeSingle();
+      if (data) {
+        const dn = (data as any).display_name ?? "Player";
+        setName(dn);
+        setInitials(((data as any).avatar_initials ?? dn.slice(0, 2)).toUpperCase());
+      }
+    })();
+  }, [req.player_id]);
+
+  const act = async (status: "approved" | "rejected") => {
+    setBusy(true);
+    try {
+      await reviewJoinRequest(req.id, status);
+      await createNotification({
+        user_id: req.player_id,
+        type: status === "approved" ? "join_approved" : "join_declined",
+        title: status === "approved" ? `You're in: ${gameTitle}` : `Request declined: ${gameTitle}`,
+        body: status === "approved" ? "The host approved your request." : "The host declined your request.",
+        link: `/games/${req.game_id}`,
+      });
+      toast.success(status === "approved" ? `Approved ${name}` : `Declined ${name}`);
+      setOpen(false);
+      onChange();
+    } catch (e: any) { toast.error(e.message); }
+    finally { setBusy(false); }
+  };
+
+  return (
+    <div className="relative">
+      <motion.button
+        type="button"
+        initial={{ scale: 0, opacity: 0 }}
+        animate={{ scale: 1, opacity: 1 }}
+        transition={{ delay: index * 0.04 }}
+        onClick={() => setOpen((v) => !v)}
+        title={`${name} — tap to approve or decline`}
+        aria-label={`Review ${name}'s pickup request`}
+        className={`relative grid h-11 w-11 place-items-center rounded-full border border-dashed text-xs font-bold transition ${
+          open ? "border-coral bg-coral/20 text-coral ring-2 ring-coral/40" : "border-coral/60 bg-coral/10 text-coral hover:bg-coral/20"
+        }`}
+      >
+        {initials}
+        <span className="absolute -bottom-1 -right-1 grid h-4 w-4 place-items-center rounded-full bg-coral text-[8px] text-white">
+          <Clock className="h-2.5 w-2.5" />
+        </span>
+      </motion.button>
+      {open && (
+        <motion.div
+          initial={{ opacity: 0, y: -4 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="absolute z-20 left-1/2 top-[calc(100%+6px)] -translate-x-1/2 w-56 rounded-2xl border border-border bg-background shadow-lg p-2"
+        >
+          <Link
+            to="/players/$userId"
+            params={{ userId: req.player_id }}
+            className="block px-2 py-1 text-sm font-semibold truncate hover:text-lime"
+          >
+            {name}
+          </Link>
+          {req.message && (
+            <div className="px-2 pb-2 text-[11px] text-muted-foreground line-clamp-3">"{req.message}"</div>
+          )}
+          <div className="flex gap-1.5 mt-1">
+            <button
+              disabled={busy}
+              onClick={() => act("rejected")}
+              className="flex-1 inline-flex items-center justify-center gap-1 rounded-xl border border-coral/40 text-coral py-1.5 text-xs font-semibold disabled:opacity-50"
+            >
+              <XIcon className="h-3.5 w-3.5" /> Decline
+            </button>
+            <button
+              disabled={busy}
+              onClick={() => act("approved")}
+              className="flex-1 inline-flex items-center justify-center gap-1 rounded-xl bg-lime-gradient text-primary-foreground py-1.5 text-xs font-semibold disabled:opacity-50"
+            >
+              <Check className="h-3.5 w-3.5" /> Approve
+            </button>
+          </div>
+        </motion.div>
+      )}
+    </div>
+  );
+}
