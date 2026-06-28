@@ -220,12 +220,17 @@ function GameDetail() {
 
 
 
+  const viewerPending = !isHost && requiresApproval && myReq?.status === "pending" && !viewerCountsAsJoined;
+  const pendingCount = isHost ? hostRequests.filter((r) => r.status === "pending").length : 0;
   const players = [
-    ...(viewerCountsAsJoined ? [{ initials: "YOU", isMe: true }] : []),
+    ...(viewerCountsAsJoined ? [{ initials: "YOU", isMe: true, pending: false }] : []),
     ...Array.from({ length: game.joined }, (_, i) => ({
       initials: ["MC", "AG", "JK", "RC", "TB", "SO", "PN", "DP", "EL", "VM"][i % 10],
       isMe: false,
+      pending: false,
     })),
+    ...(viewerPending ? [{ initials: "YOU", isMe: true, pending: true }] : []),
+    ...Array.from({ length: pendingCount }, () => ({ initials: "?", isMe: false, pending: true })),
   ];
 
   return (
