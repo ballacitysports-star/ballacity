@@ -220,12 +220,17 @@ function GameDetail() {
 
 
 
+  const viewerPending = !isHost && requiresApproval && myReq?.status === "pending" && !viewerCountsAsJoined;
+  const pendingCount = isHost ? hostRequests.filter((r) => r.status === "pending").length : 0;
   const players = [
-    ...(viewerCountsAsJoined ? [{ initials: "YOU", isMe: true }] : []),
+    ...(viewerCountsAsJoined ? [{ initials: "YOU", isMe: true, pending: false }] : []),
     ...Array.from({ length: game.joined }, (_, i) => ({
       initials: ["MC", "AG", "JK", "RC", "TB", "SO", "PN", "DP", "EL", "VM"][i % 10],
       isMe: false,
+      pending: false,
     })),
+    ...(viewerPending ? [{ initials: "YOU", isMe: true, pending: true }] : []),
+    ...Array.from({ length: pendingCount }, () => ({ initials: "?", isMe: false, pending: true })),
   ];
 
   return (
@@ -417,6 +422,12 @@ function GameDetail() {
           <div className="flex items-center justify-between mb-2">
             <h2 className="font-display text-sm font-bold uppercase tracking-wider text-muted-foreground">
               Roster ({effectiveJoined}/{game.maxPlayers})
+              {(viewerPending || pendingCount > 0) && (
+                <span className="ml-2 inline-flex items-center gap-1 rounded-full border border-coral/40 bg-coral/10 px-2 py-0.5 text-[10px] font-bold text-coral normal-case tracking-normal">
+                  <Clock className="h-3 w-3" />
+                  {viewerPending ? "You're pending" : `${pendingCount} pending`}
+                </span>
+              )}
             </h2>
             <button className="text-xs font-semibold text-lime">See all</button>
           </div>
@@ -427,14 +438,24 @@ function GameDetail() {
                 initial={{ scale: 0, opacity: 0 }}
                 animate={{ scale: 1, opacity: 1 }}
                 transition={{ delay: i * 0.04 }}
-                className={`grid h-11 w-11 place-items-center rounded-full border text-xs font-bold ${
-                  p.isMe ? "border-lime bg-lime/15 text-lime" : "border-border bg-surface"
+                title={p.pending ? "Pending host approval" : undefined}
+                className={`relative grid h-11 w-11 place-items-center rounded-full border text-xs font-bold ${
+                  p.pending
+                    ? "border-dashed border-coral/60 bg-coral/10 text-coral"
+                    : p.isMe
+                    ? "border-lime bg-lime/15 text-lime"
+                    : "border-border bg-surface"
                 }`}
               >
                 {p.initials}
+                {p.pending && (
+                  <span className="absolute -bottom-1 -right-1 grid h-4 w-4 place-items-center rounded-full bg-coral text-[8px] text-white">
+                    <Clock className="h-2.5 w-2.5" />
+                  </span>
+                )}
               </motion.div>
             ))}
-            {Array.from({ length: spotsLeft }).map((_, i) => (
+            {Array.from({ length: Math.max(0, spotsLeft - (viewerPending ? 1 : 0) - pendingCount) }).map((_, i) => (
               <div
                 key={`empty-${i}`}
                 className="grid h-11 w-11 place-items-center rounded-full border-2 border-dashed border-border bg-transparent text-muted-foreground text-lg"
@@ -443,6 +464,11 @@ function GameDetail() {
               </div>
             ))}
           </div>
+          {(viewerPending || pendingCount > 0) && (
+            <p className="mt-2 text-[11px] text-muted-foreground">
+              Dashed coral avatars = awaiting host approval. They don't hold a confirmed spot until approved.
+            </p>
+          )}
         </div>
       </div>
 
