@@ -438,29 +438,42 @@ function GameDetail() {
             <button className="text-xs font-semibold text-lime">See all</button>
           </div>
           <div className="flex flex-wrap gap-2">
-            {players.map((p, i) => (
-              <motion.div
-                key={i}
-                initial={{ scale: 0, opacity: 0 }}
-                animate={{ scale: 1, opacity: 1 }}
-                transition={{ delay: i * 0.04 }}
-                title={p.pending ? "Pending host approval" : undefined}
-                className={`relative grid h-11 w-11 place-items-center rounded-full border text-xs font-bold ${
-                  p.pending
-                    ? "border-dashed border-coral/60 bg-coral/10 text-coral"
-                    : p.isMe
-                    ? "border-lime bg-lime/15 text-lime"
-                    : "border-border bg-surface"
-                }`}
-              >
-                {p.initials}
-                {p.pending && (
-                  <span className="absolute -bottom-1 -right-1 grid h-4 w-4 place-items-center rounded-full bg-coral text-[8px] text-white">
-                    <Clock className="h-2.5 w-2.5" />
-                  </span>
-                )}
-              </motion.div>
-            ))}
+            {players.map((p, i) => {
+              if (p.kind === "hostPending") {
+                return (
+                  <HostPendingChip
+                    key={`pending-${p.req.id}`}
+                    req={p.req}
+                    gameTitle={game.title}
+                    onChange={() => { refreshHostRequests(); refreshStatus(); }}
+                    index={i}
+                  />
+                );
+              }
+              return (
+                <motion.div
+                  key={i}
+                  initial={{ scale: 0, opacity: 0 }}
+                  animate={{ scale: 1, opacity: 1 }}
+                  transition={{ delay: i * 0.04 }}
+                  title={p.pending ? "Pending host approval" : undefined}
+                  className={`relative grid h-11 w-11 place-items-center rounded-full border text-xs font-bold ${
+                    p.pending
+                      ? "border-dashed border-coral/60 bg-coral/10 text-coral"
+                      : p.isMe
+                      ? "border-lime bg-lime/15 text-lime"
+                      : "border-border bg-surface"
+                  }`}
+                >
+                  {p.initials}
+                  {p.pending && (
+                    <span className="absolute -bottom-1 -right-1 grid h-4 w-4 place-items-center rounded-full bg-coral text-[8px] text-white">
+                      <Clock className="h-2.5 w-2.5" />
+                    </span>
+                  )}
+                </motion.div>
+              );
+            })}
             {Array.from({ length: Math.max(0, spotsLeft - (viewerPending ? 1 : 0) - pendingCount) }).map((_, i) => (
               <div
                 key={`empty-${i}`}
@@ -472,7 +485,9 @@ function GameDetail() {
           </div>
           {(viewerPending || pendingCount > 0) && (
             <p className="mt-2 text-[11px] text-muted-foreground">
-              Dashed coral avatars = awaiting host approval. They don't hold a confirmed spot until approved.
+              {isHost && pendingCount > 0
+                ? "Tap a dashed coral avatar to approve or decline that pickup request."
+                : "Dashed coral avatars = awaiting host approval. They don't hold a confirmed spot until approved."}
             </p>
           )}
         </div>
