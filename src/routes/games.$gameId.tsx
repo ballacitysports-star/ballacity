@@ -221,16 +221,22 @@ function GameDetail() {
 
 
   const viewerPending = !isHost && requiresApproval && myReq?.status === "pending" && !viewerCountsAsJoined;
-  const pendingCount = isHost ? hostRequests.filter((r) => r.status === "pending").length : 0;
-  const players = [
-    ...(viewerCountsAsJoined ? [{ initials: "YOU", isMe: true, pending: false }] : []),
+  const hostPendingReqs = isHost ? hostRequests.filter((r) => r.status === "pending") : [];
+  const pendingCount = hostPendingReqs.length;
+  type RosterEntry =
+    | { kind: "player"; initials: string; isMe: boolean; pending: false }
+    | { kind: "viewerPending"; initials: "YOU"; isMe: true; pending: true }
+    | { kind: "hostPending"; req: JoinRequest; pending: true };
+  const players: RosterEntry[] = [
+    ...(viewerCountsAsJoined ? [{ kind: "player" as const, initials: "YOU", isMe: true, pending: false as const }] : []),
     ...Array.from({ length: game.joined }, (_, i) => ({
+      kind: "player" as const,
       initials: ["MC", "AG", "JK", "RC", "TB", "SO", "PN", "DP", "EL", "VM"][i % 10],
       isMe: false,
-      pending: false,
+      pending: false as const,
     })),
-    ...(viewerPending ? [{ initials: "YOU", isMe: true, pending: true }] : []),
-    ...Array.from({ length: pendingCount }, () => ({ initials: "?", isMe: false, pending: true })),
+    ...(viewerPending ? [{ kind: "viewerPending" as const, initials: "YOU" as const, isMe: true as const, pending: true as const }] : []),
+    ...hostPendingReqs.map((r) => ({ kind: "hostPending" as const, req: r, pending: true as const })),
   ];
 
   return (
