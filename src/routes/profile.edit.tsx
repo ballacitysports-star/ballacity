@@ -42,6 +42,10 @@ function EditProfile() {
   const [coverUrl, setCoverUrl] = useState<string | undefined>(profile?.coverUrl);
   const [city, setCity] = useState(profile?.city ?? "");
   const [bio, setBio] = useState(profile?.bio ?? "");
+  const [birthday, setBirthday] = useState<string>(profile?.birthday ?? "");
+  const [graduatingClass, setGraduatingClass] = useState<string>(
+    profile?.graduatingClass != null ? String(profile.graduatingClass) : "",
+  );
   const [sports, setSports] = useState(profile?.sports ?? []);
   const [links, setLinks] = useState<ProfileLink[]>(profile?.links ?? []);
   const [isDirty, setIsDirty] = useState(false);
@@ -54,6 +58,8 @@ function EditProfile() {
     coverUrl: profile.coverUrl,
     city: profile.city,
     bio: profile.bio,
+    birthday: profile.birthday,
+    graduatingClass: profile.graduatingClass,
     sports: profile.sports,
     links: profile.links,
   }) : "";
@@ -140,6 +146,8 @@ function EditProfile() {
     setCoverUrl(profile.coverUrl);
     setCity(profile.city);
     setBio(profile.bio);
+    setBirthday(profile.birthday ?? "");
+    setGraduatingClass(profile.graduatingClass != null ? String(profile.graduatingClass) : "");
     setSports(profile.sports);
     setLinks(profile.links);
   }, [profileUser?.id, profileSignature, isDirty]);
@@ -219,6 +227,14 @@ function EditProfile() {
       .map((l) => ({ ...l, url: normalizeUrl(l.url), label: l.label?.trim() || undefined }))
       .filter((l) => l.url);
     const trimmedCity = city.trim().slice(0, 80);
+    const birthdayClean = birthday && /^\d{4}-\d{2}-\d{2}$/.test(birthday) ? birthday : undefined;
+    const gradNum = graduatingClass.trim() ? parseInt(graduatingClass, 10) : NaN;
+    const currentYear = new Date().getFullYear();
+    const gradClean = Number.isFinite(gradNum) && gradNum >= 1950 && gradNum <= currentYear + 15 ? gradNum : undefined;
+    if (graduatingClass.trim() && gradClean === undefined) {
+      toast.error("Graduating class must be a valid year");
+      return;
+    }
     setProfileOverrides(profileUser.id, {
       name: trimmedName,
       username: username.trim().slice(0, 30),
@@ -227,6 +243,8 @@ function EditProfile() {
       coverUrl,
       city: trimmedCity,
       bio: bio.trim().slice(0, 280),
+      birthday: birthdayClean,
+      graduatingClass: gradClean,
       sports,
       links: cleanedLinks,
     });
@@ -244,6 +262,8 @@ function EditProfile() {
         city: trimmedCity || null,
         avatar_url: avatarUrl ?? null,
         cover_url: coverUrl ?? null,
+        birthday: birthdayClean ?? null,
+        graduating_class: gradClean ?? null,
         ...(linksDirty ? { links: cleanedLinks as any } : {}),
       };
       const { error } = await supabase
@@ -357,6 +377,23 @@ function EditProfile() {
             className="w-full rounded-2xl border border-border bg-surface px-3 py-2 text-sm outline-none focus:border-lime"
           />
           <div className="mt-1 text-right text-[10px] text-muted-foreground">{bio.length}/280</div>
+        </Field>
+        <Field label="Birthday">
+          <input
+            type="date"
+            value={birthday}
+            onChange={(e) => { markDirty(); setBirthday(e.target.value); }}
+            max={new Date().toISOString().slice(0, 10)}
+            className="w-full rounded-2xl border border-border bg-surface px-3 py-2 text-sm outline-none focus:border-lime"
+          />
+        </Field>
+        <Field label="Graduating class">
+          <Input
+            value={graduatingClass}
+            onChange={(v) => { markDirty(); setGraduatingClass(v.replace(/[^0-9]/g, "").slice(0, 4)); }}
+            placeholder={`e.g. ${new Date().getFullYear() + 4}`}
+            maxLength={4}
+          />
         </Field>
       </Section>
 

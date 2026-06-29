@@ -90,7 +90,7 @@ function Profile() {
     const key = `openrun.profileSync.v1.${profileUser.id}`;
     if (typeof window === "undefined") return;
     const local = readOverrides(profileUser.id);
-    const hasLocalData = ["name", "username", "avatar", "bio", "city", "avatarUrl", "coverUrl", "links"].some((field) =>
+    const hasLocalData = ["name", "username", "avatar", "bio", "city", "avatarUrl", "coverUrl", "links", "birthday", "graduatingClass"].some((field) =>
       Object.prototype.hasOwnProperty.call(local, field),
     );
     if (!hasLocalData) return;
@@ -103,6 +103,8 @@ function Profile() {
       city: (local.city ?? me.city) || null,
       avatar_url: local.avatarUrl ?? me.avatarUrl ?? null,
       cover_url: local.coverUrl ?? me.coverUrl ?? null,
+      birthday: local.birthday ?? me.birthday ?? null,
+      graduating_class: local.graduatingClass ?? me.graduatingClass ?? null,
       links: Array.isArray(local.links) ? local.links : (me.links ?? []),
     };
     const signature = JSON.stringify(payload);
@@ -201,6 +203,14 @@ function Profile() {
               </span>
             </h1>
             <div className="text-sm text-muted-foreground">{me.username} · {me.city}</div>
+            {(me.birthday || me.graduatingClass) && (
+              <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-muted-foreground">
+                {me.birthday && (
+                  <span>🎂 {formatBirthday(me.birthday)}{ageFrom(me.birthday) != null ? ` · ${ageFrom(me.birthday)} yrs` : ""}</span>
+                )}
+                {me.graduatingClass && <span>🎓 Class of {me.graduatingClass}</span>}
+              </div>
+            )}
           </div>
         </div>
         <p className="mt-3 text-sm text-foreground/90">{me.bio}</p>
@@ -375,4 +385,20 @@ function Profile() {
       </div>
     </div>
   );
+}
+
+function formatBirthday(iso: string): string {
+  const d = new Date(iso + "T00:00:00");
+  if (isNaN(d.getTime())) return iso;
+  return d.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
+}
+
+function ageFrom(iso: string): number | null {
+  const d = new Date(iso + "T00:00:00");
+  if (isNaN(d.getTime())) return null;
+  const now = new Date();
+  let age = now.getFullYear() - d.getFullYear();
+  const m = now.getMonth() - d.getMonth();
+  if (m < 0 || (m === 0 && now.getDate() < d.getDate())) age--;
+  return age >= 0 && age < 150 ? age : null;
 }

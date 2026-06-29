@@ -540,10 +540,12 @@ export type Database = {
           avatar_initials: string | null
           avatar_url: string | null
           bio: string | null
+          birthday: string | null
           city: string | null
           cover_url: string | null
           created_at: string
           display_name: string
+          graduating_class: number | null
           id: string
           links: Json
           sport: string | null
@@ -554,10 +556,12 @@ export type Database = {
           avatar_initials?: string | null
           avatar_url?: string | null
           bio?: string | null
+          birthday?: string | null
           city?: string | null
           cover_url?: string | null
           created_at?: string
           display_name?: string
+          graduating_class?: number | null
           id: string
           links?: Json
           sport?: string | null
@@ -568,10 +572,12 @@ export type Database = {
           avatar_initials?: string | null
           avatar_url?: string | null
           bio?: string | null
+          birthday?: string | null
           city?: string | null
           cover_url?: string | null
           created_at?: string
           display_name?: string
+          graduating_class?: number | null
           id?: string
           links?: Json
           sport?: string | null

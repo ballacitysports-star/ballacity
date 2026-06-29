@@ -29,6 +29,8 @@ export type ProfileOverrides = {
   coverUrl?: string; // hero/cover image data URL or remote URL
   bio?: string;
   city?: string;
+  birthday?: string; // ISO date (YYYY-MM-DD)
+  graduatingClass?: number;
   sports?: { name: Sport; skill: number }[];
   badges?: string[];
   links?: ProfileLink[];
@@ -42,6 +44,8 @@ export type MyProfile = {
   coverUrl?: string;
   bio: string;
   city: string;
+  birthday?: string;
+  graduatingClass?: number;
   stats: typeof ME.stats;
   sports: { name: Sport; skill: number }[];
   badges: string[];
@@ -190,6 +194,8 @@ export function useMyProfile(currentUser?: User | null): MyProfile | null {
     city?: string | null;
     avatar_url?: string | null;
     cover_url?: string | null;
+    birthday?: string | null;
+    graduating_class?: number | null;
     links?: unknown;
   } | null>(null);
   useEffect(() => {
@@ -202,7 +208,7 @@ export function useMyProfile(currentUser?: User | null): MyProfile | null {
     let cancelled = false;
     supabase
       .from("profiles")
-      .select("display_name, username, avatar_initials, bio, city, avatar_url, cover_url, links")
+      .select("display_name, username, avatar_initials, bio, city, avatar_url, cover_url, birthday, graduating_class, links")
       .eq("id", user.id)
       .maybeSingle()
       .then(({ data }) => { if (!cancelled) setDbProfile(data as any); });
@@ -221,6 +227,8 @@ export function useMyProfile(currentUser?: User | null): MyProfile | null {
     coverUrl: overrides.coverUrl ?? dbProfile?.cover_url ?? undefined,
     bio: overrides.bio ?? dbProfile?.bio ?? base.bio,
     city: overrides.city ?? dbProfile?.city ?? base.city,
+    birthday: overrides.birthday ?? dbProfile?.birthday ?? undefined,
+    graduatingClass: overrides.graduatingClass ?? dbProfile?.graduating_class ?? undefined,
     stats: base.stats,
     sports: overrides.sports ?? base.sports,
     badges: overrides.badges ?? base.badges,
