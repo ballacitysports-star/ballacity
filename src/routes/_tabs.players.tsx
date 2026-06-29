@@ -319,7 +319,16 @@ function PlayersFilterSheet({ sport, setSport, skill, setSkill, maxDistance, set
           <Chip active={ageMin === 35 && ageMax === 49} onClick={() => { setAgeMin(35); setAgeMax(49); }}>35–49</Chip>
           <Chip active={ageMin === 50 && ageMax === ""} onClick={() => { setAgeMin(50); setAgeMax(""); }}>50+</Chip>
         </div>
-        <p className="text-[11px] text-muted-foreground -mt-3 mb-4">Players who haven't set a birthday are hidden when an age range is active.</p>
+        <label className="flex items-center gap-2 mb-5 -mt-2 text-xs text-muted-foreground cursor-pointer select-none">
+          <input
+            type="checkbox"
+            className="h-4 w-4 accent-lime"
+            checked={includeUnknownAge}
+            disabled={ageMin === "" && ageMax === ""}
+            onChange={(e) => setIncludeUnknownAge(e.target.checked)}
+          />
+          <span>Include players who haven't shared a birthday</span>
+        </label>
 
 
         <div className="flex gap-2">
