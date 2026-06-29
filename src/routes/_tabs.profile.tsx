@@ -198,7 +198,7 @@ function Profile() {
           <div>
             <h1 className="font-display text-2xl font-bold flex items-center gap-2">
               {me.name}
-              {(() => { const a = ageFrom(me.birthday); return a != null ? (
+              {me.birthday && (() => { const a = ageFrom(me.birthday); return a != null ? (
                 <span className="text-sm font-normal text-muted-foreground">· {a}</span>
               ) : null; })()}
               <span className="inline-flex items-center gap-1 rounded-full bg-lime/15 px-2 py-0.5 text-xs font-bold text-lime">
