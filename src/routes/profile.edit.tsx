@@ -227,6 +227,14 @@ function EditProfile() {
       .map((l) => ({ ...l, url: normalizeUrl(l.url), label: l.label?.trim() || undefined }))
       .filter((l) => l.url);
     const trimmedCity = city.trim().slice(0, 80);
+    const birthdayClean = birthday && /^\d{4}-\d{2}-\d{2}$/.test(birthday) ? birthday : undefined;
+    const gradNum = graduatingClass.trim() ? parseInt(graduatingClass, 10) : NaN;
+    const currentYear = new Date().getFullYear();
+    const gradClean = Number.isFinite(gradNum) && gradNum >= 1950 && gradNum <= currentYear + 15 ? gradNum : undefined;
+    if (graduatingClass.trim() && gradClean === undefined) {
+      toast.error("Graduating class must be a valid year");
+      return;
+    }
     setProfileOverrides(profileUser.id, {
       name: trimmedName,
       username: username.trim().slice(0, 30),
@@ -235,6 +243,8 @@ function EditProfile() {
       coverUrl,
       city: trimmedCity,
       bio: bio.trim().slice(0, 280),
+      birthday: birthdayClean,
+      graduatingClass: gradClean,
       sports,
       links: cleanedLinks,
     });
@@ -252,6 +262,8 @@ function EditProfile() {
         city: trimmedCity || null,
         avatar_url: avatarUrl ?? null,
         cover_url: coverUrl ?? null,
+        birthday: birthdayClean ?? null,
+        graduating_class: gradClean ?? null,
         ...(linksDirty ? { links: cleanedLinks as any } : {}),
       };
       const { error } = await supabase
