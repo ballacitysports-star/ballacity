@@ -404,10 +404,19 @@ function EditProfile() {
           <input
             type="date"
             value={birthday}
-            onChange={(e) => { markDirty(); setBirthday(e.target.value); }}
+            onChange={(e) => {
+              markDirty();
+              const v = e.target.value;
+              setBirthday(v);
+              setBirthdayError(validateBirthday(v));
+            }}
             max={new Date().toISOString().slice(0, 10)}
-            className="w-full rounded-2xl border border-border bg-surface px-3 py-2 text-sm outline-none focus:border-lime"
+            aria-invalid={birthdayError ? true : undefined}
+            className={`w-full rounded-2xl border bg-surface px-3 py-2 text-sm outline-none focus:border-lime ${birthdayError ? "border-destructive" : "border-border"}`}
           />
+          {birthdayError && (
+            <p className="mt-1 text-xs text-destructive">{birthdayError}</p>
+          )}
         </Field>
         <Field label="Graduating class">
           <Input
