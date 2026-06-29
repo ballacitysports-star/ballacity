@@ -378,6 +378,23 @@ function EditProfile() {
           />
           <div className="mt-1 text-right text-[10px] text-muted-foreground">{bio.length}/280</div>
         </Field>
+        <Field label="Birthday">
+          <input
+            type="date"
+            value={birthday}
+            onChange={(e) => { markDirty(); setBirthday(e.target.value); }}
+            max={new Date().toISOString().slice(0, 10)}
+            className="w-full rounded-2xl border border-border bg-surface px-3 py-2 text-sm outline-none focus:border-lime"
+          />
+        </Field>
+        <Field label="Graduating class">
+          <Input
+            value={graduatingClass}
+            onChange={(v) => { markDirty(); setGraduatingClass(v.replace(/[^0-9]/g, "").slice(0, 4)); }}
+            placeholder={`e.g. ${new Date().getFullYear() + 4}`}
+            maxLength={4}
+          />
+        </Field>
       </Section>
 
       <Section title="Sports & skill">
