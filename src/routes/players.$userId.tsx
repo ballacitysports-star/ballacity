@@ -169,6 +169,9 @@ function PlayerProfilePage() {
           <div className="min-w-0">
             <h1 className="font-display text-2xl font-bold flex items-center gap-2">
               <span className="truncate">{displayName}</span>
+              {profile.birthday && (() => { const a = ageFrom(profile.birthday); return a != null ? (
+                <span className="text-sm font-normal text-muted-foreground shrink-0">· {a}</span>
+              ) : null; })()}
               <span className="inline-flex items-center gap-1 rounded-full bg-lime/15 px-2 py-0.5 text-xs font-bold text-lime shrink-0">
                 <Shield className="h-3 w-3" /> Verified
               </span>
