@@ -32,20 +32,64 @@ export const Route = createFileRoute("/_tabs/players")({
 const SKILLS = ["All Levels", "Beginner", "Intermediate", "Advanced"] as const;
 const WEEKDAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
+const FILTERS_STORAGE_KEY = "openrun.playersFilters.v1";
+type StoredFilters = {
+  q: string;
+  sport: string;
+  skill: string;
+  maxDistance: number;
+  ageMin: number | "";
+  ageMax: number | "";
+  includeUnknownAge: boolean;
+};
+const DEFAULT_FILTERS: StoredFilters = {
+  q: "",
+  sport: "",
+  skill: "",
+  maxDistance: 0,
+  ageMin: "",
+  ageMax: "",
+  includeUnknownAge: true,
+};
+function loadStoredFilters(): StoredFilters {
+  if (typeof window === "undefined") return DEFAULT_FILTERS;
+  try {
+    const raw = window.localStorage.getItem(FILTERS_STORAGE_KEY);
+    if (!raw) return DEFAULT_FILTERS;
+    const parsed = JSON.parse(raw) as Partial<StoredFilters>;
+    return { ...DEFAULT_FILTERS, ...parsed };
+  } catch {
+    return DEFAULT_FILTERS;
+  }
+}
+
 function PlayersPage() {
   const { user } = useAuth();
-  const [q, setQ] = useState("");
-  const [sport, setSport] = useState("");
-  const [skill, setSkill] = useState<string>("");
-  const [maxDistance, setMaxDistance] = useState<number>(0); // 0 = any
-  const [ageMin, setAgeMin] = useState<number | "">("");
-  const [ageMax, setAgeMax] = useState<number | "">("");
-  const [includeUnknownAge, setIncludeUnknownAge] = useState<boolean>(true);
+  const initial = loadStoredFilters();
+  const [q, setQ] = useState(initial.q);
+  const [sport, setSport] = useState(initial.sport);
+  const [skill, setSkill] = useState<string>(initial.skill);
+  const [maxDistance, setMaxDistance] = useState<number>(initial.maxDistance);
+  const [ageMin, setAgeMin] = useState<number | "">(initial.ageMin);
+  const [ageMax, setAgeMax] = useState<number | "">(initial.ageMax);
+  const [includeUnknownAge, setIncludeUnknownAge] = useState<boolean>(initial.includeUnknownAge);
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [list, setList] = useState<AvailabilityWithAuthor[] | null>(null);
   const [postOpen, setPostOpen] = useState(false);
   const [contactFor, setContactFor] = useState<AvailabilityWithAuthor | null>(null);
   const [reloadTick, setReloadTick] = useState(0);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    try {
+      window.localStorage.setItem(
+        FILTERS_STORAGE_KEY,
+        JSON.stringify({ q, sport, skill, maxDistance, ageMin, ageMax, includeUnknownAge } satisfies StoredFilters),
+      );
+    } catch {
+      // ignore quota / private mode failures
+    }
+  }, [q, sport, skill, maxDistance, ageMin, ageMax, includeUnknownAge]);
 
   useEffect(() => {
     let cancelled = false;
