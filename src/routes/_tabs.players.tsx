@@ -40,6 +40,7 @@ function PlayersPage() {
   const [maxDistance, setMaxDistance] = useState<number>(0); // 0 = any
   const [ageMin, setAgeMin] = useState<number | "">("");
   const [ageMax, setAgeMax] = useState<number | "">("");
+  const [includeUnknownAge, setIncludeUnknownAge] = useState<boolean>(true);
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [list, setList] = useState<AvailabilityWithAuthor[] | null>(null);
   const [postOpen, setPostOpen] = useState(false);
@@ -61,16 +62,24 @@ function PlayersPage() {
   const filtered = useMemo(() => {
     if (!list) return null;
     const needle = q.trim().toLowerCase();
-    const minA = ageMin === "" ? null : Number(ageMin);
-    const maxA = ageMax === "" ? null : Number(ageMax);
+    let minA = ageMin === "" ? null : Number(ageMin);
+    let maxA = ageMax === "" ? null : Number(ageMax);
+    // Swap if reversed so the filter still behaves sensibly
+    if (minA !== null && maxA !== null && minA > maxA) {
+      const tmp = minA; minA = maxA; maxA = tmp;
+    }
     return list.filter((a) => {
       if (skill && a.skill_level !== skill) return false;
       if (maxDistance > 0 && kmToMi(a.travel_radius_km) > maxDistance) return false;
       if (minA !== null || maxA !== null) {
         const age = ageFromBirthday(a.author_birthday);
-        if (age === null) return false;
-        if (minA !== null && age < minA) return false;
-        if (maxA !== null && age > maxA) return false;
+        if (age === null) {
+          // No birthday on file — include only when the user has opted in.
+          if (!includeUnknownAge) return false;
+        } else {
+          if (minA !== null && age < minA) return false;
+          if (maxA !== null && age > maxA) return false;
+        }
       }
       if (needle) {
         const hay = (a.author_name + " " + (a.city ?? "") + " " + (a.note ?? "") + " " + a.sports.join(" ")).toLowerCase();
@@ -78,7 +87,7 @@ function PlayersPage() {
       }
       return true;
     });
-  }, [list, q, skill, maxDistance, ageMin, ageMax]);
+  }, [list, q, skill, maxDistance, ageMin, ageMax, includeUnknownAge]);
 
   function ageFromBirthday(iso: string | null): number | null {
     if (!iso) return null;
@@ -208,8 +217,9 @@ function PlayersPage() {
             maxDistance={maxDistance} setMaxDistance={setMaxDistance}
             ageMin={ageMin} setAgeMin={setAgeMin}
             ageMax={ageMax} setAgeMax={setAgeMax}
+            includeUnknownAge={includeUnknownAge} setIncludeUnknownAge={setIncludeUnknownAge}
             onClose={() => setFiltersOpen(false)}
-            onReset={() => { setSport(""); setSkill(""); setMaxDistance(0); setAgeMin(""); setAgeMax(""); }}
+            onReset={() => { setSport(""); setSkill(""); setMaxDistance(0); setAgeMin(""); setAgeMax(""); setIncludeUnknownAge(true); }}
           />
         )}
       </AnimatePresence>
@@ -217,12 +227,13 @@ function PlayersPage() {
   );
 }
 
-function PlayersFilterSheet({ sport, setSport, skill, setSkill, maxDistance, setMaxDistance, ageMin, setAgeMin, ageMax, setAgeMax, onClose, onReset }: {
+function PlayersFilterSheet({ sport, setSport, skill, setSkill, maxDistance, setMaxDistance, ageMin, setAgeMin, ageMax, setAgeMax, includeUnknownAge, setIncludeUnknownAge, onClose, onReset }: {
   sport: string; setSport: (v: string) => void;
   skill: string; setSkill: (v: string) => void;
   maxDistance: number; setMaxDistance: (v: number) => void;
   ageMin: number | ""; setAgeMin: (v: number | "") => void;
   ageMax: number | ""; setAgeMax: (v: number | "") => void;
+  includeUnknownAge: boolean; setIncludeUnknownAge: (v: boolean) => void;
   onClose: () => void; onReset: () => void;
 }) {
   const SKILLS = ["All Levels", "Beginner", "Intermediate", "Advanced"];
@@ -308,7 +319,16 @@ function PlayersFilterSheet({ sport, setSport, skill, setSkill, maxDistance, set
           <Chip active={ageMin === 35 && ageMax === 49} onClick={() => { setAgeMin(35); setAgeMax(49); }}>35–49</Chip>
           <Chip active={ageMin === 50 && ageMax === ""} onClick={() => { setAgeMin(50); setAgeMax(""); }}>50+</Chip>
         </div>
-        <p className="text-[11px] text-muted-foreground -mt-3 mb-4">Players who haven't set a birthday are hidden when an age range is active.</p>
+        <label className="flex items-center gap-2 mb-5 -mt-2 text-xs text-muted-foreground cursor-pointer select-none">
+          <input
+            type="checkbox"
+            className="h-4 w-4 accent-lime"
+            checked={includeUnknownAge}
+            disabled={ageMin === "" && ageMax === ""}
+            onChange={(e) => setIncludeUnknownAge(e.target.checked)}
+          />
+          <span>Include players who haven't shared a birthday</span>
+        </label>
 
 
         <div className="flex gap-2">
