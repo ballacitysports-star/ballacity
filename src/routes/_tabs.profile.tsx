@@ -201,6 +201,14 @@ function Profile() {
               </span>
             </h1>
             <div className="text-sm text-muted-foreground">{me.username} · {me.city}</div>
+            {(me.birthday || me.graduatingClass) && (
+              <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-muted-foreground">
+                {me.birthday && (
+                  <span>🎂 {formatBirthday(me.birthday)}{ageFrom(me.birthday) != null ? ` · ${ageFrom(me.birthday)} yrs` : ""}</span>
+                )}
+                {me.graduatingClass && <span>🎓 Class of {me.graduatingClass}</span>}
+              </div>
+            )}
           </div>
         </div>
         <p className="mt-3 text-sm text-foreground/90">{me.bio}</p>
