@@ -217,8 +217,9 @@ function PlayersPage() {
             maxDistance={maxDistance} setMaxDistance={setMaxDistance}
             ageMin={ageMin} setAgeMin={setAgeMin}
             ageMax={ageMax} setAgeMax={setAgeMax}
+            includeUnknownAge={includeUnknownAge} setIncludeUnknownAge={setIncludeUnknownAge}
             onClose={() => setFiltersOpen(false)}
-            onReset={() => { setSport(""); setSkill(""); setMaxDistance(0); setAgeMin(""); setAgeMax(""); }}
+            onReset={() => { setSport(""); setSkill(""); setMaxDistance(0); setAgeMin(""); setAgeMax(""); setIncludeUnknownAge(true); }}
           />
         )}
       </AnimatePresence>
@@ -226,12 +227,13 @@ function PlayersPage() {
   );
 }
 
-function PlayersFilterSheet({ sport, setSport, skill, setSkill, maxDistance, setMaxDistance, ageMin, setAgeMin, ageMax, setAgeMax, onClose, onReset }: {
+function PlayersFilterSheet({ sport, setSport, skill, setSkill, maxDistance, setMaxDistance, ageMin, setAgeMin, ageMax, setAgeMax, includeUnknownAge, setIncludeUnknownAge, onClose, onReset }: {
   sport: string; setSport: (v: string) => void;
   skill: string; setSkill: (v: string) => void;
   maxDistance: number; setMaxDistance: (v: number) => void;
   ageMin: number | ""; setAgeMin: (v: number | "") => void;
   ageMax: number | ""; setAgeMax: (v: number | "") => void;
+  includeUnknownAge: boolean; setIncludeUnknownAge: (v: boolean) => void;
   onClose: () => void; onReset: () => void;
 }) {
   const SKILLS = ["All Levels", "Beginner", "Intermediate", "Advanced"];
