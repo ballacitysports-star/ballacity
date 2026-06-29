@@ -7,16 +7,18 @@ import {
   IdCard,
   LogOut,
   Lock,
+  Monitor,
   Moon,
   Shield,
   Sun,
   UserCog,
+
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
-import { Switch } from "@/components/ui/switch";
-import { useTheme } from "@/lib/theme";
+import { useTheme, type Theme } from "@/lib/theme";
+
 
 export const Route = createFileRoute("/settings")({
   component: SettingsHubPage,
@@ -70,8 +72,7 @@ const SECTIONS: Section[] = [
 ];
 
 function SettingsHubPage() {
-  const [theme, setTheme] = useTheme();
-  const isDark = theme === "dark";
+  const [theme, setTheme, , resolved] = useTheme();
 
   const handleSignOut = async () => {
     try {
@@ -83,6 +84,11 @@ function SettingsHubPage() {
     }
   };
 
+  const themeOptions: { value: Theme; label: string; icon: LucideIcon }[] = [
+    { value: "light", label: "Light", icon: Sun },
+    { value: "dark", label: "Dark", icon: Moon },
+    { value: "system", label: "Auto", icon: Monitor },
+  ];
 
   return (
     <div className="min-h-screen bg-background pb-24">
@@ -98,23 +104,38 @@ function SettingsHubPage() {
           <h2 className="px-1 pb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
             Appearance
           </h2>
-          <div className="flex items-center gap-3 rounded-xl border bg-card px-4 py-3">
-            <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-muted">
-              {isDark ? <Moon className="h-4 w-4" /> : <Sun className="h-4 w-4" />}
-            </span>
-            <span className="min-w-0 flex-1">
-              <span className="block truncate text-sm font-medium">Dark mode</span>
-              <span className="block truncate text-xs text-muted-foreground">
-                {isDark ? "Using dark theme" : "Using light theme"}
-              </span>
-            </span>
-            <Switch
-              checked={isDark}
-              onCheckedChange={(checked) => setTheme(checked ? "dark" : "light")}
-              aria-label="Toggle dark mode"
-            />
+          <div className="rounded-xl border bg-card p-2">
+            <div role="radiogroup" aria-label="Theme" className="grid grid-cols-3 gap-1">
+              {themeOptions.map((opt) => {
+                const Icon = opt.icon;
+                const active = theme === opt.value;
+                return (
+                  <button
+                    key={opt.value}
+                    type="button"
+                    role="radio"
+                    aria-checked={active}
+                    onClick={() => setTheme(opt.value)}
+                    className={`flex items-center justify-center gap-2 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors ${
+                      active
+                        ? "bg-primary text-primary-foreground"
+                        : "text-muted-foreground hover:bg-muted"
+                    }`}
+                  >
+                    <Icon className="h-4 w-4" />
+                    {opt.label}
+                  </button>
+                );
+              })}
+            </div>
+            <p className="px-2 pt-2 text-xs text-muted-foreground">
+              {theme === "system"
+                ? `Following your device (${resolved})`
+                : `Using ${resolved} theme`}
+            </p>
           </div>
         </section>
+
 
         {SECTIONS.map((section) => (
           <section key={section.title}>
