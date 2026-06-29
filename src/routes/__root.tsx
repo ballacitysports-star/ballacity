@@ -95,9 +95,10 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     links: [
       { rel: "preconnect", href: "https://fonts.googleapis.com" },
       { rel: "preconnect", href: "https://fonts.gstatic.com", crossOrigin: "anonymous" },
-      { rel: "stylesheet", href: "https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=DM+Sans:wght@400;500;600;700&display=swap" },
+      { rel: "stylesheet", href: "https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700&family=Manrope:wght@400;500;600;700&display=swap" },
       { rel: "stylesheet", href: appCss },
     ],
+
   }),
   shellComponent: RootShell,
   component: RootComponent,
@@ -105,7 +106,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
   errorComponent: ErrorComponent,
 });
 
-const THEME_INIT_SCRIPT = `(function(){try{var t=localStorage.getItem('openrun:theme');var c=t==='light'?'light':'dark';var h=document.documentElement;h.classList.add(c);h.dataset.theme=c;}catch(e){document.documentElement.classList.add('dark');}})();`;
+const THEME_INIT_SCRIPT = `(function(){try{var t=localStorage.getItem('openrun:theme');var pref=(t==='light'||t==='dark'||t==='system')?t:'system';var sysDark=window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches;var c=pref==='system'?(sysDark?'dark':'light'):pref;var h=document.documentElement;h.classList.add(c);h.dataset.theme=c;h.dataset.themePref=pref;}catch(e){document.documentElement.classList.add('dark');}})();`;
 
 function RootShell({ children }: { children: React.ReactNode }) {
   return (
