@@ -90,7 +90,7 @@ function Profile() {
     const key = `openrun.profileSync.v1.${profileUser.id}`;
     if (typeof window === "undefined") return;
     const local = readOverrides(profileUser.id);
-    const hasLocalData = ["name", "username", "avatar", "bio", "city", "avatarUrl", "coverUrl", "links"].some((field) =>
+    const hasLocalData = ["name", "username", "avatar", "bio", "city", "avatarUrl", "coverUrl", "links", "birthday", "graduatingClass"].some((field) =>
       Object.prototype.hasOwnProperty.call(local, field),
     );
     if (!hasLocalData) return;
@@ -103,6 +103,8 @@ function Profile() {
       city: (local.city ?? me.city) || null,
       avatar_url: local.avatarUrl ?? me.avatarUrl ?? null,
       cover_url: local.coverUrl ?? me.coverUrl ?? null,
+      birthday: local.birthday ?? me.birthday ?? null,
+      graduating_class: local.graduatingClass ?? me.graduatingClass ?? null,
       links: Array.isArray(local.links) ? local.links : (me.links ?? []),
     };
     const signature = JSON.stringify(payload);

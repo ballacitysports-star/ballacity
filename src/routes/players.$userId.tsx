@@ -31,6 +31,8 @@ type ProfileRow = {
   city: string | null;
   avatar_url: string | null;
   cover_url: string | null;
+  birthday: string | null;
+  graduating_class: number | null;
   links: any;
 };
 
@@ -53,7 +55,7 @@ function PlayerProfilePage() {
     Promise.all([
       supabase
         .from("profiles")
-        .select("id, display_name, avatar_initials, bio, sport, username, city, avatar_url, cover_url, links")
+        .select("id, display_name, avatar_initials, bio, sport, username, city, avatar_url, cover_url, birthday, graduating_class, links")
         .eq("id", userId)
         .maybeSingle(),
       supabase
@@ -174,6 +176,14 @@ function PlayerProfilePage() {
             <div className="text-sm text-muted-foreground truncate">
               {[username, city].filter(Boolean).join(" · ")}
             </div>
+            {(profile.birthday || profile.graduating_class) && (
+              <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-muted-foreground">
+                {profile.birthday && (
+                  <span>🎂 {formatBirthday(profile.birthday)}{ageFrom(profile.birthday) != null ? ` · ${ageFrom(profile.birthday)} yrs` : ""}</span>
+                )}
+                {profile.graduating_class && <span>🎓 Class of {profile.graduating_class}</span>}
+              </div>
+            )}
           </div>
           <Button
             onClick={handleMessage}
@@ -335,4 +345,20 @@ function formatWindow(a: PlayerAvailability): string {
 function fmtDate(iso: string) {
   const d = new Date(iso + "T00:00:00");
   return d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+}
+
+function formatBirthday(iso: string): string {
+  const d = new Date(iso + "T00:00:00");
+  if (isNaN(d.getTime())) return iso;
+  return d.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
+}
+
+function ageFrom(iso: string): number | null {
+  const d = new Date(iso + "T00:00:00");
+  if (isNaN(d.getTime())) return null;
+  const now = new Date();
+  let age = now.getFullYear() - d.getFullYear();
+  const m = now.getMonth() - d.getMonth();
+  if (m < 0 || (m === 0 && now.getDate() < d.getDate())) age--;
+  return age >= 0 && age < 150 ? age : null;
 }
