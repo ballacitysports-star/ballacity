@@ -22,6 +22,7 @@ export type PlayerAvailability = {
 export type AvailabilityWithAuthor = PlayerAvailability & {
   author_name: string;
   author_initials: string | null;
+  author_birthday: string | null;
 };
 
 export type AvailabilityContactRequest = {
