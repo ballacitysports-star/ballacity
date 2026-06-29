@@ -247,6 +247,8 @@ function EditProfile() {
       .map((l) => ({ ...l, url: normalizeUrl(l.url), label: l.label?.trim() || undefined }))
       .filter((l) => l.url);
     const trimmedCity = city.trim().slice(0, 80);
+    const birthdayErr = validateBirthday(birthday);
+    if (birthdayErr) { toast.error(birthdayErr); return; }
     const birthdayClean = birthday && /^\d{4}-\d{2}-\d{2}$/.test(birthday) ? birthday : undefined;
     const gradNum = graduatingClass.trim() ? parseInt(graduatingClass, 10) : NaN;
     const currentYear = new Date().getFullYear();
