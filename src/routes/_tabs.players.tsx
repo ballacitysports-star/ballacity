@@ -38,6 +38,8 @@ function PlayersPage() {
   const [sport, setSport] = useState("");
   const [skill, setSkill] = useState<string>("");
   const [maxDistance, setMaxDistance] = useState<number>(0); // 0 = any
+  const [ageMin, setAgeMin] = useState<number | "">("");
+  const [ageMax, setAgeMax] = useState<number | "">("");
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [list, setList] = useState<AvailabilityWithAuthor[] | null>(null);
   const [postOpen, setPostOpen] = useState(false);
@@ -53,21 +55,42 @@ function PlayersPage() {
     return () => { cancelled = true; };
   }, [sport, reloadTick]);
 
-  const activeFilterCount = (sport ? 1 : 0) + (skill ? 1 : 0) + (maxDistance > 0 ? 1 : 0);
+  const ageActive = ageMin !== "" || ageMax !== "";
+  const activeFilterCount = (sport ? 1 : 0) + (skill ? 1 : 0) + (maxDistance > 0 ? 1 : 0) + (ageActive ? 1 : 0);
 
   const filtered = useMemo(() => {
     if (!list) return null;
     const needle = q.trim().toLowerCase();
+    const minA = ageMin === "" ? null : Number(ageMin);
+    const maxA = ageMax === "" ? null : Number(ageMax);
     return list.filter((a) => {
       if (skill && a.skill_level !== skill) return false;
       if (maxDistance > 0 && kmToMi(a.travel_radius_km) > maxDistance) return false;
+      if (minA !== null || maxA !== null) {
+        const age = ageFromBirthday(a.author_birthday);
+        if (age === null) return false;
+        if (minA !== null && age < minA) return false;
+        if (maxA !== null && age > maxA) return false;
+      }
       if (needle) {
         const hay = (a.author_name + " " + (a.city ?? "") + " " + (a.note ?? "") + " " + a.sports.join(" ")).toLowerCase();
         if (!hay.includes(needle)) return false;
       }
       return true;
     });
-  }, [list, q, skill, maxDistance]);
+  }, [list, q, skill, maxDistance, ageMin, ageMax]);
+
+  function ageFromBirthday(iso: string | null): number | null {
+    if (!iso) return null;
+    const d = new Date(iso);
+    if (isNaN(d.getTime())) return null;
+    const now = new Date();
+    let age = now.getFullYear() - d.getFullYear();
+    const m = now.getMonth() - d.getMonth();
+    if (m < 0 || (m === 0 && now.getDate() < d.getDate())) age--;
+    return age;
+  }
+
 
 
   return (
@@ -183,8 +206,10 @@ function PlayersPage() {
             sport={sport} setSport={setSport}
             skill={skill} setSkill={setSkill}
             maxDistance={maxDistance} setMaxDistance={setMaxDistance}
+            ageMin={ageMin} setAgeMin={setAgeMin}
+            ageMax={ageMax} setAgeMax={setAgeMax}
             onClose={() => setFiltersOpen(false)}
-            onReset={() => { setSport(""); setSkill(""); setMaxDistance(0); }}
+            onReset={() => { setSport(""); setSkill(""); setMaxDistance(0); setAgeMin(""); setAgeMax(""); }}
           />
         )}
       </AnimatePresence>
@@ -192,10 +217,12 @@ function PlayersPage() {
   );
 }
 
-function PlayersFilterSheet({ sport, setSport, skill, setSkill, maxDistance, setMaxDistance, onClose, onReset }: {
+function PlayersFilterSheet({ sport, setSport, skill, setSkill, maxDistance, setMaxDistance, ageMin, setAgeMin, ageMax, setAgeMax, onClose, onReset }: {
   sport: string; setSport: (v: string) => void;
   skill: string; setSkill: (v: string) => void;
   maxDistance: number; setMaxDistance: (v: number) => void;
+  ageMin: number | ""; setAgeMin: (v: number | "") => void;
+  ageMax: number | ""; setAgeMax: (v: number | "") => void;
   onClose: () => void; onReset: () => void;
 }) {
   const SKILLS = ["All Levels", "Beginner", "Intermediate", "Advanced"];
@@ -246,6 +273,43 @@ function PlayersFilterSheet({ sport, setSport, skill, setSkill, maxDistance, set
             </Chip>
           ))}
         </div>
+
+        <div className="text-xs font-semibold text-muted-foreground mb-2 uppercase tracking-wider">Age range</div>
+        <div className="flex items-center gap-2 mb-2">
+          <input
+            type="number"
+            inputMode="numeric"
+            min={1}
+            max={120}
+            value={ageMin}
+            onChange={(e) => setAgeMin(e.target.value === "" ? "" : Math.max(1, Math.min(120, Number(e.target.value))))}
+            placeholder="Min"
+            className="flex-1 rounded-full border border-border bg-surface px-4 py-2 text-sm outline-none"
+            aria-label="Minimum age"
+          />
+          <span className="text-muted-foreground text-sm">–</span>
+          <input
+            type="number"
+            inputMode="numeric"
+            min={1}
+            max={120}
+            value={ageMax}
+            onChange={(e) => setAgeMax(e.target.value === "" ? "" : Math.max(1, Math.min(120, Number(e.target.value))))}
+            placeholder="Max"
+            className="flex-1 rounded-full border border-border bg-surface px-4 py-2 text-sm outline-none"
+            aria-label="Maximum age"
+          />
+        </div>
+        <div className="flex flex-wrap gap-2 mb-5">
+          <Chip active={ageMin === "" && ageMax === ""} onClick={() => { setAgeMin(""); setAgeMax(""); }}>Any age</Chip>
+          <Chip active={ageMin === 13 && ageMax === 17} onClick={() => { setAgeMin(13); setAgeMax(17); }}>13–17</Chip>
+          <Chip active={ageMin === 18 && ageMax === 24} onClick={() => { setAgeMin(18); setAgeMax(24); }}>18–24</Chip>
+          <Chip active={ageMin === 25 && ageMax === 34} onClick={() => { setAgeMin(25); setAgeMax(34); }}>25–34</Chip>
+          <Chip active={ageMin === 35 && ageMax === 49} onClick={() => { setAgeMin(35); setAgeMax(49); }}>35–49</Chip>
+          <Chip active={ageMin === 50 && ageMax === ""} onClick={() => { setAgeMin(50); setAgeMax(""); }}>50+</Chip>
+        </div>
+        <p className="text-[11px] text-muted-foreground -mt-3 mb-4">Players who haven't set a birthday are hidden when an age range is active.</p>
+
 
         <div className="flex gap-2">
           <button onClick={onReset} className="flex-1 rounded-full border border-border py-3 text-sm font-bold">Reset</button>
