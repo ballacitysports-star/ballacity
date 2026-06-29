@@ -274,6 +274,43 @@ function PlayersFilterSheet({ sport, setSport, skill, setSkill, maxDistance, set
           ))}
         </div>
 
+        <div className="text-xs font-semibold text-muted-foreground mb-2 uppercase tracking-wider">Age range</div>
+        <div className="flex items-center gap-2 mb-2">
+          <input
+            type="number"
+            inputMode="numeric"
+            min={1}
+            max={120}
+            value={ageMin}
+            onChange={(e) => setAgeMin(e.target.value === "" ? "" : Math.max(1, Math.min(120, Number(e.target.value))))}
+            placeholder="Min"
+            className="flex-1 rounded-full border border-border bg-surface px-4 py-2 text-sm outline-none"
+            aria-label="Minimum age"
+          />
+          <span className="text-muted-foreground text-sm">–</span>
+          <input
+            type="number"
+            inputMode="numeric"
+            min={1}
+            max={120}
+            value={ageMax}
+            onChange={(e) => setAgeMax(e.target.value === "" ? "" : Math.max(1, Math.min(120, Number(e.target.value))))}
+            placeholder="Max"
+            className="flex-1 rounded-full border border-border bg-surface px-4 py-2 text-sm outline-none"
+            aria-label="Maximum age"
+          />
+        </div>
+        <div className="flex flex-wrap gap-2 mb-5">
+          <Chip active={ageMin === "" && ageMax === ""} onClick={() => { setAgeMin(""); setAgeMax(""); }}>Any age</Chip>
+          <Chip active={ageMin === 13 && ageMax === 17} onClick={() => { setAgeMin(13); setAgeMax(17); }}>13–17</Chip>
+          <Chip active={ageMin === 18 && ageMax === 24} onClick={() => { setAgeMin(18); setAgeMax(24); }}>18–24</Chip>
+          <Chip active={ageMin === 25 && ageMax === 34} onClick={() => { setAgeMin(25); setAgeMax(34); }}>25–34</Chip>
+          <Chip active={ageMin === 35 && ageMax === 49} onClick={() => { setAgeMin(35); setAgeMax(49); }}>35–49</Chip>
+          <Chip active={ageMin === 50 && ageMax === ""} onClick={() => { setAgeMin(50); setAgeMax(""); }}>50+</Chip>
+        </div>
+        <p className="text-[11px] text-muted-foreground -mt-3 mb-4">Players who haven't set a birthday are hidden when an age range is active.</p>
+
+
         <div className="flex gap-2">
           <button onClick={onReset} className="flex-1 rounded-full border border-border py-3 text-sm font-bold">Reset</button>
           <button onClick={onClose} className="flex-1 rounded-full bg-lime-gradient py-3 text-sm font-bold text-primary-foreground">Done</button>
