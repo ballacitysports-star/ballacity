@@ -40,6 +40,7 @@ function PlayersPage() {
   const [maxDistance, setMaxDistance] = useState<number>(0); // 0 = any
   const [ageMin, setAgeMin] = useState<number | "">("");
   const [ageMax, setAgeMax] = useState<number | "">("");
+  const [includeUnknownAge, setIncludeUnknownAge] = useState<boolean>(true);
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [list, setList] = useState<AvailabilityWithAuthor[] | null>(null);
   const [postOpen, setPostOpen] = useState(false);
@@ -61,16 +62,24 @@ function PlayersPage() {
   const filtered = useMemo(() => {
     if (!list) return null;
     const needle = q.trim().toLowerCase();
-    const minA = ageMin === "" ? null : Number(ageMin);
-    const maxA = ageMax === "" ? null : Number(ageMax);
+    let minA = ageMin === "" ? null : Number(ageMin);
+    let maxA = ageMax === "" ? null : Number(ageMax);
+    // Swap if reversed so the filter still behaves sensibly
+    if (minA !== null && maxA !== null && minA > maxA) {
+      const tmp = minA; minA = maxA; maxA = tmp;
+    }
     return list.filter((a) => {
       if (skill && a.skill_level !== skill) return false;
       if (maxDistance > 0 && kmToMi(a.travel_radius_km) > maxDistance) return false;
       if (minA !== null || maxA !== null) {
         const age = ageFromBirthday(a.author_birthday);
-        if (age === null) return false;
-        if (minA !== null && age < minA) return false;
-        if (maxA !== null && age > maxA) return false;
+        if (age === null) {
+          // No birthday on file — include only when the user has opted in.
+          if (!includeUnknownAge) return false;
+        } else {
+          if (minA !== null && age < minA) return false;
+          if (maxA !== null && age > maxA) return false;
+        }
       }
       if (needle) {
         const hay = (a.author_name + " " + (a.city ?? "") + " " + (a.note ?? "") + " " + a.sports.join(" ")).toLowerCase();
@@ -78,7 +87,7 @@ function PlayersPage() {
       }
       return true;
     });
-  }, [list, q, skill, maxDistance, ageMin, ageMax]);
+  }, [list, q, skill, maxDistance, ageMin, ageMax, includeUnknownAge]);
 
   function ageFromBirthday(iso: string | null): number | null {
     if (!iso) return null;
