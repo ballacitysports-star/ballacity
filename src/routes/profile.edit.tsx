@@ -46,6 +46,7 @@ function EditProfile() {
   const [graduatingClass, setGraduatingClass] = useState<string>(
     profile?.graduatingClass != null ? String(profile.graduatingClass) : "",
   );
+  const [birthdayError, setBirthdayError] = useState<string | null>(null);
   const [sports, setSports] = useState(profile?.sports ?? []);
   const [links, setLinks] = useState<ProfileLink[]>(profile?.links ?? []);
   const [isDirty, setIsDirty] = useState(false);
@@ -215,6 +216,25 @@ function EditProfile() {
   };
   const linkErrors = links.map((l) => validateUrl(l.url));
 
+  function validateBirthday(value: string): string | null {
+    if (!value) return null;
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return "Enter a valid date (YYYY-MM-DD)";
+    const [y, m, day] = value.split("-").map(Number);
+    const d = new Date(y, m - 1, day);
+    if (
+      isNaN(d.getTime()) ||
+      d.getFullYear() !== y ||
+      d.getMonth() !== m - 1 ||
+      d.getDate() !== day
+    ) {
+      return "Enter a valid date (e.g., 2005-06-15)";
+    }
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    if (d > today) return "Birthday cannot be in the future";
+    return null;
+  }
+
   const save = async () => {
     if (!profileUser) { toast.error("Sign in to save"); return; }
     const trimmedName = name.trim().slice(0, 60);
@@ -227,6 +247,8 @@ function EditProfile() {
       .map((l) => ({ ...l, url: normalizeUrl(l.url), label: l.label?.trim() || undefined }))
       .filter((l) => l.url);
     const trimmedCity = city.trim().slice(0, 80);
+    const birthdayErr = validateBirthday(birthday);
+    if (birthdayErr) { toast.error(birthdayErr); return; }
     const birthdayClean = birthday && /^\d{4}-\d{2}-\d{2}$/.test(birthday) ? birthday : undefined;
     const gradNum = graduatingClass.trim() ? parseInt(graduatingClass, 10) : NaN;
     const currentYear = new Date().getFullYear();
@@ -382,10 +404,19 @@ function EditProfile() {
           <input
             type="date"
             value={birthday}
-            onChange={(e) => { markDirty(); setBirthday(e.target.value); }}
+            onChange={(e) => {
+              markDirty();
+              const v = e.target.value;
+              setBirthday(v);
+              setBirthdayError(validateBirthday(v));
+            }}
             max={new Date().toISOString().slice(0, 10)}
-            className="w-full rounded-2xl border border-border bg-surface px-3 py-2 text-sm outline-none focus:border-lime"
+            aria-invalid={birthdayError ? true : undefined}
+            className={`w-full rounded-2xl border bg-surface px-3 py-2 text-sm outline-none focus:border-lime ${birthdayError ? "border-destructive" : "border-border"}`}
           />
+          {birthdayError && (
+            <p className="mt-1 text-xs text-destructive">{birthdayError}</p>
+          )}
         </Field>
         <Field label="Graduating class">
           <Input
