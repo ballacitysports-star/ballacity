@@ -42,6 +42,10 @@ function EditProfile() {
   const [coverUrl, setCoverUrl] = useState<string | undefined>(profile?.coverUrl);
   const [city, setCity] = useState(profile?.city ?? "");
   const [bio, setBio] = useState(profile?.bio ?? "");
+  const [birthday, setBirthday] = useState<string>(profile?.birthday ?? "");
+  const [graduatingClass, setGraduatingClass] = useState<string>(
+    profile?.graduatingClass != null ? String(profile.graduatingClass) : "",
+  );
   const [sports, setSports] = useState(profile?.sports ?? []);
   const [links, setLinks] = useState<ProfileLink[]>(profile?.links ?? []);
   const [isDirty, setIsDirty] = useState(false);
@@ -54,6 +58,8 @@ function EditProfile() {
     coverUrl: profile.coverUrl,
     city: profile.city,
     bio: profile.bio,
+    birthday: profile.birthday,
+    graduatingClass: profile.graduatingClass,
     sports: profile.sports,
     links: profile.links,
   }) : "";
@@ -140,6 +146,8 @@ function EditProfile() {
     setCoverUrl(profile.coverUrl);
     setCity(profile.city);
     setBio(profile.bio);
+    setBirthday(profile.birthday ?? "");
+    setGraduatingClass(profile.graduatingClass != null ? String(profile.graduatingClass) : "");
     setSports(profile.sports);
     setLinks(profile.links);
   }, [profileUser?.id, profileSignature, isDirty]);
