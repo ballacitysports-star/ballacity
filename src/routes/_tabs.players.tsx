@@ -38,6 +38,8 @@ function PlayersPage() {
   const [sport, setSport] = useState("");
   const [skill, setSkill] = useState<string>("");
   const [maxDistance, setMaxDistance] = useState<number>(0); // 0 = any
+  const [ageMin, setAgeMin] = useState<number | "">("");
+  const [ageMax, setAgeMax] = useState<number | "">("");
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [list, setList] = useState<AvailabilityWithAuthor[] | null>(null);
   const [postOpen, setPostOpen] = useState(false);
@@ -53,21 +55,42 @@ function PlayersPage() {
     return () => { cancelled = true; };
   }, [sport, reloadTick]);
 
-  const activeFilterCount = (sport ? 1 : 0) + (skill ? 1 : 0) + (maxDistance > 0 ? 1 : 0);
+  const ageActive = ageMin !== "" || ageMax !== "";
+  const activeFilterCount = (sport ? 1 : 0) + (skill ? 1 : 0) + (maxDistance > 0 ? 1 : 0) + (ageActive ? 1 : 0);
 
   const filtered = useMemo(() => {
     if (!list) return null;
     const needle = q.trim().toLowerCase();
+    const minA = ageMin === "" ? null : Number(ageMin);
+    const maxA = ageMax === "" ? null : Number(ageMax);
     return list.filter((a) => {
       if (skill && a.skill_level !== skill) return false;
       if (maxDistance > 0 && kmToMi(a.travel_radius_km) > maxDistance) return false;
+      if (minA !== null || maxA !== null) {
+        const age = ageFromBirthday(a.author_birthday);
+        if (age === null) return false;
+        if (minA !== null && age < minA) return false;
+        if (maxA !== null && age > maxA) return false;
+      }
       if (needle) {
         const hay = (a.author_name + " " + (a.city ?? "") + " " + (a.note ?? "") + " " + a.sports.join(" ")).toLowerCase();
         if (!hay.includes(needle)) return false;
       }
       return true;
     });
-  }, [list, q, skill, maxDistance]);
+  }, [list, q, skill, maxDistance, ageMin, ageMax]);
+
+  function ageFromBirthday(iso: string | null): number | null {
+    if (!iso) return null;
+    const d = new Date(iso);
+    if (isNaN(d.getTime())) return null;
+    const now = new Date();
+    let age = now.getFullYear() - d.getFullYear();
+    const m = now.getMonth() - d.getMonth();
+    if (m < 0 || (m === 0 && now.getDate() < d.getDate())) age--;
+    return age;
+  }
+
 
 
   return (
