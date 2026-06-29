@@ -46,6 +46,7 @@ function EditProfile() {
   const [graduatingClass, setGraduatingClass] = useState<string>(
     profile?.graduatingClass != null ? String(profile.graduatingClass) : "",
   );
+  const [birthdayError, setBirthdayError] = useState<string | null>(null);
   const [sports, setSports] = useState(profile?.sports ?? []);
   const [links, setLinks] = useState<ProfileLink[]>(profile?.links ?? []);
   const [isDirty, setIsDirty] = useState(false);
