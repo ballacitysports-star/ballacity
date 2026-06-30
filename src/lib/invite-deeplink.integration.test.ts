@@ -134,10 +134,10 @@ describe.skipIf(skipIfNoBackend)("invite notification deep link", () => {
     // 3. The actual route's validateSearch parses them back into typed state,
     //    so the Game detail page will render the "You're invited" banner.
     const search = Object.fromEntries(params.entries()) as Record<string, unknown>;
-    const parsed = GameRoute.options.validateSearch!(search) as {
-      invite?: true;
-      from?: string;
-    };
+    const validate = GameRoute.options.validateSearch as unknown as (
+      s: Record<string, unknown>,
+    ) => { invite?: true; from?: string };
+    const parsed = validate(search);
     expect(parsed.invite).toBe(true);
     expect(parsed.from).toBe(hostId);
   });
