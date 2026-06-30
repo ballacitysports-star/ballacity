@@ -24,6 +24,12 @@ const emojiBySport: Record<string, string> = Object.fromEntries(SPORTS.map((s) =
 const hostIdFor = (username: string) => `host-${username.replace(/^@/, "").toLowerCase()}`;
 
 export const Route = createFileRoute("/games/$gameId")({
+  validateSearch: (search: Record<string, unknown>) => {
+    const out: { invite?: true; from?: string } = {};
+    if (search.invite === "1" || search.invite === 1 || search.invite === true) out.invite = true;
+    if (typeof search.from === "string" && search.from.length > 0) out.from = search.from;
+    return out;
+  },
   loader: ({ params }) => {
     return { gameId: params.gameId };
   },
@@ -61,6 +67,7 @@ export const Route = createFileRoute("/games/$gameId")({
 
 function GameDetail() {
   const { gameId } = Route.useLoaderData();
+  const { invite: isInvite, from: inviteFrom } = Route.useSearch();
   const hosted = useHostedGames();
   const game = useMemo<Game | undefined>(
     () => hosted.find((g) => g.id === gameId) ?? GAMES.find((g) => g.id === gameId),
@@ -273,6 +280,19 @@ function GameDetail() {
       </div>
 
       <div className="mx-auto w-full max-w-md sm:max-w-2xl lg:max-w-4xl px-4 mt-5 space-y-5">
+        {/* Invite deep-link banner */}
+        {isInvite && !isHost && !viewerCountsAsJoined && !viewerPending && (
+          <div className="rounded-2xl border border-lime/40 bg-lime/10 p-4 flex items-start gap-3" role="status">
+            <div className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-lime/20 text-lime">🎟️</div>
+            <div className="min-w-0 flex-1">
+              <div className="font-display text-sm font-bold">You're invited to this game</div>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                The host invited you personally{inviteFrom ? "" : ""}. Tap {requiresApproval ? "“Request to join”" : isPaid ? "“Pay & join”" : "“Join”"} below to confirm your spot.
+              </p>
+            </div>
+          </div>
+        )}
+
         {/* Approval status banner (player view) */}
         {!isHost && requiresApproval && myReq && (
           <div
