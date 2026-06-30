@@ -24,6 +24,10 @@ const emojiBySport: Record<string, string> = Object.fromEntries(SPORTS.map((s) =
 const hostIdFor = (username: string) => `host-${username.replace(/^@/, "").toLowerCase()}`;
 
 export const Route = createFileRoute("/games/$gameId")({
+  validateSearch: (search: Record<string, unknown>) => ({
+    invite: search.invite === "1" || search.invite === 1 || search.invite === true,
+    from: typeof search.from === "string" ? search.from : undefined,
+  }),
   loader: ({ params }) => {
     return { gameId: params.gameId };
   },
