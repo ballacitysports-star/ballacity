@@ -689,11 +689,20 @@ function ContactDialog({ availability, hostedGames, onClose }: {
     setSaving(true);
     try {
       let body = msg.trim();
-      if (isInvite && selected) {
-        const header = `You're invited to ${selected.title} — ${selected.sport} on ${formattedDate(selected.date)} at ${selected.location}.`;
+      const invite = isInvite && selected
+        ? {
+            gameId: selected.id,
+            title: selected.title,
+            startsAt: selected.date,
+            sport: selected.sport,
+            location: selected.location,
+          }
+        : null;
+      if (invite) {
+        const header = `You're invited to ${selected!.title} — ${selected!.sport} on ${formattedDate(selected!.date)} at ${selected!.location}.`;
         body = body ? `${header}\n\n${body}` : header;
       }
-      await createContactRequest(availability.id, availability.user_id, body);
+      await createContactRequest(availability.id, availability.user_id, body, invite);
       toast.success(isInvite ? "Invite sent" : "Contact request sent");
       onClose();
     } catch (e: any) {

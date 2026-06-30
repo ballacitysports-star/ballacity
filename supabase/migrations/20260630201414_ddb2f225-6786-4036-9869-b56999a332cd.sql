@@ -1,0 +1,1 @@
+REVOKE EXECUTE ON FUNCTION public.validate_availability_contact_request() FROM PUBLIC, anon, authenticated;
