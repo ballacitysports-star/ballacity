@@ -19,7 +19,13 @@ export type Database = {
           availability_id: string
           created_at: string
           from_user_id: string
+          game_id: string | null
+          game_location: string | null
+          game_sport: string | null
+          game_starts_at: string | null
+          game_title: string | null
           id: string
+          kind: string
           message: string | null
           status: string
           to_user_id: string
@@ -29,7 +35,13 @@ export type Database = {
           availability_id: string
           created_at?: string
           from_user_id: string
+          game_id?: string | null
+          game_location?: string | null
+          game_sport?: string | null
+          game_starts_at?: string | null
+          game_title?: string | null
           id?: string
+          kind?: string
           message?: string | null
           status?: string
           to_user_id: string
@@ -39,7 +51,13 @@ export type Database = {
           availability_id?: string
           created_at?: string
           from_user_id?: string
+          game_id?: string | null
+          game_location?: string | null
+          game_sport?: string | null
+          game_starts_at?: string | null
+          game_title?: string | null
           id?: string
+          kind?: string
           message?: string | null
           status?: string
           to_user_id?: string
