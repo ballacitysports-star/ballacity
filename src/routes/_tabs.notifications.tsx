@@ -478,6 +478,7 @@ function PushDeliveryFallback({ userId }: { userId: string | undefined }) {
 }
 
 
+function timeAgo(iso: string) {
   const diff = Date.now() - new Date(iso).getTime();
   const m = Math.round(diff / 60000);
   if (m < 1) return "just now";
