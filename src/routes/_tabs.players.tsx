@@ -249,6 +249,7 @@ function PlayersPage() {
                 key={a.id}
                 a={a}
                 isMine={user?.id === a.user_id}
+                hasHostedGames={myUpcomingHosted.length > 0}
                 onContact={() => user ? setContactFor(a) : toast.error("Sign in to contact this player.")}
                 onChanged={() => setReloadTick((t) => t + 1)}
               />
@@ -263,7 +264,14 @@ function PlayersPage() {
           onPosted={() => { setPostOpen(false); setReloadTick((t) => t + 1); toast.success("Availability posted"); }}
         />
       )}
-      {contactFor && <ContactDialog availability={contactFor} onClose={() => setContactFor(null)} />}
+      {contactFor && (
+        <ContactDialog
+          availability={contactFor}
+          hostedGames={myUpcomingHosted}
+          onClose={() => setContactFor(null)}
+        />
+      )}
+
 
       <AnimatePresence>
         {filtersOpen && (
