@@ -68,6 +68,14 @@ function loadStoredFilters(): StoredFilters {
 
 function PlayersPage() {
   const { user } = useAuth();
+  const hostedGames = useHostedGames();
+  const myUpcomingHosted = useMemo(() => {
+    if (!user) return [];
+    const now = Date.now();
+    return hostedGames
+      .filter((g) => g.hostUserId === user.id && new Date(g.date).getTime() > now - 3 * 60 * 60 * 1000)
+      .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+  }, [hostedGames, user?.id]);
   const initial = loadStoredFilters();
   const [q, setQ] = useState(initial.q);
   const [sport, setSport] = useState(initial.sport);
@@ -81,6 +89,7 @@ function PlayersPage() {
   const [postOpen, setPostOpen] = useState(false);
   const [contactFor, setContactFor] = useState<AvailabilityWithAuthor | null>(null);
   const [reloadTick, setReloadTick] = useState(0);
+
 
   useEffect(() => {
     if (typeof window === "undefined") return;
