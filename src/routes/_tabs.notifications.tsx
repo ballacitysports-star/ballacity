@@ -153,7 +153,9 @@ function Notifications() {
       <p className="text-muted-foreground text-sm mb-5">Real-time updates from your games & crew.</p>
 
       <PushPrompt />
+      <PushDeliveryFallback userId={user?.id} />
       <NotificationPreferences />
+
 
       {fetching ? (
         <div className="text-sm text-muted-foreground">Loading…</div>
