@@ -23,7 +23,7 @@ export const CATEGORY_META: Record<NotifCategory, { label: string; description: 
 const KEY = "openrun.notifPrefs.v2";
 
 export function categoryFor(type: string): NotifCategory {
-  if (type === "join_request") return "joinRequests";
+  if (type === "join_request" || type === "game_invite") return "joinRequests";
   if (type === "join_approved" || type === "join_declined") return "approvals";
   if (type === "message") return "messages";
   return "general";
