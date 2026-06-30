@@ -255,4 +255,49 @@ describe.skipIf(skipIfNoBackend)("availability invite endpoint", () => {
     expect(after?.kind).toBe("invite");
     expect(after?.to_user_id).toBe(playerId);
   });
+
+  it("createContactRequest(invite) inserts an in-app notification for the recipient", async () => {
+    if (!canRun || !playerAvailabilityId) return;
+    // Use the real client-side helper so we exercise the same code path the UI uses.
+    const mod = await import("./availability");
+    // Swap the singleton client briefly via dynamic import context: createContactRequest
+    // reads the signed-in user via supabase.auth — re-sign in the shared client as host.
+    const { supabase } = await import("@/integrations/supabase/client");
+    await supabase.auth.signInWithPassword({ email: host.email, password: host.password });
+
+    const gameId = `notif-${Date.now()}`;
+    const before = new Date().toISOString();
+    await mod.createContactRequest(playerAvailabilityId, playerId, "Want in?", {
+      gameId,
+      title: "Notif verification game",
+      sport: "Basketball",
+      location: "Test Park",
+      startsAt: new Date(Date.now() + 86_400_000).toISOString(),
+    });
+
+    // Recipient (player) reads their own notifications row (RLS scoped to auth.uid()).
+    // Poll briefly because the insert is fire-and-forget.
+    let found: any = null;
+    for (let i = 0; i < 6; i++) {
+      const { data } = await playerClient
+        .from("notifications")
+        .select("id, type, title, user_id, created_at")
+        .eq("user_id", playerId)
+        .eq("type", "game_invite")
+        .gte("created_at", before)
+        .order("created_at", { ascending: false })
+        .limit(1);
+      if (data && data.length) { found = data[0]; break; }
+      await new Promise((r) => setTimeout(r, 250));
+    }
+    expect(found).toBeTruthy();
+    expect(found.title).toMatch(/Notif verification game/);
+
+    // Cleanup the request row created via the helper (by recipient/game_id).
+    const { data: rows } = await hostClient
+      .from("availability_contact_requests")
+      .select("id")
+      .eq("game_id", gameId);
+    if (rows) for (const r of rows) createdRequestIds.push(r.id as string);
+  });
 });
