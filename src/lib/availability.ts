@@ -155,7 +155,7 @@ export async function createContactRequest(
         type: "game_invite",
         title: `You're invited to ${invite.title ?? "a pickup game"}`,
         body: [invite.sport, invite.location].filter(Boolean).join(" · ") || null,
-        link: "/notifications",
+        link: `/games/${invite.gameId}?invite=1&from=${u.user.id}`,
       });
     } catch (e) {
       console.warn("invite notification failed", e);
