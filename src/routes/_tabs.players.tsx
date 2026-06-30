@@ -446,8 +446,8 @@ function EmptyState({ title, body, cta }: { title: string; body: string; cta?: R
   );
 }
 
-function AvailabilityCard({ a, isMine, onContact, onChanged }: {
-  a: AvailabilityWithAuthor; isMine: boolean; onContact: () => void; onChanged: () => void;
+function AvailabilityCard({ a, isMine, hasHostedGames, onContact, onChanged }: {
+  a: AvailabilityWithAuthor; isMine: boolean; hasHostedGames: boolean; onContact: () => void; onChanged: () => void;
 }) {
   const navigate = useNavigate();
   const initials = a.author_initials ?? a.author_name.slice(0, 2).toUpperCase();
@@ -526,7 +526,11 @@ function AvailabilityCard({ a, isMine, onContact, onChanged }: {
               <MessageCircle className="h-4 w-4 mr-1" /> Message
             </Button>
             <Button size="sm" variant="outline" onClick={onContact} className="rounded-full flex-1">
-              <Send className="h-4 w-4 mr-1" /> Contact
+              {hasHostedGames ? (
+                <><Ticket className="h-4 w-4 mr-1" /> Send invite</>
+              ) : (
+                <><Send className="h-4 w-4 mr-1" /> Contact</>
+              )}
             </Button>
           </>
         )}
@@ -534,6 +538,7 @@ function AvailabilityCard({ a, isMine, onContact, onChanged }: {
     </li>
   );
 }
+
 
 function formatWindow(a: PlayerAvailability): string {
   const parts: string[] = [];
