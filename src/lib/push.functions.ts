@@ -35,9 +35,29 @@ export const sendPushToUser = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator(validate)
   .handler(async ({ data }) => {
+    const log = async (
+      status: "sent" | "failed" | "skipped",
+      extra: { error?: string | null; detail?: unknown } = {},
+    ) => {
+      try {
+        const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+        await supabaseAdmin.from("notification_delivery_log" as any).insert({
+          user_id: data.userId,
+          channel: "push",
+          status,
+          provider: "onesignal",
+          error: extra.error ?? null,
+          detail: extra.detail ? (extra.detail as any) : null,
+        } as any);
+      } catch (e) {
+        console.warn("[push] delivery log insert failed", e);
+      }
+    };
+
     const restKey = process.env.ONESIGNAL_REST_API_KEY;
     if (!restKey) {
       console.warn("[push] ONESIGNAL_REST_API_KEY not configured");
+      await log("skipped", { error: "not_configured" });
       return { ok: false as const, reason: "not_configured" };
     }
     try {
@@ -56,14 +76,25 @@ export const sendPushToUser = createServerFn({ method: "POST" })
           url: data.url ?? undefined,
         }),
       });
+      const text = await res.text().catch(() => "");
       if (!res.ok) {
-        const text = await res.text().catch(() => "");
         console.warn("[push] OneSignal error", res.status, text);
+        await log("failed", { error: `http_${res.status}`, detail: { body: text.slice(0, 500) } });
         return { ok: false as const, status: res.status };
       }
-      return { ok: true as const };
+      // OneSignal returns 200 even when no recipients matched; surface that as a skip.
+      let parsed: any = null;
+      try { parsed = text ? JSON.parse(text) : null; } catch { /* ignore */ }
+      const recipients = typeof parsed?.recipients === "number" ? parsed.recipients : null;
+      if (recipients === 0) {
+        await log("skipped", { error: "no_subscribers", detail: parsed });
+        return { ok: true as const, recipients: 0 };
+      }
+      await log("sent", { detail: parsed ? { id: parsed.id, recipients } : null });
+      return { ok: true as const, recipients };
     } catch (e) {
       console.warn("[push] fetch failed", e);
+      await log("failed", { error: "fetch_failed", detail: { message: String(e) } });
       return { ok: false as const, reason: "fetch_failed" };
     }
   });

@@ -153,7 +153,9 @@ function Notifications() {
       <p className="text-muted-foreground text-sm mb-5">Real-time updates from your games & crew.</p>
 
       <PushPrompt />
+      <PushDeliveryFallback userId={user?.id} />
       <NotificationPreferences />
+
 
       {fetching ? (
         <div className="text-sm text-muted-foreground">Loading…</div>
@@ -405,6 +407,76 @@ function PushPrompt() {
     </div>
   );
 }
+
+function PushDeliveryFallback({ userId }: { userId: string | undefined }) {
+  const [failures, setFailures] = useState<Array<{ id: string; created_at: string; error: string | null; notification_id: string | null }>>([]);
+  const [dismissedIds, setDismissedIds] = useState<Set<string>>(() => {
+    if (typeof window === "undefined") return new Set();
+    try { return new Set(JSON.parse(window.localStorage.getItem("openrun.pushFailDismissed.v1") ?? "[]")); }
+    catch { return new Set(); }
+  });
+
+  useEffect(() => {
+    if (!userId) return;
+    let cancelled = false;
+    const load = async () => {
+      const since = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+      const { data } = await supabase
+        .from("notification_delivery_log" as any)
+        .select("id, created_at, error, notification_id, status, channel")
+        .eq("user_id", userId)
+        .eq("channel", "push")
+        .in("status", ["failed", "skipped"])
+        .gte("created_at", since)
+        .order("created_at", { ascending: false })
+        .limit(10);
+      if (!cancelled) setFailures(((data ?? []) as any[]).map((r) => ({
+        id: r.id, created_at: r.created_at, error: r.error, notification_id: r.notification_id,
+      })));
+    };
+    load();
+    const channel = supabase
+      .channel(`notif-deliv-${userId}`)
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "notification_delivery_log", filter: `user_id=eq.${userId}` }, load)
+      .subscribe();
+    return () => { cancelled = true; supabase.removeChannel(channel); };
+  }, [userId]);
+
+  const active = failures.filter((f) => !dismissedIds.has(f.id));
+  if (active.length === 0) return null;
+
+  const dismissAll = () => {
+    const next = new Set(dismissedIds);
+    active.forEach((f) => next.add(f.id));
+    setDismissedIds(next);
+    try { window.localStorage.setItem("openrun.pushFailDismissed.v1", JSON.stringify(Array.from(next))); } catch { /* ignore */ }
+  };
+
+  const reason = active[0].error ?? "unknown";
+  const label =
+    reason === "no_subscribers" ? "No push device is subscribed yet — alerts are showing here instead."
+    : reason === "not_configured" ? "Push provider isn't configured — alerts are showing here instead."
+    : reason === "fetch_failed" ? "Push service is unreachable — alerts are showing here instead."
+    : `${active.length} push${active.length > 1 ? "es" : ""} couldn't be delivered — alerts are showing here instead.`;
+
+  return (
+    <div className="mb-4 rounded-2xl border border-coral/40 bg-coral/10 p-3 flex items-start gap-3">
+      <BellRing className="h-5 w-5 text-coral shrink-0 mt-0.5" />
+      <div className="min-w-0 flex-1">
+        <div className="font-semibold text-sm">Push delivery issue</div>
+        <p className="text-xs text-muted-foreground mt-0.5">{label}</p>
+      </div>
+      <button
+        onClick={dismissAll}
+        className="shrink-0 rounded-full p-1 text-muted-foreground hover:text-foreground"
+        aria-label="Dismiss"
+      >
+        <X className="h-4 w-4" />
+      </button>
+    </div>
+  );
+}
+
 
 function timeAgo(iso: string) {
   const diff = Date.now() - new Date(iso).getTime();
