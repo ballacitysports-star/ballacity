@@ -1,6 +1,6 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
-import { Search, X, Plus, MessageCircle, Send, Calendar, MapPin, Bell, Inbox, Loader2, SlidersHorizontal } from "lucide-react";
+import { Search, X, Plus, MessageCircle, Send, Calendar, MapPin, Bell, Inbox, Loader2, SlidersHorizontal, Ticket } from "lucide-react";
 import { AnimatePresence } from "framer-motion";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
@@ -17,12 +17,15 @@ import {
   type PlayerAvailability,
 } from "@/lib/availability";
 import { getOrCreateDirectConversation } from "@/lib/messages";
+import { useHostedGames } from "@/lib/hosted-games-store";
+import type { Game } from "@/lib/sample-data";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { kmToMi, miToKm } from "@/lib/distance";
+
 
 export const Route = createFileRoute("/_tabs/players")({
   head: () => ({ meta: [{ title: "Players — OpenRun" }] }),
