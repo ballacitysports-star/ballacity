@@ -112,7 +112,20 @@ export async function deleteAvailability(id: string) {
   if (error) throw error;
 }
 
-export async function createContactRequest(availabilityId: string, toUserId: string, message: string) {
+export type InvitePayload = {
+  gameId: string;
+  title?: string | null;
+  startsAt?: string | null; // ISO
+  sport?: string | null;
+  location?: string | null;
+};
+
+export async function createContactRequest(
+  availabilityId: string,
+  toUserId: string,
+  message: string,
+  invite?: InvitePayload | null,
+) {
   const { data: u } = await supabase.auth.getUser();
   if (!u.user) throw new Error("Sign in to contact this player.");
   if (u.user.id === toUserId) throw new Error("You can't contact yourself.");
@@ -124,8 +137,30 @@ export async function createContactRequest(availabilityId: string, toUserId: str
       to_user_id: toUserId,
       message: message.trim().slice(0, 500) || null,
       status: "pending",
+      kind: invite ? "invite" : "contact",
+      game_id: invite?.gameId ?? null,
+      game_title: invite?.title ? invite.title.slice(0, 200) : null,
+      game_starts_at: invite?.startsAt ?? null,
+      game_sport: invite?.sport ? invite.sport.slice(0, 60) : null,
+      game_location: invite?.location ? invite.location.slice(0, 300) : null,
     } as any);
   if (error) throw error;
+
+  // Fire a best-effort in-app + push notification to the recipient.
+  if (invite) {
+    try {
+      const { createNotification } = await import("@/lib/notifications");
+      await createNotification({
+        user_id: toUserId,
+        type: "game_invite",
+        title: `You're invited to ${invite.title ?? "a pickup game"}`,
+        body: [invite.sport, invite.location].filter(Boolean).join(" · ") || null,
+        link: "/notifications",
+      });
+    } catch (e) {
+      console.warn("invite notification failed", e);
+    }
+  }
 }
 
 export async function listMyContactRequests(box: "inbox" | "outbox"): Promise<AvailabilityContactRequest[]> {
