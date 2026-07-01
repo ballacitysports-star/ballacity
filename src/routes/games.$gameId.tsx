@@ -203,7 +203,13 @@ function GameDetail() {
       return;
     }
     if (spotsLeft <= 0) { toast.error("This game is full."); return; }
-    if (isPaid) { nav({ to: "/games/$gameId/pay", params: { gameId: game.id } }); return; }
+    if (isPaid) {
+      const search: { invite?: true; from?: string } = {};
+      if (isInvite) search.invite = true;
+      if (inviteFrom) search.from = inviteFrom;
+      nav({ to: "/games/$gameId/pay", params: { gameId: game.id }, search });
+      return;
+    }
     if (requiresApproval) {
       if (!settings) { toast.error("Host hasn't enabled approvals yet."); return; }
       try {
