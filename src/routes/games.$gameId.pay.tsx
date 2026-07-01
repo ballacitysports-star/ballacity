@@ -13,6 +13,12 @@ import { LegalNotice } from "@/components/LegalNotice";
 import { joinGame } from "@/lib/games-store";
 
 export const Route = createFileRoute("/games/$gameId/pay")({
+  validateSearch: (search: Record<string, unknown>) => {
+    const out: { invite?: true; from?: string } = {};
+    if (search.invite === "1" || search.invite === 1 || search.invite === true) out.invite = true;
+    if (typeof search.from === "string" && search.from.length > 0) out.from = search.from;
+    return out;
+  },
   loader: ({ params }) => {
     const game = GAMES.find((g) => g.id === params.gameId);
     if (!game) throw notFound();
