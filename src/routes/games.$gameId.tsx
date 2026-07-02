@@ -25,9 +25,12 @@ const hostIdFor = (username: string) => `host-${username.replace(/^@/, "").toLow
 
 export const Route = createFileRoute("/games/$gameId")({
   validateSearch: (search: Record<string, unknown>) => {
-    const out: { invite?: true; from?: string } = {};
+    const out: { invite?: true; from?: string; exp?: number } = {};
     if (search.invite === "1" || search.invite === 1 || search.invite === true) out.invite = true;
     if (typeof search.from === "string" && search.from.length > 0) out.from = search.from;
+    const rawExp = search.exp;
+    const expNum = typeof rawExp === "number" ? rawExp : typeof rawExp === "string" ? Number(rawExp) : NaN;
+    if (Number.isFinite(expNum) && expNum > 0) out.exp = expNum;
     return out;
   },
   loader: ({ params }) => {
@@ -67,7 +70,8 @@ export const Route = createFileRoute("/games/$gameId")({
 
 function GameDetail() {
   const { gameId } = Route.useLoaderData();
-  const { invite: isInvite, from: inviteFrom } = Route.useSearch();
+  const { invite: isInvite, from: inviteFrom, exp: inviteExp } = Route.useSearch();
+  const inviteExpired = !!(isInvite && inviteExp && inviteExp < Date.now());
   const hosted = useHostedGames();
   const game = useMemo<Game | undefined>(
     () => hosted.find((g) => g.id === gameId) ?? GAMES.find((g) => g.id === gameId),
@@ -177,6 +181,12 @@ function GameDetail() {
 
 
   const handleJoin = async () => {
+    // Expired invite → block all join actions and steer to discovery.
+    if (inviteExpired && !isHost && !viewerCountsAsJoined && !viewerPending) {
+      toast.error("This invite has expired. Browse open games instead.");
+      nav({ to: "/discover" });
+      return;
+    }
     // Confirmed → leave / withdraw
     if (isConfirmed || joined) {
       try {
@@ -295,15 +305,38 @@ function GameDetail() {
       <div className="mx-auto w-full max-w-md sm:max-w-2xl lg:max-w-4xl px-4 mt-5 space-y-5">
         {/* Invite deep-link banner */}
         {isInvite && !isHost && !viewerCountsAsJoined && !viewerPending && (
-          <div className="rounded-2xl border border-lime/40 bg-lime/10 p-4 flex items-start gap-3" role="status">
-            <div className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-lime/20 text-lime">🎟️</div>
-            <div className="min-w-0 flex-1">
-              <div className="font-display text-sm font-bold">You're invited to this game</div>
-              <p className="text-xs text-muted-foreground mt-0.5">
-                The host invited you personally{inviteFrom ? "" : ""}. Tap {requiresApproval ? "“Request to join”" : isPaid ? "“Pay & join”" : "“Join”"} below to confirm your spot.
-              </p>
+          inviteExpired ? (
+            <div
+              className="rounded-2xl border border-coral/50 bg-coral/10 p-4 flex items-start gap-3"
+              role="status"
+              aria-live="polite"
+              data-testid="invite-expired-banner"
+            >
+              <div className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-coral/20 text-coral">⏰</div>
+              <div className="min-w-0 flex-1">
+                <div className="font-display text-sm font-bold">Invite expired</div>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  This invitation is no longer valid. Browse other open games to find a run near you.
+                </p>
+                <Link
+                  to="/discover"
+                  className="mt-3 inline-flex items-center rounded-full bg-lime-gradient px-4 py-1.5 text-xs font-bold text-primary-foreground"
+                >
+                  Browse open games
+                </Link>
+              </div>
             </div>
-          </div>
+          ) : (
+            <div className="rounded-2xl border border-lime/40 bg-lime/10 p-4 flex items-start gap-3" role="status">
+              <div className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-lime/20 text-lime">🎟️</div>
+              <div className="min-w-0 flex-1">
+                <div className="font-display text-sm font-bold">You're invited to this game</div>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  The host invited you personally{inviteFrom ? "" : ""}. Tap {requiresApproval ? "“Request to join”" : isPaid ? "“Pay & join”" : "“Join”"} below to confirm your spot.
+                </p>
+              </div>
+            </div>
+          )
         )}
 
         {/* Approval status banner (player view) */}
