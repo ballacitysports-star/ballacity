@@ -25,14 +25,18 @@ const hostIdFor = (username: string) => `host-${username.replace(/^@/, "").toLow
 
 export const Route = createFileRoute("/games/$gameId")({
   validateSearch: (search: Record<string, unknown>) => {
-    const out: { invite?: true; from?: string; exp?: number } = {};
+    const out: { invite?: true; from?: string; exp?: number; expInvalid?: true } = {};
     if (search.invite === "1" || search.invite === 1 || search.invite === true) out.invite = true;
     if (typeof search.from === "string" && search.from.length > 0) out.from = search.from;
     const rawExp = search.exp;
-    const expNum = typeof rawExp === "number" ? rawExp : typeof rawExp === "string" ? Number(rawExp) : NaN;
-    if (Number.isFinite(expNum) && expNum > 0) out.exp = expNum;
+    if (rawExp !== undefined && rawExp !== null && rawExp !== "") {
+      const expNum = typeof rawExp === "number" ? rawExp : typeof rawExp === "string" ? Number(rawExp) : NaN;
+      if (Number.isFinite(expNum) && expNum > 0) out.exp = expNum;
+      else out.expInvalid = true;
+    }
     return out;
   },
+
   loader: ({ params }) => {
     return { gameId: params.gameId };
   },
