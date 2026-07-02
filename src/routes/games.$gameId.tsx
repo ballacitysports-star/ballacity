@@ -70,7 +70,8 @@ export const Route = createFileRoute("/games/$gameId")({
 
 function GameDetail() {
   const { gameId } = Route.useLoaderData();
-  const { invite: isInvite, from: inviteFrom } = Route.useSearch();
+  const { invite: isInvite, from: inviteFrom, exp: inviteExp } = Route.useSearch();
+  const inviteExpired = !!(isInvite && inviteExp && inviteExp < Date.now());
   const hosted = useHostedGames();
   const game = useMemo<Game | undefined>(
     () => hosted.find((g) => g.id === gameId) ?? GAMES.find((g) => g.id === gameId),
