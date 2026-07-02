@@ -212,6 +212,13 @@ function GameDetail() {
     }
     if (requiresApproval) {
       if (!settings) { toast.error("Host hasn't enabled approvals yet."); return; }
+      // Invite-link integrity: if the URL claims invite=1, `from` must be present
+      // and must match the actual host. Otherwise the link is missing context or
+      // has been tampered with — refuse to send the request.
+      if (isInvite && (!inviteFrom || inviteFrom !== settings.host_id)) {
+        toast.error("This invite link is invalid or has been tampered with.");
+        return;
+      }
       try {
         await createJoinRequest({ game_id: game.id, host_id: settings.host_id });
         await createNotification({
