@@ -181,6 +181,12 @@ function GameDetail() {
 
 
   const handleJoin = async () => {
+    // Expired invite → block all join actions and steer to discovery.
+    if (inviteExpired && !isHost && !viewerCountsAsJoined && !viewerPending) {
+      toast.error("This invite has expired. Browse open games instead.");
+      nav({ to: "/discover" });
+      return;
+    }
     // Confirmed → leave / withdraw
     if (isConfirmed || joined) {
       try {
