@@ -117,7 +117,11 @@ function GameDetail() {
         getMyJoinRequest(game.id),
       ]);
       setSettings(s); setMySubs(subs); setMyReq(req);
-      if (req?.status === "approved" && !joined) joinGame(game.id);
+      // Auto-join locally only when there's nothing left to pay. Otherwise the
+      // Join CTA would flip to "leave" and hide the Pay flow after approval.
+      const feeOwed = Number(s?.entry_fee ?? game.price ?? 0) > 0;
+      const paidOk = subs[0]?.status === "verified";
+      if (req?.status === "approved" && !joined && (!feeOwed || paidOk)) joinGame(game.id);
     } catch {}
   };
 
@@ -216,6 +220,15 @@ function GameDetail() {
     if (inviteExpired && !isHost && !viewerCountsAsJoined && !viewerPending) {
       toast.error("This invite has expired. Browse open games instead.");
       nav({ to: "/discover" });
+      return;
+    }
+    // Approved-but-unpaid on a paid game → route to pay page (don't treat as
+    // "confirmed → leave" if a prior auto-join left `joined` stale-true).
+    if (isPaid && !paymentCleared && !isPending && (isApproved || !requiresApproval)) {
+      const search: { invite?: true; from?: string } = {};
+      if (isInvite) search.invite = true;
+      if (inviteFrom) search.from = inviteFrom;
+      nav({ to: "/games/$gameId/pay", params: { gameId: game.id }, search });
       return;
     }
     // Confirmed → leave / withdraw
@@ -708,7 +721,7 @@ function GameDetail() {
               ) : (
                 <>
                   {hostRequests.filter((r) => r.status === "approved").map((r) => (
-                    <RosterPlayerRow key={r.id} req={r} gameTitle={game.title} onChange={refreshHostRequests} />
+                    <RosterPlayerRow key={r.id} req={r} gameTitle={game.title} feeRequired={isPaid} onChange={refreshHostRequests} />
                   ))}
                   {Array.from({ length: game.joined }).map((_, i) => (
                     <div key={`ph-${i}`} className="flex items-center gap-3 rounded-2xl border border-border bg-surface p-3">
@@ -878,20 +891,35 @@ function Meta({ icon, label, value }: { icon: React.ReactNode; label: string; va
   );
 }
 
-function RosterPlayerRow({ req, gameTitle, onChange }: { req: JoinRequest; gameTitle: string; onChange: () => void }) {
+function RosterPlayerRow({ req, gameTitle, feeRequired, onChange }: { req: JoinRequest; gameTitle: string; feeRequired: boolean; onChange: () => void }) {
   const [busy, setBusy] = useState(false);
   const [name, setName] = useState<string>("Player");
   const [initials, setInitials] = useState<string>("P");
+  const [paymentStatus, setPaymentStatus] = useState<"verified" | "pending" | "rejected" | "none">("none");
+  const reviews = useReviewsFor(req.player_id);
+  const rep = useMemo(() => computeReputation(reviews, "player"), [reviews]);
+  const reliability = rep.criteriaAverages.find((c) => c.key === "reliability")?.avg ?? 0;
+  const sportsmanship = rep.criteriaAverages.find((c) => c.key === "sportsmanship")?.avg ?? 0;
+
   useEffect(() => {
+    let cancel = false;
     (async () => {
-      const { data } = await supabase.from("profiles").select("display_name, avatar_initials").eq("id", req.player_id).maybeSingle();
-      if (data) {
-        const n = (data as any).display_name ?? "Player";
+      const [profRes, subRes] = await Promise.all([
+        supabase.from("profiles").select("display_name, avatar_initials").eq("id", req.player_id).maybeSingle(),
+        supabase.from("payment_submissions").select("status").eq("game_id", req.game_id).eq("player_id", req.player_id).order("submitted_at", { ascending: false }).limit(1).maybeSingle(),
+      ]);
+      if (cancel) return;
+      const d = profRes.data as any;
+      if (d) {
+        const n = d.display_name ?? "Player";
         setName(n);
-        setInitials(((data as any).avatar_initials ?? n.slice(0, 2)).toUpperCase());
+        setInitials((d.avatar_initials ?? n.slice(0, 2)).toUpperCase());
       }
+      const s = (subRes.data as any)?.status;
+      setPaymentStatus(s === "verified" || s === "pending" || s === "rejected" ? s : "none");
     })();
-  }, [req.player_id]);
+    return () => { cancel = true; };
+  }, [req.player_id, req.game_id]);
 
   const remove = async () => {
     if (!confirm(`Remove ${name} from ${gameTitle}?`)) return;
@@ -911,30 +939,65 @@ function RosterPlayerRow({ req, gameTitle, onChange }: { req: JoinRequest; gameT
     finally { setBusy(false); }
   };
 
+  const fmt = (n: number) => (n > 0 ? n.toFixed(1) : "—");
+  const paymentChip = !feeRequired
+    ? null
+    : paymentStatus === "verified"
+      ? { label: "Paid", cls: "border-lime/40 bg-lime/10 text-lime" }
+      : paymentStatus === "pending"
+        ? { label: "Payment pending", cls: "border-coral/40 bg-coral/10 text-coral" }
+        : paymentStatus === "rejected"
+          ? { label: "Payment rejected", cls: "border-coral/50 bg-coral/15 text-coral" }
+          : { label: "Unpaid", cls: "border-border bg-secondary text-muted-foreground" };
+
   return (
-    <div className="flex items-center gap-3 rounded-2xl border border-lime/30 bg-surface p-3">
-      <Link
-        to="/players/$userId"
-        params={{ userId: req.player_id }}
-        className="grid h-10 w-10 place-items-center rounded-full bg-lime-gradient text-xs font-bold text-primary-foreground"
-      >
-        {initials.slice(0, 2)}
-      </Link>
-      <div className="min-w-0 flex-1">
-        <div className="text-sm font-semibold truncate">{name}</div>
-        <div className="text-[11px] text-lime">Confirmed</div>
+    <div className="rounded-2xl border border-lime/30 bg-surface p-3">
+      <div className="flex items-center gap-3">
+        <Link
+          to="/players/$userId"
+          params={{ userId: req.player_id }}
+          className="grid h-10 w-10 place-items-center rounded-full bg-lime-gradient text-xs font-bold text-primary-foreground"
+        >
+          {initials.slice(0, 2)}
+        </Link>
+        <div className="min-w-0 flex-1">
+          <div className="text-sm font-semibold truncate">{name}</div>
+          <div className="text-[11px] text-muted-foreground">
+            {rep.count > 0 ? `${rep.count} review${rep.count === 1 ? "" : "s"} · trust ${rep.trustScore}` : "No reviews yet"}
+          </div>
+        </div>
+        <button
+          type="button"
+          onClick={remove}
+          disabled={busy}
+          className="inline-flex items-center gap-1 rounded-full border border-coral/40 bg-coral/10 px-3 py-1.5 text-xs font-bold text-coral disabled:opacity-50"
+        >
+          <XIcon className="h-3.5 w-3.5" /> Remove
+        </button>
       </div>
-      <button
-        type="button"
-        onClick={remove}
-        disabled={busy}
-        className="inline-flex items-center gap-1 rounded-full border border-coral/40 bg-coral/10 px-3 py-1.5 text-xs font-bold text-coral disabled:opacity-50"
-      >
-        <XIcon className="h-3.5 w-3.5" /> Remove
-      </button>
+      <div className="mt-2 flex flex-wrap items-center gap-1.5">
+        <span className="inline-flex items-center gap-1 rounded-full border border-border bg-background px-2 py-0.5 text-[10px] font-semibold">
+          <Clock className="h-3 w-3 text-muted-foreground" />
+          Reliability {fmt(reliability)}
+        </span>
+        <span className="inline-flex items-center gap-1 rounded-full border border-border bg-background px-2 py-0.5 text-[10px] font-semibold">
+          <Star className="h-3 w-3 text-muted-foreground" />
+          Sportsmanship {fmt(sportsmanship)}
+        </span>
+        <span className="inline-flex items-center gap-1 rounded-full border border-lime/40 bg-lime/10 px-2 py-0.5 text-[10px] font-bold text-lime">
+          <Check className="h-3 w-3" /> Approved
+        </span>
+        {paymentChip && (
+          <span className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-bold ${paymentChip.cls}`}>
+            <CreditCard className="h-3 w-3" /> {paymentChip.label}
+          </span>
+        )}
+      </div>
     </div>
   );
 }
+
+
 
 
 function HostRequestRow({ req, gameTitle, onChange }: { req: JoinRequest; gameTitle: string; onChange: () => void }) {
