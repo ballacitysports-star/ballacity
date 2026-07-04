@@ -903,22 +903,47 @@ function RosterPlayerRow({ req, gameTitle, feeRequired, onChange }: { req: JoinR
 
   useEffect(() => {
     let cancel = false;
-    (async () => {
-      const [profRes, subRes] = await Promise.all([
-        supabase.from("profiles").select("display_name, avatar_initials").eq("id", req.player_id).maybeSingle(),
-        supabase.from("payment_submissions").select("status").eq("game_id", req.game_id).eq("player_id", req.player_id).order("submitted_at", { ascending: false }).limit(1).maybeSingle(),
-      ]);
+    const loadPayment = async () => {
+      const { data } = await supabase
+        .from("payment_submissions")
+        .select("status")
+        .eq("game_id", req.game_id)
+        .eq("player_id", req.player_id)
+        .order("submitted_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
       if (cancel) return;
-      const d = profRes.data as any;
-      if (d) {
-        const n = d.display_name ?? "Player";
-        setName(n);
-        setInitials((d.avatar_initials ?? n.slice(0, 2)).toUpperCase());
-      }
-      const s = (subRes.data as any)?.status;
+      const s = (data as any)?.status;
       setPaymentStatus(s === "verified" || s === "pending" || s === "rejected" ? s : "none");
+    };
+    (async () => {
+      const profRes = await supabase.from("profiles").select("display_name, avatar_initials").eq("id", req.player_id).maybeSingle();
+      if (!cancel) {
+        const d = profRes.data as any;
+        if (d) {
+          const n = d.display_name ?? "Player";
+          setName(n);
+          setInitials((d.avatar_initials ?? n.slice(0, 2)).toUpperCase());
+        }
+      }
+      await loadPayment();
     })();
-    return () => { cancel = true; };
+
+    // Realtime: update paid chip immediately when this player's submission for this game changes.
+    const channel = supabase
+      .channel(`payment_submissions:${req.game_id}:${req.player_id}`)
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "payment_submissions", filter: `player_id=eq.${req.player_id}` },
+        (payload) => {
+          const row = (payload.new ?? payload.old) as any;
+          if (row?.game_id && row.game_id !== req.game_id) return;
+          loadPayment();
+        },
+      )
+      .subscribe();
+
+    return () => { cancel = true; supabase.removeChannel(channel); };
   }, [req.player_id, req.game_id]);
 
   const remove = async () => {
