@@ -124,10 +124,10 @@ function rowToGame(r: DbRow): Game {
   } as Game;
 }
 
-function gameToInsertRow(g: Game): Record<string, unknown> {
+function gameToInsertRow(g: Game): TablesInsert<"hosted_games"> {
   return {
     id: g.id,
-    host_id: g.hostUserId,
+    host_id: g.hostUserId as string,
     sport: g.sport,
     title: g.title,
     date: g.date,
@@ -150,7 +150,7 @@ function gameToInsertRow(g: Game): Record<string, unknown> {
     equipment: g.equipment ?? [],
     status: g.status ?? null,
     joins_closed: !!(g as { joinsClosed?: boolean }).joinsClosed,
-    host_snapshot: g.host ?? {},
+    host_snapshot: (g.host ?? {}) as TablesInsert<"hosted_games">["host_snapshot"],
   };
 }
 
