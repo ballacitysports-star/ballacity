@@ -721,7 +721,7 @@ function GameDetail() {
               ) : (
                 <>
                   {hostRequests.filter((r) => r.status === "approved").map((r) => (
-                    <RosterPlayerRow key={r.id} req={r} gameTitle={game.title} onChange={refreshHostRequests} />
+                    <RosterPlayerRow key={r.id} req={r} gameTitle={game.title} feeRequired={isPaid} onChange={refreshHostRequests} />
                   ))}
                   {Array.from({ length: game.joined }).map((_, i) => (
                     <div key={`ph-${i}`} className="flex items-center gap-3 rounded-2xl border border-border bg-surface p-3">
