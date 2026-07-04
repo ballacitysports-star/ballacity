@@ -317,7 +317,7 @@ export function updateHostedGame(id: string, patch: Partial<Game>): Game | undef
   emit();
 
   // Best-effort DB mirror; RLS restricts to the host.
-  const dbPatch: Record<string, unknown> = {};
+  const dbPatch: TablesUpdate<"hosted_games"> = {};
   if (patch.title !== undefined) dbPatch.title = patch.title;
   if (patch.location !== undefined) dbPatch.location = patch.location;
   if (patch.date !== undefined) dbPatch.date = patch.date;
