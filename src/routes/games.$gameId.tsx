@@ -117,7 +117,11 @@ function GameDetail() {
         getMyJoinRequest(game.id),
       ]);
       setSettings(s); setMySubs(subs); setMyReq(req);
-      if (req?.status === "approved" && !joined) joinGame(game.id);
+      // Auto-join locally only when there's nothing left to pay. Otherwise the
+      // Join CTA would flip to "leave" and hide the Pay flow after approval.
+      const feeOwed = Number(s?.entry_fee ?? game.price ?? 0) > 0;
+      const paidOk = subs[0]?.status === "verified";
+      if (req?.status === "approved" && !joined && (!feeOwed || paidOk)) joinGame(game.id);
     } catch {}
   };
 
