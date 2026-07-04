@@ -153,6 +153,21 @@ function GameDetail() {
   useEffect(() => { refreshStatus(); /* eslint-disable-next-line */ }, [game?.id]);
   useEffect(() => { refreshHostRequests(); /* eslint-disable-next-line */ }, [game?.id, user?.id, settings?.host_id, hostsThisGame]);
 
+  // Realtime: refresh roster/requests when any join_request for this game changes.
+  useEffect(() => {
+    if (!game?.id || !hostsThisGame) return;
+    const channel = supabase
+      .channel(`join_requests:${game.id}`)
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "join_requests", filter: `game_id=eq.${game.id}` },
+        () => { refreshHostRequests(); },
+      )
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+    // eslint-disable-next-line
+  }, [game?.id, hostsThisGame]);
+
   if (!game) {
     return (
       <div className="min-h-dvh grid place-items-center px-6 text-center">
