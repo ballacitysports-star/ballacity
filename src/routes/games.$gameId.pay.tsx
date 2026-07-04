@@ -162,6 +162,35 @@ function PayPage() {
 
       {mySubs.length > 0 && <MySubsList subs={mySubs} />}
 
+      {requiresApproval && (myReq?.status === "pending" || myReq?.status === "approved") && (
+        <div
+          data-testid="approval-status-indicator"
+          data-status={myReq.status}
+          role="status"
+          aria-live="polite"
+          aria-atomic="true"
+          className={`mb-3 inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-bold transition-colors ${
+            myReq.status === "approved"
+              ? "border-lime/40 bg-lime/10 text-lime"
+              : "border-coral/40 bg-coral/10 text-coral"
+          }`}
+        >
+          {myReq.status === "approved" ? (
+            <>
+              <ShieldCheck className="h-3.5 w-3.5" aria-hidden="true" />
+              <span>Approved — you can pay now</span>
+            </>
+          ) : (
+            <>
+              <Clock className="h-3.5 w-3.5 animate-pulse" aria-hidden="true" />
+              <span>Approval pending — waiting on host</span>
+            </>
+          )}
+        </div>
+      )}
+
+
+
       {approvalGateActive ? (
         <div
           className="rounded-2xl border border-coral/40 bg-coral/10 p-5"
