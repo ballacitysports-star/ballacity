@@ -1,8 +1,9 @@
-import { createFileRoute, Link, notFound, useNavigate } from "@tanstack/react-router";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ArrowLeft, ExternalLink, Upload, ShieldCheck, Clock, X } from "lucide-react";
 import { toast } from "sonner";
 import { GAMES } from "@/lib/sample-data";
+import { useHostedGames } from "@/lib/hosted-games-store";
 import { useAuth } from "@/hooks/use-auth";
 import { supabase } from "@/integrations/supabase/client";
 import {
@@ -22,11 +23,9 @@ export const Route = createFileRoute("/games/$gameId/pay")({
     return out;
   },
   loader: ({ params }) => {
-    const game = GAMES.find((g) => g.id === params.gameId);
-    if (!game) throw notFound();
-    return { game };
+    return { gameId: params.gameId };
   },
-  head: ({ loaderData }) => ({ meta: [{ title: `Pay for ${loaderData?.game.title ?? "game"} — OpenRun` }] }),
+  head: () => ({ meta: [{ title: "Pay game fee — OpenRun" }] }),
   notFoundComponent: () => <div className="p-6 text-center text-sm">Game not found.</div>,
   errorComponent: ({ reset }) => (
     <div className="p-6 text-center"><button onClick={reset} className="text-lime font-bold">Try again</button></div>
@@ -35,8 +34,13 @@ export const Route = createFileRoute("/games/$gameId/pay")({
 });
 
 function PayPage() {
-  const { game } = Route.useLoaderData();
+  const { gameId } = Route.useLoaderData();
   const { user, loading } = useAuth();
+  const hosted = useHostedGames();
+  const game = useMemo(
+    () => hosted.find((g) => g.id === gameId) ?? GAMES.find((g) => g.id === gameId),
+    [hosted, gameId],
+  );
   const nav = useNavigate();
   const [settings, setSettings] = useState<GamePaymentSettings | null>(null);
   const [methods, setMethods] = useState<PaymentMethod[]>([]);
@@ -50,7 +54,7 @@ function PayPage() {
   }, [loading, user, nav]);
 
   const refreshJoinRequest = useCallback(async () => {
-    if (!user) return;
+    if (!user || !game) return;
     try {
       const req = await getMyJoinRequest(game.id);
       setMyReq((prev) => {
@@ -61,12 +65,13 @@ function PayPage() {
         return req;
       });
     } catch { /* ignore polling errors */ }
-  }, [game.id, user]);
+  }, [game, user]);
 
   useEffect(() => {
     let cancelled = false;
     (async () => {
       try {
+        if (!game) return;
         const s = await getGamePaymentSettings(game.id);
         if (cancelled) return;
         setSettings(s);
@@ -90,7 +95,7 @@ function PayPage() {
       } catch (e: any) { toast.error(e.message); } finally { if (!cancelled) setFetching(false); }
     })();
     return () => { cancelled = true; };
-  }, [game.id, user]);
+  }, [game, user]);
 
   // Live-update the join-request status so the approval gate flips to the
   // payment picker the moment the host approves. Realtime is primary;
@@ -98,7 +103,7 @@ function PayPage() {
   const refreshRef = useRef(refreshJoinRequest);
   useEffect(() => { refreshRef.current = refreshJoinRequest; }, [refreshJoinRequest]);
   useEffect(() => {
-    if (!user) return;
+    if (!user || !game) return;
     const channel = supabase
       .channel(`pay-join-req:${game.id}:${user.id}`)
       .on(
@@ -128,10 +133,23 @@ function PayPage() {
       window.removeEventListener("focus", onFocus);
       document.removeEventListener("visibilitychange", onVisibility);
     };
-  }, [game.id, user]);
+  }, [game, user]);
 
   if (loading || fetching) return <div className="p-6 text-sm text-muted-foreground">Loading…</div>;
   if (!user) return null;
+  if (!game) {
+    return (
+      <div className="min-h-dvh grid place-items-center px-6 text-center">
+        <div>
+          <h1 className="font-display text-2xl font-bold">Game not found</h1>
+          <p className="text-sm text-muted-foreground mt-2">It may have wrapped up or been cancelled.</p>
+          <Link to="/feed" className="inline-block mt-5 rounded-full bg-lime px-5 py-2.5 text-sm font-bold text-primary-foreground">
+            Back to feed
+          </Link>
+        </div>
+      </div>
+    );
+  }
 
   const fee = settings?.entry_fee ?? game.price;
   const requiresApproval = !!settings?.requires_approval;
