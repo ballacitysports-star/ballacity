@@ -185,7 +185,7 @@ function Create() {
               },
             });
 
-            const game = addHostedGame({
+            const game = await addHostedGame({
               sport,
               title,
               date,
