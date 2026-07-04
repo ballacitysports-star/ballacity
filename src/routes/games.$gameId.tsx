@@ -171,8 +171,18 @@ function GameDetail() {
   const isPaid = fee > 0;
   const requiresApproval = !!settings?.requires_approval;
   const latestSub = mySubs[0];
-  const isConfirmed = latestSub?.status === "verified" || myReq?.status === "approved";
-  const isPending = latestSub?.status === "pending" || (requiresApproval && myReq?.status === "pending");
+  const isApproved = myReq?.status === "approved";
+  const isRequestPending = myReq?.status === "pending";
+  const isPaymentVerified = latestSub?.status === "verified";
+  const isPaymentPending = latestSub?.status === "pending";
+  // Approval-gated games treat approval as the *first* gate. Payment (if any)
+  // becomes actionable only after the host approves the request.
+  const approvalCleared = !requiresApproval || isApproved;
+  const paymentCleared = !isPaid || isPaymentVerified;
+  const isConfirmed = approvalCleared && paymentCleared && (requiresApproval || isPaid ? true : false);
+  // Only surface "payment pending" once approval is cleared, so players
+  // don't see a payment-pending state before they've been approved.
+  const isPending = isRequestPending || (approvalCleared && isPaymentPending);
 
   // The viewer counts as a roster player only when:
   //  - they're not the host (hosts run the game, they don't take a player slot), AND
