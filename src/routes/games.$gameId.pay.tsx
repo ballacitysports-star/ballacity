@@ -5,9 +5,10 @@ import { toast } from "sonner";
 import { GAMES } from "@/lib/sample-data";
 import { useAuth } from "@/hooks/use-auth";
 import {
-  type GamePaymentSettings, type PaymentMethod, type PaymentSubmission, paymentTypeMeta,
+  type GamePaymentSettings, type PaymentMethod, type PaymentSubmission, type JoinRequest, paymentTypeMeta,
   getGamePaymentSettings, listPaymentMethodsForHost,
   uploadProofScreenshot, createPaymentSubmission, listMySubmissionsForGame,
+  getMyJoinRequest,
 } from "@/lib/payments";
 import { LegalNotice } from "@/components/LegalNotice";
 import { joinGame } from "@/lib/games-store";
