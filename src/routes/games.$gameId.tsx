@@ -172,6 +172,37 @@ function GameDetail() {
     // eslint-disable-next-line
   }, [game?.id, hostsThisGame]);
 
+  // Player-side: keep this viewer's own join-request status live so the CTA
+  // flips from "Request pending" to "Pay host" (or "Confirmed") the instant
+  // the host approves — without needing a manual reload. Realtime is primary;
+  // polling + focus/visibility refetch cover dropped websocket frames.
+  useEffect(() => {
+    if (!game?.id || !user || hostsThisGame) return;
+    const channel = supabase
+      .channel(`join_requests:player:${game.id}:${user.id}`)
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "join_requests", filter: `player_id=eq.${user.id}` },
+        (payload) => {
+          const row = (payload.new ?? payload.old) as { game_id?: string } | undefined;
+          if (row?.game_id === game.id) refreshStatus();
+        },
+      )
+      .subscribe();
+    const poll = window.setInterval(() => { refreshStatus(); }, 15_000);
+    const onFocus = () => { refreshStatus(); };
+    const onVis = () => { if (document.visibilityState === "visible") refreshStatus(); };
+    window.addEventListener("focus", onFocus);
+    document.addEventListener("visibilitychange", onVis);
+    return () => {
+      supabase.removeChannel(channel);
+      window.clearInterval(poll);
+      window.removeEventListener("focus", onFocus);
+      document.removeEventListener("visibilitychange", onVis);
+    };
+    // eslint-disable-next-line
+  }, [game?.id, user?.id, hostsThisGame]);
+
   if (!game) {
     return (
       <div className="min-h-dvh grid place-items-center px-6 text-center">
