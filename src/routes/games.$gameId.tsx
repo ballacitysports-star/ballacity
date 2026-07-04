@@ -583,6 +583,67 @@ function GameDetail() {
       {/* Host controls */}
       {isHost && (
         <div className="mx-auto w-full max-w-md sm:max-w-2xl lg:max-w-4xl px-4 mt-4 space-y-3">
+          {/* Manage game: edit, start, close joining */}
+          <div className="rounded-2xl border border-border bg-surface p-3">
+            <div className="flex items-center justify-between gap-2">
+              <div className="min-w-0">
+                <div className="font-semibold text-sm">Manage game</div>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  {game.status === "in_progress" ? "In progress — joining locked."
+                    : game.status === "completed" ? "This game has ended."
+                    : game.joinsClosed ? "Joining is closed. Reopen to accept more players."
+                    : "Edit details, start the game, or close joining when full."}
+                </p>
+              </div>
+              <span className={`shrink-0 inline-flex items-center gap-1 rounded-full px-2 py-1 text-[10px] font-bold uppercase tracking-wider ${
+                game.status === "in_progress" ? "bg-coral/15 text-coral border border-coral/40"
+                : game.status === "completed" ? "bg-secondary text-muted-foreground border border-border"
+                : "bg-lime/15 text-lime border border-lime/40"
+              }`}>
+                {game.status === "in_progress" ? "Live" : game.status === "completed" ? "Ended" : "Scheduled"}
+              </span>
+            </div>
+            <div className="mt-3 grid grid-cols-3 gap-2">
+              <button
+                type="button"
+                onClick={() => setEditOpen(true)}
+                disabled={game.status === "completed"}
+                className="inline-flex flex-col items-center justify-center gap-1 rounded-xl border border-border bg-background py-2.5 text-xs font-semibold disabled:opacity-50"
+              >
+                <Pencil className="h-4 w-4" /> Edit
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  if (game.status === "in_progress") {
+                    updateHostedGame(game.id, { status: "completed" });
+                    toast.success("Game marked as ended.");
+                  } else {
+                    updateHostedGame(game.id, { status: "in_progress", joinsClosed: true });
+                    toast.success("Game started. Have fun!");
+                  }
+                }}
+                disabled={game.status === "completed"}
+                className="inline-flex flex-col items-center justify-center gap-1 rounded-xl border border-lime/40 bg-lime/10 text-lime py-2.5 text-xs font-bold disabled:opacity-50"
+              >
+                <Play className="h-4 w-4" />
+                {game.status === "in_progress" ? "End game" : "Start game"}
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  const next = !game.joinsClosed;
+                  updateHostedGame(game.id, { joinsClosed: next });
+                  toast.success(next ? "Joining closed." : "Joining reopened.");
+                }}
+                disabled={game.status !== "scheduled" && game.status !== undefined}
+                className="inline-flex flex-col items-center justify-center gap-1 rounded-xl border border-border bg-background py-2.5 text-xs font-semibold disabled:opacity-50"
+              >
+                {game.joinsClosed ? <><Unlock className="h-4 w-4" /> Reopen</> : <><Lock className="h-4 w-4" /> Close joins</>}
+              </button>
+            </div>
+          </div>
+
           <button
             type="button"
             onClick={toggleRequireApproval}
