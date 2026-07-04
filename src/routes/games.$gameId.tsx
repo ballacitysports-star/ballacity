@@ -222,6 +222,15 @@ function GameDetail() {
       nav({ to: "/discover" });
       return;
     }
+    // Approved-but-unpaid on a paid game → route to pay page (don't treat as
+    // "confirmed → leave" if a prior auto-join left `joined` stale-true).
+    if (isPaid && !paymentCleared && !isPending && (isApproved || !requiresApproval)) {
+      const search: { invite?: true; from?: string } = {};
+      if (isInvite) search.invite = true;
+      if (inviteFrom) search.from = inviteFrom;
+      nav({ to: "/games/$gameId/pay", params: { gameId: game.id }, search });
+      return;
+    }
     // Confirmed → leave / withdraw
     if (isConfirmed || joined) {
       try {
