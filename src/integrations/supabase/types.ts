@@ -282,6 +282,7 @@ export type Database = {
           game_id: string
           host_id: string
           id: string
+          idempotency_key: string
           message: string | null
           player_id: string
           reviewed_at: string | null
@@ -293,6 +294,7 @@ export type Database = {
           game_id: string
           host_id: string
           id?: string
+          idempotency_key: string
           message?: string | null
           player_id: string
           reviewed_at?: string | null
@@ -304,6 +306,7 @@ export type Database = {
           game_id?: string
           host_id?: string
           id?: string
+          idempotency_key?: string
           message?: string | null
           player_id?: string
           reviewed_at?: string | null
