@@ -228,6 +228,9 @@ function GameDetail() {
       } catch (e: any) { toast.error(e.message ?? "Could not cancel."); }
       return;
     }
+    if (game.status === "in_progress") { toast.error("This game has already started."); return; }
+    if (game.status === "completed") { toast.error("This game has ended."); return; }
+    if (game.joinsClosed) { toast.error("The host has closed joining for this game."); return; }
     if (spotsLeft <= 0) { toast.error("This game is full."); return; }
     // Approval gate takes priority over payment: on games that require
     // approval, players must be approved before they can pay.
