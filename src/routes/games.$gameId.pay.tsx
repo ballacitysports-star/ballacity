@@ -41,6 +41,7 @@ function PayPage() {
   const [methods, setMethods] = useState<PaymentMethod[]>([]);
   const [picked, setPicked] = useState<PaymentMethod | null>(null);
   const [mySubs, setMySubs] = useState<PaymentSubmission[]>([]);
+  const [myReq, setMyReq] = useState<JoinRequest | null>(null);
   const [fetching, setFetching] = useState(true);
 
   useEffect(() => {
@@ -63,9 +64,13 @@ function PayPage() {
           setMethods(filtered);
         }
         if (user) {
-          const subs = await listMySubmissionsForGame(game.id);
+          const [subs, req] = await Promise.all([
+            listMySubmissionsForGame(game.id),
+            getMyJoinRequest(game.id),
+          ]);
           if (cancelled) return;
           setMySubs(subs);
+          setMyReq(req);
         }
       } catch (e: any) { toast.error(e.message); } finally { if (!cancelled) setFetching(false); }
     })();
