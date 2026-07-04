@@ -276,6 +276,96 @@ export type Database = {
         }
         Relationships: []
       }
+      hosted_games: {
+        Row: {
+          created_at: string
+          date: string
+          description: string
+          distance_mi: number
+          duration: string
+          equipment: string[]
+          host_id: string
+          host_snapshot: Json
+          id: string
+          image: string
+          indoor: boolean
+          is_private: boolean
+          joined: number
+          joins_closed: boolean
+          lat: number
+          lng: number
+          location: string
+          max_players: number
+          neighborhood: string
+          price: number
+          skill: string
+          sport: string
+          status: string | null
+          title: string
+          trending: boolean
+          updated_at: string
+          urgent: boolean
+        }
+        Insert: {
+          created_at?: string
+          date: string
+          description?: string
+          distance_mi?: number
+          duration?: string
+          equipment?: string[]
+          host_id: string
+          host_snapshot?: Json
+          id: string
+          image?: string
+          indoor?: boolean
+          is_private?: boolean
+          joined?: number
+          joins_closed?: boolean
+          lat?: number
+          lng?: number
+          location?: string
+          max_players?: number
+          neighborhood?: string
+          price?: number
+          skill?: string
+          sport: string
+          status?: string | null
+          title: string
+          trending?: boolean
+          updated_at?: string
+          urgent?: boolean
+        }
+        Update: {
+          created_at?: string
+          date?: string
+          description?: string
+          distance_mi?: number
+          duration?: string
+          equipment?: string[]
+          host_id?: string
+          host_snapshot?: Json
+          id?: string
+          image?: string
+          indoor?: boolean
+          is_private?: boolean
+          joined?: number
+          joins_closed?: boolean
+          lat?: number
+          lng?: number
+          location?: string
+          max_players?: number
+          neighborhood?: string
+          price?: number
+          skill?: string
+          sport?: string
+          status?: string | null
+          title?: string
+          trending?: boolean
+          updated_at?: string
+          urgent?: boolean
+        }
+        Relationships: []
+      }
       join_requests: {
         Row: {
           created_at: string
