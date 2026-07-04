@@ -11,7 +11,7 @@ import {
 } from "@/lib/payments";
 import { LegalNotice } from "@/components/LegalNotice";
 
-export const Route = createFileRoute("/games/$gameId/payment-setup")({
+export const Route = createFileRoute("/games/$gameId_/payment-setup")({
   loader: ({ params }) => {
     return { gameId: params.gameId };
   },

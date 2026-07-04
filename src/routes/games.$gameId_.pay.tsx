@@ -15,7 +15,7 @@ import {
 import { LegalNotice } from "@/components/LegalNotice";
 import { joinGame } from "@/lib/games-store";
 
-export const Route = createFileRoute("/games/$gameId/pay")({
+export const Route = createFileRoute("/games/$gameId_/pay")({
   validateSearch: (search: Record<string, unknown>) => {
     const out: { invite?: true; from?: string } = {};
     if (search.invite === "1" || search.invite === 1 || search.invite === true) out.invite = true;
