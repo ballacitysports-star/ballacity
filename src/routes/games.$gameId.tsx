@@ -668,10 +668,10 @@ function GameDetail() {
               <><Check className="h-4 w-4" /> You're in · Tap to leave</>
             ) : spotsLeft <= 0 ? (
               <>Full</>
+            ) : requiresApproval && !isApproved ? (
+              <>Request to join · {spotsLeft} spot{spotsLeft === 1 ? "" : "s"} left</>
             ) : isPaid ? (
               <><CreditCard className="h-4 w-4" /> Pay host · ${fee.toFixed(2)}</>
-            ) : requiresApproval ? (
-              <>Request to join · {spotsLeft} spot{spotsLeft === 1 ? "" : "s"} left</>
             ) : (
               <>Join free · {spotsLeft} spot{spotsLeft === 1 ? "" : "s"} left</>
             )}
