@@ -648,34 +648,36 @@ function GameDetail() {
             className="grid h-12 w-12 place-items-center rounded-2xl border border-border bg-surface disabled:opacity-50">
             <MessageCircle className="h-5 w-5" />
           </button>
-          <motion.button
-            whileTap={{ scale: 0.97 }}
-            onClick={handleJoin}
-            disabled={!joined && !isPending && !isConfirmed && spotsLeft <= 0}
-            className={`flex-1 rounded-2xl py-3.5 font-bold inline-flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed ${
-              isConfirmed ? "bg-lime/15 border border-lime/40 text-lime" :
-              isPending ? "bg-surface border border-coral/40 text-coral" :
-              joined ? "bg-surface border border-lime/40 text-lime" :
-              "bg-lime-gradient text-primary-foreground glow-lime"
-            }`}
-          >
-            {isConfirmed ? (
-              <><Check className="h-4 w-4" /> Confirmed · Tap to leave</>
-            ) : isPending ? (
-              <><Clock className="h-4 w-4" /> {latestSub?.status === "pending" ? "Payment pending · Tap to withdraw" : "Request pending · Tap to cancel"}</>
+          {!isHost && (
+            <motion.button
+              whileTap={{ scale: 0.97 }}
+              onClick={handleJoin}
+              disabled={!joined && !isPending && !isConfirmed && spotsLeft <= 0}
+              className={`flex-1 rounded-2xl py-3.5 font-bold inline-flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed ${
+                isConfirmed ? "bg-lime/15 border border-lime/40 text-lime" :
+                isPending ? "bg-surface border border-coral/40 text-coral" :
+                joined ? "bg-surface border border-lime/40 text-lime" :
+                "bg-lime-gradient text-primary-foreground glow-lime"
+              }`}
+            >
+              {isConfirmed ? (
+                <><Check className="h-4 w-4" /> Confirmed · Tap to leave</>
+              ) : isPending ? (
+                <><Clock className="h-4 w-4" /> {latestSub?.status === "pending" ? "Payment pending · Tap to withdraw" : "Request pending · Tap to cancel"}</>
 
-            ) : joined && !isPaid ? (
-              <><Check className="h-4 w-4" /> You're in · Tap to leave</>
-            ) : spotsLeft <= 0 ? (
-              <>Full</>
-            ) : requiresApproval && !isApproved ? (
-              <>Request to join · {spotsLeft} spot{spotsLeft === 1 ? "" : "s"} left</>
-            ) : isPaid ? (
-              <><CreditCard className="h-4 w-4" /> Pay host · ${fee.toFixed(2)}</>
-            ) : (
-              <>Join free · {spotsLeft} spot{spotsLeft === 1 ? "" : "s"} left</>
-            )}
-          </motion.button>
+              ) : joined && !isPaid ? (
+                <><Check className="h-4 w-4" /> You're in · Tap to leave</>
+              ) : spotsLeft <= 0 ? (
+                <>Full</>
+              ) : requiresApproval && !isApproved ? (
+                <>Request to join · {spotsLeft} spot{spotsLeft === 1 ? "" : "s"} left</>
+              ) : isPaid ? (
+                <><CreditCard className="h-4 w-4" /> Pay host · ${fee.toFixed(2)}</>
+              ) : (
+                <>Join free · {spotsLeft} spot{spotsLeft === 1 ? "" : "s"} left</>
+              )}
+            </motion.button>
+          )}
         </div>
       </div>
     </div>
