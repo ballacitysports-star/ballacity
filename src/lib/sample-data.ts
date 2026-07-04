@@ -44,6 +44,8 @@ export type Game = {
   image: string;
   description: string;
   equipment: string[];
+  status?: "scheduled" | "in_progress" | "completed";
+  joinsClosed?: boolean;
 };
 
 export const HERO_IMAGE = heroImg;

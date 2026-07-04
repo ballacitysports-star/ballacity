@@ -95,6 +95,19 @@ export function getHostedGame(id: string): Game | undefined {
   return cache.find((g) => g.id === id);
 }
 
+/** Patch a hosted game. No-op if the game doesn't exist locally. */
+export function updateHostedGame(id: string, patch: Partial<Game>): Game | undefined {
+  load();
+  let updated: Game | undefined;
+  cache = cache.map((g) => {
+    if (g.id !== id) return g;
+    updated = { ...g, ...patch };
+    return updated;
+  });
+  if (updated) { save(); emit(); }
+  return updated;
+}
+
 /** List locally-hosted games that have no hostUserId yet. */
 export function listUnclaimedHostedGames(): Game[] {
   load();
