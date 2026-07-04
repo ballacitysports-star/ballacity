@@ -49,6 +49,20 @@ function PayPage() {
     if (!loading && !user) nav({ to: "/auth" });
   }, [loading, user, nav]);
 
+  const refreshJoinRequest = useCallback(async () => {
+    if (!user) return;
+    try {
+      const req = await getMyJoinRequest(game.id);
+      setMyReq((prev) => {
+        // Toast on approval transition (pending/rejected/none → approved).
+        if (req?.status === "approved" && prev?.status !== "approved") {
+          toast.success("You're approved! You can pay now.");
+        }
+        return req;
+      });
+    } catch { /* ignore polling errors */ }
+  }, [game.id, user]);
+
   useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -76,6 +90,44 @@ function PayPage() {
       } catch (e: any) { toast.error(e.message); } finally { if (!cancelled) setFetching(false); }
     })();
     return () => { cancelled = true; };
+  }, [game.id, user]);
+
+  // Live-update the join-request status so the approval gate flips to the
+  // payment picker the moment the host approves. Realtime is primary;
+  // a slow poll and refetch-on-focus cover any dropped websocket frames.
+  const refreshRef = useRef(refreshJoinRequest);
+  useEffect(() => { refreshRef.current = refreshJoinRequest; }, [refreshJoinRequest]);
+  useEffect(() => {
+    if (!user) return;
+    const channel = supabase
+      .channel(`pay-join-req:${game.id}:${user.id}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "join_requests",
+          filter: `player_id=eq.${user.id}`,
+        },
+        (payload) => {
+          const row = (payload.new ?? payload.old) as JoinRequest | undefined;
+          if (row?.game_id === game.id) refreshRef.current();
+        },
+      )
+      .subscribe();
+
+    const poll = window.setInterval(() => refreshRef.current(), 15_000);
+    const onFocus = () => refreshRef.current();
+    window.addEventListener("focus", onFocus);
+    const onVisibility = () => { if (document.visibilityState === "visible") refreshRef.current(); };
+    document.addEventListener("visibilitychange", onVisibility);
+
+    return () => {
+      supabase.removeChannel(channel);
+      window.clearInterval(poll);
+      window.removeEventListener("focus", onFocus);
+      document.removeEventListener("visibilitychange", onVisibility);
+    };
   }, [game.id, user]);
 
   if (loading || fetching) return <div className="p-6 text-sm text-muted-foreground">Loading…</div>;
