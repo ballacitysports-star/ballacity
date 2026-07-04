@@ -81,6 +81,9 @@ function PayPage() {
   if (!user) return null;
 
   const fee = settings?.entry_fee ?? game.price;
+  const requiresApproval = !!settings?.requires_approval;
+  const isApproved = myReq?.status === "approved";
+  const approvalGateActive = requiresApproval && !isApproved;
 
   return (
     <div className="mx-auto max-w-md px-4 pt-6 pb-32">
