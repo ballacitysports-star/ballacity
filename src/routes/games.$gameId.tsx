@@ -90,6 +90,7 @@ function GameDetail() {
   const [myReq, setMyReq] = useState<JoinRequest | null>(null);
   const [hostRequests, setHostRequests] = useState<JoinRequest[]>([]);
   const [messaging, setMessaging] = useState(false);
+  const [editOpen, setEditOpen] = useState(false);
 
   // effectiveJoined is computed below, after settings/myReq/isHost resolve.
   // Placeholder removed — see definition near line 161.
