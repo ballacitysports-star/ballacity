@@ -228,14 +228,9 @@ function GameDetail() {
       return;
     }
     if (spotsLeft <= 0) { toast.error("This game is full."); return; }
-    if (isPaid) {
-      const search: { invite?: true; from?: string } = {};
-      if (isInvite) search.invite = true;
-      if (inviteFrom) search.from = inviteFrom;
-      nav({ to: "/games/$gameId/pay", params: { gameId: game.id }, search });
-      return;
-    }
-    if (requiresApproval) {
+    // Approval gate takes priority over payment: on games that require
+    // approval, players must be approved before they can pay.
+    if (requiresApproval && !isApproved) {
       if (!settings) { toast.error("Host hasn't enabled approvals yet."); return; }
       // Invite-link integrity: if the URL claims invite=1, `from` must be present
       // and must match the actual host. Otherwise the link is missing context or
@@ -256,6 +251,13 @@ function GameDetail() {
         toast.success("Request sent. The host will review it.");
         refreshStatus();
       } catch (e: any) { toast.error(e.message ?? "Could not send request."); }
+      return;
+    }
+    if (isPaid) {
+      const search: { invite?: true; from?: string } = {};
+      if (isInvite) search.invite = true;
+      if (inviteFrom) search.from = inviteFrom;
+      nav({ to: "/games/$gameId/pay", params: { gameId: game.id }, search });
       return;
     }
     joinGame(game.id);
