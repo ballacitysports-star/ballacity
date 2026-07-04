@@ -679,8 +679,40 @@ function GameDetail() {
               No pickup requests yet. You'll see them here as players ask to join.
             </div>
           ) : null}
+
+          {/* Roster (host view) */}
+          <div>
+            <h2 className="font-display text-sm font-bold uppercase tracking-wider text-muted-foreground mb-2">
+              Roster · {hostRequests.filter((r) => r.status === "approved").length + game.joined} / {game.maxPlayers}
+            </h2>
+            <div className="space-y-2">
+              {hostRequests.filter((r) => r.status === "approved").length === 0 && game.joined === 0 ? (
+                <div className="rounded-2xl border border-dashed border-border bg-surface/40 p-3 text-xs text-muted-foreground">
+                  No confirmed players yet.
+                </div>
+              ) : (
+                <>
+                  {hostRequests.filter((r) => r.status === "approved").map((r) => (
+                    <RosterPlayerRow key={r.id} req={r} gameTitle={game.title} onChange={refreshHostRequests} />
+                  ))}
+                  {Array.from({ length: game.joined }).map((_, i) => (
+                    <div key={`ph-${i}`} className="flex items-center gap-3 rounded-2xl border border-border bg-surface p-3">
+                      <div className="grid h-10 w-10 place-items-center rounded-full bg-secondary text-xs font-bold">
+                        {["MC","AG","JK","RC","TB","SO","PN","DP","EL","VM"][i % 10]}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <div className="text-sm font-semibold truncate">Player</div>
+                        <div className="text-[11px] text-muted-foreground">Sample roster · read-only</div>
+                      </div>
+                    </div>
+                  ))}
+                </>
+              )}
+            </div>
+          </div>
         </div>
       )}
+
 
       {/* Host-only payment setup link */}
       <div className="mx-auto w-full max-w-md sm:max-w-2xl lg:max-w-4xl px-4 mt-4">
@@ -830,6 +862,65 @@ function Meta({ icon, label, value }: { icon: React.ReactNode; label: string; va
     </div>
   );
 }
+
+function RosterPlayerRow({ req, gameTitle, onChange }: { req: JoinRequest; gameTitle: string; onChange: () => void }) {
+  const [busy, setBusy] = useState(false);
+  const [name, setName] = useState<string>("Player");
+  const [initials, setInitials] = useState<string>("P");
+  useEffect(() => {
+    (async () => {
+      const { data } = await supabase.from("profiles").select("display_name, avatar_initials").eq("id", req.player_id).maybeSingle();
+      if (data) {
+        const n = (data as any).display_name ?? "Player";
+        setName(n);
+        setInitials(((data as any).avatar_initials ?? n.slice(0, 2)).toUpperCase());
+      }
+    })();
+  }, [req.player_id]);
+
+  const remove = async () => {
+    if (!confirm(`Remove ${name} from ${gameTitle}?`)) return;
+    setBusy(true);
+    try {
+      await reviewJoinRequest(req.id, "rejected", "Removed by host");
+      await createNotification({
+        user_id: req.player_id,
+        type: "join_declined",
+        title: `Removed from ${gameTitle}`,
+        body: "The host removed you from this game.",
+        link: `/games/${req.game_id}`,
+      });
+      toast.success(`${name} removed.`);
+      onChange();
+    } catch (e: any) { toast.error(e.message ?? "Could not remove."); }
+    finally { setBusy(false); }
+  };
+
+  return (
+    <div className="flex items-center gap-3 rounded-2xl border border-lime/30 bg-surface p-3">
+      <Link
+        to="/players/$userId"
+        params={{ userId: req.player_id }}
+        className="grid h-10 w-10 place-items-center rounded-full bg-lime-gradient text-xs font-bold text-primary-foreground"
+      >
+        {initials.slice(0, 2)}
+      </Link>
+      <div className="min-w-0 flex-1">
+        <div className="text-sm font-semibold truncate">{name}</div>
+        <div className="text-[11px] text-lime">Confirmed</div>
+      </div>
+      <button
+        type="button"
+        onClick={remove}
+        disabled={busy}
+        className="inline-flex items-center gap-1 rounded-full border border-coral/40 bg-coral/10 px-3 py-1.5 text-xs font-bold text-coral disabled:opacity-50"
+      >
+        <XIcon className="h-3.5 w-3.5" /> Remove
+      </button>
+    </div>
+  );
+}
+
 
 function HostRequestRow({ req, gameTitle, onChange }: { req: JoinRequest; gameTitle: string; onChange: () => void }) {
   const [busy, setBusy] = useState(false);
