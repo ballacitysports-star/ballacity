@@ -679,8 +679,40 @@ function GameDetail() {
               No pickup requests yet. You'll see them here as players ask to join.
             </div>
           ) : null}
+
+          {/* Roster (host view) */}
+          <div>
+            <h2 className="font-display text-sm font-bold uppercase tracking-wider text-muted-foreground mb-2">
+              Roster · {hostRequests.filter((r) => r.status === "approved").length + game.joined} / {game.maxPlayers}
+            </h2>
+            <div className="space-y-2">
+              {hostRequests.filter((r) => r.status === "approved").length === 0 && game.joined === 0 ? (
+                <div className="rounded-2xl border border-dashed border-border bg-surface/40 p-3 text-xs text-muted-foreground">
+                  No confirmed players yet.
+                </div>
+              ) : (
+                <>
+                  {hostRequests.filter((r) => r.status === "approved").map((r) => (
+                    <RosterPlayerRow key={r.id} req={r} gameTitle={game.title} onChange={refreshHostRequests} />
+                  ))}
+                  {Array.from({ length: game.joined }).map((_, i) => (
+                    <div key={`ph-${i}`} className="flex items-center gap-3 rounded-2xl border border-border bg-surface p-3">
+                      <div className="grid h-10 w-10 place-items-center rounded-full bg-secondary text-xs font-bold">
+                        {["MC","AG","JK","RC","TB","SO","PN","DP","EL","VM"][i % 10]}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <div className="text-sm font-semibold truncate">Player</div>
+                        <div className="text-[11px] text-muted-foreground">Sample roster · read-only</div>
+                      </div>
+                    </div>
+                  ))}
+                </>
+              )}
+            </div>
+          </div>
         </div>
       )}
+
 
       {/* Host-only payment setup link */}
       <div className="mx-auto w-full max-w-md sm:max-w-2xl lg:max-w-4xl px-4 mt-4">
