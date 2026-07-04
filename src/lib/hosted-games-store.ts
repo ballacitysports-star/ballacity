@@ -2,6 +2,7 @@ import { useSyncExternalStore } from "react";
 import type { Game, Sport } from "@/lib/sample-data";
 import { imageFor, ME } from "@/lib/sample-data";
 import { supabase } from "@/integrations/supabase/client";
+import type { TablesInsert, TablesUpdate } from "@/integrations/supabase/types";
 
 const STORAGE_KEY = "openrun.hostedGames.v1";
 const listeners = new Set<() => void>();
