@@ -5,9 +5,10 @@ import { toast } from "sonner";
 import { GAMES } from "@/lib/sample-data";
 import { useAuth } from "@/hooks/use-auth";
 import {
-  type GamePaymentSettings, type PaymentMethod, type PaymentSubmission, paymentTypeMeta,
+  type GamePaymentSettings, type PaymentMethod, type PaymentSubmission, type JoinRequest, paymentTypeMeta,
   getGamePaymentSettings, listPaymentMethodsForHost,
   uploadProofScreenshot, createPaymentSubmission, listMySubmissionsForGame,
+  getMyJoinRequest,
 } from "@/lib/payments";
 import { LegalNotice } from "@/components/LegalNotice";
 import { joinGame } from "@/lib/games-store";
@@ -40,6 +41,7 @@ function PayPage() {
   const [methods, setMethods] = useState<PaymentMethod[]>([]);
   const [picked, setPicked] = useState<PaymentMethod | null>(null);
   const [mySubs, setMySubs] = useState<PaymentSubmission[]>([]);
+  const [myReq, setMyReq] = useState<JoinRequest | null>(null);
   const [fetching, setFetching] = useState(true);
 
   useEffect(() => {
@@ -62,9 +64,13 @@ function PayPage() {
           setMethods(filtered);
         }
         if (user) {
-          const subs = await listMySubmissionsForGame(game.id);
+          const [subs, req] = await Promise.all([
+            listMySubmissionsForGame(game.id),
+            getMyJoinRequest(game.id),
+          ]);
           if (cancelled) return;
           setMySubs(subs);
+          setMyReq(req);
         }
       } catch (e: any) { toast.error(e.message); } finally { if (!cancelled) setFetching(false); }
     })();
@@ -75,6 +81,9 @@ function PayPage() {
   if (!user) return null;
 
   const fee = settings?.entry_fee ?? game.price;
+  const requiresApproval = !!settings?.requires_approval;
+  const isApproved = myReq?.status === "approved";
+  const approvalGateActive = requiresApproval && !isApproved;
 
   return (
     <div className="mx-auto max-w-md px-4 pt-6 pb-32">
@@ -100,7 +109,32 @@ function PayPage() {
 
       {mySubs.length > 0 && <MySubsList subs={mySubs} />}
 
-      {!settings || methods.length === 0 ? (
+      {approvalGateActive ? (
+        <div
+          className="rounded-2xl border border-coral/40 bg-coral/10 p-5"
+          role="status"
+          aria-live="polite"
+          data-testid="approval-required-gate"
+        >
+          <div className="flex items-center gap-2 font-display text-sm font-bold">
+            <Clock className="h-4 w-4 text-coral" /> Waiting on host approval
+          </div>
+          <p className="text-xs text-muted-foreground mt-1">
+            {myReq?.status === "pending"
+              ? "Your request to join is pending. Payment unlocks after the host approves you."
+              : myReq?.status === "rejected"
+              ? "The host declined your request. You can't submit payment for this game."
+              : "This host reviews every player before payment. Send a request to join first."}
+          </p>
+          <Link
+            to="/games/$gameId"
+            params={{ gameId: game.id }}
+            className="mt-3 inline-flex items-center rounded-full bg-lime-gradient px-4 py-1.5 text-xs font-bold text-primary-foreground"
+          >
+            {myReq ? "Back to game" : "Request to join"}
+          </Link>
+        </div>
+      ) : !settings || methods.length === 0 ? (
         <div className="rounded-2xl border border-dashed border-border bg-surface/40 p-5 text-center">
           <div className="font-semibold text-sm">Host hasn't configured payment yet</div>
           <p className="text-xs text-muted-foreground mt-1">Reach out to the host directly to arrange payment.</p>
