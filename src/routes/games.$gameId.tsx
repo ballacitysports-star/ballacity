@@ -171,8 +171,18 @@ function GameDetail() {
   const isPaid = fee > 0;
   const requiresApproval = !!settings?.requires_approval;
   const latestSub = mySubs[0];
-  const isConfirmed = latestSub?.status === "verified" || myReq?.status === "approved";
-  const isPending = latestSub?.status === "pending" || (requiresApproval && myReq?.status === "pending");
+  const isApproved = myReq?.status === "approved";
+  const isRequestPending = myReq?.status === "pending";
+  const isPaymentVerified = latestSub?.status === "verified";
+  const isPaymentPending = latestSub?.status === "pending";
+  // Approval-gated games treat approval as the *first* gate. Payment (if any)
+  // becomes actionable only after the host approves the request.
+  const approvalCleared = !requiresApproval || isApproved;
+  const paymentCleared = !isPaid || isPaymentVerified;
+  const isConfirmed = approvalCleared && paymentCleared && (requiresApproval || isPaid ? true : false);
+  // Only surface "payment pending" once approval is cleared, so players
+  // don't see a payment-pending state before they've been approved.
+  const isPending = isRequestPending || (approvalCleared && isPaymentPending);
 
   // The viewer counts as a roster player only when:
   //  - they're not the host (hosts run the game, they don't take a player slot), AND
@@ -218,14 +228,9 @@ function GameDetail() {
       return;
     }
     if (spotsLeft <= 0) { toast.error("This game is full."); return; }
-    if (isPaid) {
-      const search: { invite?: true; from?: string } = {};
-      if (isInvite) search.invite = true;
-      if (inviteFrom) search.from = inviteFrom;
-      nav({ to: "/games/$gameId/pay", params: { gameId: game.id }, search });
-      return;
-    }
-    if (requiresApproval) {
+    // Approval gate takes priority over payment: on games that require
+    // approval, players must be approved before they can pay.
+    if (requiresApproval && !isApproved) {
       if (!settings) { toast.error("Host hasn't enabled approvals yet."); return; }
       // Invite-link integrity: if the URL claims invite=1, `from` must be present
       // and must match the actual host. Otherwise the link is missing context or
@@ -246,6 +251,13 @@ function GameDetail() {
         toast.success("Request sent. The host will review it.");
         refreshStatus();
       } catch (e: any) { toast.error(e.message ?? "Could not send request."); }
+      return;
+    }
+    if (isPaid) {
+      const search: { invite?: true; from?: string } = {};
+      if (isInvite) search.invite = true;
+      if (inviteFrom) search.from = inviteFrom;
+      nav({ to: "/games/$gameId/pay", params: { gameId: game.id }, search });
       return;
     }
     joinGame(game.id);
@@ -656,10 +668,10 @@ function GameDetail() {
               <><Check className="h-4 w-4" /> You're in · Tap to leave</>
             ) : spotsLeft <= 0 ? (
               <>Full</>
+            ) : requiresApproval && !isApproved ? (
+              <>Request to join · {spotsLeft} spot{spotsLeft === 1 ? "" : "s"} left</>
             ) : isPaid ? (
               <><CreditCard className="h-4 w-4" /> Pay host · ${fee.toFixed(2)}</>
-            ) : requiresApproval ? (
-              <>Request to join · {spotsLeft} spot{spotsLeft === 1 ? "" : "s"} left</>
             ) : (
               <>Join free · {spotsLeft} spot{spotsLeft === 1 ? "" : "s"} left</>
             )}
