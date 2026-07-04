@@ -745,7 +745,77 @@ function GameDetail() {
           )}
         </div>
       </div>
+
+      {isHost && editOpen && (
+        <EditGameModal game={game} onClose={() => setEditOpen(false)} />
+      )}
     </div>
+  );
+}
+
+function EditGameModal({ game, onClose }: { game: Game; onClose: () => void }) {
+  const [title, setTitle] = useState(game.title);
+  const [location, setLocation] = useState(game.location);
+  const [dateLocal, setDateLocal] = useState(() => {
+    const d = new Date(game.date);
+    const pad = (n: number) => String(n).padStart(2, "0");
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  });
+  const [maxPlayers, setMaxPlayers] = useState(String(game.maxPlayers));
+  const [price, setPrice] = useState(String(game.price));
+  const [description, setDescription] = useState(game.description);
+
+  const save = () => {
+    const mp = Math.max(2, Math.min(200, Number(maxPlayers) || game.maxPlayers));
+    const pr = Math.max(0, Number(price) || 0);
+    const iso = new Date(dateLocal).toISOString();
+    const updated = updateHostedGame(game.id, {
+      title: title.trim() || game.title,
+      location: location.trim() || game.location,
+      date: Number.isFinite(new Date(dateLocal).getTime()) ? iso : game.date,
+      maxPlayers: mp,
+      price: pr,
+      description,
+    });
+    if (!updated) { toast.error("This game can't be edited here."); return; }
+    toast.success("Game updated.");
+    onClose();
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 bg-background/80 backdrop-blur-sm grid place-items-center p-4" role="dialog" aria-modal="true">
+      <div className="w-full max-w-md rounded-2xl border border-border bg-surface p-4 max-h-[85vh] overflow-y-auto">
+        <div className="flex items-center justify-between">
+          <h2 className="font-display text-lg font-bold">Edit game</h2>
+          <button onClick={onClose} className="grid h-9 w-9 place-items-center rounded-full border border-border" aria-label="Close">
+            <XIcon className="h-4 w-4" />
+          </button>
+        </div>
+        <div className="mt-3 space-y-3">
+          <Field label="Title"><input value={title} onChange={(e) => setTitle(e.target.value)} className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm" /></Field>
+          <Field label="Location"><input value={location} onChange={(e) => setLocation(e.target.value)} className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm" /></Field>
+          <Field label="Date & time"><input type="datetime-local" value={dateLocal} onChange={(e) => setDateLocal(e.target.value)} className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm" /></Field>
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="Max players"><input type="number" min={2} value={maxPlayers} onChange={(e) => setMaxPlayers(e.target.value)} className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm" /></Field>
+            <Field label="Price ($)"><input type="number" min={0} step="0.01" value={price} onChange={(e) => setPrice(e.target.value)} className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm" /></Field>
+          </div>
+          <Field label="Description"><textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={3} className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm" /></Field>
+        </div>
+        <div className="mt-4 flex items-center gap-2">
+          <button onClick={onClose} className="flex-1 rounded-xl border border-border bg-background py-2.5 text-sm font-semibold">Cancel</button>
+          <button onClick={save} className="flex-1 rounded-xl bg-lime-gradient py-2.5 text-sm font-bold text-primary-foreground">Save changes</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function Field({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <label className="block">
+      <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1">{label}</div>
+      {children}
+    </label>
   );
 }
 
