@@ -1,8 +1,15 @@
 import { useSyncExternalStore } from "react";
+import { toast } from "sonner";
 import type { Game, Sport } from "@/lib/sample-data";
 import { imageFor, ME } from "@/lib/sample-data";
 import { supabase } from "@/integrations/supabase/client";
 import type { TablesInsert, TablesUpdate } from "@/integrations/supabase/types";
+
+let currentUserId: string | null = null;
+if (typeof window !== "undefined") {
+  supabase.auth.getUser().then(({ data }) => { currentUserId = data.user?.id ?? null; });
+  supabase.auth.onAuthStateChange((_e, session) => { currentUserId = session?.user?.id ?? null; });
+}
 
 const STORAGE_KEY = "openrun.hostedGames.v1";
 const listeners = new Set<() => void>();
