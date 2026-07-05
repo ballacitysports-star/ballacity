@@ -1,4 +1,6 @@
 import { useMemo, useSyncExternalStore } from "react";
+import { bumpHostedGameJoined } from "@/lib/hosted-games-store";
+
 
 const joined = new Set<string>();
 const listeners = new Set<() => void>();
