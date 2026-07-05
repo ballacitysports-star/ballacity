@@ -366,6 +366,30 @@ export function updateHostedGame(id: string, patch: Partial<Game>): Game | undef
   return updated;
 }
 
+/** Delete a hosted game optimistically, rolling back on DB failure. */
+export async function deleteHostedGame(id: string): Promise<void> {
+  loadLocal();
+  const prev = cache.find((g) => g.id === id);
+  if (!prev) return;
+
+  // Optimistic removal.
+  cache = cache.filter((g) => g.id !== id);
+  emit();
+
+  try {
+    const { error } = await supabase.from("hosted_games").delete().eq("id", id);
+    if (error) throw error;
+  } catch (err: any) {
+    // Restore on failure.
+    if (prev) {
+      cache = [prev, ...cache];
+      emit();
+    }
+    toast.error(`Couldn't delete "${prev.title}"`, { description: err.message });
+    throw err;
+  }
+}
+
 /** List locally-hosted games that have no hostUserId yet. */
 export function listUnclaimedHostedGames(): Game[] {
   loadLocal();
