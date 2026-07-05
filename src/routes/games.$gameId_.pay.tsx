@@ -155,6 +155,7 @@ function PayPage() {
   const requiresApproval = !!settings?.requires_approval;
   const isApproved = myReq?.status === "approved";
   const approvalGateActive = requiresApproval && !isApproved;
+  const hostId = settings?.host_id ?? game.hostUserId ?? null;
 
   return (
     <div className="mx-auto max-w-md px-4 pt-6 pb-32">
@@ -234,11 +235,24 @@ function PayPage() {
             {myReq ? "Back to game" : "Request to join"}
           </Link>
         </div>
-      ) : !settings || methods.length === 0 ? (
+      ) : !hostId ? (
         <div className="rounded-2xl border border-dashed border-border bg-surface/40 p-5 text-center">
-          <div className="font-semibold text-sm">Host hasn't configured payment yet</div>
-          <p className="text-xs text-muted-foreground mt-1">Reach out to the host directly to arrange payment.</p>
+          <div className="font-semibold text-sm">Payment is not ready yet</div>
+          <p className="text-xs text-muted-foreground mt-1">Reach out to the host directly to arrange this game fee.</p>
         </div>
+      ) : methods.length === 0 ? (
+        <PaymentInstructionsAndProof
+          game_id={game.id}
+          host_id={hostId}
+          method={null}
+          extraInstructions={settings?.payment_instructions ?? null}
+          onCancel={() => nav({ to: "/games/$gameId", params: { gameId: game.id } })}
+          onSubmitted={async () => {
+            joinGame(game.id);
+            const subs = await listMySubmissionsForGame(game.id);
+            setMySubs(subs);
+          }}
+        />
       ) : !picked ? (
         <>
           <h2 className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2">Pay host using</h2>
@@ -311,10 +325,10 @@ function MySubsList({ subs }: { subs: PaymentSubmission[] }) {
 function PaymentInstructionsAndProof({
   game_id, host_id, method, extraInstructions, onCancel, onSubmitted,
 }: {
-  game_id: string; host_id: string; method: PaymentMethod;
+  game_id: string; host_id: string; method: PaymentMethod | null;
   extraInstructions: string | null; onCancel: () => void; onSubmitted: () => void;
 }) {
-  const meta = paymentTypeMeta(method.payment_type);
+  const meta = method ? paymentTypeMeta(method.payment_type) : paymentTypeMeta("cash");
   const [file, setFile] = useState<File | null>(null);
   const [ref, setRef] = useState("");
   const [notes, setNotes] = useState("");
@@ -328,8 +342,8 @@ function PaymentInstructionsAndProof({
       if (file) path = await uploadProofScreenshot(file);
       await createPaymentSubmission({
         game_id, host_id,
-        payment_method_id: method.id,
-        payment_type: method.payment_type,
+        payment_method_id: method?.id ?? null,
+        payment_type: method?.payment_type ?? "cash",
         screenshot_path: path,
         transaction_reference: ref || null,
         notes: notes || null,
@@ -345,23 +359,26 @@ function PaymentInstructionsAndProof({
         <div className="flex items-center gap-3 mb-3">
           <div className="grid h-10 w-10 place-items-center rounded-xl bg-secondary text-lg">{meta.emoji}</div>
           <div>
-            <div className="font-bold text-sm">{meta.name}</div>
-            <div className="text-xs text-muted-foreground">Send directly to host</div>
+            <div className="font-bold text-sm">{method ? meta.name : "Pay host directly"}</div>
+            <div className="text-xs text-muted-foreground">
+              {method ? "Send directly to host" : "Use the arrangement the host shared, then submit proof"}
+            </div>
           </div>
           <button onClick={onCancel} className="ml-auto text-muted-foreground"><X className="h-4 w-4" /></button>
         </div>
-        {method.username && <Field label="Send to" value={method.username} />}
-        {method.contact_info && <Field label="Contact" value={method.contact_info} />}
-        {method.payment_url && (
+        {method?.username && <Field label="Send to" value={method.username} />}
+        {method?.contact_info && <Field label="Contact" value={method.contact_info} />}
+        {method?.payment_url && (
           <a href={method.payment_url} target="_blank" rel="noreferrer"
             className="mt-2 flex items-center justify-center gap-2 w-full rounded-xl bg-lime-gradient py-3 text-sm font-bold text-primary-foreground">
             <ExternalLink className="h-4 w-4" /> Open {meta.name}
           </a>
         )}
-        {(method.instructions || extraInstructions) && (
+        {(method?.instructions || extraInstructions || !method) && (
           <div className="mt-3 rounded-xl bg-background p-3 text-xs text-muted-foreground space-y-1">
-            {method.instructions && <p>{method.instructions}</p>}
+            {method?.instructions && <p>{method.instructions}</p>}
             {extraInstructions && <p>{extraInstructions}</p>}
+            {!method && !extraInstructions && <p>Confirm payment details with the host, then submit a screenshot, transaction ID, or note for verification.</p>}
           </div>
         )}
       </div>
