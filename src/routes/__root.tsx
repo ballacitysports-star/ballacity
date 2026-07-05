@@ -191,6 +191,7 @@ function AuthGate({ children }: { children: React.ReactNode }) {
   return (
     <>
       {children}
+      <FloatingNotificationsButton />
       <BottomNav />
     </>
   );
