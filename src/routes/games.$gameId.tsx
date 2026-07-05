@@ -203,6 +203,25 @@ function GameDetail() {
     // eslint-disable-next-line
   }, [game?.id, user?.id, hostsThisGame]);
 
+  // Player-side: keep this viewer's own payment_submission status live so the
+  // CTA flips to "Confirmed" the instant the host verifies payment.
+  useEffect(() => {
+    if (!game?.id || !user || hostsThisGame) return;
+    const channel = supabase
+      .channel(`payment_submissions:player:${game.id}:${user.id}`)
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "payment_submissions", filter: `player_id=eq.${user.id}` },
+        (payload) => {
+          const row = (payload.new ?? payload.old) as { game_id?: string } | undefined;
+          if (row?.game_id === game.id) refreshStatus();
+        },
+      )
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+    // eslint-disable-next-line
+  }, [game?.id, user?.id, hostsThisGame]);
+
   if (!game) {
     return (
       <div className="min-h-dvh grid place-items-center px-6 text-center">
