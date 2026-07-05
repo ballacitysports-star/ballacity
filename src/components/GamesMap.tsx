@@ -122,6 +122,15 @@ export function GamesMap({
     return { lat: center.lat + dLat, lng: center.lng + dLng };
   };
 
+  /** Real geo coords (from geocoding) vs 0-100 sample-data pseudo coords. */
+  const isRealCoord = (lat: number, lng: number) =>
+    lng < 0 || lng > 100 || lat < 0 || lat > 90 ||
+    !Number.isInteger(lat) || !Number.isInteger(lng);
+
+  const pinPosition = (p: { lat: number; lng: number }, center: { lat: number; lng: number }) =>
+    isRealCoord(p.lat, p.lng) ? { lat: p.lat, lng: p.lng } : toLatLng(p.lng, p.lat, center);
+
+
   // Initialize map
   useEffect(() => {
     let cancelled = false;
