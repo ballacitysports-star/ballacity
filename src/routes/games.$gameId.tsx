@@ -477,6 +477,21 @@ function GameDetail() {
           </div>
         )}
 
+        {/* Payment progress timeline (player view) */}
+        {!isHost && (myReq || latestSub || (isPaid && (isConfirmed || joined))) && (
+          <PaymentStatusTimeline
+            requiresApproval={requiresApproval}
+            isPaid={isPaid}
+            fee={fee}
+            myReq={myReq}
+            latestSub={latestSub}
+            isConfirmed={isConfirmed}
+            joined={joined}
+          />
+        )}
+
+
+
         {/* Meta */}
         <div className="grid grid-cols-2 gap-2">
           <Meta icon={<Clock className="h-4 w-4 text-lime" />} label="Starts" value={formatWhen(game.date)} />
