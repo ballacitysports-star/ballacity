@@ -111,11 +111,11 @@ const THEME_INIT_SCRIPT = `(function(){try{var t=localStorage.getItem('openrun:t
 function RootShell({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" className="dark" data-theme="dark" suppressHydrationWarning>
-      <head>
+      <head suppressHydrationWarning>
         <HeadContent />
-        <script dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
+        <script suppressHydrationWarning dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
       </head>
-      <body>
+      <body suppressHydrationWarning>
         {children}
         <Scripts />
       </body>
