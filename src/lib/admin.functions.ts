@@ -210,3 +210,112 @@ export const adminRunReelWorker = createServerFn({ method: "POST" })
       return { ok: false, error: e?.message ?? "Worker call failed" };
     }
   });
+
+// ---------- Hosted-games map debug ----------
+
+export type HostedGameGeocodeStatus =
+  | "valid"
+  | "default_coords"
+  | "pseudo_coords"
+  | "missing_location"
+  | "invalid";
+
+export type HostedGameDebugRow = {
+  id: string;
+  title: string;
+  location: string;
+  host_id: string;
+  lat: number;
+  lng: number;
+  created_at: string;
+  geocode_status: HostedGameGeocodeStatus;
+  reason: string;
+};
+
+function classifyCoords(lat: number, lng: number, location: string): { status: HostedGameGeocodeStatus; reason: string } {
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) return { status: "invalid", reason: "lat/lng not a finite number" };
+  if (!location || !location.trim()) return { status: "missing_location", reason: "No location text on the game" };
+  if (lat === 50 && lng === 50) return { status: "default_coords", reason: "Coordinates are the default sentinel (50, 50) — geocoding never ran or failed" };
+  const isReal = lng < 0 || lng > 100 || lat < 0 || lat > 90 || !Number.isInteger(lat) || !Number.isInteger(lng);
+  if (isReal) return { status: "valid", reason: "Real geographic coordinates" };
+  return { status: "pseudo_coords", reason: "Integer 0–100 pseudo coords — will render offset around the viewer, not at the venue" };
+}
+
+export const adminListHostedGames = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }): Promise<{ rows: HostedGameDebugRow[] }> => {
+    await assertAdmin(context);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data, error } = await supabaseAdmin
+      .from("hosted_games")
+      .select("id, title, location, host_id, lat, lng, created_at")
+      .order("created_at", { ascending: false })
+      .limit(200);
+    if (error) throw new Error(error.message);
+    const rows: HostedGameDebugRow[] = (data ?? []).map((r: any) => {
+      const lat = Number(r.lat);
+      const lng = Number(r.lng);
+      const { status, reason } = classifyCoords(lat, lng, r.location ?? "");
+      return {
+        id: r.id,
+        title: r.title ?? "(untitled)",
+        location: r.location ?? "",
+        host_id: r.host_id,
+        lat,
+        lng,
+        created_at: r.created_at,
+        geocode_status: status,
+        reason,
+      };
+    });
+    return { rows };
+  });
+
+export const adminRegeocodeHostedGame = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { id: string }) => z.object({ id: z.string().min(1) }).parse(d))
+  .handler(async ({ context, data }): Promise<
+    | { ok: true; lat: number; lng: number; formatted: string }
+    | { ok: false; error: string }
+  > => {
+    await assertAdmin(context);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: game, error: fetchErr } = await supabaseAdmin
+      .from("hosted_games")
+      .select("id, location")
+      .eq("id", data.id)
+      .maybeSingle();
+    if (fetchErr) return { ok: false, error: fetchErr.message };
+    if (!game) return { ok: false, error: "Game not found" };
+    const address = String(game.location ?? "").trim();
+    if (!address) return { ok: false, error: "Game has no location text to geocode" };
+
+    const lovableKey = process.env.LOVABLE_API_KEY;
+    const gKey = process.env.GOOGLE_MAPS_API_KEY;
+    if (!lovableKey || !gKey) return { ok: false, error: "Maps credentials missing on server" };
+
+    const url = `https://ai.gateway.lovable.dev/v1/gateway/maps/api/geocode/json?address=${encodeURIComponent(address)}`;
+    let res: Response;
+    try {
+      res = await fetch(url, {
+        headers: { Authorization: `Bearer ${lovableKey}`, "X-Connection-Api-Key": gKey },
+      });
+    } catch (e: any) {
+      return { ok: false, error: `Geocode fetch failed: ${e?.message ?? "unknown"}` };
+    }
+    if (!res.ok) return { ok: false, error: `Geocode HTTP ${res.status}` };
+    const body: any = await res.json().catch(() => ({}));
+    const first = body?.results?.[0];
+    const lat = first?.geometry?.location?.lat;
+    const lng = first?.geometry?.location?.lng;
+    if (typeof lat !== "number" || typeof lng !== "number") {
+      return { ok: false, error: body?.status === "ZERO_RESULTS" ? "No location found for that address" : `Invalid geocode response (${body?.status ?? "unknown"})` };
+    }
+    const { error: updErr } = await supabaseAdmin
+      .from("hosted_games")
+      .update({ lat, lng } as any)
+      .eq("id", data.id);
+    if (updErr) return { ok: false, error: updErr.message };
+    return { ok: true, lat, lng, formatted: first?.formatted_address ?? address };
+  });
+
