@@ -110,12 +110,12 @@ const THEME_INIT_SCRIPT = `(function(){try{var t=localStorage.getItem('openrun:t
 
 function RootShell({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className="dark">
-      <head>
+    <html lang="en" className="dark" data-theme="dark" suppressHydrationWarning>
+      <head suppressHydrationWarning>
         <HeadContent />
-        <script dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
+        <script suppressHydrationWarning dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
       </head>
-      <body>
+      <body suppressHydrationWarning>
         {children}
         <Scripts />
       </body>
@@ -227,17 +227,9 @@ function RootComponent() {
 
   return (
     <QueryClientProvider client={queryClient}>
-      <ClientOnly
-        fallback={
-          <div className="grid min-h-dvh place-items-center bg-background">
-            <div className="h-8 w-8 animate-spin rounded-full border-2 border-muted border-t-foreground" />
-          </div>
-        }
-      >
-        <AuthGate>
-          <Outlet />
-        </AuthGate>
-      </ClientOnly>
+      <AuthGate>
+        <Outlet />
+      </AuthGate>
       <Toaster position="top-center" richColors />
       <ClientOnly fallback={null}>
         <DebugModeToggle />
