@@ -294,7 +294,7 @@ export const adminRegeocodeHostedGame = createServerFn({ method: "POST" })
     const gKey = process.env.GOOGLE_MAPS_API_KEY;
     if (!lovableKey || !gKey) return { ok: false, error: "Maps credentials missing on server" };
 
-    const url = `https://ai.gateway.lovable.dev/v1/gateway/maps/api/geocode/json?address=${encodeURIComponent(address)}`;
+    const url = `https://connector-gateway.lovable.dev/google_maps/maps/api/geocode/json?address=${encodeURIComponent(address)}`;
     let res: Response;
     try {
       res = await fetch(url, {
