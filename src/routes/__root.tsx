@@ -227,17 +227,9 @@ function RootComponent() {
 
   return (
     <QueryClientProvider client={queryClient}>
-      <ClientOnly
-        fallback={
-          <div className="grid min-h-dvh place-items-center bg-background">
-            <div className="h-8 w-8 animate-spin rounded-full border-2 border-muted border-t-foreground" />
-          </div>
-        }
-      >
-        <AuthGate>
-          <Outlet />
-        </AuthGate>
-      </ClientOnly>
+      <AuthGate>
+        <Outlet />
+      </AuthGate>
       <Toaster position="top-center" richColors />
       <ClientOnly fallback={null}>
         <DebugModeToggle />
