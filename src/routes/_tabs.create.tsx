@@ -39,6 +39,7 @@ function Create() {
   const [description, setDescription] = useState("");
   const [requiresApproval, setRequiresApproval] = useState(false);
   const [publishing, setPublishing] = useState(false);
+  const geocode = useServerFn(geocodeAddress);
 
   useEffect(() => {
     const nextCity = profile?.city?.trim() ?? "";
