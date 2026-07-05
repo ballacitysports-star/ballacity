@@ -328,6 +328,33 @@ export function getHostedGame(id: string): Game | undefined {
   return cache.find((g) => g.id === id);
 }
 
+/** Optimistically bump a hosted game's joined count; roll back on DB failure. */
+export function bumpHostedGameJoined(id: string, delta: number): void {
+  loadLocal();
+  const prev = cache.find((g) => g.id === id);
+  if (!prev) return;
+  const nextJoined = Math.max(0, (prev.joined ?? 0) + delta);
+  const updated: Game = { ...prev, joined: nextJoined };
+  cache = cache.map((g) => (g.id === id ? updated : g));
+  emit();
+
+  supabase
+    .from("hosted_games")
+    .update({ joined: nextJoined } as TablesUpdate<"hosted_games">)
+    .eq("id", id)
+    .then(({ error }) => {
+      if (error) {
+        // Silent rollback — RLS may block non-host writes; keep UI in sync with DB.
+        const curr = cache.find((g) => g.id === id);
+        if (curr && curr.joined === nextJoined) {
+          cache = cache.map((g) => (g.id === id ? { ...g, joined: prev.joined ?? 0 } : g));
+          emit();
+        }
+      }
+    });
+}
+
+
 /** Patch a hosted game locally, and mirror the change to the DB. */
 export function updateHostedGame(id: string, patch: Partial<Game>): Game | undefined {
   loadLocal();
