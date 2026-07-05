@@ -380,7 +380,7 @@ export function GamesMap({
     const center = pinCenterRef.current || userPosRef.current || { lat: 40.7281, lng: -73.9842 };
     pins.forEach((p) => {
       const m = pinMarkersRef.current.get(p.id);
-      if (m) m.setPosition(toLatLng(p.lng, p.lat, center));
+      if (m) m.setPosition(pinPosition(p, center));
     });
   };
 
