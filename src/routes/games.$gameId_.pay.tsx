@@ -275,9 +275,9 @@ function PayPage() {
       ) : (
         <PaymentInstructionsAndProof
           game_id={game.id}
-          host_id={settings.host_id}
+          host_id={hostId}
           method={picked}
-          extraInstructions={settings.payment_instructions}
+          extraInstructions={settings?.payment_instructions ?? null}
           onCancel={() => setPicked(null)}
           onSubmitted={async () => {
             joinGame(game.id);
