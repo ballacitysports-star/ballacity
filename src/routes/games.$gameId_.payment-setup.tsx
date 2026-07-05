@@ -1,8 +1,9 @@
-import { createFileRoute, Link, notFound, useNavigate } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { useEffect, useMemo, useState } from "react";
 import { ArrowLeft, Check, ShieldAlert } from "lucide-react";
 import { toast } from "sonner";
 import { GAMES } from "@/lib/sample-data";
+import { useHostedGames } from "@/lib/hosted-games-store";
 import { useAuth } from "@/hooks/use-auth";
 import {
   type PaymentMethod, paymentTypeMeta,
@@ -10,24 +11,27 @@ import {
 } from "@/lib/payments";
 import { LegalNotice } from "@/components/LegalNotice";
 
-export const Route = createFileRoute("/games/$gameId/payment-setup")({
+export const Route = createFileRoute("/games/$gameId_/payment-setup")({
   loader: ({ params }) => {
-    const game = GAMES.find((g) => g.id === params.gameId);
-    if (!game) throw notFound();
-    return { game };
+    return { gameId: params.gameId };
   },
-  head: ({ loaderData }) => ({ meta: [{ title: `Payment setup — ${loaderData?.game.title ?? "game"}` }] }),
+  head: () => ({ meta: [{ title: "Payment setup — OpenRun" }] }),
   notFoundComponent: () => <div className="p-6 text-sm">Game not found.</div>,
   errorComponent: ({ reset }) => <div className="p-6"><button onClick={reset} className="text-lime">Try again</button></div>,
   component: SetupPage,
 });
 
 function SetupPage() {
-  const { game } = Route.useLoaderData();
+  const { gameId } = Route.useLoaderData();
   const { user, loading } = useAuth();
+  const hosted = useHostedGames();
+  const game = useMemo(
+    () => hosted.find((g) => g.id === gameId) ?? GAMES.find((g) => g.id === gameId),
+    [hosted, gameId],
+  );
   const nav = useNavigate();
   const [methods, setMethods] = useState<PaymentMethod[]>([]);
-  const [fee, setFee] = useState<string>(String(game.price || 0));
+  const [fee, setFee] = useState("0");
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [deadline, setDeadline] = useState("");
   const [refundPolicy, setRefundPolicy] = useState("");
@@ -38,7 +42,11 @@ function SetupPage() {
   useEffect(() => { if (!loading && !user) nav({ to: "/auth" }); }, [loading, user, nav]);
 
   useEffect(() => {
-    if (!user) return;
+    if (game) setFee(String(game.price || 0));
+  }, [game]);
+
+  useEffect(() => {
+    if (!user || !game) return;
     (async () => {
       const [m, s] = await Promise.all([listMyPaymentMethods(), getMyGamePaymentSettings(game.id)]);
       setMethods(m.filter((x) => x.is_enabled));
@@ -51,10 +59,23 @@ function SetupPage() {
         setRequiresApproval(!!s.requires_approval);
       }
     })();
-  }, [user, game.id]);
+  }, [user, game]);
 
   if (loading) return <div className="p-6 text-sm text-muted-foreground">Loading…</div>;
   if (!user) return null;
+  if (!game) {
+    return (
+      <div className="min-h-dvh grid place-items-center px-6 text-center">
+        <div>
+          <h1 className="font-display text-2xl font-bold">Game not found</h1>
+          <p className="text-sm text-muted-foreground mt-2">It may have wrapped up or been cancelled.</p>
+          <Link to="/feed" className="inline-block mt-5 rounded-full bg-lime px-5 py-2.5 text-sm font-bold text-primary-foreground">
+            Back to feed
+          </Link>
+        </div>
+      </div>
+    );
+  }
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
