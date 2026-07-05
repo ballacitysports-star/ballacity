@@ -477,6 +477,21 @@ function GameDetail() {
           </div>
         )}
 
+        {/* Payment progress timeline (player view) */}
+        {!isHost && (myReq || latestSub || (isPaid && (isConfirmed || joined))) && (
+          <PaymentStatusTimeline
+            requiresApproval={requiresApproval}
+            isPaid={isPaid}
+            fee={fee}
+            myReq={myReq}
+            latestSub={latestSub}
+            isConfirmed={isConfirmed}
+            joined={joined}
+          />
+        )}
+
+
+
         {/* Meta */}
         <div className="grid grid-cols-2 gap-2">
           <Meta icon={<Clock className="h-4 w-4 text-lime" />} label="Starts" value={formatWhen(game.date)} />
@@ -919,6 +934,161 @@ function EditGameModal({ game, onClose }: { game: Game; onClose: () => void }) {
     </div>
   );
 }
+
+function fmtTs(ts: string | null | undefined) {
+  if (!ts) return "";
+  try {
+    return new Date(ts).toLocaleString(undefined, {
+      month: "short", day: "numeric", hour: "numeric", minute: "2-digit",
+    });
+  } catch { return ""; }
+}
+
+type TimelineState = "done" | "current" | "pending" | "failed" | "skipped";
+
+function PaymentStatusTimeline({
+  requiresApproval, isPaid, fee, myReq, latestSub, isConfirmed, joined,
+}: {
+  requiresApproval: boolean;
+  isPaid: boolean;
+  fee: number;
+  myReq: JoinRequest | null;
+  latestSub: PaymentSubmission | undefined;
+  isConfirmed: boolean;
+  joined: boolean;
+}) {
+  type Step = {
+    key: string;
+    label: string;
+    detail?: string;
+    ts?: string | null;
+    state: TimelineState;
+  };
+  const steps: Step[] = [];
+
+  // 1) Requested (only if approval-gated)
+  if (requiresApproval) {
+    const st: TimelineState = myReq
+      ? myReq.status === "rejected" ? "failed" : "done"
+      : "current";
+    steps.push({
+      key: "requested",
+      label: myReq?.status === "rejected" ? "Request declined" : "Request sent",
+      detail: myReq?.status === "rejected" ? (myReq.reviewer_notes || "Host declined this request.") : undefined,
+      ts: myReq?.created_at,
+      state: st,
+    });
+
+    // 2) Approved by host
+    const approved = myReq?.status === "approved";
+    const approvalState: TimelineState =
+      myReq?.status === "rejected" ? "skipped" :
+      approved ? "done" :
+      myReq ? "current" : "pending";
+    steps.push({
+      key: "approved",
+      label: approved ? "Approved by host" : "Awaiting host approval",
+      ts: approved ? myReq?.reviewed_at : null,
+      state: approvalState,
+    });
+  }
+
+  // 3) Payment steps (only if paid game)
+  if (isPaid) {
+    const canPayYet = !requiresApproval || myReq?.status === "approved";
+    const subState: TimelineState =
+      latestSub
+        ? latestSub.status === "rejected" ? "failed" : "done"
+        : canPayYet ? "current" : "pending";
+    steps.push({
+      key: "payHost",
+      label: latestSub ? "Payment submitted" : `Pay host · $${fee.toFixed(2)}`,
+      detail: latestSub?.status === "rejected"
+        ? (latestSub.reviewer_notes || "Host rejected this payment. Submit again.")
+        : latestSub
+        ? "Awaiting host verification."
+        : undefined,
+      ts: latestSub?.submitted_at,
+      state: subState,
+    });
+
+    // 4) Confirmed / verified
+    const verified = latestSub?.status === "verified";
+    const confState: TimelineState =
+      latestSub?.status === "rejected" ? "skipped" :
+      verified ? "done" :
+      latestSub ? "current" : "pending";
+    steps.push({
+      key: "confirmed",
+      label: verified ? "Confirmed — you're in" : "Awaiting confirmation",
+      ts: verified ? latestSub?.reviewed_at : null,
+      state: confState,
+    });
+  } else if (!requiresApproval && joined) {
+    steps.push({ key: "joined", label: "You're in", ts: null, state: "done" });
+  } else if (isConfirmed && !isPaid) {
+    steps.push({ key: "joined", label: "You're in", ts: null, state: "done" });
+  }
+
+  if (steps.length === 0) return null;
+
+  return (
+    <div className="rounded-3xl border border-border bg-surface p-4">
+      <div className="flex items-center justify-between mb-3">
+        <div className="font-display text-sm font-bold">Your progress</div>
+        <div className="text-[10px] uppercase tracking-wider text-muted-foreground">
+          {steps.filter((s) => s.state === "done").length} / {steps.length}
+        </div>
+      </div>
+      <ol className="relative">
+        {steps.map((s, i) => {
+          const isLast = i === steps.length - 1;
+          const dotClass =
+            s.state === "done" ? "bg-lime border-lime text-primary-foreground" :
+            s.state === "current" ? "bg-coral/20 border-coral text-coral animate-pulse" :
+            s.state === "failed" ? "bg-coral border-coral text-primary-foreground" :
+            s.state === "skipped" ? "bg-background border-border text-muted-foreground/50" :
+            "bg-background border-border text-muted-foreground";
+          const lineClass =
+            s.state === "done" ? "bg-lime/60" :
+            s.state === "failed" ? "bg-coral/60" :
+            "bg-border";
+          const labelClass =
+            s.state === "skipped" ? "text-muted-foreground/60 line-through" :
+            s.state === "failed" ? "text-coral" :
+            s.state === "done" ? "text-foreground" :
+            s.state === "current" ? "text-foreground" :
+            "text-muted-foreground";
+          return (
+            <li key={s.key} className="flex gap-3 pb-4 last:pb-0 relative">
+              <div className="flex flex-col items-center">
+                <div className={`grid h-6 w-6 place-items-center rounded-full border ${dotClass}`}>
+                  {s.state === "done" ? <Check className="h-3.5 w-3.5" /> :
+                   s.state === "failed" ? <XIcon className="h-3.5 w-3.5" /> :
+                   s.state === "current" ? <Clock className="h-3 w-3" /> :
+                   <span className="h-1.5 w-1.5 rounded-full bg-current" />}
+                </div>
+                {!isLast && <div className={`w-px flex-1 mt-1 ${lineClass}`} />}
+              </div>
+              <div className="flex-1 min-w-0 pb-1">
+                <div className="flex items-baseline justify-between gap-2">
+                  <div className={`text-sm font-semibold ${labelClass}`}>{s.label}</div>
+                  {s.ts && (
+                    <div className="text-[10px] text-muted-foreground shrink-0">{fmtTs(s.ts)}</div>
+                  )}
+                </div>
+                {s.detail && (
+                  <p className={`text-xs mt-0.5 ${s.state === "failed" ? "text-coral/80" : "text-muted-foreground"}`}>{s.detail}</p>
+                )}
+              </div>
+            </li>
+          );
+        })}
+      </ol>
+    </div>
+  );
+}
+
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
