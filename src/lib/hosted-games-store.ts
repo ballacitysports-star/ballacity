@@ -1,8 +1,15 @@
 import { useSyncExternalStore } from "react";
+import { toast } from "sonner";
 import type { Game, Sport } from "@/lib/sample-data";
 import { imageFor, ME } from "@/lib/sample-data";
 import { supabase } from "@/integrations/supabase/client";
 import type { TablesInsert, TablesUpdate } from "@/integrations/supabase/types";
+
+let currentUserId: string | null = null;
+if (typeof window !== "undefined") {
+  supabase.auth.getUser().then(({ data }) => { currentUserId = data.user?.id ?? null; });
+  supabase.auth.onAuthStateChange((_e, session) => { currentUserId = session?.user?.id ?? null; });
+}
 
 const STORAGE_KEY = "openrun.hostedGames.v1";
 const listeners = new Set<() => void>();
@@ -202,6 +209,19 @@ function ensureRealtime() {
         if (newRow) {
           const g = rowToGame(newRow);
           const idx = cache.findIndex((x) => x.id === g.id);
+          const isMine = currentUserId && newRow.host_id === currentUserId;
+          const title = g.title || "Untitled game";
+          if (payload.eventType === "INSERT" && !isMine) {
+            toast(`New game: ${title}`, { description: g.location || g.neighborhood });
+          } else if (payload.eventType === "UPDATE" && !isMine) {
+            const prevStatus = (oldRow?.status as string | null) ?? null;
+            const nextStatus = (newRow.status as string | null) ?? null;
+            if (prevStatus !== "published" && nextStatus === "published") {
+              toast.success(`Game published: ${title}`, { description: g.location || g.neighborhood });
+            } else {
+              toast(`Game updated: ${title}`);
+            }
+          }
           if (idx >= 0) cache = cache.map((x) => (x.id === g.id ? g : x));
           else cache = [g, ...cache];
           emit();
