@@ -393,7 +393,7 @@ export function GamesMap({
     pins.forEach((p) => {
       if (existing.has(p.id)) return;
       const marker = new window.google.maps.Marker({
-        position: toLatLng(p.lng, p.lat, center),
+        position: pinPosition(p, center),
         map: mapRef.current,
         icon: makePinIcon(p.emoji, p.id === activeId, !!p.urgent),
       });
