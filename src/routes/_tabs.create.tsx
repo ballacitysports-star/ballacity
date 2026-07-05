@@ -5,7 +5,7 @@ import { ArrowLeft, Calendar, MapPin, Users, DollarSign, Lock, Home, ShieldCheck
 import { SPORTS, type Sport } from "@/lib/sample-data";
 import { addHostedGame } from "@/lib/hosted-games-store";
 import { useServerFn } from "@tanstack/react-start";
-import { reverseGeocode } from "@/lib/geocode.functions";
+import { reverseGeocode, geocodeAddress } from "@/lib/geocode.functions";
 
 import { toast } from "sonner";
 import { LocationAutocomplete } from "@/components/LocationAutocomplete";
