@@ -5,7 +5,7 @@ import { ArrowLeft, Calendar, MapPin, Users, DollarSign, Lock, Home, ShieldCheck
 import { SPORTS, type Sport } from "@/lib/sample-data";
 import { addHostedGame } from "@/lib/hosted-games-store";
 import { useServerFn } from "@tanstack/react-start";
-import { reverseGeocode } from "@/lib/geocode.functions";
+import { reverseGeocode, geocodeAddress } from "@/lib/geocode.functions";
 
 import { toast } from "sonner";
 import { LocationAutocomplete } from "@/components/LocationAutocomplete";
@@ -39,6 +39,7 @@ function Create() {
   const [description, setDescription] = useState("");
   const [requiresApproval, setRequiresApproval] = useState(false);
   const [publishing, setPublishing] = useState(false);
+  const geocode = useServerFn(geocodeAddress);
 
   useEffect(() => {
     const nextCity = profile?.city?.trim() ?? "";
@@ -185,6 +186,17 @@ function Create() {
               },
             });
 
+            // Geocode the location so the game shows up at the right spot on the map.
+            let coords: { lat: number; lng: number } | null = null;
+            if (location.trim()) {
+              try {
+                const res = await geocode({ data: { address: location.trim() } });
+                coords = { lat: res.lat, lng: res.lng };
+              } catch (err) {
+                console.warn("[create] geocode failed", err);
+              }
+            }
+
             const game = await addHostedGame({
               sport,
               title,
@@ -198,6 +210,8 @@ function Create() {
               description,
               hostUserId: user?.id,
               host: hostSnap,
+              lat: coords?.lat,
+              lng: coords?.lng,
             });
 
 

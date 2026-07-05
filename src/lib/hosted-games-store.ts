@@ -247,6 +247,9 @@ export type HostedGameInput = {
   description: string;
   host?: { name: string; username: string; avatar: string; rating?: number };
   hostUserId?: string;
+  /** Real geographic coordinates from geocoding the location. */
+  lat?: number;
+  lng?: number;
 };
 
 export async function addHostedGame(input: HostedGameInput): Promise<Game> {
@@ -266,8 +269,8 @@ export async function addHostedGame(input: HostedGameInput): Promise<Game> {
     location: input.location || "TBD",
     neighborhood: "",
     distanceMi: 0,
-    lat: 50,
-    lng: 50,
+    lat: typeof input.lat === "number" ? input.lat : 50,
+    lng: typeof input.lng === "number" ? input.lng : 50,
     maxPlayers: input.maxPlayers,
     joined: 0,
     skill: input.skill,
@@ -278,6 +281,7 @@ export async function addHostedGame(input: HostedGameInput): Promise<Game> {
     description: input.description || "",
     equipment: [],
   };
+
 
   // Optimistic local insert.
   cache = [game, ...cache];
