@@ -331,16 +331,13 @@ export function getHostedGame(id: string): Game | undefined {
 /** Patch a hosted game locally, and mirror the change to the DB. */
 export function updateHostedGame(id: string, patch: Partial<Game>): Game | undefined {
   loadLocal();
-  let updated: Game | undefined;
-  cache = cache.map((g) => {
-    if (g.id !== id) return g;
-    updated = { ...g, ...patch };
-    return updated;
-  });
-  if (!updated) return undefined;
+  const prev = cache.find((g) => g.id === id);
+  if (!prev) return undefined;
+  const updated: Game = { ...prev, ...patch };
+  cache = cache.map((g) => (g.id === id ? updated : g));
   emit();
 
-  // Best-effort DB mirror; RLS restricts to the host.
+  // Best-effort DB mirror; RLS restricts to the host. Roll back on failure.
   const dbPatch: TablesUpdate<"hosted_games"> = {};
   if (patch.title !== undefined) dbPatch.title = patch.title;
   if (patch.location !== undefined) dbPatch.location = patch.location;
@@ -353,7 +350,18 @@ export function updateHostedGame(id: string, patch: Partial<Game>): Game | undef
     dbPatch.joins_closed = (patch as { joinsClosed?: boolean }).joinsClosed;
   }
   if (Object.keys(dbPatch).length > 0) {
-    supabase.from("hosted_games").update(dbPatch).eq("id", id).then(() => { /* noop */ });
+    supabase
+      .from("hosted_games")
+      .update(dbPatch)
+      .eq("id", id)
+      .then(({ error }) => {
+        if (error) {
+          // Revert optimistic patch.
+          cache = cache.map((g) => (g.id === id ? prev : g));
+          emit();
+          try { toast.error(`Couldn't save changes to "${prev.title}"`, { description: error.message }); } catch { /* ignore */ }
+        }
+      });
   }
   return updated;
 }
