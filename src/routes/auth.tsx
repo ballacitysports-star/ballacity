@@ -96,17 +96,17 @@ function AuthPage() {
     }
   };
 
-  const google = async () => {
+  const oauth = async (provider: "google" | "apple") => {
     setBusy(true);
     try {
-      const result = await lovable.auth.signInWithOAuth("google", {
+      const result = await lovable.auth.signInWithOAuth(provider, {
         redirect_uri: window.location.origin,
       });
       if (result.error) {
-        toast.error(result.error.message || "Google sign-in failed");
+        toast.error(result.error.message || `${provider === "google" ? "Google" : "Apple"} sign-in failed`);
       }
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Google sign-in failed");
+      toast.error(err instanceof Error ? err.message : "Sign-in failed");
     } finally {
       setBusy(false);
     }
@@ -136,7 +136,7 @@ function AuthPage() {
         </div>
 
         <button
-          onClick={google}
+          onClick={() => oauth("google")}
           disabled={busy}
           className="w-full rounded-full border border-border bg-surface px-4 py-3 text-sm font-bold flex items-center justify-center gap-2 disabled:opacity-50"
         >
@@ -147,6 +147,17 @@ function AuthPage() {
             <path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.3-2.3 4.3-4.2 5.7l6.2 5.2C40.8 35.6 44 30.2 44 24c0-1.3-.1-2.3-.4-3.5z"/>
           </svg>
           Continue with Google
+        </button>
+
+        <button
+          onClick={() => oauth("apple")}
+          disabled={busy}
+          className="w-full rounded-full border border-border bg-foreground text-background px-4 py-3 text-sm font-bold flex items-center justify-center gap-2 disabled:opacity-50"
+        >
+          <svg className="h-4 w-4" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
+            <path d="M16.365 1.43c0 1.14-.42 2.22-1.24 3.03-.86.9-2.28 1.6-3.44 1.5-.14-1.08.4-2.22 1.16-3.03.86-.92 2.32-1.6 3.52-1.5zM20.5 17.29c-.55 1.28-.82 1.85-1.53 2.98-.99 1.57-2.39 3.53-4.12 3.55-1.54.01-1.94-.99-4.03-.99s-2.53.97-4.03 1c-1.73.03-3.05-1.7-4.04-3.28-2.78-4.42-3.07-9.61-1.36-12.36 1.22-1.94 3.14-3.07 4.95-3.07 1.84 0 3 .99 4.53.99 1.48 0 2.38-.99 4.51-.99 1.61 0 3.32.86 4.54 2.35-3.99 2.15-3.34 7.72.58 8.82z"/>
+          </svg>
+          Continue with Apple
         </button>
 
         <div className="flex items-center gap-3 text-[10px] uppercase tracking-wider text-muted-foreground">
