@@ -1,9 +1,11 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
-import { Camera, Check, ArrowRight } from "lucide-react";
+import { useServerFn } from "@tanstack/react-start";
+import { Camera, Check, ArrowRight, MapPin, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
+import { reverseGeocode } from "@/lib/geocode.functions";
 
 export const Route = createFileRoute("/onboarding")({
   head: () => ({ meta: [{ title: "Welcome — OpenRun" }] }),
@@ -11,6 +13,8 @@ export const Route = createFileRoute("/onboarding")({
 });
 
 const USERNAME_RE = /^[a-z0-9_]{3,20}$/;
+
+
 
 function OnboardingPage() {
   const nav = useNavigate();
