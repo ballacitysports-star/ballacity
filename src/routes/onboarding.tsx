@@ -162,6 +162,7 @@ function OnboardingPage() {
       <div className="flex items-center gap-2 mb-8">
         <div className={`h-1 flex-1 rounded-full ${step >= 1 ? "bg-lime" : "bg-border"}`} />
         <div className={`h-1 flex-1 rounded-full ${step >= 2 ? "bg-lime" : "bg-border"}`} />
+        <div className={`h-1 flex-1 rounded-full ${step >= 3 ? "bg-lime" : "bg-border"}`} />
       </div>
 
       {step === 1 && (
