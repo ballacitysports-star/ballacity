@@ -163,12 +163,42 @@ function AuthGate({ children }: { children: React.ReactNode }) {
   useNotificationPush();
   useOneSignal();
 
+  const [needsOnboarding, setNeedsOnboarding] = useState<boolean | null>(null);
+
   useEffect(() => {
     if (loading) return;
     if (!user && !isPublic) {
       router.navigate({ to: "/auth", replace: true });
     }
   }, [loading, user, isPublic, router, pathname]);
+
+  // Detect whether the signed-in user has completed onboarding (username set).
+  useEffect(() => {
+    if (!user) {
+      setNeedsOnboarding(null);
+      return;
+    }
+    let cancelled = false;
+    supabase
+      .from("profiles")
+      .select("username")
+      .eq("id", user.id)
+      .maybeSingle()
+      .then(({ data }) => {
+        if (cancelled) return;
+        setNeedsOnboarding(!data?.username);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [user?.id]);
+
+  // Redirect to onboarding when needed (skip on public + onboarding routes).
+  useEffect(() => {
+    if (!user || needsOnboarding !== true) return;
+    if (pathname === ONBOARDING_ROUTE || pathname === "/auth" || pathname === "/reset-password") return;
+    router.navigate({ to: ONBOARDING_ROUTE, replace: true });
+  }, [user, needsOnboarding, pathname, router]);
 
   useEffect(() => {
     if (user && !isPublic && !isTab) {
