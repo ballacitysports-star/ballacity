@@ -257,24 +257,92 @@ function OnboardingPage() {
 
           <div className="space-y-2">
             <button
-              onClick={finish}
-              disabled={busy}
-              className="w-full rounded-full bg-lime-gradient px-4 py-3 text-sm font-bold text-primary-foreground disabled:opacity-50"
+              onClick={() => setStep(3)}
+              className="w-full rounded-full bg-lime-gradient px-4 py-3 text-sm font-bold text-primary-foreground flex items-center justify-center gap-2"
             >
-              {busy ? "Saving…" : "Finish"}
+              {avatarDataUrl ? "Continue" : "Skip for now"} <ArrowRight className="h-4 w-4" />
             </button>
+            {avatarDataUrl && (
+              <button
+                onClick={() => setAvatarDataUrl(null)}
+                className="w-full text-center text-xs text-muted-foreground py-2"
+              >
+                Remove photo
+              </button>
+            )}
             <button
-              onClick={() => {
-                if (!avatarDataUrl) void finish();
-                else setAvatarDataUrl(null);
-              }}
+              onClick={() => setStep(1)}
+              className="w-full text-center text-xs text-muted-foreground py-1"
+            >
+              Back
+            </button>
+          </div>
+        </div>
+      )}
+
+      {step === 3 && (
+        <div className="space-y-6">
+          <div>
+            <h1 className="font-display text-3xl font-bold">Find games nearby</h1>
+            <p className="text-sm text-muted-foreground mt-2">
+              OpenRun uses your location to show pickup games happening near you.
+              We never share your precise location with other players.
+            </p>
+          </div>
+
+          <div className="flex flex-col items-center gap-4 py-6">
+            <div className="h-24 w-24 rounded-full bg-lime/10 grid place-items-center">
+              <MapPin className="h-10 w-10 text-lime" />
+            </div>
+            {city ? (
+              <div className="text-center">
+                <div className="text-xs text-muted-foreground">You're near</div>
+                <div className="font-display text-lg font-bold flex items-center gap-1 justify-center">
+                  <Check className="h-4 w-4 text-lime" /> {city}
+                </div>
+              </div>
+            ) : (
+              <p className="text-xs text-muted-foreground text-center max-w-xs">
+                Tap "Allow location" and confirm the browser prompt.
+              </p>
+            )}
+          </div>
+
+          <div className="space-y-2">
+            {!city ? (
+              <button
+                onClick={requestLocation}
+                disabled={locating}
+                className="w-full rounded-full bg-lime-gradient px-4 py-3 text-sm font-bold text-primary-foreground disabled:opacity-50 flex items-center justify-center gap-2"
+              >
+                {locating ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" /> Finding you…
+                  </>
+                ) : (
+                  <>
+                    <MapPin className="h-4 w-4" /> Allow location
+                  </>
+                )}
+              </button>
+            ) : (
+              <button
+                onClick={finish}
+                disabled={busy}
+                className="w-full rounded-full bg-lime-gradient px-4 py-3 text-sm font-bold text-primary-foreground disabled:opacity-50"
+              >
+                {busy ? "Saving…" : "Finish"}
+              </button>
+            )}
+            <button
+              onClick={finish}
               disabled={busy}
               className="w-full text-center text-xs text-muted-foreground py-2"
             >
-              {avatarDataUrl ? "Remove photo" : "Skip for now"}
+              {city ? "Use a different location later" : "Skip for now"}
             </button>
             <button
-              onClick={() => setStep(1)}
+              onClick={() => setStep(2)}
               className="w-full text-center text-xs text-muted-foreground py-1"
             >
               Back
