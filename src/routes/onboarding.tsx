@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
 import { reverseGeocode } from "@/lib/geocode.functions";
+import { SPORTS, type Sport } from "@/lib/sample-data";
 
 export const Route = createFileRoute("/onboarding")({
   head: () => ({ meta: [{ title: "Welcome — OpenRun" }] }),
@@ -13,22 +14,24 @@ export const Route = createFileRoute("/onboarding")({
 });
 
 const USERNAME_RE = /^[a-z0-9_]{3,20}$/;
-
-
+const SKILL_LEVELS = ["Beginner", "Intermediate", "Advanced", "Pro"] as const;
+type SkillLevel = (typeof SKILL_LEVELS)[number];
 
 function OnboardingPage() {
   const nav = useNavigate();
   const { user, loading } = useAuth();
-  const [step, setStep] = useState<1 | 2 | 3>(1);
+  const [step, setStep] = useState<1 | 2 | 3 | 4>(1);
   const [username, setUsername] = useState("");
   const [checking, setChecking] = useState(false);
   const [available, setAvailable] = useState<boolean | null>(null);
   const [avatarDataUrl, setAvatarDataUrl] = useState<string | null>(null);
   const [city, setCity] = useState<string | null>(null);
   const [locating, setLocating] = useState(false);
+  const [skillLevels, setSkillLevels] = useState<Record<string, SkillLevel>>({});
   const [busy, setBusy] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
   const reverse = useServerFn(reverseGeocode);
+
 
   // Bounce out if unauthenticated or already onboarded
   useEffect(() => {
