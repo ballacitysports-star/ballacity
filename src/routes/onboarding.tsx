@@ -138,6 +138,7 @@ function OnboardingPage() {
           username: cleanUsername,
           avatar_url: avatarDataUrl,
           city: city ?? null,
+          skill_levels: skillLevels,
         })
         .eq("id", user.id);
       if (error) throw error;
