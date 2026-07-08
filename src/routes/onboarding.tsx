@@ -332,22 +332,102 @@ function OnboardingPage() {
               </button>
             ) : (
               <button
-                onClick={finish}
-                disabled={busy}
-                className="w-full rounded-full bg-lime-gradient px-4 py-3 text-sm font-bold text-primary-foreground disabled:opacity-50"
+                onClick={() => setStep(4)}
+                className="w-full rounded-full bg-lime-gradient px-4 py-3 text-sm font-bold text-primary-foreground flex items-center justify-center gap-2"
               >
-                {busy ? "Saving…" : "Finish"}
+                Continue <ArrowRight className="h-4 w-4" />
               </button>
             )}
             <button
-              onClick={finish}
-              disabled={busy}
+              onClick={() => setStep(4)}
               className="w-full text-center text-xs text-muted-foreground py-2"
             >
               {city ? "Use a different location later" : "Skip for now"}
             </button>
             <button
               onClick={() => setStep(2)}
+              className="w-full text-center text-xs text-muted-foreground py-1"
+            >
+              Back
+            </button>
+          </div>
+        </div>
+      )}
+
+      {step === 4 && (
+        <div className="space-y-6">
+          <div>
+            <h1 className="font-display text-3xl font-bold">Your skill level</h1>
+            <p className="text-sm text-muted-foreground mt-2">
+              Pick the sports you play and rate yourself. We use this to recommend games at your level.
+            </p>
+          </div>
+
+          <div className="space-y-3">
+            {SPORTS.map((s) => {
+              const selected = skillLevels[s.name] != null;
+              return (
+                <div
+                  key={s.name}
+                  className={`rounded-2xl border ${
+                    selected ? "border-lime bg-lime/5" : "border-border bg-surface"
+                  } px-4 py-3`}
+                >
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSkillLevels((prev) => {
+                        const next = { ...prev };
+                        if (selected) delete next[s.name];
+                        else next[s.name] = "Intermediate";
+                        return next;
+                      });
+                    }}
+                    className="flex items-center gap-3 w-full text-left"
+                  >
+                    <span className="text-xl">{s.emoji}</span>
+                    <span className="flex-1 text-sm font-semibold">{s.name}</span>
+                    {selected && <Check className="h-4 w-4 text-lime" />}
+                  </button>
+
+                  {selected && (
+                    <div className="mt-3 grid grid-cols-4 gap-1.5">
+                      {SKILL_LEVELS.map((lvl) => {
+                        const active = skillLevels[s.name] === lvl;
+                        return (
+                          <button
+                            key={lvl}
+                            type="button"
+                            onClick={() =>
+                              setSkillLevels((prev) => ({ ...prev, [s.name as Sport]: lvl }))
+                            }
+                            className={`rounded-full px-2 py-1.5 text-[11px] font-semibold transition-colors ${
+                              active
+                                ? "bg-lime text-primary-foreground"
+                                : "bg-background text-muted-foreground border border-border"
+                            }`}
+                          >
+                            {lvl}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+
+          <div className="space-y-2 pt-2">
+            <button
+              onClick={finish}
+              disabled={busy}
+              className="w-full rounded-full bg-lime-gradient px-4 py-3 text-sm font-bold text-primary-foreground disabled:opacity-50"
+            >
+              {busy ? "Saving…" : Object.keys(skillLevels).length > 0 ? "Finish" : "Skip & Finish"}
+            </button>
+            <button
+              onClick={() => setStep(3)}
               className="w-full text-center text-xs text-muted-foreground py-1"
             >
               Back
