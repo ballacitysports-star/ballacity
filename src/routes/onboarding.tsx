@@ -94,6 +94,37 @@ function OnboardingPage() {
     }
   };
 
+  const requestLocation = () => {
+    if (!navigator.geolocation) {
+      toast.error("Geolocation isn't available on this device");
+      return;
+    }
+    setLocating(true);
+    navigator.geolocation.getCurrentPosition(
+      async (pos) => {
+        try {
+          const { city: c, formatted } = await reverse({
+            data: { lat: pos.coords.latitude, lng: pos.coords.longitude },
+          });
+          setCity(c || formatted || null);
+        } catch {
+          toast.error("Couldn't resolve your location");
+        } finally {
+          setLocating(false);
+        }
+      },
+      (err) => {
+        setLocating(false);
+        toast.error(
+          err.code === 1
+            ? "Location permission denied. You can set it later in your profile."
+            : "Couldn't get your location",
+        );
+      },
+      { enableHighAccuracy: false, timeout: 10000, maximumAge: 60000 },
+    );
+  };
+
   const finish = async () => {
     if (!user || busy) return;
     setBusy(true);
@@ -103,6 +134,7 @@ function OnboardingPage() {
         .update({
           username: cleanUsername,
           avatar_url: avatarDataUrl,
+          city: city ?? null,
         })
         .eq("id", user.id);
       if (error) throw error;
@@ -114,6 +146,7 @@ function OnboardingPage() {
       setBusy(false);
     }
   };
+
 
   if (loading || !user) {
     return (
