@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
 import { reverseGeocode } from "@/lib/geocode.functions";
+import { SPORTS, type Sport } from "@/lib/sample-data";
 
 export const Route = createFileRoute("/onboarding")({
   head: () => ({ meta: [{ title: "Welcome — OpenRun" }] }),
@@ -13,22 +14,24 @@ export const Route = createFileRoute("/onboarding")({
 });
 
 const USERNAME_RE = /^[a-z0-9_]{3,20}$/;
-
-
+const SKILL_LEVELS = ["Beginner", "Intermediate", "Advanced", "Pro"] as const;
+type SkillLevel = (typeof SKILL_LEVELS)[number];
 
 function OnboardingPage() {
   const nav = useNavigate();
   const { user, loading } = useAuth();
-  const [step, setStep] = useState<1 | 2 | 3>(1);
+  const [step, setStep] = useState<1 | 2 | 3 | 4>(1);
   const [username, setUsername] = useState("");
   const [checking, setChecking] = useState(false);
   const [available, setAvailable] = useState<boolean | null>(null);
   const [avatarDataUrl, setAvatarDataUrl] = useState<string | null>(null);
   const [city, setCity] = useState<string | null>(null);
   const [locating, setLocating] = useState(false);
+  const [skillLevels, setSkillLevels] = useState<Record<string, SkillLevel>>({});
   const [busy, setBusy] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
   const reverse = useServerFn(reverseGeocode);
+
 
   // Bounce out if unauthenticated or already onboarded
   useEffect(() => {
@@ -135,6 +138,7 @@ function OnboardingPage() {
           username: cleanUsername,
           avatar_url: avatarDataUrl,
           city: city ?? null,
+          skill_levels: skillLevels,
         })
         .eq("id", user.id);
       if (error) throw error;
@@ -163,6 +167,7 @@ function OnboardingPage() {
         <div className={`h-1 flex-1 rounded-full ${step >= 1 ? "bg-lime" : "bg-border"}`} />
         <div className={`h-1 flex-1 rounded-full ${step >= 2 ? "bg-lime" : "bg-border"}`} />
         <div className={`h-1 flex-1 rounded-full ${step >= 3 ? "bg-lime" : "bg-border"}`} />
+        <div className={`h-1 flex-1 rounded-full ${step >= 4 ? "bg-lime" : "bg-border"}`} />
       </div>
 
       {step === 1 && (
@@ -327,22 +332,102 @@ function OnboardingPage() {
               </button>
             ) : (
               <button
-                onClick={finish}
-                disabled={busy}
-                className="w-full rounded-full bg-lime-gradient px-4 py-3 text-sm font-bold text-primary-foreground disabled:opacity-50"
+                onClick={() => setStep(4)}
+                className="w-full rounded-full bg-lime-gradient px-4 py-3 text-sm font-bold text-primary-foreground flex items-center justify-center gap-2"
               >
-                {busy ? "Saving…" : "Finish"}
+                Continue <ArrowRight className="h-4 w-4" />
               </button>
             )}
             <button
-              onClick={finish}
-              disabled={busy}
+              onClick={() => setStep(4)}
               className="w-full text-center text-xs text-muted-foreground py-2"
             >
               {city ? "Use a different location later" : "Skip for now"}
             </button>
             <button
               onClick={() => setStep(2)}
+              className="w-full text-center text-xs text-muted-foreground py-1"
+            >
+              Back
+            </button>
+          </div>
+        </div>
+      )}
+
+      {step === 4 && (
+        <div className="space-y-6">
+          <div>
+            <h1 className="font-display text-3xl font-bold">Your skill level</h1>
+            <p className="text-sm text-muted-foreground mt-2">
+              Pick the sports you play and rate yourself. We use this to recommend games at your level.
+            </p>
+          </div>
+
+          <div className="space-y-3">
+            {SPORTS.map((s) => {
+              const selected = skillLevels[s.name] != null;
+              return (
+                <div
+                  key={s.name}
+                  className={`rounded-2xl border ${
+                    selected ? "border-lime bg-lime/5" : "border-border bg-surface"
+                  } px-4 py-3`}
+                >
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSkillLevels((prev) => {
+                        const next = { ...prev };
+                        if (selected) delete next[s.name];
+                        else next[s.name] = "Intermediate";
+                        return next;
+                      });
+                    }}
+                    className="flex items-center gap-3 w-full text-left"
+                  >
+                    <span className="text-xl">{s.emoji}</span>
+                    <span className="flex-1 text-sm font-semibold">{s.name}</span>
+                    {selected && <Check className="h-4 w-4 text-lime" />}
+                  </button>
+
+                  {selected && (
+                    <div className="mt-3 grid grid-cols-4 gap-1.5">
+                      {SKILL_LEVELS.map((lvl) => {
+                        const active = skillLevels[s.name] === lvl;
+                        return (
+                          <button
+                            key={lvl}
+                            type="button"
+                            onClick={() =>
+                              setSkillLevels((prev) => ({ ...prev, [s.name as Sport]: lvl }))
+                            }
+                            className={`rounded-full px-2 py-1.5 text-[11px] font-semibold transition-colors ${
+                              active
+                                ? "bg-lime text-primary-foreground"
+                                : "bg-background text-muted-foreground border border-border"
+                            }`}
+                          >
+                            {lvl}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+
+          <div className="space-y-2 pt-2">
+            <button
+              onClick={finish}
+              disabled={busy}
+              className="w-full rounded-full bg-lime-gradient px-4 py-3 text-sm font-bold text-primary-foreground disabled:opacity-50"
+            >
+              {busy ? "Saving…" : Object.keys(skillLevels).length > 0 ? "Finish" : "Skip & Finish"}
+            </button>
+            <button
+              onClick={() => setStep(3)}
               className="w-full text-center text-xs text-muted-foreground py-1"
             >
               Back

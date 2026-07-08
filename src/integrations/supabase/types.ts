@@ -703,6 +703,7 @@ export type Database = {
           graduating_class: number | null
           id: string
           links: Json
+          skill_levels: Json
           sport: string | null
           updated_at: string
           username: string | null
@@ -719,6 +720,7 @@ export type Database = {
           graduating_class?: number | null
           id: string
           links?: Json
+          skill_levels?: Json
           sport?: string | null
           updated_at?: string
           username?: string | null
@@ -735,6 +737,7 @@ export type Database = {
           graduating_class?: number | null
           id?: string
           links?: Json
+          skill_levels?: Json
           sport?: string | null
           updated_at?: string
           username?: string | null
