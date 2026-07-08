@@ -17,6 +17,7 @@ import { Route as ResetPasswordRouteImport } from './routes/reset-password'
 import { Route as PlansRouteImport } from './routes/plans'
 import { Route as PickupRouteImport } from './routes/pickup'
 import { Route as PaymentsRouteImport } from './routes/payments'
+import { Route as OnboardingRouteImport } from './routes/onboarding'
 import { Route as AvailablePlayersRouteImport } from './routes/available-players'
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as AdminRouteImport } from './routes/admin'
@@ -86,6 +87,11 @@ const PickupRoute = PickupRouteImport.update({
 const PaymentsRoute = PaymentsRouteImport.update({
   id: '/payments',
   path: '/payments',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const OnboardingRoute = OnboardingRouteImport.update({
+  id: '/onboarding',
+  path: '/onboarding',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AvailablePlayersRoute = AvailablePlayersRouteImport.update({
@@ -245,6 +251,7 @@ export interface FileRoutesByFullPath {
   '/auth': typeof AuthRoute
   '/available-players': typeof AvailablePlayersRoute
   '/index': typeof Char91indexChar93Route
+  '/onboarding': typeof OnboardingRoute
   '/payments': typeof PaymentsRoute
   '/pickup': typeof PickupRoute
   '/plans': typeof PlansRoute
@@ -284,6 +291,7 @@ export interface FileRoutesByTo {
   '/auth': typeof AuthRoute
   '/available-players': typeof AvailablePlayersRoute
   '/index': typeof Char91indexChar93Route
+  '/onboarding': typeof OnboardingRoute
   '/payments': typeof PaymentsRoute
   '/pickup': typeof PickupRoute
   '/plans': typeof PlansRoute
@@ -325,6 +333,7 @@ export interface FileRoutesById {
   '/auth': typeof AuthRoute
   '/available-players': typeof AvailablePlayersRoute
   '/index': typeof Char91indexChar93Route
+  '/onboarding': typeof OnboardingRoute
   '/payments': typeof PaymentsRoute
   '/pickup': typeof PickupRoute
   '/plans': typeof PlansRoute
@@ -366,6 +375,7 @@ export interface FileRouteTypes {
     | '/auth'
     | '/available-players'
     | '/index'
+    | '/onboarding'
     | '/payments'
     | '/pickup'
     | '/plans'
@@ -405,6 +415,7 @@ export interface FileRouteTypes {
     | '/auth'
     | '/available-players'
     | '/index'
+    | '/onboarding'
     | '/payments'
     | '/pickup'
     | '/plans'
@@ -445,6 +456,7 @@ export interface FileRouteTypes {
     | '/auth'
     | '/available-players'
     | '/index'
+    | '/onboarding'
     | '/payments'
     | '/pickup'
     | '/plans'
@@ -486,6 +498,7 @@ export interface RootRouteChildren {
   AuthRoute: typeof AuthRoute
   AvailablePlayersRoute: typeof AvailablePlayersRoute
   Char91indexChar93Route: typeof Char91indexChar93Route
+  OnboardingRoute: typeof OnboardingRoute
   PaymentsRoute: typeof PaymentsRoute
   PickupRoute: typeof PickupRoute
   PlansRoute: typeof PlansRoute
@@ -566,6 +579,13 @@ declare module '@tanstack/react-router' {
       path: '/payments'
       fullPath: '/payments'
       preLoaderRoute: typeof PaymentsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/onboarding': {
+      id: '/onboarding'
+      path: '/onboarding'
+      fullPath: '/onboarding'
+      preLoaderRoute: typeof OnboardingRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/available-players': {
@@ -834,6 +854,7 @@ const rootRouteChildren: RootRouteChildren = {
   AuthRoute: AuthRoute,
   AvailablePlayersRoute: AvailablePlayersRoute,
   Char91indexChar93Route: Char91indexChar93Route,
+  OnboardingRoute: OnboardingRoute,
   PaymentsRoute: PaymentsRoute,
   PickupRoute: PickupRoute,
   PlansRoute: PlansRoute,

@@ -1,0 +1,260 @@
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { useEffect, useRef, useState } from "react";
+import { Camera, Check, ArrowRight } from "lucide-react";
+import { toast } from "sonner";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/use-auth";
+
+export const Route = createFileRoute("/onboarding")({
+  head: () => ({ meta: [{ title: "Welcome — OpenRun" }] }),
+  component: OnboardingPage,
+});
+
+const USERNAME_RE = /^[a-z0-9_]{3,20}$/;
+
+function OnboardingPage() {
+  const nav = useNavigate();
+  const { user, loading } = useAuth();
+  const [step, setStep] = useState<1 | 2>(1);
+  const [username, setUsername] = useState("");
+  const [checking, setChecking] = useState(false);
+  const [available, setAvailable] = useState<boolean | null>(null);
+  const [avatarDataUrl, setAvatarDataUrl] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  // Bounce out if unauthenticated or already onboarded
+  useEffect(() => {
+    if (loading) return;
+    if (!user) {
+      nav({ to: "/auth", replace: true });
+      return;
+    }
+    let cancelled = false;
+    supabase
+      .from("profiles")
+      .select("username")
+      .eq("id", user.id)
+      .maybeSingle()
+      .then(({ data }) => {
+        if (cancelled) return;
+        if (data?.username) nav({ to: "/profile", replace: true });
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [loading, user, nav]);
+
+  // Debounced username availability check
+  useEffect(() => {
+    const raw = username.trim().toLowerCase().replace(/^@/, "");
+    if (!USERNAME_RE.test(raw)) {
+      setAvailable(null);
+      return;
+    }
+    setChecking(true);
+    const t = setTimeout(async () => {
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("id")
+        .ilike("username", raw)
+        .neq("id", user?.id ?? "")
+        .maybeSingle();
+      setChecking(false);
+      if (error) {
+        setAvailable(null);
+        return;
+      }
+      setAvailable(!data);
+    }, 350);
+    return () => clearTimeout(t);
+  }, [username, user?.id]);
+
+  const cleanUsername = username.trim().toLowerCase().replace(/^@/, "");
+  const usernameValid = USERNAME_RE.test(cleanUsername) && available === true;
+
+  const onPickFile = async (file: File | null) => {
+    if (!file) return;
+    if (!file.type.startsWith("image/")) {
+      toast.error("Please choose an image");
+      return;
+    }
+    try {
+      const dataUrl = await resizeImageToDataUrl(file, 384);
+      setAvatarDataUrl(dataUrl);
+    } catch {
+      toast.error("Couldn't load that image");
+    }
+  };
+
+  const finish = async () => {
+    if (!user || busy) return;
+    setBusy(true);
+    try {
+      const { error } = await supabase
+        .from("profiles")
+        .update({
+          username: cleanUsername,
+          avatar_url: avatarDataUrl,
+        })
+        .eq("id", user.id);
+      if (error) throw error;
+      toast.success("You're all set!");
+      nav({ to: "/", replace: true });
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Couldn't save profile");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  if (loading || !user) {
+    return (
+      <div className="grid min-h-dvh place-items-center bg-background">
+        <div className="h-8 w-8 animate-spin rounded-full border-2 border-muted border-t-foreground" />
+      </div>
+    );
+  }
+
+  return (
+    <div className="mx-auto max-w-md min-h-screen flex flex-col px-5 pt-10 pb-16">
+      {/* Progress */}
+      <div className="flex items-center gap-2 mb-8">
+        <div className={`h-1 flex-1 rounded-full ${step >= 1 ? "bg-lime" : "bg-border"}`} />
+        <div className={`h-1 flex-1 rounded-full ${step >= 2 ? "bg-lime" : "bg-border"}`} />
+      </div>
+
+      {step === 1 && (
+        <div className="space-y-6">
+          <div>
+            <h1 className="font-display text-3xl font-bold">Pick a username</h1>
+            <p className="text-sm text-muted-foreground mt-2">
+              This is how other players will find you. 3–20 characters, letters, numbers, and underscores.
+            </p>
+          </div>
+
+          <div className="space-y-2">
+            <div className="flex items-center rounded-2xl border border-border bg-surface px-4 py-3 focus-within:border-lime">
+              <span className="text-muted-foreground text-sm mr-1">@</span>
+              <input
+                autoFocus
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                placeholder="yourname"
+                autoComplete="off"
+                autoCapitalize="none"
+                spellCheck={false}
+                maxLength={30}
+                className="flex-1 bg-transparent text-sm outline-none"
+              />
+              {cleanUsername && USERNAME_RE.test(cleanUsername) && (
+                <span className="ml-2">
+                  {checking ? (
+                    <span className="h-4 w-4 block animate-spin rounded-full border-2 border-muted border-t-foreground" />
+                  ) : available === true ? (
+                    <Check className="h-4 w-4 text-lime" />
+                  ) : available === false ? (
+                    <span className="text-xs text-red-400">taken</span>
+                  ) : null}
+                </span>
+              )}
+            </div>
+            {cleanUsername && !USERNAME_RE.test(cleanUsername) && (
+              <p className="text-xs text-red-400">
+                Use 3–20 lowercase letters, numbers, or underscores.
+              </p>
+            )}
+          </div>
+
+          <button
+            onClick={() => setStep(2)}
+            disabled={!usernameValid}
+            className="w-full rounded-full bg-lime-gradient px-4 py-3 text-sm font-bold text-primary-foreground disabled:opacity-50 flex items-center justify-center gap-2"
+          >
+            Continue <ArrowRight className="h-4 w-4" />
+          </button>
+        </div>
+      )}
+
+      {step === 2 && (
+        <div className="space-y-6">
+          <div>
+            <h1 className="font-display text-3xl font-bold">Add a profile photo</h1>
+            <p className="text-sm text-muted-foreground mt-2">
+              Help teammates recognize you on the court. You can skip and add one later.
+            </p>
+          </div>
+
+          <div className="flex flex-col items-center gap-4 py-4">
+            <button
+              type="button"
+              onClick={() => fileRef.current?.click()}
+              className="relative h-32 w-32 rounded-full border-2 border-dashed border-border bg-surface overflow-hidden grid place-items-center"
+              aria-label="Choose profile photo"
+            >
+              {avatarDataUrl ? (
+                <img src={avatarDataUrl} alt="" className="h-full w-full object-cover" />
+              ) : (
+                <Camera className="h-8 w-8 text-muted-foreground" />
+              )}
+            </button>
+            <input
+              ref={fileRef}
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={(e) => onPickFile(e.target.files?.[0] ?? null)}
+            />
+            <button
+              type="button"
+              onClick={() => fileRef.current?.click()}
+              className="text-sm font-medium text-lime underline"
+            >
+              {avatarDataUrl ? "Change photo" : "Upload photo"}
+            </button>
+          </div>
+
+          <div className="space-y-2">
+            <button
+              onClick={finish}
+              disabled={busy}
+              className="w-full rounded-full bg-lime-gradient px-4 py-3 text-sm font-bold text-primary-foreground disabled:opacity-50"
+            >
+              {busy ? "Saving…" : "Finish"}
+            </button>
+            <button
+              onClick={() => {
+                if (!avatarDataUrl) void finish();
+                else setAvatarDataUrl(null);
+              }}
+              disabled={busy}
+              className="w-full text-center text-xs text-muted-foreground py-2"
+            >
+              {avatarDataUrl ? "Remove photo" : "Skip for now"}
+            </button>
+            <button
+              onClick={() => setStep(1)}
+              className="w-full text-center text-xs text-muted-foreground py-1"
+            >
+              Back
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+async function resizeImageToDataUrl(file: File, maxSize: number): Promise<string> {
+  const bitmap = await createImageBitmap(file);
+  const scale = Math.min(1, maxSize / Math.max(bitmap.width, bitmap.height));
+  const w = Math.round(bitmap.width * scale);
+  const h = Math.round(bitmap.height * scale);
+  const canvas = document.createElement("canvas");
+  canvas.width = w;
+  canvas.height = h;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) throw new Error("Canvas not available");
+  ctx.drawImage(bitmap, 0, 0, w, h);
+  return canvas.toDataURL("image/jpeg", 0.85);
+}
