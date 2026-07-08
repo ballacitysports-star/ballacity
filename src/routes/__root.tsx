@@ -151,6 +151,7 @@ function maybeReloadForStaleChunk(reason: unknown) {
 }
 
 const PUBLIC_ROUTES = ["/", "/auth", "/reset-password"];
+const ONBOARDING_ROUTE = "/onboarding";
 const TAB_PATHS = ["/feed", "/players", "/teams", "/create", "/discover", "/profile", "/notifications", "/reels"];
 
 function AuthGate({ children }: { children: React.ReactNode }) {
