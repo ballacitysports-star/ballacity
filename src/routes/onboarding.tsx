@@ -1,9 +1,11 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
-import { Camera, Check, ArrowRight } from "lucide-react";
+import { useServerFn } from "@tanstack/react-start";
+import { Camera, Check, ArrowRight, MapPin, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
+import { reverseGeocode } from "@/lib/geocode.functions";
 
 export const Route = createFileRoute("/onboarding")({
   head: () => ({ meta: [{ title: "Welcome — OpenRun" }] }),
@@ -12,16 +14,21 @@ export const Route = createFileRoute("/onboarding")({
 
 const USERNAME_RE = /^[a-z0-9_]{3,20}$/;
 
+
+
 function OnboardingPage() {
   const nav = useNavigate();
   const { user, loading } = useAuth();
-  const [step, setStep] = useState<1 | 2>(1);
+  const [step, setStep] = useState<1 | 2 | 3>(1);
   const [username, setUsername] = useState("");
   const [checking, setChecking] = useState(false);
   const [available, setAvailable] = useState<boolean | null>(null);
   const [avatarDataUrl, setAvatarDataUrl] = useState<string | null>(null);
+  const [city, setCity] = useState<string | null>(null);
+  const [locating, setLocating] = useState(false);
   const [busy, setBusy] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
+  const reverse = useServerFn(reverseGeocode);
 
   // Bounce out if unauthenticated or already onboarded
   useEffect(() => {
@@ -87,6 +94,37 @@ function OnboardingPage() {
     }
   };
 
+  const requestLocation = () => {
+    if (!navigator.geolocation) {
+      toast.error("Geolocation isn't available on this device");
+      return;
+    }
+    setLocating(true);
+    navigator.geolocation.getCurrentPosition(
+      async (pos) => {
+        try {
+          const { city: c, formatted } = await reverse({
+            data: { lat: pos.coords.latitude, lng: pos.coords.longitude },
+          });
+          setCity(c || formatted || null);
+        } catch {
+          toast.error("Couldn't resolve your location");
+        } finally {
+          setLocating(false);
+        }
+      },
+      (err) => {
+        setLocating(false);
+        toast.error(
+          err.code === 1
+            ? "Location permission denied. You can set it later in your profile."
+            : "Couldn't get your location",
+        );
+      },
+      { enableHighAccuracy: false, timeout: 10000, maximumAge: 60000 },
+    );
+  };
+
   const finish = async () => {
     if (!user || busy) return;
     setBusy(true);
@@ -96,6 +134,7 @@ function OnboardingPage() {
         .update({
           username: cleanUsername,
           avatar_url: avatarDataUrl,
+          city: city ?? null,
         })
         .eq("id", user.id);
       if (error) throw error;
@@ -107,6 +146,7 @@ function OnboardingPage() {
       setBusy(false);
     }
   };
+
 
   if (loading || !user) {
     return (
@@ -122,6 +162,7 @@ function OnboardingPage() {
       <div className="flex items-center gap-2 mb-8">
         <div className={`h-1 flex-1 rounded-full ${step >= 1 ? "bg-lime" : "bg-border"}`} />
         <div className={`h-1 flex-1 rounded-full ${step >= 2 ? "bg-lime" : "bg-border"}`} />
+        <div className={`h-1 flex-1 rounded-full ${step >= 3 ? "bg-lime" : "bg-border"}`} />
       </div>
 
       {step === 1 && (
@@ -216,24 +257,92 @@ function OnboardingPage() {
 
           <div className="space-y-2">
             <button
-              onClick={finish}
-              disabled={busy}
-              className="w-full rounded-full bg-lime-gradient px-4 py-3 text-sm font-bold text-primary-foreground disabled:opacity-50"
+              onClick={() => setStep(3)}
+              className="w-full rounded-full bg-lime-gradient px-4 py-3 text-sm font-bold text-primary-foreground flex items-center justify-center gap-2"
             >
-              {busy ? "Saving…" : "Finish"}
+              {avatarDataUrl ? "Continue" : "Skip for now"} <ArrowRight className="h-4 w-4" />
             </button>
+            {avatarDataUrl && (
+              <button
+                onClick={() => setAvatarDataUrl(null)}
+                className="w-full text-center text-xs text-muted-foreground py-2"
+              >
+                Remove photo
+              </button>
+            )}
             <button
-              onClick={() => {
-                if (!avatarDataUrl) void finish();
-                else setAvatarDataUrl(null);
-              }}
+              onClick={() => setStep(1)}
+              className="w-full text-center text-xs text-muted-foreground py-1"
+            >
+              Back
+            </button>
+          </div>
+        </div>
+      )}
+
+      {step === 3 && (
+        <div className="space-y-6">
+          <div>
+            <h1 className="font-display text-3xl font-bold">Find games nearby</h1>
+            <p className="text-sm text-muted-foreground mt-2">
+              OpenRun uses your location to show pickup games happening near you.
+              We never share your precise location with other players.
+            </p>
+          </div>
+
+          <div className="flex flex-col items-center gap-4 py-6">
+            <div className="h-24 w-24 rounded-full bg-lime/10 grid place-items-center">
+              <MapPin className="h-10 w-10 text-lime" />
+            </div>
+            {city ? (
+              <div className="text-center">
+                <div className="text-xs text-muted-foreground">You're near</div>
+                <div className="font-display text-lg font-bold flex items-center gap-1 justify-center">
+                  <Check className="h-4 w-4 text-lime" /> {city}
+                </div>
+              </div>
+            ) : (
+              <p className="text-xs text-muted-foreground text-center max-w-xs">
+                Tap "Allow location" and confirm the browser prompt.
+              </p>
+            )}
+          </div>
+
+          <div className="space-y-2">
+            {!city ? (
+              <button
+                onClick={requestLocation}
+                disabled={locating}
+                className="w-full rounded-full bg-lime-gradient px-4 py-3 text-sm font-bold text-primary-foreground disabled:opacity-50 flex items-center justify-center gap-2"
+              >
+                {locating ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" /> Finding you…
+                  </>
+                ) : (
+                  <>
+                    <MapPin className="h-4 w-4" /> Allow location
+                  </>
+                )}
+              </button>
+            ) : (
+              <button
+                onClick={finish}
+                disabled={busy}
+                className="w-full rounded-full bg-lime-gradient px-4 py-3 text-sm font-bold text-primary-foreground disabled:opacity-50"
+              >
+                {busy ? "Saving…" : "Finish"}
+              </button>
+            )}
+            <button
+              onClick={finish}
               disabled={busy}
               className="w-full text-center text-xs text-muted-foreground py-2"
             >
-              {avatarDataUrl ? "Remove photo" : "Skip for now"}
+              {city ? "Use a different location later" : "Skip for now"}
             </button>
             <button
-              onClick={() => setStep(1)}
+              onClick={() => setStep(2)}
               className="w-full text-center text-xs text-muted-foreground py-1"
             >
               Back
