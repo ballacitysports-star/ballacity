@@ -219,6 +219,7 @@ function AuthGate({ children }: { children: React.ReactNode }) {
       </div>
     );
   }
+  if (pathname === ONBOARDING_ROUTE) return <>{children}</>;
   return (
     <>
       {children}
