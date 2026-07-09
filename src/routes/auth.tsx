@@ -104,11 +104,9 @@ function AuthPage() {
   const oauth = async (provider: "google") => {
     setGoogleBusy(true);
     try {
-      try {
-        sessionStorage.setItem("openrun:postAuthRedirect", "/profile");
-      } catch {
-        // Ignore storage failures; the callback has a safe default.
-      }
+      // If AuthGate already saved an intended destination, keep it. Otherwise
+      // fall back to /profile so /oauth/callback has something to consume.
+      if (!peekPostAuthRedirect()) savePostAuthRedirect("/profile");
       // Route both popup (web_message) and full-page redirect flows through
       // our public /oauth/callback route, which polls for the session and then
       // navigates to the saved post-auth destination. Landing on `/` after a
@@ -143,7 +141,8 @@ function AuthPage() {
       }
       // Hard redirect ensures the whole app re-hydrates with the new session
       // (fixes cases where in-app nav races the auth-store update).
-      window.location.assign("/profile");
+      const target = consumePostAuthRedirect("/profile");
+      window.location.assign(target);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Sign-in failed");
     } finally {
