@@ -151,41 +151,15 @@ function maybeReloadForStaleChunk(reason: unknown) {
   window.location.reload();
 }
 
-const AUTH_ONLY_ROUTES = ["/auth", "/oauth/callback", "/reset-password"];
+const PUBLIC_ROUTES = ["/", "/index", "/auth", "/oauth/callback", "/reset-password"];
 const ONBOARDING_ROUTE = "/onboarding";
 const TAB_PATHS = ["/feed", "/players", "/teams", "/create", "/discover", "/profile", "/notifications", "/reels"];
-
-// Routes that require sign-in. Everything else is publicly viewable.
-// Signed-out visitors who try a protected path get bounced to /auth and
-// returned after login via savePostAuthRedirect.
-const PROTECTED_PREFIXES = [
-  "/account",
-  "/admin",
-  "/checkout",
-  "/messages",
-  "/payments",
-  "/settings",
-  "/onboarding",
-  "/notifications",
-  "/create",
-  "/profile/edit",
-  "/review/new",
-];
-function isProtectedPath(pathname: string): boolean {
-  if (PROTECTED_PREFIXES.some((p) => pathname === p || pathname.startsWith(`${p}/`))) return true;
-  if (/^\/teams\/create$/.test(pathname)) return true;
-  if (/^\/teams\/[^/]+\/edit$/.test(pathname)) return true;
-  if (/^\/games\/[^/]+\/(pay|payment-setup)$/.test(pathname)) return true;
-  return false;
-}
 
 function AuthGate({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const pathname = router.state.location.pathname;
   const { user, loading } = useAuth();
-  const isAuthOnly = AUTH_ONLY_ROUTES.includes(pathname);
-  const isProtected = isProtectedPath(pathname);
-  const isPublic = !isProtected && !isAuthOnly;
+  const isPublic = pathname === "/" || PUBLIC_ROUTES.some((p) => p !== "/" && (pathname === p || pathname.startsWith(`${p}/`)));
   const isTab = TAB_PATHS.includes(pathname);
   useNotificationPush();
   useOneSignal();
@@ -194,17 +168,17 @@ function AuthGate({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     if (loading) return;
-    if (!user && isProtected) {
+    if (!user && !isPublic) {
       // Preserve the URL (pathname + search) so we can restore it after auth.
       const search = router.state.location.searchStr ?? "";
       savePostAuthRedirect(`${pathname}${search}`);
       router.navigate({ to: "/auth", replace: true });
       return;
     }
-    // If user is authenticated but sitting on an auth-only route, bounce
+    // If user is authenticated but sitting on an auth-only public route, bounce
     // into the app as soon as we know whether they need onboarding. Onboarding
     // always wins over a saved destination; otherwise honor the saved path.
-    if (user && isAuthOnly) {
+    if (user && (pathname === "/auth" || pathname === "/oauth/callback" || pathname === "/reset-password")) {
       if (needsOnboarding === true) {
         router.navigate({ to: "/onboarding", replace: true });
       } else if (needsOnboarding === false) {
@@ -213,7 +187,7 @@ function AuthGate({ children }: { children: React.ReactNode }) {
         router.navigate({ to: target as any, replace: true });
       }
     }
-  }, [loading, user, isProtected, isAuthOnly, router, pathname, needsOnboarding]);
+  }, [loading, user, isPublic, router, pathname, needsOnboarding]);
 
   // Detect whether the signed-in user has completed onboarding (username set).
   useEffect(() => {
@@ -236,17 +210,15 @@ function AuthGate({ children }: { children: React.ReactNode }) {
     };
   }, [user?.id]);
 
-  // Redirect to onboarding only when a signed-in user without a username
-  // tries to access a protected route. Public browsing is unrestricted.
+  // Redirect to onboarding when needed (skip on public + onboarding routes).
   useEffect(() => {
     if (!user || needsOnboarding !== true) return;
-    if (!isProtected) return;
-    if (pathname === ONBOARDING_ROUTE) return;
+    if (pathname === ONBOARDING_ROUTE || pathname === "/auth" || pathname === "/reset-password") return;
     router.navigate({ to: ONBOARDING_ROUTE, replace: true });
-  }, [user, needsOnboarding, pathname, router, isProtected]);
+  }, [user, needsOnboarding, pathname, router]);
 
   useEffect(() => {
-    if (user && !isTab && !isAuthOnly) {
+    if (user && !isPublic && !isTab) {
       document.body.style.paddingBottom = "calc(env(safe-area-inset-bottom) + 6rem)";
     } else {
       document.body.style.paddingBottom = "";
@@ -254,27 +226,17 @@ function AuthGate({ children }: { children: React.ReactNode }) {
     return () => {
       document.body.style.paddingBottom = "";
     };
-  }, [user, isTab, isAuthOnly]);
+  }, [user, isPublic, isTab]);
 
-  // Signed-out visitors: render public content freely; auth pages render as-is.
-  // Protected paths are handled by the redirect effect above; show a spinner
-  // while we're still resolving auth to avoid flashing a redirect.
-  if (!user) {
-    if (isPublic || isAuthOnly) return <>{children}</>;
+  if (isPublic) return <>{children}</>;
+  if (loading || !user) {
     return (
       <div className="grid min-h-dvh place-items-center bg-background">
         <div className="h-8 w-8 animate-spin rounded-full border-2 border-muted border-t-foreground" />
       </div>
     );
   }
-  if (loading) {
-    return (
-      <div className="grid min-h-dvh place-items-center bg-background">
-        <div className="h-8 w-8 animate-spin rounded-full border-2 border-muted border-t-foreground" />
-      </div>
-    );
-  }
-  if (pathname === ONBOARDING_ROUTE || isAuthOnly) return <>{children}</>;
+  if (pathname === ONBOARDING_ROUTE) return <>{children}</>;
   return (
     <>
       {children}
