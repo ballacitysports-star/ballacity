@@ -9,7 +9,6 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
-import { Route as Char91indexChar93RouteImport } from './routes/[index]'
 import { Route as ShopRouteImport } from './routes/shop'
 import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as ReviewsRouteImport } from './routes/reviews'
@@ -17,7 +16,6 @@ import { Route as ResetPasswordRouteImport } from './routes/reset-password'
 import { Route as PlansRouteImport } from './routes/plans'
 import { Route as PickupRouteImport } from './routes/pickup'
 import { Route as PaymentsRouteImport } from './routes/payments'
-import { Route as OnboardingRouteImport } from './routes/onboarding'
 import { Route as AvailablePlayersRouteImport } from './routes/available-players'
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as AdminRouteImport } from './routes/admin'
@@ -29,7 +27,6 @@ import { Route as TeamsTeamIdRouteImport } from './routes/teams.$teamId'
 import { Route as ReviewNewRouteImport } from './routes/review.new'
 import { Route as ProfileEditRouteImport } from './routes/profile.edit'
 import { Route as PlayersUserIdRouteImport } from './routes/players.$userId'
-import { Route as OauthCallbackRouteImport } from './routes/oauth.callback'
 import { Route as MessagesConversationIdRouteImport } from './routes/messages.$conversationId'
 import { Route as GamesGameIdRouteImport } from './routes/games.$gameId'
 import { Route as CheckoutReturnRouteImport } from './routes/checkout.return'
@@ -45,16 +42,11 @@ import { Route as TabsFeedRouteImport } from './routes/_tabs.feed'
 import { Route as TabsDiscoverRouteImport } from './routes/_tabs.discover'
 import { Route as TabsCreateRouteImport } from './routes/_tabs.create'
 import { Route as TeamsTeamIdEditRouteImport } from './routes/teams.$teamId.edit'
-import { Route as GamesGameIdPaymentSetupRouteImport } from './routes/games.$gameId_.payment-setup'
-import { Route as GamesGameIdPayRouteImport } from './routes/games.$gameId_.pay'
+import { Route as GamesGameIdPaymentSetupRouteImport } from './routes/games.$gameId.payment-setup'
+import { Route as GamesGameIdPayRouteImport } from './routes/games.$gameId.pay'
 import { Route as ApiPublicReelsProcessRouteImport } from './routes/api/public/reels/process'
 import { Route as ApiPublicPaymentsWebhookRouteImport } from './routes/api/public/payments/webhook'
 
-const Char91indexChar93Route = Char91indexChar93RouteImport.update({
-  id: '/index',
-  path: '/index',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const ShopRoute = ShopRouteImport.update({
   id: '/shop',
   path: '/shop',
@@ -88,11 +80,6 @@ const PickupRoute = PickupRouteImport.update({
 const PaymentsRoute = PaymentsRouteImport.update({
   id: '/payments',
   path: '/payments',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const OnboardingRoute = OnboardingRouteImport.update({
-  id: '/onboarding',
-  path: '/onboarding',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AvailablePlayersRoute = AvailablePlayersRouteImport.update({
@@ -147,11 +134,6 @@ const ProfileEditRoute = ProfileEditRouteImport.update({
 const PlayersUserIdRoute = PlayersUserIdRouteImport.update({
   id: '/players/$userId',
   path: '/players/$userId',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const OauthCallbackRoute = OauthCallbackRouteImport.update({
-  id: '/oauth/callback',
-  path: '/oauth/callback',
   getParentRoute: () => rootRouteImport,
 } as any)
 const MessagesConversationIdRoute = MessagesConversationIdRouteImport.update({
@@ -230,14 +212,14 @@ const TeamsTeamIdEditRoute = TeamsTeamIdEditRouteImport.update({
   getParentRoute: () => TeamsTeamIdRoute,
 } as any)
 const GamesGameIdPaymentSetupRoute = GamesGameIdPaymentSetupRouteImport.update({
-  id: '/games/$gameId_/payment-setup',
-  path: '/games/$gameId/payment-setup',
-  getParentRoute: () => rootRouteImport,
+  id: '/payment-setup',
+  path: '/payment-setup',
+  getParentRoute: () => GamesGameIdRoute,
 } as any)
 const GamesGameIdPayRoute = GamesGameIdPayRouteImport.update({
-  id: '/games/$gameId_/pay',
-  path: '/games/$gameId/pay',
-  getParentRoute: () => rootRouteImport,
+  id: '/pay',
+  path: '/pay',
+  getParentRoute: () => GamesGameIdRoute,
 } as any)
 const ApiPublicReelsProcessRoute = ApiPublicReelsProcessRouteImport.update({
   id: '/api/public/reels/process',
@@ -256,8 +238,6 @@ export interface FileRoutesByFullPath {
   '/admin': typeof AdminRouteWithChildren
   '/auth': typeof AuthRoute
   '/available-players': typeof AvailablePlayersRoute
-  '/index': typeof Char91indexChar93Route
-  '/onboarding': typeof OnboardingRoute
   '/payments': typeof PaymentsRoute
   '/pickup': typeof PickupRoute
   '/plans': typeof PlansRoute
@@ -277,9 +257,8 @@ export interface FileRoutesByFullPath {
   '/account/security': typeof AccountSecurityRoute
   '/admin/location-analytics': typeof AdminLocationAnalyticsRoute
   '/checkout/return': typeof CheckoutReturnRoute
-  '/games/$gameId': typeof GamesGameIdRoute
+  '/games/$gameId': typeof GamesGameIdRouteWithChildren
   '/messages/$conversationId': typeof MessagesConversationIdRoute
-  '/oauth/callback': typeof OauthCallbackRoute
   '/players/$userId': typeof PlayersUserIdRoute
   '/profile/edit': typeof ProfileEditRoute
   '/review/new': typeof ReviewNewRoute
@@ -297,8 +276,6 @@ export interface FileRoutesByTo {
   '/admin': typeof AdminRouteWithChildren
   '/auth': typeof AuthRoute
   '/available-players': typeof AvailablePlayersRoute
-  '/index': typeof Char91indexChar93Route
-  '/onboarding': typeof OnboardingRoute
   '/payments': typeof PaymentsRoute
   '/pickup': typeof PickupRoute
   '/plans': typeof PlansRoute
@@ -318,9 +295,8 @@ export interface FileRoutesByTo {
   '/account/security': typeof AccountSecurityRoute
   '/admin/location-analytics': typeof AdminLocationAnalyticsRoute
   '/checkout/return': typeof CheckoutReturnRoute
-  '/games/$gameId': typeof GamesGameIdRoute
+  '/games/$gameId': typeof GamesGameIdRouteWithChildren
   '/messages/$conversationId': typeof MessagesConversationIdRoute
-  '/oauth/callback': typeof OauthCallbackRoute
   '/players/$userId': typeof PlayersUserIdRoute
   '/profile/edit': typeof ProfileEditRoute
   '/review/new': typeof ReviewNewRoute
@@ -340,8 +316,6 @@ export interface FileRoutesById {
   '/admin': typeof AdminRouteWithChildren
   '/auth': typeof AuthRoute
   '/available-players': typeof AvailablePlayersRoute
-  '/index': typeof Char91indexChar93Route
-  '/onboarding': typeof OnboardingRoute
   '/payments': typeof PaymentsRoute
   '/pickup': typeof PickupRoute
   '/plans': typeof PlansRoute
@@ -361,17 +335,16 @@ export interface FileRoutesById {
   '/account/security': typeof AccountSecurityRoute
   '/admin/location-analytics': typeof AdminLocationAnalyticsRoute
   '/checkout/return': typeof CheckoutReturnRoute
-  '/games/$gameId': typeof GamesGameIdRoute
+  '/games/$gameId': typeof GamesGameIdRouteWithChildren
   '/messages/$conversationId': typeof MessagesConversationIdRoute
-  '/oauth/callback': typeof OauthCallbackRoute
   '/players/$userId': typeof PlayersUserIdRoute
   '/profile/edit': typeof ProfileEditRoute
   '/review/new': typeof ReviewNewRoute
   '/teams/$teamId': typeof TeamsTeamIdRouteWithChildren
   '/teams/create': typeof TeamsCreateRoute
   '/messages/': typeof MessagesIndexRoute
-  '/games/$gameId_/pay': typeof GamesGameIdPayRoute
-  '/games/$gameId_/payment-setup': typeof GamesGameIdPaymentSetupRoute
+  '/games/$gameId/pay': typeof GamesGameIdPayRoute
+  '/games/$gameId/payment-setup': typeof GamesGameIdPaymentSetupRoute
   '/teams/$teamId/edit': typeof TeamsTeamIdEditRoute
   '/api/public/payments/webhook': typeof ApiPublicPaymentsWebhookRoute
   '/api/public/reels/process': typeof ApiPublicReelsProcessRoute
@@ -383,8 +356,6 @@ export interface FileRouteTypes {
     | '/admin'
     | '/auth'
     | '/available-players'
-    | '/index'
-    | '/onboarding'
     | '/payments'
     | '/pickup'
     | '/plans'
@@ -406,7 +377,6 @@ export interface FileRouteTypes {
     | '/checkout/return'
     | '/games/$gameId'
     | '/messages/$conversationId'
-    | '/oauth/callback'
     | '/players/$userId'
     | '/profile/edit'
     | '/review/new'
@@ -424,8 +394,6 @@ export interface FileRouteTypes {
     | '/admin'
     | '/auth'
     | '/available-players'
-    | '/index'
-    | '/onboarding'
     | '/payments'
     | '/pickup'
     | '/plans'
@@ -447,7 +415,6 @@ export interface FileRouteTypes {
     | '/checkout/return'
     | '/games/$gameId'
     | '/messages/$conversationId'
-    | '/oauth/callback'
     | '/players/$userId'
     | '/profile/edit'
     | '/review/new'
@@ -466,8 +433,6 @@ export interface FileRouteTypes {
     | '/admin'
     | '/auth'
     | '/available-players'
-    | '/index'
-    | '/onboarding'
     | '/payments'
     | '/pickup'
     | '/plans'
@@ -489,15 +454,14 @@ export interface FileRouteTypes {
     | '/checkout/return'
     | '/games/$gameId'
     | '/messages/$conversationId'
-    | '/oauth/callback'
     | '/players/$userId'
     | '/profile/edit'
     | '/review/new'
     | '/teams/$teamId'
     | '/teams/create'
     | '/messages/'
-    | '/games/$gameId_/pay'
-    | '/games/$gameId_/payment-setup'
+    | '/games/$gameId/pay'
+    | '/games/$gameId/payment-setup'
     | '/teams/$teamId/edit'
     | '/api/public/payments/webhook'
     | '/api/public/reels/process'
@@ -509,8 +473,6 @@ export interface RootRouteChildren {
   AdminRoute: typeof AdminRouteWithChildren
   AuthRoute: typeof AuthRoute
   AvailablePlayersRoute: typeof AvailablePlayersRoute
-  Char91indexChar93Route: typeof Char91indexChar93Route
-  OnboardingRoute: typeof OnboardingRoute
   PaymentsRoute: typeof PaymentsRoute
   PickupRoute: typeof PickupRoute
   PlansRoute: typeof PlansRoute
@@ -521,30 +483,20 @@ export interface RootRouteChildren {
   AccountNotificationsRoute: typeof AccountNotificationsRoute
   AccountSecurityRoute: typeof AccountSecurityRoute
   CheckoutReturnRoute: typeof CheckoutReturnRoute
-  GamesGameIdRoute: typeof GamesGameIdRoute
+  GamesGameIdRoute: typeof GamesGameIdRouteWithChildren
   MessagesConversationIdRoute: typeof MessagesConversationIdRoute
-  OauthCallbackRoute: typeof OauthCallbackRoute
   PlayersUserIdRoute: typeof PlayersUserIdRoute
   ProfileEditRoute: typeof ProfileEditRoute
   ReviewNewRoute: typeof ReviewNewRoute
   TeamsTeamIdRoute: typeof TeamsTeamIdRouteWithChildren
   TeamsCreateRoute: typeof TeamsCreateRoute
   MessagesIndexRoute: typeof MessagesIndexRoute
-  GamesGameIdPayRoute: typeof GamesGameIdPayRoute
-  GamesGameIdPaymentSetupRoute: typeof GamesGameIdPaymentSetupRoute
   ApiPublicPaymentsWebhookRoute: typeof ApiPublicPaymentsWebhookRoute
   ApiPublicReelsProcessRoute: typeof ApiPublicReelsProcessRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/index': {
-      id: '/index'
-      path: '/index'
-      fullPath: '/index'
-      preLoaderRoute: typeof Char91indexChar93RouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/shop': {
       id: '/shop'
       path: '/shop'
@@ -592,13 +544,6 @@ declare module '@tanstack/react-router' {
       path: '/payments'
       fullPath: '/payments'
       preLoaderRoute: typeof PaymentsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/onboarding': {
-      id: '/onboarding'
-      path: '/onboarding'
-      fullPath: '/onboarding'
-      preLoaderRoute: typeof OnboardingRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/available-players': {
@@ -676,13 +621,6 @@ declare module '@tanstack/react-router' {
       path: '/players/$userId'
       fullPath: '/players/$userId'
       preLoaderRoute: typeof PlayersUserIdRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/oauth/callback': {
-      id: '/oauth/callback'
-      path: '/oauth/callback'
-      fullPath: '/oauth/callback'
-      preLoaderRoute: typeof OauthCallbackRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/messages/$conversationId': {
@@ -790,19 +728,19 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof TeamsTeamIdEditRouteImport
       parentRoute: typeof TeamsTeamIdRoute
     }
-    '/games/$gameId_/payment-setup': {
-      id: '/games/$gameId_/payment-setup'
-      path: '/games/$gameId/payment-setup'
+    '/games/$gameId/payment-setup': {
+      id: '/games/$gameId/payment-setup'
+      path: '/payment-setup'
       fullPath: '/games/$gameId/payment-setup'
       preLoaderRoute: typeof GamesGameIdPaymentSetupRouteImport
-      parentRoute: typeof rootRouteImport
+      parentRoute: typeof GamesGameIdRoute
     }
-    '/games/$gameId_/pay': {
-      id: '/games/$gameId_/pay'
-      path: '/games/$gameId/pay'
+    '/games/$gameId/pay': {
+      id: '/games/$gameId/pay'
+      path: '/pay'
       fullPath: '/games/$gameId/pay'
       preLoaderRoute: typeof GamesGameIdPayRouteImport
-      parentRoute: typeof rootRouteImport
+      parentRoute: typeof GamesGameIdRoute
     }
     '/api/public/reels/process': {
       id: '/api/public/reels/process'
@@ -855,6 +793,20 @@ const AdminRouteChildren: AdminRouteChildren = {
 
 const AdminRouteWithChildren = AdminRoute._addFileChildren(AdminRouteChildren)
 
+interface GamesGameIdRouteChildren {
+  GamesGameIdPayRoute: typeof GamesGameIdPayRoute
+  GamesGameIdPaymentSetupRoute: typeof GamesGameIdPaymentSetupRoute
+}
+
+const GamesGameIdRouteChildren: GamesGameIdRouteChildren = {
+  GamesGameIdPayRoute: GamesGameIdPayRoute,
+  GamesGameIdPaymentSetupRoute: GamesGameIdPaymentSetupRoute,
+}
+
+const GamesGameIdRouteWithChildren = GamesGameIdRoute._addFileChildren(
+  GamesGameIdRouteChildren,
+)
+
 interface TeamsTeamIdRouteChildren {
   TeamsTeamIdEditRoute: typeof TeamsTeamIdEditRoute
 }
@@ -873,8 +825,6 @@ const rootRouteChildren: RootRouteChildren = {
   AdminRoute: AdminRouteWithChildren,
   AuthRoute: AuthRoute,
   AvailablePlayersRoute: AvailablePlayersRoute,
-  Char91indexChar93Route: Char91indexChar93Route,
-  OnboardingRoute: OnboardingRoute,
   PaymentsRoute: PaymentsRoute,
   PickupRoute: PickupRoute,
   PlansRoute: PlansRoute,
@@ -885,17 +835,14 @@ const rootRouteChildren: RootRouteChildren = {
   AccountNotificationsRoute: AccountNotificationsRoute,
   AccountSecurityRoute: AccountSecurityRoute,
   CheckoutReturnRoute: CheckoutReturnRoute,
-  GamesGameIdRoute: GamesGameIdRoute,
+  GamesGameIdRoute: GamesGameIdRouteWithChildren,
   MessagesConversationIdRoute: MessagesConversationIdRoute,
-  OauthCallbackRoute: OauthCallbackRoute,
   PlayersUserIdRoute: PlayersUserIdRoute,
   ProfileEditRoute: ProfileEditRoute,
   ReviewNewRoute: ReviewNewRoute,
   TeamsTeamIdRoute: TeamsTeamIdRouteWithChildren,
   TeamsCreateRoute: TeamsCreateRoute,
   MessagesIndexRoute: MessagesIndexRoute,
-  GamesGameIdPayRoute: GamesGameIdPayRoute,
-  GamesGameIdPaymentSetupRoute: GamesGameIdPaymentSetupRoute,
   ApiPublicPaymentsWebhookRoute: ApiPublicPaymentsWebhookRoute,
   ApiPublicReelsProcessRoute: ApiPublicReelsProcessRoute,
 }

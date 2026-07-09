@@ -5,7 +5,7 @@ import { ArrowLeft, Calendar, MapPin, Users, DollarSign, Lock, Home, ShieldCheck
 import { SPORTS, type Sport } from "@/lib/sample-data";
 import { addHostedGame } from "@/lib/hosted-games-store";
 import { useServerFn } from "@tanstack/react-start";
-import { reverseGeocode, geocodeAddress } from "@/lib/geocode.functions";
+import { reverseGeocode } from "@/lib/geocode.functions";
 
 import { toast } from "sonner";
 import { LocationAutocomplete } from "@/components/LocationAutocomplete";
@@ -39,7 +39,6 @@ function Create() {
   const [description, setDescription] = useState("");
   const [requiresApproval, setRequiresApproval] = useState(false);
   const [publishing, setPublishing] = useState(false);
-  const geocode = useServerFn(geocodeAddress);
 
   useEffect(() => {
     const nextCity = profile?.city?.trim() ?? "";
@@ -186,18 +185,7 @@ function Create() {
               },
             });
 
-            // Geocode the location so the game shows up at the right spot on the map.
-            let coords: { lat: number; lng: number } | null = null;
-            if (location.trim()) {
-              try {
-                const res = await geocode({ data: { address: location.trim() } });
-                coords = { lat: res.lat, lng: res.lng };
-              } catch (err) {
-                console.warn("[create] geocode failed", err);
-              }
-            }
-
-            const game = await addHostedGame({
+            const game = addHostedGame({
               sport,
               title,
               date,
@@ -210,26 +198,7 @@ function Create() {
               description,
               hostUserId: user?.id,
               host: hostSnap,
-              lat: coords?.lat,
-              lng: coords?.lng,
             });
-
-            // Belt-and-suspenders: if the inline geocode above failed or the
-            // game landed with default/invalid coords, ask the server to
-            // re-geocode using the stored location. Fire-and-forget so we
-            // don't delay the "Game published" toast; the map subscription
-            // picks up the coordinate update in realtime.
-            void import("@/lib/hosted-games.functions").then(({ autoGeocodeHostedGameIfNeeded }) =>
-              autoGeocodeHostedGameIfNeeded({ data: { id: game.id } })
-                .then((res) => {
-                  if (res.status === "failed") {
-                    console.warn("[create] auto-geocode failed", res.error);
-                  } else if (res.status === "updated") {
-                    console.info("[create] auto-geocoded", res.lat, res.lng);
-                  }
-                })
-                .catch((err) => console.warn("[create] auto-geocode threw", err)),
-            );
 
 
 

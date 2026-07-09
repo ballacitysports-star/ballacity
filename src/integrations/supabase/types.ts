@@ -276,103 +276,12 @@ export type Database = {
         }
         Relationships: []
       }
-      hosted_games: {
-        Row: {
-          created_at: string
-          date: string
-          description: string
-          distance_mi: number
-          duration: string
-          equipment: string[]
-          host_id: string
-          host_snapshot: Json
-          id: string
-          image: string
-          indoor: boolean
-          is_private: boolean
-          joined: number
-          joins_closed: boolean
-          lat: number
-          lng: number
-          location: string
-          max_players: number
-          neighborhood: string
-          price: number
-          skill: string
-          sport: string
-          status: string | null
-          title: string
-          trending: boolean
-          updated_at: string
-          urgent: boolean
-        }
-        Insert: {
-          created_at?: string
-          date: string
-          description?: string
-          distance_mi?: number
-          duration?: string
-          equipment?: string[]
-          host_id: string
-          host_snapshot?: Json
-          id: string
-          image?: string
-          indoor?: boolean
-          is_private?: boolean
-          joined?: number
-          joins_closed?: boolean
-          lat?: number
-          lng?: number
-          location?: string
-          max_players?: number
-          neighborhood?: string
-          price?: number
-          skill?: string
-          sport: string
-          status?: string | null
-          title: string
-          trending?: boolean
-          updated_at?: string
-          urgent?: boolean
-        }
-        Update: {
-          created_at?: string
-          date?: string
-          description?: string
-          distance_mi?: number
-          duration?: string
-          equipment?: string[]
-          host_id?: string
-          host_snapshot?: Json
-          id?: string
-          image?: string
-          indoor?: boolean
-          is_private?: boolean
-          joined?: number
-          joins_closed?: boolean
-          lat?: number
-          lng?: number
-          location?: string
-          max_players?: number
-          neighborhood?: string
-          price?: number
-          skill?: string
-          sport?: string
-          status?: string | null
-          title?: string
-          trending?: boolean
-          updated_at?: string
-          urgent?: boolean
-        }
-        Relationships: []
-      }
       join_requests: {
         Row: {
           created_at: string
           game_id: string
           host_id: string
           id: string
-          idempotency_key: string
           message: string | null
           player_id: string
           reviewed_at: string | null
@@ -384,7 +293,6 @@ export type Database = {
           game_id: string
           host_id: string
           id?: string
-          idempotency_key: string
           message?: string | null
           player_id: string
           reviewed_at?: string | null
@@ -396,7 +304,6 @@ export type Database = {
           game_id?: string
           host_id?: string
           id?: string
-          idempotency_key?: string
           message?: string | null
           player_id?: string
           reviewed_at?: string | null
@@ -703,7 +610,6 @@ export type Database = {
           graduating_class: number | null
           id: string
           links: Json
-          skill_levels: Json
           sport: string | null
           updated_at: string
           username: string | null
@@ -720,7 +626,6 @@ export type Database = {
           graduating_class?: number | null
           id: string
           links?: Json
-          skill_levels?: Json
           sport?: string | null
           updated_at?: string
           username?: string | null
@@ -737,7 +642,6 @@ export type Database = {
           graduating_class?: number | null
           id?: string
           links?: Json
-          skill_levels?: Json
           sport?: string | null
           updated_at?: string
           username?: string | null
