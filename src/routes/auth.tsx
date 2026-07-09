@@ -6,8 +6,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { lovable } from "@/integrations/lovable";
 import { getOAuthRedirectUri } from "@/lib/oauth-redirect";
 import { waitForAuthSession } from "@/lib/oauth-session";
+import { getPostSignInDestination } from "@/lib/post-sign-in-destination";
 import {
-  consumePostAuthRedirect,
   peekPostAuthRedirect,
   savePostAuthRedirect,
 } from "@/lib/post-auth-redirect";
@@ -40,7 +40,7 @@ function AuthPage() {
   const checkExistingSession = async () => {
     const session = await waitForAuthSession({ timeoutMs: 2_000, intervalMs: 150 });
     if (session) {
-      const target = consumePostAuthRedirect("/profile");
+      const target = await getPostSignInDestination(session);
       window.location.assign(target);
       return true;
     }
@@ -140,7 +140,7 @@ function AuthPage() {
 
       if (firstResult.kind === "session") {
         if (firstResult.session) {
-          const target = consumePostAuthRedirect("/profile");
+          const target = await getPostSignInDestination(firstResult.session);
           window.location.assign(target);
           return;
         }
@@ -165,7 +165,7 @@ function AuthPage() {
         setGoogleStatus({ kind: "timeout" });
         return;
       }
-      const target = consumePostAuthRedirect("/profile");
+      const target = await getPostSignInDestination(session);
       window.location.assign(target);
     } catch (err) {
       const message = err instanceof Error ? err.message : "Sign-in failed";
