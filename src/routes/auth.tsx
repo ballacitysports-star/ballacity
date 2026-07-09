@@ -217,7 +217,7 @@ function AuthPage() {
           />
           <button
             type="submit"
-            disabled={busy}
+            disabled={busy || googleBusy}
             className="w-full rounded-full bg-lime-gradient px-4 py-3 text-sm font-bold text-primary-foreground disabled:opacity-50"
           >
             {busy ? "Please wait…" : mode === "signin" ? "Sign in" : "Create account"}
