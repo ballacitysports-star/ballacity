@@ -96,7 +96,7 @@ function AuthPage() {
     }
   };
 
-  const oauth = async (provider: "google" | "apple") => {
+  const oauth = async (provider: "google") => {
     setBusy(true);
     try {
       try {
@@ -181,16 +181,6 @@ function AuthPage() {
           Continue with Google
         </button>
 
-        <button
-          onClick={() => oauth("apple")}
-          disabled={busy}
-          className="w-full rounded-full border border-border bg-foreground text-background px-4 py-3 text-sm font-bold flex items-center justify-center gap-2 disabled:opacity-50"
-        >
-          <svg className="h-4 w-4" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
-            <path d="M16.365 1.43c0 1.14-.42 2.22-1.24 3.03-.86.9-2.28 1.6-3.44 1.5-.14-1.08.4-2.22 1.16-3.03.86-.92 2.32-1.6 3.52-1.5zM20.5 17.29c-.55 1.28-.82 1.85-1.53 2.98-.99 1.57-2.39 3.53-4.12 3.55-1.54.01-1.94-.99-4.03-.99s-2.53.97-4.03 1c-1.73.03-3.05-1.7-4.04-3.28-2.78-4.42-3.07-9.61-1.36-12.36 1.22-1.94 3.14-3.07 4.95-3.07 1.84 0 3 .99 4.53.99 1.48 0 2.38-.99 4.51-.99 1.61 0 3.32.86 4.54 2.35-3.99 2.15-3.34 7.72.58 8.82z"/>
-          </svg>
-          Continue with Apple
-        </button>
 
         <div className="flex items-center gap-3 text-[10px] uppercase tracking-wider text-muted-foreground">
           <div className="h-px flex-1 bg-border" /> or <div className="h-px flex-1 bg-border" />
