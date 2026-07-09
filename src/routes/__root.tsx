@@ -201,7 +201,7 @@ function AuthGate({ children }: { children: React.ReactNode }) {
       router.navigate({ to: "/auth", replace: true });
       return;
     }
-  }, [loading, user, isProtected, isAuthOnly, router, pathname, needsOnboarding]);
+  }, [loading, user, isProtected, router, pathname]);
 
   // Detect whether the signed-in user has completed onboarding (username set).
   useEffect(() => {
