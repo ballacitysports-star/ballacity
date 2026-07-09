@@ -105,10 +105,13 @@ function AuthPage() {
       } catch {
         // Ignore storage failures; the callback has a safe default.
       }
-      // redirect_uri MUST be a public origin URL so the Lovable OAuth broker
-      // popup can intercept it via web_message. Do NOT point at our own route.
+      // Route both popup (web_message) and full-page redirect flows through
+      // our public /oauth/callback route, which polls for the session and then
+      // navigates to the saved post-auth destination. Landing on `/` after a
+      // full-page redirect strands users on the marketing page because
+      // AuthGate only auto-bounces from /auth, /oauth/callback, /reset-password.
       const result = await lovable.auth.signInWithOAuth(provider, {
-        redirect_uri: window.location.origin,
+        redirect_uri: `${window.location.origin}/oauth/callback`,
       });
       if (result.error) {
         toast.error(result.error.message || "Google sign-in failed");
