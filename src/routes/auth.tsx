@@ -4,6 +4,7 @@ import { ArrowLeft } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { lovable } from "@/integrations/lovable";
+import { useAuth } from "@/hooks/use-auth";
 import { getOAuthRedirectUri } from "@/lib/oauth-redirect";
 import { waitForAuthSession } from "@/lib/oauth-session";
 import { getPostSignInDestination } from "@/lib/post-sign-in-destination";
@@ -25,6 +26,7 @@ type GoogleStatus =
   | { kind: "error"; message: string };
 
 function AuthPage() {
+  const { session } = useAuth();
   const [mode, setMode] = useState<"signin" | "signup">("signin");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -69,6 +71,10 @@ function AuthPage() {
       data.subscription.unsubscribe();
     };
   }, []);
+
+  useEffect(() => {
+    if (session) void finishAuthenticatedSession(session);
+  }, [session]);
 
   const checkExistingSession = async () => {
     const session = await waitForAuthSession({ timeoutMs: 2_000, intervalMs: 150 });
