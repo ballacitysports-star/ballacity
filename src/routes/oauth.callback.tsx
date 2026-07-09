@@ -1,29 +1,19 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { consumePostAuthRedirect } from "@/lib/post-auth-redirect";
 
 export const Route = createFileRoute("/oauth/callback")({
   head: () => ({ meta: [{ title: "Signing in — OpenRun" }] }),
   component: OAuthCallbackPage,
 });
 
-function getSafeReturnPath() {
-  try {
-    const stored = sessionStorage.getItem("openrun:postAuthRedirect");
-    sessionStorage.removeItem("openrun:postAuthRedirect");
-    if (stored && stored.startsWith("/") && !stored.startsWith("//")) return stored;
-  } catch {
-    // Ignore storage failures.
-  }
-  return "/profile";
-}
-
 function OAuthCallbackPage() {
   const [failed, setFailed] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
-    const returnPath = getSafeReturnPath();
+    const returnPath = consumePostAuthRedirect("/profile");
 
     const finish = async () => {
       const startedAt = Date.now();

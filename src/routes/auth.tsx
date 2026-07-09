@@ -1,11 +1,15 @@
-import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { createFileRoute, Link } from "@tanstack/react-router";
+import { useState } from "react";
 import { ArrowLeft } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { lovable } from "@/integrations/lovable";
 import { getOAuthRedirectUri } from "@/lib/oauth-redirect";
-import { useAuth } from "@/hooks/use-auth";
+import {
+  consumePostAuthRedirect,
+  peekPostAuthRedirect,
+  savePostAuthRedirect,
+} from "@/lib/post-auth-redirect";
 
 export const Route = createFileRoute("/auth")({
   head: () => ({ meta: [{ title: "Sign in — OpenRun" }] }),
@@ -13,8 +17,6 @@ export const Route = createFileRoute("/auth")({
 });
 
 function AuthPage() {
-  const nav = useNavigate();
-  const { user, loading } = useAuth();
   const [mode, setMode] = useState<"signin" | "signup">("signin");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -22,9 +24,10 @@ function AuthPage() {
   const [busy, setBusy] = useState(false);
   const [googleBusy, setGoogleBusy] = useState(false);
 
-  useEffect(() => {
-    if (!loading && user) nav({ to: "/profile" });
-  }, [loading, user, nav]);
+  // AuthGate owns post-auth navigation: it awaits the onboarding check and
+  // consumes the saved post-auth redirect. We deliberately do NOT nav() here,
+  // since that would race the onboarding check and skip /onboarding.
+
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -101,11 +104,9 @@ function AuthPage() {
   const oauth = async (provider: "google") => {
     setGoogleBusy(true);
     try {
-      try {
-        sessionStorage.setItem("openrun:postAuthRedirect", "/profile");
-      } catch {
-        // Ignore storage failures; the callback has a safe default.
-      }
+      // If AuthGate already saved an intended destination, keep it. Otherwise
+      // fall back to /profile so /oauth/callback has something to consume.
+      if (!peekPostAuthRedirect()) savePostAuthRedirect("/profile");
       // Route both popup (web_message) and full-page redirect flows through
       // our public /oauth/callback route, which polls for the session and then
       // navigates to the saved post-auth destination. Landing on `/` after a
@@ -140,7 +141,8 @@ function AuthPage() {
       }
       // Hard redirect ensures the whole app re-hydrates with the new session
       // (fixes cases where in-app nav races the auth-store update).
-      window.location.assign("/profile");
+      const target = consumePostAuthRedirect("/profile");
+      window.location.assign(target);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Sign-in failed");
     } finally {
