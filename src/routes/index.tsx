@@ -153,19 +153,6 @@ function Landing() {
         </div>
       </section>
 
-      {/* Trending */}
-      <section id="trending" className="mx-auto max-w-6xl px-5 py-16">
-        <div className="flex items-end justify-between mb-6">
-          <h2 className="font-display text-3xl md:text-4xl font-bold">Trending near you</h2>
-          <Link to="/feed" className="text-sm font-semibold text-lime hover:underline inline-flex items-center gap-1">
-            See all <ArrowRight className="h-4 w-4" />
-          </Link>
-        </div>
-        <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-4">
-          {trending.map((g, i) => <GameCard key={g.id} game={g} index={i} />)}
-        </div>
-      </section>
-
       {/* Sports */}
       <section id="sports" className="mx-auto max-w-6xl px-5 py-16">
         <div className="flex items-end justify-between gap-4 mb-6">
@@ -222,6 +209,19 @@ function Landing() {
               </motion.div>
             );
           })}
+        </div>
+      </section>
+
+      {/* Trending */}
+      <section id="trending" className="mx-auto max-w-6xl px-5 py-16">
+        <div className="flex items-end justify-between mb-6">
+          <h2 className="font-display text-3xl md:text-4xl font-bold">Trending near you</h2>
+          <Link to="/feed" className="text-sm font-semibold text-lime hover:underline inline-flex items-center gap-1">
+            See all <ArrowRight className="h-4 w-4" />
+          </Link>
+        </div>
+        <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-4">
+          {trending.map((g, i) => <GameCard key={g.id} game={g} index={i} />)}
         </div>
       </section>
 

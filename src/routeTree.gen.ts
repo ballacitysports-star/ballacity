@@ -17,7 +17,6 @@ import { Route as ResetPasswordRouteImport } from './routes/reset-password'
 import { Route as PlansRouteImport } from './routes/plans'
 import { Route as PickupRouteImport } from './routes/pickup'
 import { Route as PaymentsRouteImport } from './routes/payments'
-import { Route as OnboardingRouteImport } from './routes/onboarding'
 import { Route as AvailablePlayersRouteImport } from './routes/available-players'
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as AdminRouteImport } from './routes/admin'
@@ -29,7 +28,6 @@ import { Route as TeamsTeamIdRouteImport } from './routes/teams.$teamId'
 import { Route as ReviewNewRouteImport } from './routes/review.new'
 import { Route as ProfileEditRouteImport } from './routes/profile.edit'
 import { Route as PlayersUserIdRouteImport } from './routes/players.$userId'
-import { Route as OauthCallbackRouteImport } from './routes/oauth.callback'
 import { Route as MessagesConversationIdRouteImport } from './routes/messages.$conversationId'
 import { Route as GamesGameIdRouteImport } from './routes/games.$gameId'
 import { Route as CheckoutReturnRouteImport } from './routes/checkout.return'
@@ -90,11 +88,6 @@ const PaymentsRoute = PaymentsRouteImport.update({
   path: '/payments',
   getParentRoute: () => rootRouteImport,
 } as any)
-const OnboardingRoute = OnboardingRouteImport.update({
-  id: '/onboarding',
-  path: '/onboarding',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const AvailablePlayersRoute = AvailablePlayersRouteImport.update({
   id: '/available-players',
   path: '/available-players',
@@ -147,11 +140,6 @@ const ProfileEditRoute = ProfileEditRouteImport.update({
 const PlayersUserIdRoute = PlayersUserIdRouteImport.update({
   id: '/players/$userId',
   path: '/players/$userId',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const OauthCallbackRoute = OauthCallbackRouteImport.update({
-  id: '/oauth/callback',
-  path: '/oauth/callback',
   getParentRoute: () => rootRouteImport,
 } as any)
 const MessagesConversationIdRoute = MessagesConversationIdRouteImport.update({
@@ -257,7 +245,6 @@ export interface FileRoutesByFullPath {
   '/auth': typeof AuthRoute
   '/available-players': typeof AvailablePlayersRoute
   '/index': typeof Char91indexChar93Route
-  '/onboarding': typeof OnboardingRoute
   '/payments': typeof PaymentsRoute
   '/pickup': typeof PickupRoute
   '/plans': typeof PlansRoute
@@ -279,7 +266,6 @@ export interface FileRoutesByFullPath {
   '/checkout/return': typeof CheckoutReturnRoute
   '/games/$gameId': typeof GamesGameIdRoute
   '/messages/$conversationId': typeof MessagesConversationIdRoute
-  '/oauth/callback': typeof OauthCallbackRoute
   '/players/$userId': typeof PlayersUserIdRoute
   '/profile/edit': typeof ProfileEditRoute
   '/review/new': typeof ReviewNewRoute
@@ -298,7 +284,6 @@ export interface FileRoutesByTo {
   '/auth': typeof AuthRoute
   '/available-players': typeof AvailablePlayersRoute
   '/index': typeof Char91indexChar93Route
-  '/onboarding': typeof OnboardingRoute
   '/payments': typeof PaymentsRoute
   '/pickup': typeof PickupRoute
   '/plans': typeof PlansRoute
@@ -320,7 +305,6 @@ export interface FileRoutesByTo {
   '/checkout/return': typeof CheckoutReturnRoute
   '/games/$gameId': typeof GamesGameIdRoute
   '/messages/$conversationId': typeof MessagesConversationIdRoute
-  '/oauth/callback': typeof OauthCallbackRoute
   '/players/$userId': typeof PlayersUserIdRoute
   '/profile/edit': typeof ProfileEditRoute
   '/review/new': typeof ReviewNewRoute
@@ -341,7 +325,6 @@ export interface FileRoutesById {
   '/auth': typeof AuthRoute
   '/available-players': typeof AvailablePlayersRoute
   '/index': typeof Char91indexChar93Route
-  '/onboarding': typeof OnboardingRoute
   '/payments': typeof PaymentsRoute
   '/pickup': typeof PickupRoute
   '/plans': typeof PlansRoute
@@ -363,7 +346,6 @@ export interface FileRoutesById {
   '/checkout/return': typeof CheckoutReturnRoute
   '/games/$gameId': typeof GamesGameIdRoute
   '/messages/$conversationId': typeof MessagesConversationIdRoute
-  '/oauth/callback': typeof OauthCallbackRoute
   '/players/$userId': typeof PlayersUserIdRoute
   '/profile/edit': typeof ProfileEditRoute
   '/review/new': typeof ReviewNewRoute
@@ -384,7 +366,6 @@ export interface FileRouteTypes {
     | '/auth'
     | '/available-players'
     | '/index'
-    | '/onboarding'
     | '/payments'
     | '/pickup'
     | '/plans'
@@ -406,7 +387,6 @@ export interface FileRouteTypes {
     | '/checkout/return'
     | '/games/$gameId'
     | '/messages/$conversationId'
-    | '/oauth/callback'
     | '/players/$userId'
     | '/profile/edit'
     | '/review/new'
@@ -425,7 +405,6 @@ export interface FileRouteTypes {
     | '/auth'
     | '/available-players'
     | '/index'
-    | '/onboarding'
     | '/payments'
     | '/pickup'
     | '/plans'
@@ -447,7 +426,6 @@ export interface FileRouteTypes {
     | '/checkout/return'
     | '/games/$gameId'
     | '/messages/$conversationId'
-    | '/oauth/callback'
     | '/players/$userId'
     | '/profile/edit'
     | '/review/new'
@@ -467,7 +445,6 @@ export interface FileRouteTypes {
     | '/auth'
     | '/available-players'
     | '/index'
-    | '/onboarding'
     | '/payments'
     | '/pickup'
     | '/plans'
@@ -489,7 +466,6 @@ export interface FileRouteTypes {
     | '/checkout/return'
     | '/games/$gameId'
     | '/messages/$conversationId'
-    | '/oauth/callback'
     | '/players/$userId'
     | '/profile/edit'
     | '/review/new'
@@ -510,7 +486,6 @@ export interface RootRouteChildren {
   AuthRoute: typeof AuthRoute
   AvailablePlayersRoute: typeof AvailablePlayersRoute
   Char91indexChar93Route: typeof Char91indexChar93Route
-  OnboardingRoute: typeof OnboardingRoute
   PaymentsRoute: typeof PaymentsRoute
   PickupRoute: typeof PickupRoute
   PlansRoute: typeof PlansRoute
@@ -523,7 +498,6 @@ export interface RootRouteChildren {
   CheckoutReturnRoute: typeof CheckoutReturnRoute
   GamesGameIdRoute: typeof GamesGameIdRoute
   MessagesConversationIdRoute: typeof MessagesConversationIdRoute
-  OauthCallbackRoute: typeof OauthCallbackRoute
   PlayersUserIdRoute: typeof PlayersUserIdRoute
   ProfileEditRoute: typeof ProfileEditRoute
   ReviewNewRoute: typeof ReviewNewRoute
@@ -592,13 +566,6 @@ declare module '@tanstack/react-router' {
       path: '/payments'
       fullPath: '/payments'
       preLoaderRoute: typeof PaymentsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/onboarding': {
-      id: '/onboarding'
-      path: '/onboarding'
-      fullPath: '/onboarding'
-      preLoaderRoute: typeof OnboardingRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/available-players': {
@@ -676,13 +643,6 @@ declare module '@tanstack/react-router' {
       path: '/players/$userId'
       fullPath: '/players/$userId'
       preLoaderRoute: typeof PlayersUserIdRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/oauth/callback': {
-      id: '/oauth/callback'
-      path: '/oauth/callback'
-      fullPath: '/oauth/callback'
-      preLoaderRoute: typeof OauthCallbackRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/messages/$conversationId': {
@@ -874,7 +834,6 @@ const rootRouteChildren: RootRouteChildren = {
   AuthRoute: AuthRoute,
   AvailablePlayersRoute: AvailablePlayersRoute,
   Char91indexChar93Route: Char91indexChar93Route,
-  OnboardingRoute: OnboardingRoute,
   PaymentsRoute: PaymentsRoute,
   PickupRoute: PickupRoute,
   PlansRoute: PlansRoute,
@@ -887,7 +846,6 @@ const rootRouteChildren: RootRouteChildren = {
   CheckoutReturnRoute: CheckoutReturnRoute,
   GamesGameIdRoute: GamesGameIdRoute,
   MessagesConversationIdRoute: MessagesConversationIdRoute,
-  OauthCallbackRoute: OauthCallbackRoute,
   PlayersUserIdRoute: PlayersUserIdRoute,
   ProfileEditRoute: ProfileEditRoute,
   ReviewNewRoute: ReviewNewRoute,
