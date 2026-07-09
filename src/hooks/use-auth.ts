@@ -27,30 +27,34 @@ function initAuthStore() {
   initialized = true;
 
   supabase.auth.onAuthStateChange((event, session) => {
-    if (event === "INITIAL_SESSION" && !session) return;
     setAuthState({ session, user: session?.user ?? null, loading: false });
   });
 
-  supabase.auth.getUser().then(async ({ data, error }) => {
-    if (error || !data.user) {
-      const { data: sessionData } = await supabase.auth.getSession();
+  supabase.auth
+    .getSession()
+    .then(({ data: sessionData }) => {
+      const session = sessionData.session;
       setAuthState({
-        session: sessionData.session,
-        user: sessionData.session?.user ?? null,
+        session,
+        user: session?.user ?? null,
         loading: false,
       });
-      return;
-    }
 
-    const { data: sessionData } = await supabase.auth.getSession();
-    setAuthState({
-      session: sessionData.session,
-      user: data.user,
-      loading: false,
+      if (!session) return;
+      supabase.auth
+        .getUser()
+        .then(({ data, error }) => {
+          if (error || !data.user) return;
+          setAuthState({ user: data.user });
+        })
+        .catch(() => {
+          // Keep the restored session user; a transient validation failure
+          // should not put the app back into an indefinite loading state.
+        });
+    })
+    .catch(() => {
+      setAuthState({ session: null, user: null, loading: false });
     });
-  }).catch(() => {
-    setAuthState({ session: null, user: null, loading: false });
-  });
 }
 
 function subscribe(listener: () => void) {
