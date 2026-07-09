@@ -110,7 +110,7 @@ function AuthPage() {
         redirect_uri: window.location.origin,
       });
       if (result.error) {
-        toast.error(result.error.message || `${provider === "google" ? "Google" : "Apple"} sign-in failed`);
+        toast.error(result.error.message || "Google sign-in failed");
         return;
       }
       if (result.redirected) {
