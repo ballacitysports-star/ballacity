@@ -1,9 +1,8 @@
-import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { createFileRoute, Link, notFound, useNavigate } from "@tanstack/react-router";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { ArrowLeft, ExternalLink, Upload, ShieldCheck, Clock, X } from "lucide-react";
 import { toast } from "sonner";
 import { GAMES } from "@/lib/sample-data";
-import { useHostedGames } from "@/lib/hosted-games-store";
 import { useAuth } from "@/hooks/use-auth";
 import { supabase } from "@/integrations/supabase/client";
 import {
@@ -15,7 +14,7 @@ import {
 import { LegalNotice } from "@/components/LegalNotice";
 import { joinGame } from "@/lib/games-store";
 
-export const Route = createFileRoute("/games/$gameId_/pay")({
+export const Route = createFileRoute("/games/$gameId/pay")({
   validateSearch: (search: Record<string, unknown>) => {
     const out: { invite?: true; from?: string } = {};
     if (search.invite === "1" || search.invite === 1 || search.invite === true) out.invite = true;
@@ -23,9 +22,11 @@ export const Route = createFileRoute("/games/$gameId_/pay")({
     return out;
   },
   loader: ({ params }) => {
-    return { gameId: params.gameId };
+    const game = GAMES.find((g) => g.id === params.gameId);
+    if (!game) throw notFound();
+    return { game };
   },
-  head: () => ({ meta: [{ title: "Pay game fee — OpenRun" }] }),
+  head: ({ loaderData }) => ({ meta: [{ title: `Pay for ${loaderData?.game.title ?? "game"} — OpenRun` }] }),
   notFoundComponent: () => <div className="p-6 text-center text-sm">Game not found.</div>,
   errorComponent: ({ reset }) => (
     <div className="p-6 text-center"><button onClick={reset} className="text-lime font-bold">Try again</button></div>
@@ -34,13 +35,8 @@ export const Route = createFileRoute("/games/$gameId_/pay")({
 });
 
 function PayPage() {
-  const { gameId } = Route.useLoaderData();
+  const { game } = Route.useLoaderData();
   const { user, loading } = useAuth();
-  const hosted = useHostedGames();
-  const game = useMemo(
-    () => hosted.find((g) => g.id === gameId) ?? GAMES.find((g) => g.id === gameId),
-    [hosted, gameId],
-  );
   const nav = useNavigate();
   const [settings, setSettings] = useState<GamePaymentSettings | null>(null);
   const [methods, setMethods] = useState<PaymentMethod[]>([]);
@@ -54,7 +50,7 @@ function PayPage() {
   }, [loading, user, nav]);
 
   const refreshJoinRequest = useCallback(async () => {
-    if (!user || !game) return;
+    if (!user) return;
     try {
       const req = await getMyJoinRequest(game.id);
       setMyReq((prev) => {
@@ -65,13 +61,12 @@ function PayPage() {
         return req;
       });
     } catch { /* ignore polling errors */ }
-  }, [game, user]);
+  }, [game.id, user]);
 
   useEffect(() => {
     let cancelled = false;
     (async () => {
       try {
-        if (!game) return;
         const s = await getGamePaymentSettings(game.id);
         if (cancelled) return;
         setSettings(s);
@@ -95,7 +90,7 @@ function PayPage() {
       } catch (e: any) { toast.error(e.message); } finally { if (!cancelled) setFetching(false); }
     })();
     return () => { cancelled = true; };
-  }, [game, user]);
+  }, [game.id, user]);
 
   // Live-update the join-request status so the approval gate flips to the
   // payment picker the moment the host approves. Realtime is primary;
@@ -103,7 +98,7 @@ function PayPage() {
   const refreshRef = useRef(refreshJoinRequest);
   useEffect(() => { refreshRef.current = refreshJoinRequest; }, [refreshJoinRequest]);
   useEffect(() => {
-    if (!user || !game) return;
+    if (!user) return;
     const channel = supabase
       .channel(`pay-join-req:${game.id}:${user.id}`)
       .on(
@@ -133,29 +128,15 @@ function PayPage() {
       window.removeEventListener("focus", onFocus);
       document.removeEventListener("visibilitychange", onVisibility);
     };
-  }, [game, user]);
+  }, [game.id, user]);
 
   if (loading || fetching) return <div className="p-6 text-sm text-muted-foreground">Loading…</div>;
   if (!user) return null;
-  if (!game) {
-    return (
-      <div className="min-h-dvh grid place-items-center px-6 text-center">
-        <div>
-          <h1 className="font-display text-2xl font-bold">Game not found</h1>
-          <p className="text-sm text-muted-foreground mt-2">It may have wrapped up or been cancelled.</p>
-          <Link to="/feed" className="inline-block mt-5 rounded-full bg-lime px-5 py-2.5 text-sm font-bold text-primary-foreground">
-            Back to feed
-          </Link>
-        </div>
-      </div>
-    );
-  }
 
   const fee = settings?.entry_fee ?? game.price;
   const requiresApproval = !!settings?.requires_approval;
   const isApproved = myReq?.status === "approved";
   const approvalGateActive = requiresApproval && !isApproved;
-  const hostId = settings?.host_id ?? game.hostUserId ?? null;
 
   return (
     <div className="mx-auto max-w-md px-4 pt-6 pb-32">
@@ -235,24 +216,11 @@ function PayPage() {
             {myReq ? "Back to game" : "Request to join"}
           </Link>
         </div>
-      ) : !hostId ? (
+      ) : !settings || methods.length === 0 ? (
         <div className="rounded-2xl border border-dashed border-border bg-surface/40 p-5 text-center">
-          <div className="font-semibold text-sm">Payment is not ready yet</div>
-          <p className="text-xs text-muted-foreground mt-1">Reach out to the host directly to arrange this game fee.</p>
+          <div className="font-semibold text-sm">Host hasn't configured payment yet</div>
+          <p className="text-xs text-muted-foreground mt-1">Reach out to the host directly to arrange payment.</p>
         </div>
-      ) : methods.length === 0 ? (
-        <PaymentInstructionsAndProof
-          game_id={game.id}
-          host_id={hostId}
-          method={null}
-          extraInstructions={settings?.payment_instructions ?? null}
-          onCancel={() => nav({ to: "/games/$gameId", params: { gameId: game.id } })}
-          onSubmitted={async () => {
-            joinGame(game.id);
-            const subs = await listMySubmissionsForGame(game.id);
-            setMySubs(subs);
-          }}
-        />
       ) : !picked ? (
         <>
           <h2 className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2">Pay host using</h2>
@@ -275,9 +243,9 @@ function PayPage() {
       ) : (
         <PaymentInstructionsAndProof
           game_id={game.id}
-          host_id={hostId}
+          host_id={settings.host_id}
           method={picked}
-          extraInstructions={settings?.payment_instructions ?? null}
+          extraInstructions={settings.payment_instructions}
           onCancel={() => setPicked(null)}
           onSubmitted={async () => {
             joinGame(game.id);
@@ -325,10 +293,10 @@ function MySubsList({ subs }: { subs: PaymentSubmission[] }) {
 function PaymentInstructionsAndProof({
   game_id, host_id, method, extraInstructions, onCancel, onSubmitted,
 }: {
-  game_id: string; host_id: string; method: PaymentMethod | null;
+  game_id: string; host_id: string; method: PaymentMethod;
   extraInstructions: string | null; onCancel: () => void; onSubmitted: () => void;
 }) {
-  const meta = method ? paymentTypeMeta(method.payment_type) : paymentTypeMeta("cash");
+  const meta = paymentTypeMeta(method.payment_type);
   const [file, setFile] = useState<File | null>(null);
   const [ref, setRef] = useState("");
   const [notes, setNotes] = useState("");
@@ -342,8 +310,8 @@ function PaymentInstructionsAndProof({
       if (file) path = await uploadProofScreenshot(file);
       await createPaymentSubmission({
         game_id, host_id,
-        payment_method_id: method?.id ?? null,
-        payment_type: method?.payment_type ?? "cash",
+        payment_method_id: method.id,
+        payment_type: method.payment_type,
         screenshot_path: path,
         transaction_reference: ref || null,
         notes: notes || null,
@@ -359,26 +327,23 @@ function PaymentInstructionsAndProof({
         <div className="flex items-center gap-3 mb-3">
           <div className="grid h-10 w-10 place-items-center rounded-xl bg-secondary text-lg">{meta.emoji}</div>
           <div>
-            <div className="font-bold text-sm">{method ? meta.name : "Pay host directly"}</div>
-            <div className="text-xs text-muted-foreground">
-              {method ? "Send directly to host" : "Use the arrangement the host shared, then submit proof"}
-            </div>
+            <div className="font-bold text-sm">{meta.name}</div>
+            <div className="text-xs text-muted-foreground">Send directly to host</div>
           </div>
           <button onClick={onCancel} className="ml-auto text-muted-foreground"><X className="h-4 w-4" /></button>
         </div>
-        {method?.username && <Field label="Send to" value={method.username} />}
-        {method?.contact_info && <Field label="Contact" value={method.contact_info} />}
-        {method?.payment_url && (
+        {method.username && <Field label="Send to" value={method.username} />}
+        {method.contact_info && <Field label="Contact" value={method.contact_info} />}
+        {method.payment_url && (
           <a href={method.payment_url} target="_blank" rel="noreferrer"
             className="mt-2 flex items-center justify-center gap-2 w-full rounded-xl bg-lime-gradient py-3 text-sm font-bold text-primary-foreground">
             <ExternalLink className="h-4 w-4" /> Open {meta.name}
           </a>
         )}
-        {(method?.instructions || extraInstructions || !method) && (
+        {(method.instructions || extraInstructions) && (
           <div className="mt-3 rounded-xl bg-background p-3 text-xs text-muted-foreground space-y-1">
-            {method?.instructions && <p>{method.instructions}</p>}
+            {method.instructions && <p>{method.instructions}</p>}
             {extraInstructions && <p>{extraInstructions}</p>}
-            {!method && !extraInstructions && <p>Confirm payment details with the host, then submit a screenshot, transaction ID, or note for verification.</p>}
           </div>
         )}
       </div>
