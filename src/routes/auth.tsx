@@ -4,35 +4,13 @@ import { ArrowLeft } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { lovable } from "@/integrations/lovable";
-import { refreshAuth, useAuth } from "@/hooks/use-auth";
+import { refreshAuth, useAuth, waitForAuthSession } from "@/hooks/use-auth";
+import { consumePostAuthRedirect, rememberPostAuthRedirect } from "@/lib/auth-redirect";
 
 export const Route = createFileRoute("/auth")({
   head: () => ({ meta: [{ title: "Sign in — OpenRun" }] }),
   component: AuthPage,
 });
-
-const POST_AUTH_REDIRECT_KEY = "openrun.postAuthRedirect.v1";
-
-function rememberPostAuthRedirect(path = "/profile") {
-  if (typeof window === "undefined") return;
-  try {
-    window.sessionStorage.setItem(POST_AUTH_REDIRECT_KEY, path);
-  } catch {
-    // ignore storage errors
-  }
-}
-
-function consumePostAuthRedirect() {
-  if (typeof window === "undefined") return "/profile";
-  try {
-    const next = window.sessionStorage.getItem(POST_AUTH_REDIRECT_KEY);
-    window.sessionStorage.removeItem(POST_AUTH_REDIRECT_KEY);
-    if (next && next.startsWith("/") && !next.startsWith("//")) return next;
-  } catch {
-    // ignore storage errors
-  }
-  return "/profile";
-}
 
 function AuthPage() {
   const nav = useNavigate();
@@ -128,14 +106,14 @@ function AuthPage() {
     try {
       rememberPostAuthRedirect("/profile");
       const result = await lovable.auth.signInWithOAuth("google", {
-        redirect_uri: window.location.origin,
+        redirect_uri: `${window.location.origin}/auth/callback`,
       });
       if (result.error) {
         toast.error(result.error.message || "Google sign-in failed");
         return;
       }
       if (result.redirected) return;
-      await refreshAuth();
+      await waitForAuthSession();
       nav({ to: consumePostAuthRedirect(), replace: true });
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Google sign-in failed");

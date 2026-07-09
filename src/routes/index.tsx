@@ -6,6 +6,7 @@ import { HERO_IMAGE, SPORTS, GAMES } from "@/lib/sample-data";
 import { GameCard } from "@/components/GameCard";
 import { useEffect } from "react";
 import { useAuth } from "@/hooks/use-auth";
+import { consumePostAuthRedirect } from "@/lib/auth-redirect";
 
 
 
@@ -28,14 +29,7 @@ function Landing() {
 
   useEffect(() => {
     if (loading || !user || typeof window === "undefined") return;
-    let target = "/profile";
-    try {
-      const stored = window.sessionStorage.getItem("openrun.postAuthRedirect.v1");
-      window.sessionStorage.removeItem("openrun.postAuthRedirect.v1");
-      if (stored && stored.startsWith("/") && !stored.startsWith("//")) target = stored;
-    } catch {
-      // ignore storage errors
-    }
+    const target = consumePostAuthRedirect();
     nav({ to: target, replace: true });
   }, [loading, user, nav]);
 

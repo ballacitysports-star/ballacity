@@ -31,6 +31,7 @@ import { Route as PlayersUserIdRouteImport } from './routes/players.$userId'
 import { Route as MessagesConversationIdRouteImport } from './routes/messages.$conversationId'
 import { Route as GamesGameIdRouteImport } from './routes/games.$gameId'
 import { Route as CheckoutReturnRouteImport } from './routes/checkout.return'
+import { Route as AuthCallbackRouteImport } from './routes/auth.callback'
 import { Route as AdminLocationAnalyticsRouteImport } from './routes/admin.location-analytics'
 import { Route as AccountSecurityRouteImport } from './routes/account.security'
 import { Route as AccountNotificationsRouteImport } from './routes/account.notifications'
@@ -157,6 +158,11 @@ const CheckoutReturnRoute = CheckoutReturnRouteImport.update({
   path: '/checkout/return',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AuthCallbackRoute = AuthCallbackRouteImport.update({
+  id: '/callback',
+  path: '/callback',
+  getParentRoute: () => AuthRoute,
+} as any)
 const AdminLocationAnalyticsRoute = AdminLocationAnalyticsRouteImport.update({
   id: '/location-analytics',
   path: '/location-analytics',
@@ -242,7 +248,7 @@ const ApiPublicPaymentsWebhookRoute =
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/admin': typeof AdminRouteWithChildren
-  '/auth': typeof AuthRoute
+  '/auth': typeof AuthRouteWithChildren
   '/available-players': typeof AvailablePlayersRoute
   '/index': typeof Char91indexChar93Route
   '/payments': typeof PaymentsRoute
@@ -263,6 +269,7 @@ export interface FileRoutesByFullPath {
   '/account/notifications': typeof AccountNotificationsRoute
   '/account/security': typeof AccountSecurityRoute
   '/admin/location-analytics': typeof AdminLocationAnalyticsRoute
+  '/auth/callback': typeof AuthCallbackRoute
   '/checkout/return': typeof CheckoutReturnRoute
   '/games/$gameId': typeof GamesGameIdRoute
   '/messages/$conversationId': typeof MessagesConversationIdRoute
@@ -281,7 +288,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/admin': typeof AdminRouteWithChildren
-  '/auth': typeof AuthRoute
+  '/auth': typeof AuthRouteWithChildren
   '/available-players': typeof AvailablePlayersRoute
   '/index': typeof Char91indexChar93Route
   '/payments': typeof PaymentsRoute
@@ -302,6 +309,7 @@ export interface FileRoutesByTo {
   '/account/notifications': typeof AccountNotificationsRoute
   '/account/security': typeof AccountSecurityRoute
   '/admin/location-analytics': typeof AdminLocationAnalyticsRoute
+  '/auth/callback': typeof AuthCallbackRoute
   '/checkout/return': typeof CheckoutReturnRoute
   '/games/$gameId': typeof GamesGameIdRoute
   '/messages/$conversationId': typeof MessagesConversationIdRoute
@@ -322,7 +330,7 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/_tabs': typeof TabsRouteWithChildren
   '/admin': typeof AdminRouteWithChildren
-  '/auth': typeof AuthRoute
+  '/auth': typeof AuthRouteWithChildren
   '/available-players': typeof AvailablePlayersRoute
   '/index': typeof Char91indexChar93Route
   '/payments': typeof PaymentsRoute
@@ -343,6 +351,7 @@ export interface FileRoutesById {
   '/account/notifications': typeof AccountNotificationsRoute
   '/account/security': typeof AccountSecurityRoute
   '/admin/location-analytics': typeof AdminLocationAnalyticsRoute
+  '/auth/callback': typeof AuthCallbackRoute
   '/checkout/return': typeof CheckoutReturnRoute
   '/games/$gameId': typeof GamesGameIdRoute
   '/messages/$conversationId': typeof MessagesConversationIdRoute
@@ -384,6 +393,7 @@ export interface FileRouteTypes {
     | '/account/notifications'
     | '/account/security'
     | '/admin/location-analytics'
+    | '/auth/callback'
     | '/checkout/return'
     | '/games/$gameId'
     | '/messages/$conversationId'
@@ -423,6 +433,7 @@ export interface FileRouteTypes {
     | '/account/notifications'
     | '/account/security'
     | '/admin/location-analytics'
+    | '/auth/callback'
     | '/checkout/return'
     | '/games/$gameId'
     | '/messages/$conversationId'
@@ -463,6 +474,7 @@ export interface FileRouteTypes {
     | '/account/notifications'
     | '/account/security'
     | '/admin/location-analytics'
+    | '/auth/callback'
     | '/checkout/return'
     | '/games/$gameId'
     | '/messages/$conversationId'
@@ -483,7 +495,7 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   TabsRoute: typeof TabsRouteWithChildren
   AdminRoute: typeof AdminRouteWithChildren
-  AuthRoute: typeof AuthRoute
+  AuthRoute: typeof AuthRouteWithChildren
   AvailablePlayersRoute: typeof AvailablePlayersRoute
   Char91indexChar93Route: typeof Char91indexChar93Route
   PaymentsRoute: typeof PaymentsRoute
@@ -666,6 +678,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof CheckoutReturnRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/auth/callback': {
+      id: '/auth/callback'
+      path: '/callback'
+      fullPath: '/auth/callback'
+      preLoaderRoute: typeof AuthCallbackRouteImport
+      parentRoute: typeof AuthRoute
+    }
     '/admin/location-analytics': {
       id: '/admin/location-analytics'
       path: '/location-analytics'
@@ -815,6 +834,16 @@ const AdminRouteChildren: AdminRouteChildren = {
 
 const AdminRouteWithChildren = AdminRoute._addFileChildren(AdminRouteChildren)
 
+interface AuthRouteChildren {
+  AuthCallbackRoute: typeof AuthCallbackRoute
+}
+
+const AuthRouteChildren: AuthRouteChildren = {
+  AuthCallbackRoute: AuthCallbackRoute,
+}
+
+const AuthRouteWithChildren = AuthRoute._addFileChildren(AuthRouteChildren)
+
 interface TeamsTeamIdRouteChildren {
   TeamsTeamIdEditRoute: typeof TeamsTeamIdEditRoute
 }
@@ -831,7 +860,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   TabsRoute: TabsRouteWithChildren,
   AdminRoute: AdminRouteWithChildren,
-  AuthRoute: AuthRoute,
+  AuthRoute: AuthRouteWithChildren,
   AvailablePlayersRoute: AvailablePlayersRoute,
   Char91indexChar93Route: Char91indexChar93Route,
   PaymentsRoute: PaymentsRoute,
@@ -860,13 +889,3 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
-  }
-}
