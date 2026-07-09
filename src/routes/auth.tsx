@@ -17,6 +17,13 @@ export const Route = createFileRoute("/auth")({
   component: AuthPage,
 });
 
+type GoogleStatus =
+  | { kind: "idle" }
+  | { kind: "opening" }
+  | { kind: "waiting" }
+  | { kind: "timeout" }
+  | { kind: "error"; message: string };
+
 function AuthPage() {
   const [mode, setMode] = useState<"signin" | "signup">("signin");
   const [email, setEmail] = useState("");
@@ -24,10 +31,23 @@ function AuthPage() {
   const [displayName, setDisplayName] = useState("");
   const [busy, setBusy] = useState(false);
   const [googleBusy, setGoogleBusy] = useState(false);
+  const [googleStatus, setGoogleStatus] = useState<GoogleStatus>({ kind: "idle" });
 
   // AuthGate owns post-auth navigation: it awaits the onboarding check and
   // consumes the saved post-auth redirect. We deliberately do NOT nav() here,
   // since that would race the onboarding check and skip /onboarding.
+
+  const checkExistingSession = async () => {
+    const session = await waitForAuthSession({ timeoutMs: 2_000, intervalMs: 150 });
+    if (session) {
+      const target = consumePostAuthRedirect("/profile");
+      window.location.assign(target);
+      return true;
+    }
+    return false;
+  };
+
+
 
 
   const submit = async (e: React.FormEvent) => {
