@@ -122,6 +122,15 @@ export function GamesMap({
     return { lat: center.lat + dLat, lng: center.lng + dLng };
   };
 
+  /** Real geo coords (from geocoding) vs 0-100 sample-data pseudo coords. */
+  const isRealCoord = (lat: number, lng: number) =>
+    lng < 0 || lng > 100 || lat < 0 || lat > 90 ||
+    !Number.isInteger(lat) || !Number.isInteger(lng);
+
+  const pinPosition = (p: { lat: number; lng: number }, center: { lat: number; lng: number }) =>
+    isRealCoord(p.lat, p.lng) ? { lat: p.lat, lng: p.lng } : toLatLng(p.lng, p.lat, center);
+
+
   // Initialize map
   useEffect(() => {
     let cancelled = false;
@@ -371,7 +380,7 @@ export function GamesMap({
     const center = pinCenterRef.current || userPosRef.current || { lat: 40.7281, lng: -73.9842 };
     pins.forEach((p) => {
       const m = pinMarkersRef.current.get(p.id);
-      if (m) m.setPosition(toLatLng(p.lng, p.lat, center));
+      if (m) m.setPosition(pinPosition(p, center));
     });
   };
 
@@ -384,7 +393,7 @@ export function GamesMap({
     pins.forEach((p) => {
       if (existing.has(p.id)) return;
       const marker = new window.google.maps.Marker({
-        position: toLatLng(p.lng, p.lat, center),
+        position: pinPosition(p, center),
         map: mapRef.current,
         icon: makePinIcon(p.emoji, p.id === activeId, !!p.urgent),
       });

@@ -239,17 +239,62 @@ export async function deleteMyPendingSubmission(id: string) {
 }
 
 // ----- Join requests -----
-export async function createJoinRequest(input: { game_id: string; host_id: string; message?: string | null }) {
+/**
+ * Create a join request idempotently.
+ *
+ * `idempotency_key` is unique per player. Re-submitting with the same key
+ * (rapid double-tap, retry after a network blip, a second tab) resolves to
+ * the row created by the first request instead of a duplicate. The default
+ * key is stable per (game_id, player_id) so any accidental re-submission
+ * for the same game deduplicates server-side, even across tabs/devices.
+ */
+export async function createJoinRequest(input: {
+  game_id: string;
+  host_id: string;
+  message?: string | null;
+  idempotency_key?: string;
+}): Promise<JoinRequest> {
   const { data: u } = await supabase.auth.getUser();
   if (!u.user) throw new Error("Sign in to request to join.");
-  const { error } = await supabase.from("join_requests").insert({
-    game_id: input.game_id,
-    host_id: input.host_id,
-    player_id: u.user.id,
-    message: input.message ?? null,
-  });
-  if (error) throw error;
+
+  const idempotency_key =
+    input.idempotency_key ?? `join:${input.game_id}`;
+
+  const { data, error } = await supabase
+    .from("join_requests")
+    .insert({
+      game_id: input.game_id,
+      host_id: input.host_id,
+      player_id: u.user.id,
+      message: input.message ?? null,
+      idempotency_key,
+    })
+    .select("*")
+    .single();
+
+  if (!error && data) return data as JoinRequest;
+
+  // 23505 = unique_violation. Either (player_id, idempotency_key) or the
+  // (game_id, player_id) constraint fired — both mean "already submitted".
+  // Return the existing row so callers see a successful idempotent result.
+  if (error && (error as { code?: string }).code === "23505") {
+    const { data: existing, error: readErr } = await supabase
+      .from("join_requests")
+      .select("*")
+      .eq("player_id", u.user.id)
+      .or(
+        `idempotency_key.eq.${idempotency_key},and(game_id.eq.${input.game_id})`,
+      )
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (readErr) throw readErr;
+    if (existing) return existing as JoinRequest;
+  }
+
+  throw error;
 }
+
 
 export async function cancelMyJoinRequest(gameId: string) {
   const { data: u } = await supabase.auth.getUser();

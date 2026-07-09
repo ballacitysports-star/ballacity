@@ -1,6 +1,6 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { motion } from "framer-motion";
-import { ArrowLeft, Share2, Bookmark, MapPin, Clock, Users, Calendar, MessageCircle, Star, Check, CreditCard, Settings as SettingsIcon, X as XIcon } from "lucide-react";
+import { ArrowLeft, Share2, Bookmark, MapPin, Clock, Users, Calendar, MessageCircle, Star, Check, CreditCard, Settings as SettingsIcon, X as XIcon, Pencil, Play, Lock, Unlock } from "lucide-react";
 import { GAMES, SPORTS } from "@/lib/sample-data";
 import { formatWhen } from "@/lib/format";
 import { ReviewsSection } from "@/components/ReviewsSection";
@@ -10,7 +10,7 @@ import { joinGame, leaveGame, useIsJoined } from "@/lib/games-store";
 import { toast } from "sonner";
 import { useEffect, useMemo, useState } from "react";
 import { getGamePaymentSettings, listMySubmissionsForGame, deleteMyPendingSubmission, getMyJoinRequest, createJoinRequest, cancelMyJoinRequest, listHostJoinRequests, reviewJoinRequest, upsertGamePaymentSettings, type GamePaymentSettings, type PaymentSubmission, type JoinRequest } from "@/lib/payments";
-import { useHostedGames } from "@/lib/hosted-games-store";
+import { useHostedGames, updateHostedGame } from "@/lib/hosted-games-store";
 import type { Game } from "@/lib/sample-data";
 import { LegalNotice } from "@/components/LegalNotice";
 import { useAuth } from "@/hooks/use-auth";
@@ -25,11 +25,18 @@ const hostIdFor = (username: string) => `host-${username.replace(/^@/, "").toLow
 
 export const Route = createFileRoute("/games/$gameId")({
   validateSearch: (search: Record<string, unknown>) => {
-    const out: { invite?: true; from?: string } = {};
+    const out: { invite?: true; from?: string; exp?: number; expInvalid?: true } = {};
     if (search.invite === "1" || search.invite === 1 || search.invite === true) out.invite = true;
     if (typeof search.from === "string" && search.from.length > 0) out.from = search.from;
+    const rawExp = search.exp;
+    if (rawExp !== undefined && rawExp !== null && rawExp !== "") {
+      const expNum = typeof rawExp === "number" ? rawExp : typeof rawExp === "string" ? Number(rawExp) : NaN;
+      if (Number.isFinite(expNum) && expNum > 0) out.exp = expNum;
+      else out.expInvalid = true;
+    }
     return out;
   },
+
   loader: ({ params }) => {
     return { gameId: params.gameId };
   },
@@ -67,7 +74,9 @@ export const Route = createFileRoute("/games/$gameId")({
 
 function GameDetail() {
   const { gameId } = Route.useLoaderData();
-  const { invite: isInvite, from: inviteFrom } = Route.useSearch();
+  const { invite: isInvite, from: inviteFrom, exp: inviteExp, expInvalid } = Route.useSearch();
+  const inviteExpired = !!(isInvite && ((inviteExp && inviteExp < Date.now()) || expInvalid));
+
   const hosted = useHostedGames();
   const game = useMemo<Game | undefined>(
     () => hosted.find((g) => g.id === gameId) ?? GAMES.find((g) => g.id === gameId),
@@ -81,6 +90,7 @@ function GameDetail() {
   const [myReq, setMyReq] = useState<JoinRequest | null>(null);
   const [hostRequests, setHostRequests] = useState<JoinRequest[]>([]);
   const [messaging, setMessaging] = useState(false);
+  const [editOpen, setEditOpen] = useState(false);
 
   // effectiveJoined is computed below, after settings/myReq/isHost resolve.
   // Placeholder removed — see definition near line 161.
@@ -107,7 +117,11 @@ function GameDetail() {
         getMyJoinRequest(game.id),
       ]);
       setSettings(s); setMySubs(subs); setMyReq(req);
-      if (req?.status === "approved" && !joined) joinGame(game.id);
+      // Auto-join locally only when there's nothing left to pay. Otherwise the
+      // Join CTA would flip to "leave" and hide the Pay flow after approval.
+      const feeOwed = Number(s?.entry_fee ?? game.price ?? 0) > 0;
+      const paidOk = subs[0]?.status === "verified";
+      if (req?.status === "approved" && !joined && (!feeOwed || paidOk)) joinGame(game.id);
     } catch {}
   };
 
@@ -143,6 +157,71 @@ function GameDetail() {
   useEffect(() => { refreshStatus(); /* eslint-disable-next-line */ }, [game?.id]);
   useEffect(() => { refreshHostRequests(); /* eslint-disable-next-line */ }, [game?.id, user?.id, settings?.host_id, hostsThisGame]);
 
+  // Realtime: refresh roster/requests when any join_request for this game changes.
+  useEffect(() => {
+    if (!game?.id || !hostsThisGame) return;
+    const channel = supabase
+      .channel(`join_requests:${game.id}`)
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "join_requests", filter: `game_id=eq.${game.id}` },
+        () => { refreshHostRequests(); },
+      )
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+    // eslint-disable-next-line
+  }, [game?.id, hostsThisGame]);
+
+  // Player-side: keep this viewer's own join-request status live so the CTA
+  // flips from "Request pending" to "Pay host" (or "Confirmed") the instant
+  // the host approves — without needing a manual reload. Realtime is primary;
+  // polling + focus/visibility refetch cover dropped websocket frames.
+  useEffect(() => {
+    if (!game?.id || !user || hostsThisGame) return;
+    const channel = supabase
+      .channel(`join_requests:player:${game.id}:${user.id}`)
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "join_requests", filter: `player_id=eq.${user.id}` },
+        (payload) => {
+          const row = (payload.new ?? payload.old) as { game_id?: string } | undefined;
+          if (row?.game_id === game.id) refreshStatus();
+        },
+      )
+      .subscribe();
+    const poll = window.setInterval(() => { refreshStatus(); }, 15_000);
+    const onFocus = () => { refreshStatus(); };
+    const onVis = () => { if (document.visibilityState === "visible") refreshStatus(); };
+    window.addEventListener("focus", onFocus);
+    document.addEventListener("visibilitychange", onVis);
+    return () => {
+      supabase.removeChannel(channel);
+      window.clearInterval(poll);
+      window.removeEventListener("focus", onFocus);
+      document.removeEventListener("visibilitychange", onVis);
+    };
+    // eslint-disable-next-line
+  }, [game?.id, user?.id, hostsThisGame]);
+
+  // Player-side: keep this viewer's own payment_submission status live so the
+  // CTA flips to "Confirmed" the instant the host verifies payment.
+  useEffect(() => {
+    if (!game?.id || !user || hostsThisGame) return;
+    const channel = supabase
+      .channel(`payment_submissions:player:${game.id}:${user.id}`)
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "payment_submissions", filter: `player_id=eq.${user.id}` },
+        (payload) => {
+          const row = (payload.new ?? payload.old) as { game_id?: string } | undefined;
+          if (row?.game_id === game.id) refreshStatus();
+        },
+      )
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+    // eslint-disable-next-line
+  }, [game?.id, user?.id, hostsThisGame]);
+
   if (!game) {
     return (
       <div className="min-h-dvh grid place-items-center px-6 text-center">
@@ -162,8 +241,18 @@ function GameDetail() {
   const isPaid = fee > 0;
   const requiresApproval = !!settings?.requires_approval;
   const latestSub = mySubs[0];
-  const isConfirmed = latestSub?.status === "verified" || myReq?.status === "approved";
-  const isPending = latestSub?.status === "pending" || (requiresApproval && myReq?.status === "pending");
+  const isApproved = myReq?.status === "approved";
+  const isRequestPending = myReq?.status === "pending";
+  const isPaymentVerified = latestSub?.status === "verified";
+  const isPaymentPending = latestSub?.status === "pending";
+  // Approval-gated games treat approval as the *first* gate. Payment (if any)
+  // becomes actionable only after the host approves the request.
+  const approvalCleared = !requiresApproval || isApproved;
+  const paymentCleared = !isPaid || isPaymentVerified;
+  const isConfirmed = approvalCleared && paymentCleared && (requiresApproval || isPaid ? true : false);
+  // Only surface "payment pending" once approval is cleared, so players
+  // don't see a payment-pending state before they've been approved.
+  const isPending = isRequestPending || (approvalCleared && isPaymentPending);
 
   // The viewer counts as a roster player only when:
   //  - they're not the host (hosts run the game, they don't take a player slot), AND
@@ -177,6 +266,21 @@ function GameDetail() {
 
 
   const handleJoin = async () => {
+    // Expired invite → block all join actions and steer to discovery.
+    if (inviteExpired && !isHost && !viewerCountsAsJoined && !viewerPending) {
+      toast.error("This invite has expired. Browse open games instead.");
+      nav({ to: "/discover" });
+      return;
+    }
+    // Approved-but-unpaid on a paid game → route to pay page (don't treat as
+    // "confirmed → leave" if a prior auto-join left `joined` stale-true).
+    if (isPaid && !paymentCleared && !isPending && (isApproved || !requiresApproval)) {
+      const search: { invite?: true; from?: string } = {};
+      if (isInvite) search.invite = true;
+      if (inviteFrom) search.from = inviteFrom;
+      nav({ to: "/games/$gameId/pay", params: { gameId: game.id }, search });
+      return;
+    }
     // Confirmed → leave / withdraw
     if (isConfirmed || joined) {
       try {
@@ -202,16 +306,21 @@ function GameDetail() {
       } catch (e: any) { toast.error(e.message ?? "Could not cancel."); }
       return;
     }
+    if (game.status === "in_progress") { toast.error("This game has already started."); return; }
+    if (game.status === "completed") { toast.error("This game has ended."); return; }
+    if (game.joinsClosed) { toast.error("The host has closed joining for this game."); return; }
     if (spotsLeft <= 0) { toast.error("This game is full."); return; }
-    if (isPaid) {
-      const search: { invite?: true; from?: string } = {};
-      if (isInvite) search.invite = true;
-      if (inviteFrom) search.from = inviteFrom;
-      nav({ to: "/games/$gameId/pay", params: { gameId: game.id }, search });
-      return;
-    }
-    if (requiresApproval) {
+    // Approval gate takes priority over payment: on games that require
+    // approval, players must be approved before they can pay.
+    if (requiresApproval && !isApproved) {
       if (!settings) { toast.error("Host hasn't enabled approvals yet."); return; }
+      // Invite-link integrity: if the URL claims invite=1, `from` must be present
+      // and must match the actual host. Otherwise the link is missing context or
+      // has been tampered with — refuse to send the request.
+      if (isInvite && (!inviteFrom || inviteFrom !== settings.host_id)) {
+        toast.error("This invite link is invalid or has been tampered with.");
+        return;
+      }
       try {
         await createJoinRequest({ game_id: game.id, host_id: settings.host_id });
         await createNotification({
@@ -224,6 +333,13 @@ function GameDetail() {
         toast.success("Request sent. The host will review it.");
         refreshStatus();
       } catch (e: any) { toast.error(e.message ?? "Could not send request."); }
+      return;
+    }
+    if (isPaid) {
+      const search: { invite?: true; from?: string } = {};
+      if (isInvite) search.invite = true;
+      if (inviteFrom) search.from = inviteFrom;
+      nav({ to: "/games/$gameId/pay", params: { gameId: game.id }, search });
       return;
     }
     joinGame(game.id);
@@ -288,15 +404,38 @@ function GameDetail() {
       <div className="mx-auto w-full max-w-md sm:max-w-2xl lg:max-w-4xl px-4 mt-5 space-y-5">
         {/* Invite deep-link banner */}
         {isInvite && !isHost && !viewerCountsAsJoined && !viewerPending && (
-          <div className="rounded-2xl border border-lime/40 bg-lime/10 p-4 flex items-start gap-3" role="status">
-            <div className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-lime/20 text-lime">🎟️</div>
-            <div className="min-w-0 flex-1">
-              <div className="font-display text-sm font-bold">You're invited to this game</div>
-              <p className="text-xs text-muted-foreground mt-0.5">
-                The host invited you personally{inviteFrom ? "" : ""}. Tap {requiresApproval ? "“Request to join”" : isPaid ? "“Pay & join”" : "“Join”"} below to confirm your spot.
-              </p>
+          inviteExpired ? (
+            <div
+              className="rounded-2xl border border-coral/50 bg-coral/10 p-4 flex items-start gap-3"
+              role="status"
+              aria-live="polite"
+              data-testid="invite-expired-banner"
+            >
+              <div className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-coral/20 text-coral">⏰</div>
+              <div className="min-w-0 flex-1">
+                <div className="font-display text-sm font-bold">Invite expired</div>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  This invitation is no longer valid. Browse other open games to find a run near you.
+                </p>
+                <Link
+                  to="/discover"
+                  className="mt-3 inline-flex items-center rounded-full bg-lime-gradient px-4 py-1.5 text-xs font-bold text-primary-foreground"
+                >
+                  Browse open games
+                </Link>
+              </div>
             </div>
-          </div>
+          ) : (
+            <div className="rounded-2xl border border-lime/40 bg-lime/10 p-4 flex items-start gap-3" role="status">
+              <div className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-lime/20 text-lime">🎟️</div>
+              <div className="min-w-0 flex-1">
+                <div className="font-display text-sm font-bold">You're invited to this game</div>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  The host invited you personally{inviteFrom ? "" : ""}. Tap {requiresApproval ? "“Request to join”" : isPaid ? "“Pay & join”" : "“Join”"} below to confirm your spot.
+                </p>
+              </div>
+            </div>
+          )
         )}
 
         {/* Approval status banner (player view) */}
@@ -337,6 +476,21 @@ function GameDetail() {
             </div>
           </div>
         )}
+
+        {/* Payment progress timeline (player view) */}
+        {!isHost && (myReq || latestSub || (isPaid && (isConfirmed || joined))) && (
+          <PaymentStatusTimeline
+            requiresApproval={requiresApproval}
+            isPaid={isPaid}
+            fee={fee}
+            myReq={myReq}
+            latestSub={latestSub}
+            isConfirmed={isConfirmed}
+            joined={joined}
+          />
+        )}
+
+
 
         {/* Meta */}
         <div className="grid grid-cols-2 gap-2">
@@ -522,6 +676,67 @@ function GameDetail() {
       {/* Host controls */}
       {isHost && (
         <div className="mx-auto w-full max-w-md sm:max-w-2xl lg:max-w-4xl px-4 mt-4 space-y-3">
+          {/* Manage game: edit, start, close joining */}
+          <div className="rounded-2xl border border-border bg-surface p-3">
+            <div className="flex items-center justify-between gap-2">
+              <div className="min-w-0">
+                <div className="font-semibold text-sm">Manage game</div>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  {game.status === "in_progress" ? "In progress — joining locked."
+                    : game.status === "completed" ? "This game has ended."
+                    : game.joinsClosed ? "Joining is closed. Reopen to accept more players."
+                    : "Edit details, start the game, or close joining when full."}
+                </p>
+              </div>
+              <span className={`shrink-0 inline-flex items-center gap-1 rounded-full px-2 py-1 text-[10px] font-bold uppercase tracking-wider ${
+                game.status === "in_progress" ? "bg-coral/15 text-coral border border-coral/40"
+                : game.status === "completed" ? "bg-secondary text-muted-foreground border border-border"
+                : "bg-lime/15 text-lime border border-lime/40"
+              }`}>
+                {game.status === "in_progress" ? "Live" : game.status === "completed" ? "Ended" : "Scheduled"}
+              </span>
+            </div>
+            <div className="mt-3 grid grid-cols-3 gap-2">
+              <button
+                type="button"
+                onClick={() => setEditOpen(true)}
+                disabled={game.status === "completed"}
+                className="inline-flex flex-col items-center justify-center gap-1 rounded-xl border border-border bg-background py-2.5 text-xs font-semibold disabled:opacity-50"
+              >
+                <Pencil className="h-4 w-4" /> Edit
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  if (game.status === "in_progress") {
+                    updateHostedGame(game.id, { status: "completed" });
+                    toast.success("Game marked as ended.");
+                  } else {
+                    updateHostedGame(game.id, { status: "in_progress", joinsClosed: true });
+                    toast.success("Game started. Have fun!");
+                  }
+                }}
+                disabled={game.status === "completed"}
+                className="inline-flex flex-col items-center justify-center gap-1 rounded-xl border border-lime/40 bg-lime/10 text-lime py-2.5 text-xs font-bold disabled:opacity-50"
+              >
+                <Play className="h-4 w-4" />
+                {game.status === "in_progress" ? "End game" : "Start game"}
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  const next = !game.joinsClosed;
+                  updateHostedGame(game.id, { joinsClosed: next });
+                  toast.success(next ? "Joining closed." : "Joining reopened.");
+                }}
+                disabled={game.status !== "scheduled" && game.status !== undefined}
+                className="inline-flex flex-col items-center justify-center gap-1 rounded-xl border border-border bg-background py-2.5 text-xs font-semibold disabled:opacity-50"
+              >
+                {game.joinsClosed ? <><Unlock className="h-4 w-4" /> Reopen</> : <><Lock className="h-4 w-4" /> Close joins</>}
+              </button>
+            </div>
+          </div>
+
           <button
             type="button"
             onClick={toggleRequireApproval}
@@ -557,8 +772,40 @@ function GameDetail() {
               No pickup requests yet. You'll see them here as players ask to join.
             </div>
           ) : null}
+
+          {/* Roster (host view) */}
+          <div>
+            <h2 className="font-display text-sm font-bold uppercase tracking-wider text-muted-foreground mb-2">
+              Roster · {hostRequests.filter((r) => r.status === "approved").length + game.joined} / {game.maxPlayers}
+            </h2>
+            <div className="space-y-2">
+              {hostRequests.filter((r) => r.status === "approved").length === 0 && game.joined === 0 ? (
+                <div className="rounded-2xl border border-dashed border-border bg-surface/40 p-3 text-xs text-muted-foreground">
+                  No confirmed players yet.
+                </div>
+              ) : (
+                <>
+                  {hostRequests.filter((r) => r.status === "approved").map((r) => (
+                    <RosterPlayerRow key={r.id} req={r} gameTitle={game.title} feeRequired={isPaid} onChange={refreshHostRequests} />
+                  ))}
+                  {Array.from({ length: game.joined }).map((_, i) => (
+                    <div key={`ph-${i}`} className="flex items-center gap-3 rounded-2xl border border-border bg-surface p-3">
+                      <div className="grid h-10 w-10 place-items-center rounded-full bg-secondary text-xs font-bold">
+                        {["MC","AG","JK","RC","TB","SO","PN","DP","EL","VM"][i % 10]}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <div className="text-sm font-semibold truncate">Player</div>
+                        <div className="text-[11px] text-muted-foreground">Sample roster · read-only</div>
+                      </div>
+                    </div>
+                  ))}
+                </>
+              )}
+            </div>
+          </div>
         </div>
       )}
+
 
       {/* Host-only payment setup link */}
       <div className="mx-auto w-full max-w-md sm:max-w-2xl lg:max-w-4xl px-4 mt-4">
@@ -591,37 +838,264 @@ function GameDetail() {
             className="grid h-12 w-12 place-items-center rounded-2xl border border-border bg-surface disabled:opacity-50">
             <MessageCircle className="h-5 w-5" />
           </button>
-          <motion.button
-            whileTap={{ scale: 0.97 }}
-            onClick={handleJoin}
-            disabled={!joined && !isPending && !isConfirmed && spotsLeft <= 0}
-            className={`flex-1 rounded-2xl py-3.5 font-bold inline-flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed ${
-              isConfirmed ? "bg-lime/15 border border-lime/40 text-lime" :
-              isPending ? "bg-surface border border-coral/40 text-coral" :
-              joined ? "bg-surface border border-lime/40 text-lime" :
-              "bg-lime-gradient text-primary-foreground glow-lime"
-            }`}
-          >
-            {isConfirmed ? (
-              <><Check className="h-4 w-4" /> Confirmed · Tap to leave</>
-            ) : isPending ? (
-              <><Clock className="h-4 w-4" /> {latestSub?.status === "pending" ? "Payment pending · Tap to withdraw" : "Request pending · Tap to cancel"}</>
+          {!isHost && (
+            <motion.button
+              whileTap={{ scale: 0.97 }}
+              onClick={handleJoin}
+              disabled={!joined && !isPending && !isConfirmed && spotsLeft <= 0}
+              className={`flex-1 rounded-2xl py-3.5 font-bold inline-flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed ${
+                isConfirmed ? "bg-lime/15 border border-lime/40 text-lime" :
+                isPending ? "bg-surface border border-coral/40 text-coral" :
+                joined ? "bg-surface border border-lime/40 text-lime" :
+                "bg-lime-gradient text-primary-foreground glow-lime"
+              }`}
+            >
+              {isConfirmed ? (
+                <><Check className="h-4 w-4" /> Confirmed · Tap to leave</>
+              ) : isPending ? (
+                <><Clock className="h-4 w-4" /> {latestSub?.status === "pending" ? "Payment pending · Tap to withdraw" : "Request pending · Tap to cancel"}</>
 
-            ) : joined && !isPaid ? (
-              <><Check className="h-4 w-4" /> You're in · Tap to leave</>
-            ) : spotsLeft <= 0 ? (
-              <>Full</>
-            ) : isPaid ? (
-              <><CreditCard className="h-4 w-4" /> Pay host · ${fee.toFixed(2)}</>
-            ) : requiresApproval ? (
-              <>Request to join · {spotsLeft} spot{spotsLeft === 1 ? "" : "s"} left</>
-            ) : (
-              <>Join free · {spotsLeft} spot{spotsLeft === 1 ? "" : "s"} left</>
-            )}
-          </motion.button>
+              ) : joined && !isPaid ? (
+                <><Check className="h-4 w-4" /> You're in · Tap to leave</>
+              ) : spotsLeft <= 0 ? (
+                <>Full</>
+              ) : requiresApproval && !isApproved ? (
+                <>Request to join · {spotsLeft} spot{spotsLeft === 1 ? "" : "s"} left</>
+              ) : isPaid ? (
+                <><CreditCard className="h-4 w-4" /> Pay host · ${fee.toFixed(2)}</>
+              ) : (
+                <>Join free · {spotsLeft} spot{spotsLeft === 1 ? "" : "s"} left</>
+              )}
+            </motion.button>
+          )}
+        </div>
+      </div>
+
+      {isHost && editOpen && (
+        <EditGameModal game={game} onClose={() => setEditOpen(false)} />
+      )}
+    </div>
+  );
+}
+
+function EditGameModal({ game, onClose }: { game: Game; onClose: () => void }) {
+  const [title, setTitle] = useState(game.title);
+  const [location, setLocation] = useState(game.location);
+  const [dateLocal, setDateLocal] = useState(() => {
+    const d = new Date(game.date);
+    const pad = (n: number) => String(n).padStart(2, "0");
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  });
+  const [maxPlayers, setMaxPlayers] = useState(String(game.maxPlayers));
+  const [price, setPrice] = useState(String(game.price));
+  const [description, setDescription] = useState(game.description);
+
+  const save = () => {
+    const mp = Math.max(2, Math.min(200, Number(maxPlayers) || game.maxPlayers));
+    const pr = Math.max(0, Number(price) || 0);
+    const iso = new Date(dateLocal).toISOString();
+    const updated = updateHostedGame(game.id, {
+      title: title.trim() || game.title,
+      location: location.trim() || game.location,
+      date: Number.isFinite(new Date(dateLocal).getTime()) ? iso : game.date,
+      maxPlayers: mp,
+      price: pr,
+      description,
+    });
+    if (!updated) { toast.error("This game can't be edited here."); return; }
+    toast.success("Game updated.");
+    onClose();
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 bg-background/80 backdrop-blur-sm grid place-items-center p-4" role="dialog" aria-modal="true">
+      <div className="w-full max-w-md rounded-2xl border border-border bg-surface p-4 max-h-[85vh] overflow-y-auto">
+        <div className="flex items-center justify-between">
+          <h2 className="font-display text-lg font-bold">Edit game</h2>
+          <button onClick={onClose} className="grid h-9 w-9 place-items-center rounded-full border border-border" aria-label="Close">
+            <XIcon className="h-4 w-4" />
+          </button>
+        </div>
+        <div className="mt-3 space-y-3">
+          <Field label="Title"><input value={title} onChange={(e) => setTitle(e.target.value)} className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm" /></Field>
+          <Field label="Location"><input value={location} onChange={(e) => setLocation(e.target.value)} className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm" /></Field>
+          <Field label="Date & time"><input type="datetime-local" value={dateLocal} onChange={(e) => setDateLocal(e.target.value)} className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm" /></Field>
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="Max players"><input type="number" min={2} value={maxPlayers} onChange={(e) => setMaxPlayers(e.target.value)} className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm" /></Field>
+            <Field label="Price ($)"><input type="number" min={0} step="0.01" value={price} onChange={(e) => setPrice(e.target.value)} className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm" /></Field>
+          </div>
+          <Field label="Description"><textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={3} className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm" /></Field>
+        </div>
+        <div className="mt-4 flex items-center gap-2">
+          <button onClick={onClose} className="flex-1 rounded-xl border border-border bg-background py-2.5 text-sm font-semibold">Cancel</button>
+          <button onClick={save} className="flex-1 rounded-xl bg-lime-gradient py-2.5 text-sm font-bold text-primary-foreground">Save changes</button>
         </div>
       </div>
     </div>
+  );
+}
+
+function fmtTs(ts: string | null | undefined) {
+  if (!ts) return "";
+  try {
+    return new Date(ts).toLocaleString(undefined, {
+      month: "short", day: "numeric", hour: "numeric", minute: "2-digit",
+    });
+  } catch { return ""; }
+}
+
+type TimelineState = "done" | "current" | "pending" | "failed" | "skipped";
+
+function PaymentStatusTimeline({
+  requiresApproval, isPaid, fee, myReq, latestSub, isConfirmed, joined,
+}: {
+  requiresApproval: boolean;
+  isPaid: boolean;
+  fee: number;
+  myReq: JoinRequest | null;
+  latestSub: PaymentSubmission | undefined;
+  isConfirmed: boolean;
+  joined: boolean;
+}) {
+  type Step = {
+    key: string;
+    label: string;
+    detail?: string;
+    ts?: string | null;
+    state: TimelineState;
+  };
+  const steps: Step[] = [];
+
+  // 1) Requested (only if approval-gated)
+  if (requiresApproval) {
+    const st: TimelineState = myReq
+      ? myReq.status === "rejected" ? "failed" : "done"
+      : "current";
+    steps.push({
+      key: "requested",
+      label: myReq?.status === "rejected" ? "Request declined" : "Request sent",
+      detail: myReq?.status === "rejected" ? (myReq.reviewer_notes || "Host declined this request.") : undefined,
+      ts: myReq?.created_at,
+      state: st,
+    });
+
+    // 2) Approved by host
+    const approved = myReq?.status === "approved";
+    const approvalState: TimelineState =
+      myReq?.status === "rejected" ? "skipped" :
+      approved ? "done" :
+      myReq ? "current" : "pending";
+    steps.push({
+      key: "approved",
+      label: approved ? "Approved by host" : "Awaiting host approval",
+      ts: approved ? myReq?.reviewed_at : null,
+      state: approvalState,
+    });
+  }
+
+  // 3) Payment steps (only if paid game)
+  if (isPaid) {
+    const canPayYet = !requiresApproval || myReq?.status === "approved";
+    const subState: TimelineState =
+      latestSub
+        ? latestSub.status === "rejected" ? "failed" : "done"
+        : canPayYet ? "current" : "pending";
+    steps.push({
+      key: "payHost",
+      label: latestSub ? "Payment submitted" : `Pay host · $${fee.toFixed(2)}`,
+      detail: latestSub?.status === "rejected"
+        ? (latestSub.reviewer_notes || "Host rejected this payment. Submit again.")
+        : latestSub
+        ? "Awaiting host verification."
+        : undefined,
+      ts: latestSub?.submitted_at,
+      state: subState,
+    });
+
+    // 4) Confirmed / verified
+    const verified = latestSub?.status === "verified";
+    const confState: TimelineState =
+      latestSub?.status === "rejected" ? "skipped" :
+      verified ? "done" :
+      latestSub ? "current" : "pending";
+    steps.push({
+      key: "confirmed",
+      label: verified ? "Confirmed — you're in" : "Awaiting confirmation",
+      ts: verified ? latestSub?.reviewed_at : null,
+      state: confState,
+    });
+  } else if (!requiresApproval && joined) {
+    steps.push({ key: "joined", label: "You're in", ts: null, state: "done" });
+  } else if (isConfirmed && !isPaid) {
+    steps.push({ key: "joined", label: "You're in", ts: null, state: "done" });
+  }
+
+  if (steps.length === 0) return null;
+
+  return (
+    <div className="rounded-3xl border border-border bg-surface p-4">
+      <div className="flex items-center justify-between mb-3">
+        <div className="font-display text-sm font-bold">Your progress</div>
+        <div className="text-[10px] uppercase tracking-wider text-muted-foreground">
+          {steps.filter((s) => s.state === "done").length} / {steps.length}
+        </div>
+      </div>
+      <ol className="relative">
+        {steps.map((s, i) => {
+          const isLast = i === steps.length - 1;
+          const dotClass =
+            s.state === "done" ? "bg-lime border-lime text-primary-foreground" :
+            s.state === "current" ? "bg-coral/20 border-coral text-coral animate-pulse" :
+            s.state === "failed" ? "bg-coral border-coral text-primary-foreground" :
+            s.state === "skipped" ? "bg-background border-border text-muted-foreground/50" :
+            "bg-background border-border text-muted-foreground";
+          const lineClass =
+            s.state === "done" ? "bg-lime/60" :
+            s.state === "failed" ? "bg-coral/60" :
+            "bg-border";
+          const labelClass =
+            s.state === "skipped" ? "text-muted-foreground/60 line-through" :
+            s.state === "failed" ? "text-coral" :
+            s.state === "done" ? "text-foreground" :
+            s.state === "current" ? "text-foreground" :
+            "text-muted-foreground";
+          return (
+            <li key={s.key} className="flex gap-3 pb-4 last:pb-0 relative">
+              <div className="flex flex-col items-center">
+                <div className={`grid h-6 w-6 place-items-center rounded-full border ${dotClass}`}>
+                  {s.state === "done" ? <Check className="h-3.5 w-3.5" /> :
+                   s.state === "failed" ? <XIcon className="h-3.5 w-3.5" /> :
+                   s.state === "current" ? <Clock className="h-3 w-3" /> :
+                   <span className="h-1.5 w-1.5 rounded-full bg-current" />}
+                </div>
+                {!isLast && <div className={`w-px flex-1 mt-1 ${lineClass}`} />}
+              </div>
+              <div className="flex-1 min-w-0 pb-1">
+                <div className="flex items-baseline justify-between gap-2">
+                  <div className={`text-sm font-semibold ${labelClass}`}>{s.label}</div>
+                  {s.ts && (
+                    <div className="text-[10px] text-muted-foreground shrink-0">{fmtTs(s.ts)}</div>
+                  )}
+                </div>
+                {s.detail && (
+                  <p className={`text-xs mt-0.5 ${s.state === "failed" ? "text-coral/80" : "text-muted-foreground"}`}>{s.detail}</p>
+                )}
+              </div>
+            </li>
+          );
+        })}
+      </ol>
+    </div>
+  );
+}
+
+
+function Field({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <label className="block">
+      <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1">{label}</div>
+      {children}
+    </label>
   );
 }
 
@@ -636,6 +1110,140 @@ function Meta({ icon, label, value }: { icon: React.ReactNode; label: string; va
     </div>
   );
 }
+
+function RosterPlayerRow({ req, gameTitle, feeRequired, onChange }: { req: JoinRequest; gameTitle: string; feeRequired: boolean; onChange: () => void }) {
+  const [busy, setBusy] = useState(false);
+  const [name, setName] = useState<string>("Player");
+  const [initials, setInitials] = useState<string>("P");
+  const [paymentStatus, setPaymentStatus] = useState<"verified" | "pending" | "rejected" | "none">("none");
+  const reviews = useReviewsFor(req.player_id);
+  const rep = useMemo(() => computeReputation(reviews, "player"), [reviews]);
+  const reliability = rep.criteriaAverages.find((c) => c.key === "reliability")?.avg ?? 0;
+  const sportsmanship = rep.criteriaAverages.find((c) => c.key === "sportsmanship")?.avg ?? 0;
+
+  useEffect(() => {
+    let cancel = false;
+    const loadPayment = async () => {
+      const { data } = await supabase
+        .from("payment_submissions")
+        .select("status")
+        .eq("game_id", req.game_id)
+        .eq("player_id", req.player_id)
+        .order("submitted_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (cancel) return;
+      const s = (data as any)?.status;
+      setPaymentStatus(s === "verified" || s === "pending" || s === "rejected" ? s : "none");
+    };
+    (async () => {
+      const profRes = await supabase.from("profiles").select("display_name, avatar_initials").eq("id", req.player_id).maybeSingle();
+      if (!cancel) {
+        const d = profRes.data as any;
+        if (d) {
+          const n = d.display_name ?? "Player";
+          setName(n);
+          setInitials((d.avatar_initials ?? n.slice(0, 2)).toUpperCase());
+        }
+      }
+      await loadPayment();
+    })();
+
+    // Realtime: update paid chip immediately when this player's submission for this game changes.
+    const channel = supabase
+      .channel(`payment_submissions:${req.game_id}:${req.player_id}`)
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "payment_submissions", filter: `player_id=eq.${req.player_id}` },
+        (payload) => {
+          const row = (payload.new ?? payload.old) as any;
+          if (row?.game_id && row.game_id !== req.game_id) return;
+          loadPayment();
+        },
+      )
+      .subscribe();
+
+    return () => { cancel = true; supabase.removeChannel(channel); };
+  }, [req.player_id, req.game_id]);
+
+  const remove = async () => {
+    if (!confirm(`Remove ${name} from ${gameTitle}?`)) return;
+    setBusy(true);
+    try {
+      await reviewJoinRequest(req.id, "rejected", "Removed by host");
+      await createNotification({
+        user_id: req.player_id,
+        type: "join_declined",
+        title: `Removed from ${gameTitle}`,
+        body: "The host removed you from this game.",
+        link: `/games/${req.game_id}`,
+      });
+      toast.success(`${name} removed.`);
+      onChange();
+    } catch (e: any) { toast.error(e.message ?? "Could not remove."); }
+    finally { setBusy(false); }
+  };
+
+  const fmt = (n: number) => (n > 0 ? n.toFixed(1) : "—");
+  const paymentChip = !feeRequired
+    ? null
+    : paymentStatus === "verified"
+      ? { label: "Paid", cls: "border-lime/40 bg-lime/10 text-lime" }
+      : paymentStatus === "pending"
+        ? { label: "Payment pending", cls: "border-coral/40 bg-coral/10 text-coral" }
+        : paymentStatus === "rejected"
+          ? { label: "Payment rejected", cls: "border-coral/50 bg-coral/15 text-coral" }
+          : { label: "Unpaid", cls: "border-border bg-secondary text-muted-foreground" };
+
+  return (
+    <div className="rounded-2xl border border-lime/30 bg-surface p-3">
+      <div className="flex items-center gap-3">
+        <Link
+          to="/players/$userId"
+          params={{ userId: req.player_id }}
+          className="grid h-10 w-10 place-items-center rounded-full bg-lime-gradient text-xs font-bold text-primary-foreground"
+        >
+          {initials.slice(0, 2)}
+        </Link>
+        <div className="min-w-0 flex-1">
+          <div className="text-sm font-semibold truncate">{name}</div>
+          <div className="text-[11px] text-muted-foreground">
+            {rep.count > 0 ? `${rep.count} review${rep.count === 1 ? "" : "s"} · trust ${rep.trustScore}` : "No reviews yet"}
+          </div>
+        </div>
+        <button
+          type="button"
+          onClick={remove}
+          disabled={busy}
+          className="inline-flex items-center gap-1 rounded-full border border-coral/40 bg-coral/10 px-3 py-1.5 text-xs font-bold text-coral disabled:opacity-50"
+        >
+          <XIcon className="h-3.5 w-3.5" /> Remove
+        </button>
+      </div>
+      <div className="mt-2 flex flex-wrap items-center gap-1.5">
+        <span className="inline-flex items-center gap-1 rounded-full border border-border bg-background px-2 py-0.5 text-[10px] font-semibold">
+          <Clock className="h-3 w-3 text-muted-foreground" />
+          Reliability {fmt(reliability)}
+        </span>
+        <span className="inline-flex items-center gap-1 rounded-full border border-border bg-background px-2 py-0.5 text-[10px] font-semibold">
+          <Star className="h-3 w-3 text-muted-foreground" />
+          Sportsmanship {fmt(sportsmanship)}
+        </span>
+        <span className="inline-flex items-center gap-1 rounded-full border border-lime/40 bg-lime/10 px-2 py-0.5 text-[10px] font-bold text-lime">
+          <Check className="h-3 w-3" /> Approved
+        </span>
+        {paymentChip && (
+          <span className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-bold ${paymentChip.cls}`}>
+            <CreditCard className="h-3 w-3" /> {paymentChip.label}
+          </span>
+        )}
+      </div>
+    </div>
+  );
+}
+
+
+
 
 function HostRequestRow({ req, gameTitle, onChange }: { req: JoinRequest; gameTitle: string; onChange: () => void }) {
   const [busy, setBusy] = useState(false);

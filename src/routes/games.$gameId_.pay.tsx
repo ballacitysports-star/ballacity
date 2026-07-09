@@ -1,18 +1,21 @@
-import { createFileRoute, Link, notFound, useNavigate } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ArrowLeft, ExternalLink, Upload, ShieldCheck, Clock, X } from "lucide-react";
 import { toast } from "sonner";
 import { GAMES } from "@/lib/sample-data";
+import { useHostedGames } from "@/lib/hosted-games-store";
 import { useAuth } from "@/hooks/use-auth";
+import { supabase } from "@/integrations/supabase/client";
 import {
-  type GamePaymentSettings, type PaymentMethod, type PaymentSubmission, paymentTypeMeta,
+  type GamePaymentSettings, type PaymentMethod, type PaymentSubmission, type JoinRequest, paymentTypeMeta,
   getGamePaymentSettings, listPaymentMethodsForHost,
   uploadProofScreenshot, createPaymentSubmission, listMySubmissionsForGame,
+  getMyJoinRequest,
 } from "@/lib/payments";
 import { LegalNotice } from "@/components/LegalNotice";
 import { joinGame } from "@/lib/games-store";
 
-export const Route = createFileRoute("/games/$gameId/pay")({
+export const Route = createFileRoute("/games/$gameId_/pay")({
   validateSearch: (search: Record<string, unknown>) => {
     const out: { invite?: true; from?: string } = {};
     if (search.invite === "1" || search.invite === 1 || search.invite === true) out.invite = true;
@@ -20,11 +23,9 @@ export const Route = createFileRoute("/games/$gameId/pay")({
     return out;
   },
   loader: ({ params }) => {
-    const game = GAMES.find((g) => g.id === params.gameId);
-    if (!game) throw notFound();
-    return { game };
+    return { gameId: params.gameId };
   },
-  head: ({ loaderData }) => ({ meta: [{ title: `Pay for ${loaderData?.game.title ?? "game"} — OpenRun` }] }),
+  head: () => ({ meta: [{ title: "Pay game fee — OpenRun" }] }),
   notFoundComponent: () => <div className="p-6 text-center text-sm">Game not found.</div>,
   errorComponent: ({ reset }) => (
     <div className="p-6 text-center"><button onClick={reset} className="text-lime font-bold">Try again</button></div>
@@ -33,23 +34,44 @@ export const Route = createFileRoute("/games/$gameId/pay")({
 });
 
 function PayPage() {
-  const { game } = Route.useLoaderData();
+  const { gameId } = Route.useLoaderData();
   const { user, loading } = useAuth();
+  const hosted = useHostedGames();
+  const game = useMemo(
+    () => hosted.find((g) => g.id === gameId) ?? GAMES.find((g) => g.id === gameId),
+    [hosted, gameId],
+  );
   const nav = useNavigate();
   const [settings, setSettings] = useState<GamePaymentSettings | null>(null);
   const [methods, setMethods] = useState<PaymentMethod[]>([]);
   const [picked, setPicked] = useState<PaymentMethod | null>(null);
   const [mySubs, setMySubs] = useState<PaymentSubmission[]>([]);
+  const [myReq, setMyReq] = useState<JoinRequest | null>(null);
   const [fetching, setFetching] = useState(true);
 
   useEffect(() => {
     if (!loading && !user) nav({ to: "/auth" });
   }, [loading, user, nav]);
 
+  const refreshJoinRequest = useCallback(async () => {
+    if (!user || !game) return;
+    try {
+      const req = await getMyJoinRequest(game.id);
+      setMyReq((prev) => {
+        // Toast on approval transition (pending/rejected/none → approved).
+        if (req?.status === "approved" && prev?.status !== "approved") {
+          toast.success("You're approved! You can pay now.");
+        }
+        return req;
+      });
+    } catch { /* ignore polling errors */ }
+  }, [game, user]);
+
   useEffect(() => {
     let cancelled = false;
     (async () => {
       try {
+        if (!game) return;
         const s = await getGamePaymentSettings(game.id);
         if (cancelled) return;
         setSettings(s);
@@ -62,19 +84,78 @@ function PayPage() {
           setMethods(filtered);
         }
         if (user) {
-          const subs = await listMySubmissionsForGame(game.id);
+          const [subs, req] = await Promise.all([
+            listMySubmissionsForGame(game.id),
+            getMyJoinRequest(game.id),
+          ]);
           if (cancelled) return;
           setMySubs(subs);
+          setMyReq(req);
         }
       } catch (e: any) { toast.error(e.message); } finally { if (!cancelled) setFetching(false); }
     })();
     return () => { cancelled = true; };
-  }, [game.id, user]);
+  }, [game, user]);
+
+  // Live-update the join-request status so the approval gate flips to the
+  // payment picker the moment the host approves. Realtime is primary;
+  // a slow poll and refetch-on-focus cover any dropped websocket frames.
+  const refreshRef = useRef(refreshJoinRequest);
+  useEffect(() => { refreshRef.current = refreshJoinRequest; }, [refreshJoinRequest]);
+  useEffect(() => {
+    if (!user || !game) return;
+    const channel = supabase
+      .channel(`pay-join-req:${game.id}:${user.id}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "join_requests",
+          filter: `player_id=eq.${user.id}`,
+        },
+        (payload) => {
+          const row = (payload.new ?? payload.old) as JoinRequest | undefined;
+          if (row?.game_id === game.id) refreshRef.current();
+        },
+      )
+      .subscribe();
+
+    const poll = window.setInterval(() => refreshRef.current(), 15_000);
+    const onFocus = () => refreshRef.current();
+    window.addEventListener("focus", onFocus);
+    const onVisibility = () => { if (document.visibilityState === "visible") refreshRef.current(); };
+    document.addEventListener("visibilitychange", onVisibility);
+
+    return () => {
+      supabase.removeChannel(channel);
+      window.clearInterval(poll);
+      window.removeEventListener("focus", onFocus);
+      document.removeEventListener("visibilitychange", onVisibility);
+    };
+  }, [game, user]);
 
   if (loading || fetching) return <div className="p-6 text-sm text-muted-foreground">Loading…</div>;
   if (!user) return null;
+  if (!game) {
+    return (
+      <div className="min-h-dvh grid place-items-center px-6 text-center">
+        <div>
+          <h1 className="font-display text-2xl font-bold">Game not found</h1>
+          <p className="text-sm text-muted-foreground mt-2">It may have wrapped up or been cancelled.</p>
+          <Link to="/feed" className="inline-block mt-5 rounded-full bg-lime px-5 py-2.5 text-sm font-bold text-primary-foreground">
+            Back to feed
+          </Link>
+        </div>
+      </div>
+    );
+  }
 
   const fee = settings?.entry_fee ?? game.price;
+  const requiresApproval = !!settings?.requires_approval;
+  const isApproved = myReq?.status === "approved";
+  const approvalGateActive = requiresApproval && !isApproved;
+  const hostId = settings?.host_id ?? game.hostUserId ?? null;
 
   return (
     <div className="mx-auto max-w-md px-4 pt-6 pb-32">
@@ -100,11 +181,78 @@ function PayPage() {
 
       {mySubs.length > 0 && <MySubsList subs={mySubs} />}
 
-      {!settings || methods.length === 0 ? (
-        <div className="rounded-2xl border border-dashed border-border bg-surface/40 p-5 text-center">
-          <div className="font-semibold text-sm">Host hasn't configured payment yet</div>
-          <p className="text-xs text-muted-foreground mt-1">Reach out to the host directly to arrange payment.</p>
+      {requiresApproval && (myReq?.status === "pending" || myReq?.status === "approved") && (
+        <div
+          data-testid="approval-status-indicator"
+          data-status={myReq.status}
+          role="status"
+          aria-live="polite"
+          aria-atomic="true"
+          className={`mb-3 inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-bold transition-colors ${
+            myReq.status === "approved"
+              ? "border-lime/40 bg-lime/10 text-lime"
+              : "border-coral/40 bg-coral/10 text-coral"
+          }`}
+        >
+          {myReq.status === "approved" ? (
+            <>
+              <ShieldCheck className="h-3.5 w-3.5" aria-hidden="true" />
+              <span>Approved — you can pay now</span>
+            </>
+          ) : (
+            <>
+              <Clock className="h-3.5 w-3.5 animate-pulse" aria-hidden="true" />
+              <span>Approval pending — waiting on host</span>
+            </>
+          )}
         </div>
+      )}
+
+
+
+      {approvalGateActive ? (
+        <div
+          className="rounded-2xl border border-coral/40 bg-coral/10 p-5"
+          role="status"
+          aria-live="polite"
+          data-testid="approval-required-gate"
+        >
+          <div className="flex items-center gap-2 font-display text-sm font-bold">
+            <Clock className="h-4 w-4 text-coral" /> Waiting on host approval
+          </div>
+          <p className="text-xs text-muted-foreground mt-1">
+            {myReq?.status === "pending"
+              ? "Your request to join is pending. Payment unlocks after the host approves you."
+              : myReq?.status === "rejected"
+              ? "The host declined your request. You can't submit payment for this game."
+              : "This host reviews every player before payment. Send a request to join first."}
+          </p>
+          <Link
+            to="/games/$gameId"
+            params={{ gameId: game.id }}
+            className="mt-3 inline-flex items-center rounded-full bg-lime-gradient px-4 py-1.5 text-xs font-bold text-primary-foreground"
+          >
+            {myReq ? "Back to game" : "Request to join"}
+          </Link>
+        </div>
+      ) : !hostId ? (
+        <div className="rounded-2xl border border-dashed border-border bg-surface/40 p-5 text-center">
+          <div className="font-semibold text-sm">Payment is not ready yet</div>
+          <p className="text-xs text-muted-foreground mt-1">Reach out to the host directly to arrange this game fee.</p>
+        </div>
+      ) : methods.length === 0 ? (
+        <PaymentInstructionsAndProof
+          game_id={game.id}
+          host_id={hostId}
+          method={null}
+          extraInstructions={settings?.payment_instructions ?? null}
+          onCancel={() => nav({ to: "/games/$gameId", params: { gameId: game.id } })}
+          onSubmitted={async () => {
+            joinGame(game.id);
+            const subs = await listMySubmissionsForGame(game.id);
+            setMySubs(subs);
+          }}
+        />
       ) : !picked ? (
         <>
           <h2 className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2">Pay host using</h2>
@@ -127,9 +275,9 @@ function PayPage() {
       ) : (
         <PaymentInstructionsAndProof
           game_id={game.id}
-          host_id={settings.host_id}
+          host_id={hostId}
           method={picked}
-          extraInstructions={settings.payment_instructions}
+          extraInstructions={settings?.payment_instructions ?? null}
           onCancel={() => setPicked(null)}
           onSubmitted={async () => {
             joinGame(game.id);
@@ -177,10 +325,10 @@ function MySubsList({ subs }: { subs: PaymentSubmission[] }) {
 function PaymentInstructionsAndProof({
   game_id, host_id, method, extraInstructions, onCancel, onSubmitted,
 }: {
-  game_id: string; host_id: string; method: PaymentMethod;
+  game_id: string; host_id: string; method: PaymentMethod | null;
   extraInstructions: string | null; onCancel: () => void; onSubmitted: () => void;
 }) {
-  const meta = paymentTypeMeta(method.payment_type);
+  const meta = method ? paymentTypeMeta(method.payment_type) : paymentTypeMeta("cash");
   const [file, setFile] = useState<File | null>(null);
   const [ref, setRef] = useState("");
   const [notes, setNotes] = useState("");
@@ -194,8 +342,8 @@ function PaymentInstructionsAndProof({
       if (file) path = await uploadProofScreenshot(file);
       await createPaymentSubmission({
         game_id, host_id,
-        payment_method_id: method.id,
-        payment_type: method.payment_type,
+        payment_method_id: method?.id ?? null,
+        payment_type: method?.payment_type ?? "cash",
         screenshot_path: path,
         transaction_reference: ref || null,
         notes: notes || null,
@@ -211,23 +359,26 @@ function PaymentInstructionsAndProof({
         <div className="flex items-center gap-3 mb-3">
           <div className="grid h-10 w-10 place-items-center rounded-xl bg-secondary text-lg">{meta.emoji}</div>
           <div>
-            <div className="font-bold text-sm">{meta.name}</div>
-            <div className="text-xs text-muted-foreground">Send directly to host</div>
+            <div className="font-bold text-sm">{method ? meta.name : "Pay host directly"}</div>
+            <div className="text-xs text-muted-foreground">
+              {method ? "Send directly to host" : "Use the arrangement the host shared, then submit proof"}
+            </div>
           </div>
           <button onClick={onCancel} className="ml-auto text-muted-foreground"><X className="h-4 w-4" /></button>
         </div>
-        {method.username && <Field label="Send to" value={method.username} />}
-        {method.contact_info && <Field label="Contact" value={method.contact_info} />}
-        {method.payment_url && (
+        {method?.username && <Field label="Send to" value={method.username} />}
+        {method?.contact_info && <Field label="Contact" value={method.contact_info} />}
+        {method?.payment_url && (
           <a href={method.payment_url} target="_blank" rel="noreferrer"
             className="mt-2 flex items-center justify-center gap-2 w-full rounded-xl bg-lime-gradient py-3 text-sm font-bold text-primary-foreground">
             <ExternalLink className="h-4 w-4" /> Open {meta.name}
           </a>
         )}
-        {(method.instructions || extraInstructions) && (
+        {(method?.instructions || extraInstructions || !method) && (
           <div className="mt-3 rounded-xl bg-background p-3 text-xs text-muted-foreground space-y-1">
-            {method.instructions && <p>{method.instructions}</p>}
+            {method?.instructions && <p>{method.instructions}</p>}
             {extraInstructions && <p>{extraInstructions}</p>}
+            {!method && !extraInstructions && <p>Confirm payment details with the host, then submit a screenshot, transaction ID, or note for verification.</p>}
           </div>
         )}
       </div>

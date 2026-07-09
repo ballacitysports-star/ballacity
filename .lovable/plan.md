@@ -1,57 +1,27 @@
-## Scope
+## Why hosted games disappear
 
-Fix four broken/missing flows. Each touches the database + UI.
+Hosted games live only in browser `localStorage` (`openrun.hostedGames.v1`). Nothing in the app removes them, but the preview iframe / partitioned storage can wipe that key silently. When it does, every screen that reads `useHostedGames()` (Feed, Discover, Profile, Players → Invite) goes empty — which matches what you're seeing.
 
-## 1. Notifications bell (header alert button)
+Fix: give hosted games a real home in the database. Keep localStorage only as an offline cache that heals itself from the DB on load.
 
-- Audit current bell icon usage in the header / bottom nav; make it a real `<Link to="/notifications">` (mapped to `_tabs.notifications.tsx`).
-- Build a `notifications` table (id, user_id, type, title, body, link, read_at, created_at) with RLS scoping to `auth.uid()`.
-- Realtime subscription on the bell to show an unread dot/count.
-- Notifications list page reads from the table, marks as read on click, deep-links to the related game/request/message.
+## What I'll build
 
-## 2. Host approve/decline pickups (join requests)
+1. **New `hosted_games` table** (backend)
+   - Columns mirror the local `Game` shape needed for display: `id text pk`, `host_id uuid`, `sport`, `title`, `date timestamptz`, `duration`, `location`, `neighborhood`, `lat`, `lng`, `max_players`, `skill`, `price`, `indoor`, `is_private`, `description`, `equipment text[]`, `image text`, `status`, `joins_closed`, `host_snapshot jsonb`, `created_at`, `updated_at`.
+   - RLS: hosts read/write their own rows; everyone signed in can `SELECT` (games are shown publicly in feed today). GRANTs on `authenticated` + `service_role`, `SELECT` on `anon` so signed-out home/feed still shows them.
+   - `updated_at` trigger using the existing `touch_updated_at()` function.
 
-Join requests already exist in DB (`join_requests` table + RLS). What's missing is UI.
+2. **Rewrite `src/lib/hosted-games-store.ts`**
+   - On first use (and on auth change), fetch the signed-in user's + all public hosted games from `hosted_games` and hydrate the in-memory cache + localStorage mirror.
+   - `addHostedGame` / `updateHostedGame` / `claimHostedGame` write to Supabase, then update local cache. Local write happens first for optimistic UI; DB error → toast + rollback.
+   - Realtime subscription on `hosted_games` so other tabs / devices stay in sync.
+   - `localStorage` becomes a warm cache only — if it gets wiped, the next fetch repopulates it. Games never vanish again.
 
-- **Per-game section** on `games.$gameId.tsx`: if viewer is host, show pending join requests with Approve / Decline buttons + reviewer notes input.
-- **Host dashboard route** `/host/requests` listing all pending requests across the host's games (filter tabs: Pending / Approved / Rejected).
-- On approve/decline, insert a row into `notifications` for the player ("Your request to join X was approved/declined"), so the bell lights up.
-- Approved players auto-added to the game roster.
+3. **Migrate existing localStorage games** on first load per user (one-shot flag), pushing anything with no `hostUserId` into the DB stamped with the current user's id (piggybacks on existing `runLegacyHostMigration` pattern).
 
-## 3. Messaging (build from scratch)
-
-- New tables:
-  - `conversations` (id, created_at, last_message_at, context game_id nullable)
-  - `conversation_participants` (conversation_id, user_id) — used for RLS membership
-  - `messages` (id, conversation_id, sender_id, body, created_at, read_at)
-- RLS: only participants can read/insert in a conversation.
-- Realtime on `messages` for live updates.
-- UI:
-  - `/messages` — inbox list (sorted by last_message_at).
-  - `/messages/$conversationId` — thread view with composer.
-  - "Message host" button on game detail page → finds-or-creates a 1:1 conversation, navigates to thread.
-- New-message arriving → notification row for the recipient.
-
-## 4. Payment feature
-
-The "Pay" CTA on the game detail page doesn't route to payment info. Fix:
-
-- Audit `games.$gameId.tsx`: the Pay button should `<Link to="/games/$gameId/pay">` (route already exists at `games.$gameId.pay.tsx`).
-- If the host has no `game_payment_settings` yet, surface the existing empty-state instead of failing silently.
-- Host-side: ensure the "Set up payments" entry point on a hosted game routes to `games.$gameId.payment-setup.tsx`.
-- Verify the join → pay → submit-proof flow end-to-end once routed.
-
-## Tech notes
-
-- All new tables: explicit `GRANT` to `authenticated` + `service_role`, RLS enabled, policies scoped to `auth.uid()`.
-- Realtime via `ALTER PUBLICATION supabase_realtime ADD TABLE ...` for `messages` and `notifications`.
-- All data access from client uses the browser `supabase` client (RLS-scoped); no server functions needed for this scope.
-- No new design tokens; reuse existing `lime` / `coral` / `surface` styles.
+4. **No UI changes.** The `useHostedGames()` hook keeps the same signature, so `_tabs.feed.tsx`, `_tabs.discover.tsx`, `_tabs.profile.tsx`, `_tabs.players.tsx`, `games.$gameId.tsx`, and `_tabs.create.tsx` don't need edits beyond `addHostedGame` becoming async where it's awaited (only the create form).
 
 ## Out of scope
 
-- Push notifications (browser/native) — in-app only.
-- Group chat (only 1:1 for now).
-- Editing/deleting sent messages.
-
-Shall I proceed?
+- No changes to sample `GAMES`, join flow, payment flow, or roster panel.
+- No changes to auth or route structure.
