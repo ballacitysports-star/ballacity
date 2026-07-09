@@ -1,6 +1,4 @@
 import { useMemo, useSyncExternalStore } from "react";
-import { bumpHostedGameJoined } from "@/lib/hosted-games-store";
-
 
 const joined = new Set<string>();
 const listeners = new Set<() => void>();
@@ -49,22 +47,17 @@ function subscribe(cb: () => void) {
 
 export function joinGame(id: string) {
   loadJoinedGames();
-  if (joined.has(id)) return;
   joined.add(id);
   saveJoinedGames();
   emit();
-  bumpHostedGameJoined(id, +1);
 }
 
 export function leaveGame(id: string) {
   loadJoinedGames();
-  if (!joined.has(id)) return;
   joined.delete(id);
   saveJoinedGames();
   emit();
-  bumpHostedGameJoined(id, -1);
 }
-
 
 export function isJoined(id: string): boolean {
   loadJoinedGames();
