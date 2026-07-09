@@ -18,7 +18,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Toaster } from "@/components/ui/sonner";
 import { runLegacyHostMigration } from "@/lib/legacy-host-migration";
 import { useAuth } from "@/hooks/use-auth";
-import { savePostAuthRedirect, consumePostAuthRedirect } from "@/lib/post-auth-redirect";
+import { savePostAuthRedirect } from "@/lib/post-auth-redirect";
 import { useNotificationPush } from "@/lib/notifications";
 import { useOneSignal } from "@/lib/onesignal";
 
@@ -200,18 +200,6 @@ function AuthGate({ children }: { children: React.ReactNode }) {
       savePostAuthRedirect(`${pathname}${search}`);
       router.navigate({ to: "/auth", replace: true });
       return;
-    }
-    // If user is authenticated but sitting on an auth-only route, bounce
-    // into the app as soon as we know whether they need onboarding. Onboarding
-    // always wins over a saved destination; otherwise honor the saved path.
-    if (user && isAuthOnly) {
-      if (needsOnboarding === true) {
-        router.navigate({ to: "/onboarding", replace: true });
-      } else if (needsOnboarding === false) {
-        const target = consumePostAuthRedirect("/profile");
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        router.navigate({ to: target as any, replace: true });
-      }
     }
   }, [loading, user, isProtected, isAuthOnly, router, pathname, needsOnboarding]);
 
