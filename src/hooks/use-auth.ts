@@ -28,6 +28,7 @@ function initAuthStore() {
   initialized = true;
 
   supabase.auth.onAuthStateChange((event, session) => {
+    if (event === "INITIAL_SESSION" && !session) return;
     setAuthState({ session, user: session?.user ?? null, loading: false });
   });
 
@@ -87,6 +88,20 @@ export async function refreshAuth() {
   })();
 
   return refreshPromise;
+}
+
+export async function waitForAuthSession(timeoutMs = 5_000) {
+  const started = Date.now();
+  let lastState = await refreshAuth();
+  if (lastState.user) return lastState;
+
+  while (Date.now() - started < timeoutMs) {
+    await new Promise((resolve) => window.setTimeout(resolve, 150));
+    lastState = await refreshAuth();
+    if (lastState.user) return lastState;
+  }
+
+  return lastState;
 }
 
 export async function signOut() {
