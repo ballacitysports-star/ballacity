@@ -12,7 +12,7 @@
 
 const STORAGE_KEY = "openrun:postAuthRedirect";
 
-const BLOCKED_PREFIXES = ["/auth", "/oauth/", "/reset-password"];
+const BLOCKED_PREFIXES = ["/auth", "/oauth", "/reset-password"];
 
 export function isSafeRedirectPath(candidate: unknown): candidate is string {
   if (typeof candidate !== "string") return false;
@@ -21,9 +21,7 @@ export function isSafeRedirectPath(candidate: unknown): candidate is string {
   if (candidate.startsWith("//")) return false; // protocol-relative
   if (candidate.startsWith("/\\")) return false;
   for (const p of BLOCKED_PREFIXES) {
-    if (candidate === p || candidate.startsWith(`${p}/`) || candidate === `${p.replace(/\/$/, "")}`) {
-      return false;
-    }
+    if (candidate === p || candidate.startsWith(`${p}/`)) return false;
   }
   return true;
 }
