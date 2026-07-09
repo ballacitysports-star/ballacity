@@ -10,7 +10,6 @@ import {
   peekPostAuthRedirect,
   savePostAuthRedirect,
 } from "@/lib/post-auth-redirect";
-import { useAuth } from "@/hooks/use-auth";
 
 export const Route = createFileRoute("/auth")({
   head: () => ({ meta: [{ title: "Sign in — OpenRun" }] }),
