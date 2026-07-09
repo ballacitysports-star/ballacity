@@ -140,7 +140,7 @@ function AuthPage() {
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Sign-in failed");
     } finally {
-      setBusy(false);
+      setGoogleBusy(false);
     }
   };
 
