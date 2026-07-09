@@ -143,7 +143,7 @@ function OnboardingPage() {
         .eq("id", user.id);
       if (error) throw error;
       toast.success("You're all set!");
-      nav({ to: "/", replace: true });
+      nav({ to: "/profile", replace: true });
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Couldn't save profile");
     } finally {
