@@ -293,7 +293,7 @@ function AuthPage() {
           {googleStatus.kind === "waiting" && "Confirming your session…"}
         </div>
 
-        {(googleStatus.kind === "timeout" || googleStatus.kind === "error") && (
+        {!completingAuth && !session && (googleStatus.kind === "timeout" || googleStatus.kind === "error") && (
           <div
             role="alert"
             className="rounded-2xl border border-border bg-surface p-4 space-y-3"
