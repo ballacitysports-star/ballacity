@@ -98,7 +98,7 @@ function AuthPage() {
   };
 
   const oauth = async (provider: "google") => {
-    setBusy(true);
+    setGoogleBusy(true);
     try {
       try {
         sessionStorage.setItem("openrun:postAuthRedirect", "/profile");
