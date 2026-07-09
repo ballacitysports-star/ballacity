@@ -4,7 +4,7 @@ import { ArrowLeft } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { lovable } from "@/integrations/lovable";
-import { useAuth } from "@/hooks/use-auth";
+import { refreshAuth, useAuth } from "@/hooks/use-auth";
 
 export const Route = createFileRoute("/auth")({
   head: () => ({ meta: [{ title: "Sign in — OpenRun" }] }),
@@ -46,7 +46,9 @@ function AuthPage() {
           return;
         }
         if (data.session) {
+          await refreshAuth();
           toast.success("Account created!");
+          nav({ to: "/profile", replace: true });
         } else {
           toast.success("Check your email to confirm your account.");
         }
@@ -72,6 +74,8 @@ function AuthPage() {
           }
           throw error;
         }
+        await refreshAuth();
+        nav({ to: "/profile", replace: true });
       }
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Auth failed");
@@ -100,11 +104,14 @@ function AuthPage() {
     setBusy(true);
     try {
       const result = await lovable.auth.signInWithOAuth("google", {
-        redirect_uri: window.location.origin,
+        redirect_uri: `${window.location.origin}/auth`,
       });
       if (result.error) {
         toast.error(result.error.message || "Google sign-in failed");
+        return;
       }
+      await refreshAuth();
+      nav({ to: "/profile", replace: true });
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Google sign-in failed");
     } finally {
