@@ -4,6 +4,7 @@ import { ArrowLeft } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { lovable } from "@/integrations/lovable";
+import { getOAuthRedirectUri } from "@/lib/oauth-redirect";
 import { useAuth } from "@/hooks/use-auth";
 
 export const Route = createFileRoute("/auth")({
