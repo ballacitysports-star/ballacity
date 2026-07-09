@@ -212,14 +212,15 @@ function AuthPage() {
         // Full-page redirect is in flight — nothing more to do here.
         return;
       }
+      // Popup/web_message flow: session write happens asynchronously.
+      // Let the top-level onAuthStateChange / useAuth effect drive navigation,
+      // and only escalate to a timeout if nothing lands within 15s.
       setGoogleStatus({ kind: "waiting" });
-      const session = await waitForAuthSession({ timeoutMs: 4_000, intervalMs: 150 });
-      if (!session) {
-        setGoogleStatus({ kind: "timeout" });
-        return;
-      }
-      const target = await getPostSignInDestination(session);
-      window.location.assign(target);
+      clearTimeoutTimer();
+      timeoutTimerRef.current = window.setTimeout(() => {
+        if (!completingRef.current) setGoogleStatus({ kind: "timeout" });
+        timeoutTimerRef.current = null;
+      }, 15_000);
     } catch (err) {
       const message = err instanceof Error ? err.message : "Sign-in failed";
       setGoogleStatus({ kind: "error", message });
@@ -228,6 +229,7 @@ function AuthPage() {
       setGoogleBusy(false);
     }
   };
+
 
 
 
