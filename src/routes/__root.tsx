@@ -151,15 +151,41 @@ function maybeReloadForStaleChunk(reason: unknown) {
   window.location.reload();
 }
 
-const PUBLIC_ROUTES = ["/", "/index", "/auth", "/oauth/callback", "/reset-password"];
+const AUTH_ONLY_ROUTES = ["/auth", "/oauth/callback", "/reset-password"];
 const ONBOARDING_ROUTE = "/onboarding";
 const TAB_PATHS = ["/feed", "/players", "/teams", "/create", "/discover", "/profile", "/notifications", "/reels"];
+
+// Routes that require sign-in. Everything else is publicly viewable.
+// Signed-out visitors who try a protected path get bounced to /auth and
+// returned after login via savePostAuthRedirect.
+const PROTECTED_PREFIXES = [
+  "/account",
+  "/admin",
+  "/checkout",
+  "/messages",
+  "/payments",
+  "/settings",
+  "/onboarding",
+  "/notifications",
+  "/create",
+  "/profile/edit",
+  "/review/new",
+];
+function isProtectedPath(pathname: string): boolean {
+  if (PROTECTED_PREFIXES.some((p) => pathname === p || pathname.startsWith(`${p}/`))) return true;
+  if (/^\/teams\/create$/.test(pathname)) return true;
+  if (/^\/teams\/[^/]+\/edit$/.test(pathname)) return true;
+  if (/^\/games\/[^/]+\/(pay|payment-setup)$/.test(pathname)) return true;
+  return false;
+}
 
 function AuthGate({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const pathname = router.state.location.pathname;
   const { user, loading } = useAuth();
-  const isPublic = pathname === "/" || PUBLIC_ROUTES.some((p) => p !== "/" && (pathname === p || pathname.startsWith(`${p}/`)));
+  const isAuthOnly = AUTH_ONLY_ROUTES.includes(pathname);
+  const isProtected = isProtectedPath(pathname);
+  const isPublic = !isProtected && !isAuthOnly;
   const isTab = TAB_PATHS.includes(pathname);
   useNotificationPush();
   useOneSignal();
