@@ -12,7 +12,6 @@ const listeners = new Set<() => void>();
 const SERVER_AUTH_STATE: AuthState = { session: null, user: null, loading: true };
 let authState: AuthState = { session: null, user: null, loading: true };
 let initialized = false;
-let refreshPromise: Promise<AuthState> | null = null;
 
 function emit() {
   listeners.forEach((listener) => listener());
@@ -32,7 +31,26 @@ function initAuthStore() {
     setAuthState({ session, user: session?.user ?? null, loading: false });
   });
 
-  void refreshAuth();
+  supabase.auth.getUser().then(async ({ data, error }) => {
+    if (error || !data.user) {
+      const { data: sessionData } = await supabase.auth.getSession();
+      setAuthState({
+        session: sessionData.session,
+        user: sessionData.session?.user ?? null,
+        loading: false,
+      });
+      return;
+    }
+
+    const { data: sessionData } = await supabase.auth.getSession();
+    setAuthState({
+      session: sessionData.session,
+      user: data.user,
+      loading: false,
+    });
+  }).catch(() => {
+    setAuthState({ session: null, user: null, loading: false });
+  });
 }
 
 function subscribe(listener: () => void) {
@@ -53,60 +71,8 @@ export function useAuth() {
   return useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
 }
 
-export async function refreshAuth() {
-  if (typeof window === "undefined") return authState;
-  if (refreshPromise) return refreshPromise;
-
-  refreshPromise = (async () => {
-    try {
-      const { data: sessionData } = await supabase.auth.getSession();
-      const sessionUser = sessionData.session?.user ?? null;
-
-      if (!sessionUser) {
-        const next = { session: null, user: null, loading: false };
-        setAuthState(next);
-        return next;
-      }
-
-      setAuthState({ session: sessionData.session, user: sessionUser, loading: false });
-
-      const { data, error } = await supabase.auth.getUser();
-      const next = {
-        session: sessionData.session,
-        user: error ? sessionUser : data.user ?? sessionUser,
-        loading: false,
-      };
-      setAuthState(next);
-      return next;
-    } catch {
-      const next = { session: null, user: null, loading: false };
-      setAuthState(next);
-      return next;
-    } finally {
-      refreshPromise = null;
-    }
-  })();
-
-  return refreshPromise;
-}
-
-export async function waitForAuthSession(timeoutMs = 5_000) {
-  const started = Date.now();
-  let lastState = await refreshAuth();
-  if (lastState.user) return lastState;
-
-  while (Date.now() - started < timeoutMs) {
-    await new Promise((resolve) => window.setTimeout(resolve, 150));
-    lastState = await refreshAuth();
-    if (lastState.user) return lastState;
-  }
-
-  return lastState;
-}
-
 export async function signOut() {
   await supabase.auth.signOut();
-  setAuthState({ session: null, user: null, loading: false });
 }
 
 export async function getCurrentUser() {

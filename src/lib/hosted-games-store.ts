@@ -1,15 +1,8 @@
 import { useSyncExternalStore } from "react";
-import { toast } from "sonner";
 import type { Game, Sport } from "@/lib/sample-data";
 import { imageFor, ME } from "@/lib/sample-data";
 import { supabase } from "@/integrations/supabase/client";
 import type { TablesInsert, TablesUpdate } from "@/integrations/supabase/types";
-
-let currentUserId: string | null = null;
-if (typeof window !== "undefined") {
-  supabase.auth.getUser().then(({ data }) => { currentUserId = data.user?.id ?? null; });
-  supabase.auth.onAuthStateChange((_e, session) => { currentUserId = session?.user?.id ?? null; });
-}
 
 const STORAGE_KEY = "openrun.hostedGames.v1";
 const listeners = new Set<() => void>();
@@ -209,19 +202,6 @@ function ensureRealtime() {
         if (newRow) {
           const g = rowToGame(newRow);
           const idx = cache.findIndex((x) => x.id === g.id);
-          const isMine = currentUserId && newRow.host_id === currentUserId;
-          const title = g.title || "Untitled game";
-          if (payload.eventType === "INSERT" && !isMine) {
-            toast(`New game: ${title}`, { description: g.location || g.neighborhood });
-          } else if (payload.eventType === "UPDATE" && !isMine) {
-            const prevStatus = (oldRow?.status as string | null) ?? null;
-            const nextStatus = (newRow.status as string | null) ?? null;
-            if (prevStatus !== "published" && nextStatus === "published") {
-              toast.success(`Game published: ${title}`, { description: g.location || g.neighborhood });
-            } else {
-              toast(`Game updated: ${title}`);
-            }
-          }
           if (idx >= 0) cache = cache.map((x) => (x.id === g.id ? g : x));
           else cache = [g, ...cache];
           emit();
@@ -328,43 +308,19 @@ export function getHostedGame(id: string): Game | undefined {
   return cache.find((g) => g.id === id);
 }
 
-/** Optimistically bump a hosted game's joined count; roll back on DB failure. */
-export function bumpHostedGameJoined(id: string, delta: number): void {
-  loadLocal();
-  const prev = cache.find((g) => g.id === id);
-  if (!prev) return;
-  const nextJoined = Math.max(0, (prev.joined ?? 0) + delta);
-  const updated: Game = { ...prev, joined: nextJoined };
-  cache = cache.map((g) => (g.id === id ? updated : g));
-  emit();
-
-  supabase
-    .from("hosted_games")
-    .update({ joined: nextJoined } as TablesUpdate<"hosted_games">)
-    .eq("id", id)
-    .then(({ error }) => {
-      if (error) {
-        // Silent rollback — RLS may block non-host writes; keep UI in sync with DB.
-        const curr = cache.find((g) => g.id === id);
-        if (curr && curr.joined === nextJoined) {
-          cache = cache.map((g) => (g.id === id ? { ...g, joined: prev.joined ?? 0 } : g));
-          emit();
-        }
-      }
-    });
-}
-
-
 /** Patch a hosted game locally, and mirror the change to the DB. */
 export function updateHostedGame(id: string, patch: Partial<Game>): Game | undefined {
   loadLocal();
-  const prev = cache.find((g) => g.id === id);
-  if (!prev) return undefined;
-  const updated: Game = { ...prev, ...patch };
-  cache = cache.map((g) => (g.id === id ? updated : g));
+  let updated: Game | undefined;
+  cache = cache.map((g) => {
+    if (g.id !== id) return g;
+    updated = { ...g, ...patch };
+    return updated;
+  });
+  if (!updated) return undefined;
   emit();
 
-  // Best-effort DB mirror; RLS restricts to the host. Roll back on failure.
+  // Best-effort DB mirror; RLS restricts to the host.
   const dbPatch: TablesUpdate<"hosted_games"> = {};
   if (patch.title !== undefined) dbPatch.title = patch.title;
   if (patch.location !== undefined) dbPatch.location = patch.location;
@@ -377,44 +333,9 @@ export function updateHostedGame(id: string, patch: Partial<Game>): Game | undef
     dbPatch.joins_closed = (patch as { joinsClosed?: boolean }).joinsClosed;
   }
   if (Object.keys(dbPatch).length > 0) {
-    supabase
-      .from("hosted_games")
-      .update(dbPatch)
-      .eq("id", id)
-      .then(({ error }) => {
-        if (error) {
-          // Revert optimistic patch.
-          cache = cache.map((g) => (g.id === id ? prev : g));
-          emit();
-          try { toast.error(`Couldn't save changes to "${prev.title}"`, { description: error.message }); } catch { /* ignore */ }
-        }
-      });
+    supabase.from("hosted_games").update(dbPatch).eq("id", id).then(() => { /* noop */ });
   }
   return updated;
-}
-
-/** Delete a hosted game optimistically, rolling back on DB failure. */
-export async function deleteHostedGame(id: string): Promise<void> {
-  loadLocal();
-  const prev = cache.find((g) => g.id === id);
-  if (!prev) return;
-
-  // Optimistic removal.
-  cache = cache.filter((g) => g.id !== id);
-  emit();
-
-  try {
-    const { error } = await supabase.from("hosted_games").delete().eq("id", id);
-    if (error) throw error;
-  } catch (err: any) {
-    // Restore on failure.
-    if (prev) {
-      cache = [prev, ...cache];
-      emit();
-    }
-    toast.error(`Couldn't delete "${prev.title}"`, { description: err.message });
-    throw err;
-  }
 }
 
 /** List locally-hosted games that have no hostUserId yet. */

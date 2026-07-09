@@ -214,23 +214,6 @@ function Create() {
               lng: coords?.lng,
             });
 
-            // Belt-and-suspenders: if the inline geocode above failed or the
-            // game landed with default/invalid coords, ask the server to
-            // re-geocode using the stored location. Fire-and-forget so we
-            // don't delay the "Game published" toast; the map subscription
-            // picks up the coordinate update in realtime.
-            void import("@/lib/hosted-games.functions").then(({ autoGeocodeHostedGameIfNeeded }) =>
-              autoGeocodeHostedGameIfNeeded({ data: { id: game.id } })
-                .then((res) => {
-                  if (res.status === "failed") {
-                    console.warn("[create] auto-geocode failed", res.error);
-                  } else if (res.status === "updated") {
-                    console.info("[create] auto-geocoded", res.lat, res.lng);
-                  }
-                })
-                .catch((err) => console.warn("[create] auto-geocode threw", err)),
-            );
-
 
 
             // Persist host ownership + approval/fee preferences so the host & players see them on the detail page

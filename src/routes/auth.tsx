@@ -4,8 +4,7 @@ import { ArrowLeft } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { lovable } from "@/integrations/lovable";
-import { refreshAuth, useAuth, waitForAuthSession } from "@/hooks/use-auth";
-import { consumePostAuthRedirect, rememberPostAuthRedirect } from "@/lib/auth-redirect";
+import { useAuth } from "@/hooks/use-auth";
 
 export const Route = createFileRoute("/auth")({
   head: () => ({ meta: [{ title: "Sign in — OpenRun" }] }),
@@ -22,7 +21,7 @@ function AuthPage() {
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
-    if (!loading && user) nav({ to: consumePostAuthRedirect(), replace: true });
+    if (!loading && user) nav({ to: "/profile" });
   }, [loading, user, nav]);
 
   const submit = async (e: React.FormEvent) => {
@@ -47,9 +46,7 @@ function AuthPage() {
           return;
         }
         if (data.session) {
-          await refreshAuth();
           toast.success("Account created!");
-          nav({ to: consumePostAuthRedirect(), replace: true });
         } else {
           toast.success("Check your email to confirm your account.");
         }
@@ -75,8 +72,6 @@ function AuthPage() {
           }
           throw error;
         }
-        await refreshAuth();
-        nav({ to: consumePostAuthRedirect(), replace: true });
       }
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Auth failed");
@@ -104,17 +99,12 @@ function AuthPage() {
   const google = async () => {
     setBusy(true);
     try {
-      rememberPostAuthRedirect("/profile");
       const result = await lovable.auth.signInWithOAuth("google", {
-        redirect_uri: `${window.location.origin}/auth/callback`,
+        redirect_uri: window.location.origin,
       });
       if (result.error) {
         toast.error(result.error.message || "Google sign-in failed");
-        return;
       }
-      if (result.redirected) return;
-      await waitForAuthSession();
-      nav({ to: consumePostAuthRedirect(), replace: true });
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Google sign-in failed");
     } finally {

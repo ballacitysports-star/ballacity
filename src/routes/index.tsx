@@ -1,12 +1,9 @@
-import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { motion } from "framer-motion";
 import { ArrowRight, MapPin, Sparkles, Trophy, Users, Video, Zap } from "lucide-react";
 import { Logo } from "@/components/Logo";
 import { HERO_IMAGE, SPORTS, GAMES } from "@/lib/sample-data";
 import { GameCard } from "@/components/GameCard";
-import { useEffect } from "react";
-import { useAuth } from "@/hooks/use-auth";
-import { consumePostAuthRedirect } from "@/lib/auth-redirect";
 
 
 
@@ -23,15 +20,7 @@ export const Route = createFileRoute("/")({
 });
 
 function Landing() {
-  const nav = useNavigate();
-  const { user, loading } = useAuth();
   const trending = GAMES.filter((g) => g.trending).slice(0, 4);
-
-  useEffect(() => {
-    if (loading || !user || typeof window === "undefined") return;
-    const target = consumePostAuthRedirect();
-    nav({ to: target, replace: true });
-  }, [loading, user, nav]);
 
   return (
     <div className="min-h-dvh">
