@@ -99,19 +99,13 @@ function AuthPage() {
   const oauth = async (provider: "google" | "apple") => {
     setBusy(true);
     try {
-      // Remember where to land after a full-page (published) redirect.
-      // The in-editor preview uses a popup and resolves synchronously below;
-      // the fallback /oauth/callback route reads this on hard-redirect flows.
       try {
         sessionStorage.setItem("openrun:postAuthRedirect", "/profile");
       } catch {
         // Ignore storage failures; the callback has a safe default.
       }
-      // IMPORTANT: redirect_uri MUST be a public origin URL so the Lovable
-      // OAuth broker/popup can intercept it and post the code back via
-      // web_message. Pointing this at our own React route (e.g.
-      // /oauth/callback) breaks the popup flow — the SDK never gets the
-      // message, the promise never resolves, and the button hangs.
+      // redirect_uri MUST be a public origin URL so the Lovable OAuth broker
+      // popup can intercept it via web_message. Do NOT point at our own route.
       const result = await lovable.auth.signInWithOAuth(provider, {
         redirect_uri: window.location.origin,
       });
@@ -119,16 +113,36 @@ function AuthPage() {
         toast.error(result.error.message || `${provider === "google" ? "Google" : "Apple"} sign-in failed`);
         return;
       }
-      if (!result.redirected) {
-        // Popup flow (preview): session is already set — send the user in.
-        nav({ to: "/profile" });
+      if (result.redirected) {
+        // Full-page redirect is in flight — nothing more to do here.
+        return;
       }
+      // Popup flow (preview/desktop): confirm the session actually landed,
+      // then hard-navigate so every provider re-reads it fresh.
+      const deadline = Date.now() + 4000;
+      let session = null as Awaited<ReturnType<typeof supabase.auth.getSession>>["data"]["session"];
+      while (Date.now() < deadline) {
+        const { data } = await supabase.auth.getSession();
+        if (data.session) {
+          session = data.session;
+          break;
+        }
+        await new Promise((r) => setTimeout(r, 150));
+      }
+      if (!session) {
+        toast.error("Sign-in didn't complete. Please try again.");
+        return;
+      }
+      // Hard redirect ensures the whole app re-hydrates with the new session
+      // (fixes cases where in-app nav races the auth-store update).
+      window.location.assign("/profile");
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Sign-in failed");
     } finally {
       setBusy(false);
     }
   };
+
 
   return (
     <div className="mx-auto max-w-md min-h-screen flex flex-col pb-12">
