@@ -169,16 +169,21 @@ function AuthGate({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (loading) return;
     if (!user && !isPublic) {
+      // Preserve the URL (pathname + search) so we can restore it after auth.
+      const search = router.state.location.searchStr ?? "";
+      savePostAuthRedirect(`${pathname}${search}`);
       router.navigate({ to: "/auth", replace: true });
       return;
     }
-    // If user is authenticated but sitting on an auth-only public route, bounce into the app
-    // as soon as we know whether they need onboarding.
+    // If user is authenticated but sitting on an auth-only public route, bounce
+    // into the app as soon as we know whether they need onboarding. Onboarding
+    // always wins over a saved destination; otherwise honor the saved path.
     if (user && (pathname === "/auth" || pathname === "/oauth/callback" || pathname === "/reset-password")) {
       if (needsOnboarding === true) {
         router.navigate({ to: "/onboarding", replace: true });
       } else if (needsOnboarding === false) {
-        router.navigate({ to: "/profile", replace: true });
+        const target = consumePostAuthRedirect("/profile");
+        router.navigate({ to: target, replace: true });
       }
     }
   }, [loading, user, isPublic, router, pathname, needsOnboarding]);
