@@ -36,14 +36,24 @@ function AuthPage() {
   const [completingAuth, setCompletingAuth] = useState(false);
   const [googleStatus, setGoogleStatus] = useState<GoogleStatus>({ kind: "idle" });
   const completingRef = useRef(false);
+  const timeoutTimerRef = useRef<number | null>(null);
+
+  const clearTimeoutTimer = () => {
+    if (timeoutTimerRef.current !== null) {
+      window.clearTimeout(timeoutTimerRef.current);
+      timeoutTimerRef.current = null;
+    }
+  };
 
   const finishAuthenticatedSession = async (session: NonNullable<Awaited<ReturnType<typeof waitForAuthSession>>>) => {
     if (completingRef.current) return;
     completingRef.current = true;
+    clearTimeoutTimer();
     setCompletingAuth(true);
     const target = await getPostSignInDestination(session);
     window.location.assign(target);
   };
+
 
   useEffect(() => {
     let cancelled = false;
@@ -69,8 +79,10 @@ function AuthPage() {
     return () => {
       cancelled = true;
       data.subscription.unsubscribe();
+      clearTimeoutTimer();
     };
   }, []);
+
 
   useEffect(() => {
     if (session) void finishAuthenticatedSession(session);
@@ -202,14 +214,15 @@ function AuthPage() {
         // Full-page redirect is in flight — nothing more to do here.
         return;
       }
+      // Popup/web_message flow: session write happens asynchronously.
+      // Let the top-level onAuthStateChange / useAuth effect drive navigation,
+      // and only escalate to a timeout if nothing lands within 15s.
       setGoogleStatus({ kind: "waiting" });
-      const session = await waitForAuthSession({ timeoutMs: 4_000, intervalMs: 150 });
-      if (!session) {
-        setGoogleStatus({ kind: "timeout" });
-        return;
-      }
-      const target = await getPostSignInDestination(session);
-      window.location.assign(target);
+      clearTimeoutTimer();
+      timeoutTimerRef.current = window.setTimeout(() => {
+        if (!completingRef.current) setGoogleStatus({ kind: "timeout" });
+        timeoutTimerRef.current = null;
+      }, 15_000);
     } catch (err) {
       const message = err instanceof Error ? err.message : "Sign-in failed";
       setGoogleStatus({ kind: "error", message });
@@ -218,6 +231,7 @@ function AuthPage() {
       setGoogleBusy(false);
     }
   };
+
 
 
 
@@ -281,7 +295,7 @@ function AuthPage() {
           {googleStatus.kind === "waiting" && "Confirming your session…"}
         </div>
 
-        {(googleStatus.kind === "timeout" || googleStatus.kind === "error") && (
+        {!completingAuth && !session && (googleStatus.kind === "timeout" || googleStatus.kind === "error") && (
           <div
             role="alert"
             className="rounded-2xl border border-border bg-surface p-4 space-y-3"
