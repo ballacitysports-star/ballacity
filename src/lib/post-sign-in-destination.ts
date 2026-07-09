@@ -18,18 +18,32 @@ async function withTimeout<T>(promise: Promise<T>, fallback: T, timeoutMs: numbe
   });
 }
 
+const DEBUG = import.meta.env.DEV;
+function debug(...args: unknown[]) {
+  if (DEBUG) console.info("[auth-routing]", ...args);
+}
+
 export async function getPostSignInDestination(
   session: Session,
   fallback = "/profile",
 ): Promise<string> {
   const savedDestination = consumePostAuthRedirect(fallback);
+  debug("saved redirect consumed", { savedDestination, fallback, userId: session.user.id });
+
   const onboardingCheck = Promise.resolve(
     supabase
       .from("profiles")
       .select("username")
       .eq("id", session.user.id)
       .maybeSingle(),
-  ).then(({ data, error }) => (error ? false : !data?.username));
+  ).then(({ data, error }) => {
+    debug("profile lookup result", {
+      hasRow: Boolean(data),
+      username: data?.username ?? null,
+      error: error?.message ?? null,
+    });
+    return error ? false : !data?.username;
+  });
 
   const needsOnboarding = await withTimeout(
     onboardingCheck,
@@ -37,5 +51,7 @@ export async function getPostSignInDestination(
     ONBOARDING_CHECK_TIMEOUT_MS,
   );
 
-  return needsOnboarding ? "/onboarding" : savedDestination;
+  const destination = needsOnboarding ? "/onboarding" : savedDestination;
+  debug("destination decision", { needsOnboarding, destination });
+  return destination;
 }
