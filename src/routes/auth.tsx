@@ -4,6 +4,7 @@ import { ArrowLeft } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { lovable } from "@/integrations/lovable";
+import { getOAuthRedirectUri } from "@/lib/oauth-redirect";
 import { useAuth } from "@/hooks/use-auth";
 
 export const Route = createFileRoute("/auth")({
@@ -111,7 +112,7 @@ function AuthPage() {
       // full-page redirect strands users on the marketing page because
       // AuthGate only auto-bounces from /auth, /oauth/callback, /reset-password.
       const result = await lovable.auth.signInWithOAuth(provider, {
-        redirect_uri: `${window.location.origin}/oauth/callback`,
+        redirect_uri: getOAuthRedirectUri(),
       });
       if (result.error) {
         toast.error(result.error.message || "Google sign-in failed");
