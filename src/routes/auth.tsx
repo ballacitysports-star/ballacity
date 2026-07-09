@@ -112,7 +112,7 @@ function AuthPage() {
       // full-page redirect strands users on the marketing page because
       // AuthGate only auto-bounces from /auth, /oauth/callback, /reset-password.
       const result = await lovable.auth.signInWithOAuth(provider, {
-        redirect_uri: `${window.location.origin}/oauth/callback`,
+        redirect_uri: getOAuthRedirectUri(),
       });
       if (result.error) {
         toast.error(result.error.message || "Google sign-in failed");
