@@ -99,11 +99,20 @@ function AuthPage() {
   const oauth = async (provider: "google" | "apple") => {
     setBusy(true);
     try {
+      try {
+        sessionStorage.setItem("openrun:postAuthRedirect", "/profile");
+      } catch {
+        // Ignore storage failures; the callback has a safe default.
+      }
       const result = await lovable.auth.signInWithOAuth(provider, {
-        redirect_uri: window.location.origin,
+        redirect_uri: `${window.location.origin}/auth/callback`,
       });
       if (result.error) {
         toast.error(result.error.message || `${provider === "google" ? "Google" : "Apple"} sign-in failed`);
+        return;
+      }
+      if (!result.redirected) {
+        nav({ to: "/profile" });
       }
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Sign-in failed");
