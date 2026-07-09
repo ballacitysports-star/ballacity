@@ -13,6 +13,10 @@ import {
   adminListReels,
   adminRetryReel,
   adminRunReelWorker,
+  adminListHostedGames,
+  adminRegeocodeHostedGame,
+  type HostedGameDebugRow,
+  type HostedGameGeocodeStatus,
 } from "@/lib/admin.functions";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -510,6 +514,121 @@ function GamesPanel() {
           {!data?.games.length && <p className="text-muted-foreground">No paid games yet</p>}
         </CardContent>
       </Card>
+
+      <HostedGamesMapDebugPanel />
     </div>
   );
 }
+
+const GEOCODE_BADGE: Record<HostedGameGeocodeStatus, { text: string; variant: "default" | "secondary" | "destructive" | "outline" }> = {
+  valid: { text: "Valid", variant: "default" },
+  default_coords: { text: "Default (50,50)", variant: "destructive" },
+  pseudo_coords: { text: "Pseudo 0–100", variant: "destructive" },
+  missing_location: { text: "No location", variant: "destructive" },
+  invalid: { text: "Invalid", variant: "destructive" },
+};
+
+function HostedGamesMapDebugPanel() {
+  const list = useServerFn(adminListHostedGames);
+  const regeocode = useServerFn(adminRegeocodeHostedGame);
+  const qc = useQueryClient();
+  const { data, isLoading, isRefetching, refetch } = useQuery({
+    queryKey: ["admin-hosted-games-debug"],
+    queryFn: () => list({}),
+  });
+  const [filter, setFilter] = useState<"all" | "broken">("broken");
+  const [busyId, setBusyId] = useState<string | null>(null);
+
+  const rows = data?.rows ?? [];
+  const broken = rows.filter((r) => r.geocode_status !== "valid");
+  const shown = filter === "broken" ? broken : rows;
+
+  const runRegeocode = async (row: HostedGameDebugRow) => {
+    setBusyId(row.id);
+    try {
+      const res = await regeocode({ data: { id: row.id } });
+      if (res.ok) {
+        toast.success(`Geocoded to ${res.lat.toFixed(5)}, ${res.lng.toFixed(5)}`);
+        await qc.invalidateQueries({ queryKey: ["admin-hosted-games-debug"] });
+      } else {
+        toast.error(res.error);
+      }
+    } catch (e: any) {
+      toast.error(e?.message ?? "Regeocode failed");
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-base flex items-center justify-between gap-3 flex-wrap">
+          <span>Hosted games — map debug ({rows.length} total, {broken.length} broken)</span>
+          <div className="flex items-center gap-2">
+            <Button size="sm" variant={filter === "broken" ? "default" : "outline"} onClick={() => setFilter("broken")}>
+              Broken only
+            </Button>
+            <Button size="sm" variant={filter === "all" ? "default" : "outline"} onClick={() => setFilter("all")}>
+              All
+            </Button>
+            <Button size="sm" variant="outline" onClick={() => refetch()} disabled={isRefetching}>
+              {isRefetching ? "Refreshing…" : "Refresh"}
+            </Button>
+          </div>
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-2 text-sm">
+        {isLoading && <p className="text-muted-foreground">Loading…</p>}
+        {!isLoading && shown.length === 0 && (
+          <p className="text-muted-foreground">
+            {filter === "broken"
+              ? "All hosted games have valid geocoded coordinates. 🎉"
+              : "No hosted games found."}
+          </p>
+        )}
+        {shown.map((r) => {
+          const badge = GEOCODE_BADGE[r.geocode_status];
+          return (
+            <div key={r.id} className="border rounded-md p-3 space-y-1">
+              <div className="flex items-center justify-between gap-2 flex-wrap">
+                <div className="font-medium truncate">{r.title}</div>
+                <Badge variant={badge.variant}>{badge.text}</Badge>
+              </div>
+              <div className="text-xs text-muted-foreground font-mono break-all">id: {r.id}</div>
+              <div className="text-xs">
+                <div>
+                  location: <span className="font-mono">{r.location || "—"}</span>
+                </div>
+                <div>
+                  lat/lng:{" "}
+                  <span className="font-mono">
+                    {Number.isFinite(r.lat) ? r.lat.toFixed(6) : "—"}, {Number.isFinite(r.lng) ? r.lng.toFixed(6) : "—"}
+                  </span>
+                </div>
+                <div>
+                  host: <span className="font-mono">{r.host_id?.slice(0, 8)}…</span> · created{" "}
+                  {new Date(r.created_at).toLocaleString()}
+                </div>
+                {r.geocode_status !== "valid" && (
+                  <p className="mt-1 text-destructive">{r.reason}</p>
+                )}
+              </div>
+              <div className="pt-1">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => runRegeocode(r)}
+                  disabled={busyId === r.id || !r.location.trim()}
+                >
+                  {busyId === r.id ? "Geocoding…" : "Re-geocode from location"}
+                </Button>
+              </div>
+            </div>
+          );
+        })}
+      </CardContent>
+    </Card>
+  );
+}
+
