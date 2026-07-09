@@ -105,7 +105,7 @@ function AuthPage() {
         // Ignore storage failures; the callback has a safe default.
       }
       const result = await lovable.auth.signInWithOAuth(provider, {
-        redirect_uri: `${window.location.origin}/auth/callback`,
+        redirect_uri: `${window.location.origin}/oauth/callback`,
       });
       if (result.error) {
         toast.error(result.error.message || `${provider === "google" ? "Google" : "Apple"} sign-in failed`);

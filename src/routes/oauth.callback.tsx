@@ -2,9 +2,9 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 
-export const Route = createFileRoute("/auth/callback")({
+export const Route = createFileRoute("/oauth/callback")({
   head: () => ({ meta: [{ title: "Signing in — OpenRun" }] }),
-  component: AuthCallbackPage,
+  component: OAuthCallbackPage,
 });
 
 function getSafeReturnPath() {
@@ -18,7 +18,7 @@ function getSafeReturnPath() {
   return "/profile";
 }
 
-function AuthCallbackPage() {
+function OAuthCallbackPage() {
   const [failed, setFailed] = useState(false);
 
   useEffect(() => {
