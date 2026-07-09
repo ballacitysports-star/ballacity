@@ -110,7 +110,7 @@ const THEME_INIT_SCRIPT = `(function(){try{var t=localStorage.getItem('openrun:t
 
 function RootShell({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className="dark" suppressHydrationWarning>
+    <html lang="en" className="dark" data-theme="dark" suppressHydrationWarning>
       <head suppressHydrationWarning>
         <HeadContent />
         <script suppressHydrationWarning dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
@@ -150,7 +150,7 @@ function maybeReloadForStaleChunk(reason: unknown) {
   window.location.reload();
 }
 
-const PUBLIC_ROUTES = ["/", "/auth", "/reset-password"];
+const PUBLIC_ROUTES = ["/", "/auth", "/auth/callback", "/reset-password"];
 const TAB_PATHS = ["/feed", "/players", "/teams", "/create", "/discover", "/profile", "/notifications", "/reels"];
 
 function AuthGate({ children }: { children: React.ReactNode }) {
@@ -227,17 +227,9 @@ function RootComponent() {
 
   return (
     <QueryClientProvider client={queryClient}>
-      <ClientOnly
-        fallback={
-          <div className="grid min-h-dvh place-items-center bg-background">
-            <div className="h-8 w-8 animate-spin rounded-full border-2 border-muted border-t-foreground" />
-          </div>
-        }
-      >
-        <AuthGate>
-          <Outlet />
-        </AuthGate>
-      </ClientOnly>
+      <AuthGate>
+        <Outlet />
+      </AuthGate>
       <Toaster position="top-center" richColors />
       <ClientOnly fallback={null}>
         <DebugModeToggle />

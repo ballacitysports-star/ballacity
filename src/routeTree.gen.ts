@@ -9,6 +9,7 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as Char91indexChar93RouteImport } from './routes/[index]'
 import { Route as ShopRouteImport } from './routes/shop'
 import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as ReviewsRouteImport } from './routes/reviews'
@@ -30,6 +31,7 @@ import { Route as PlayersUserIdRouteImport } from './routes/players.$userId'
 import { Route as MessagesConversationIdRouteImport } from './routes/messages.$conversationId'
 import { Route as GamesGameIdRouteImport } from './routes/games.$gameId'
 import { Route as CheckoutReturnRouteImport } from './routes/checkout.return'
+import { Route as AuthCallbackRouteImport } from './routes/auth.callback'
 import { Route as AdminLocationAnalyticsRouteImport } from './routes/admin.location-analytics'
 import { Route as AccountSecurityRouteImport } from './routes/account.security'
 import { Route as AccountNotificationsRouteImport } from './routes/account.notifications'
@@ -47,6 +49,11 @@ import { Route as GamesGameIdPayRouteImport } from './routes/games.$gameId_.pay'
 import { Route as ApiPublicReelsProcessRouteImport } from './routes/api/public/reels/process'
 import { Route as ApiPublicPaymentsWebhookRouteImport } from './routes/api/public/payments/webhook'
 
+const Char91indexChar93Route = Char91indexChar93RouteImport.update({
+  id: '/index',
+  path: '/index',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ShopRoute = ShopRouteImport.update({
   id: '/shop',
   path: '/shop',
@@ -151,6 +158,11 @@ const CheckoutReturnRoute = CheckoutReturnRouteImport.update({
   path: '/checkout/return',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AuthCallbackRoute = AuthCallbackRouteImport.update({
+  id: '/callback',
+  path: '/callback',
+  getParentRoute: () => AuthRoute,
+} as any)
 const AdminLocationAnalyticsRoute = AdminLocationAnalyticsRouteImport.update({
   id: '/location-analytics',
   path: '/location-analytics',
@@ -236,8 +248,9 @@ const ApiPublicPaymentsWebhookRoute =
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/admin': typeof AdminRouteWithChildren
-  '/auth': typeof AuthRoute
+  '/auth': typeof AuthRouteWithChildren
   '/available-players': typeof AvailablePlayersRoute
+  '/index': typeof Char91indexChar93Route
   '/payments': typeof PaymentsRoute
   '/pickup': typeof PickupRoute
   '/plans': typeof PlansRoute
@@ -256,6 +269,7 @@ export interface FileRoutesByFullPath {
   '/account/notifications': typeof AccountNotificationsRoute
   '/account/security': typeof AccountSecurityRoute
   '/admin/location-analytics': typeof AdminLocationAnalyticsRoute
+  '/auth/callback': typeof AuthCallbackRoute
   '/checkout/return': typeof CheckoutReturnRoute
   '/games/$gameId': typeof GamesGameIdRoute
   '/messages/$conversationId': typeof MessagesConversationIdRoute
@@ -274,8 +288,9 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/admin': typeof AdminRouteWithChildren
-  '/auth': typeof AuthRoute
+  '/auth': typeof AuthRouteWithChildren
   '/available-players': typeof AvailablePlayersRoute
+  '/index': typeof Char91indexChar93Route
   '/payments': typeof PaymentsRoute
   '/pickup': typeof PickupRoute
   '/plans': typeof PlansRoute
@@ -294,6 +309,7 @@ export interface FileRoutesByTo {
   '/account/notifications': typeof AccountNotificationsRoute
   '/account/security': typeof AccountSecurityRoute
   '/admin/location-analytics': typeof AdminLocationAnalyticsRoute
+  '/auth/callback': typeof AuthCallbackRoute
   '/checkout/return': typeof CheckoutReturnRoute
   '/games/$gameId': typeof GamesGameIdRoute
   '/messages/$conversationId': typeof MessagesConversationIdRoute
@@ -314,8 +330,9 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/_tabs': typeof TabsRouteWithChildren
   '/admin': typeof AdminRouteWithChildren
-  '/auth': typeof AuthRoute
+  '/auth': typeof AuthRouteWithChildren
   '/available-players': typeof AvailablePlayersRoute
+  '/index': typeof Char91indexChar93Route
   '/payments': typeof PaymentsRoute
   '/pickup': typeof PickupRoute
   '/plans': typeof PlansRoute
@@ -334,6 +351,7 @@ export interface FileRoutesById {
   '/account/notifications': typeof AccountNotificationsRoute
   '/account/security': typeof AccountSecurityRoute
   '/admin/location-analytics': typeof AdminLocationAnalyticsRoute
+  '/auth/callback': typeof AuthCallbackRoute
   '/checkout/return': typeof CheckoutReturnRoute
   '/games/$gameId': typeof GamesGameIdRoute
   '/messages/$conversationId': typeof MessagesConversationIdRoute
@@ -356,6 +374,7 @@ export interface FileRouteTypes {
     | '/admin'
     | '/auth'
     | '/available-players'
+    | '/index'
     | '/payments'
     | '/pickup'
     | '/plans'
@@ -374,6 +393,7 @@ export interface FileRouteTypes {
     | '/account/notifications'
     | '/account/security'
     | '/admin/location-analytics'
+    | '/auth/callback'
     | '/checkout/return'
     | '/games/$gameId'
     | '/messages/$conversationId'
@@ -394,6 +414,7 @@ export interface FileRouteTypes {
     | '/admin'
     | '/auth'
     | '/available-players'
+    | '/index'
     | '/payments'
     | '/pickup'
     | '/plans'
@@ -412,6 +433,7 @@ export interface FileRouteTypes {
     | '/account/notifications'
     | '/account/security'
     | '/admin/location-analytics'
+    | '/auth/callback'
     | '/checkout/return'
     | '/games/$gameId'
     | '/messages/$conversationId'
@@ -433,6 +455,7 @@ export interface FileRouteTypes {
     | '/admin'
     | '/auth'
     | '/available-players'
+    | '/index'
     | '/payments'
     | '/pickup'
     | '/plans'
@@ -451,6 +474,7 @@ export interface FileRouteTypes {
     | '/account/notifications'
     | '/account/security'
     | '/admin/location-analytics'
+    | '/auth/callback'
     | '/checkout/return'
     | '/games/$gameId'
     | '/messages/$conversationId'
@@ -471,8 +495,9 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   TabsRoute: typeof TabsRouteWithChildren
   AdminRoute: typeof AdminRouteWithChildren
-  AuthRoute: typeof AuthRoute
+  AuthRoute: typeof AuthRouteWithChildren
   AvailablePlayersRoute: typeof AvailablePlayersRoute
+  Char91indexChar93Route: typeof Char91indexChar93Route
   PaymentsRoute: typeof PaymentsRoute
   PickupRoute: typeof PickupRoute
   PlansRoute: typeof PlansRoute
@@ -499,6 +524,13 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/index': {
+      id: '/index'
+      path: '/index'
+      fullPath: '/index'
+      preLoaderRoute: typeof Char91indexChar93RouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/shop': {
       id: '/shop'
       path: '/shop'
@@ -645,6 +677,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/checkout/return'
       preLoaderRoute: typeof CheckoutReturnRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/auth/callback': {
+      id: '/auth/callback'
+      path: '/callback'
+      fullPath: '/auth/callback'
+      preLoaderRoute: typeof AuthCallbackRouteImport
+      parentRoute: typeof AuthRoute
     }
     '/admin/location-analytics': {
       id: '/admin/location-analytics'
@@ -795,6 +834,16 @@ const AdminRouteChildren: AdminRouteChildren = {
 
 const AdminRouteWithChildren = AdminRoute._addFileChildren(AdminRouteChildren)
 
+interface AuthRouteChildren {
+  AuthCallbackRoute: typeof AuthCallbackRoute
+}
+
+const AuthRouteChildren: AuthRouteChildren = {
+  AuthCallbackRoute: AuthCallbackRoute,
+}
+
+const AuthRouteWithChildren = AuthRoute._addFileChildren(AuthRouteChildren)
+
 interface TeamsTeamIdRouteChildren {
   TeamsTeamIdEditRoute: typeof TeamsTeamIdEditRoute
 }
@@ -811,8 +860,9 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   TabsRoute: TabsRouteWithChildren,
   AdminRoute: AdminRouteWithChildren,
-  AuthRoute: AuthRoute,
+  AuthRoute: AuthRouteWithChildren,
   AvailablePlayersRoute: AvailablePlayersRoute,
+  Char91indexChar93Route: Char91indexChar93Route,
   PaymentsRoute: PaymentsRoute,
   PickupRoute: PickupRoute,
   PlansRoute: PlansRoute,
