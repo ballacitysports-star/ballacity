@@ -151,7 +151,7 @@ function maybeReloadForStaleChunk(reason: unknown) {
   window.location.reload();
 }
 
-const PUBLIC_ROUTES = ["/", "/auth", "/oauth/callback", "/reset-password"];
+const PUBLIC_ROUTES = ["/", "/index", "/auth", "/oauth/callback", "/reset-password"];
 const ONBOARDING_ROUTE = "/onboarding";
 const TAB_PATHS = ["/feed", "/players", "/teams", "/create", "/discover", "/profile", "/notifications", "/reels"];
 
