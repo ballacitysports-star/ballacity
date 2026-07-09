@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { lovable } from "@/integrations/lovable";
 import { getOAuthRedirectUri } from "@/lib/oauth-redirect";
+import { waitForAuthSession } from "@/lib/oauth-session";
 import {
   consumePostAuthRedirect,
   peekPostAuthRedirect,
@@ -112,9 +113,24 @@ function AuthPage() {
       // navigates to the saved post-auth destination. Landing on `/` after a
       // full-page redirect strands users on the marketing page because
       // AuthGate only auto-bounces from /auth, /oauth/callback, /reset-password.
-      const result = await lovable.auth.signInWithOAuth(provider, {
+      const oauthPromise = lovable.auth.signInWithOAuth(provider, {
         redirect_uri: getOAuthRedirectUri(),
       });
+      const firstResult = await Promise.race([
+        oauthPromise.then((result) => ({ kind: "oauth" as const, result })),
+        waitForAuthSession({ timeoutMs: 20_000, intervalMs: 250 }).then(
+          (session) => ({ kind: "session" as const, session }),
+        ),
+      ]);
+
+      if (firstResult.kind === "session" && firstResult.session) {
+        const target = consumePostAuthRedirect("/profile");
+        window.location.assign(target);
+        return;
+      }
+
+      const result =
+        firstResult.kind === "oauth" ? firstResult.result : await oauthPromise;
       if (result.error) {
         toast.error(result.error.message || "Google sign-in failed");
         return;
@@ -125,16 +141,7 @@ function AuthPage() {
       }
       // Popup flow (preview/desktop): confirm the session actually landed,
       // then hard-navigate so every provider re-reads it fresh.
-      const deadline = Date.now() + 4000;
-      let session = null as Awaited<ReturnType<typeof supabase.auth.getSession>>["data"]["session"];
-      while (Date.now() < deadline) {
-        const { data } = await supabase.auth.getSession();
-        if (data.session) {
-          session = data.session;
-          break;
-        }
-        await new Promise((r) => setTimeout(r, 150));
-      }
+      const session = await waitForAuthSession({ timeoutMs: 4_000, intervalMs: 150 });
       if (!session) {
         toast.error("Sign-in didn't complete. Please try again.");
         return;
