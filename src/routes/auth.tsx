@@ -36,14 +36,24 @@ function AuthPage() {
   const [completingAuth, setCompletingAuth] = useState(false);
   const [googleStatus, setGoogleStatus] = useState<GoogleStatus>({ kind: "idle" });
   const completingRef = useRef(false);
+  const timeoutTimerRef = useRef<number | null>(null);
+
+  const clearTimeoutTimer = () => {
+    if (timeoutTimerRef.current !== null) {
+      window.clearTimeout(timeoutTimerRef.current);
+      timeoutTimerRef.current = null;
+    }
+  };
 
   const finishAuthenticatedSession = async (session: NonNullable<Awaited<ReturnType<typeof waitForAuthSession>>>) => {
     if (completingRef.current) return;
     completingRef.current = true;
+    clearTimeoutTimer();
     setCompletingAuth(true);
     const target = await getPostSignInDestination(session);
     window.location.assign(target);
   };
+
 
   useEffect(() => {
     let cancelled = false;
