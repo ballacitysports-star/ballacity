@@ -1,26 +1,27 @@
-## Plan
+## Why hosted games disappear
 
-1. **Add a public auth callback route**
-   - Create `/auth/callback` as a loading screen that runs after Google returns to the app.
-   - It will refresh the session, wait briefly for the auth token to be available, then navigate to the intended content screen (`/profile` by default).
-   - If no session appears, it will send the user back to `/auth` with a clear error toast/state instead of silently staying stuck.
+Hosted games live only in browser `localStorage` (`openrun.hostedGames.v1`). Nothing in the app removes them, but the preview iframe / partitioned storage can wipe that key silently. When it does, every screen that reads `useHostedGames()` (Feed, Discover, Profile, Players → Invite) goes empty — which matches what you're seeing.
 
-2. **Route Google through the callback**
-   - Keep using the managed `lovable.auth.signInWithOAuth("google", ...)` helper.
-   - Set `redirect_uri` to the public same-origin callback URL: `${window.location.origin}/auth/callback`.
-   - Preserve the intended destination separately in session storage, not in the protected URL.
-   - Keep the `result.redirected` branch so full-page OAuth exits cleanly while preview popup/token flows still navigate after session refresh.
+Fix: give hosted games a real home in the database. Keep localStorage only as an offline cache that heals itself from the DB on load.
 
-3. **Make auth readiness race-proof**
-   - Update the auth hook so session restoration starts from `getSession()` and does not let an early empty `INITIAL_SESSION` permanently mark the user signed out.
-   - Keep `onAuthStateChange` synchronous and only use it to update local auth state.
-   - Add a helper that waits/polls briefly for a restored session after OAuth/email sign-in before navigating.
+## What I'll build
 
-4. **Update public-route gating**
-   - Add `/auth/callback` to the public route list so the callback can run before the auth gate redirects.
-   - Keep protected content routes unchanged; once the callback confirms a session, navigation will open `/profile` normally.
+1. **New `hosted_games` table** (backend)
+   - Columns mirror the local `Game` shape needed for display: `id text pk`, `host_id uuid`, `sport`, `title`, `date timestamptz`, `duration`, `location`, `neighborhood`, `lat`, `lng`, `max_players`, `skill`, `price`, `indoor`, `is_private`, `description`, `equipment text[]`, `image text`, `status`, `joins_closed`, `host_snapshot jsonb`, `created_at`, `updated_at`.
+   - RLS: hosts read/write their own rows; everyone signed in can `SELECT` (games are shown publicly in feed today). GRANTs on `authenticated` + `service_role`, `SELECT` on `anon` so signed-out home/feed still shows them.
+   - `updated_at` trigger using the existing `touch_updated_at()` function.
 
-5. **Verify**
-   - Confirm `/auth` and `/auth/callback` render.
-   - Confirm Google sign-in code uses the managed helper and handles both `redirected` and inline-token flows.
-   - If a session is present in the preview, verify the app leaves `/auth`/`/` and opens `/profile`.
+2. **Rewrite `src/lib/hosted-games-store.ts`**
+   - On first use (and on auth change), fetch the signed-in user's + all public hosted games from `hosted_games` and hydrate the in-memory cache + localStorage mirror.
+   - `addHostedGame` / `updateHostedGame` / `claimHostedGame` write to Supabase, then update local cache. Local write happens first for optimistic UI; DB error → toast + rollback.
+   - Realtime subscription on `hosted_games` so other tabs / devices stay in sync.
+   - `localStorage` becomes a warm cache only — if it gets wiped, the next fetch repopulates it. Games never vanish again.
+
+3. **Migrate existing localStorage games** on first load per user (one-shot flag), pushing anything with no `hostUserId` into the DB stamped with the current user's id (piggybacks on existing `runLegacyHostMigration` pattern).
+
+4. **No UI changes.** The `useHostedGames()` hook keeps the same signature, so `_tabs.feed.tsx`, `_tabs.discover.tsx`, `_tabs.profile.tsx`, `_tabs.players.tsx`, `games.$gameId.tsx`, and `_tabs.create.tsx` don't need edits beyond `addHostedGame` becoming async where it's awaited (only the create form).
+
+## Out of scope
+
+- No changes to sample `GAMES`, join flow, payment flow, or roster panel.
+- No changes to auth or route structure.

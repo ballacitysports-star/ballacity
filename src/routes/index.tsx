@@ -1,12 +1,9 @@
-import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { motion } from "framer-motion";
 import { ArrowRight, MapPin, Sparkles, Trophy, Users, Video, Zap } from "lucide-react";
 import { Logo } from "@/components/Logo";
 import { HERO_IMAGE, SPORTS, GAMES } from "@/lib/sample-data";
 import { GameCard } from "@/components/GameCard";
-import { useEffect } from "react";
-import { useAuth } from "@/hooks/use-auth";
-import { consumePostAuthRedirect } from "@/lib/auth-redirect";
 
 
 
@@ -23,15 +20,7 @@ export const Route = createFileRoute("/")({
 });
 
 function Landing() {
-  const nav = useNavigate();
-  const { user, loading } = useAuth();
   const trending = GAMES.filter((g) => g.trending).slice(0, 4);
-
-  useEffect(() => {
-    if (loading || !user || typeof window === "undefined") return;
-    const target = consumePostAuthRedirect();
-    nav({ to: target, replace: true });
-  }, [loading, user, nav]);
 
   return (
     <div className="min-h-dvh">
@@ -164,6 +153,19 @@ function Landing() {
         </div>
       </section>
 
+      {/* Trending */}
+      <section id="trending" className="mx-auto max-w-6xl px-5 py-16">
+        <div className="flex items-end justify-between mb-6">
+          <h2 className="font-display text-3xl md:text-4xl font-bold">Trending near you</h2>
+          <Link to="/feed" className="text-sm font-semibold text-lime hover:underline inline-flex items-center gap-1">
+            See all <ArrowRight className="h-4 w-4" />
+          </Link>
+        </div>
+        <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-4">
+          {trending.map((g, i) => <GameCard key={g.id} game={g} index={i} />)}
+        </div>
+      </section>
+
       {/* Sports */}
       <section id="sports" className="mx-auto max-w-6xl px-5 py-16">
         <div className="flex items-end justify-between gap-4 mb-6">
@@ -220,19 +222,6 @@ function Landing() {
               </motion.div>
             );
           })}
-        </div>
-      </section>
-
-      {/* Trending */}
-      <section id="trending" className="mx-auto max-w-6xl px-5 py-16">
-        <div className="flex items-end justify-between mb-6">
-          <h2 className="font-display text-3xl md:text-4xl font-bold">Trending near you</h2>
-          <Link to="/feed" className="text-sm font-semibold text-lime hover:underline inline-flex items-center gap-1">
-            See all <ArrowRight className="h-4 w-4" />
-          </Link>
-        </div>
-        <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-4">
-          {trending.map((g, i) => <GameCard key={g.id} game={g} index={i} />)}
         </div>
       </section>
 

@@ -7,7 +7,7 @@ import {
   HeadContent,
   Scripts,
 } from "@tanstack/react-router";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 
 import appCss from "../styles.css?url";
 import { DebugModeToggle } from "@/components/DebugModeToggle";
@@ -18,6 +18,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Toaster } from "@/components/ui/sonner";
 import { runLegacyHostMigration } from "@/lib/legacy-host-migration";
 import { useAuth } from "@/hooks/use-auth";
+import { savePostAuthRedirect, consumePostAuthRedirect } from "@/lib/post-auth-redirect";
 import { useNotificationPush } from "@/lib/notifications";
 import { useOneSignal } from "@/lib/onesignal";
 
@@ -150,7 +151,8 @@ function maybeReloadForStaleChunk(reason: unknown) {
   window.location.reload();
 }
 
-const PUBLIC_ROUTES = ["/", "/auth", "/auth/callback", "/reset-password"];
+const PUBLIC_ROUTES = ["/", "/index", "/auth", "/oauth/callback", "/reset-password"];
+const ONBOARDING_ROUTE = "/onboarding";
 const TAB_PATHS = ["/feed", "/players", "/teams", "/create", "/discover", "/profile", "/notifications", "/reels"];
 
 function AuthGate({ children }: { children: React.ReactNode }) {
@@ -162,12 +164,58 @@ function AuthGate({ children }: { children: React.ReactNode }) {
   useNotificationPush();
   useOneSignal();
 
+  const [needsOnboarding, setNeedsOnboarding] = useState<boolean | null>(null);
+
   useEffect(() => {
     if (loading) return;
     if (!user && !isPublic) {
+      // Preserve the URL (pathname + search) so we can restore it after auth.
+      const search = router.state.location.searchStr ?? "";
+      savePostAuthRedirect(`${pathname}${search}`);
       router.navigate({ to: "/auth", replace: true });
+      return;
     }
-  }, [loading, user, isPublic, router, pathname]);
+    // If user is authenticated but sitting on an auth-only public route, bounce
+    // into the app as soon as we know whether they need onboarding. Onboarding
+    // always wins over a saved destination; otherwise honor the saved path.
+    if (user && (pathname === "/auth" || pathname === "/oauth/callback" || pathname === "/reset-password")) {
+      if (needsOnboarding === true) {
+        router.navigate({ to: "/onboarding", replace: true });
+      } else if (needsOnboarding === false) {
+        const target = consumePostAuthRedirect("/profile");
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        router.navigate({ to: target as any, replace: true });
+      }
+    }
+  }, [loading, user, isPublic, router, pathname, needsOnboarding]);
+
+  // Detect whether the signed-in user has completed onboarding (username set).
+  useEffect(() => {
+    if (!user) {
+      setNeedsOnboarding(null);
+      return;
+    }
+    let cancelled = false;
+    supabase
+      .from("profiles")
+      .select("username")
+      .eq("id", user.id)
+      .maybeSingle()
+      .then(({ data }) => {
+        if (cancelled) return;
+        setNeedsOnboarding(!data?.username);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [user?.id]);
+
+  // Redirect to onboarding when needed (skip on public + onboarding routes).
+  useEffect(() => {
+    if (!user || needsOnboarding !== true) return;
+    if (pathname === ONBOARDING_ROUTE || pathname === "/auth" || pathname === "/reset-password") return;
+    router.navigate({ to: ONBOARDING_ROUTE, replace: true });
+  }, [user, needsOnboarding, pathname, router]);
 
   useEffect(() => {
     if (user && !isPublic && !isTab) {
@@ -188,6 +236,7 @@ function AuthGate({ children }: { children: React.ReactNode }) {
       </div>
     );
   }
+  if (pathname === ONBOARDING_ROUTE) return <>{children}</>;
   return (
     <>
       {children}
