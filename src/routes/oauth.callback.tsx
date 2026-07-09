@@ -13,7 +13,7 @@ function OAuthCallbackPage() {
 
   useEffect(() => {
     let cancelled = false;
-    const returnPath = getSafeReturnPath();
+    const returnPath = consumePostAuthRedirect("/profile");
 
     const finish = async () => {
       const startedAt = Date.now();
