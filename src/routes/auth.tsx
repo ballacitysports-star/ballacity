@@ -79,8 +79,10 @@ function AuthPage() {
     return () => {
       cancelled = true;
       data.subscription.unsubscribe();
+      clearTimeoutTimer();
     };
   }, []);
+
 
   useEffect(() => {
     if (session) void finishAuthenticatedSession(session);
