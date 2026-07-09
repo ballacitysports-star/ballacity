@@ -29,10 +29,10 @@ import { Route as TeamsTeamIdRouteImport } from './routes/teams.$teamId'
 import { Route as ReviewNewRouteImport } from './routes/review.new'
 import { Route as ProfileEditRouteImport } from './routes/profile.edit'
 import { Route as PlayersUserIdRouteImport } from './routes/players.$userId'
+import { Route as OauthCallbackRouteImport } from './routes/oauth.callback'
 import { Route as MessagesConversationIdRouteImport } from './routes/messages.$conversationId'
 import { Route as GamesGameIdRouteImport } from './routes/games.$gameId'
 import { Route as CheckoutReturnRouteImport } from './routes/checkout.return'
-import { Route as AuthCallbackRouteImport } from './routes/auth.callback'
 import { Route as AdminLocationAnalyticsRouteImport } from './routes/admin.location-analytics'
 import { Route as AccountSecurityRouteImport } from './routes/account.security'
 import { Route as AccountNotificationsRouteImport } from './routes/account.notifications'
@@ -149,6 +149,11 @@ const PlayersUserIdRoute = PlayersUserIdRouteImport.update({
   path: '/players/$userId',
   getParentRoute: () => rootRouteImport,
 } as any)
+const OauthCallbackRoute = OauthCallbackRouteImport.update({
+  id: '/oauth/callback',
+  path: '/oauth/callback',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const MessagesConversationIdRoute = MessagesConversationIdRouteImport.update({
   id: '/messages/$conversationId',
   path: '/messages/$conversationId',
@@ -163,11 +168,6 @@ const CheckoutReturnRoute = CheckoutReturnRouteImport.update({
   id: '/checkout/return',
   path: '/checkout/return',
   getParentRoute: () => rootRouteImport,
-} as any)
-const AuthCallbackRoute = AuthCallbackRouteImport.update({
-  id: '/callback',
-  path: '/callback',
-  getParentRoute: () => AuthRoute,
 } as any)
 const AdminLocationAnalyticsRoute = AdminLocationAnalyticsRouteImport.update({
   id: '/location-analytics',
@@ -254,7 +254,7 @@ const ApiPublicPaymentsWebhookRoute =
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/admin': typeof AdminRouteWithChildren
-  '/auth': typeof AuthRouteWithChildren
+  '/auth': typeof AuthRoute
   '/available-players': typeof AvailablePlayersRoute
   '/index': typeof Char91indexChar93Route
   '/onboarding': typeof OnboardingRoute
@@ -276,10 +276,10 @@ export interface FileRoutesByFullPath {
   '/account/notifications': typeof AccountNotificationsRoute
   '/account/security': typeof AccountSecurityRoute
   '/admin/location-analytics': typeof AdminLocationAnalyticsRoute
-  '/auth/callback': typeof AuthCallbackRoute
   '/checkout/return': typeof CheckoutReturnRoute
   '/games/$gameId': typeof GamesGameIdRoute
   '/messages/$conversationId': typeof MessagesConversationIdRoute
+  '/oauth/callback': typeof OauthCallbackRoute
   '/players/$userId': typeof PlayersUserIdRoute
   '/profile/edit': typeof ProfileEditRoute
   '/review/new': typeof ReviewNewRoute
@@ -295,7 +295,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/admin': typeof AdminRouteWithChildren
-  '/auth': typeof AuthRouteWithChildren
+  '/auth': typeof AuthRoute
   '/available-players': typeof AvailablePlayersRoute
   '/index': typeof Char91indexChar93Route
   '/onboarding': typeof OnboardingRoute
@@ -317,10 +317,10 @@ export interface FileRoutesByTo {
   '/account/notifications': typeof AccountNotificationsRoute
   '/account/security': typeof AccountSecurityRoute
   '/admin/location-analytics': typeof AdminLocationAnalyticsRoute
-  '/auth/callback': typeof AuthCallbackRoute
   '/checkout/return': typeof CheckoutReturnRoute
   '/games/$gameId': typeof GamesGameIdRoute
   '/messages/$conversationId': typeof MessagesConversationIdRoute
+  '/oauth/callback': typeof OauthCallbackRoute
   '/players/$userId': typeof PlayersUserIdRoute
   '/profile/edit': typeof ProfileEditRoute
   '/review/new': typeof ReviewNewRoute
@@ -338,7 +338,7 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/_tabs': typeof TabsRouteWithChildren
   '/admin': typeof AdminRouteWithChildren
-  '/auth': typeof AuthRouteWithChildren
+  '/auth': typeof AuthRoute
   '/available-players': typeof AvailablePlayersRoute
   '/index': typeof Char91indexChar93Route
   '/onboarding': typeof OnboardingRoute
@@ -360,10 +360,10 @@ export interface FileRoutesById {
   '/account/notifications': typeof AccountNotificationsRoute
   '/account/security': typeof AccountSecurityRoute
   '/admin/location-analytics': typeof AdminLocationAnalyticsRoute
-  '/auth/callback': typeof AuthCallbackRoute
   '/checkout/return': typeof CheckoutReturnRoute
   '/games/$gameId': typeof GamesGameIdRoute
   '/messages/$conversationId': typeof MessagesConversationIdRoute
+  '/oauth/callback': typeof OauthCallbackRoute
   '/players/$userId': typeof PlayersUserIdRoute
   '/profile/edit': typeof ProfileEditRoute
   '/review/new': typeof ReviewNewRoute
@@ -403,10 +403,10 @@ export interface FileRouteTypes {
     | '/account/notifications'
     | '/account/security'
     | '/admin/location-analytics'
-    | '/auth/callback'
     | '/checkout/return'
     | '/games/$gameId'
     | '/messages/$conversationId'
+    | '/oauth/callback'
     | '/players/$userId'
     | '/profile/edit'
     | '/review/new'
@@ -444,10 +444,10 @@ export interface FileRouteTypes {
     | '/account/notifications'
     | '/account/security'
     | '/admin/location-analytics'
-    | '/auth/callback'
     | '/checkout/return'
     | '/games/$gameId'
     | '/messages/$conversationId'
+    | '/oauth/callback'
     | '/players/$userId'
     | '/profile/edit'
     | '/review/new'
@@ -486,10 +486,10 @@ export interface FileRouteTypes {
     | '/account/notifications'
     | '/account/security'
     | '/admin/location-analytics'
-    | '/auth/callback'
     | '/checkout/return'
     | '/games/$gameId'
     | '/messages/$conversationId'
+    | '/oauth/callback'
     | '/players/$userId'
     | '/profile/edit'
     | '/review/new'
@@ -507,7 +507,7 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   TabsRoute: typeof TabsRouteWithChildren
   AdminRoute: typeof AdminRouteWithChildren
-  AuthRoute: typeof AuthRouteWithChildren
+  AuthRoute: typeof AuthRoute
   AvailablePlayersRoute: typeof AvailablePlayersRoute
   Char91indexChar93Route: typeof Char91indexChar93Route
   OnboardingRoute: typeof OnboardingRoute
@@ -523,6 +523,7 @@ export interface RootRouteChildren {
   CheckoutReturnRoute: typeof CheckoutReturnRoute
   GamesGameIdRoute: typeof GamesGameIdRoute
   MessagesConversationIdRoute: typeof MessagesConversationIdRoute
+  OauthCallbackRoute: typeof OauthCallbackRoute
   PlayersUserIdRoute: typeof PlayersUserIdRoute
   ProfileEditRoute: typeof ProfileEditRoute
   ReviewNewRoute: typeof ReviewNewRoute
@@ -677,6 +678,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof PlayersUserIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/oauth/callback': {
+      id: '/oauth/callback'
+      path: '/oauth/callback'
+      fullPath: '/oauth/callback'
+      preLoaderRoute: typeof OauthCallbackRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/messages/$conversationId': {
       id: '/messages/$conversationId'
       path: '/messages/$conversationId'
@@ -697,13 +705,6 @@ declare module '@tanstack/react-router' {
       fullPath: '/checkout/return'
       preLoaderRoute: typeof CheckoutReturnRouteImport
       parentRoute: typeof rootRouteImport
-    }
-    '/auth/callback': {
-      id: '/auth/callback'
-      path: '/callback'
-      fullPath: '/auth/callback'
-      preLoaderRoute: typeof AuthCallbackRouteImport
-      parentRoute: typeof AuthRoute
     }
     '/admin/location-analytics': {
       id: '/admin/location-analytics'
@@ -854,16 +855,6 @@ const AdminRouteChildren: AdminRouteChildren = {
 
 const AdminRouteWithChildren = AdminRoute._addFileChildren(AdminRouteChildren)
 
-interface AuthRouteChildren {
-  AuthCallbackRoute: typeof AuthCallbackRoute
-}
-
-const AuthRouteChildren: AuthRouteChildren = {
-  AuthCallbackRoute: AuthCallbackRoute,
-}
-
-const AuthRouteWithChildren = AuthRoute._addFileChildren(AuthRouteChildren)
-
 interface TeamsTeamIdRouteChildren {
   TeamsTeamIdEditRoute: typeof TeamsTeamIdEditRoute
 }
@@ -880,7 +871,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   TabsRoute: TabsRouteWithChildren,
   AdminRoute: AdminRouteWithChildren,
-  AuthRoute: AuthRouteWithChildren,
+  AuthRoute: AuthRoute,
   AvailablePlayersRoute: AvailablePlayersRoute,
   Char91indexChar93Route: Char91indexChar93Route,
   OnboardingRoute: OnboardingRoute,
@@ -896,6 +887,7 @@ const rootRouteChildren: RootRouteChildren = {
   CheckoutReturnRoute: CheckoutReturnRoute,
   GamesGameIdRoute: GamesGameIdRoute,
   MessagesConversationIdRoute: MessagesConversationIdRoute,
+  OauthCallbackRoute: OauthCallbackRoute,
   PlayersUserIdRoute: PlayersUserIdRoute,
   ProfileEditRoute: ProfileEditRoute,
   ReviewNewRoute: ReviewNewRoute,
