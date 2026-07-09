@@ -86,11 +86,46 @@ export async function waitForAuthSession({
   timeoutMs?: number;
   intervalMs?: number;
 } = {}): Promise<Session | null> {
-  const startedAt = Date.now();
-  while (Date.now() - startedAt < timeoutMs) {
-    const { data } = await supabase.auth.getSession();
-    if (data.session) return data.session;
-    await new Promise((resolve) => setTimeout(resolve, intervalMs));
-  }
-  return null;
+  return new Promise((resolve) => {
+    let settled = false;
+    let polling = false;
+    let subscription: { unsubscribe: () => void } | undefined;
+
+    const cleanup = () => {
+      window.clearTimeout(timeout);
+      window.clearInterval(interval);
+      subscription?.unsubscribe();
+    };
+
+    const finish = (session: Session | null) => {
+      if (settled) return;
+      settled = true;
+      cleanup();
+      resolve(session);
+    };
+
+    const poll = () => {
+      if (polling || settled) return;
+      polling = true;
+      supabase.auth
+        .getSession()
+        .then(({ data }) => {
+          if (data.session) finish(data.session);
+        })
+        .catch(() => {
+          // Keep waiting until the hard timeout or an auth-state event fires.
+        })
+        .finally(() => {
+          polling = false;
+        });
+    };
+
+    const timeout = window.setTimeout(() => finish(null), timeoutMs);
+    const interval = window.setInterval(poll, intervalMs);
+    const { data } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (session) finish(session);
+    });
+    subscription = data.subscription;
+    poll();
+  });
 }

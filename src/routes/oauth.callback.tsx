@@ -5,7 +5,7 @@ import {
   hasOAuthErrorInUrl,
   waitForAuthSession,
 } from "@/lib/oauth-session";
-import { consumePostAuthRedirect } from "@/lib/post-auth-redirect";
+import { getPostSignInDestination } from "@/lib/post-sign-in-destination";
 
 export const Route = createFileRoute("/oauth/callback")({
   head: () => ({ meta: [{ title: "Signing in — OpenRun" }] }),
@@ -34,7 +34,7 @@ function OAuthCallbackPage() {
       if (cancelled) return;
 
       if (session) {
-        const returnPath = consumePostAuthRedirect("/profile");
+        const returnPath = await getPostSignInDestination(session);
         window.location.replace(returnPath);
         return;
       }
