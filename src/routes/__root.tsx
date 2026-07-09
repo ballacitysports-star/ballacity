@@ -169,8 +169,18 @@ function AuthGate({ children }: { children: React.ReactNode }) {
     if (loading) return;
     if (!user && !isPublic) {
       router.navigate({ to: "/auth", replace: true });
+      return;
     }
-  }, [loading, user, isPublic, router, pathname]);
+    // If user is authenticated but sitting on an auth-only public route, bounce into the app
+    // as soon as we know whether they need onboarding.
+    if (user && (pathname === "/auth" || pathname === "/oauth/callback" || pathname === "/reset-password")) {
+      if (needsOnboarding === true) {
+        router.navigate({ to: "/onboarding", replace: true });
+      } else if (needsOnboarding === false) {
+        router.navigate({ to: "/profile", replace: true });
+      }
+    }
+  }, [loading, user, isPublic, router, pathname, needsOnboarding]);
 
   // Detect whether the signed-in user has completed onboarding (username set).
   useEffect(() => {
