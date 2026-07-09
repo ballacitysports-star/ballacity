@@ -183,7 +183,8 @@ function AuthGate({ children }: { children: React.ReactNode }) {
         router.navigate({ to: "/onboarding", replace: true });
       } else if (needsOnboarding === false) {
         const target = consumePostAuthRedirect("/profile");
-        router.navigate({ to: target, replace: true });
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        router.navigate({ to: target as any, replace: true });
       }
     }
   }, [loading, user, isPublic, router, pathname, needsOnboarding]);
