@@ -138,13 +138,12 @@ function AuthPage() {
         ),
       ]);
 
-      if (firstResult.kind === "session" && firstResult.session) {
-        const target = consumePostAuthRedirect("/profile");
-        window.location.assign(target);
-        return;
-      }
-
-      if (firstResult.kind === "session" && !firstResult.session) {
+      if (firstResult.kind === "session") {
+        if (firstResult.session) {
+          const target = consumePostAuthRedirect("/profile");
+          window.location.assign(target);
+          return;
+        }
         setGoogleStatus({ kind: "timeout" });
         return;
       }
