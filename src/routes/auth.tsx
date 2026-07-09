@@ -124,15 +124,9 @@ function AuthPage() {
 
   const oauth = async (provider: "google") => {
     setGoogleBusy(true);
+    setGoogleStatus({ kind: "opening" });
     try {
-      // If AuthGate already saved an intended destination, keep it. Otherwise
-      // fall back to /profile so /oauth/callback has something to consume.
       if (!peekPostAuthRedirect()) savePostAuthRedirect("/profile");
-      // Route both popup (web_message) and full-page redirect flows through
-      // our public /oauth/callback route, which polls for the session and then
-      // navigates to the saved post-auth destination. Landing on `/` after a
-      // full-page redirect strands users on the marketing page because
-      // AuthGate only auto-bounces from /auth, /oauth/callback, /reset-password.
       const oauthPromise = lovable.auth.signInWithOAuth(provider, {
         redirect_uri: getOAuthRedirectUri(),
       });
@@ -152,30 +146,32 @@ function AuthPage() {
       const result =
         firstResult.kind === "oauth" ? firstResult.result : await oauthPromise;
       if (result.error) {
-        toast.error(result.error.message || "Google sign-in failed");
+        const message = result.error.message || "Google sign-in failed";
+        setGoogleStatus({ kind: "error", message });
+        toast.error(message);
         return;
       }
       if (result.redirected) {
         // Full-page redirect is in flight — nothing more to do here.
         return;
       }
-      // Popup flow (preview/desktop): confirm the session actually landed,
-      // then hard-navigate so every provider re-reads it fresh.
+      setGoogleStatus({ kind: "waiting" });
       const session = await waitForAuthSession({ timeoutMs: 4_000, intervalMs: 150 });
       if (!session) {
-        toast.error("Sign-in didn't complete. Please try again.");
+        setGoogleStatus({ kind: "timeout" });
         return;
       }
-      // Hard redirect ensures the whole app re-hydrates with the new session
-      // (fixes cases where in-app nav races the auth-store update).
       const target = consumePostAuthRedirect("/profile");
       window.location.assign(target);
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Sign-in failed");
+      const message = err instanceof Error ? err.message : "Sign-in failed";
+      setGoogleStatus({ kind: "error", message });
+      toast.error(message);
     } finally {
       setGoogleBusy(false);
     }
   };
+
 
 
   return (
