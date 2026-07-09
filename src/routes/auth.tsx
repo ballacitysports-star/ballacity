@@ -5,6 +5,11 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { lovable } from "@/integrations/lovable";
 import { getOAuthRedirectUri } from "@/lib/oauth-redirect";
+import {
+  consumePostAuthRedirect,
+  peekPostAuthRedirect,
+  savePostAuthRedirect,
+} from "@/lib/post-auth-redirect";
 import { useAuth } from "@/hooks/use-auth";
 
 export const Route = createFileRoute("/auth")({
