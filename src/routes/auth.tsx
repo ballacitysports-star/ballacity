@@ -11,6 +11,29 @@ export const Route = createFileRoute("/auth")({
   component: AuthPage,
 });
 
+const POST_AUTH_REDIRECT_KEY = "openrun.postAuthRedirect.v1";
+
+function rememberPostAuthRedirect(path = "/profile") {
+  if (typeof window === "undefined") return;
+  try {
+    window.sessionStorage.setItem(POST_AUTH_REDIRECT_KEY, path);
+  } catch {
+    // ignore storage errors
+  }
+}
+
+function consumePostAuthRedirect() {
+  if (typeof window === "undefined") return "/profile";
+  try {
+    const next = window.sessionStorage.getItem(POST_AUTH_REDIRECT_KEY);
+    window.sessionStorage.removeItem(POST_AUTH_REDIRECT_KEY);
+    if (next && next.startsWith("/") && !next.startsWith("//")) return next;
+  } catch {
+    // ignore storage errors
+  }
+  return "/profile";
+}
+
 function AuthPage() {
   const nav = useNavigate();
   const { user, loading } = useAuth();
@@ -21,7 +44,7 @@ function AuthPage() {
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
-    if (!loading && user) nav({ to: "/profile" });
+    if (!loading && user) nav({ to: consumePostAuthRedirect(), replace: true });
   }, [loading, user, nav]);
 
   const submit = async (e: React.FormEvent) => {
@@ -48,7 +71,7 @@ function AuthPage() {
         if (data.session) {
           await refreshAuth();
           toast.success("Account created!");
-          nav({ to: "/profile", replace: true });
+          nav({ to: consumePostAuthRedirect(), replace: true });
         } else {
           toast.success("Check your email to confirm your account.");
         }
@@ -75,7 +98,7 @@ function AuthPage() {
           throw error;
         }
         await refreshAuth();
-        nav({ to: "/profile", replace: true });
+        nav({ to: consumePostAuthRedirect(), replace: true });
       }
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Auth failed");
@@ -103,15 +126,17 @@ function AuthPage() {
   const google = async () => {
     setBusy(true);
     try {
+      rememberPostAuthRedirect("/profile");
       const result = await lovable.auth.signInWithOAuth("google", {
-        redirect_uri: `${window.location.origin}/auth`,
+        redirect_uri: window.location.origin,
       });
       if (result.error) {
         toast.error(result.error.message || "Google sign-in failed");
         return;
       }
+      if (result.redirected) return;
       await refreshAuth();
-      nav({ to: "/profile", replace: true });
+      nav({ to: consumePostAuthRedirect(), replace: true });
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Google sign-in failed");
     } finally {

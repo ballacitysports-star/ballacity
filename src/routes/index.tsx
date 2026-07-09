@@ -1,9 +1,11 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { motion } from "framer-motion";
 import { ArrowRight, MapPin, Sparkles, Trophy, Users, Video, Zap } from "lucide-react";
 import { Logo } from "@/components/Logo";
 import { HERO_IMAGE, SPORTS, GAMES } from "@/lib/sample-data";
 import { GameCard } from "@/components/GameCard";
+import { useEffect } from "react";
+import { useAuth } from "@/hooks/use-auth";
 
 
 
@@ -20,7 +22,22 @@ export const Route = createFileRoute("/")({
 });
 
 function Landing() {
+  const nav = useNavigate();
+  const { user, loading } = useAuth();
   const trending = GAMES.filter((g) => g.trending).slice(0, 4);
+
+  useEffect(() => {
+    if (loading || !user || typeof window === "undefined") return;
+    let target = "/profile";
+    try {
+      const stored = window.sessionStorage.getItem("openrun.postAuthRedirect.v1");
+      window.sessionStorage.removeItem("openrun.postAuthRedirect.v1");
+      if (stored && stored.startsWith("/") && !stored.startsWith("//")) target = stored;
+    } catch {
+      // ignore storage errors
+    }
+    nav({ to: target, replace: true });
+  }, [loading, user, nav]);
 
   return (
     <div className="min-h-dvh">
