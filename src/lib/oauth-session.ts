@@ -30,6 +30,15 @@ export function readOAuthTokensFromUrl(url: string): OAuthTokens | null {
   return null;
 }
 
+export function readOAuthCodeFromUrl(url: string): string | null {
+  const paramSets = paramsFromUrl(url);
+  for (const params of paramSets) {
+    const code = params.get("code");
+    if (code) return code;
+  }
+  return null;
+}
+
 export function hasOAuthErrorInUrl(url: string): boolean {
   return paramsFromUrl(url).some((params) => params.has("error"));
 }
@@ -48,7 +57,18 @@ export async function establishSessionFromOAuthUrl(
 ): Promise<OAuthSessionResult> {
   if (!url) return { session: null, error: null, foundTokens: false };
   const tokens = readOAuthTokensFromUrl(url);
-  if (!tokens) return { session: null, error: null, foundTokens: false };
+  if (!tokens) {
+    const code = readOAuthCodeFromUrl(url);
+    if (!code) return { session: null, error: null, foundTokens: false };
+
+    const { data, error } = await supabase.auth.exchangeCodeForSession(code);
+    cleanOAuthUrl();
+    return {
+      session: data.session ?? null,
+      error: error ?? null,
+      foundTokens: true,
+    };
+  }
 
   const { data, error } = await supabase.auth.setSession(tokens);
   cleanOAuthUrl();
