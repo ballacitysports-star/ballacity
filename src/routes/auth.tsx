@@ -99,19 +99,28 @@ function AuthPage() {
   const oauth = async (provider: "google" | "apple") => {
     setBusy(true);
     try {
+      // Remember where to land after a full-page (published) redirect.
+      // The in-editor preview uses a popup and resolves synchronously below;
+      // the fallback /oauth/callback route reads this on hard-redirect flows.
       try {
         sessionStorage.setItem("openrun:postAuthRedirect", "/profile");
       } catch {
         // Ignore storage failures; the callback has a safe default.
       }
+      // IMPORTANT: redirect_uri MUST be a public origin URL so the Lovable
+      // OAuth broker/popup can intercept it and post the code back via
+      // web_message. Pointing this at our own React route (e.g.
+      // /oauth/callback) breaks the popup flow — the SDK never gets the
+      // message, the promise never resolves, and the button hangs.
       const result = await lovable.auth.signInWithOAuth(provider, {
-        redirect_uri: `${window.location.origin}/oauth/callback`,
+        redirect_uri: window.location.origin,
       });
       if (result.error) {
         toast.error(result.error.message || `${provider === "google" ? "Google" : "Apple"} sign-in failed`);
         return;
       }
       if (!result.redirected) {
+        // Popup flow (preview): session is already set — send the user in.
         nav({ to: "/profile" });
       }
     } catch (err) {
