@@ -130,6 +130,7 @@ function AuthPage() {
       const oauthPromise = lovable.auth.signInWithOAuth(provider, {
         redirect_uri: getOAuthRedirectUri(),
       });
+      setGoogleStatus({ kind: "waiting" });
       const firstResult = await Promise.race([
         oauthPromise.then((result) => ({ kind: "oauth" as const, result })),
         waitForAuthSession({ timeoutMs: 20_000, intervalMs: 250 }).then(
@@ -137,14 +138,17 @@ function AuthPage() {
         ),
       ]);
 
-      if (firstResult.kind === "session" && firstResult.session) {
-        const target = consumePostAuthRedirect("/profile");
-        window.location.assign(target);
+      if (firstResult.kind === "session") {
+        if (firstResult.session) {
+          const target = consumePostAuthRedirect("/profile");
+          window.location.assign(target);
+          return;
+        }
+        setGoogleStatus({ kind: "timeout" });
         return;
       }
 
-      const result =
-        firstResult.kind === "oauth" ? firstResult.result : await oauthPromise;
+      const result = firstResult.result;
       if (result.error) {
         const message = result.error.message || "Google sign-in failed";
         setGoogleStatus({ kind: "error", message });

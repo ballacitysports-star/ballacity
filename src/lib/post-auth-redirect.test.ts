@@ -36,6 +36,9 @@ describe("isSafeRedirectPath", () => {
   });
 
   it("rejects auth-loop-producing paths", () => {
+    expect(isSafeRedirectPath("/")).toBe(false);
+    expect(isSafeRedirectPath("/index")).toBe(false);
+    expect(isSafeRedirectPath("/index?from=preview")).toBe(false);
     expect(isSafeRedirectPath("/auth")).toBe(false);
     expect(isSafeRedirectPath("/auth/anything")).toBe(false);
     expect(isSafeRedirectPath("/oauth/callback")).toBe(false);

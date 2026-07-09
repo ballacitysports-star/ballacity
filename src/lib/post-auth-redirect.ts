@@ -6,12 +6,13 @@
  * Rules:
  * - Only same-origin relative paths (must start with a single "/").
  * - Never protocol-relative ("//host") or absolute URLs.
- * - Never /auth, /oauth/*, /reset-password (would loop).
+ * - Never /, /index, /auth, /oauth/*, /reset-password (would loop or land on marketing).
  * - Never empty; fall back to the caller-provided default.
  */
 
 const STORAGE_KEY = "openrun:postAuthRedirect";
 
+const BLOCKED_EXACT_PATHS = new Set(["/", "/index"]);
 const BLOCKED_PREFIXES = ["/auth", "/oauth", "/reset-password"];
 
 export function isSafeRedirectPath(candidate: unknown): candidate is string {
@@ -20,8 +21,10 @@ export function isSafeRedirectPath(candidate: unknown): candidate is string {
   if (!candidate.startsWith("/")) return false;
   if (candidate.startsWith("//")) return false; // protocol-relative
   if (candidate.startsWith("/\\")) return false;
+  const pathOnly = candidate.split(/[?#]/, 1)[0];
+  if (BLOCKED_EXACT_PATHS.has(pathOnly)) return false;
   for (const p of BLOCKED_PREFIXES) {
-    if (candidate === p || candidate.startsWith(`${p}/`)) return false;
+    if (pathOnly === p || pathOnly.startsWith(`${p}/`)) return false;
   }
   return true;
 }
