@@ -1,10 +1,9 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import { ArrowLeft } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { lovable } from "@/integrations/lovable";
-import { useAuth } from "@/hooks/use-auth";
 import { getOAuthRedirectUri } from "@/lib/oauth-redirect";
 import { waitForAuthSession } from "@/lib/oauth-session";
 import { getPostSignInDestination } from "@/lib/post-sign-in-destination";
@@ -26,67 +25,17 @@ type GoogleStatus =
   | { kind: "error"; message: string };
 
 function AuthPage() {
-  const { session } = useAuth();
   const [mode, setMode] = useState<"signin" | "signup">("signin");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [displayName, setDisplayName] = useState("");
   const [busy, setBusy] = useState(false);
   const [googleBusy, setGoogleBusy] = useState(false);
-  const [completingAuth, setCompletingAuth] = useState(false);
   const [googleStatus, setGoogleStatus] = useState<GoogleStatus>({ kind: "idle" });
-  const completingRef = useRef(false);
-  const timeoutTimerRef = useRef<number | null>(null);
 
-  const clearTimeoutTimer = () => {
-    if (timeoutTimerRef.current !== null) {
-      window.clearTimeout(timeoutTimerRef.current);
-      timeoutTimerRef.current = null;
-    }
-  };
-
-  const finishAuthenticatedSession = async (session: NonNullable<Awaited<ReturnType<typeof waitForAuthSession>>>) => {
-    if (completingRef.current) return;
-    completingRef.current = true;
-    clearTimeoutTimer();
-    setCompletingAuth(true);
-    const target = await getPostSignInDestination(session);
-    window.location.assign(target);
-  };
-
-
-  useEffect(() => {
-    let cancelled = false;
-
-    const finish = async (session: NonNullable<Awaited<ReturnType<typeof waitForAuthSession>>>) => {
-      if (cancelled || completingRef.current) return;
-      completingRef.current = true;
-      setCompletingAuth(true);
-      const target = await getPostSignInDestination(session);
-      if (!cancelled) window.location.assign(target);
-    };
-
-    supabase.auth.getSession().then(({ data }) => {
-      if (data.session) void finish(data.session);
-    });
-
-    const { data } = supabase.auth.onAuthStateChange((event, session) => {
-      if ((event === "SIGNED_IN" || event === "INITIAL_SESSION") && session) {
-        void finish(session);
-      }
-    });
-
-    return () => {
-      cancelled = true;
-      data.subscription.unsubscribe();
-      clearTimeoutTimer();
-    };
-  }, []);
-
-
-  useEffect(() => {
-    if (session) void finishAuthenticatedSession(session);
-  }, [session]);
+  // AuthGate owns post-auth navigation: it awaits the onboarding check and
+  // consumes the saved post-auth redirect. We deliberately do NOT nav() here,
+  // since that would race the onboarding check and skip /onboarding.
 
   const checkExistingSession = async () => {
     const session = await waitForAuthSession({ timeoutMs: 2_000, intervalMs: 150 });
@@ -124,12 +73,11 @@ function AuthPage() {
         }
         if (data.session) {
           toast.success("Account created!");
-          await finishAuthenticatedSession(data.session);
         } else {
           toast.success("Check your email to confirm your account.");
         }
       } else {
-        const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+        const { error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) {
           const msg = error.message?.toLowerCase() ?? "";
           if (msg.includes("invalid login") || msg.includes("invalid credentials")) {
@@ -149,9 +97,6 @@ function AuthPage() {
             return;
           }
           throw error;
-        }
-        if (data.session) {
-          await finishAuthenticatedSession(data.session);
         }
       }
     } catch (err) {
@@ -214,15 +159,14 @@ function AuthPage() {
         // Full-page redirect is in flight — nothing more to do here.
         return;
       }
-      // Popup/web_message flow: session write happens asynchronously.
-      // Let the top-level onAuthStateChange / useAuth effect drive navigation,
-      // and only escalate to a timeout if nothing lands within 15s.
       setGoogleStatus({ kind: "waiting" });
-      clearTimeoutTimer();
-      timeoutTimerRef.current = window.setTimeout(() => {
-        if (!completingRef.current) setGoogleStatus({ kind: "timeout" });
-        timeoutTimerRef.current = null;
-      }, 15_000);
+      const session = await waitForAuthSession({ timeoutMs: 4_000, intervalMs: 150 });
+      if (!session) {
+        setGoogleStatus({ kind: "timeout" });
+        return;
+      }
+      const target = await getPostSignInDestination(session);
+      window.location.assign(target);
     } catch (err) {
       const message = err instanceof Error ? err.message : "Sign-in failed";
       setGoogleStatus({ kind: "error", message });
@@ -231,7 +175,6 @@ function AuthPage() {
       setGoogleBusy(false);
     }
   };
-
 
 
 
@@ -281,8 +224,6 @@ function AuthPage() {
             ? "Opening Google…"
             : googleStatus.kind === "waiting"
               ? "Finishing sign-in…"
-              : completingAuth
-                ? "Finishing sign-in…"
               : "Continue with Google"}
         </button>
 
@@ -295,7 +236,7 @@ function AuthPage() {
           {googleStatus.kind === "waiting" && "Confirming your session…"}
         </div>
 
-        {!completingAuth && !session && (googleStatus.kind === "timeout" || googleStatus.kind === "error") && (
+        {(googleStatus.kind === "timeout" || googleStatus.kind === "error") && (
           <div
             role="alert"
             className="rounded-2xl border border-border bg-surface p-4 space-y-3"
@@ -392,7 +333,7 @@ function AuthPage() {
             disabled={busy || googleBusy}
             className="w-full rounded-full bg-lime-gradient px-4 py-3 text-sm font-bold text-primary-foreground disabled:opacity-50"
           >
-            {busy || completingAuth ? "Please wait…" : mode === "signin" ? "Sign in" : "Create account"}
+            {busy ? "Please wait…" : mode === "signin" ? "Sign in" : "Create account"}
           </button>
         </form>
 
