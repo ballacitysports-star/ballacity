@@ -27,9 +27,10 @@ function AuthPage() {
   const [busy, setBusy] = useState(false);
   const [googleBusy, setGoogleBusy] = useState(false);
 
-  useEffect(() => {
-    if (!loading && user) nav({ to: "/profile" });
-  }, [loading, user, nav]);
+  // AuthGate owns post-auth navigation: it awaits the onboarding check and
+  // consumes the saved post-auth redirect. We deliberately do NOT nav() here,
+  // since that would race the onboarding check and skip /onboarding.
+
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
