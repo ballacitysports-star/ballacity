@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ArrowLeft } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -31,11 +31,44 @@ function AuthPage() {
   const [displayName, setDisplayName] = useState("");
   const [busy, setBusy] = useState(false);
   const [googleBusy, setGoogleBusy] = useState(false);
+  const [completingAuth, setCompletingAuth] = useState(false);
   const [googleStatus, setGoogleStatus] = useState<GoogleStatus>({ kind: "idle" });
+  const completingRef = useRef(false);
 
-  // AuthGate owns post-auth navigation: it awaits the onboarding check and
-  // consumes the saved post-auth redirect. We deliberately do NOT nav() here,
-  // since that would race the onboarding check and skip /onboarding.
+  const finishAuthenticatedSession = async (session: NonNullable<Awaited<ReturnType<typeof waitForAuthSession>>>) => {
+    if (completingRef.current) return;
+    completingRef.current = true;
+    setCompletingAuth(true);
+    const target = await getPostSignInDestination(session);
+    window.location.assign(target);
+  };
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const finish = async (session: NonNullable<Awaited<ReturnType<typeof waitForAuthSession>>>) => {
+      if (cancelled || completingRef.current) return;
+      completingRef.current = true;
+      setCompletingAuth(true);
+      const target = await getPostSignInDestination(session);
+      if (!cancelled) window.location.assign(target);
+    };
+
+    supabase.auth.getSession().then(({ data }) => {
+      if (data.session) void finish(data.session);
+    });
+
+    const { data } = supabase.auth.onAuthStateChange((event, session) => {
+      if ((event === "SIGNED_IN" || event === "INITIAL_SESSION") && session) {
+        void finish(session);
+      }
+    });
+
+    return () => {
+      cancelled = true;
+      data.subscription.unsubscribe();
+    };
+  }, []);
 
   const checkExistingSession = async () => {
     const session = await waitForAuthSession({ timeoutMs: 2_000, intervalMs: 150 });
@@ -73,11 +106,12 @@ function AuthPage() {
         }
         if (data.session) {
           toast.success("Account created!");
+          await finishAuthenticatedSession(data.session);
         } else {
           toast.success("Check your email to confirm your account.");
         }
       } else {
-        const { error } = await supabase.auth.signInWithPassword({ email, password });
+        const { data, error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) {
           const msg = error.message?.toLowerCase() ?? "";
           if (msg.includes("invalid login") || msg.includes("invalid credentials")) {
@@ -97,6 +131,9 @@ function AuthPage() {
             return;
           }
           throw error;
+        }
+        if (data.session) {
+          await finishAuthenticatedSession(data.session);
         }
       }
     } catch (err) {
@@ -224,6 +261,8 @@ function AuthPage() {
             ? "Opening Google…"
             : googleStatus.kind === "waiting"
               ? "Finishing sign-in…"
+              : completingAuth
+                ? "Finishing sign-in…"
               : "Continue with Google"}
         </button>
 
@@ -333,7 +372,7 @@ function AuthPage() {
             disabled={busy || googleBusy}
             className="w-full rounded-full bg-lime-gradient px-4 py-3 text-sm font-bold text-primary-foreground disabled:opacity-50"
           >
-            {busy ? "Please wait…" : mode === "signin" ? "Sign in" : "Create account"}
+            {busy || completingAuth ? "Please wait…" : mode === "signin" ? "Sign in" : "Create account"}
           </button>
         </form>
 
