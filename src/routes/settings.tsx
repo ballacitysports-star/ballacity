@@ -103,8 +103,7 @@ const SECTIONS: Section[] = [
 ];
 
 function SettingsHubPage() {
-  const [theme, setTheme] = useTheme();
-  const isDark = theme === "dark";
+  const [theme, setTheme, , resolved] = useTheme();
 
   const handleSignOut = async () => {
     try {
@@ -115,6 +114,12 @@ function SettingsHubPage() {
       toast.error("Couldn't sign out");
     }
   };
+
+  const themeOptions: Array<{ value: "light" | "dark" | "system"; label: string; Icon: typeof Sun }> = [
+    { value: "light", label: "Light", Icon: Sun },
+    { value: "dark", label: "Dark", Icon: Moon },
+    { value: "system", label: "System", Icon: Monitor },
+  ];
 
   return (
     <div className="min-h-screen bg-background pb-24">
@@ -130,23 +135,37 @@ function SettingsHubPage() {
           <h2 className="px-1 pb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
             Appearance
           </h2>
-          <div className="flex items-center gap-3 rounded-xl border bg-card px-4 py-3">
-            <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-muted">
-              {isDark ? <Moon className="h-4 w-4" /> : <Sun className="h-4 w-4" />}
-            </span>
-            <span className="min-w-0 flex-1">
-              <span className="block truncate text-sm font-medium">Dark mode</span>
-              <span className="block truncate text-xs text-muted-foreground">
-                {isDark ? "Using dark theme" : "Using light theme"}
-              </span>
-            </span>
-            <Switch
-              checked={isDark}
-              onCheckedChange={(checked) => setTheme(checked ? "dark" : "light")}
-              aria-label="Toggle dark mode"
-            />
+          <div className="rounded-xl border bg-card p-3 space-y-3">
+            <div className="grid grid-cols-3 gap-2" role="radiogroup" aria-label="Theme">
+              {themeOptions.map(({ value, label, Icon }) => {
+                const active = theme === value;
+                return (
+                  <button
+                    key={value}
+                    type="button"
+                    role="radio"
+                    aria-checked={active}
+                    onClick={() => setTheme(value)}
+                    className={`flex flex-col items-center gap-1.5 rounded-lg border px-2 py-3 text-xs font-medium transition ${
+                      active
+                        ? "border-primary bg-primary/10 text-foreground"
+                        : "border-border bg-muted/40 text-muted-foreground hover:text-foreground hover:bg-muted"
+                    }`}
+                  >
+                    <Icon className="h-4 w-4" />
+                    {label}
+                  </button>
+                );
+              })}
+            </div>
+            <p className="px-1 text-xs text-muted-foreground">
+              {theme === "system"
+                ? `Following your device (currently ${resolved})`
+                : `Using ${theme} theme`}
+            </p>
           </div>
         </section>
+
 
         {SECTIONS.map((section) => (
           <section key={section.title}>
