@@ -1,3 +1,5 @@
+import pickleballCover from "@/assets/pickleball-cover.jpg";
+
 export type Sport =
   | "Basketball"
   | "Soccer"
@@ -76,7 +78,10 @@ const sportMeta: Record<Sport, { color: string; emoji: string }> = SPORTS.reduce
 );
 
 const sportImage: Record<Sport, string> = Object.fromEntries(
-  (Object.keys(sportMeta) as Sport[]).map((s) => [s, makeDefaultCover(sportMeta[s].color, sportMeta[s].emoji)]),
+  (Object.keys(sportMeta) as Sport[]).map((s) => [
+    s,
+    s === "Pickleball" ? pickleballCover : makeDefaultCover(sportMeta[s].color, sportMeta[s].emoji),
+  ]),
 ) as Record<Sport, string>;
 
 export const HERO_IMAGE = sportImage.Basketball;
