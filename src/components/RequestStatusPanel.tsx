@@ -118,49 +118,85 @@ export function RequestStatusPanel({
 
   const handleCancel = async () => {
     if (!summary?.id) return;
-    if (!window.confirm("Cancel this pending request? You can re-send it afterwards.")) return;
     setCancelling(true);
     try {
       await cancelContactRequest(summary.id);
-      toast.success("Request cancelled");
+      toast.success("Request cancelled", {
+        description: "You can send a new invite or contact request now.",
+      });
       setLocalRefresh((k) => k + 1);
       onCancelled?.();
+      setConfirmOpen(false);
     } catch (e: any) {
-      toast.error(e?.message ?? "Couldn't cancel request");
+      toast.error("Couldn't cancel request", {
+        description: e?.message ?? "Please try again in a moment.",
+      });
     } finally {
       setCancelling(false);
     }
   };
 
   const isPending = s.status === "pending" && !!summary?.id;
+  const kindLabel = summary?.kind === "invite" ? "invite" : "contact request";
 
   return (
-    <div className={`flex items-start gap-2 rounded-2xl border p-3 ${cfg.className}`}>
-      <Icon className="h-4 w-4 mt-0.5 shrink-0" />
-      <div className="min-w-0 flex-1 text-xs">
-        <p className="font-semibold">
-          Status: {cfg.label}
-          {when && s.status !== "none" ? (
-            <span className="ml-1 font-normal opacity-80">· {when}</span>
-          ) : null}
-        </p>
-        <p className="opacity-90 mt-0.5">{cfg.sub}</p>
-        {isPending && (
-          <button
-            type="button"
-            onClick={handleCancel}
-            disabled={cancelling}
-            className="mt-2 inline-flex items-center gap-1 rounded-full border border-current/40 bg-background/60 px-2.5 py-1 text-[11px] font-semibold hover:bg-background/90 disabled:opacity-60"
-          >
-            {cancelling ? (
-              <Loader2 className="h-3 w-3 animate-spin" />
-            ) : (
-              <X className="h-3 w-3" />
-            )}
-            {cancelling ? "Cancelling…" : "Cancel request"}
-          </button>
-        )}
+    <>
+      <div className={`flex items-start gap-2 rounded-2xl border p-3 ${cfg.className}`}>
+        <Icon className="h-4 w-4 mt-0.5 shrink-0" />
+        <div className="min-w-0 flex-1 text-xs">
+          <p className="font-semibold">
+            Status: {cfg.label}
+            {when && s.status !== "none" ? (
+              <span className="ml-1 font-normal opacity-80">· {when}</span>
+            ) : null}
+          </p>
+          <p className="opacity-90 mt-0.5">{cfg.sub}</p>
+          {isPending && (
+            <button
+              type="button"
+              onClick={() => setConfirmOpen(true)}
+              disabled={cancelling}
+              className="mt-2 inline-flex items-center gap-1 rounded-full border border-current/40 bg-background/60 px-2.5 py-1 text-[11px] font-semibold hover:bg-background/90 disabled:opacity-60"
+            >
+              {cancelling ? (
+                <Loader2 className="h-3 w-3 animate-spin" />
+              ) : (
+                <X className="h-3 w-3" />
+              )}
+              {cancelling ? "Cancelling…" : "Cancel request"}
+            </button>
+          )}
+        </div>
       </div>
-    </div>
+
+      <AlertDialog
+        open={confirmOpen}
+        onOpenChange={(o) => !cancelling && setConfirmOpen(o)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Cancel this pending {kindLabel}?</AlertDialogTitle>
+            <AlertDialogDescription>
+              The other player won't be notified. You can send a new {kindLabel} to
+              them right after.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={cancelling}>Keep request</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => {
+                e.preventDefault();
+                handleCancel();
+              }}
+              disabled={cancelling}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {cancelling && <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" />}
+              {cancelling ? "Cancelling…" : `Cancel ${kindLabel}`}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
   );
 }
