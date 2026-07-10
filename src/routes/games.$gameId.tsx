@@ -1437,8 +1437,10 @@ function RosterPlayerRow({
             {rep.count > 0
               ? `${rep.count} review${rep.count === 1 ? "" : "s"} · trust ${rep.trustScore}`
               : "No reviews yet"}
+          </div>
         </div>
         <div className="flex flex-col gap-1.5">
+
           <button
             type="button"
             onClick={remove}
