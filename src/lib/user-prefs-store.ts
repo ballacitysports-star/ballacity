@@ -286,9 +286,16 @@ export function useFeedPrefs(): FeedPrefs {
   if (!sections.showForYou && !sections.showUrgent) {
     sections.showForYou = true;
   }
+  const maxDistanceMi =
+    typeof parsed.maxDistanceMi === "number" && parsed.maxDistanceMi > 0
+      ? parsed.maxDistanceMi
+      : null;
+  const distanceUnit = parsed.distanceUnit === "km" ? "km" : "mi";
   return {
     preferredSports: parsed.preferredSports ?? [],
     sections,
+    maxDistanceMi,
+    distanceUnit,
   };
 }
 
