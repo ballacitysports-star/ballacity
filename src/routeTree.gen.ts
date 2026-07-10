@@ -16,6 +16,7 @@ import { Route as ResetPasswordRouteImport } from './routes/reset-password'
 import { Route as PlansRouteImport } from './routes/plans'
 import { Route as PickupRouteImport } from './routes/pickup'
 import { Route as PaymentsRouteImport } from './routes/payments'
+import { Route as McpRouteImport } from './routes/mcp'
 import { Route as AvailablePlayersRouteImport } from './routes/available-players'
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as AdminRouteImport } from './routes/admin'
@@ -41,9 +42,12 @@ import { Route as TabsNotificationsRouteImport } from './routes/_tabs.notificati
 import { Route as TabsFeedRouteImport } from './routes/_tabs.feed'
 import { Route as TabsDiscoverRouteImport } from './routes/_tabs.discover'
 import { Route as TabsCreateRouteImport } from './routes/_tabs.create'
+import { Route as Char91DotwellKnownChar93OauthProtectedResourceRouteImport } from './routes/[.well-known]/oauth-protected-resource'
+import { Route as Char91DotmcpChar93ListToolsRouteImport } from './routes/[.mcp]/list-tools'
 import { Route as TeamsTeamIdEditRouteImport } from './routes/teams.$teamId.edit'
 import { Route as GamesGameIdPaymentSetupRouteImport } from './routes/games.$gameId.payment-setup'
 import { Route as GamesGameIdPayRouteImport } from './routes/games.$gameId.pay'
+import { Route as Char91DotmcpChar93InvokeToolToolRouteImport } from './routes/[.mcp]/invoke-tool/$tool'
 import { Route as ApiPublicReelsProcessRouteImport } from './routes/api/public/reels/process'
 import { Route as ApiPublicPaymentsWebhookRouteImport } from './routes/api/public/payments/webhook'
 
@@ -80,6 +84,11 @@ const PickupRoute = PickupRouteImport.update({
 const PaymentsRoute = PaymentsRouteImport.update({
   id: '/payments',
   path: '/payments',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const McpRoute = McpRouteImport.update({
+  id: '/mcp',
+  path: '/mcp',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AvailablePlayersRoute = AvailablePlayersRouteImport.update({
@@ -206,6 +215,18 @@ const TabsCreateRoute = TabsCreateRouteImport.update({
   path: '/create',
   getParentRoute: () => TabsRoute,
 } as any)
+const Char91DotwellKnownChar93OauthProtectedResourceRoute =
+  Char91DotwellKnownChar93OauthProtectedResourceRouteImport.update({
+    id: '/.well-known/oauth-protected-resource',
+    path: '/.well-known/oauth-protected-resource',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const Char91DotmcpChar93ListToolsRoute =
+  Char91DotmcpChar93ListToolsRouteImport.update({
+    id: '/.mcp/list-tools',
+    path: '/.mcp/list-tools',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const TeamsTeamIdEditRoute = TeamsTeamIdEditRouteImport.update({
   id: '/edit',
   path: '/edit',
@@ -221,6 +242,12 @@ const GamesGameIdPayRoute = GamesGameIdPayRouteImport.update({
   path: '/pay',
   getParentRoute: () => GamesGameIdRoute,
 } as any)
+const Char91DotmcpChar93InvokeToolToolRoute =
+  Char91DotmcpChar93InvokeToolToolRouteImport.update({
+    id: '/.mcp/invoke-tool/$tool',
+    path: '/.mcp/invoke-tool/$tool',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiPublicReelsProcessRoute = ApiPublicReelsProcessRouteImport.update({
   id: '/api/public/reels/process',
   path: '/api/public/reels/process',
@@ -238,6 +265,7 @@ export interface FileRoutesByFullPath {
   '/admin': typeof AdminRouteWithChildren
   '/auth': typeof AuthRoute
   '/available-players': typeof AvailablePlayersRoute
+  '/mcp': typeof McpRoute
   '/payments': typeof PaymentsRoute
   '/pickup': typeof PickupRoute
   '/plans': typeof PlansRoute
@@ -245,6 +273,8 @@ export interface FileRoutesByFullPath {
   '/reviews': typeof ReviewsRoute
   '/settings': typeof SettingsRoute
   '/shop': typeof ShopRoute
+  '/.mcp/list-tools': typeof Char91DotmcpChar93ListToolsRoute
+  '/.well-known/oauth-protected-resource': typeof Char91DotwellKnownChar93OauthProtectedResourceRoute
   '/create': typeof TabsCreateRoute
   '/discover': typeof TabsDiscoverRoute
   '/feed': typeof TabsFeedRoute
@@ -265,6 +295,7 @@ export interface FileRoutesByFullPath {
   '/teams/$teamId': typeof TeamsTeamIdRouteWithChildren
   '/teams/create': typeof TeamsCreateRoute
   '/messages/': typeof MessagesIndexRoute
+  '/.mcp/invoke-tool/$tool': typeof Char91DotmcpChar93InvokeToolToolRoute
   '/games/$gameId/pay': typeof GamesGameIdPayRoute
   '/games/$gameId/payment-setup': typeof GamesGameIdPaymentSetupRoute
   '/teams/$teamId/edit': typeof TeamsTeamIdEditRoute
@@ -276,6 +307,7 @@ export interface FileRoutesByTo {
   '/admin': typeof AdminRouteWithChildren
   '/auth': typeof AuthRoute
   '/available-players': typeof AvailablePlayersRoute
+  '/mcp': typeof McpRoute
   '/payments': typeof PaymentsRoute
   '/pickup': typeof PickupRoute
   '/plans': typeof PlansRoute
@@ -283,6 +315,8 @@ export interface FileRoutesByTo {
   '/reviews': typeof ReviewsRoute
   '/settings': typeof SettingsRoute
   '/shop': typeof ShopRoute
+  '/.mcp/list-tools': typeof Char91DotmcpChar93ListToolsRoute
+  '/.well-known/oauth-protected-resource': typeof Char91DotwellKnownChar93OauthProtectedResourceRoute
   '/create': typeof TabsCreateRoute
   '/discover': typeof TabsDiscoverRoute
   '/feed': typeof TabsFeedRoute
@@ -303,6 +337,7 @@ export interface FileRoutesByTo {
   '/teams/$teamId': typeof TeamsTeamIdRouteWithChildren
   '/teams/create': typeof TeamsCreateRoute
   '/messages': typeof MessagesIndexRoute
+  '/.mcp/invoke-tool/$tool': typeof Char91DotmcpChar93InvokeToolToolRoute
   '/games/$gameId/pay': typeof GamesGameIdPayRoute
   '/games/$gameId/payment-setup': typeof GamesGameIdPaymentSetupRoute
   '/teams/$teamId/edit': typeof TeamsTeamIdEditRoute
@@ -316,6 +351,7 @@ export interface FileRoutesById {
   '/admin': typeof AdminRouteWithChildren
   '/auth': typeof AuthRoute
   '/available-players': typeof AvailablePlayersRoute
+  '/mcp': typeof McpRoute
   '/payments': typeof PaymentsRoute
   '/pickup': typeof PickupRoute
   '/plans': typeof PlansRoute
@@ -323,6 +359,8 @@ export interface FileRoutesById {
   '/reviews': typeof ReviewsRoute
   '/settings': typeof SettingsRoute
   '/shop': typeof ShopRoute
+  '/.mcp/list-tools': typeof Char91DotmcpChar93ListToolsRoute
+  '/.well-known/oauth-protected-resource': typeof Char91DotwellKnownChar93OauthProtectedResourceRoute
   '/_tabs/create': typeof TabsCreateRoute
   '/_tabs/discover': typeof TabsDiscoverRoute
   '/_tabs/feed': typeof TabsFeedRoute
@@ -343,6 +381,7 @@ export interface FileRoutesById {
   '/teams/$teamId': typeof TeamsTeamIdRouteWithChildren
   '/teams/create': typeof TeamsCreateRoute
   '/messages/': typeof MessagesIndexRoute
+  '/.mcp/invoke-tool/$tool': typeof Char91DotmcpChar93InvokeToolToolRoute
   '/games/$gameId/pay': typeof GamesGameIdPayRoute
   '/games/$gameId/payment-setup': typeof GamesGameIdPaymentSetupRoute
   '/teams/$teamId/edit': typeof TeamsTeamIdEditRoute
@@ -356,6 +395,7 @@ export interface FileRouteTypes {
     | '/admin'
     | '/auth'
     | '/available-players'
+    | '/mcp'
     | '/payments'
     | '/pickup'
     | '/plans'
@@ -363,6 +403,8 @@ export interface FileRouteTypes {
     | '/reviews'
     | '/settings'
     | '/shop'
+    | '/.mcp/list-tools'
+    | '/.well-known/oauth-protected-resource'
     | '/create'
     | '/discover'
     | '/feed'
@@ -383,6 +425,7 @@ export interface FileRouteTypes {
     | '/teams/$teamId'
     | '/teams/create'
     | '/messages/'
+    | '/.mcp/invoke-tool/$tool'
     | '/games/$gameId/pay'
     | '/games/$gameId/payment-setup'
     | '/teams/$teamId/edit'
@@ -394,6 +437,7 @@ export interface FileRouteTypes {
     | '/admin'
     | '/auth'
     | '/available-players'
+    | '/mcp'
     | '/payments'
     | '/pickup'
     | '/plans'
@@ -401,6 +445,8 @@ export interface FileRouteTypes {
     | '/reviews'
     | '/settings'
     | '/shop'
+    | '/.mcp/list-tools'
+    | '/.well-known/oauth-protected-resource'
     | '/create'
     | '/discover'
     | '/feed'
@@ -421,6 +467,7 @@ export interface FileRouteTypes {
     | '/teams/$teamId'
     | '/teams/create'
     | '/messages'
+    | '/.mcp/invoke-tool/$tool'
     | '/games/$gameId/pay'
     | '/games/$gameId/payment-setup'
     | '/teams/$teamId/edit'
@@ -433,6 +480,7 @@ export interface FileRouteTypes {
     | '/admin'
     | '/auth'
     | '/available-players'
+    | '/mcp'
     | '/payments'
     | '/pickup'
     | '/plans'
@@ -440,6 +488,8 @@ export interface FileRouteTypes {
     | '/reviews'
     | '/settings'
     | '/shop'
+    | '/.mcp/list-tools'
+    | '/.well-known/oauth-protected-resource'
     | '/_tabs/create'
     | '/_tabs/discover'
     | '/_tabs/feed'
@@ -460,6 +510,7 @@ export interface FileRouteTypes {
     | '/teams/$teamId'
     | '/teams/create'
     | '/messages/'
+    | '/.mcp/invoke-tool/$tool'
     | '/games/$gameId/pay'
     | '/games/$gameId/payment-setup'
     | '/teams/$teamId/edit'
@@ -473,6 +524,7 @@ export interface RootRouteChildren {
   AdminRoute: typeof AdminRouteWithChildren
   AuthRoute: typeof AuthRoute
   AvailablePlayersRoute: typeof AvailablePlayersRoute
+  McpRoute: typeof McpRoute
   PaymentsRoute: typeof PaymentsRoute
   PickupRoute: typeof PickupRoute
   PlansRoute: typeof PlansRoute
@@ -480,6 +532,8 @@ export interface RootRouteChildren {
   ReviewsRoute: typeof ReviewsRoute
   SettingsRoute: typeof SettingsRoute
   ShopRoute: typeof ShopRoute
+  Char91DotmcpChar93ListToolsRoute: typeof Char91DotmcpChar93ListToolsRoute
+  Char91DotwellKnownChar93OauthProtectedResourceRoute: typeof Char91DotwellKnownChar93OauthProtectedResourceRoute
   AccountNotificationsRoute: typeof AccountNotificationsRoute
   AccountSecurityRoute: typeof AccountSecurityRoute
   CheckoutReturnRoute: typeof CheckoutReturnRoute
@@ -491,6 +545,7 @@ export interface RootRouteChildren {
   TeamsTeamIdRoute: typeof TeamsTeamIdRouteWithChildren
   TeamsCreateRoute: typeof TeamsCreateRoute
   MessagesIndexRoute: typeof MessagesIndexRoute
+  Char91DotmcpChar93InvokeToolToolRoute: typeof Char91DotmcpChar93InvokeToolToolRoute
   ApiPublicPaymentsWebhookRoute: typeof ApiPublicPaymentsWebhookRoute
   ApiPublicReelsProcessRoute: typeof ApiPublicReelsProcessRoute
 }
@@ -544,6 +599,13 @@ declare module '@tanstack/react-router' {
       path: '/payments'
       fullPath: '/payments'
       preLoaderRoute: typeof PaymentsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/mcp': {
+      id: '/mcp'
+      path: '/mcp'
+      fullPath: '/mcp'
+      preLoaderRoute: typeof McpRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/available-players': {
@@ -721,6 +783,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof TabsCreateRouteImport
       parentRoute: typeof TabsRoute
     }
+    '/.well-known/oauth-protected-resource': {
+      id: '/.well-known/oauth-protected-resource'
+      path: '/.well-known/oauth-protected-resource'
+      fullPath: '/.well-known/oauth-protected-resource'
+      preLoaderRoute: typeof Char91DotwellKnownChar93OauthProtectedResourceRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/.mcp/list-tools': {
+      id: '/.mcp/list-tools'
+      path: '/.mcp/list-tools'
+      fullPath: '/.mcp/list-tools'
+      preLoaderRoute: typeof Char91DotmcpChar93ListToolsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/teams/$teamId/edit': {
       id: '/teams/$teamId/edit'
       path: '/edit'
@@ -741,6 +817,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/games/$gameId/pay'
       preLoaderRoute: typeof GamesGameIdPayRouteImport
       parentRoute: typeof GamesGameIdRoute
+    }
+    '/.mcp/invoke-tool/$tool': {
+      id: '/.mcp/invoke-tool/$tool'
+      path: '/.mcp/invoke-tool/$tool'
+      fullPath: '/.mcp/invoke-tool/$tool'
+      preLoaderRoute: typeof Char91DotmcpChar93InvokeToolToolRouteImport
+      parentRoute: typeof rootRouteImport
     }
     '/api/public/reels/process': {
       id: '/api/public/reels/process'
@@ -825,6 +908,7 @@ const rootRouteChildren: RootRouteChildren = {
   AdminRoute: AdminRouteWithChildren,
   AuthRoute: AuthRoute,
   AvailablePlayersRoute: AvailablePlayersRoute,
+  McpRoute: McpRoute,
   PaymentsRoute: PaymentsRoute,
   PickupRoute: PickupRoute,
   PlansRoute: PlansRoute,
@@ -832,6 +916,9 @@ const rootRouteChildren: RootRouteChildren = {
   ReviewsRoute: ReviewsRoute,
   SettingsRoute: SettingsRoute,
   ShopRoute: ShopRoute,
+  Char91DotmcpChar93ListToolsRoute: Char91DotmcpChar93ListToolsRoute,
+  Char91DotwellKnownChar93OauthProtectedResourceRoute:
+    Char91DotwellKnownChar93OauthProtectedResourceRoute,
   AccountNotificationsRoute: AccountNotificationsRoute,
   AccountSecurityRoute: AccountSecurityRoute,
   CheckoutReturnRoute: CheckoutReturnRoute,
@@ -843,6 +930,7 @@ const rootRouteChildren: RootRouteChildren = {
   TeamsTeamIdRoute: TeamsTeamIdRouteWithChildren,
   TeamsCreateRoute: TeamsCreateRoute,
   MessagesIndexRoute: MessagesIndexRoute,
+  Char91DotmcpChar93InvokeToolToolRoute: Char91DotmcpChar93InvokeToolToolRoute,
   ApiPublicPaymentsWebhookRoute: ApiPublicPaymentsWebhookRoute,
   ApiPublicReelsProcessRoute: ApiPublicReelsProcessRoute,
 }
