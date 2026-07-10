@@ -57,6 +57,9 @@ function Feed() {
       .filter((g) => (prefs.sections.freeOnly ? g.price === 0 : true))
       .filter((g) => (prefs.sections.paidOnly ? g.price > 0 : true))
       .filter((g) =>
+        prefs.maxDistanceMi != null ? g.distanceMi <= prefs.maxDistanceMi : true,
+      )
+      .filter((g) =>
         q
           ? (
               g.title +
