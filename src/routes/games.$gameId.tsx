@@ -1230,6 +1230,64 @@ function Meta({ icon, label, value }: { icon: React.ReactNode; label: string; va
   );
 }
 
+function BlockedUsersSection({ hostId }: { hostId: string }) {
+  const blocked = useBlockedUsers(hostId);
+  const [names, setNames] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    if (blocked.length === 0) return;
+    const missing = blocked.filter((id) => !(id in names));
+    if (missing.length === 0) return;
+    let cancel = false;
+    (async () => {
+      const { data } = await supabase
+        .from("profiles")
+        .select("id, display_name")
+        .in("id", missing);
+      if (cancel || !data) return;
+      const next: Record<string, string> = {};
+      (data as { id: string; display_name: string | null }[]).forEach((r) => {
+        next[r.id] = r.display_name ?? "Player";
+      });
+      setNames((n) => ({ ...n, ...next }));
+    })();
+    return () => {
+      cancel = true;
+    };
+  }, [blocked, names]);
+
+  if (!hostId) return null;
+
+  return (
+    <div className="mt-4 rounded-xl border border-border bg-background p-3">
+      <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-2">
+        Blocked players
+      </div>
+      {blocked.length === 0 ? (
+        <div className="text-xs text-muted-foreground">
+          You haven't blocked anyone. Use the Block button on a request or roster row to prevent a
+          player from joining your games.
+        </div>
+      ) : (
+        <ul className="space-y-1.5">
+          {blocked.map((id) => (
+            <li key={id} className="flex items-center justify-between gap-2">
+              <span className="text-sm font-semibold truncate">{names[id] ?? "Player"}</span>
+              <button
+                type="button"
+                onClick={() => unblockUser(hostId, id)}
+                className="rounded-full border border-border bg-surface px-3 py-1 text-[11px] font-semibold hover:bg-secondary"
+              >
+                Unblock
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
 function RosterPlayerRow({
   req,
   gameTitle,
