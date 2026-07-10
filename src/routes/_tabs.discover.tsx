@@ -105,3 +105,63 @@ function Discover() {
     </div>
   );
 }
+
+type ActiveGame = {
+  id: string;
+  image: string;
+  sport: string;
+  skill: string;
+  title: string;
+  location: string;
+  date: string | number | Date;
+  maxPlayers: number;
+  joined: number;
+};
+
+function ActiveGameCard({ game }: { game: ActiveGame }) {
+  const liveCount = useLiveParticipantCount(game.id);
+  const joinedCount = Math.min(game.maxPlayers, liveCount ?? game.joined);
+  const spotsLeft = Math.max(0, game.maxPlayers - joinedCount);
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 30 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, y: 30 }}
+      transition={{ type: "spring", stiffness: 240, damping: 24 }}
+    >
+      <Link
+        to="/games/$gameId"
+        params={{ gameId: game.id }}
+        className="flex gap-3 rounded-3xl border border-border bg-surface/90 backdrop-blur-xl p-3 shadow-2xl"
+      >
+        <img
+          src={game.image}
+          alt=""
+          loading="lazy"
+          className="h-20 w-20 rounded-2xl object-cover"
+        />
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 text-xs">
+            <span>{emojiBySport[game.sport]}</span>
+            <span className="font-semibold">{game.sport}</span>
+            <span className="text-muted-foreground">· {game.skill}</span>
+          </div>
+          <h3 className="font-display text-base font-bold truncate">{game.title}</h3>
+          <div className="flex items-center gap-2 text-xs text-muted-foreground mt-0.5">
+            <MapPin className="h-3.5 w-3.5" />
+            <span className="truncate">{game.location}</span>
+          </div>
+          <div className="flex items-center justify-between mt-1.5">
+            <span className="text-xs">{formatWhen(game.date as Date)}</span>
+            <span
+              aria-live="polite"
+              className="rounded-full bg-lime px-2.5 py-0.5 text-[11px] font-bold text-primary-foreground"
+            >
+              {spotsLeft} spots
+            </span>
+          </div>
+        </div>
+      </Link>
+    </motion.div>
+  );
+}
