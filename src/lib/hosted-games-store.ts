@@ -145,7 +145,7 @@ function gameToInsertRow(g: Game): TablesInsert<"hosted_games"> {
     is_private: !!g.isPrivate,
     urgent: !!g.urgent,
     trending: !!g.trending,
-    image: g.image ?? "",
+    image: g.image && g.image !== imageFor(g.sport) ? g.image : "",
     description: g.description ?? "",
     equipment: g.equipment ?? [],
     status: g.status ?? null,
