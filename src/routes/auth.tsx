@@ -21,8 +21,29 @@ function AuthPage() {
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
-    if (!loading && user) nav({ to: "/profile" });
+    if (!loading && user) nav({ to: "/profile", replace: true });
   }, [loading, user, nav]);
+
+  // Belt-and-suspenders for mobile browsers (esp. iOS Chrome) where the
+  // OAuth popup's postMessage can race useAuth state. Listen directly for
+  // a session and navigate as soon as one exists, and do a one-shot
+  // getSession() check on mount in case the session was hydrated via
+  // storage event from the popup/other tab before this component mounted.
+  useEffect(() => {
+    let cancelled = false;
+    supabase.auth.getSession().then(({ data }) => {
+      if (!cancelled && data.session) nav({ to: "/profile", replace: true });
+    });
+    const { data: sub } = supabase.auth.onAuthStateChange((event, session) => {
+      if (session && (event === "SIGNED_IN" || event === "INITIAL_SESSION" || event === "TOKEN_REFRESHED")) {
+        nav({ to: "/profile", replace: true });
+      }
+    });
+    return () => {
+      cancelled = true;
+      sub.subscription.unsubscribe();
+    };
+  }, [nav]);
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -98,6 +119,18 @@ function AuthPage() {
 
   const google = async () => {
     setBusy(true);
+    // Nudge users on locked-down browsers / in-app webviews where the
+    // OAuth popup is silently blocked and no session ever arrives.
+    const hangTimer = window.setTimeout(async () => {
+      const { data } = await supabase.auth.getSession();
+      if (!data.session) {
+        toast.error("Sign-in didn't complete", {
+          description:
+            "If a Google popup was blocked, allow popups for this site or try Safari. You can also sign in with email below.",
+          duration: 10000,
+        });
+      }
+    }, 8000);
     try {
       const result = await lovable.auth.signInWithOAuth("google", {
         redirect_uri: window.location.origin,
@@ -108,6 +141,7 @@ function AuthPage() {
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Google sign-in failed");
     } finally {
+      window.clearTimeout(hangTimer);
       setBusy(false);
     }
   };
