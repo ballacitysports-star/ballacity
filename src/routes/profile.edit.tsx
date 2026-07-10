@@ -339,7 +339,7 @@ function EditProfile() {
       toast.error(`Saved locally, but couldn't sync to server: ${e?.message ?? "unknown error"}`);
     }
 
-    setFeedPrefs({ preferredSports, sections });
+    setFeedPrefs({ ...prefs, preferredSports, sections });
     if (syncedToServer) toast.success("Profile saved & synced");
     nav({ to: "/profile" });
   };

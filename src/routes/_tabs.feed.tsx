@@ -10,6 +10,7 @@ import { GAMES, SPORTS, type Sport } from "@/lib/sample-data";
 import { useHostedGames } from "@/lib/hosted-games-store";
 import { useJoinedGameIds } from "@/lib/games-store";
 import { useFeedPrefs, setFeedPrefs, DEFAULT_PREFS, useMyProfile } from "@/lib/user-prefs-store";
+import { miToKm } from "@/lib/distance";
 import { motion, AnimatePresence } from "framer-motion";
 
 export const Route = createFileRoute("/_tabs/feed")({
@@ -55,6 +56,9 @@ function Feed() {
       .filter((g) => (prefs.sections.joinedOnly ? joinedSet.has(g.id) : true))
       .filter((g) => (prefs.sections.freeOnly ? g.price === 0 : true))
       .filter((g) => (prefs.sections.paidOnly ? g.price > 0 : true))
+      .filter((g) =>
+        prefs.maxDistanceMi != null ? g.distanceMi <= prefs.maxDistanceMi : true,
+      )
       .filter((g) =>
         q
           ? (
@@ -109,6 +113,7 @@ function Feed() {
   const urgent = filtered.filter((g) => g.urgent);
   const activeFilterCount =
     (prefs.preferredSports.length > 0 ? 1 : 0) +
+    (prefs.maxDistanceMi != null ? 1 : 0) +
     Object.entries(prefs.sections).filter(
       ([k, v]) => k in DEFAULT_PREFS.sections && v !== (DEFAULT_PREFS.sections as any)[k],
     ).length;
@@ -457,8 +462,12 @@ function BellLink() {
 
 function FilterSheet({ onClose }: { onClose: () => void }) {
   const prefs = useFeedPrefs();
+  const profile = useMyProfile();
+  const hasCity = Boolean(profile?.city?.trim());
   const preferredSports = prefs.preferredSports;
   const sections = prefs.sections;
+  const unit = prefs.distanceUnit;
+  const presetsMi = [5, 10, 25, 50, 100];
 
   const toggleSport = (s: Sport) => {
     const next = preferredSports.includes(s)
@@ -468,15 +477,22 @@ function FilterSheet({ onClose }: { onClose: () => void }) {
   };
   const toggleSection = (k: keyof typeof sections) => {
     const nextSections = { ...sections, [k]: !sections[k] };
-    // Mutually exclusive pairs to prevent empty-feed states
     if (k === "paidOnly" && nextSections.paidOnly) nextSections.freeOnly = false;
     if (k === "freeOnly" && nextSections.freeOnly) nextSections.paidOnly = false;
     if (k === "hostedByMeOnly" && nextSections.hostedByMeOnly) nextSections.joinedOnly = false;
     if (k === "joinedOnly" && nextSections.joinedOnly) nextSections.hostedByMeOnly = false;
     setFeedPrefs({ ...prefs, sections: nextSections });
   };
+  const setUnit = (u: "mi" | "km") => setFeedPrefs({ ...prefs, distanceUnit: u });
+  const setMaxMi = (mi: number | null) => setFeedPrefs({ ...prefs, maxDistanceMi: mi });
 
-  const reset = () => setFeedPrefs({ preferredSports: [], sections: DEFAULT_PREFS.sections });
+  const reset = () =>
+    setFeedPrefs({
+      ...prefs,
+      preferredSports: [],
+      sections: DEFAULT_PREFS.sections,
+      maxDistanceMi: null,
+    });
 
   return (
     <motion.div
@@ -518,6 +534,57 @@ function FilterSheet({ onClose }: { onClose: () => void }) {
               >
                 <span>{s.emoji}</span>
                 {s.name}
+              </button>
+            );
+          })}
+        </div>
+
+        <div className="text-xs font-semibold text-muted-foreground mb-2 uppercase tracking-wider flex items-center justify-between">
+          <span>
+            Distance from you
+            {hasCity && profile?.city ? (
+              <span className="ml-2 normal-case tracking-normal text-muted-foreground/80">
+                · {profile.city}
+              </span>
+            ) : null}
+          </span>
+          <span className="inline-flex rounded-full border border-border bg-surface p-0.5">
+            {(["mi", "km"] as const).map((u) => (
+              <button
+                key={u}
+                onClick={() => setUnit(u)}
+                className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase ${unit === u ? "bg-lime text-primary-foreground" : "text-muted-foreground"}`}
+              >
+                {u}
+              </button>
+            ))}
+          </span>
+        </div>
+        {!hasCity && (
+          <p className="text-xs text-muted-foreground mb-2">
+            <Link to="/profile/edit" className="text-lime font-semibold">
+              Set your city
+            </Link>{" "}
+            to filter by distance.
+          </p>
+        )}
+        <div className={`flex flex-wrap gap-2 mb-5 ${hasCity ? "" : "opacity-50 pointer-events-none"}`}>
+          <button
+            onClick={() => setMaxMi(null)}
+            className={`rounded-full border px-3 py-1.5 text-xs font-semibold ${prefs.maxDistanceMi == null ? "border-lime bg-lime text-primary-foreground" : "border-border bg-surface"}`}
+          >
+            Any
+          </button>
+          {presetsMi.map((mi) => {
+            const active = prefs.maxDistanceMi === mi;
+            const label = unit === "mi" ? `${mi} mi` : `${miToKm(mi)} km`;
+            return (
+              <button
+                key={mi}
+                onClick={() => setMaxMi(mi)}
+                className={`rounded-full border px-3 py-1.5 text-xs font-semibold ${active ? "border-lime bg-lime text-primary-foreground" : "border-border bg-surface"}`}
+              >
+                {label}
               </button>
             );
           })}
