@@ -1,4 +1,12 @@
-import pickleballCover from "@/assets/pickleball-cover.jpg";
+import pickleballCover from "@/assets/sport-pickleball.jpg";
+import basketballCover from "@/assets/sport-basketball.jpg";
+import soccerCover from "@/assets/sport-soccer.jpg";
+import volleyballCover from "@/assets/sport-volleyball.jpg";
+import tennisCover from "@/assets/sport-tennis.jpg";
+import flagFootballCover from "@/assets/sport-flagfootball.jpg";
+import baseballCover from "@/assets/sport-baseball.jpg";
+import softballCover from "@/assets/sport-softball.jpg";
+import runningCover from "@/assets/sport-running.jpg";
 
 export type Sport =
   | "Basketball"
@@ -77,12 +85,19 @@ const sportMeta: Record<Sport, { color: string; emoji: string }> = SPORTS.reduce
   {} as Record<Sport, { color: string; emoji: string }>,
 );
 
-const sportImage: Record<Sport, string> = Object.fromEntries(
-  (Object.keys(sportMeta) as Sport[]).map((s) => [
-    s,
-    s === "Pickleball" ? pickleballCover : makeDefaultCover(sportMeta[s].color, sportMeta[s].emoji),
-  ]),
-) as Record<Sport, string>;
+const sportImage: Record<Sport, string> = {
+  Basketball: basketballCover,
+  Soccer: soccerCover,
+  Pickleball: pickleballCover,
+  Volleyball: volleyballCover,
+  Tennis: tennisCover,
+  "Flag Football": flagFootballCover,
+  Baseball: baseballCover,
+  Softball: softballCover,
+  Running: runningCover,
+};
+// Fallback generator kept for any future sport without a photo cover.
+void makeDefaultCover;
 
 export const HERO_IMAGE = sportImage.Basketball;
 
