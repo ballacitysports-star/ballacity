@@ -18,6 +18,7 @@ import {
   Play,
   Lock,
   Unlock,
+  Trash2,
 } from "lucide-react";
 import { GAMES, SPORTS } from "@/lib/sample-data";
 import { formatWhen } from "@/lib/format";
