@@ -84,44 +84,7 @@ function Discover() {
       <div className="absolute bottom-24 left-0 right-0 z-20 px-4">
         <AnimatePresence mode="wait">
           {activeGame ? (
-            <motion.div
-              key={activeGame.id}
-              initial={{ opacity: 0, y: 30 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: 30 }}
-              transition={{ type: "spring", stiffness: 240, damping: 24 }}
-            >
-              <Link
-                to="/games/$gameId"
-                params={{ gameId: activeGame.id }}
-                className="flex gap-3 rounded-3xl border border-border bg-surface/90 backdrop-blur-xl p-3 shadow-2xl"
-              >
-                <img
-                  src={activeGame.image}
-                  alt=""
-                  loading="lazy"
-                  className="h-20 w-20 rounded-2xl object-cover"
-                />
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 text-xs">
-                    <span>{emojiBySport[activeGame.sport]}</span>
-                    <span className="font-semibold">{activeGame.sport}</span>
-                    <span className="text-muted-foreground">· {activeGame.skill}</span>
-                  </div>
-                  <h3 className="font-display text-base font-bold truncate">{activeGame.title}</h3>
-                  <div className="flex items-center gap-2 text-xs text-muted-foreground mt-0.5">
-                    <MapPin className="h-3.5 w-3.5" />
-                    <span className="truncate">{activeGame.location}</span>
-                  </div>
-                  <div className="flex items-center justify-between mt-1.5">
-                    <span className="text-xs">{formatWhen(activeGame.date)}</span>
-                    <span className="rounded-full bg-lime px-2.5 py-0.5 text-[11px] font-bold text-primary-foreground">
-                      {activeGame.maxPlayers - activeGame.joined} spots
-                    </span>
-                  </div>
-                </div>
-              </Link>
-            </motion.div>
+            <ActiveGameCard key={activeGame.id} game={activeGame} />
           ) : (
             <motion.div
               key="empty"
