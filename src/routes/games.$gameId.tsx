@@ -49,6 +49,12 @@ import { getOrCreateDirectConversation } from "@/lib/messages";
 import { createNotification } from "@/lib/notifications";
 import { supabase } from "@/integrations/supabase/client";
 import { useCanReview } from "@/lib/transactions";
+import {
+  blockUser,
+  unblockUser,
+  isUserBlocked,
+  useBlockedUsers,
+} from "@/lib/blocked-users-store";
 
 const emojiBySport: Record<string, string> = Object.fromEntries(
   SPORTS.map((s) => [s.name, s.emoji]),
@@ -276,6 +282,20 @@ function GameDetail() {
     if (inviteExpired && !isHost && !viewerCountsAsJoined && !viewerPending) {
       toast.error("This invite has expired. Browse open games instead.");
       nav({ to: "/discover" });
+      return;
+    }
+    // Host has blocked this user from their games.
+    const gameHostId = settings?.host_id ?? game.hostUserId ?? null;
+    if (
+      !isHost &&
+      user &&
+      gameHostId &&
+      !isConfirmed &&
+      !joined &&
+      !isPending &&
+      isUserBlocked(gameHostId, user.id)
+    ) {
+      toast.error("The host has blocked you from joining their games.");
       return;
     }
     // Approved-but-unpaid on a paid game → route to pay page (don't treat as
@@ -1047,12 +1067,26 @@ function GameDetail() {
         </div>
       </div>
 
-      {isHost && editOpen && <EditGameModal game={game} onClose={() => setEditOpen(false)} />}
+      {isHost && editOpen && (
+        <EditGameModal
+          game={game}
+          hostId={settings?.host_id ?? game.hostUserId ?? user?.id ?? ""}
+          onClose={() => setEditOpen(false)}
+        />
+      )}
     </div>
   );
 }
 
-function EditGameModal({ game, onClose }: { game: Game; onClose: () => void }) {
+function EditGameModal({
+  game,
+  hostId,
+  onClose,
+}: {
+  game: Game;
+  hostId: string;
+  onClose: () => void;
+}) {
   const [title, setTitle] = useState(game.title);
   const [location, setLocation] = useState(game.location);
   const [dateLocal, setDateLocal] = useState(() => {
@@ -1154,7 +1188,9 @@ function EditGameModal({ game, onClose }: { game: Game; onClose: () => void }) {
             />
           </Field>
         </div>
+        <BlockedUsersSection hostId={hostId} />
         <div className="mt-4 flex items-center gap-2">
+
           <button
             onClick={onClose}
             className="flex-1 rounded-xl border border-border bg-background py-2.5 text-sm font-semibold"
@@ -1190,6 +1226,64 @@ function Meta({ icon, label, value }: { icon: React.ReactNode; label: string; va
         {label}
       </div>
       <div className="mt-0.5 font-semibold text-sm">{value}</div>
+    </div>
+  );
+}
+
+function BlockedUsersSection({ hostId }: { hostId: string }) {
+  const blocked = useBlockedUsers(hostId);
+  const [names, setNames] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    if (blocked.length === 0) return;
+    const missing = blocked.filter((id) => !(id in names));
+    if (missing.length === 0) return;
+    let cancel = false;
+    (async () => {
+      const { data } = await supabase
+        .from("profiles")
+        .select("id, display_name")
+        .in("id", missing);
+      if (cancel || !data) return;
+      const next: Record<string, string> = {};
+      (data as { id: string; display_name: string | null }[]).forEach((r) => {
+        next[r.id] = r.display_name ?? "Player";
+      });
+      setNames((n) => ({ ...n, ...next }));
+    })();
+    return () => {
+      cancel = true;
+    };
+  }, [blocked, names]);
+
+  if (!hostId) return null;
+
+  return (
+    <div className="mt-4 rounded-xl border border-border bg-background p-3">
+      <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-2">
+        Blocked players
+      </div>
+      {blocked.length === 0 ? (
+        <div className="text-xs text-muted-foreground">
+          You haven't blocked anyone. Use the Block button on a request or roster row to prevent a
+          player from joining your games.
+        </div>
+      ) : (
+        <ul className="space-y-1.5">
+          {blocked.map((id) => (
+            <li key={id} className="flex items-center justify-between gap-2">
+              <span className="text-sm font-semibold truncate">{names[id] ?? "Player"}</span>
+              <button
+                type="button"
+                onClick={() => unblockUser(hostId, id)}
+                className="rounded-full border border-border bg-surface px-3 py-1 text-[11px] font-semibold hover:bg-secondary"
+              >
+                Unblock
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
     </div>
   );
 }
@@ -1294,6 +1388,28 @@ function RosterPlayerRow({
     }
   };
 
+  const removeAndBlock = async () => {
+    if (!confirm(`Block ${name}? They won't be able to join your future games.`)) return;
+    setBusy(true);
+    try {
+      await reviewJoinRequest(req.id, "rejected", "Blocked by host");
+      blockUser(req.host_id, req.player_id);
+      await createNotification({
+        user_id: req.player_id,
+        type: "join_declined",
+        title: `Removed from ${gameTitle}`,
+        body: "The host removed you from this game.",
+        link: `/games/${req.game_id}`,
+      });
+      toast.success(`${name} blocked.`);
+      onChange();
+    } catch (e: any) {
+      toast.error(e.message ?? "Could not block.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const fmt = (n: number) => (n > 0 ? n.toFixed(1) : "—");
   const paymentChip = !feeRequired
     ? null
@@ -1323,14 +1439,25 @@ function RosterPlayerRow({
               : "No reviews yet"}
           </div>
         </div>
-        <button
-          type="button"
-          onClick={remove}
-          disabled={busy}
-          className="inline-flex items-center gap-1 rounded-full border border-coral/40 bg-coral/10 px-3 py-1.5 text-xs font-bold text-coral disabled:opacity-50"
-        >
-          <XIcon className="h-3.5 w-3.5" /> Remove
-        </button>
+        <div className="flex flex-col gap-1.5">
+
+          <button
+            type="button"
+            onClick={remove}
+            disabled={busy}
+            className="inline-flex items-center gap-1 rounded-full border border-coral/40 bg-coral/10 px-3 py-1.5 text-xs font-bold text-coral disabled:opacity-50"
+          >
+            <XIcon className="h-3.5 w-3.5" /> Remove
+          </button>
+          <button
+            type="button"
+            onClick={removeAndBlock}
+            disabled={busy}
+            className="inline-flex items-center justify-center gap-1 rounded-full border border-coral/60 bg-coral/20 px-3 py-1.5 text-xs font-bold text-coral disabled:opacity-50"
+          >
+            Block
+          </button>
+        </div>
       </div>
       <div className="mt-2 flex flex-wrap items-center gap-1.5">
         <span className="inline-flex items-center gap-1 rounded-full border border-border bg-background px-2 py-0.5 text-[10px] font-semibold">
@@ -1428,6 +1555,20 @@ function HostRequestRow({
         </div>
         {req.status === "pending" ? (
           <div className="flex gap-1.5">
+            <button
+              disabled={busy}
+              onClick={async () => {
+                if (!confirm(`Block ${name}? They won't be able to join your future games.`))
+                  return;
+                await act("rejected");
+                blockUser(req.host_id, req.player_id);
+                toast.success(`${name} blocked.`);
+              }}
+              className="grid h-9 px-2 place-items-center rounded-xl border border-coral/60 bg-coral/10 text-coral text-[11px] font-bold disabled:opacity-50"
+              title="Block from your games"
+            >
+              Block
+            </button>
             <button
               disabled={busy}
               onClick={() => act("rejected")}
@@ -1544,20 +1685,35 @@ function HostPendingChip({
               "{req.message}"
             </div>
           )}
-          <div className="flex gap-1.5 mt-1">
+          <div className="flex flex-col gap-1.5 mt-1">
+            <div className="flex gap-1.5">
+              <button
+                disabled={busy}
+                onClick={() => act("rejected")}
+                className="flex-1 inline-flex items-center justify-center gap-1 rounded-xl border border-coral/40 text-coral py-1.5 text-xs font-semibold disabled:opacity-50"
+              >
+                <XIcon className="h-3.5 w-3.5" /> Decline
+              </button>
+              <button
+                disabled={busy}
+                onClick={() => act("approved")}
+                className="flex-1 inline-flex items-center justify-center gap-1 rounded-xl bg-lime-gradient text-primary-foreground py-1.5 text-xs font-semibold disabled:opacity-50"
+              >
+                <Check className="h-3.5 w-3.5" /> Approve
+              </button>
+            </div>
             <button
               disabled={busy}
-              onClick={() => act("rejected")}
-              className="flex-1 inline-flex items-center justify-center gap-1 rounded-xl border border-coral/40 text-coral py-1.5 text-xs font-semibold disabled:opacity-50"
+              onClick={async () => {
+                if (!confirm(`Block ${name}? They won't be able to join your future games.`))
+                  return;
+                await act("rejected");
+                blockUser(req.host_id, req.player_id);
+                toast.success(`${name} blocked.`);
+              }}
+              className="inline-flex items-center justify-center gap-1 rounded-xl border border-coral/60 bg-coral/10 text-coral py-1.5 text-xs font-semibold disabled:opacity-50"
             >
-              <XIcon className="h-3.5 w-3.5" /> Decline
-            </button>
-            <button
-              disabled={busy}
-              onClick={() => act("approved")}
-              className="flex-1 inline-flex items-center justify-center gap-1 rounded-xl bg-lime-gradient text-primary-foreground py-1.5 text-xs font-semibold disabled:opacity-50"
-            >
-              <Check className="h-3.5 w-3.5" /> Approve
+              Block from your games
             </button>
           </div>
         </motion.div>
