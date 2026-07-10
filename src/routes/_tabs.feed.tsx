@@ -113,6 +113,7 @@ function Feed() {
   const urgent = filtered.filter((g) => g.urgent);
   const activeFilterCount =
     (prefs.preferredSports.length > 0 ? 1 : 0) +
+    (prefs.maxDistanceMi != null ? 1 : 0) +
     Object.entries(prefs.sections).filter(
       ([k, v]) => k in DEFAULT_PREFS.sections && v !== (DEFAULT_PREFS.sections as any)[k],
     ).length;
