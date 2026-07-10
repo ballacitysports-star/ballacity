@@ -14,6 +14,57 @@ export type Database = {
   }
   public: {
     Tables: {
+      auth_signin_events: {
+        Row: {
+          browser: string | null
+          created_at: string
+          error_message: string | null
+          event: string
+          id: string
+          is_in_app_webview: boolean | null
+          is_ios: boolean | null
+          is_ios_chrome: boolean | null
+          platform: string | null
+          provider: string
+          user_agent: string | null
+          user_id: string | null
+          viewport_height: number | null
+          viewport_width: number | null
+        }
+        Insert: {
+          browser?: string | null
+          created_at?: string
+          error_message?: string | null
+          event: string
+          id?: string
+          is_in_app_webview?: boolean | null
+          is_ios?: boolean | null
+          is_ios_chrome?: boolean | null
+          platform?: string | null
+          provider?: string
+          user_agent?: string | null
+          user_id?: string | null
+          viewport_height?: number | null
+          viewport_width?: number | null
+        }
+        Update: {
+          browser?: string | null
+          created_at?: string
+          error_message?: string | null
+          event?: string
+          id?: string
+          is_in_app_webview?: boolean | null
+          is_ios?: boolean | null
+          is_ios_chrome?: boolean | null
+          platform?: string | null
+          provider?: string
+          user_agent?: string | null
+          user_id?: string | null
+          viewport_height?: number | null
+          viewport_width?: number | null
+        }
+        Relationships: []
+      }
       availability_contact_requests: {
         Row: {
           availability_id: string
