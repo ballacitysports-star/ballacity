@@ -31,6 +31,7 @@ export function GameCard({ game, index = 0 }: { game: Game; index?: number }) {
   const { user } = useAuth();
   const [opening, setOpening] = useState(false);
   const hostUserId = (game as { hostUserId?: string }).hostUserId;
+  const liveStatus = useLiveStatus(game);
   const goToHost = (e: React.MouseEvent) => {
     if (!hostUserId) return;
     e.preventDefault();
