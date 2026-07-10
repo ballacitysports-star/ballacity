@@ -123,25 +123,16 @@ function AuthPage() {
     }
   };
 
-  const google = (opts: { isRetry?: boolean; silent?: boolean } = {}) => {
+  const google = (opts: { isRetry?: boolean } = {}) => {
     // CRITICAL: call signInWithOAuth SYNCHRONOUSLY as the first statement
     // in the click handler. iOS Chrome only treats popup.open() as a
     // trusted user gesture if no awaits / state updates happen first.
     // Remember the last Google account so returning users skip the picker.
     const lastEmail =
       (typeof window !== "undefined" && window.localStorage.getItem("lastGoogleEmail")) || "";
-    // Returning users (silent !== false): ask Google to skip its UI entirely
-    // when the user is already signed in on google.com. If Google can't do
-    // it silently, we retry once with the normal picker (see .then below).
-    const useSilent = !!lastEmail && opts.silent !== false;
-    const extraParams: Record<string, string> = lastEmail
-      ? useSilent
-        ? { login_hint: lastEmail, prompt: "none" }
-        : { login_hint: lastEmail }
-      : { prompt: "select_account" };
     const promise = lovable.auth.signInWithOAuth("google", {
       redirect_uri: window.location.origin,
-      extraParams,
+      extraParams: lastEmail ? { login_hint: lastEmail } : { prompt: "select_account" },
     });
 
     setBusy(true);
@@ -193,14 +184,6 @@ function AuthPage() {
       .then((result) => {
         if (result?.error) {
           const msg = result.error.message || "";
-          // Silent sign-in couldn't complete (user signed out of Google,
-          // session expired, cookies cleared). Transparently retry once
-          // with the normal picker — no error toast.
-          if (useSilent && /login_required|interaction_required|consent_required|prompt=?none/i.test(msg)) {
-            try { window.localStorage.removeItem("lastGoogleEmail"); } catch {}
-            google({ silent: false, isRetry: true });
-            return;
-          }
           if (/popup|blocked|window|opener/i.test(msg)) {
             showBlockedToast(msg);
           } else {
