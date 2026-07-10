@@ -174,6 +174,27 @@ export type Database = {
         }
         Relationships: []
       }
+      game_participants: {
+        Row: {
+          created_at: string
+          game_id: string
+          id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          game_id: string
+          id?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          game_id?: string
+          id?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       game_payment_settings: {
         Row: {
           accepted_method_ids: string[]
