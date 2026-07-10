@@ -333,6 +333,17 @@ function GameDetail() {
         }
         leaveGame(game.id);
         toast("You left the game.");
+        // Notify host in real time that a player left.
+        if (gameHostId && user && gameHostId !== user.id) {
+          const who = myProfile?.display_name || user.email?.split("@")[0] || "A player";
+          void createNotification({
+            user_id: gameHostId,
+            type: "participant_left",
+            title: `${who} left ${game.title}`,
+            body: "Their spot is open again.",
+            link: `/games/${game.id}`,
+          }).catch(() => {});
+        }
         refreshStatus();
       } catch (e: any) {
         toast.error(e.message ?? "Could not leave.");
