@@ -423,6 +423,17 @@ function GameDetail() {
     }
     joinGame(game.id);
     toast.success(`You're in! See you at ${game.location}.`);
+    // Notify host in real time that a new player joined.
+    if (gameHostId && user && gameHostId !== user.id) {
+      const who = myProfile?.name || user.email?.split("@")[0] || "A player";
+      void createNotification({
+        user_id: gameHostId,
+        type: "participant_joined",
+        title: `${who} joined ${game.title}`,
+        body: `${effectiveJoined + 1}/${game.maxPlayers} players confirmed.`,
+        link: `/games/${game.id}`,
+      }).catch(() => {});
+    }
   };
 
   const viewerPending =
