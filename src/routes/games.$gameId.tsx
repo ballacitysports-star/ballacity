@@ -1174,6 +1174,34 @@ function EditGameModal({
               className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm"
             />
           </Field>
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="Sport">
+              <select
+                value={sport}
+                onChange={(e) => setSport(e.target.value as Game["sport"])}
+                className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm"
+              >
+                {SPORTS.map((s) => (
+                  <option key={s.name} value={s.name}>
+                    {s.emoji} {s.name}
+                  </option>
+                ))}
+              </select>
+            </Field>
+            <Field label="Skill">
+              <select
+                value={skill}
+                onChange={(e) => setSkill(e.target.value as Game["skill"])}
+                className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm"
+              >
+                {(["All Levels", "Beginner", "Intermediate", "Advanced"] as const).map((s) => (
+                  <option key={s} value={s}>
+                    {s}
+                  </option>
+                ))}
+              </select>
+            </Field>
+          </div>
           <Field label="Location">
             <input
               value={location}
@@ -1181,14 +1209,31 @@ function EditGameModal({
               className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm"
             />
           </Field>
-          <Field label="Date & time">
+          <Field label="Neighborhood">
             <input
-              type="datetime-local"
-              value={dateLocal}
-              onChange={(e) => setDateLocal(e.target.value)}
+              value={neighborhood}
+              onChange={(e) => setNeighborhood(e.target.value)}
               className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm"
             />
           </Field>
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="Date & time">
+              <input
+                type="datetime-local"
+                value={dateLocal}
+                onChange={(e) => setDateLocal(e.target.value)}
+                className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm"
+              />
+            </Field>
+            <Field label="Duration">
+              <input
+                value={duration}
+                onChange={(e) => setDuration(e.target.value)}
+                placeholder="90 min"
+                className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm"
+              />
+            </Field>
+          </div>
           <div className="grid grid-cols-2 gap-3">
             <Field label="Max players">
               <input
@@ -1210,6 +1255,32 @@ function EditGameModal({
               />
             </Field>
           </div>
+          <div className="grid grid-cols-2 gap-3">
+            <label className="flex items-center gap-2 rounded-xl border border-border bg-background px-3 py-2 text-sm">
+              <input
+                type="checkbox"
+                checked={indoor}
+                onChange={(e) => setIndoor(e.target.checked)}
+              />
+              Indoor
+            </label>
+            <label className="flex items-center gap-2 rounded-xl border border-border bg-background px-3 py-2 text-sm">
+              <input
+                type="checkbox"
+                checked={isPrivate}
+                onChange={(e) => setIsPrivate(e.target.checked)}
+              />
+              Private (invite only)
+            </label>
+          </div>
+          <Field label="Cover image URL (optional)">
+            <input
+              value={image}
+              onChange={(e) => setImage(e.target.value)}
+              placeholder="https://…"
+              className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm"
+            />
+          </Field>
           <Field label="Description">
             <textarea
               value={description}
