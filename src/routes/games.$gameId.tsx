@@ -1388,6 +1388,28 @@ function RosterPlayerRow({
     }
   };
 
+  const removeAndBlock = async () => {
+    if (!confirm(`Block ${name}? They won't be able to join your future games.`)) return;
+    setBusy(true);
+    try {
+      await reviewJoinRequest(req.id, "rejected", "Blocked by host");
+      blockUser(req.host_id, req.player_id);
+      await createNotification({
+        user_id: req.player_id,
+        type: "join_declined",
+        title: `Removed from ${gameTitle}`,
+        body: "The host removed you from this game.",
+        link: `/games/${req.game_id}`,
+      });
+      toast.success(`${name} blocked.`);
+      onChange();
+    } catch (e: any) {
+      toast.error(e.message ?? "Could not block.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const fmt = (n: number) => (n > 0 ? n.toFixed(1) : "—");
   const paymentChip = !feeRequired
     ? null
