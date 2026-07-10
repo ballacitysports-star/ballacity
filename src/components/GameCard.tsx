@@ -15,7 +15,7 @@ const sportEmoji: Record<string, string> = {
   Pickleball: "🥒",
   Volleyball: "🏐",
   Tennis: "🎾",
-  "Flag Football": "🏈",
+  "Football": "🏈",
   Baseball: "⚾",
   Softball: "🥎",
   Running: "🏃",
