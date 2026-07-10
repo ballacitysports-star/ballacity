@@ -77,12 +77,18 @@ function Feed() {
           : true,
       )
       .sort((a, b) => {
-        // Nearest first when we know the user's city; ties break on distanceMi then date.
-        const la = isLocal(a) ? 0 : 1;
-        const lb = isLocal(b) ? 0 : 1;
-        if (la !== lb) return la - lb;
-        if (a.distanceMi !== b.distanceMi) return a.distanceMi - b.distanceMi;
-        return +new Date(a.date) - +new Date(b.date);
+        if (prefs.sortBy === "nearest") {
+          // Nearest first; prefer local city, then distanceMi, then date.
+          const la = isLocal(a) ? 0 : 1;
+          const lb = isLocal(b) ? 0 : 1;
+          if (la !== lb) return la - lb;
+          if (a.distanceMi !== b.distanceMi) return a.distanceMi - b.distanceMi;
+          return +new Date(a.date) - +new Date(b.date);
+        }
+        // Soonest first; break ties by distance.
+        const da = +new Date(a.date) - +new Date(b.date);
+        if (da !== 0) return da;
+        return a.distanceMi - b.distanceMi;
       });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [q, hosted, prefs, joinedSet, hostedIds, userCityToken]);
