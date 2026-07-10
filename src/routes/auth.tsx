@@ -197,7 +197,7 @@ function AuthPage() {
           // (notably the Lovable Android app) where onAuthStateChange
           // fires but the client-side navigate never leaves /auth.
           trackSigninEvent("success");
-          window.location.replace("/profile");
+          window.location.replace(next ?? "/profile");
         } else {
           trackSigninEvent("success");
         }
