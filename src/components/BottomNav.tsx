@@ -3,26 +3,25 @@ import { Home, Map, Plus, IdCard, Users, UserCheck, Dribbble } from "lucide-reac
 import { motion } from "framer-motion";
 
 
-const items: { to: string; icon: typeof Home; label: string; key?: string }[] = [
+const items: { to: string; icon: typeof Home; label: string }[] = [
   { to: "/feed", icon: Dribbble, label: "Pickup" },
   { to: "/players", icon: UserCheck, label: "Players" },
   { to: "/teams", icon: Users, label: "Teams" },
   { to: "/create", icon: Plus, label: "Host" },
   { to: "/discover", icon: Map, label: "Map" },
-  { to: "/messages", icon: MessageCircle, label: "Chats", key: "messages" },
   { to: "/profile", icon: IdCard, label: "My Card" },
 ];
 
 export function BottomNav() {
   const { pathname } = useLocation();
-  const unreadMessages = useUnreadMessageCount();
+  
   const PUBLIC_PATHS = ["/auth", "/reset-password"];
   const isPublic = PUBLIC_PATHS.some((p) => pathname === p || pathname.startsWith(`${p}/`));
   if (isPublic) return null;
   return (
     <nav className="fixed bottom-0 left-0 right-0 z-40 pb-[max(env(safe-area-inset-bottom),0.5rem)] pt-2 px-3">
       <div className="mx-auto max-w-md sm:max-w-xl lg:max-w-2xl rounded-3xl border border-border bg-surface/85 backdrop-blur-xl shadow-2xl">
-        <ul className="grid grid-cols-7">
+        <ul className="grid grid-cols-6">
           {items.map((it) => {
             const active = pathname === it.to || (it.to !== "/feed" && pathname.startsWith(it.to));
             const Icon = it.icon;
