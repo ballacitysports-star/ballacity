@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
-import { CheckCircle2, Clock, XCircle, Info, Loader2 } from "lucide-react";
+import { CheckCircle2, Clock, XCircle, Info, Loader2, X } from "lucide-react";
+import { toast } from "sonner";
 import {
+  cancelContactRequest,
   getExistingContactRequest,
   type ExistingRequestStatus,
   type ExistingRequestSummary,
@@ -12,6 +14,8 @@ type Props = {
   /** Bump to force refetch after a successful send. */
   refreshKey?: number;
   onLoaded?: (summary: ExistingRequestSummary) => void;
+  /** Fired after a successful cancel so parent can refresh its own state. */
+  onCancelled?: () => void;
 };
 
 const STYLES: Record<
