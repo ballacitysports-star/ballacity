@@ -7,6 +7,16 @@ import {
   type ExistingRequestStatus,
   type ExistingRequestSummary,
 } from "@/lib/availability";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 type Props = {
   availabilityId: string;
