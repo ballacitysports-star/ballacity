@@ -1,10 +1,3 @@
-import soccerImg from "@/assets/sport-soccer.jpg";
-import pickleballImg from "@/assets/sport-pickleball.jpg";
-import volleyballImg from "@/assets/sport-volleyball.jpg";
-import runningImg from "@/assets/sport-running.jpg";
-import tennisImg from "@/assets/sport-tennis.jpg";
-import heroImg from "@/assets/hero-court.jpg";
-
 export type Sport =
   | "Basketball"
   | "Soccer"
@@ -56,23 +49,42 @@ export type Game = {
   joinsClosed?: boolean;
 };
 
-export const HERO_IMAGE = heroImg;
+// Simple default cover: a soft duotone gradient tuned to each sport's accent
+// color, with the sport's emoji centered. Rendered as an inline SVG data URI
+// so it needs no network round-trip and stays crisp at any size.
+function makeDefaultCover(color: string, emoji: string): string {
+  const svg = `<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 800 500'>
+    <defs>
+      <linearGradient id='g' x1='0' y1='0' x2='1' y2='1'>
+        <stop offset='0%' stop-color='${color}' stop-opacity='0.85'/>
+        <stop offset='100%' stop-color='#0b0f1a' stop-opacity='1'/>
+      </linearGradient>
+    </defs>
+    <rect width='800' height='500' fill='#0b0f1a'/>
+    <rect width='800' height='500' fill='url(%23g)'/>
+    <text x='50%' y='54%' text-anchor='middle' font-size='220' font-family='Apple Color Emoji, Segoe UI Emoji, sans-serif'>${emoji}</text>
+  </svg>`.replace(/\n\s+/g, "");
+  return `data:image/svg+xml;utf8,${svg.replace(/#/g, "%23")}`;
+}
 
-const sportImage: Record<Sport, string> = {
-  Basketball: heroImg,
-  Soccer: soccerImg,
-  Pickleball: pickleballImg,
-  Volleyball: volleyballImg,
-  Tennis: tennisImg,
-  "Flag Football": soccerImg,
-  Baseball: tennisImg,
-  Softball: tennisImg,
-  Running: runningImg,
-};
+const sportMeta: Record<Sport, { color: string; emoji: string }> = SPORTS.reduce(
+  (acc, s) => {
+    acc[s.name] = { color: s.color, emoji: s.emoji };
+    return acc;
+  },
+  {} as Record<Sport, { color: string; emoji: string }>,
+);
+
+const sportImage: Record<Sport, string> = Object.fromEntries(
+  (Object.keys(sportMeta) as Sport[]).map((s) => [s, makeDefaultCover(sportMeta[s].color, sportMeta[s].emoji)]),
+) as Record<Sport, string>;
+
+export const HERO_IMAGE = sportImage.Basketball;
 
 export function imageFor(sport: Sport) {
   return sportImage[sport];
 }
+
 
 // Pinned to start-of-UTC-day so SSR and client hydration produce identical
 // ISO strings. Date.now() at module scope causes hydration mismatches because
