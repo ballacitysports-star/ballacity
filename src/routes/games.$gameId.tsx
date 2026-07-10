@@ -284,6 +284,20 @@ function GameDetail() {
       nav({ to: "/discover" });
       return;
     }
+    // Host has blocked this user from their games.
+    const gameHostId = settings?.host_id ?? game.hostUserId ?? null;
+    if (
+      !isHost &&
+      user &&
+      gameHostId &&
+      !isConfirmed &&
+      !joined &&
+      !isPending &&
+      isUserBlocked(gameHostId, user.id)
+    ) {
+      toast.error("The host has blocked you from joining their games.");
+      return;
+    }
     // Approved-but-unpaid on a paid game → route to pay page (don't treat as
     // "confirmed → leave" if a prior auto-join left `joined` stale-true).
     if (isPaid && !paymentCleared && !isPending && (isApproved || !requiresApproval)) {
