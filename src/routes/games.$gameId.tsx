@@ -139,6 +139,7 @@ function GameDetail() {
   const { participants: liveRoster } = useLiveParticipants(gameId);
   const nav = useNavigate();
   const { user } = useAuth();
+  const myProfile = useMyProfile(user);
   const [settings, setSettings] = useState<GamePaymentSettings | null>(null);
   const [mySubs, setMySubs] = useState<PaymentSubmission[]>([]);
   const [myReq, setMyReq] = useState<JoinRequest | null>(null);
