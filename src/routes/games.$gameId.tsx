@@ -18,6 +18,7 @@ import {
   Play,
   Lock,
   Unlock,
+  Trash2,
 } from "lucide-react";
 import { GAMES, SPORTS } from "@/lib/sample-data";
 import { formatWhen } from "@/lib/format";
@@ -41,7 +42,7 @@ import {
   type PaymentSubmission,
   type JoinRequest,
 } from "@/lib/payments";
-import { useHostedGames, updateHostedGame } from "@/lib/hosted-games-store";
+import { useHostedGames, updateHostedGame, deleteHostedGame } from "@/lib/hosted-games-store";
 import type { Game } from "@/lib/sample-data";
 import { LegalNotice } from "@/components/LegalNotice";
 import { useAuth } from "@/hooks/use-auth";
@@ -872,6 +873,22 @@ function GameDetail() {
                 )}
               </button>
             </div>
+            <button
+              type="button"
+              onClick={async () => {
+                if (!window.confirm("Delete this game? This can't be undone.")) return;
+                try {
+                  await deleteHostedGame(game.id);
+                  toast.success("Game deleted.");
+                  nav({ to: "/" });
+                } catch {
+                  toast.error("Couldn't delete this game.");
+                }
+              }}
+              className="mt-2 w-full inline-flex items-center justify-center gap-2 rounded-xl border border-coral/40 bg-coral/10 text-coral py-2.5 text-xs font-bold"
+            >
+              <Trash2 className="h-4 w-4" /> Delete game
+            </button>
           </div>
 
           <button
@@ -1088,14 +1105,21 @@ function EditGameModal({
   onClose: () => void;
 }) {
   const [title, setTitle] = useState(game.title);
+  const [sport, setSport] = useState<Game["sport"]>(game.sport);
+  const [skill, setSkill] = useState<Game["skill"]>(game.skill);
   const [location, setLocation] = useState(game.location);
+  const [neighborhood, setNeighborhood] = useState(game.neighborhood ?? "");
   const [dateLocal, setDateLocal] = useState(() => {
     const d = new Date(game.date);
     const pad = (n: number) => String(n).padStart(2, "0");
     return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
   });
+  const [duration, setDuration] = useState(game.duration);
   const [maxPlayers, setMaxPlayers] = useState(String(game.maxPlayers));
   const [price, setPrice] = useState(String(game.price));
+  const [indoor, setIndoor] = useState(!!game.indoor);
+  const [isPrivate, setIsPrivate] = useState(!!game.isPrivate);
+  const [image, setImage] = useState(game.image ?? "");
   const [description, setDescription] = useState(game.description);
 
   const save = () => {
@@ -1104,10 +1128,17 @@ function EditGameModal({
     const iso = new Date(dateLocal).toISOString();
     const updated = updateHostedGame(game.id, {
       title: title.trim() || game.title,
+      sport,
+      skill,
       location: location.trim() || game.location,
+      neighborhood: neighborhood.trim(),
       date: Number.isFinite(new Date(dateLocal).getTime()) ? iso : game.date,
+      duration: duration.trim() || game.duration,
       maxPlayers: mp,
       price: pr,
+      indoor,
+      isPrivate,
+      image: image.trim(),
       description,
     });
     if (!updated) {
@@ -1143,6 +1174,34 @@ function EditGameModal({
               className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm"
             />
           </Field>
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="Sport">
+              <select
+                value={sport}
+                onChange={(e) => setSport(e.target.value as Game["sport"])}
+                className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm"
+              >
+                {SPORTS.map((s) => (
+                  <option key={s.name} value={s.name}>
+                    {s.emoji} {s.name}
+                  </option>
+                ))}
+              </select>
+            </Field>
+            <Field label="Skill">
+              <select
+                value={skill}
+                onChange={(e) => setSkill(e.target.value as Game["skill"])}
+                className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm"
+              >
+                {(["All Levels", "Beginner", "Intermediate", "Advanced"] as const).map((s) => (
+                  <option key={s} value={s}>
+                    {s}
+                  </option>
+                ))}
+              </select>
+            </Field>
+          </div>
           <Field label="Location">
             <input
               value={location}
@@ -1150,14 +1209,31 @@ function EditGameModal({
               className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm"
             />
           </Field>
-          <Field label="Date & time">
+          <Field label="Neighborhood">
             <input
-              type="datetime-local"
-              value={dateLocal}
-              onChange={(e) => setDateLocal(e.target.value)}
+              value={neighborhood}
+              onChange={(e) => setNeighborhood(e.target.value)}
               className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm"
             />
           </Field>
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="Date & time">
+              <input
+                type="datetime-local"
+                value={dateLocal}
+                onChange={(e) => setDateLocal(e.target.value)}
+                className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm"
+              />
+            </Field>
+            <Field label="Duration">
+              <input
+                value={duration}
+                onChange={(e) => setDuration(e.target.value)}
+                placeholder="90 min"
+                className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm"
+              />
+            </Field>
+          </div>
           <div className="grid grid-cols-2 gap-3">
             <Field label="Max players">
               <input
@@ -1179,6 +1255,32 @@ function EditGameModal({
               />
             </Field>
           </div>
+          <div className="grid grid-cols-2 gap-3">
+            <label className="flex items-center gap-2 rounded-xl border border-border bg-background px-3 py-2 text-sm">
+              <input
+                type="checkbox"
+                checked={indoor}
+                onChange={(e) => setIndoor(e.target.checked)}
+              />
+              Indoor
+            </label>
+            <label className="flex items-center gap-2 rounded-xl border border-border bg-background px-3 py-2 text-sm">
+              <input
+                type="checkbox"
+                checked={isPrivate}
+                onChange={(e) => setIsPrivate(e.target.checked)}
+              />
+              Private (invite only)
+            </label>
+          </div>
+          <Field label="Cover image URL (optional)">
+            <input
+              value={image}
+              onChange={(e) => setImage(e.target.value)}
+              placeholder="https://…"
+              className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm"
+            />
+          </Field>
           <Field label="Description">
             <textarea
               value={description}
