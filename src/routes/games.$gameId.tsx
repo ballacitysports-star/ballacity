@@ -284,6 +284,7 @@ function GameDetail() {
       const search: { invite?: true; from?: string } = {};
       if (isInvite) search.invite = true;
       if (inviteFrom) search.from = inviteFrom;
+      setRequesting(true);
       nav({ to: "/games/$gameId/pay", params: { gameId: game.id }, search });
       return;
     }
