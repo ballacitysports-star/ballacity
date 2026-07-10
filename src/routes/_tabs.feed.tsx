@@ -462,8 +462,12 @@ function BellLink() {
 
 function FilterSheet({ onClose }: { onClose: () => void }) {
   const prefs = useFeedPrefs();
+  const profile = useMyProfile();
+  const hasCity = Boolean(profile?.city?.trim());
   const preferredSports = prefs.preferredSports;
   const sections = prefs.sections;
+  const unit = prefs.distanceUnit;
+  const presetsMi = [5, 10, 25, 50, 100];
 
   const toggleSport = (s: Sport) => {
     const next = preferredSports.includes(s)
@@ -473,15 +477,22 @@ function FilterSheet({ onClose }: { onClose: () => void }) {
   };
   const toggleSection = (k: keyof typeof sections) => {
     const nextSections = { ...sections, [k]: !sections[k] };
-    // Mutually exclusive pairs to prevent empty-feed states
     if (k === "paidOnly" && nextSections.paidOnly) nextSections.freeOnly = false;
     if (k === "freeOnly" && nextSections.freeOnly) nextSections.paidOnly = false;
     if (k === "hostedByMeOnly" && nextSections.hostedByMeOnly) nextSections.joinedOnly = false;
     if (k === "joinedOnly" && nextSections.joinedOnly) nextSections.hostedByMeOnly = false;
     setFeedPrefs({ ...prefs, sections: nextSections });
   };
+  const setUnit = (u: "mi" | "km") => setFeedPrefs({ ...prefs, distanceUnit: u });
+  const setMaxMi = (mi: number | null) => setFeedPrefs({ ...prefs, maxDistanceMi: mi });
 
-  const reset = () => setFeedPrefs({ preferredSports: [], sections: DEFAULT_PREFS.sections });
+  const reset = () =>
+    setFeedPrefs({
+      ...prefs,
+      preferredSports: [],
+      sections: DEFAULT_PREFS.sections,
+      maxDistanceMi: null,
+    });
 
   return (
     <motion.div
