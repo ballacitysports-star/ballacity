@@ -37,6 +37,11 @@ function AuthPage() {
     });
     const { data: sub } = supabase.auth.onAuthStateChange((event, session) => {
       if (session && (event === "SIGNED_IN" || event === "INITIAL_SESSION" || event === "TOKEN_REFRESHED")) {
+        const email = session.user?.email;
+        const isGoogle = session.user?.app_metadata?.provider === "google";
+        if (email && isGoogle) {
+          try { window.localStorage.setItem("lastGoogleEmail", email); } catch {}
+        }
         nav({ to: "/profile", replace: true });
       }
     });
