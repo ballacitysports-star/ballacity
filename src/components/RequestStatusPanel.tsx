@@ -54,9 +54,17 @@ const STYLES: Record<
   },
 };
 
-export function RequestStatusPanel({ availabilityId, gameId, refreshKey, onLoaded }: Props) {
+export function RequestStatusPanel({
+  availabilityId,
+  gameId,
+  refreshKey,
+  onLoaded,
+  onCancelled,
+}: Props) {
   const [loading, setLoading] = useState(true);
   const [summary, setSummary] = useState<ExistingRequestSummary | null>(null);
+  const [cancelling, setCancelling] = useState(false);
+  const [localRefresh, setLocalRefresh] = useState(0);
 
   useEffect(() => {
     let alive = true;
@@ -67,13 +75,15 @@ export function RequestStatusPanel({ availabilityId, gameId, refreshKey, onLoade
         setSummary(s);
         onLoaded?.(s);
       })
-      .catch(() => alive && setSummary({ status: "none", kind: null, game_id: null, updated_at: null, id: null }))
+      .catch(() =>
+        alive && setSummary({ status: "none", kind: null, game_id: null, updated_at: null, id: null }),
+      )
       .finally(() => alive && setLoading(false));
     return () => {
       alive = false;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [availabilityId, gameId ?? "", refreshKey]);
+  }, [availabilityId, gameId ?? "", refreshKey, localRefresh]);
 
   if (loading) {
     return (
@@ -83,20 +93,40 @@ export function RequestStatusPanel({ availabilityId, gameId, refreshKey, onLoade
     );
   }
 
-  const s = summary ?? { status: "none" as ExistingRequestStatus, updated_at: null };
+  const s = summary ?? { status: "none" as ExistingRequestStatus, updated_at: null, id: null };
   const cfg = STYLES[s.status];
   const Icon = cfg.Icon;
-  const when = s.updated_at ? new Date(s.updated_at).toLocaleString(undefined, {
-    month: "short",
-    day: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
-  }) : null;
+  const when = s.updated_at
+    ? new Date(s.updated_at).toLocaleString(undefined, {
+        month: "short",
+        day: "numeric",
+        hour: "numeric",
+        minute: "2-digit",
+      })
+    : null;
+
+  const handleCancel = async () => {
+    if (!summary?.id) return;
+    if (!window.confirm("Cancel this pending request? You can re-send it afterwards.")) return;
+    setCancelling(true);
+    try {
+      await cancelContactRequest(summary.id);
+      toast.success("Request cancelled");
+      setLocalRefresh((k) => k + 1);
+      onCancelled?.();
+    } catch (e: any) {
+      toast.error(e?.message ?? "Couldn't cancel request");
+    } finally {
+      setCancelling(false);
+    }
+  };
+
+  const isPending = s.status === "pending" && !!summary?.id;
 
   return (
     <div className={`flex items-start gap-2 rounded-2xl border p-3 ${cfg.className}`}>
       <Icon className="h-4 w-4 mt-0.5 shrink-0" />
-      <div className="min-w-0 text-xs">
+      <div className="min-w-0 flex-1 text-xs">
         <p className="font-semibold">
           Status: {cfg.label}
           {when && s.status !== "none" ? (
@@ -104,7 +134,23 @@ export function RequestStatusPanel({ availabilityId, gameId, refreshKey, onLoade
           ) : null}
         </p>
         <p className="opacity-90 mt-0.5">{cfg.sub}</p>
+        {isPending && (
+          <button
+            type="button"
+            onClick={handleCancel}
+            disabled={cancelling}
+            className="mt-2 inline-flex items-center gap-1 rounded-full border border-current/40 bg-background/60 px-2.5 py-1 text-[11px] font-semibold hover:bg-background/90 disabled:opacity-60"
+          >
+            {cancelling ? (
+              <Loader2 className="h-3 w-3 animate-spin" />
+            ) : (
+              <X className="h-3 w-3" />
+            )}
+            {cancelling ? "Cancelling…" : "Cancel request"}
+          </button>
+        )}
       </div>
     </div>
   );
+}
 }
