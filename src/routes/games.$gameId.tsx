@@ -978,7 +978,7 @@ function GameDetail() {
                         onChange={refreshHostRequests}
                       />
                     ))}
-                  {Array.from({ length: game.joined }).map((_, i) => (
+                  {Array.from({ length: liveParticipantCount ?? game.joined }).map((_, i) => (
                     <div
                       key={`ph-${i}`}
                       className="flex items-center gap-3 rounded-2xl border border-border bg-surface p-3"
