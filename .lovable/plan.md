@@ -1,34 +1,41 @@
-## Fix: "Google popup was blocked" on iOS Chrome
+## Fix: Stuck on `/auth` after Google login in the Lovable mobile app
 
-### Cause
+### What the logs show
 
-The Lovable auth helper opens Google in a popup window. iOS Chrome (and most in-app webviews) block that popup unless it's triggered synchronously from a user gesture with no prior awaits. Our `google()` handler in `src/routes/auth.tsx` does `setBusy(true)` and sets a timer before awaiting `lovable.auth.signInWithOAuth`, so by the time the popup opens, iOS Chrome no longer treats it as a trusted user gesture and blocks it. Result: the popup never opens, no session ever lands, and after 8s the user sees "Sign-in didn't complete / popup blocked".
+Server side, Google sign-in succeeds — auth logs show 6 back-to-back `POST /token` responses with status 200 and `grant_type: id_token` for user BallaCity, all from `LovableApp/1.1.0` (Android webview). So tokens ARE being exchanged and Supabase considers the user signed in.
 
-We can't change `src/integrations/lovable/index.ts` (auto-generated), but we can:
-1. Trigger the OAuth call synchronously in the click handler (no awaits, no state updates before the call).
-2. Detect mobile/in-app browsers where popups are unreliable and, if the popup path fails, guide the user cleanly.
+Client side, the user stays on `/auth`. This means `supabase.auth.setSession(tokens)` finishes inside the OAuth helper, but the follow-up client-side `navigate({ to: "/profile" })` never actually leaves the page — most likely a webview timing issue between the popup closing, `onAuthStateChange` firing, and TanStack Router picking it up.
 
-### Changes
+### The fix
 
-**`src/routes/auth.tsx` — `google()` handler**
+In `src/routes/auth.tsx`, when the `lovable.auth.signInWithOAuth("google", …)` promise resolves with **no error and no `redirected` flag** (meaning tokens were returned and `setSession` was called), do a hard navigation instead of a client-side one:
 
-- Make the click handler call `lovable.auth.signInWithOAuth(...)` synchronously as the very first statement (no `setBusy` / `setTimeout` before it). Handle the returned promise with `.then/.catch` instead of `await`, so nothing blocks the popup open.
-- Move the "hang" timer and `setBusy(true)` to fire immediately after kicking off the call, but AFTER the sync call to `signInWithOAuth`.
-- On error whose message includes "popup" / "blocked" (or on the 8s timeout with no session), show a clearer toast:
-  - Title: "Google popup was blocked"
-  - Description: "Enable popups for this site in iOS Chrome (aA menu → Website Settings → Pop-ups), or open this page in Safari and try again."
-  - Include an action button "Copy link" that copies `window.location.href` so the user can paste it into Safari.
-- Keep the existing `onAuthStateChange` + `getSession()` listeners so a successful sign-in still redirects.
+```ts
+if (!result?.error && !result?.redirected) {
+  trackSigninEvent("success");
+  // Hard reload bypasses any router/state race in the mobile webview.
+  window.location.replace("/profile");
+  return;
+}
+```
 
-**No other files changed.** OneSignal SW passthrough, auth listeners, and reset-password flow stay as-is.
+Why a hard reload works: it forces the whole app to remount, `useAuth` re-initializes from scratch, `supabase.auth.getUser()` reads the freshly-set session from storage, and the `_tabs.profile` route renders. No dependency on `onAuthStateChange` firing before the router evaluates the redirect effect.
+
+### Also keep
+
+- The synchronous `signInWithOAuth` call as the first statement in the click handler (iOS Chrome popup-gesture fix).
+- The existing `onAuthStateChange` + mount-time `getSession` redirect — those still cover desktop and non-webview mobile where they work fine.
+- The popup-blocked toast for real errors from the OAuth promise.
+- The telemetry events (`attempt`, `success`, `failure`, `popup_blocked`, `retry_clicked`, `copy_link_clicked`).
 
 ### Out of scope
 
-- Not editing `src/integrations/lovable/index.ts` (auto-generated).
-- Not switching to a different OAuth library or full-page redirect flow — the Lovable helper controls that internally and only falls back to full-page redirect when it detects the popup was blocked at open time. Making the call synchronous is what enables that detection to succeed.
-- No backend/provider changes — Google auth is confirmed working server-side.
+- No backend / provider / migration changes.
+- No changes to `src/integrations/lovable/index.ts` (auto-generated).
+- No new routes.
 
 ### Verification
 
-- On desktop: Google sign-in still opens a popup and completes normally.
-- On iOS Chrome: tapping Continue with Google opens the Google account picker (popup no longer blocked because the call runs inside the user gesture). If a user has popups explicitly disabled at the OS/browser level, they now see a clear, actionable toast with a "Copy link" fallback instead of a generic "didn't complete" message.
+- Lovable mobile app (Android webview): tap Continue with Google → complete Google flow → land on `/profile` (no more stuck `/auth`).
+- Desktop Chrome / Safari: still works the same — the hard-reload path only runs after tokens are returned in-window, and it lands on `/profile` just like the old client-side nav did.
+- iOS Chrome: popup fix + hard-reload both apply; same happy path.
