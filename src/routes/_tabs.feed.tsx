@@ -539,6 +539,60 @@ function FilterSheet({ onClose }: { onClose: () => void }) {
           })}
         </div>
 
+        <div className="text-xs font-semibold text-muted-foreground mb-2 uppercase tracking-wider flex items-center justify-between">
+          <span>
+            Distance from you
+            {hasCity && profile?.city ? (
+              <span className="ml-2 normal-case tracking-normal text-muted-foreground/80">
+                · {profile.city}
+              </span>
+            ) : null}
+          </span>
+          <span className="inline-flex rounded-full border border-border bg-surface p-0.5">
+            {(["mi", "km"] as const).map((u) => (
+              <button
+                key={u}
+                onClick={() => setUnit(u)}
+                className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase ${unit === u ? "bg-lime text-primary-foreground" : "text-muted-foreground"}`}
+              >
+                {u}
+              </button>
+            ))}
+          </span>
+        </div>
+        {!hasCity && (
+          <p className="text-xs text-muted-foreground mb-2">
+            <Link to="/profile/edit" className="text-lime font-semibold">
+              Set your city
+            </Link>{" "}
+            to filter by distance.
+          </p>
+        )}
+        <div className={`flex flex-wrap gap-2 mb-5 ${hasCity ? "" : "opacity-50 pointer-events-none"}`}>
+          <button
+            onClick={() => setMaxMi(null)}
+            className={`rounded-full border px-3 py-1.5 text-xs font-semibold ${prefs.maxDistanceMi == null ? "border-lime bg-lime text-primary-foreground" : "border-border bg-surface"}`}
+          >
+            Any
+          </button>
+          {presetsMi.map((mi) => {
+            const active = prefs.maxDistanceMi === mi;
+            const label = unit === "mi" ? `${mi} mi` : `${miToKm(kmToMi(miToKm(mi)))} km`;
+            // Show clean km numbers (5/10/25/50/100 mi) → convert mi→km for display.
+            const kmLabel = `${miToKm(mi)} km`;
+            return (
+              <button
+                key={mi}
+                onClick={() => setMaxMi(mi)}
+                className={`rounded-full border px-3 py-1.5 text-xs font-semibold ${active ? "border-lime bg-lime text-primary-foreground" : "border-border bg-surface"}`}
+              >
+                {unit === "mi" ? `${mi} mi` : kmLabel}
+                {void label}
+              </button>
+            );
+          })}
+        </div>
+
         <div className="text-xs font-semibold text-muted-foreground mb-2 uppercase tracking-wider">
           Sections
         </div>
