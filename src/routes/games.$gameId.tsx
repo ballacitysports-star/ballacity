@@ -1105,14 +1105,21 @@ function EditGameModal({
   onClose: () => void;
 }) {
   const [title, setTitle] = useState(game.title);
+  const [sport, setSport] = useState<Game["sport"]>(game.sport);
+  const [skill, setSkill] = useState<Game["skill"]>(game.skill);
   const [location, setLocation] = useState(game.location);
+  const [neighborhood, setNeighborhood] = useState(game.neighborhood ?? "");
   const [dateLocal, setDateLocal] = useState(() => {
     const d = new Date(game.date);
     const pad = (n: number) => String(n).padStart(2, "0");
     return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
   });
+  const [duration, setDuration] = useState(game.duration);
   const [maxPlayers, setMaxPlayers] = useState(String(game.maxPlayers));
   const [price, setPrice] = useState(String(game.price));
+  const [indoor, setIndoor] = useState(!!game.indoor);
+  const [isPrivate, setIsPrivate] = useState(!!game.isPrivate);
+  const [image, setImage] = useState(game.image ?? "");
   const [description, setDescription] = useState(game.description);
 
   const save = () => {
@@ -1121,10 +1128,17 @@ function EditGameModal({
     const iso = new Date(dateLocal).toISOString();
     const updated = updateHostedGame(game.id, {
       title: title.trim() || game.title,
+      sport,
+      skill,
       location: location.trim() || game.location,
+      neighborhood: neighborhood.trim(),
       date: Number.isFinite(new Date(dateLocal).getTime()) ? iso : game.date,
+      duration: duration.trim() || game.duration,
       maxPlayers: mp,
       price: pr,
+      indoor,
+      isPrivate,
+      image: image.trim(),
       description,
     });
     if (!updated) {
