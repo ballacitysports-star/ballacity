@@ -12,8 +12,6 @@ import { useEffect } from "react";
 import appCss from "../styles.css?url";
 import { DebugModeToggle } from "@/components/DebugModeToggle";
 import { BottomNav } from "@/components/BottomNav";
-import { FloatingActions } from "@/components/FloatingActions";
-
 import { ClientOnly } from "@tanstack/react-router";
 import { supabase } from "@/integrations/supabase/client";
 import { Toaster } from "@/components/ui/sonner";
@@ -213,11 +211,9 @@ function AuthGate({ children }: { children: React.ReactNode }) {
   return (
     <>
       {children}
-      <FloatingActions />
       <BottomNav />
     </>
   );
-
 }
 
 function RootComponent() {
