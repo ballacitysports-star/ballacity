@@ -956,7 +956,7 @@ function GameDetail() {
           {/* Roster (host view) */}
           <div>
             <h2 className="font-display text-sm font-bold uppercase tracking-wider text-muted-foreground mb-2">
-              Roster · {hostRequests.filter((r) => r.status === "approved").length + game.joined} /{" "}
+              Roster · {hostRequests.filter((r) => r.status === "approved").length + (liveParticipantCount ?? game.joined)} /{" "}
               {game.maxPlayers}
             </h2>
             <div className="space-y-2">
