@@ -159,7 +159,7 @@ function maybeReloadForStaleChunk(reason: unknown) {
   window.location.reload();
 }
 
-const PUBLIC_ROUTES = ["/", "/auth", "/reset-password"];
+const PUBLIC_ROUTES = ["/", "/auth", "/reset-password", "/.lovable/oauth/consent"];
 const TAB_PATHS = [
   "/feed",
   "/players",
