@@ -795,14 +795,22 @@ function GameDetail() {
                   />
                 );
               }
-              return (
+              const isRealPlayer =
+                p.kind === "player" && !!p.userId && !p.isMe && !!p.displayName;
+              const chip = (
                 <motion.div
                   key={i}
                   initial={{ scale: 0, opacity: 0 }}
                   animate={{ scale: 1, opacity: 1 }}
                   transition={{ delay: i * 0.04 }}
-                  title={p.pending ? "Pending host approval" : undefined}
-                  className={`relative grid h-11 w-11 place-items-center rounded-full border text-xs font-bold ${
+                  title={
+                    p.pending
+                      ? "Pending host approval"
+                      : p.kind === "player" && p.displayName
+                        ? p.displayName
+                        : undefined
+                  }
+                  className={`relative grid h-11 w-11 place-items-center overflow-hidden rounded-full border text-xs font-bold ${
                     p.pending
                       ? "border-dashed border-coral/60 bg-coral/10 text-coral"
                       : p.isMe
@@ -810,7 +818,16 @@ function GameDetail() {
                         : "border-border bg-surface"
                   }`}
                 >
-                  {p.initials}
+                  {p.kind === "player" && p.avatarUrl ? (
+                    <img
+                      src={p.avatarUrl}
+                      alt={p.displayName ?? p.initials}
+                      className="h-full w-full object-cover"
+                      loading="lazy"
+                    />
+                  ) : (
+                    p.initials
+                  )}
                   {p.pending && (
                     <span className="absolute -bottom-1 -right-1 grid h-4 w-4 place-items-center rounded-full bg-coral text-[8px] text-white">
                       <Clock className="h-2.5 w-2.5" />
@@ -818,6 +835,19 @@ function GameDetail() {
                   )}
                 </motion.div>
               );
+              if (isRealPlayer && p.kind === "player" && p.userId) {
+                return (
+                  <Link
+                    key={i}
+                    to="/players/$userId"
+                    params={{ userId: p.userId }}
+                    className="focus:outline-none focus-visible:ring-2 focus-visible:ring-lime rounded-full"
+                  >
+                    {chip}
+                  </Link>
+                );
+              }
+              return chip;
             })}
             {Array.from({
               length: Math.max(0, spotsLeft - (viewerPending ? 1 : 0) - pendingCount),
