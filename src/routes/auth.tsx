@@ -193,6 +193,14 @@ function AuthPage() {
       .then((result) => {
         if (result?.error) {
           const msg = result.error.message || "";
+          // Silent sign-in couldn't complete (user signed out of Google,
+          // session expired, cookies cleared). Transparently retry once
+          // with the normal picker — no error toast.
+          if (useSilent && /login_required|interaction_required|consent_required|prompt=?none/i.test(msg)) {
+            try { window.localStorage.removeItem("lastGoogleEmail"); } catch {}
+            google({ silent: false, isRetry: true });
+            return;
+          }
           if (/popup|blocked|window|opener/i.test(msg)) {
             showBlockedToast(msg);
           } else {
