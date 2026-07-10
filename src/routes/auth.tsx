@@ -181,6 +181,13 @@ function AuthPage() {
             trackSigninEvent("failure", { errorMessage: msg });
             toast.error(msg || "Google sign-in failed");
           }
+        } else if (!result?.redirected) {
+          // Tokens were returned in-window and setSession was called.
+          // Hard-reload bypasses router/state races in mobile webviews
+          // (notably the Lovable Android app) where onAuthStateChange
+          // fires but the client-side navigate never leaves /auth.
+          trackSigninEvent("success");
+          window.location.replace("/profile");
         } else {
           trackSigninEvent("success");
         }
