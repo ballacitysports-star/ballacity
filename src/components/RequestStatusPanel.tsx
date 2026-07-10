@@ -74,6 +74,7 @@ export function RequestStatusPanel({
   const [loading, setLoading] = useState(true);
   const [summary, setSummary] = useState<ExistingRequestSummary | null>(null);
   const [cancelling, setCancelling] = useState(false);
+  const [confirmOpen, setConfirmOpen] = useState(false);
   const [localRefresh, setLocalRefresh] = useState(0);
 
   useEffect(() => {
