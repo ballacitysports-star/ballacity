@@ -1,10 +1,3 @@
-import soccerImg from "@/assets/sport-soccer.jpg";
-import pickleballImg from "@/assets/sport-pickleball.jpg";
-import volleyballImg from "@/assets/sport-volleyball.jpg";
-import runningImg from "@/assets/sport-running.jpg";
-import tennisImg from "@/assets/sport-tennis.jpg";
-import heroImg from "@/assets/hero-court.jpg";
-
 export type Sport =
   | "Basketball"
   | "Soccer"
@@ -56,23 +49,42 @@ export type Game = {
   joinsClosed?: boolean;
 };
 
-export const HERO_IMAGE = heroImg;
+// Simple default cover: a soft duotone gradient tuned to each sport's accent
+// color, with the sport's emoji centered. Rendered as an inline SVG data URI
+// so it needs no network round-trip and stays crisp at any size.
+function makeDefaultCover(color: string, emoji: string): string {
+  const svg = `<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 800 500'>
+    <defs>
+      <linearGradient id='g' x1='0' y1='0' x2='1' y2='1'>
+        <stop offset='0%' stop-color='${color}' stop-opacity='0.85'/>
+        <stop offset='100%' stop-color='#0b0f1a' stop-opacity='1'/>
+      </linearGradient>
+    </defs>
+    <rect width='800' height='500' fill='#0b0f1a'/>
+    <rect width='800' height='500' fill='url(%23g)'/>
+    <text x='50%' y='54%' text-anchor='middle' font-size='220' font-family='Apple Color Emoji, Segoe UI Emoji, sans-serif'>${emoji}</text>
+  </svg>`.replace(/\n\s+/g, "");
+  return `data:image/svg+xml;utf8,${svg.replace(/#/g, "%23")}`;
+}
 
-const sportImage: Record<Sport, string> = {
-  Basketball: heroImg,
-  Soccer: soccerImg,
-  Pickleball: pickleballImg,
-  Volleyball: volleyballImg,
-  Tennis: tennisImg,
-  "Flag Football": soccerImg,
-  Baseball: tennisImg,
-  Softball: tennisImg,
-  Running: runningImg,
-};
+const sportMeta: Record<Sport, { color: string; emoji: string }> = SPORTS.reduce(
+  (acc, s) => {
+    acc[s.name] = { color: s.color, emoji: s.emoji };
+    return acc;
+  },
+  {} as Record<Sport, { color: string; emoji: string }>,
+);
+
+const sportImage: Record<Sport, string> = Object.fromEntries(
+  (Object.keys(sportMeta) as Sport[]).map((s) => [s, makeDefaultCover(sportMeta[s].color, sportMeta[s].emoji)]),
+) as Record<Sport, string>;
+
+export const HERO_IMAGE = sportImage.Basketball;
 
 export function imageFor(sport: Sport) {
   return sportImage[sport];
 }
+
 
 // Pinned to start-of-UTC-day so SSR and client hydration produce identical
 // ISO strings. Date.now() at module scope causes hydration mismatches because
@@ -105,7 +117,7 @@ export const GAMES: Game[] = [
     isPrivate: false,
     urgent: true,
     trending: true,
-    image: heroImg,
+    image: sportImage.Basketball,
     description:
       "Competitive but chill. We rotate teams every game to 11. Bring a light + dark shirt.",
     equipment: ["Reversible jersey", "Water"],
@@ -129,7 +141,7 @@ export const GAMES: Game[] = [
     indoor: false,
     isPrivate: false,
     trending: true,
-    image: soccerImg,
+    image: sportImage.Soccer,
     description: "Mixed-gender, all levels. $8 covers turf rental. Cleats recommended.",
     equipment: ["Cleats", "Shin guards"],
   },
@@ -151,7 +163,7 @@ export const GAMES: Game[] = [
     price: 0,
     indoor: false,
     isPrivate: false,
-    image: pickleballImg,
+    image: sportImage.Pickleball,
     description: "Beginner-friendly round robin. Paddles available if you don't have one.",
     equipment: ["Paddle (optional)"],
   },
@@ -173,7 +185,7 @@ export const GAMES: Game[] = [
     price: 15,
     indoor: true,
     isPrivate: false,
-    image: volleyballImg,
+    image: sportImage.Volleyball,
     description: "Higher level scrimmage prepping for the spring league. Knee pads recommended.",
     equipment: ["Knee pads", "Court shoes"],
   },
@@ -196,7 +208,7 @@ export const GAMES: Game[] = [
     indoor: false,
     isPrivate: false,
     trending: true,
-    image: runningImg,
+    image: sportImage.Running,
     description: "2 mile warmup · 5K tempo @ 7:00 pace · 1 mile cool. Coffee after.",
     equipment: ["Running shoes"],
   },
@@ -219,7 +231,7 @@ export const GAMES: Game[] = [
     indoor: false,
     isPrivate: false,
     urgent: true,
-    image: tennisImg,
+    image: sportImage.Tennis,
     description: "30 min of doubles drills then competitive sets. 3.5–4.0 NTRP.",
     equipment: ["Racquet", "Balls (bring 1 can)"],
   },
@@ -241,7 +253,7 @@ export const GAMES: Game[] = [
     price: 0,
     indoor: false,
     isPrivate: false,
-    image: soccerImg,
+    image: sportImage.Soccer,
     description: "Casual flag football. Flags provided. Bring cleats or turfs.",
     equipment: ["Cleats", "Water"],
   },
@@ -264,7 +276,7 @@ export const GAMES: Game[] = [
     indoor: false,
     isPrivate: false,
     urgent: true,
-    image: heroImg,
+    image: sportImage.Basketball,
     description: "Run before work. 3v3 to 15. Winners stay on.",
     equipment: ["Ball (we'll have one)"],
   },
@@ -350,7 +362,7 @@ export const ORGS: Org[] = [
     founded: 2019,
     sports: ["Basketball"],
     verified: true,
-    cover: heroImg,
+    cover: sportImage.Basketball,
     avatar: "EE",
     accent: "#a3ff12",
     followers: 2840,
@@ -417,7 +429,7 @@ export const ORGS: Org[] = [
     founded: 2021,
     sports: ["Soccer"],
     verified: true,
-    cover: soccerImg,
+    cover: sportImage.Soccer,
     avatar: "FM",
     accent: "#7df9c1",
     followers: 1560,
@@ -479,7 +491,7 @@ export const ORGS: Org[] = [
     founded: 2017,
     sports: ["Running"],
     verified: true,
-    cover: runningImg,
+    cover: sportImage.Running,
     avatar: "JK",
     accent: "#ff3d68",
     followers: 4210,
@@ -538,7 +550,7 @@ export const ORGS: Org[] = [
     founded: 2019,
     sports: ["Volleyball"],
     verified: true,
-    cover: volleyballImg,
+    cover: sportImage.Volleyball,
     avatar: "PN",
     accent: "#ffd166",
     followers: 1820,
@@ -588,7 +600,7 @@ export const ORGS: Org[] = [
     founded: 2022,
     sports: ["Pickleball"],
     verified: false,
-    cover: pickleballImg,
+    cover: sportImage.Pickleball,
     avatar: "WP",
     accent: "#c8ff5b",
     followers: 980,

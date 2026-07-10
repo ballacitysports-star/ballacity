@@ -10,8 +10,10 @@ import {
   Lock,
   Home,
   ShieldCheck,
+  ImagePlus,
+  X,
 } from "lucide-react";
-import { SPORTS, type Sport } from "@/lib/sample-data";
+import { SPORTS, type Sport, imageFor } from "@/lib/sample-data";
 import { addHostedGame } from "@/lib/hosted-games-store";
 import { useServerFn } from "@tanstack/react-start";
 import { reverseGeocode } from "@/lib/geocode.functions";
@@ -21,6 +23,8 @@ import { LocationAutocomplete } from "@/components/LocationAutocomplete";
 import { useMyProfile } from "@/lib/user-prefs-store";
 import { useAuth } from "@/hooks/use-auth";
 import { upsertGamePaymentSettings } from "@/lib/payments";
+import { supabase } from "@/integrations/supabase/client";
+
 
 export const Route = createFileRoute("/_tabs/create")({
   head: () => ({ meta: [{ title: "Host a game — OpenRun" }] }),
@@ -47,6 +51,10 @@ function Create() {
   const [description, setDescription] = useState("");
   const [requiresApproval, setRequiresApproval] = useState(false);
   const [publishing, setPublishing] = useState(false);
+  const [coverUrl, setCoverUrl] = useState<string | null>(null);
+  const [coverUploading, setCoverUploading] = useState(false);
+  const coverInputRef = useRef<HTMLInputElement>(null);
+
 
   useEffect(() => {
     const nextCity = profile?.city?.trim() ?? "";
@@ -205,6 +213,8 @@ function Create() {
               description,
               hostUserId: user?.id,
               host: hostSnap,
+              image: coverUrl ?? undefined,
+
             });
 
             // Persist host ownership + approval/fee preferences so the host & players see them on the detail page
@@ -254,6 +264,80 @@ function Create() {
             })}
           </div>
         </Section>
+
+        {/* Cover photo */}
+        <Section title="Cover photo" icon={<ImagePlus className="h-4 w-4" />}>
+          <div className="relative overflow-hidden rounded-2xl border border-border bg-surface">
+            <img
+              src={coverUrl ?? imageFor(sport)}
+              alt="Game cover preview"
+              className="h-40 w-full object-cover"
+            />
+            <div className="absolute inset-x-0 bottom-0 flex items-center justify-between gap-2 bg-gradient-to-t from-black/70 to-transparent p-3">
+              <span className="text-xs text-white/90">
+                {coverUrl ? "Custom cover" : "Default cover — pick your own"}
+              </span>
+              <div className="flex items-center gap-2">
+                {coverUrl && (
+                  <button
+                    type="button"
+                    onClick={() => setCoverUrl(null)}
+                    className="grid h-8 w-8 place-items-center rounded-full bg-black/60 text-white"
+                    aria-label="Remove cover"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                )}
+                <button
+                  type="button"
+                  disabled={coverUploading || !user}
+                  onClick={() => coverInputRef.current?.click()}
+                  className="rounded-full bg-lime px-3 py-1.5 text-xs font-bold text-primary-foreground disabled:opacity-60"
+                >
+                  {coverUploading ? "Uploading…" : coverUrl ? "Replace" : "Upload"}
+                </button>
+              </div>
+            </div>
+            <input
+              ref={coverInputRef}
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={async (e) => {
+                const file = e.target.files?.[0];
+                e.target.value = "";
+                if (!file || !user) return;
+                if (file.size > 5 * 1024 * 1024) {
+                  toast.error("Image too large (max 5MB).");
+                  return;
+                }
+                setCoverUploading(true);
+                try {
+                  const ext = file.name.split(".").pop() || "jpg";
+                  const path = `${user.id}/${Date.now()}-${Math.random()
+                    .toString(36)
+                    .slice(2, 8)}.${ext}`;
+                  const { error: upErr } = await supabase.storage
+                    .from("game-covers")
+                    .upload(path, file, { cacheControl: "3600", upsert: false });
+                  if (upErr) throw upErr;
+                  const { data, error: urlErr } = await supabase.storage
+                    .from("game-covers")
+                    .createSignedUrl(path, 60 * 60 * 24 * 365 * 10);
+                  if (urlErr || !data?.signedUrl) throw urlErr ?? new Error("Signed URL failed");
+                  setCoverUrl(data.signedUrl);
+
+                } catch (err: any) {
+                  toast.error(err?.message ?? "Upload failed");
+                } finally {
+                  setCoverUploading(false);
+                }
+              }}
+            />
+          </div>
+        </Section>
+
+
 
         {/* Title */}
         <Section title="Game title">

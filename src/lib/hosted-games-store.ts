@@ -145,7 +145,7 @@ function gameToInsertRow(g: Game): TablesInsert<"hosted_games"> {
     is_private: !!g.isPrivate,
     urgent: !!g.urgent,
     trending: !!g.trending,
-    image: g.image ?? "",
+    image: g.image && g.image !== imageFor(g.sport) ? g.image : "",
     description: g.description ?? "",
     equipment: g.equipment ?? [],
     status: g.status ?? null,
@@ -243,6 +243,7 @@ export type HostedGameInput = {
   description: string;
   host?: { name: string; username: string; avatar: string; rating?: number };
   hostUserId?: string;
+  image?: string; // optional custom cover URL
 };
 
 export async function addHostedGame(input: HostedGameInput): Promise<Game> {
@@ -275,10 +276,11 @@ export async function addHostedGame(input: HostedGameInput): Promise<Game> {
     price: input.price,
     indoor: input.indoor,
     isPrivate: input.isPrivate,
-    image: imageFor(input.sport),
+    image: input.image?.trim() || imageFor(input.sport),
     description: input.description || "",
     equipment: [],
   };
+
 
   // Optimistic local insert.
   cache = [game, ...cache];
