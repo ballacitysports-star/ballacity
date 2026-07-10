@@ -3,7 +3,7 @@ import basketballCover from "@/assets/sport-basketball.jpg";
 import soccerCover from "@/assets/sport-soccer.jpg";
 import volleyballCover from "@/assets/sport-volleyball.jpg";
 import tennisCover from "@/assets/sport-tennis.jpg";
-import flagFootballCover from "@/assets/sport-flagfootball.jpg";
+import footballCover from "@/assets/sport-football.jpg";
 import baseballCover from "@/assets/sport-baseball.jpg";
 import softballCover from "@/assets/sport-softball.jpg";
 import runningCover from "@/assets/sport-running.jpg";
@@ -14,7 +14,7 @@ export type Sport =
   | "Pickleball"
   | "Volleyball"
   | "Tennis"
-  | "Flag Football"
+  | "Football"
   | "Baseball"
   | "Softball"
   | "Running";
@@ -25,7 +25,7 @@ export const SPORTS: { name: Sport; emoji: string; color: string }[] = [
   { name: "Pickleball", emoji: "🥒", color: "#7df9c1" },
   { name: "Volleyball", emoji: "🏐", color: "#ffd166" },
   { name: "Tennis", emoji: "🎾", color: "#c8ff5b" },
-  { name: "Flag Football", emoji: "🏈", color: "#ff6b35" },
+  { name: "Football", emoji: "🏈", color: "#ff6b35" },
   { name: "Baseball", emoji: "⚾", color: "#ffffff" },
   { name: "Softball", emoji: "🥎", color: "#ffe27a" },
   { name: "Running", emoji: "🏃", color: "#ff3d68" },
@@ -91,7 +91,7 @@ const sportImage: Record<Sport, string> = {
   Pickleball: pickleballCover,
   Volleyball: volleyballCover,
   Tennis: tennisCover,
-  "Flag Football": flagFootballCover,
+  "Football": footballCover,
   Baseball: baseballCover,
   Softball: softballCover,
   Running: runningCover,
@@ -257,7 +257,7 @@ export const GAMES: Game[] = [
   },
   {
     id: "g7",
-    sport: "Flag Football",
+    sport: "Football",
     title: "Sunday Funday 5v5",
     host: { name: "Tyrese B.", username: "@ty", avatar: "TB", rating: 4.8 },
     date: inHours(72),
