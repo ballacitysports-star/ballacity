@@ -188,3 +188,46 @@ export async function setContactRequestStatus(id: string, status: ContactRequest
     .eq("id", id);
   if (error) throw error;
 }
+
+export type ExistingRequestStatus = "none" | "pending" | "accepted" | "declined" | "withdrawn";
+
+export type ExistingRequestSummary = {
+  status: ExistingRequestStatus;
+  kind: "contact" | "invite" | null;
+  game_id: string | null;
+  updated_at: string | null;
+  id: string | null;
+};
+
+/**
+ * Look up the most recent contact/invite request from the current user to a
+ * given availability. Optionally scope to a specific game_id (for invites).
+ */
+export async function getExistingContactRequest(
+  availabilityId: string,
+  opts: { gameId?: string | null } = {},
+): Promise<ExistingRequestSummary> {
+  const { data: u } = await supabase.auth.getUser();
+  if (!u.user) return { status: "none", kind: null, game_id: null, updated_at: null, id: null };
+  let q = supabase
+    .from("availability_contact_requests" as any)
+    .select("id, status, kind, game_id, updated_at")
+    .eq("availability_id", availabilityId)
+    .eq("from_user_id", u.user.id)
+    .order("updated_at", { ascending: false })
+    .limit(1);
+  if (opts.gameId !== undefined) {
+    q = opts.gameId === null ? q.is("game_id", null) : q.eq("game_id", opts.gameId);
+  }
+  const { data, error } = await q;
+  if (error) throw error;
+  const row = (data ?? [])[0] as any;
+  if (!row) return { status: "none", kind: null, game_id: null, updated_at: null, id: null };
+  return {
+    status: row.status as ExistingRequestStatus,
+    kind: row.kind as "contact" | "invite",
+    game_id: row.game_id ?? null,
+    updated_at: row.updated_at ?? null,
+    id: row.id ?? null,
+  };
+}
