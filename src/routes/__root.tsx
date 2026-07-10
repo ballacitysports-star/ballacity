@@ -106,6 +106,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
         href: "https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=DM+Sans:wght@400;500;600;700&display=swap",
       },
       { rel: "stylesheet", href: appCss },
+      { rel: "icon", type: "image/svg+xml", href: "/favicon.svg" },
     ],
   }),
   shellComponent: RootShell,
@@ -158,7 +159,7 @@ function maybeReloadForStaleChunk(reason: unknown) {
   window.location.reload();
 }
 
-const PUBLIC_ROUTES = ["/", "/auth", "/reset-password"];
+const PUBLIC_ROUTES = ["/", "/auth", "/reset-password", "/.lovable/oauth/consent"];
 const TAB_PATHS = [
   "/feed",
   "/players",
