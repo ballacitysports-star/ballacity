@@ -41,7 +41,7 @@ import {
   type PaymentSubmission,
   type JoinRequest,
 } from "@/lib/payments";
-import { useHostedGames, updateHostedGame } from "@/lib/hosted-games-store";
+import { useHostedGames, updateHostedGame, deleteHostedGame } from "@/lib/hosted-games-store";
 import type { Game } from "@/lib/sample-data";
 import { LegalNotice } from "@/components/LegalNotice";
 import { useAuth } from "@/hooks/use-auth";
