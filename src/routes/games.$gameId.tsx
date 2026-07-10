@@ -27,6 +27,7 @@ import { computeReputation, useReviewsFor } from "@/lib/reviews";
 import { ReputationBadge } from "@/components/ReputationBadge";
 import { joinGame, leaveGame, useIsJoined } from "@/lib/games-store";
 import { useLiveParticipantCount } from "@/lib/game-participants-store";
+import { useLiveParticipants } from "@/lib/game-roster";
 import { toast } from "sonner";
 import { useEffect, useMemo, useState } from "react";
 import {
@@ -134,6 +135,7 @@ function GameDetail() {
   );
   const joined = useIsJoined(gameId);
   const liveParticipantCount = useLiveParticipantCount(gameId);
+  const { participants: liveRoster } = useLiveParticipants(gameId);
   const nav = useNavigate();
   const { user } = useAuth();
   const [settings, setSettings] = useState<GamePaymentSettings | null>(null);
@@ -415,26 +417,56 @@ function GameDetail() {
   const hostPendingReqs = isHost ? hostRequests.filter((r) => r.status === "pending") : [];
   const pendingCount = hostPendingReqs.length;
   type RosterEntry =
-    | { kind: "player"; initials: string; isMe: boolean; pending: false }
+    | {
+        kind: "player";
+        initials: string;
+        isMe: boolean;
+        pending: false;
+        userId?: string;
+        displayName?: string;
+        avatarUrl?: string | null;
+      }
     | { kind: "viewerPending"; initials: "YOU"; isMe: true; pending: true }
     | { kind: "hostPending"; req: JoinRequest; pending: true };
-  // Non-"me" placeholder count: use the live baseline minus the viewer if
-  // the live count already includes them. Falls back to game.joined during
-  // hydration.
-  const otherPlayersCount = Math.max(
-    0,
-    (liveParticipantCount ?? game.joined ?? 0) - (viewerCountsAsJoined && liveParticipantCount !== undefined ? 1 : 0),
-  );
-  const players: RosterEntry[] = [
-    ...(viewerCountsAsJoined
-      ? [{ kind: "player" as const, initials: "YOU", isMe: true, pending: false as const }]
-      : []),
-    ...Array.from({ length: otherPlayersCount }, (_, i) => ({
+
+  // Real confirmed roster from `game_participants` (live via realtime).
+  // Falls back to game.joined-sized placeholders during hydration so the
+  // slot count never briefly collapses to zero.
+  const meId = user?.id ?? null;
+  const rosterOthers: RosterEntry[] = liveRoster
+    .filter((p) => p.userId !== meId)
+    .map((p) => ({
       kind: "player" as const,
-      initials: ["MC", "AG", "JK", "RC", "TB", "SO", "PN", "DP", "EL", "VM"][i % 10],
+      initials: p.avatarInitials,
       isMe: false,
       pending: false as const,
-    })),
+      userId: p.userId,
+      displayName: p.displayName,
+      avatarUrl: p.avatarUrl,
+    }));
+  const usePlaceholderRoster = liveRoster.length === 0 && (game.joined ?? 0) > 0;
+  const placeholderOthers: RosterEntry[] = usePlaceholderRoster
+    ? Array.from({ length: game.joined }, (_, i) => ({
+        kind: "player" as const,
+        initials: ["MC", "AG", "JK", "RC", "TB", "SO", "PN", "DP", "EL", "VM"][i % 10],
+        isMe: false,
+        pending: false as const,
+      }))
+    : [];
+  const players: RosterEntry[] = [
+    ...(viewerCountsAsJoined
+      ? [
+          {
+            kind: "player" as const,
+            initials: "YOU",
+            isMe: true,
+            pending: false as const,
+            userId: meId ?? undefined,
+          },
+        ]
+      : []),
+    ...rosterOthers,
+    ...placeholderOthers,
     ...(viewerPending
       ? [
           {
@@ -763,14 +795,22 @@ function GameDetail() {
                   />
                 );
               }
-              return (
+              const isRealPlayer =
+                p.kind === "player" && !!p.userId && !p.isMe && !!p.displayName;
+              const chip = (
                 <motion.div
                   key={i}
                   initial={{ scale: 0, opacity: 0 }}
                   animate={{ scale: 1, opacity: 1 }}
                   transition={{ delay: i * 0.04 }}
-                  title={p.pending ? "Pending host approval" : undefined}
-                  className={`relative grid h-11 w-11 place-items-center rounded-full border text-xs font-bold ${
+                  title={
+                    p.pending
+                      ? "Pending host approval"
+                      : p.kind === "player" && p.displayName
+                        ? p.displayName
+                        : undefined
+                  }
+                  className={`relative grid h-11 w-11 place-items-center overflow-hidden rounded-full border text-xs font-bold ${
                     p.pending
                       ? "border-dashed border-coral/60 bg-coral/10 text-coral"
                       : p.isMe
@@ -778,7 +818,16 @@ function GameDetail() {
                         : "border-border bg-surface"
                   }`}
                 >
-                  {p.initials}
+                  {p.kind === "player" && p.avatarUrl ? (
+                    <img
+                      src={p.avatarUrl}
+                      alt={p.displayName ?? p.initials}
+                      className="h-full w-full object-cover"
+                      loading="lazy"
+                    />
+                  ) : (
+                    p.initials
+                  )}
                   {p.pending && (
                     <span className="absolute -bottom-1 -right-1 grid h-4 w-4 place-items-center rounded-full bg-coral text-[8px] text-white">
                       <Clock className="h-2.5 w-2.5" />
@@ -786,6 +835,19 @@ function GameDetail() {
                   )}
                 </motion.div>
               );
+              if (isRealPlayer && p.kind === "player" && p.userId) {
+                return (
+                  <Link
+                    key={i}
+                    to="/players/$userId"
+                    params={{ userId: p.userId }}
+                    className="focus:outline-none focus-visible:ring-2 focus-visible:ring-lime rounded-full"
+                  >
+                    {chip}
+                  </Link>
+                );
+              }
+              return chip;
             })}
             {Array.from({
               length: Math.max(0, spotsLeft - (viewerPending ? 1 : 0) - pendingCount),
@@ -955,48 +1017,89 @@ function GameDetail() {
 
           {/* Roster (host view) */}
           <div>
-            <h2 className="font-display text-sm font-bold uppercase tracking-wider text-muted-foreground mb-2">
-              Roster · {hostRequests.filter((r) => r.status === "approved").length + (liveParticipantCount ?? game.joined)} /{" "}
-              {game.maxPlayers}
-            </h2>
-            <div className="space-y-2">
-              {hostRequests.filter((r) => r.status === "approved").length === 0 &&
-              (liveParticipantCount ?? game.joined) === 0 ? (
-                <div className="rounded-2xl border border-dashed border-border bg-surface/40 p-3 text-xs text-muted-foreground">
-                  No confirmed players yet.
-                </div>
-              ) : (
+            {(() => {
+              const approvedReqs = hostRequests.filter((r) => r.status === "approved");
+              const approvedIds = new Set(approvedReqs.map((r) => r.player_id));
+              // Realtime participants that aren't already surfaced via an
+              // approved join request. Falls back to placeholder rows only
+              // while hydrating and the cached count says there should be
+              // players.
+              const rosterFromLive = liveRoster.filter((p) => !approvedIds.has(p.userId));
+              const fallbackPlaceholderCount =
+                liveRoster.length === 0 ? (liveParticipantCount ?? game.joined ?? 0) : 0;
+              const totalConfirmed = approvedReqs.length + Math.max(rosterFromLive.length, fallbackPlaceholderCount);
+              return (
                 <>
-                  {hostRequests
-                    .filter((r) => r.status === "approved")
-                    .map((r) => (
-                      <RosterPlayerRow
-                        key={r.id}
-                        req={r}
-                        gameTitle={game.title}
-                        feeRequired={isPaid}
-                        onChange={refreshHostRequests}
-                      />
-                    ))}
-                  {Array.from({ length: liveParticipantCount ?? game.joined }).map((_, i) => (
-                    <div
-                      key={`ph-${i}`}
-                      className="flex items-center gap-3 rounded-2xl border border-border bg-surface p-3"
-                    >
-                      <div className="grid h-10 w-10 place-items-center rounded-full bg-secondary text-xs font-bold">
-                        {["MC", "AG", "JK", "RC", "TB", "SO", "PN", "DP", "EL", "VM"][i % 10]}
+                  <h2 className="font-display text-sm font-bold uppercase tracking-wider text-muted-foreground mb-2">
+                    Roster · {totalConfirmed} / {game.maxPlayers}
+                  </h2>
+                  <div className="space-y-2">
+                    {totalConfirmed === 0 ? (
+                      <div className="rounded-2xl border border-dashed border-border bg-surface/40 p-3 text-xs text-muted-foreground">
+                        No confirmed players yet.
                       </div>
-                      <div className="min-w-0 flex-1">
-                        <div className="text-sm font-semibold truncate">Player</div>
-                        <div className="text-[11px] text-muted-foreground">
-                          Sample roster · read-only
-                        </div>
-                      </div>
-                    </div>
-                  ))}
+                    ) : (
+                      <>
+                        {approvedReqs.map((r) => (
+                          <RosterPlayerRow
+                            key={r.id}
+                            req={r}
+                            gameTitle={game.title}
+                            feeRequired={isPaid}
+                            onChange={refreshHostRequests}
+                          />
+                        ))}
+                        {rosterFromLive.map((p) => (
+                          <Link
+                            key={`live-${p.userId}`}
+                            to="/players/$userId"
+                            params={{ userId: p.userId }}
+                            className="flex items-center gap-3 rounded-2xl border border-border bg-surface p-3 hover:border-lime/40"
+                          >
+                            <div className="grid h-10 w-10 place-items-center overflow-hidden rounded-full bg-secondary text-xs font-bold">
+                              {p.avatarUrl ? (
+                                <img
+                                  src={p.avatarUrl}
+                                  alt={p.displayName}
+                                  className="h-full w-full object-cover"
+                                  loading="lazy"
+                                />
+                              ) : (
+                                p.avatarInitials
+                              )}
+                            </div>
+                            <div className="min-w-0 flex-1">
+                              <div className="text-sm font-semibold truncate">
+                                {p.displayName}
+                              </div>
+                              <div className="text-[11px] text-muted-foreground">
+                                Joined {new Date(p.joinedAt).toLocaleString()}
+                              </div>
+                            </div>
+                          </Link>
+                        ))}
+                        {Array.from({ length: fallbackPlaceholderCount }).map((_, i) => (
+                          <div
+                            key={`ph-${i}`}
+                            className="flex items-center gap-3 rounded-2xl border border-border bg-surface p-3"
+                          >
+                            <div className="grid h-10 w-10 place-items-center rounded-full bg-secondary text-xs font-bold">
+                              {["MC", "AG", "JK", "RC", "TB", "SO", "PN", "DP", "EL", "VM"][i % 10]}
+                            </div>
+                            <div className="min-w-0 flex-1">
+                              <div className="text-sm font-semibold truncate">Player</div>
+                              <div className="text-[11px] text-muted-foreground">
+                                Loading roster…
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </>
+                    )}
+                  </div>
                 </>
-              )}
-            </div>
+              );
+            })()}
           </div>
         </div>
       )}
