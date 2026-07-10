@@ -13,7 +13,7 @@ export default defineTool({
   name: "list_upcoming_games",
   title: "List upcoming games",
   description:
-    "List upcoming pickup games visible to the signed-in OpenRun user, ordered by start time.",
+    "List upcoming pickup games visible to the signed-in OpenRun user, ordered by date.",
   inputSchema: {
     limit: z
       .number()
@@ -32,11 +32,14 @@ export default defineTool({
     if (!ctx.isAuthenticated()) {
       return { content: [{ type: "text", text: "Not authenticated" }], isError: true };
     }
+    const today = new Date().toISOString().slice(0, 10);
     let query = supabaseForUser(ctx)
-      .from("games")
-      .select("id,title,sport,starts_at,location_name,city,spots,price_cents,host_user_id")
-      .gte("starts_at", new Date().toISOString())
-      .order("starts_at", { ascending: true })
+      .from("hosted_games")
+      .select(
+        "id,title,sport,date,duration,location,neighborhood,skill,price,joined,max_players,host_id",
+      )
+      .gte("date", today)
+      .order("date", { ascending: true })
       .limit(limit ?? 20);
     if (sport) query = query.eq("sport", sport);
     const { data, error } = await query;
