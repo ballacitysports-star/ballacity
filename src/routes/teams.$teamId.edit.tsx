@@ -127,7 +127,6 @@ function EditOrg() {
   const kind = org.kind;
   const computedAvatar = avatar || initials(name || "OR");
 
-
   const handlePreview: Org = {
     ...org,
     name: name || org.name,
