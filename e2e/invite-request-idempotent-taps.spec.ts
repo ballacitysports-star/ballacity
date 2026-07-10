@@ -44,37 +44,47 @@ function sessionUserId(): string {
 
 const isTable = (url: string, table: string) => url.includes(`/rest/v1/${table}`);
 
-test("rapid taps on Request-to-join create exactly one pending row (server-side idempotency)", async ({ browser }) => {
+test("rapid taps on Request-to-join create exactly one pending row (server-side idempotency)", async ({
+  browser,
+}) => {
   const userId = sessionUserId();
 
   const ctx = await browser.newContext();
   const page = await ctx.newPage();
 
-  await page.route((u) => isTable(u, "game_payment_settings"), async (route: PWRoute) => {
-    if (route.request().method() !== "GET") return route.fallback();
-    await route.fulfill({
-      status: 200,
-      contentType: "application/json",
-      body: JSON.stringify([{
-        id: "mock-settings-id",
-        game_id: GAME_ID,
-        host_id: FAKE_HOST_ID,
-        entry_fee: 0,
-        accepted_method_ids: [],
-        payment_deadline: null,
-        refund_policy: null,
-        payment_instructions: null,
-        requires_approval: true,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      }]),
-    });
-  });
+  await page.route(
+    (u) => isTable(u, "game_payment_settings"),
+    async (route: PWRoute) => {
+      if (route.request().method() !== "GET") return route.fallback();
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify([
+          {
+            id: "mock-settings-id",
+            game_id: GAME_ID,
+            host_id: FAKE_HOST_ID,
+            entry_fee: 0,
+            accepted_method_ids: [],
+            payment_deadline: null,
+            refund_policy: null,
+            payment_instructions: null,
+            requires_approval: true,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          },
+        ]),
+      });
+    },
+  );
 
-  await page.route((u) => isTable(u, "payment_submissions"), async (route: PWRoute) => {
-    if (route.request().method() !== "GET") return route.fallback();
-    await route.fulfill({ status: 200, contentType: "application/json", body: "[]" });
-  });
+  await page.route(
+    (u) => isTable(u, "payment_submissions"),
+    async (route: PWRoute) => {
+      if (route.request().method() !== "GET") return route.fallback();
+      await route.fulfill({ status: 200, contentType: "application/json", body: "[]" });
+    },
+  );
 
   // Server-side row store keyed by (player_id, idempotency_key).
   const rowsByKey = new Map<string, any>();
@@ -93,74 +103,84 @@ test("rapid taps on Request-to-join create exactly one pending row (server-side 
     updated_at: new Date().toISOString(),
   });
 
-  await page.route((u) => isTable(u, "join_requests"), async (route: PWRoute) => {
-    const req = route.request();
-    const method = req.method();
+  await page.route(
+    (u) => isTable(u, "join_requests"),
+    async (route: PWRoute) => {
+      const req = route.request();
+      const method = req.method();
 
-    if (method === "GET") {
-      const rows = Array.from(rowsByKey.values());
-      await route.fulfill({
-        status: 200,
-        contentType: "application/json",
-        body: JSON.stringify(rows),
-      });
-      return;
-    }
-
-    if (method === "POST") {
-      let parsed: any = null;
-      try { parsed = JSON.parse(req.postData() ?? "null"); } catch { /* ignore */ }
-      const body = Array.isArray(parsed) ? parsed[0] : parsed;
-      const key: string | null = body?.idempotency_key ?? null;
-      joinPosts.push({
-        idempotency_key: key,
-        game_id: body?.game_id ?? null,
-      });
-
-      // Simulate network latency so multiple rapid taps overlap.
-      await new Promise((r) => setTimeout(r, POST_DELAY_MS));
-
-      // Server-side dedupe by (player_id, idempotency_key). Missing key = reject
-      // (mirrors the DB trigger which requires idempotency_key).
-      if (!key) {
+      if (method === "GET") {
+        const rows = Array.from(rowsByKey.values());
         await route.fulfill({
-          status: 400,
+          status: 200,
           contentType: "application/json",
-          body: JSON.stringify({ code: "23514", message: "idempotency_key is required." }),
+          body: JSON.stringify(rows),
         });
         return;
       }
 
-      const existing = rowsByKey.get(key);
-      if (existing) {
-        // Return the same row (idempotent success).
+      if (method === "POST") {
+        let parsed: any = null;
+        try {
+          parsed = JSON.parse(req.postData() ?? "null");
+        } catch {
+          /* ignore */
+        }
+        const body = Array.isArray(parsed) ? parsed[0] : parsed;
+        const key: string | null = body?.idempotency_key ?? null;
+        joinPosts.push({
+          idempotency_key: key,
+          game_id: body?.game_id ?? null,
+        });
+
+        // Simulate network latency so multiple rapid taps overlap.
+        await new Promise((r) => setTimeout(r, POST_DELAY_MS));
+
+        // Server-side dedupe by (player_id, idempotency_key). Missing key = reject
+        // (mirrors the DB trigger which requires idempotency_key).
+        if (!key) {
+          await route.fulfill({
+            status: 400,
+            contentType: "application/json",
+            body: JSON.stringify({ code: "23514", message: "idempotency_key is required." }),
+          });
+          return;
+        }
+
+        const existing = rowsByKey.get(key);
+        if (existing) {
+          // Return the same row (idempotent success).
+          await route.fulfill({
+            status: 201,
+            contentType: "application/json",
+            headers: { "content-range": "0-0/1" },
+            body: JSON.stringify([existing]),
+          });
+          return;
+        }
+
+        const row = makeRow(key);
+        rowsByKey.set(key, row);
         await route.fulfill({
           status: 201,
           contentType: "application/json",
           headers: { "content-range": "0-0/1" },
-          body: JSON.stringify([existing]),
+          body: JSON.stringify([row]),
         });
         return;
       }
 
-      const row = makeRow(key);
-      rowsByKey.set(key, row);
-      await route.fulfill({
-        status: 201,
-        contentType: "application/json",
-        headers: { "content-range": "0-0/1" },
-        body: JSON.stringify([row]),
-      });
-      return;
-    }
-
-    return route.fallback();
-  });
+      return route.fallback();
+    },
+  );
 
   await restoreSession(page);
   await page.goto(INVITE_URL, { waitUntil: "domcontentloaded" });
 
-  const banner = page.getByRole("status").filter({ hasText: /you're invited to this game/i }).first();
+  const banner = page
+    .getByRole("status")
+    .filter({ hasText: /you're invited to this game/i })
+    .first();
   await expect(banner).toBeVisible({ timeout: 10_000 });
 
   const cta = page.getByRole("button", { name: /request to join/i }).first();
@@ -177,8 +197,9 @@ test("rapid taps on Request-to-join create exactly one pending row (server-side 
   ]);
 
   // Wait for the pending UI (implies at least one POST resolved successfully).
-  await expect(page.getByText(/request pending · tap to cancel/i).first())
-    .toBeVisible({ timeout: 10_000 });
+  await expect(page.getByText(/request pending · tap to cancel/i).first()).toBeVisible({
+    timeout: 10_000,
+  });
   await expect(page.getByRole("button", { name: /^request to join/i })).toHaveCount(0);
 
   // Give any late in-flight POSTs a moment to settle.
@@ -198,10 +219,7 @@ test("rapid taps on Request-to-join create exactly one pending row (server-side 
   ).toBe(1);
 
   // Exactly one row exists on the server, regardless of how many POSTs fired.
-  expect(
-    rowsByKey.size,
-    `expected exactly 1 pending row, server holds ${rowsByKey.size}`,
-  ).toBe(1);
+  expect(rowsByKey.size, `expected exactly 1 pending row, server holds ${rowsByKey.size}`).toBe(1);
 
   const [row] = Array.from(rowsByKey.values());
   expect(row.status).toBe("pending");

@@ -1,6 +1,19 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
-import { Search, X, Plus, MessageCircle, Send, Calendar, MapPin, Bell, Inbox, Loader2, SlidersHorizontal, Ticket } from "lucide-react";
+import {
+  Search,
+  X,
+  Plus,
+  MessageCircle,
+  Send,
+  Calendar,
+  MapPin,
+  Bell,
+  Inbox,
+  Loader2,
+  SlidersHorizontal,
+  Ticket,
+} from "lucide-react";
 import { AnimatePresence } from "framer-motion";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
@@ -19,13 +32,18 @@ import {
 import { getOrCreateDirectConversation } from "@/lib/messages";
 import { useHostedGames } from "@/lib/hosted-games-store";
 import type { Game } from "@/lib/sample-data";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { kmToMi, miToKm } from "@/lib/distance";
-
 
 export const Route = createFileRoute("/_tabs/players")({
   head: () => ({ meta: [{ title: "Players — OpenRun" }] }),
@@ -73,7 +91,9 @@ function PlayersPage() {
     if (!user) return [];
     const now = Date.now();
     return hostedGames
-      .filter((g) => g.hostUserId === user.id && new Date(g.date).getTime() > now - 3 * 60 * 60 * 1000)
+      .filter(
+        (g) => g.hostUserId === user.id && new Date(g.date).getTime() > now - 3 * 60 * 60 * 1000,
+      )
       .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
   }, [hostedGames, user?.id]);
   const initial = loadStoredFilters();
@@ -90,13 +110,20 @@ function PlayersPage() {
   const [contactFor, setContactFor] = useState<AvailabilityWithAuthor | null>(null);
   const [reloadTick, setReloadTick] = useState(0);
 
-
   useEffect(() => {
     if (typeof window === "undefined") return;
     try {
       window.localStorage.setItem(
         FILTERS_STORAGE_KEY,
-        JSON.stringify({ q, sport, skill, maxDistance, ageMin, ageMax, includeUnknownAge } satisfies StoredFilters),
+        JSON.stringify({
+          q,
+          sport,
+          skill,
+          maxDistance,
+          ageMin,
+          ageMax,
+          includeUnknownAge,
+        } satisfies StoredFilters),
       );
     } catch {
       // ignore quota / private mode failures
@@ -107,13 +134,23 @@ function PlayersPage() {
     let cancelled = false;
     setList(null);
     listOpenAvailabilities({ sport: sport || undefined })
-      .then((rows) => { if (!cancelled) setList(rows); })
-      .catch((e) => { if (!cancelled) { setList([]); toast.error(e.message || "Failed to load"); } });
-    return () => { cancelled = true; };
+      .then((rows) => {
+        if (!cancelled) setList(rows);
+      })
+      .catch((e) => {
+        if (!cancelled) {
+          setList([]);
+          toast.error(e.message || "Failed to load");
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [sport, reloadTick]);
 
   const ageActive = ageMin !== "" || ageMax !== "";
-  const activeFilterCount = (sport ? 1 : 0) + (skill ? 1 : 0) + (maxDistance > 0 ? 1 : 0) + (ageActive ? 1 : 0);
+  const activeFilterCount =
+    (sport ? 1 : 0) + (skill ? 1 : 0) + (maxDistance > 0 ? 1 : 0) + (ageActive ? 1 : 0);
 
   const filtered = useMemo(() => {
     if (!list) return null;
@@ -122,7 +159,9 @@ function PlayersPage() {
     let maxA = ageMax === "" ? null : Number(ageMax);
     // Swap if reversed so the filter still behaves sensibly
     if (minA !== null && maxA !== null && minA > maxA) {
-      const tmp = minA; minA = maxA; maxA = tmp;
+      const tmp = minA;
+      minA = maxA;
+      maxA = tmp;
     }
     return list.filter((a) => {
       if (skill && a.skill_level !== skill) return false;
@@ -138,7 +177,15 @@ function PlayersPage() {
         }
       }
       if (needle) {
-        const hay = (a.author_name + " " + (a.city ?? "") + " " + (a.note ?? "") + " " + a.sports.join(" ")).toLowerCase();
+        const hay = (
+          a.author_name +
+          " " +
+          (a.city ?? "") +
+          " " +
+          (a.note ?? "") +
+          " " +
+          a.sports.join(" ")
+        ).toLowerCase();
         if (!hay.includes(needle)) return false;
       }
       return true;
@@ -156,14 +203,16 @@ function PlayersPage() {
     return age;
   }
 
-
-
   return (
     <div className="mx-auto w-full max-w-md sm:max-w-2xl lg:max-w-4xl px-4 pt-6">
       <div className="flex items-center justify-between mb-5">
         <Logo />
         <div className="flex items-center gap-2">
-          <Link to="/messages" className="grid h-10 w-10 place-items-center rounded-full border border-border bg-surface" aria-label="Messages">
+          <Link
+            to="/messages"
+            className="grid h-10 w-10 place-items-center rounded-full border border-border bg-surface"
+            aria-label="Messages"
+          >
             <MessageCircle className="h-5 w-5" />
           </Link>
           <BellLink />
@@ -205,7 +254,9 @@ function PlayersPage() {
           )}
         </button>
         <button
-          onClick={() => user ? setPostOpen(true) : toast.error("Sign in to post your availability.")}
+          onClick={() =>
+            user ? setPostOpen(true) : toast.error("Sign in to post your availability.")
+          }
           className="grid h-11 w-11 place-items-center rounded-full bg-lime-gradient text-primary-foreground glow-lime"
           aria-label="Post availability"
         >
@@ -213,14 +264,15 @@ function PlayersPage() {
         </button>
       </div>
 
-
-
       <div className="-mx-4 overflow-x-auto px-4 mb-5">
         <div className="flex gap-2 pb-1">
-          <Chip active={!sport} onClick={() => setSport("")}>All sports</Chip>
+          <Chip active={!sport} onClick={() => setSport("")}>
+            All sports
+          </Chip>
           {SPORTS.map((s) => (
             <Chip key={s.name} active={sport === s.name} onClick={() => setSport(s.name)}>
-              <span className="mr-1">{s.emoji}</span>{s.name}
+              <span className="mr-1">{s.emoji}</span>
+              {s.name}
             </Chip>
           ))}
         </div>
@@ -231,12 +283,28 @@ function PlayersPage() {
       ) : filtered.length === 0 ? (
         <EmptyState
           title={list && list.length > 0 ? "No matches" : "No one's posted yet"}
-          body={list && list.length > 0 ? "Try a different search or sport." : "Be the first — share when you're free and where you'll travel."}
-          cta={user ? (
-            <Button onClick={() => setPostOpen(true)} className="rounded-full bg-lime-gradient text-primary-foreground">Post availability</Button>
-          ) : (
-            <Link to="/auth" className="inline-flex rounded-full bg-lime-gradient px-5 py-2.5 text-sm font-bold text-primary-foreground">Sign in</Link>
-          )}
+          body={
+            list && list.length > 0
+              ? "Try a different search or sport."
+              : "Be the first — share when you're free and where you'll travel."
+          }
+          cta={
+            user ? (
+              <Button
+                onClick={() => setPostOpen(true)}
+                className="rounded-full bg-lime-gradient text-primary-foreground"
+              >
+                Post availability
+              </Button>
+            ) : (
+              <Link
+                to="/auth"
+                className="inline-flex rounded-full bg-lime-gradient px-5 py-2.5 text-sm font-bold text-primary-foreground"
+              >
+                Sign in
+              </Link>
+            )
+          }
         />
       ) : (
         <>
@@ -250,7 +318,9 @@ function PlayersPage() {
                 a={a}
                 isMine={user?.id === a.user_id}
                 hasHostedGames={myUpcomingHosted.length > 0}
-                onContact={() => user ? setContactFor(a) : toast.error("Sign in to contact this player.")}
+                onContact={() =>
+                  user ? setContactFor(a) : toast.error("Sign in to contact this player.")
+                }
                 onChanged={() => setReloadTick((t) => t + 1)}
               />
             ))}
@@ -261,7 +331,11 @@ function PlayersPage() {
       {postOpen && (
         <PostAvailabilityDialog
           onClose={() => setPostOpen(false)}
-          onPosted={() => { setPostOpen(false); setReloadTick((t) => t + 1); toast.success("Availability posted"); }}
+          onPosted={() => {
+            setPostOpen(false);
+            setReloadTick((t) => t + 1);
+            toast.success("Availability posted");
+          }}
         />
       )}
       {contactFor && (
@@ -272,18 +346,30 @@ function PlayersPage() {
         />
       )}
 
-
       <AnimatePresence>
         {filtersOpen && (
           <PlayersFilterSheet
-            sport={sport} setSport={setSport}
-            skill={skill} setSkill={setSkill}
-            maxDistance={maxDistance} setMaxDistance={setMaxDistance}
-            ageMin={ageMin} setAgeMin={setAgeMin}
-            ageMax={ageMax} setAgeMax={setAgeMax}
-            includeUnknownAge={includeUnknownAge} setIncludeUnknownAge={setIncludeUnknownAge}
+            sport={sport}
+            setSport={setSport}
+            skill={skill}
+            setSkill={setSkill}
+            maxDistance={maxDistance}
+            setMaxDistance={setMaxDistance}
+            ageMin={ageMin}
+            setAgeMin={setAgeMin}
+            ageMax={ageMax}
+            setAgeMax={setAgeMax}
+            includeUnknownAge={includeUnknownAge}
+            setIncludeUnknownAge={setIncludeUnknownAge}
             onClose={() => setFiltersOpen(false)}
-            onReset={() => { setSport(""); setSkill(""); setMaxDistance(0); setAgeMin(""); setAgeMax(""); setIncludeUnknownAge(true); }}
+            onReset={() => {
+              setSport("");
+              setSkill("");
+              setMaxDistance(0);
+              setAgeMin("");
+              setAgeMax("");
+              setIncludeUnknownAge(true);
+            }}
           />
         )}
       </AnimatePresence>
@@ -291,56 +377,98 @@ function PlayersPage() {
   );
 }
 
-function PlayersFilterSheet({ sport, setSport, skill, setSkill, maxDistance, setMaxDistance, ageMin, setAgeMin, ageMax, setAgeMax, includeUnknownAge, setIncludeUnknownAge, onClose, onReset }: {
-  sport: string; setSport: (v: string) => void;
-  skill: string; setSkill: (v: string) => void;
-  maxDistance: number; setMaxDistance: (v: number) => void;
-  ageMin: number | ""; setAgeMin: (v: number | "") => void;
-  ageMax: number | ""; setAgeMax: (v: number | "") => void;
-  includeUnknownAge: boolean; setIncludeUnknownAge: (v: boolean) => void;
-  onClose: () => void; onReset: () => void;
+function PlayersFilterSheet({
+  sport,
+  setSport,
+  skill,
+  setSkill,
+  maxDistance,
+  setMaxDistance,
+  ageMin,
+  setAgeMin,
+  ageMax,
+  setAgeMax,
+  includeUnknownAge,
+  setIncludeUnknownAge,
+  onClose,
+  onReset,
+}: {
+  sport: string;
+  setSport: (v: string) => void;
+  skill: string;
+  setSkill: (v: string) => void;
+  maxDistance: number;
+  setMaxDistance: (v: number) => void;
+  ageMin: number | "";
+  setAgeMin: (v: number | "") => void;
+  ageMax: number | "";
+  setAgeMax: (v: number | "") => void;
+  includeUnknownAge: boolean;
+  setIncludeUnknownAge: (v: boolean) => void;
+  onClose: () => void;
+  onReset: () => void;
 }) {
   const SKILLS = ["All Levels", "Beginner", "Intermediate", "Advanced"];
   const DISTANCES = [0, 5, 10, 25, 50, 100];
   return (
     <motion.div
-      initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
       className="fixed inset-0 z-50 bg-background/70 backdrop-blur flex items-end justify-center"
       onClick={onClose}
     >
       <motion.div
-        initial={{ y: "100%" }} animate={{ y: 0 }} exit={{ y: "100%" }}
+        initial={{ y: "100%" }}
+        animate={{ y: 0 }}
+        exit={{ y: "100%" }}
         transition={{ type: "spring", stiffness: 280, damping: 30 }}
         onClick={(e) => e.stopPropagation()}
         className="w-full max-w-md rounded-t-3xl border-t border-border bg-background p-5 max-h-[85vh] overflow-y-auto pb-10"
       >
         <div className="flex items-center justify-between mb-4">
           <h2 className="font-display text-lg font-bold">Filter players</h2>
-          <button onClick={onClose} className="grid h-9 w-9 place-items-center rounded-full border border-border" aria-label="Close">
+          <button
+            onClick={onClose}
+            className="grid h-9 w-9 place-items-center rounded-full border border-border"
+            aria-label="Close"
+          >
             <X className="h-4 w-4" />
           </button>
         </div>
 
-        <div className="text-xs font-semibold text-muted-foreground mb-2 uppercase tracking-wider">Sport (Players)</div>
+        <div className="text-xs font-semibold text-muted-foreground mb-2 uppercase tracking-wider">
+          Sport (Players)
+        </div>
         <div className="flex flex-wrap gap-2 mb-5">
-          <Chip active={!sport} onClick={() => setSport("")}>All sports</Chip>
+          <Chip active={!sport} onClick={() => setSport("")}>
+            All sports
+          </Chip>
           {SPORTS.map((s) => (
             <Chip key={s.name} active={sport === s.name} onClick={() => setSport(s.name)}>
-              <span className="mr-1">{s.emoji}</span>{s.name}
+              <span className="mr-1">{s.emoji}</span>
+              {s.name}
             </Chip>
           ))}
         </div>
 
-        <div className="text-xs font-semibold text-muted-foreground mb-2 uppercase tracking-wider">Skill level</div>
+        <div className="text-xs font-semibold text-muted-foreground mb-2 uppercase tracking-wider">
+          Skill level
+        </div>
         <div className="flex flex-wrap gap-2 mb-5">
-          <Chip active={!skill} onClick={() => setSkill("")}>Any</Chip>
+          <Chip active={!skill} onClick={() => setSkill("")}>
+            Any
+          </Chip>
           {SKILLS.map((s) => (
-            <Chip key={s} active={skill === s} onClick={() => setSkill(s)}>{s}</Chip>
+            <Chip key={s} active={skill === s} onClick={() => setSkill(s)}>
+              {s}
+            </Chip>
           ))}
         </div>
 
-
-        <div className="text-xs font-semibold text-muted-foreground mb-2 uppercase tracking-wider">Max travel distance</div>
+        <div className="text-xs font-semibold text-muted-foreground mb-2 uppercase tracking-wider">
+          Max travel distance
+        </div>
         <div className="flex flex-wrap gap-2 mb-5">
           {DISTANCES.map((d) => (
             <Chip key={d} active={maxDistance === d} onClick={() => setMaxDistance(d)}>
@@ -349,7 +477,9 @@ function PlayersFilterSheet({ sport, setSport, skill, setSkill, maxDistance, set
           ))}
         </div>
 
-        <div className="text-xs font-semibold text-muted-foreground mb-2 uppercase tracking-wider">Age range</div>
+        <div className="text-xs font-semibold text-muted-foreground mb-2 uppercase tracking-wider">
+          Age range
+        </div>
         <div className="flex items-center gap-2 mb-2">
           <input
             type="number"
@@ -357,7 +487,11 @@ function PlayersFilterSheet({ sport, setSport, skill, setSkill, maxDistance, set
             min={1}
             max={120}
             value={ageMin}
-            onChange={(e) => setAgeMin(e.target.value === "" ? "" : Math.max(1, Math.min(120, Number(e.target.value))))}
+            onChange={(e) =>
+              setAgeMin(
+                e.target.value === "" ? "" : Math.max(1, Math.min(120, Number(e.target.value))),
+              )
+            }
             placeholder="Min"
             className="flex-1 rounded-full border border-border bg-surface px-4 py-2 text-sm outline-none"
             aria-label="Minimum age"
@@ -369,19 +503,71 @@ function PlayersFilterSheet({ sport, setSport, skill, setSkill, maxDistance, set
             min={1}
             max={120}
             value={ageMax}
-            onChange={(e) => setAgeMax(e.target.value === "" ? "" : Math.max(1, Math.min(120, Number(e.target.value))))}
+            onChange={(e) =>
+              setAgeMax(
+                e.target.value === "" ? "" : Math.max(1, Math.min(120, Number(e.target.value))),
+              )
+            }
             placeholder="Max"
             className="flex-1 rounded-full border border-border bg-surface px-4 py-2 text-sm outline-none"
             aria-label="Maximum age"
           />
         </div>
         <div className="flex flex-wrap gap-2 mb-5">
-          <Chip active={ageMin === "" && ageMax === ""} onClick={() => { setAgeMin(""); setAgeMax(""); }}>Any age</Chip>
-          <Chip active={ageMin === 13 && ageMax === 17} onClick={() => { setAgeMin(13); setAgeMax(17); }}>13–17</Chip>
-          <Chip active={ageMin === 18 && ageMax === 24} onClick={() => { setAgeMin(18); setAgeMax(24); }}>18–24</Chip>
-          <Chip active={ageMin === 25 && ageMax === 34} onClick={() => { setAgeMin(25); setAgeMax(34); }}>25–34</Chip>
-          <Chip active={ageMin === 35 && ageMax === 49} onClick={() => { setAgeMin(35); setAgeMax(49); }}>35–49</Chip>
-          <Chip active={ageMin === 50 && ageMax === ""} onClick={() => { setAgeMin(50); setAgeMax(""); }}>50+</Chip>
+          <Chip
+            active={ageMin === "" && ageMax === ""}
+            onClick={() => {
+              setAgeMin("");
+              setAgeMax("");
+            }}
+          >
+            Any age
+          </Chip>
+          <Chip
+            active={ageMin === 13 && ageMax === 17}
+            onClick={() => {
+              setAgeMin(13);
+              setAgeMax(17);
+            }}
+          >
+            13–17
+          </Chip>
+          <Chip
+            active={ageMin === 18 && ageMax === 24}
+            onClick={() => {
+              setAgeMin(18);
+              setAgeMax(24);
+            }}
+          >
+            18–24
+          </Chip>
+          <Chip
+            active={ageMin === 25 && ageMax === 34}
+            onClick={() => {
+              setAgeMin(25);
+              setAgeMax(34);
+            }}
+          >
+            25–34
+          </Chip>
+          <Chip
+            active={ageMin === 35 && ageMax === 49}
+            onClick={() => {
+              setAgeMin(35);
+              setAgeMax(49);
+            }}
+          >
+            35–49
+          </Chip>
+          <Chip
+            active={ageMin === 50 && ageMax === ""}
+            onClick={() => {
+              setAgeMin(50);
+              setAgeMax("");
+            }}
+          >
+            50+
+          </Chip>
         </div>
         <label className="flex items-center gap-2 mb-5 -mt-2 text-xs text-muted-foreground cursor-pointer select-none">
           <input
@@ -394,10 +580,19 @@ function PlayersFilterSheet({ sport, setSport, skill, setSkill, maxDistance, set
           <span>Include players who haven't shared a birthday</span>
         </label>
 
-
         <div className="flex gap-2">
-          <button onClick={onReset} className="flex-1 rounded-full border border-border py-3 text-sm font-bold">Reset</button>
-          <button onClick={onClose} className="flex-1 rounded-full bg-lime-gradient py-3 text-sm font-bold text-primary-foreground">Done</button>
+          <button
+            onClick={onReset}
+            className="flex-1 rounded-full border border-border py-3 text-sm font-bold"
+          >
+            Reset
+          </button>
+          <button
+            onClick={onClose}
+            className="flex-1 rounded-full bg-lime-gradient py-3 text-sm font-bold text-primary-foreground"
+          >
+            Done
+          </button>
         </div>
       </motion.div>
     </motion.div>
@@ -407,21 +602,37 @@ function PlayersFilterSheet({ sport, setSport, skill, setSkill, maxDistance, set
 function BellLink() {
   const unread = useUnreadNotificationCount();
   return (
-    <Link to="/notifications" className="relative grid h-10 w-10 place-items-center rounded-full border border-border bg-surface" aria-label="Notifications">
+    <Link
+      to="/notifications"
+      className="relative grid h-10 w-10 place-items-center rounded-full border border-border bg-surface"
+      aria-label="Notifications"
+    >
       <Bell className="h-5 w-5" />
       {unread > 0 && (
-        <span className="absolute -top-1 -right-1 grid h-4 min-w-4 px-1 place-items-center rounded-full bg-coral text-[10px] font-bold text-white">{unread > 9 ? "9+" : unread}</span>
+        <span className="absolute -top-1 -right-1 grid h-4 min-w-4 px-1 place-items-center rounded-full bg-coral text-[10px] font-bold text-white">
+          {unread > 9 ? "9+" : unread}
+        </span>
       )}
     </Link>
   );
 }
 
-function Chip({ active, onClick, children }: { active?: boolean; onClick?: () => void; children: React.ReactNode }) {
+function Chip({
+  active,
+  onClick,
+  children,
+}: {
+  active?: boolean;
+  onClick?: () => void;
+  children: React.ReactNode;
+}) {
   return (
     <button
       onClick={onClick}
       className={`shrink-0 rounded-full border px-3 py-1.5 text-xs font-semibold whitespace-nowrap ${active ? "border-lime bg-lime/15 text-foreground" : "border-border bg-surface text-muted-foreground"}`}
-    >{children}</button>
+    >
+      {children}
+    </button>
   );
 }
 
@@ -429,7 +640,10 @@ function LoadingRows() {
   return (
     <div className="space-y-3">
       {[0, 1, 2].map((i) => (
-        <div key={i} className="h-28 animate-pulse rounded-2xl border border-border bg-surface/40" />
+        <div
+          key={i}
+          className="h-28 animate-pulse rounded-2xl border border-border bg-surface/40"
+        />
       ))}
     </div>
   );
@@ -446,8 +660,18 @@ function EmptyState({ title, body, cta }: { title: string; body: string; cta?: R
   );
 }
 
-function AvailabilityCard({ a, isMine, hasHostedGames, onContact, onChanged }: {
-  a: AvailabilityWithAuthor; isMine: boolean; hasHostedGames: boolean; onContact: () => void; onChanged: () => void;
+function AvailabilityCard({
+  a,
+  isMine,
+  hasHostedGames,
+  onContact,
+  onChanged,
+}: {
+  a: AvailabilityWithAuthor;
+  isMine: boolean;
+  hasHostedGames: boolean;
+  onContact: () => void;
+  onChanged: () => void;
 }) {
   const navigate = useNavigate();
   const initials = a.author_initials ?? a.author_name.slice(0, 2).toUpperCase();
@@ -457,13 +681,20 @@ function AvailabilityCard({ a, isMine, hasHostedGames, onContact, onChanged }: {
     try {
       const id = await getOrCreateDirectConversation(a.user_id);
       navigate({ to: "/messages/$conversationId", params: { conversationId: id } });
-    } catch (e: any) { toast.error(e.message || "Couldn't open chat"); }
+    } catch (e: any) {
+      toast.error(e.message || "Couldn't open chat");
+    }
   };
 
   const handleDelete = async () => {
     if (!confirm("Remove this availability post?")) return;
-    try { await deleteAvailability(a.id); toast.success("Removed"); onChanged(); }
-    catch (e: any) { toast.error(e.message); }
+    try {
+      await deleteAvailability(a.id);
+      toast.success("Removed");
+      onChanged();
+    } catch (e: any) {
+      toast.error(e.message);
+    }
   };
 
   return (
@@ -486,19 +717,26 @@ function AvailabilityCard({ a, isMine, hasHostedGames, onContact, onChanged }: {
             >
               {a.author_name}
             </Link>
-            <span className="shrink-0 rounded-full bg-lime/15 px-2 py-0.5 text-[10px] font-bold text-lime">{a.skill_level}</span>
+            <span className="shrink-0 rounded-full bg-lime/15 px-2 py-0.5 text-[10px] font-bold text-lime">
+              {a.skill_level}
+            </span>
           </div>
           <div className="mt-1 flex flex-wrap gap-1">
             {a.sports.length === 0 ? (
               <span className="text-xs text-muted-foreground">Any sport</span>
-            ) : a.sports.map((s) => {
-              const emoji = SPORTS.find((sp) => sp.name === s)?.emoji ?? "🎯";
-              return (
-                <span key={s} className="rounded-full border border-border px-2 py-0.5 text-[10px] font-semibold">
-                  {emoji} {s}
-                </span>
-              );
-            })}
+            ) : (
+              a.sports.map((s) => {
+                const emoji = SPORTS.find((sp) => sp.name === s)?.emoji ?? "🎯";
+                return (
+                  <span
+                    key={s}
+                    className="rounded-full border border-border px-2 py-0.5 text-[10px] font-semibold"
+                  >
+                    {emoji} {s}
+                  </span>
+                );
+              })
+            )}
           </div>
           {when && (
             <p className="mt-2 flex items-center gap-1 text-xs text-muted-foreground">
@@ -522,14 +760,22 @@ function AvailabilityCard({ a, isMine, hasHostedGames, onContact, onChanged }: {
           </Button>
         ) : (
           <>
-            <Button size="sm" onClick={handleMessage} className="rounded-full flex-1 bg-lime-gradient text-primary-foreground">
+            <Button
+              size="sm"
+              onClick={handleMessage}
+              className="rounded-full flex-1 bg-lime-gradient text-primary-foreground"
+            >
               <MessageCircle className="h-4 w-4 mr-1" /> Message
             </Button>
             <Button size="sm" variant="outline" onClick={onContact} className="rounded-full flex-1">
               {hasHostedGames ? (
-                <><Ticket className="h-4 w-4 mr-1" /> Send invite</>
+                <>
+                  <Ticket className="h-4 w-4 mr-1" /> Send invite
+                </>
               ) : (
-                <><Send className="h-4 w-4 mr-1" /> Contact</>
+                <>
+                  <Send className="h-4 w-4 mr-1" /> Contact
+                </>
               )}
             </Button>
           </>
@@ -538,7 +784,6 @@ function AvailabilityCard({ a, isMine, hasHostedGames, onContact, onChanged }: {
     </li>
   );
 }
-
 
 function formatWindow(a: PlayerAvailability): string {
   const parts: string[] = [];
@@ -557,7 +802,13 @@ function fmtDate(iso: string) {
   return d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
 }
 
-function PostAvailabilityDialog({ onClose, onPosted }: { onClose: () => void; onPosted: () => void }) {
+function PostAvailabilityDialog({
+  onClose,
+  onPosted,
+}: {
+  onClose: () => void;
+  onPosted: () => void;
+}) {
   const [sports, setSports] = useState<string[]>([]);
   const [skill, setSkill] = useState<string>("All Levels");
   const [starts, setStarts] = useState("");
@@ -567,7 +818,8 @@ function PostAvailabilityDialog({ onClose, onPosted }: { onClose: () => void; on
   const [radius, setRadius] = useState(25);
   const [note, setNote] = useState("");
   const [saving, setSaving] = useState(false);
-  const toggle = (arr: string[], v: string) => arr.includes(v) ? arr.filter((x) => x !== v) : [...arr, v];
+  const toggle = (arr: string[], v: string) =>
+    arr.includes(v) ? arr.filter((x) => x !== v) : [...arr, v];
 
   const save = async () => {
     if (sports.length === 0 && !note.trim()) {
@@ -577,28 +829,42 @@ function PostAvailabilityDialog({ onClose, onPosted }: { onClose: () => void; on
     setSaving(true);
     try {
       await createAvailability({
-        sports, skill_level: skill,
+        sports,
+        skill_level: skill,
         // datetime-local gives "YYYY-MM-DDTHH:mm"; DB columns are DATE → store date portion only.
         starts_on: starts ? starts.slice(0, 10) : null,
         ends_on: ends ? ends.slice(0, 10) : null,
-        recurring_days: days, city, travel_radius_km: miToKm(radius), note,
+        recurring_days: days,
+        city,
+        travel_radius_km: miToKm(radius),
+        note,
       });
       onPosted();
-    } catch (e: any) { toast.error(e.message); }
-    finally { setSaving(false); }
+    } catch (e: any) {
+      toast.error(e.message);
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
     <Dialog open onOpenChange={(o) => !o && onClose()}>
       <DialogContent className="max-w-md max-h-[90dvh] overflow-y-auto">
-        <DialogHeader><DialogTitle>Post availability</DialogTitle></DialogHeader>
+        <DialogHeader>
+          <DialogTitle>Post availability</DialogTitle>
+        </DialogHeader>
         <div className="space-y-4">
           <div>
             <Label className="mb-2 block">Sports</Label>
             <div className="flex flex-wrap gap-2">
               {SPORTS.map((s) => (
-                <Chip key={s.name} active={sports.includes(s.name)} onClick={() => setSports((arr) => toggle(arr, s.name))}>
-                  <span className="mr-1">{s.emoji}</span>{s.name}
+                <Chip
+                  key={s.name}
+                  active={sports.includes(s.name)}
+                  onClick={() => setSports((arr) => toggle(arr, s.name))}
+                >
+                  <span className="mr-1">{s.emoji}</span>
+                  {s.name}
                 </Chip>
               ))}
             </div>
@@ -607,7 +873,9 @@ function PostAvailabilityDialog({ onClose, onPosted }: { onClose: () => void; on
             <Label className="mb-2 block">Skill level</Label>
             <div className="flex flex-wrap gap-2">
               {SKILLS.map((s) => (
-                <Chip key={s} active={skill === s} onClick={() => setSkill(s)}>{s}</Chip>
+                <Chip key={s} active={skill === s} onClick={() => setSkill(s)}>
+                  {s}
+                </Chip>
               ))}
             </div>
           </div>
@@ -637,30 +905,60 @@ function PostAvailabilityDialog({ onClose, onPosted }: { onClose: () => void; on
             <Label className="mb-2 block">Recurring days (optional)</Label>
             <div className="flex flex-wrap gap-2">
               {WEEKDAYS.map((d) => (
-                <Chip key={d} active={days.includes(d)} onClick={() => setDays((arr) => toggle(arr, d))}>{d}</Chip>
+                <Chip
+                  key={d}
+                  active={days.includes(d)}
+                  onClick={() => setDays((arr) => toggle(arr, d))}
+                >
+                  {d}
+                </Chip>
               ))}
             </div>
           </div>
           <div className="grid grid-cols-[1fr_110px] gap-2">
             <div>
               <Label htmlFor="city">City</Label>
-              <Input id="city" value={city} onChange={(e) => setCity(e.target.value)} placeholder="e.g. Austin" />
+              <Input
+                id="city"
+                value={city}
+                onChange={(e) => setCity(e.target.value)}
+                placeholder="e.g. Austin"
+              />
             </div>
             <div>
               <Label htmlFor="radius">Radius (mi)</Label>
-              <Input id="radius" type="number" min={1} max={500} value={radius} onChange={(e) => setRadius(Number(e.target.value) || 0)} />
+              <Input
+                id="radius"
+                type="number"
+                min={1}
+                max={500}
+                value={radius}
+                onChange={(e) => setRadius(Number(e.target.value) || 0)}
+              />
             </div>
           </div>
           <div>
             <Label htmlFor="note">Short note</Label>
-            <Textarea id="note" value={note} onChange={(e) => setNote(e.target.value)} maxLength={500} rows={3}
-              placeholder="Positions, goals, what you're looking for…" />
+            <Textarea
+              id="note"
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+              maxLength={500}
+              rows={3}
+              placeholder="Positions, goals, what you're looking for…"
+            />
             <p className="mt-1 text-[10px] text-muted-foreground text-right">{note.length}/500</p>
           </div>
         </div>
         <DialogFooter>
-          <Button variant="ghost" onClick={onClose}>Cancel</Button>
-          <Button onClick={save} disabled={saving} className="bg-lime-gradient text-primary-foreground">
+          <Button variant="ghost" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button
+            onClick={save}
+            disabled={saving}
+            className="bg-lime-gradient text-primary-foreground"
+          >
             {saving && <Loader2 className="h-4 w-4 mr-1 animate-spin" />}Post
           </Button>
         </DialogFooter>
@@ -669,7 +967,11 @@ function PostAvailabilityDialog({ onClose, onPosted }: { onClose: () => void; on
   );
 }
 
-function ContactDialog({ availability, hostedGames, onClose }: {
+function ContactDialog({
+  availability,
+  hostedGames,
+  onClose,
+}: {
   availability: AvailabilityWithAuthor;
   hostedGames: Game[];
   onClose: () => void;
@@ -682,22 +984,29 @@ function ContactDialog({ availability, hostedGames, onClose }: {
 
   const formattedDate = (iso: string) => {
     const d = new Date(iso);
-    return d.toLocaleString(undefined, { weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
+    return d.toLocaleString(undefined, {
+      weekday: "short",
+      month: "short",
+      day: "numeric",
+      hour: "numeric",
+      minute: "2-digit",
+    });
   };
 
   const send = async () => {
     setSaving(true);
     try {
       let body = msg.trim();
-      const invite = isInvite && selected
-        ? {
-            gameId: selected.id,
-            title: selected.title,
-            startsAt: selected.date,
-            sport: selected.sport,
-            location: selected.location,
-          }
-        : null;
+      const invite =
+        isInvite && selected
+          ? {
+              gameId: selected.id,
+              title: selected.title,
+              startsAt: selected.date,
+              sport: selected.sport,
+              location: selected.location,
+            }
+          : null;
       if (invite) {
         const header = `You're invited to ${selected!.title} — ${selected!.sport} on ${formattedDate(selected!.date)} at ${selected!.location}.`;
         body = body ? `${header}\n\n${body}` : header;
@@ -708,14 +1017,20 @@ function ContactDialog({ availability, hostedGames, onClose }: {
     } catch (e: any) {
       if (String(e.message).includes("duplicate")) toast.error("You've already sent a request.");
       else toast.error(e.message);
-    } finally { setSaving(false); }
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
     <Dialog open onOpenChange={(o) => !o && onClose()}>
       <DialogContent className="max-w-md">
         <DialogHeader>
-          <DialogTitle>{isInvite ? `Invite ${availability.author_name}` : `Contact ${availability.author_name}`}</DialogTitle>
+          <DialogTitle>
+            {isInvite
+              ? `Invite ${availability.author_name}`
+              : `Contact ${availability.author_name}`}
+          </DialogTitle>
         </DialogHeader>
 
         {isInvite && (
@@ -760,20 +1075,31 @@ function ContactDialog({ availability, hostedGames, onClose }: {
             ? `Add a short note. ${availability.author_name} can accept or decline.`
             : `Send a short message introducing your team or session. ${availability.author_name} can accept or decline.`}
         </p>
-        <Textarea value={msg} onChange={(e) => setMsg(e.target.value)} rows={4} maxLength={500}
-          placeholder={isInvite ? "We'd love to have you — let me know if you can make it!" : "Hey! We're a Tuesday-night 7v7 squad short a midfielder…"} />
+        <Textarea
+          value={msg}
+          onChange={(e) => setMsg(e.target.value)}
+          rows={4}
+          maxLength={500}
+          placeholder={
+            isInvite
+              ? "We'd love to have you — let me know if you can make it!"
+              : "Hey! We're a Tuesday-night 7v7 squad short a midfielder…"
+          }
+        />
         <DialogFooter>
-          <Button variant="ghost" onClick={onClose}>Cancel</Button>
+          <Button variant="ghost" onClick={onClose}>
+            Cancel
+          </Button>
           <Button
             onClick={send}
             disabled={saving || (isInvite && !selected)}
             className="bg-lime-gradient text-primary-foreground"
           >
-            {saving && <Loader2 className="h-4 w-4 mr-1 animate-spin" />}{isInvite ? "Send invite" : "Send request"}
+            {saving && <Loader2 className="h-4 w-4 mr-1 animate-spin" />}
+            {isInvite ? "Send invite" : "Send request"}
           </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
   );
 }
-

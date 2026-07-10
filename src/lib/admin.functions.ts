@@ -87,12 +87,16 @@ export const adminListPayments = createServerFn({ method: "GET" })
     const [{ data: purchases }, { data: subs }] = await Promise.all([
       supabaseAdmin
         .from("purchases")
-        .select("id, user_id, product_id, amount_total, currency, status, customer_email, environment, created_at")
+        .select(
+          "id, user_id, product_id, amount_total, currency, status, customer_email, environment, created_at",
+        )
         .order("created_at", { ascending: false })
         .limit(100),
       supabaseAdmin
         .from("subscriptions")
-        .select("id, user_id, product_id, status, current_period_end, cancel_at_period_end, environment, created_at")
+        .select(
+          "id, user_id, product_id, status, current_period_end, cancel_at_period_end, environment, created_at",
+        )
         .order("created_at", { ascending: false })
         .limit(100),
     ]);
@@ -143,7 +147,9 @@ export const adminListReels = createServerFn({ method: "GET" })
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { data } = await supabaseAdmin
       .from("highlight_reels")
-      .select("id, user_id, title, video_path, status, attempts, error_message, failed_at, environment, created_at, processing_step, step_progress, last_step_at")
+      .select(
+        "id, user_id, title, video_path, status, attempts, error_message, failed_at, environment, created_at, processing_step, step_progress, last_step_at",
+      )
       .order("created_at", { ascending: false })
       .limit(200);
     return { reels: data ?? [] };
@@ -171,7 +177,10 @@ export const adminRetryReel = createServerFn({ method: "POST" })
       patch.step_progress = {};
       patch.last_step_at = null;
     }
-    await supabaseAdmin.from("highlight_reels").update(patch as any).eq("id", data.id);
+    await supabaseAdmin
+      .from("highlight_reels")
+      .update(patch as any)
+      .eq("id", data.id);
     return { ok: true, resumed: !data.restart };
   });
 
@@ -185,7 +194,11 @@ export const adminMarkReelFailed = createServerFn({ method: "POST" })
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     await supabaseAdmin
       .from("highlight_reels")
-      .update({ status: "failed", error_message: data.message, failed_at: new Date().toISOString() })
+      .update({
+        status: "failed",
+        error_message: data.message,
+        failed_at: new Date().toISOString(),
+      })
       .eq("id", data.id);
     return { ok: true };
   });

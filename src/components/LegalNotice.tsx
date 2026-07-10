@@ -4,7 +4,8 @@ export function LegalNotice({ compact = false }: { compact?: boolean }) {
   if (compact) {
     return (
       <p className="text-[11px] leading-relaxed text-muted-foreground">
-        OpenRun does not process payments, hold funds, or act as an escrow. All payments go directly between you and the host. Verify recipient details before sending.
+        OpenRun does not process payments, hold funds, or act as an escrow. All payments go directly
+        between you and the host. Verify recipient details before sending.
       </p>
     );
   }

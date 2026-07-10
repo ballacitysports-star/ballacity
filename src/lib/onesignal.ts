@@ -58,7 +58,10 @@ async function initOneSignal(userId: string) {
         console.warn("[onesignal] login failed", e);
       }
       // Gently prompt for permission if still default
-      if (typeof window.Notification !== "undefined" && window.Notification.permission === "default") {
+      if (
+        typeof window.Notification !== "undefined" &&
+        window.Notification.permission === "default"
+      ) {
         try {
           await OneSignal.Slidedown.promptPush({ force: false });
         } catch {

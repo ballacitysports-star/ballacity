@@ -29,8 +29,10 @@ export function BottomNav() {
             const badge = it.key === "messages" && unreadMessages > 0 ? unreadMessages : 0;
             return (
               <li key={it.to} className="min-w-0">
-                <Link to={it.to} className="relative flex flex-col items-center gap-1 px-1 py-3 text-[10px] sm:text-[11px] font-medium">
-
+                <Link
+                  to={it.to}
+                  className="relative flex flex-col items-center gap-1 px-1 py-3 text-[10px] sm:text-[11px] font-medium"
+                >
                   <span className="relative">
                     <Icon className={`h-5 w-5 ${active ? "text-lime" : "text-muted-foreground"}`} />
                     {badge > 0 && (
@@ -39,7 +41,11 @@ export function BottomNav() {
                       </span>
                     )}
                   </span>
-                  <span className={`truncate max-w-full ${active ? "text-foreground" : "text-muted-foreground"}`}>{it.label}</span>
+                  <span
+                    className={`truncate max-w-full ${active ? "text-foreground" : "text-muted-foreground"}`}
+                  >
+                    {it.label}
+                  </span>
                   {active && (
                     <motion.span
                       layoutId="nav-dot"

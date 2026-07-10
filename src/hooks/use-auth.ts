@@ -31,26 +31,29 @@ function initAuthStore() {
     setAuthState({ session, user: session?.user ?? null, loading: false });
   });
 
-  supabase.auth.getUser().then(async ({ data, error }) => {
-    if (error || !data.user) {
+  supabase.auth
+    .getUser()
+    .then(async ({ data, error }) => {
+      if (error || !data.user) {
+        const { data: sessionData } = await supabase.auth.getSession();
+        setAuthState({
+          session: sessionData.session,
+          user: sessionData.session?.user ?? null,
+          loading: false,
+        });
+        return;
+      }
+
       const { data: sessionData } = await supabase.auth.getSession();
       setAuthState({
         session: sessionData.session,
-        user: sessionData.session?.user ?? null,
+        user: data.user,
         loading: false,
       });
-      return;
-    }
-
-    const { data: sessionData } = await supabase.auth.getSession();
-    setAuthState({
-      session: sessionData.session,
-      user: data.user,
-      loading: false,
+    })
+    .catch(() => {
+      setAuthState({ session: null, user: null, loading: false });
     });
-  }).catch(() => {
-    setAuthState({ session: null, user: null, loading: false });
-  });
 }
 
 function subscribe(listener: () => void) {

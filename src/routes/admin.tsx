@@ -82,7 +82,8 @@ function AdminPage() {
     }
   }, [data, isLoading, navigate, authReady, hasSession]);
 
-  if (!authReady || isLoading) return <div className="p-6 text-sm text-muted-foreground">Loading…</div>;
+  if (!authReady || isLoading)
+    return <div className="p-6 text-sm text-muted-foreground">Loading…</div>;
   if (!data?.isAdmin) return null;
 
   return (
@@ -110,11 +111,21 @@ function AdminPage() {
           <TabsTrigger value="reviews">Reviews</TabsTrigger>
           <TabsTrigger value="games">Games</TabsTrigger>
         </TabsList>
-        <TabsContent value="reels"><ReelsPanel /></TabsContent>
-        <TabsContent value="users"><UsersPanel /></TabsContent>
-        <TabsContent value="payments"><PaymentsPanel /></TabsContent>
-        <TabsContent value="reviews"><ReviewsPanel /></TabsContent>
-        <TabsContent value="games"><GamesPanel /></TabsContent>
+        <TabsContent value="reels">
+          <ReelsPanel />
+        </TabsContent>
+        <TabsContent value="users">
+          <UsersPanel />
+        </TabsContent>
+        <TabsContent value="payments">
+          <PaymentsPanel />
+        </TabsContent>
+        <TabsContent value="reviews">
+          <ReviewsPanel />
+        </TabsContent>
+        <TabsContent value="games">
+          <GamesPanel />
+        </TabsContent>
       </Tabs>
     </div>
   );
@@ -146,8 +157,9 @@ function ReelsPanel() {
   });
   if (isLoading) return <p className="text-sm text-muted-foreground p-4">Loading…</p>;
 
-  const stuck = (data?.reels ?? []).filter((r: any) =>
-    r.status === "processing" && Date.now() - new Date(r.created_at).getTime() > 10 * 60 * 1000
+  const stuck = (data?.reels ?? []).filter(
+    (r: any) =>
+      r.status === "processing" && Date.now() - new Date(r.created_at).getTime() > 10 * 60 * 1000,
   );
 
   return (
@@ -162,7 +174,10 @@ function ReelsPanel() {
           </CardTitle>
         </CardHeader>
         <CardContent className="text-sm space-y-1">
-          <p>Worker runs automatically every minute via scheduled job. Use the button to trigger immediately.</p>
+          <p>
+            Worker runs automatically every minute via scheduled job. Use the button to trigger
+            immediately.
+          </p>
           <p className="text-muted-foreground text-xs">
             Stuck &gt;10 min: <strong>{stuck.length}</strong> · Total: {data?.reels.length ?? 0}
           </p>
@@ -170,19 +185,25 @@ function ReelsPanel() {
       </Card>
 
       <Card>
-        <CardHeader><CardTitle>Reels ({data?.reels.length ?? 0})</CardTitle></CardHeader>
+        <CardHeader>
+          <CardTitle>Reels ({data?.reels.length ?? 0})</CardTitle>
+        </CardHeader>
         <CardContent className="space-y-2">
           {data?.reels.map((r: any) => {
             const ageMin = Math.floor((Date.now() - new Date(r.created_at).getTime()) / 60000);
             const isStuck = r.status === "processing" && ageMin > 10;
             const isFailed = r.status === "failed";
             return (
-              <div key={r.id} className="border rounded-md p-3 text-sm flex items-start justify-between gap-3">
+              <div
+                key={r.id}
+                className="border rounded-md p-3 text-sm flex items-start justify-between gap-3"
+              >
                 <div className="min-w-0 flex-1">
                   <div className="font-medium flex items-center gap-2 flex-wrap">
                     {r.title}
                     <Badge variant={isFailed ? "destructive" : isStuck ? "outline" : "secondary"}>
-                      {r.status}{isStuck ? " (stuck)" : ""}
+                      {r.status}
+                      {isStuck ? " (stuck)" : ""}
                     </Badge>
                     {r.attempts > 0 && <Badge variant="outline">attempt {r.attempts}</Badge>}
                     {r.processing_step && r.processing_step !== "pending" && (
@@ -191,7 +212,8 @@ function ReelsPanel() {
                   </div>
                   <div className="text-xs text-muted-foreground">
                     user {r.user_id?.slice(0, 8)}… · {ageMin}m ago · {r.environment}
-                    {r.last_step_at && ` · last step ${new Date(r.last_step_at).toLocaleTimeString()}`}
+                    {r.last_step_at &&
+                      ` · last step ${new Date(r.last_step_at).toLocaleTimeString()}`}
                   </div>
                   {r.step_progress && Object.keys(r.step_progress).length > 0 && (
                     <div className="text-xs text-muted-foreground mt-1">
@@ -201,7 +223,11 @@ function ReelsPanel() {
                   {r.error_message && (
                     <pre className="mt-1 text-xs text-destructive bg-destructive/10 rounded p-2 whitespace-pre-wrap break-all">
                       {r.error_message}
-                      {r.failed_at && <span className="block text-muted-foreground mt-1">at {new Date(r.failed_at).toLocaleString()}</span>}
+                      {r.failed_at && (
+                        <span className="block text-muted-foreground mt-1">
+                          at {new Date(r.failed_at).toLocaleString()}
+                        </span>
+                      )}
                     </pre>
                   )}
                 </div>
@@ -210,7 +236,11 @@ function ReelsPanel() {
                     <Button size="sm" variant="outline" onClick={() => mut.mutate({ id: r.id })}>
                       Resume
                     </Button>
-                    <Button size="sm" variant="ghost" onClick={() => mut.mutate({ id: r.id, restart: true })}>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => mut.mutate({ id: r.id, restart: true })}
+                    >
                       Restart
                     </Button>
                   </div>
@@ -243,15 +273,24 @@ function UsersPanel() {
   if (isLoading) return <p className="text-sm text-muted-foreground p-4">Loading…</p>;
   return (
     <Card>
-      <CardHeader><CardTitle>Users ({data?.users.length ?? 0})</CardTitle></CardHeader>
+      <CardHeader>
+        <CardTitle>Users ({data?.users.length ?? 0})</CardTitle>
+      </CardHeader>
       <CardContent className="space-y-2">
         {data?.users.map((u: any) => (
-          <div key={u.id} className="flex items-center justify-between border rounded-md p-3 text-sm gap-3 flex-wrap">
+          <div
+            key={u.id}
+            className="flex items-center justify-between border rounded-md p-3 text-sm gap-3 flex-wrap"
+          >
             <div className="min-w-0">
               <div className="font-medium">{u.display_name || u.username || "—"}</div>
               <div className="text-xs text-muted-foreground truncate">{u.email}</div>
               <div className="flex gap-1 mt-1">
-                {u.roles.map((r: string) => <Badge key={r} variant="secondary">{r}</Badge>)}
+                {u.roles.map((r: string) => (
+                  <Badge key={r} variant="secondary">
+                    {r}
+                  </Badge>
+                ))}
               </div>
             </div>
             <div className="flex gap-2">
@@ -283,12 +322,16 @@ function PaymentsPanel() {
   return (
     <div className="grid gap-4 md:grid-cols-2">
       <Card>
-        <CardHeader><CardTitle>Subscriptions ({data?.subscriptions.length ?? 0})</CardTitle></CardHeader>
+        <CardHeader>
+          <CardTitle>Subscriptions ({data?.subscriptions.length ?? 0})</CardTitle>
+        </CardHeader>
         <CardContent className="space-y-2 text-sm">
           {data?.subscriptions.map((s: any) => (
             <div key={s.id} className="border rounded-md p-2">
               <div className="font-medium">{s.product_id}</div>
-              <div className="text-xs text-muted-foreground">{s.status} · {s.environment}</div>
+              <div className="text-xs text-muted-foreground">
+                {s.status} · {s.environment}
+              </div>
               <div className="text-xs">user: {s.user_id?.slice(0, 8)}…</div>
             </div>
           ))}
@@ -296,12 +339,18 @@ function PaymentsPanel() {
         </CardContent>
       </Card>
       <Card>
-        <CardHeader><CardTitle>Purchases ({data?.purchases.length ?? 0})</CardTitle></CardHeader>
+        <CardHeader>
+          <CardTitle>Purchases ({data?.purchases.length ?? 0})</CardTitle>
+        </CardHeader>
         <CardContent className="space-y-2 text-sm">
           {data?.purchases.map((p: any) => (
             <div key={p.id} className="border rounded-md p-2">
-              <div className="font-medium">{p.product_id} — ${(p.amount_total / 100).toFixed(2)} {p.currency?.toUpperCase()}</div>
-              <div className="text-xs text-muted-foreground">{p.status} · {p.environment}</div>
+              <div className="font-medium">
+                {p.product_id} — ${(p.amount_total / 100).toFixed(2)} {p.currency?.toUpperCase()}
+              </div>
+              <div className="text-xs text-muted-foreground">
+                {p.status} · {p.environment}
+              </div>
               <div className="text-xs">{p.customer_email}</div>
             </div>
           ))}
@@ -327,10 +376,15 @@ function ReviewsPanel() {
   if (isLoading) return <p className="text-sm text-muted-foreground p-4">Loading…</p>;
   return (
     <Card>
-      <CardHeader><CardTitle>Reviews ({data?.reviews.length ?? 0})</CardTitle></CardHeader>
+      <CardHeader>
+        <CardTitle>Reviews ({data?.reviews.length ?? 0})</CardTitle>
+      </CardHeader>
       <CardContent className="space-y-2">
         {data?.reviews.map((r: any) => (
-          <div key={r.id} className="border rounded-md p-3 text-sm flex items-start justify-between gap-3">
+          <div
+            key={r.id}
+            className="border rounded-md p-3 text-sm flex items-start justify-between gap-3"
+          >
             <div className="min-w-0">
               <div className="font-medium flex items-center gap-2">
                 {r.title || "(no title)"} <span className="text-xs">★{r.rating}</span>
@@ -339,7 +393,9 @@ function ReviewsPanel() {
               <div className="text-xs text-muted-foreground">→ {r.reviewee_name}</div>
               <p className="text-xs mt-1 line-clamp-2">{r.body}</p>
             </div>
-            <Button size="sm" variant="destructive" onClick={() => mut.mutate(r.id)}>Delete</Button>
+            <Button size="sm" variant="destructive" onClick={() => mut.mutate(r.id)}>
+              Delete
+            </Button>
           </div>
         ))}
         {!data?.reviews.length && <p className="text-muted-foreground text-sm">No reviews</p>}
@@ -349,8 +405,10 @@ function ReviewsPanel() {
 }
 
 function actionLabel(a: PlanEntry["action"]) {
-  if (a === "claim-new-settings") return { text: "Will claim (new settings row)", variant: "default" as const };
-  if (a === "claim-matching-settings") return { text: "Will claim (settings already yours)", variant: "secondary" as const };
+  if (a === "claim-new-settings")
+    return { text: "Will claim (new settings row)", variant: "default" as const };
+  if (a === "claim-matching-settings")
+    return { text: "Will claim (settings already yours)", variant: "secondary" as const };
   return { text: "Skip — owned by another host", variant: "outline" as const };
 }
 
@@ -397,7 +455,12 @@ function GamesPanel() {
           <CardTitle className="text-base flex items-center justify-between gap-3 flex-wrap">
             <span>Host backfill (this device)</span>
             <div className="flex gap-2">
-              <Button size="sm" variant="outline" onClick={() => dryRunMut.mutate()} disabled={dryRunMut.isPending}>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => dryRunMut.mutate()}
+                disabled={dryRunMut.isPending}
+              >
                 {dryRunMut.isPending ? "Scanning…" : "Preview (dry run)"}
               </Button>
               <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
@@ -416,16 +479,23 @@ function GamesPanel() {
                         payment-settings rows.
                       </p>
                       <p className="text-destructive font-medium">
-                        Warning: if any game already has a different host in the database,
-                        this will <strong>overwrite</strong> that ownership and permanently
-                        transfer host controls to you.
+                        Warning: if any game already has a different host in the database, this will{" "}
+                        <strong>overwrite</strong> that ownership and permanently transfer host
+                        controls to you.
                       </p>
-                      <p>Tip: click "Preview (dry run)" first to see exactly which games will change.</p>
+                      <p>
+                        Tip: click "Preview (dry run)" first to see exactly which games will change.
+                      </p>
                     </AlertDialogDescription>
                   </AlertDialogHeader>
                   <AlertDialogFooter>
-                    <AlertDialogCancel onClick={() => setConfirmOpen(false)}>Cancel</AlertDialogCancel>
-                    <AlertDialogAction onClick={() => backfill.mutate()} disabled={backfill.isPending}>
+                    <AlertDialogCancel onClick={() => setConfirmOpen(false)}>
+                      Cancel
+                    </AlertDialogCancel>
+                    <AlertDialogAction
+                      onClick={() => backfill.mutate()}
+                      disabled={backfill.isPending}
+                    >
                       {backfill.isPending ? "Running…" : "Run backfill"}
                     </AlertDialogAction>
                   </AlertDialogFooter>
@@ -435,7 +505,9 @@ function GamesPanel() {
           </CardTitle>
         </CardHeader>
         <CardContent className="text-xs text-muted-foreground">
-          Locally-hosted games live in each user's browser. "Preview" shows the exact plan without writing anything. "Run backfill" stamps unclaimed games on this device with your user id and creates any missing payment-settings rows.
+          Locally-hosted games live in each user's browser. "Preview" shows the exact plan without
+          writing anything. "Run backfill" stamps unclaimed games on this device with your user id
+          and creates any missing payment-settings rows.
         </CardContent>
       </Card>
 
@@ -444,7 +516,8 @@ function GamesPanel() {
           <DialogHeader>
             <DialogTitle>Backfill preview (dry run)</DialogTitle>
             <DialogDescription>
-              Scanned {preview?.scanned ?? 0} local games. {willClaim.length} would be claimed, {willSkip.length} would be skipped. Nothing has been written.
+              Scanned {preview?.scanned ?? 0} local games. {willClaim.length} would be claimed,{" "}
+              {willSkip.length} would be skipped. Nothing has been written.
             </DialogDescription>
           </DialogHeader>
           <div className="max-h-[50vh] overflow-y-auto space-y-2">
@@ -457,20 +530,34 @@ function GamesPanel() {
                       <div className="font-medium truncate">{p.title}</div>
                       <Badge variant={label.variant}>{label.text}</Badge>
                     </div>
-                    <div className="text-xs text-muted-foreground font-mono break-all">id: {p.gameId}</div>
+                    <div className="text-xs text-muted-foreground font-mono break-all">
+                      id: {p.gameId}
+                    </div>
                     <div className="text-xs">
                       <div>
                         local hostUserId:{" "}
                         <span className="font-mono">{p.currentHostUserId ?? "—"}</span>
                         {p.newHostUserId !== p.currentHostUserId && (
-                          <> → <span className="font-mono text-foreground font-medium">{p.newHostUserId ?? "—"}</span></>
+                          <>
+                            {" "}
+                            →{" "}
+                            <span className="font-mono text-foreground font-medium">
+                              {p.newHostUserId ?? "—"}
+                            </span>
+                          </>
                         )}
                       </div>
                       <div>
                         settings.host_id:{" "}
                         <span className="font-mono">{p.currentSettingsHostId ?? "—"}</span>
                         {p.newSettingsHostId !== p.currentSettingsHostId && (
-                          <> → <span className="font-mono text-foreground font-medium">{p.newSettingsHostId ?? "—"}</span></>
+                          <>
+                            {" "}
+                            →{" "}
+                            <span className="font-mono text-foreground font-medium">
+                              {p.newSettingsHostId ?? "—"}
+                            </span>
+                          </>
                         )}
                       </div>
                     </div>
@@ -478,11 +565,15 @@ function GamesPanel() {
                 );
               })
             ) : (
-              <p className="text-sm text-muted-foreground">No unclaimed local games on this device.</p>
+              <p className="text-sm text-muted-foreground">
+                No unclaimed local games on this device.
+              </p>
             )}
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setPreviewOpen(false)}>Close</Button>
+            <Button variant="outline" onClick={() => setPreviewOpen(false)}>
+              Close
+            </Button>
             <Button
               onClick={() => {
                 setPreviewOpen(false);
@@ -497,13 +588,16 @@ function GamesPanel() {
       </Dialog>
 
       <Card>
-        <CardHeader><CardTitle>Games with payment settings ({data?.games.length ?? 0})</CardTitle></CardHeader>
+        <CardHeader>
+          <CardTitle>Games with payment settings ({data?.games.length ?? 0})</CardTitle>
+        </CardHeader>
         <CardContent className="space-y-2 text-sm">
           {data?.games.map((g: any) => (
             <div key={g.id} className="border rounded-md p-3">
               <div className="font-medium">Game {g.game_id}</div>
               <div className="text-xs text-muted-foreground">
-                Host {g.host_id?.slice(0, 8)}… · fee ${Number(g.entry_fee).toFixed(2)} · approval: {g.requires_approval ? "yes" : "no"}
+                Host {g.host_id?.slice(0, 8)}… · fee ${Number(g.entry_fee).toFixed(2)} · approval:{" "}
+                {g.requires_approval ? "yes" : "no"}
               </div>
             </div>
           ))}

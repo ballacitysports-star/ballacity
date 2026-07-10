@@ -84,7 +84,11 @@ export const sendPushToUser = createServerFn({ method: "POST" })
       }
       // OneSignal returns 200 even when no recipients matched; surface that as a skip.
       let parsed: any = null;
-      try { parsed = text ? JSON.parse(text) : null; } catch { /* ignore */ }
+      try {
+        parsed = text ? JSON.parse(text) : null;
+      } catch {
+        /* ignore */
+      }
       const recipients = typeof parsed?.recipients === "number" ? parsed.recipients : null;
       if (recipients === 0) {
         await log("skipped", { error: "no_subscribers", detail: parsed });

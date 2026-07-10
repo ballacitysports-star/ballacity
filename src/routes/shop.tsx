@@ -21,7 +21,10 @@ function ShopPage() {
   const { openCheckout, checkoutElement, closeCheckout, isOpen } = useStripeCheckout();
 
   function buy(priceId: string) {
-    if (!user) { toast.error("Sign in to check out"); return; }
+    if (!user) {
+      toast.error("Sign in to check out");
+      return;
+    }
     openCheckout({
       priceId,
       customerEmail: user.email,
@@ -34,7 +37,10 @@ function ShopPage() {
   if (isOpen) {
     return (
       <div className="mx-auto max-w-2xl px-4 py-6">
-        <button onClick={closeCheckout} className="mb-4 inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground">
+        <button
+          onClick={closeCheckout}
+          className="mb-4 inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground"
+        >
           <ArrowLeft className="h-4 w-4" /> Back to shop
         </button>
         {checkoutElement}
@@ -46,18 +52,24 @@ function ShopPage() {
     <div className="min-h-dvh">
       <PaymentTestModeBanner />
       <div className="mx-auto max-w-2xl px-4 pb-24 pt-6">
-        <Link to="/profile" className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground">
+        <Link
+          to="/profile"
+          className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground"
+        >
           <ArrowLeft className="h-4 w-4" /> Profile
         </Link>
         <h1 className="mt-4 font-display text-3xl font-bold">Shop</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          OpenRun gear, shipped to your door. <span className="font-semibold text-foreground">All sales final — no refunds.</span>
+          OpenRun gear, shipped to your door.{" "}
+          <span className="font-semibold text-foreground">All sales final — no refunds.</span>
         </p>
 
         <div className="mt-6 grid gap-4 sm:grid-cols-2">
           {MERCH_ITEMS.map((item) => (
             <div key={item.priceId} className="rounded-2xl border border-border bg-surface p-5">
-              <div className="grid h-32 place-items-center rounded-xl bg-muted/40 text-5xl">{item.emoji}</div>
+              <div className="grid h-32 place-items-center rounded-xl bg-muted/40 text-5xl">
+                {item.emoji}
+              </div>
               <div className="mt-3 flex items-start justify-between gap-2">
                 <div>
                   <div className="font-display text-lg font-bold">{item.name}</div>

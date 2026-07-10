@@ -38,7 +38,9 @@ function sessionUserId(): string {
   return id!;
 }
 
-test("tapping an invite notification opens the game with preserved invite params + CTA copy", async ({ browser }) => {
+test("tapping an invite notification opens the game with preserved invite params + CTA copy", async ({
+  browser,
+}) => {
   const userId = sessionUserId();
   // A free/no-approval game from sample-data — CTA should be "Join".
   const gameId = "g1";
@@ -51,17 +53,20 @@ test("tapping an invite notification opens the game with preserved invite params
   await restoreSession(page);
 
   // Seed a game_invite notification for the signed-in user.
-  const insertRes = await page.evaluate(async ({ userId, title, link }) => {
-    const mod = await import("/src/integrations/supabase/client.ts");
-    const { error } = await mod.supabase.from("notifications").insert({
-      user_id: userId,
-      type: "game_invite",
-      title,
-      body: "Basketball · Test Court",
-      link,
-    } as any);
-    return error ? { ok: false, message: error.message } : { ok: true };
-  }, { userId, title, link });
+  const insertRes = await page.evaluate(
+    async ({ userId, title, link }) => {
+      const mod = await import("/src/integrations/supabase/client.ts");
+      const { error } = await mod.supabase.from("notifications").insert({
+        user_id: userId,
+        type: "game_invite",
+        title,
+        body: "Basketball · Test Court",
+        link,
+      } as any);
+      return error ? { ok: false, message: error.message } : { ok: true };
+    },
+    { userId, title, link },
+  );
   expect(insertRes.ok, `seed insert failed: ${(insertRes as any).message ?? ""}`).toBe(true);
 
   // Open Alerts and tap the seeded invite.
@@ -72,14 +77,18 @@ test("tapping an invite notification opens the game with preserved invite params
 
   // URL must preserve both invite params exactly.
   await page.waitForURL(
-    (u) => u.pathname === `/games/${gameId}` &&
-           u.searchParams.get("invite") === "1" &&
-           u.searchParams.get("from") === fakeHostId,
+    (u) =>
+      u.pathname === `/games/${gameId}` &&
+      u.searchParams.get("invite") === "1" &&
+      u.searchParams.get("from") === fakeHostId,
     { timeout: 10_000 },
   );
 
   // Invite banner renders...
-  const banner = page.getByRole("status").filter({ hasText: /you're invited to this game/i }).first();
+  const banner = page
+    .getByRole("status")
+    .filter({ hasText: /you're invited to this game/i })
+    .first();
   await expect(banner).toBeVisible({ timeout: 10_000 });
   // ...with CTA-specific copy. g1 is free + no-approval → "Join".
   await expect(banner).toContainText(/tap\s+[“"']?Join[”"']?\s+below/i);

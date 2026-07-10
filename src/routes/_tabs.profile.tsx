@@ -1,6 +1,16 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { motion } from "framer-motion";
-import { Settings, Trophy, Calendar, Shield, LogIn, LogOut, Clock, Check, X as XIcon } from "lucide-react";
+import {
+  Settings,
+  Trophy,
+  Calendar,
+  Shield,
+  LogIn,
+  LogOut,
+  Clock,
+  Check,
+  X as XIcon,
+} from "lucide-react";
 import { ME, GAMES } from "@/lib/sample-data";
 import { GameCard } from "@/components/GameCard";
 import { ReviewsSection } from "@/components/ReviewsSection";
@@ -17,7 +27,6 @@ import { readOverrides, useMyProfile } from "@/lib/user-prefs-store";
 import { ProfileLinksList } from "@/components/ProfileLinks";
 import { listMyJoinRequests, cancelMyJoinRequest, type JoinRequest } from "@/lib/payments";
 import { supabase } from "@/integrations/supabase/client";
-
 
 export const Route = createFileRoute("/_tabs/profile")({
   head: () => ({ meta: [{ title: "Profile — OpenRun" }] }),
@@ -38,7 +47,11 @@ function Profile() {
     const pool = [...hosted, ...GAMES];
     const seen = new Set<string>();
     return pool
-      .filter((game) => ids.has(game.id) || (profileUser && (game as { hostUserId?: string }).hostUserId === profileUser.id))
+      .filter(
+        (game) =>
+          ids.has(game.id) ||
+          (profileUser && (game as { hostUserId?: string }).hostUserId === profileUser.id),
+      )
       .filter((g) => (seen.has(g.id) ? false : (seen.add(g.id), true)))
       .sort((a, b) => +new Date(a.date) - +new Date(b.date));
   }, [joinedGameIds, hosted, profileUser]);
@@ -46,23 +59,45 @@ function Profile() {
   // Pending / recently-reviewed join requests for player view
   const [myRequests, setMyRequests] = useState<JoinRequest[]>([]);
   const refreshRequests = async () => {
-    if (!profileUser) { setMyRequests([]); return; }
-    try { setMyRequests(await listMyJoinRequests()); } catch { /* ignore */ }
+    if (!profileUser) {
+      setMyRequests([]);
+      return;
+    }
+    try {
+      setMyRequests(await listMyJoinRequests());
+    } catch {
+      /* ignore */
+    }
   };
-  useEffect(() => { refreshRequests(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [profileUser?.id]);
+  useEffect(() => {
+    refreshRequests(); /* eslint-disable-next-line react-hooks/exhaustive-deps */
+  }, [profileUser?.id]);
   useEffect(() => {
     if (!profileUser) return;
     const ch = supabase
       .channel(`profile-join-requests-${profileUser.id}`)
-      .on("postgres_changes", { event: "*", schema: "public", table: "join_requests", filter: `player_id=eq.${profileUser.id}` }, () => refreshRequests())
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "join_requests",
+          filter: `player_id=eq.${profileUser.id}`,
+        },
+        () => refreshRequests(),
+      )
       .subscribe();
-    return () => { supabase.removeChannel(ch); };
+    return () => {
+      supabase.removeChannel(ch);
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [profileUser?.id]);
 
   const gameLookup = useMemo(() => {
     const m = new Map<string, { title: string; date: string; location: string }>();
-    [...hosted, ...GAMES].forEach((g) => { if (!m.has(g.id)) m.set(g.id, { title: g.title, date: g.date, location: g.location }); });
+    [...hosted, ...GAMES].forEach((g) => {
+      if (!m.has(g.id)) m.set(g.id, { title: g.title, date: g.date, location: g.location });
+    });
     return m;
   }, [hosted]);
 
@@ -80,7 +115,9 @@ function Profile() {
       if (!cancelled && currentUser) setConfirmedUser(currentUser);
       if (!cancelled && !currentUser) setConfirmedUser(null);
     });
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [loading, profileUser, me]);
 
   // Sync locally stored profile overrides up to the server profiles row,
@@ -90,9 +127,18 @@ function Profile() {
     const key = `openrun.profileSync.v1.${profileUser.id}`;
     if (typeof window === "undefined") return;
     const local = readOverrides(profileUser.id);
-    const hasLocalData = ["name", "username", "avatar", "bio", "city", "avatarUrl", "coverUrl", "links", "birthday", "graduatingClass"].some((field) =>
-      Object.prototype.hasOwnProperty.call(local, field),
-    );
+    const hasLocalData = [
+      "name",
+      "username",
+      "avatar",
+      "bio",
+      "city",
+      "avatarUrl",
+      "coverUrl",
+      "links",
+      "birthday",
+      "graduatingClass",
+    ].some((field) => Object.prototype.hasOwnProperty.call(local, field));
     if (!hasLocalData) return;
     const payload = {
       id: profileUser.id,
@@ -121,7 +167,9 @@ function Profile() {
         /* ignore */
       }
     })();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [profileUser, me]);
 
   if (loading) return null;
@@ -132,7 +180,9 @@ function Profile() {
           O
         </div>
         <h1 className="mt-5 font-display text-3xl font-bold">Sign in to view your profile</h1>
-        <p className="mt-2 text-sm text-muted-foreground">Your games, reviews, and profile stay private until you sign in.</p>
+        <p className="mt-2 text-sm text-muted-foreground">
+          Your games, reviews, and profile stay private until you sign in.
+        </p>
         <Link
           to="/auth"
           className="mt-6 inline-flex rounded-full bg-lime-gradient px-6 py-3 text-sm font-bold text-primary-foreground"
@@ -143,7 +193,6 @@ function Profile() {
     );
   }
 
-
   return (
     <div className="mx-auto w-full max-w-md sm:max-w-2xl lg:max-w-4xl">
       {/* Cover */}
@@ -153,7 +202,9 @@ function Profile() {
         <div className="absolute top-4 right-4 flex items-center gap-2">
           {user ? (
             <button
-              onClick={async () => { await signOut(); }}
+              onClick={async () => {
+                await signOut();
+              }}
               className="inline-flex items-center gap-1 rounded-full border border-border bg-background/70 px-3 py-2 text-xs font-bold backdrop-blur"
             >
               <LogOut className="h-3.5 w-3.5" /> Sign out
@@ -174,7 +225,11 @@ function Profile() {
               <Shield className="h-3.5 w-3.5" /> Security
             </Link>
           )}
-          <Link to="/profile/edit" className="grid h-10 w-10 place-items-center rounded-full border border-border bg-background/70 backdrop-blur" aria-label="Edit profile">
+          <Link
+            to="/profile/edit"
+            className="grid h-10 w-10 place-items-center rounded-full border border-border bg-background/70 backdrop-blur"
+            aria-label="Edit profile"
+          >
             <Settings className="h-4 w-4" />
           </Link>
         </div>
@@ -198,18 +253,27 @@ function Profile() {
           <div>
             <h1 className="font-display text-2xl font-bold flex items-center gap-2">
               {me.name}
-              {me.birthday && (() => { const a = ageFrom(me.birthday); return a != null ? (
-                <span className="text-sm font-normal text-muted-foreground">· {a}</span>
-              ) : null; })()}
+              {me.birthday &&
+                (() => {
+                  const a = ageFrom(me.birthday);
+                  return a != null ? (
+                    <span className="text-sm font-normal text-muted-foreground">· {a}</span>
+                  ) : null;
+                })()}
               <span className="inline-flex items-center gap-1 rounded-full bg-lime/15 px-2 py-0.5 text-xs font-bold text-lime">
                 <Shield className="h-3 w-3" /> Verified
               </span>
             </h1>
-            <div className="text-sm text-muted-foreground">{me.username} · {me.city}</div>
+            <div className="text-sm text-muted-foreground">
+              {me.username} · {me.city}
+            </div>
             {(me.birthday || me.graduatingClass) && (
               <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-muted-foreground">
                 {me.birthday && (
-                  <span>🎂 {formatBirthday(me.birthday)}{ageFrom(me.birthday) != null ? ` · ${ageFrom(me.birthday)} yrs` : ""}</span>
+                  <span>
+                    🎂 {formatBirthday(me.birthday)}
+                    {ageFrom(me.birthday) != null ? ` · ${ageFrom(me.birthday)} yrs` : ""}
+                  </span>
                 )}
                 {me.graduatingClass && <span>🎓 Class of {me.graduatingClass}</span>}
               </div>
@@ -224,8 +288,6 @@ function Profile() {
           </div>
         )}
 
-
-
         {/* Stats */}
         <div className="mt-5 grid grid-cols-4 gap-2">
           {[
@@ -236,7 +298,9 @@ function Profile() {
           ].map((s) => (
             <div key={s.v} className="rounded-2xl border border-border bg-surface p-3 text-center">
               <div className="font-display text-lg font-bold">{s.k}</div>
-              <div className="text-[10px] uppercase tracking-wider text-muted-foreground">{s.v}</div>
+              <div className="text-[10px] uppercase tracking-wider text-muted-foreground">
+                {s.v}
+              </div>
             </div>
           ))}
         </div>
@@ -261,7 +325,10 @@ function Profile() {
               {pendingRequests.map((r) => {
                 const g = gameLookup.get(r.game_id);
                 return (
-                  <div key={r.id} className="rounded-2xl border border-coral/40 bg-coral/10 p-3 flex items-start gap-3">
+                  <div
+                    key={r.id}
+                    className="rounded-2xl border border-coral/40 bg-coral/10 p-3 flex items-start gap-3"
+                  >
                     <Clock className="h-4 w-4 text-coral shrink-0 mt-0.5" />
                     <div className="min-w-0 flex-1">
                       <Link
@@ -281,7 +348,9 @@ function Profile() {
                           await cancelMyJoinRequest(r.game_id);
                           toast("Request canceled.");
                           refreshRequests();
-                        } catch (e: any) { toast.error(e.message ?? "Could not cancel."); }
+                        } catch (e: any) {
+                          toast.error(e.message ?? "Could not cancel.");
+                        }
                       }}
                       className="rounded-full border border-border bg-background px-3 py-1 text-xs font-semibold hover:border-coral/40"
                     >
@@ -308,7 +377,9 @@ function Profile() {
                       <XIcon className="h-4 w-4 text-muted-foreground shrink-0 mt-0.5" />
                     )}
                     <div className="min-w-0 flex-1">
-                      <div className="font-semibold text-sm truncate">{g?.title ?? "Pickup game"}</div>
+                      <div className="font-semibold text-sm truncate">
+                        {g?.title ?? "Pickup game"}
+                      </div>
                       <p className="text-xs text-muted-foreground mt-0.5">
                         {approved ? "Approved — you're on the roster." : "Declined by host."}
                       </p>
@@ -327,7 +398,9 @@ function Profile() {
           </h2>
           {upcomingGames.length > 0 ? (
             <div className="space-y-3">
-              {upcomingGames.map((g, i) => <GameCard key={g.id} game={g} index={i} />)}
+              {upcomingGames.map((g, i) => (
+                <GameCard key={g.id} game={g} index={i} />
+              ))}
             </div>
           ) : (
             <Link
@@ -342,7 +415,9 @@ function Profile() {
 
         {/* Sports & skill */}
         <div className="mt-6">
-          <h2 className="font-display text-sm font-bold uppercase tracking-wider text-muted-foreground mb-2">Sports</h2>
+          <h2 className="font-display text-sm font-bold uppercase tracking-wider text-muted-foreground mb-2">
+            Sports
+          </h2>
           <div className="space-y-2">
             {me.sports.map((s) => (
               <div key={s.name} className="rounded-2xl border border-border bg-surface p-3">
@@ -370,21 +445,18 @@ function Profile() {
           </h2>
           <div className="flex flex-wrap gap-2">
             {me.badges.map((b) => (
-              <span key={b} className="rounded-full border border-border bg-surface px-3 py-1.5 text-xs font-semibold">
+              <span
+                key={b}
+                className="rounded-full border border-border bg-surface px-3 py-1.5 text-xs font-semibold"
+              >
                 {b}
               </span>
             ))}
           </div>
         </div>
 
-
-
-
-
-
         {/* Reviews */}
         <ReviewsSection revieweeId="me" revieweeKind="player" revieweeName={me.name} isOwner />
-
       </div>
     </div>
   );

@@ -170,7 +170,8 @@ function AccountSecurityPage() {
           </button>
           {email.trim().toLowerCase() !== (user.email ?? "").toLowerCase() && (
             <p className="text-xs text-muted-foreground">
-              Changing the email may require you to confirm it from your inbox before email sign-in works.
+              Changing the email may require you to confirm it from your inbox before email sign-in
+              works.
             </p>
           )}
         </form>

@@ -36,8 +36,7 @@ async function restoreSession(page: Page) {
 function sessionDisplayName(): string {
   const session = JSON.parse(SESSION_JSON!);
   const meta = session?.user?.user_metadata ?? {};
-  const name: string | undefined =
-    meta.display_name || meta.full_name || meta.name;
+  const name: string | undefined = meta.display_name || meta.full_name || meta.name;
   expect(name, "test account must have user_metadata.display_name").toBeTruthy();
   return name!;
 }
@@ -65,7 +64,9 @@ async function fireRealtimeStyleInvalidations(page: Page) {
     // The app exposes the React Query client on window for debug; if it
     // isn't, fall back to dispatching a focus event which also triggers
     // refetchOnWindowFocus.
-    const qc = (window as unknown as { queryClient?: { invalidateQueries: (opts?: unknown) => void } }).queryClient;
+    const qc = (
+      window as unknown as { queryClient?: { invalidateQueries: (opts?: unknown) => void } }
+    ).queryClient;
     if (qc?.invalidateQueries) {
       qc.invalidateQueries();
     } else {
@@ -80,7 +81,11 @@ async function sampleHostNameOverTime(page: Page, forbidden: string | null) {
   let seenForbidden = false;
   const samples: string[] = [];
   while (Date.now() - start < SAMPLE_DURATION_MS) {
-    const text = (await page.locator("body").innerText().catch(() => "")) || "";
+    const text =
+      (await page
+        .locator("body")
+        .innerText()
+        .catch(() => "")) || "";
     samples.push(text.slice(0, 200));
     if (forbidden && new RegExp(`(^|\\s|>)${forbidden}(\\s|<|$)`).test(text)) {
       seenForbidden = true;
@@ -91,7 +96,9 @@ async function sampleHostNameOverTime(page: Page, forbidden: string | null) {
   return { seenForbidden, samples };
 }
 
-test("realtime refresh under throttled profile reads keeps display_name (no email-prefix flicker)", async ({ page }) => {
+test("realtime refresh under throttled profile reads keeps display_name (no email-prefix flicker)", async ({
+  page,
+}) => {
   const displayName = sessionDisplayName();
   const emailPrefix = emailLocalPart();
 
@@ -102,13 +109,20 @@ test("realtime refresh under throttled profile reads keeps display_name (no emai
   await page.goto("/create");
   await expect(page.getByRole("heading", { name: /host a game/i })).toBeVisible();
   const title = `E2E realtime host ${Date.now()}`;
-  await page.getByPlaceholder(/title|game/i).first().fill(title).catch(() => {});
+  await page
+    .getByPlaceholder(/title|game/i)
+    .first()
+    .fill(title)
+    .catch(() => {});
   const addressInput = page.getByPlaceholder(/address|location|venue/i).first();
   if (await addressInput.isVisible().catch(() => false)) {
     const current = await addressInput.inputValue();
     if (!current) await addressInput.fill("123 Test Court, Demo City");
   }
-  await page.getByRole("button", { name: /publish|host|create/i }).first().click();
+  await page
+    .getByRole("button", { name: /publish|host|create/i })
+    .first()
+    .click();
   await page.waitForURL(/\/games\/[^/?#]+/, { timeout: 15_000 });
   const gameUrl = page.url();
 
@@ -125,7 +139,10 @@ test("realtime refresh under throttled profile reads keeps display_name (no emai
     await page.waitForTimeout(300);
   }
 
-  const detail = await sampleHostNameOverTime(page, emailPrefix && emailPrefix !== displayName ? emailPrefix : null);
+  const detail = await sampleHostNameOverTime(
+    page,
+    emailPrefix && emailPrefix !== displayName ? emailPrefix : null,
+  );
   expect(detail.seenForbidden, "email prefix appeared on detail page during refresh").toBe(false);
   await expect(page.getByText(displayName, { exact: false })).toBeVisible();
 
@@ -142,7 +159,10 @@ test("realtime refresh under throttled profile reads keeps display_name (no emai
     await fireRealtimeStyleInvalidations(page);
     await page.waitForTimeout(300);
   }
-  const feed = await sampleHostNameOverTime(page, emailPrefix && emailPrefix !== displayName ? emailPrefix : null);
+  const feed = await sampleHostNameOverTime(
+    page,
+    emailPrefix && emailPrefix !== displayName ? emailPrefix : null,
+  );
   expect(feed.seenForbidden, "email prefix appeared on feed card during refresh").toBe(false);
   await expect(card).toContainText(displayName);
 

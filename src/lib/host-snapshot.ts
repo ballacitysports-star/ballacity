@@ -50,7 +50,11 @@ export async function resolveHostSnapshot(input: HostSnapshotInput): Promise<Hos
     emailLocal ||
     "Player";
 
-  const usernameRaw = db?.username || stripLeadingAt(input.fallback?.username) || emailLocal || input.userId.slice(0, 6);
+  const usernameRaw =
+    db?.username ||
+    stripLeadingAt(input.fallback?.username) ||
+    emailLocal ||
+    input.userId.slice(0, 6);
   const username = `@${stripLeadingAt(usernameRaw) ?? ""}`;
 
   const avatar = db?.avatar_initials || input.fallback?.avatar || initialsFrom(name);

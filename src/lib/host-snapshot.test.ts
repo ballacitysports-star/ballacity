@@ -18,9 +18,11 @@ const META_DISPLAY_NAME = "Alex Smith";
 
 /** Simulates a `profiles` row read that takes `delayMs` to settle. */
 function slowDbProfile(payload: Record<string, unknown> | null, delayMs: number) {
-  return vi.fn().mockImplementation(
-    () => new Promise((resolve) => setTimeout(() => resolve(payload), delayMs)),
-  );
+  return vi
+    .fn()
+    .mockImplementation(
+      () => new Promise((resolve) => setTimeout(() => resolve(payload), delayMs)),
+    );
 }
 
 describe("resolveHostSnapshot — host name under slow profile loading", () => {
@@ -49,7 +51,11 @@ describe("resolveHostSnapshot — host name under slow profile loading", () => {
     // `defaultsFromUser` prefers `user_metadata.display_name`, so this is what
     // `useMyProfile` exposes once the auth user is hydrated, even if the
     // `profiles` row hasn't been inserted yet.
-    const fallbackFromUserMetadata = { name: META_DISPLAY_NAME, username: `@${EMAIL_PREFIX}`, avatar: "AS" };
+    const fallbackFromUserMetadata = {
+      name: META_DISPLAY_NAME,
+      username: `@${EMAIL_PREFIX}`,
+      avatar: "AS",
+    };
 
     const snap = await resolveHostSnapshot({
       userId: USER_ID,
@@ -108,7 +114,12 @@ describe("snapshot shape matches what GameCard + games.$gameId render", () => {
     const snap = await resolveHostSnapshot({
       userId: USER_ID,
       userEmail: EMAIL,
-      fallback: { name: META_DISPLAY_NAME, username: `@${EMAIL_PREFIX}`, avatar: "AS", rating: 4.9 },
+      fallback: {
+        name: META_DISPLAY_NAME,
+        username: `@${EMAIL_PREFIX}`,
+        avatar: "AS",
+        rating: 4.9,
+      },
       fetchDbProfile: slowDbProfile(
         { display_name: META_DISPLAY_NAME, username: "alex", avatar_initials: "AS" },
         10,

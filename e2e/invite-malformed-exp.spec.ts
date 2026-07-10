@@ -37,7 +37,9 @@ const MALFORMED_CASES: Array<{ label: string; expParam: string }> = [
 ];
 
 for (const { label, expParam } of MALFORMED_CASES) {
-  test(`malformed exp (${label}) → Invite expired banner, CTA routes to /discover`, async ({ browser }) => {
+  test(`malformed exp (${label}) → Invite expired banner, CTA routes to /discover`, async ({
+    browser,
+  }) => {
     const ctx = await browser.newContext();
     const page = await ctx.newPage();
     await restoreSession(page);
@@ -66,7 +68,9 @@ for (const { label, expParam } of MALFORMED_CASES) {
     await expect(expired).toBeVisible({ timeout: 10_000 });
     await expect(expired).toContainText(/invite expired/i);
 
-    const normalBanner = page.getByRole("status").filter({ hasText: /you're invited to this game/i });
+    const normalBanner = page
+      .getByRole("status")
+      .filter({ hasText: /you're invited to this game/i });
     await expect(normalBanner).toHaveCount(0);
 
     // Banner CTA links to the discovery fallback.

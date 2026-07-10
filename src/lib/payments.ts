@@ -1,8 +1,14 @@
 import { supabase } from "@/integrations/supabase/client";
 
 export type PaymentType =
-  | "venmo" | "cashapp" | "zelle" | "paypal"
-  | "applecash" | "googlepay" | "cash" | "custom";
+  | "venmo"
+  | "cashapp"
+  | "zelle"
+  | "paypal"
+  | "applecash"
+  | "googlepay"
+  | "cash"
+  | "custom";
 
 export type PaymentMethod = {
   id: string;
@@ -56,15 +62,40 @@ export type PaymentSubmission = {
   reviewed_at: string | null;
 };
 
-export const PAYMENT_TYPES: { id: PaymentType; name: string; emoji: string; fields: { username?: string; url?: string; contact?: string } }[] = [
-  { id: "venmo", name: "Venmo", emoji: "💸", fields: { username: "Venmo username", url: "Payment URL (https://venmo.com/u/…)" } },
-  { id: "cashapp", name: "Cash App", emoji: "💵", fields: { username: "Cashtag ($yourname)", url: "Payment URL (https://cash.app/$…)" } },
+export const PAYMENT_TYPES: {
+  id: PaymentType;
+  name: string;
+  emoji: string;
+  fields: { username?: string; url?: string; contact?: string };
+}[] = [
+  {
+    id: "venmo",
+    name: "Venmo",
+    emoji: "💸",
+    fields: { username: "Venmo username", url: "Payment URL (https://venmo.com/u/…)" },
+  },
+  {
+    id: "cashapp",
+    name: "Cash App",
+    emoji: "💵",
+    fields: { username: "Cashtag ($yourname)", url: "Payment URL (https://cash.app/$…)" },
+  },
   { id: "zelle", name: "Zelle", emoji: "⚡", fields: { contact: "Email or phone" } },
-  { id: "paypal", name: "PayPal F&F", emoji: "🅿️", fields: { username: "PayPal username", url: "PayPal.me link" } },
+  {
+    id: "paypal",
+    name: "PayPal F&F",
+    emoji: "🅿️",
+    fields: { username: "PayPal username", url: "PayPal.me link" },
+  },
   { id: "applecash", name: "Apple Cash", emoji: "🍎", fields: { contact: "Phone number" } },
   { id: "googlepay", name: "Google Pay", emoji: "🇬", fields: { contact: "Email or phone" } },
   { id: "cash", name: "Cash (in person)", emoji: "💰", fields: {} },
-  { id: "custom", name: "Custom method", emoji: "✨", fields: { username: "Method name", contact: "Instructions" } },
+  {
+    id: "custom",
+    name: "Custom method",
+    emoji: "✨",
+    fields: { username: "Method name", contact: "Instructions" },
+  },
 ];
 
 export function paymentTypeMeta(t: string) {
@@ -91,7 +122,9 @@ export async function listPaymentMethodsForHost(hostId: string): Promise<Payment
   return (data ?? []) as PaymentMethod[];
 }
 
-export async function createPaymentMethod(input: Omit<PaymentMethod, "id" | "host_id" | "is_enabled"> & { is_enabled?: boolean }) {
+export async function createPaymentMethod(
+  input: Omit<PaymentMethod, "id" | "host_id" | "is_enabled"> & { is_enabled?: boolean },
+) {
   const { data: u } = await supabase.auth.getUser();
   if (!u.user) throw new Error("Sign in to add payment methods.");
   const { error } = await supabase.from("host_payment_methods").insert({
@@ -125,7 +158,9 @@ export async function getGamePaymentSettings(gameId: string): Promise<GamePaymen
   return (data as GamePaymentSettings) ?? null;
 }
 
-export async function getMyGamePaymentSettings(gameId: string): Promise<GamePaymentSettings | null> {
+export async function getMyGamePaymentSettings(
+  gameId: string,
+): Promise<GamePaymentSettings | null> {
   const { data: u } = await supabase.auth.getUser();
   if (!u.user) return null;
   const { data, error } = await supabase
@@ -170,7 +205,9 @@ export async function uploadProofScreenshot(file: File): Promise<string> {
 }
 
 export async function getSignedProofUrl(path: string): Promise<string | null> {
-  const { data, error } = await supabase.storage.from("payment-proofs").createSignedUrl(path, 60 * 10);
+  const { data, error } = await supabase.storage
+    .from("payment-proofs")
+    .createSignedUrl(path, 60 * 10);
   if (error) return null;
   return data?.signedUrl ?? null;
 }
@@ -206,7 +243,9 @@ export async function listMySubmissionsForGame(gameId: string): Promise<PaymentS
   return (data ?? []) as PaymentSubmission[];
 }
 
-export async function listHostSubmissions(status?: "pending" | "verified" | "rejected"): Promise<PaymentSubmission[]> {
+export async function listHostSubmissions(
+  status?: "pending" | "verified" | "rejected",
+): Promise<PaymentSubmission[]> {
   const { data: u } = await supabase.auth.getUser();
   if (!u.user) return [];
   let q = supabase
@@ -220,7 +259,11 @@ export async function listHostSubmissions(status?: "pending" | "verified" | "rej
   return (data ?? []) as PaymentSubmission[];
 }
 
-export async function reviewSubmission(id: string, status: "verified" | "rejected" | "pending", notes?: string) {
+export async function reviewSubmission(
+  id: string,
+  status: "verified" | "rejected" | "pending",
+  notes?: string,
+) {
   const { error } = await supabase
     .from("payment_submissions")
     .update({
@@ -257,8 +300,7 @@ export async function createJoinRequest(input: {
   const { data: u } = await supabase.auth.getUser();
   if (!u.user) throw new Error("Sign in to request to join.");
 
-  const idempotency_key =
-    input.idempotency_key ?? `join:${input.game_id}`;
+  const idempotency_key = input.idempotency_key ?? `join:${input.game_id}`;
 
   const { data, error } = await supabase
     .from("join_requests")
@@ -282,9 +324,7 @@ export async function createJoinRequest(input: {
       .from("join_requests")
       .select("*")
       .eq("player_id", u.user.id)
-      .or(
-        `idempotency_key.eq.${idempotency_key},and(game_id.eq.${input.game_id})`,
-      )
+      .or(`idempotency_key.eq.${idempotency_key},and(game_id.eq.${input.game_id})`)
       .order("created_at", { ascending: false })
       .limit(1)
       .maybeSingle();
@@ -294,7 +334,6 @@ export async function createJoinRequest(input: {
 
   throw error;
 }
-
 
 export async function cancelMyJoinRequest(gameId: string) {
   const { data: u } = await supabase.auth.getUser();
@@ -323,7 +362,9 @@ export async function getMyJoinRequest(gameId: string): Promise<JoinRequest | nu
   return (data as JoinRequest) ?? null;
 }
 
-export async function listHostJoinRequests(status?: "pending" | "approved" | "rejected"): Promise<JoinRequest[]> {
+export async function listHostJoinRequests(
+  status?: "pending" | "approved" | "rejected",
+): Promise<JoinRequest[]> {
   const { data: u } = await supabase.auth.getUser();
   if (!u.user) return [];
   let q = supabase
@@ -337,7 +378,9 @@ export async function listHostJoinRequests(status?: "pending" | "approved" | "re
   return (data ?? []) as JoinRequest[];
 }
 
-export async function listMyJoinRequests(status?: "pending" | "approved" | "rejected"): Promise<JoinRequest[]> {
+export async function listMyJoinRequests(
+  status?: "pending" | "approved" | "rejected",
+): Promise<JoinRequest[]> {
   const { data: u } = await supabase.auth.getUser();
   if (!u.user) return [];
   let q = supabase
@@ -351,7 +394,11 @@ export async function listMyJoinRequests(status?: "pending" | "approved" | "reje
   return (data ?? []) as JoinRequest[];
 }
 
-export async function reviewJoinRequest(id: string, status: "approved" | "rejected", notes?: string) {
+export async function reviewJoinRequest(
+  id: string,
+  status: "approved" | "rejected",
+  notes?: string,
+) {
   const { error } = await supabase
     .from("join_requests")
     .update({

@@ -1,7 +1,15 @@
 import { useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import { Link } from "@tanstack/react-router";
-import { Star, MessageSquarePlus, ThumbsUp, Flag, ShieldCheck, Lock, ArrowUpDown } from "lucide-react";
+import {
+  Star,
+  MessageSquarePlus,
+  ThumbsUp,
+  Flag,
+  ShieldCheck,
+  Lock,
+  ArrowUpDown,
+} from "lucide-react";
 import {
   REVIEWER_META,
   computeReputation,
@@ -104,7 +112,9 @@ function ReviewCard({ r, index, isOwner }: { r: Review; index: number; isOwner: 
         </div>
       </header>
 
-      {r.title && <h3 className="mt-3 font-display text-base font-bold leading-tight">{r.title}</h3>}
+      {r.title && (
+        <h3 className="mt-3 font-display text-base font-bold leading-tight">{r.title}</h3>
+      )}
       <p className="mt-1 text-sm text-foreground/90">{r.body}</p>
 
       {r.context && (
@@ -120,9 +130,17 @@ function ReviewCard({ r, index, isOwner }: { r: Review; index: number; isOwner: 
           </summary>
           <div className="mt-2 grid grid-cols-2 gap-1.5">
             {Object.entries(r.scores).map(([k, v]) => (
-              <div key={k} className="flex items-center justify-between rounded-lg border border-border bg-background/40 px-2 py-1">
-                <span className="text-[10px] uppercase tracking-wide text-muted-foreground truncate">{k}</span>
-                <span className="font-display text-xs font-bold text-lime">{v}<span className="text-muted-foreground text-[9px]">/5</span></span>
+              <div
+                key={k}
+                className="flex items-center justify-between rounded-lg border border-border bg-background/40 px-2 py-1"
+              >
+                <span className="text-[10px] uppercase tracking-wide text-muted-foreground truncate">
+                  {k}
+                </span>
+                <span className="font-display text-xs font-bold text-lime">
+                  {v}
+                  <span className="text-muted-foreground text-[9px]">/5</span>
+                </span>
               </div>
             ))}
           </div>

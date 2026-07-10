@@ -66,7 +66,7 @@ export function useSubscription() {
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "subscriptions", filter: `user_id=eq.${user.id}` },
-        () => refetch()
+        () => refetch(),
       )
       .subscribe();
 
@@ -78,10 +78,10 @@ export function useSubscription() {
 
   const now = Date.now();
   const periodEnd = sub?.current_period_end ? new Date(sub.current_period_end).getTime() : null;
-  const isActive = !!sub && (
-    (["active", "trialing", "past_due"].includes(sub.status) && (!periodEnd || periodEnd > now))
-    || (sub.status === "canceled" && periodEnd !== null && periodEnd > now)
-  );
+  const isActive =
+    !!sub &&
+    ((["active", "trialing", "past_due"].includes(sub.status) && (!periodEnd || periodEnd > now)) ||
+      (sub.status === "canceled" && periodEnd !== null && periodEnd > now));
   const isPastDue = sub?.status === "past_due";
 
   return {

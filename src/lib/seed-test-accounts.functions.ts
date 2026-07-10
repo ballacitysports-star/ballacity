@@ -51,13 +51,12 @@ export const seedTestAccounts = createServerFn({ method: "POST" })
       };
 
       if (!user) {
-        const { data: createRes, error: createErr } =
-          await supabaseAdmin.auth.admin.createUser({
-            email: acct.email,
-            password: acct.password,
-            email_confirm: true,
-            user_metadata: metadata,
-          });
+        const { data: createRes, error: createErr } = await supabaseAdmin.auth.admin.createUser({
+          email: acct.email,
+          password: acct.password,
+          email_confirm: true,
+          user_metadata: metadata,
+        });
         if (createErr) throw new Error(`createUser ${acct.email}: ${createErr.message}`);
         user = createRes.user!;
         created = true;
@@ -73,22 +72,20 @@ export const seedTestAccounts = createServerFn({ method: "POST" })
       }
 
       // Upsert profile (handle_new_user trigger creates a base row; we enrich it)
-      await supabaseAdmin
-        .from("profiles")
-        .upsert(
-          {
-            id: user.id,
-            display_name: acct.displayName,
-            avatar_initials: acct.displayName
-              .split(" ")
-              .map((s) => s[0])
-              .join("")
-              .slice(0, 2)
-              .toUpperCase(),
-            city: acct.city,
-          },
-          { onConflict: "id" },
-        );
+      await supabaseAdmin.from("profiles").upsert(
+        {
+          id: user.id,
+          display_name: acct.displayName,
+          avatar_initials: acct.displayName
+            .split(" ")
+            .map((s) => s[0])
+            .join("")
+            .slice(0, 2)
+            .toUpperCase(),
+          city: acct.city,
+        },
+        { onConflict: "id" },
+      );
 
       results.push({ key: acct.key, email: acct.email, userId: user.id, created });
     }
@@ -122,10 +119,7 @@ export const seedTestAccounts = createServerFn({ method: "POST" })
       };
 
       if (existing && existing.length > 0) {
-        await supabaseAdmin
-          .from("player_availabilities")
-          .update(payload)
-          .eq("id", existing[0].id);
+        await supabaseAdmin.from("player_availabilities").update(payload).eq("id", existing[0].id);
       } else {
         await supabaseAdmin.from("player_availabilities").insert(payload);
       }

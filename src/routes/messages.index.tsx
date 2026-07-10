@@ -17,11 +17,18 @@ function MessagesInbox() {
 
   useEffect(() => {
     if (loading) return;
-    if (!user) { setFetching(false); return; }
+    if (!user) {
+      setFetching(false);
+      return;
+    }
     let cancelled = false;
     const load = async () => {
-      try { const data = await listMyConversations(); if (!cancelled) setConvs(data); }
-      finally { if (!cancelled) setFetching(false); }
+      try {
+        const data = await listMyConversations();
+        if (!cancelled) setConvs(data);
+      } finally {
+        if (!cancelled) setFetching(false);
+      }
     };
     load();
     const channel = supabase
@@ -30,7 +37,10 @@ function MessagesInbox() {
       .on("postgres_changes", { event: "UPDATE", schema: "public", table: "messages" }, load)
       .on("postgres_changes", { event: "UPDATE", schema: "public", table: "conversations" }, load)
       .subscribe();
-    return () => { cancelled = true; supabase.removeChannel(channel); };
+    return () => {
+      cancelled = true;
+      supabase.removeChannel(channel);
+    };
   }, [user?.id, loading]);
 
   if (!loading && !user) {
@@ -38,7 +48,12 @@ function MessagesInbox() {
       <div className="mx-auto max-w-md px-4 pt-10 text-center">
         <MessageCircle className="mx-auto h-10 w-10 text-muted-foreground mb-3" />
         <h1 className="font-display text-2xl font-bold mb-2">Sign in to message</h1>
-        <Link to="/auth" className="inline-flex rounded-full bg-lime-gradient px-5 py-2.5 text-sm font-bold text-primary-foreground">Sign in</Link>
+        <Link
+          to="/auth"
+          className="inline-flex rounded-full bg-lime-gradient px-5 py-2.5 text-sm font-bold text-primary-foreground"
+        >
+          Sign in
+        </Link>
       </div>
     );
   }
@@ -46,7 +61,10 @@ function MessagesInbox() {
   return (
     <div className="mx-auto max-w-md px-4 pt-6 pb-32">
       <div className="flex items-center gap-3 mb-5">
-        <Link to="/feed" className="grid h-10 w-10 place-items-center rounded-full border border-border bg-surface">
+        <Link
+          to="/feed"
+          className="grid h-10 w-10 place-items-center rounded-full border border-border bg-surface"
+        >
           <ArrowLeft className="h-5 w-5" />
         </Link>
         <h1 className="font-display text-2xl font-bold">Messages</h1>
@@ -61,20 +79,30 @@ function MessagesInbox() {
       ) : (
         <div className="space-y-2">
           {convs.map((c) => (
-            <Link key={c.id} to="/messages/$conversationId" params={{ conversationId: c.id }}
-              className="flex items-center gap-3 rounded-2xl border border-border bg-surface p-3 hover:border-lime/40">
+            <Link
+              key={c.id}
+              to="/messages/$conversationId"
+              params={{ conversationId: c.id }}
+              className="flex items-center gap-3 rounded-2xl border border-border bg-surface p-3 hover:border-lime/40"
+            >
               <div className="grid h-12 w-12 place-items-center rounded-2xl bg-lime-gradient font-bold text-primary-foreground">
                 {c.other_initials ?? "PL"}
               </div>
               <div className="flex-1 min-w-0">
                 <div className="flex items-center justify-between gap-2">
                   <span className="font-semibold text-sm truncate">{c.other_display_name}</span>
-                  <span className="text-[10px] text-muted-foreground shrink-0">{timeAgo(c.last_message_at)}</span>
+                  <span className="text-[10px] text-muted-foreground shrink-0">
+                    {timeAgo(c.last_message_at)}
+                  </span>
                 </div>
-                <p className="text-xs text-muted-foreground truncate">{c.last_message ?? "Say hi 👋"}</p>
+                <p className="text-xs text-muted-foreground truncate">
+                  {c.last_message ?? "Say hi 👋"}
+                </p>
               </div>
               {c.unread > 0 && (
-                <span className="grid h-5 min-w-5 px-1.5 place-items-center rounded-full bg-coral text-[10px] font-bold text-white">{c.unread}</span>
+                <span className="grid h-5 min-w-5 px-1.5 place-items-center rounded-full bg-coral text-[10px] font-bold text-white">
+                  {c.unread}
+                </span>
               )}
             </Link>
           ))}

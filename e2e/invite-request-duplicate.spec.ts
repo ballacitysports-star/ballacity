@@ -48,37 +48,47 @@ function sessionUserId(): string {
 
 const isTable = (url: string, table: string) => url.includes(`/rest/v1/${table}`);
 
-test("re-opening a valid invite after submitting blocks a second join request", async ({ browser }) => {
+test("re-opening a valid invite after submitting blocks a second join request", async ({
+  browser,
+}) => {
   const userId = sessionUserId();
 
   const ctx = await browser.newContext();
   const page = await ctx.newPage();
 
-  await page.route((u) => isTable(u, "game_payment_settings"), async (route: PWRoute) => {
-    if (route.request().method() !== "GET") return route.fallback();
-    await route.fulfill({
-      status: 200,
-      contentType: "application/json",
-      body: JSON.stringify([{
-        id: "mock-settings-id",
-        game_id: GAME_ID,
-        host_id: FAKE_HOST_ID,
-        entry_fee: 0,
-        accepted_method_ids: [],
-        payment_deadline: null,
-        refund_policy: null,
-        payment_instructions: null,
-        requires_approval: true,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      }]),
-    });
-  });
+  await page.route(
+    (u) => isTable(u, "game_payment_settings"),
+    async (route: PWRoute) => {
+      if (route.request().method() !== "GET") return route.fallback();
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify([
+          {
+            id: "mock-settings-id",
+            game_id: GAME_ID,
+            host_id: FAKE_HOST_ID,
+            entry_fee: 0,
+            accepted_method_ids: [],
+            payment_deadline: null,
+            refund_policy: null,
+            payment_instructions: null,
+            requires_approval: true,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          },
+        ]),
+      });
+    },
+  );
 
-  await page.route((u) => isTable(u, "payment_submissions"), async (route: PWRoute) => {
-    if (route.request().method() !== "GET") return route.fallback();
-    await route.fulfill({ status: 200, contentType: "application/json", body: "[]" });
-  });
+  await page.route(
+    (u) => isTable(u, "payment_submissions"),
+    async (route: PWRoute) => {
+      if (route.request().method() !== "GET") return route.fallback();
+      await route.fulfill({ status: 200, contentType: "application/json", body: "[]" });
+    },
+  );
 
   // Track every POST to join_requests. Once the first one lands, subsequent
   // GETs return the pending row so the UI reflects the existing request.
@@ -95,38 +105,48 @@ test("re-opening a valid invite after submitting blocks a second join request", 
     updated_at: new Date().toISOString(),
   });
 
-  await page.route((u) => isTable(u, "join_requests"), async (route: PWRoute) => {
-    const req = route.request();
-    const method = req.method();
-    if (method === "GET") {
-      await route.fulfill({
-        status: 200,
-        contentType: "application/json",
-        body: JSON.stringify(joinPosts.length > 0 ? [pendingRow()] : []),
-      });
-      return;
-    }
-    if (method === "POST") {
-      let parsed: any = null;
-      try { parsed = JSON.parse(req.postData() ?? "null"); } catch { /* ignore */ }
-      joinPosts.push({ body: parsed, urlAtRequest: page.url() });
-      await route.fulfill({
-        status: 201,
-        contentType: "application/json",
-        headers: { "content-range": "0-0/1" },
-        body: JSON.stringify([pendingRow()]),
-      });
-      return;
-    }
-    return route.fallback();
-  });
+  await page.route(
+    (u) => isTable(u, "join_requests"),
+    async (route: PWRoute) => {
+      const req = route.request();
+      const method = req.method();
+      if (method === "GET") {
+        await route.fulfill({
+          status: 200,
+          contentType: "application/json",
+          body: JSON.stringify(joinPosts.length > 0 ? [pendingRow()] : []),
+        });
+        return;
+      }
+      if (method === "POST") {
+        let parsed: any = null;
+        try {
+          parsed = JSON.parse(req.postData() ?? "null");
+        } catch {
+          /* ignore */
+        }
+        joinPosts.push({ body: parsed, urlAtRequest: page.url() });
+        await route.fulfill({
+          status: 201,
+          contentType: "application/json",
+          headers: { "content-range": "0-0/1" },
+          body: JSON.stringify([pendingRow()]),
+        });
+        return;
+      }
+      return route.fallback();
+    },
+  );
 
   await restoreSession(page);
 
   // ---- Visit #1: submit the join request. ----
   await page.goto(INVITE_URL, { waitUntil: "domcontentloaded" });
 
-  const banner = page.getByRole("status").filter({ hasText: /you're invited to this game/i }).first();
+  const banner = page
+    .getByRole("status")
+    .filter({ hasText: /you're invited to this game/i })
+    .first();
   await expect(banner).toBeVisible({ timeout: 10_000 });
 
   const cta = page.getByRole("button", { name: /request to join/i }).first();
@@ -134,19 +154,25 @@ test("re-opening a valid invite after submitting blocks a second join request", 
   await cta.click();
 
   await expect
-    .poll(() => joinPosts.length, { timeout: 10_000, message: "first join_requests POST never fired" })
+    .poll(() => joinPosts.length, {
+      timeout: 10_000,
+      message: "first join_requests POST never fired",
+    })
     .toBe(1);
 
-  await expect(page.getByText(/request pending · tap to cancel/i).first())
-    .toBeVisible({ timeout: 10_000 });
+  await expect(page.getByText(/request pending · tap to cancel/i).first()).toBeVisible({
+    timeout: 10_000,
+  });
 
   // ---- Navigate away, then re-open the SAME invite link. ----
   await page.goto("/discover", { waitUntil: "domcontentloaded" });
   await page.goto(INVITE_URL, { waitUntil: "domcontentloaded" });
 
   // Existing pending state must be reflected on re-entry.
-  const pendingBanner = page.getByRole("status")
-    .filter({ hasText: /waiting for host approval/i }).first();
+  const pendingBanner = page
+    .getByRole("status")
+    .filter({ hasText: /waiting for host approval/i })
+    .first();
   await expect(pendingBanner).toBeVisible({ timeout: 10_000 });
 
   // Sticky action shows the pending/cancel state — NOT "Request to join".
@@ -158,14 +184,15 @@ test("re-opening a valid invite after submitting blocks a second join request", 
   expect(postCountBeforeSecondTap).toBe(1);
 
   // Tapping the pending CTA must not create a duplicate join_requests row.
-  await pendingCta.click().catch(() => { /* cancel confirm dialogs are fine to ignore */ });
+  await pendingCta.click().catch(() => {
+    /* cancel confirm dialogs are fine to ignore */
+  });
 
   // Give the app a beat to (not) fire a second POST.
   await page.waitForTimeout(1_000);
-  expect(
-    joinPosts.length,
-    "second Request to join submission must be blocked",
-  ).toBe(postCountBeforeSecondTap);
+  expect(joinPosts.length, "second Request to join submission must be blocked").toBe(
+    postCountBeforeSecondTap,
+  );
 
   // Params still preserved.
   const finalUrl = new URL(page.url());

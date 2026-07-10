@@ -1,5 +1,16 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { ArrowLeft, Check, Plus, X, Users, Trophy, BarChart3, CreditCard, Video, ExternalLink } from "lucide-react";
+import {
+  ArrowLeft,
+  Check,
+  Plus,
+  X,
+  Users,
+  Trophy,
+  BarChart3,
+  CreditCard,
+  Video,
+  ExternalLink,
+} from "lucide-react";
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import type { User } from "@supabase/supabase-js";
@@ -19,7 +30,6 @@ import { OrgCard } from "@/components/OrgCard";
 import { getCurrentUser, useAuth } from "@/hooks/use-auth";
 import { LocationAutocomplete } from "@/components/LocationAutocomplete";
 import { LINK_TYPES, LinkIcon } from "@/components/ProfileLinks";
-
 
 export const Route = createFileRoute("/profile/edit")({
   head: () => ({ meta: [{ title: "Edit profile — OpenRun" }] }),
@@ -51,26 +61,31 @@ function EditProfile() {
   const [links, setLinks] = useState<ProfileLink[]>(profile?.links ?? []);
   const [isDirty, setIsDirty] = useState(false);
   const [linksDirty, setLinksDirty] = useState(false);
-  const profileSignature = profile ? JSON.stringify({
-    name: profile.name,
-    username: profile.username,
-    avatar: profile.avatar,
-    avatarUrl: profile.avatarUrl,
-    coverUrl: profile.coverUrl,
-    city: profile.city,
-    bio: profile.bio,
-    birthday: profile.birthday,
-    graduatingClass: profile.graduatingClass,
-    sports: profile.sports,
-    links: profile.links,
-  }) : "";
+  const profileSignature = profile
+    ? JSON.stringify({
+        name: profile.name,
+        username: profile.username,
+        avatar: profile.avatar,
+        avatarUrl: profile.avatarUrl,
+        coverUrl: profile.coverUrl,
+        city: profile.city,
+        bio: profile.bio,
+        birthday: profile.birthday,
+        graduatingClass: profile.graduatingClass,
+        sports: profile.sports,
+        links: profile.links,
+      })
+    : "";
 
   const markDirty = () => setIsDirty(true);
 
   const onPickAvatar = async (file: File | null) => {
     if (!file) return;
     markDirty();
-    if (!file.type.startsWith("image/")) { toast.error("Please choose an image"); return; }
+    if (!file.type.startsWith("image/")) {
+      toast.error("Please choose an image");
+      return;
+    }
     try {
       const dataUrl = await resizeImageToDataUrl(file, 256);
       setAvatarUrl(dataUrl);
@@ -82,7 +97,10 @@ function EditProfile() {
   const onPickCover = async (file: File | null) => {
     if (!file) return;
     markDirty();
-    if (!file.type.startsWith("image/")) { toast.error("Please choose an image"); return; }
+    if (!file.type.startsWith("image/")) {
+      toast.error("Please choose an image");
+      return;
+    }
     try {
       const dataUrl = await resizeImageToDataUrl(file, 1600);
       setCoverUrl(dataUrl);
@@ -107,13 +125,12 @@ function EditProfile() {
     setLinks((prev) => prev.filter((_, idx) => idx !== i));
   };
 
-
   const [preferredSports, setPreferredSports] = useState<Sport[]>(prefs.preferredSports);
   const [sections, setSections] = useState(prefs.sections);
 
   const toggleSport = (s: Sport) => {
     markDirty();
-    setPreferredSports((prev) => prev.includes(s) ? prev.filter(x => x !== s) : [...prev, s]);
+    setPreferredSports((prev) => (prev.includes(s) ? prev.filter((x) => x !== s) : [...prev, s]));
   };
   const toggleSection = (k: keyof typeof sections) => {
     markDirty();
@@ -160,7 +177,9 @@ function EditProfile() {
       if (!cancelled && currentUser) setConfirmedUser(currentUser);
       if (!cancelled && !currentUser) setConfirmedUser(null);
     });
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [loading, profileUser, nav]);
 
   if (loading) return null;
@@ -168,8 +187,13 @@ function EditProfile() {
     return (
       <div className="mx-auto flex min-h-dvh w-full max-w-md sm:max-w-2xl lg:max-w-4xl flex-col items-center justify-center px-6 text-center">
         <h1 className="font-display text-3xl font-bold">Sign in to edit your profile</h1>
-        <p className="mt-2 text-sm text-muted-foreground">Profile changes are saved to your account.</p>
-        <Link to="/auth" className="mt-6 rounded-full bg-lime-gradient px-6 py-3 text-sm font-bold text-primary-foreground">
+        <p className="mt-2 text-sm text-muted-foreground">
+          Profile changes are saved to your account.
+        </p>
+        <Link
+          to="/auth"
+          className="mt-6 rounded-full bg-lime-gradient px-6 py-3 text-sm font-bold text-primary-foreground"
+        >
           Sign in
         </Link>
       </div>
@@ -183,7 +207,10 @@ function EditProfile() {
     try {
       const u = new URL(withProto);
       u.hostname = u.hostname.toLowerCase();
-      if ((u.protocol === "https:" && u.port === "443") || (u.protocol === "http:" && u.port === "80")) {
+      if (
+        (u.protocol === "https:" && u.port === "443") ||
+        (u.protocol === "http:" && u.port === "80")
+      ) {
         u.port = "";
       }
       let out = u.toString();
@@ -204,14 +231,16 @@ function EditProfile() {
     } catch {
       return "Enter a valid URL";
     }
-    if (u.protocol !== "http:" && u.protocol !== "https:") return "Must start with http:// or https://";
+    if (u.protocol !== "http:" && u.protocol !== "https:")
+      return "Must start with http:// or https://";
     const host = u.hostname;
     if (!host || host.length > 253) return "Enter a valid domain";
     if (!/^[a-z0-9.-]+$/i.test(host)) return "Domain has invalid characters";
     if (!host.includes(".")) return "Enter a valid domain (missing .com, .org, etc.)";
     const tld = host.split(".").pop() ?? "";
     if (tld.length < 2 || !/^[a-z]+$/i.test(tld)) return "Enter a valid domain extension";
-    if (host === "localhost" || /^\d+\.\d+\.\d+\.\d+$/.test(host)) return "Use a public website URL";
+    if (host === "localhost" || /^\d+\.\d+\.\d+\.\d+$/.test(host))
+      return "Use a public website URL";
     return null;
   };
   const linkErrors = links.map((l) => validateUrl(l.url));
@@ -236,9 +265,15 @@ function EditProfile() {
   }
 
   const save = async () => {
-    if (!profileUser) { toast.error("Sign in to save"); return; }
+    if (!profileUser) {
+      toast.error("Sign in to save");
+      return;
+    }
     const trimmedName = name.trim().slice(0, 60);
-    if (!trimmedName) { toast.error("Name is required"); return; }
+    if (!trimmedName) {
+      toast.error("Name is required");
+      return;
+    }
     if (linkErrors.some((e) => e !== null)) {
       toast.error("Fix invalid profile links before saving");
       return;
@@ -248,11 +283,17 @@ function EditProfile() {
       .filter((l) => l.url);
     const trimmedCity = city.trim().slice(0, 80);
     const birthdayErr = validateBirthday(birthday);
-    if (birthdayErr) { toast.error(birthdayErr); return; }
+    if (birthdayErr) {
+      toast.error(birthdayErr);
+      return;
+    }
     const birthdayClean = birthday && /^\d{4}-\d{2}-\d{2}$/.test(birthday) ? birthday : undefined;
     const gradNum = graduatingClass.trim() ? parseInt(graduatingClass, 10) : NaN;
     const currentYear = new Date().getFullYear();
-    const gradClean = Number.isFinite(gradNum) && gradNum >= 1950 && gradNum <= currentYear + 15 ? gradNum : undefined;
+    const gradClean =
+      Number.isFinite(gradNum) && gradNum >= 1950 && gradNum <= currentYear + 15
+        ? gradNum
+        : undefined;
     if (graduatingClass.trim() && gradClean === undefined) {
       toast.error("Graduating class must be a valid year");
       return;
@@ -303,22 +344,26 @@ function EditProfile() {
     nav({ to: "/profile" });
   };
 
-
   const reset = () => {
     markDirty();
     setPreferredSports(DEFAULT_PREFS.preferredSports);
     setSections(DEFAULT_PREFS.sections);
   };
 
-
   return (
     <div className="mx-auto w-full max-w-md sm:max-w-2xl lg:max-w-4xl px-4 py-6 pb-32">
       <div className="flex items-center justify-between mb-5">
-        <Link to="/profile" className="grid h-10 w-10 place-items-center rounded-full border border-border bg-surface">
+        <Link
+          to="/profile"
+          className="grid h-10 w-10 place-items-center rounded-full border border-border bg-surface"
+        >
           <ArrowLeft className="h-4 w-4" />
         </Link>
         <h1 className="font-display text-lg font-bold">Edit profile</h1>
-        <button onClick={save} className="inline-flex items-center gap-1 rounded-full bg-lime-gradient px-4 py-2 text-xs font-bold text-primary-foreground">
+        <button
+          onClick={save}
+          className="inline-flex items-center gap-1 rounded-full bg-lime-gradient px-4 py-2 text-xs font-bold text-primary-foreground"
+        >
           <Check className="h-3.5 w-3.5" /> Save
         </button>
       </div>
@@ -346,7 +391,10 @@ function EditProfile() {
               {coverUrl && (
                 <button
                   type="button"
-                  onClick={() => { markDirty(); setCoverUrl(undefined); }}
+                  onClick={() => {
+                    markDirty();
+                    setCoverUrl(undefined);
+                  }}
                   className="rounded-full border border-border bg-background/80 backdrop-blur px-3 py-1.5 text-xs font-semibold text-coral"
                 >
                   Remove
@@ -377,7 +425,10 @@ function EditProfile() {
               {avatarUrl && (
                 <button
                   type="button"
-                  onClick={() => { markDirty(); setAvatarUrl(undefined); }}
+                  onClick={() => {
+                    markDirty();
+                    setAvatarUrl(undefined);
+                  }}
                   className="text-xs font-semibold text-coral text-left"
                 >
                   Remove photo
@@ -386,14 +437,55 @@ function EditProfile() {
             </div>
           </div>
         </Field>
-        <Field label="Display name"><Input value={name} onChange={(v) => { markDirty(); setName(v); }} maxLength={60} /></Field>
-        <Field label="Username"><Input value={username} onChange={(v) => { markDirty(); setUsername(v); }} maxLength={30} placeholder="@you" /></Field>
-        <Field label="Avatar initials (fallback)"><Input value={avatar} onChange={(v) => { markDirty(); setAvatar(v); }} maxLength={3} /></Field>
-        <Field label="City"><LocationAutocomplete value={city} onChange={(v) => { markDirty(); setCity(v); }} placeholder="Your city" mode="city" /></Field>
+        <Field label="Display name">
+          <Input
+            value={name}
+            onChange={(v) => {
+              markDirty();
+              setName(v);
+            }}
+            maxLength={60}
+          />
+        </Field>
+        <Field label="Username">
+          <Input
+            value={username}
+            onChange={(v) => {
+              markDirty();
+              setUsername(v);
+            }}
+            maxLength={30}
+            placeholder="@you"
+          />
+        </Field>
+        <Field label="Avatar initials (fallback)">
+          <Input
+            value={avatar}
+            onChange={(v) => {
+              markDirty();
+              setAvatar(v);
+            }}
+            maxLength={3}
+          />
+        </Field>
+        <Field label="City">
+          <LocationAutocomplete
+            value={city}
+            onChange={(v) => {
+              markDirty();
+              setCity(v);
+            }}
+            placeholder="Your city"
+            mode="city"
+          />
+        </Field>
         <Field label="Bio">
           <textarea
             value={bio}
-            onChange={(e) => { markDirty(); setBio(e.target.value); }}
+            onChange={(e) => {
+              markDirty();
+              setBio(e.target.value);
+            }}
             maxLength={280}
             rows={3}
             className="w-full rounded-2xl border border-border bg-surface px-3 py-2 text-sm outline-none focus:border-lime"
@@ -414,14 +506,15 @@ function EditProfile() {
             aria-invalid={birthdayError ? true : undefined}
             className={`w-full rounded-2xl border bg-surface px-3 py-2 text-sm outline-none focus:border-lime ${birthdayError ? "border-destructive" : "border-border"}`}
           />
-          {birthdayError && (
-            <p className="mt-1 text-xs text-destructive">{birthdayError}</p>
-          )}
+          {birthdayError && <p className="mt-1 text-xs text-destructive">{birthdayError}</p>}
         </Field>
         <Field label="Graduating class">
           <Input
             value={graduatingClass}
-            onChange={(v) => { markDirty(); setGraduatingClass(v.replace(/[^0-9]/g, "").slice(0, 4)); }}
+            onChange={(v) => {
+              markDirty();
+              setGraduatingClass(v.replace(/[^0-9]/g, "").slice(0, 4));
+            }}
             placeholder={`e.g. ${new Date().getFullYear() + 4}`}
             maxLength={4}
           />
@@ -435,14 +528,23 @@ function EditProfile() {
               <div className="flex items-center justify-between text-sm">
                 <span className="font-semibold">{s.name}</span>
                 <div className="flex items-center gap-2">
-                  <span className="text-lime font-bold w-12 text-right">{s.skill.toFixed(1)} / 5</span>
-                  <button onClick={() => removeSport(s.name)} className="grid h-7 w-7 place-items-center rounded-full border border-border text-muted-foreground">
+                  <span className="text-lime font-bold w-12 text-right">
+                    {s.skill.toFixed(1)} / 5
+                  </span>
+                  <button
+                    onClick={() => removeSport(s.name)}
+                    className="grid h-7 w-7 place-items-center rounded-full border border-border text-muted-foreground"
+                  >
                     <X className="h-3.5 w-3.5" />
                   </button>
                 </div>
               </div>
               <input
-                type="range" min={1} max={5} step={0.1} value={s.skill}
+                type="range"
+                min={1}
+                max={5}
+                step={0.1}
+                value={s.skill}
                 onChange={(e) => setSkill(s.name, parseFloat(e.target.value))}
                 className="mt-2 w-full accent-lime"
               />
@@ -453,8 +555,13 @@ function EditProfile() {
           <div className="text-xs text-muted-foreground mb-1.5">Add sport</div>
           <div className="flex flex-wrap gap-2">
             {SPORTS.filter((s) => !sports.some((x) => x.name === s.name)).map((s) => (
-              <button key={s.name} onClick={() => addSport(s.name)} className="inline-flex items-center gap-1 rounded-full border border-border bg-surface px-3 py-1.5 text-xs font-semibold hover:border-lime/40">
-                <span>{s.emoji}</span>{s.name}
+              <button
+                key={s.name}
+                onClick={() => addSport(s.name)}
+                className="inline-flex items-center gap-1 rounded-full border border-border bg-surface px-3 py-1.5 text-xs font-semibold hover:border-lime/40"
+              >
+                <span>{s.emoji}</span>
+                {s.name}
               </button>
             ))}
           </div>
@@ -477,11 +584,16 @@ function EditProfile() {
                     className="bg-transparent text-xs font-semibold outline-none"
                   >
                     {LINK_TYPES.map((opt) => (
-                      <option key={opt.type} value={opt.type}>{opt.label}</option>
+                      <option key={opt.type} value={opt.type}>
+                        {opt.label}
+                      </option>
                     ))}
                   </select>
                 </div>
-                <button onClick={() => removeLink(i)} className="grid h-7 w-7 place-items-center rounded-full border border-border text-muted-foreground">
+                <button
+                  onClick={() => removeLink(i)}
+                  className="grid h-7 w-7 place-items-center rounded-full border border-border text-muted-foreground"
+                >
                   <X className="h-3.5 w-3.5" />
                 </button>
               </div>
@@ -490,11 +602,11 @@ function EditProfile() {
                 onChange={(v) => updateLink(i, { url: v })}
                 placeholder={LINK_TYPES.find((t) => t.type === l.type)?.placeholder ?? "https://"}
                 aria-invalid={linkErrors[i] ? true : undefined}
-                className={linkErrors[i] ? "border-destructive focus-visible:ring-destructive" : undefined}
+                className={
+                  linkErrors[i] ? "border-destructive focus-visible:ring-destructive" : undefined
+                }
               />
-              {linkErrors[i] && (
-                <p className="mt-1 text-xs text-destructive">{linkErrors[i]}</p>
-              )}
+              {linkErrors[i] && <p className="mt-1 text-xs text-destructive">{linkErrors[i]}</p>}
               <div className="mt-2">
                 <Input
                   value={l.label ?? ""}
@@ -503,40 +615,47 @@ function EditProfile() {
                   placeholder="Optional label (e.g. @handle)"
                 />
               </div>
-              {!linkErrors[i] && l.url.trim() && (() => {
-                const href = normalizeUrl(l.url);
-                let host = "";
-                let path = "";
-                try {
-                  const u = new URL(href);
-                  host = u.hostname.replace(/^www\./, "");
-                  path = (u.pathname === "/" ? "" : u.pathname) + u.search + u.hash;
-                } catch { /* noop */ }
-                const title = l.label?.trim() || (LINK_TYPES.find((t) => t.type === l.type)?.label ?? host);
-                return (
-                  <div className="mt-3">
-                    <div className="text-[10px] uppercase tracking-wide text-muted-foreground mb-1">Preview</div>
-                    <a
-                      href={href}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="flex items-center gap-3 rounded-2xl border border-border bg-background p-3 hover:border-lime/40 transition-colors"
-                    >
-                      <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-border bg-surface overflow-hidden">
-                        <LinkIcon type={l.type} url={href} className="h-5 w-5" />
+              {!linkErrors[i] &&
+                l.url.trim() &&
+                (() => {
+                  const href = normalizeUrl(l.url);
+                  let host = "";
+                  let path = "";
+                  try {
+                    const u = new URL(href);
+                    host = u.hostname.replace(/^www\./, "");
+                    path = (u.pathname === "/" ? "" : u.pathname) + u.search + u.hash;
+                  } catch {
+                    /* noop */
+                  }
+                  const title =
+                    l.label?.trim() || (LINK_TYPES.find((t) => t.type === l.type)?.label ?? host);
+                  return (
+                    <div className="mt-3">
+                      <div className="text-[10px] uppercase tracking-wide text-muted-foreground mb-1">
+                        Preview
                       </div>
-                      <div className="min-w-0 flex-1">
-                        <div className="truncate text-sm font-semibold">{title}</div>
-                        <div className="truncate text-xs text-muted-foreground">
-                          <span className="font-medium text-foreground/80">{host}</span>
-                          {path && <span className="opacity-70">{path}</span>}
+                      <a
+                        href={href}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center gap-3 rounded-2xl border border-border bg-background p-3 hover:border-lime/40 transition-colors"
+                      >
+                        <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-border bg-surface overflow-hidden">
+                          <LinkIcon type={l.type} url={href} className="h-5 w-5" />
                         </div>
-                      </div>
-                      <ExternalLink className="h-4 w-4 shrink-0 text-muted-foreground" />
-                    </a>
-                  </div>
-                );
-              })()}
+                        <div className="min-w-0 flex-1">
+                          <div className="truncate text-sm font-semibold">{title}</div>
+                          <div className="truncate text-xs text-muted-foreground">
+                            <span className="font-medium text-foreground/80">{host}</span>
+                            {path && <span className="opacity-70">{path}</span>}
+                          </div>
+                        </div>
+                        <ExternalLink className="h-4 w-4 shrink-0 text-muted-foreground" />
+                      </a>
+                    </div>
+                  );
+                })()}
             </div>
           ))}
         </div>
@@ -556,13 +675,13 @@ function EditProfile() {
         </div>
       </Section>
 
-
-
-
       <Section
         title="My organizations"
         right={
-          <Link to="/teams/create" className="inline-flex items-center gap-1 text-xs font-bold text-lime">
+          <Link
+            to="/teams/create"
+            className="inline-flex items-center gap-1 text-xs font-bold text-lime"
+          >
             <Plus className="h-3.5 w-3.5" /> New
           </Link>
         }
@@ -576,43 +695,60 @@ function EditProfile() {
               <Users className="h-6 w-6" />
             </div>
             <div className="font-display text-base font-bold">Start a team or coach profile</div>
-            <p className="text-xs text-muted-foreground mt-1">Post tryouts, run pickups, build your following.</p>
+            <p className="text-xs text-muted-foreground mt-1">
+              Post tryouts, run pickups, build your following.
+            </p>
           </Link>
         ) : (
           <div className="space-y-3">
-            {myOrgs.map((o, i) => <OrgCard key={o.id} org={o} index={i} />)}
+            {myOrgs.map((o, i) => (
+              <OrgCard key={o.id} org={o} index={i} />
+            ))}
           </div>
         )}
       </Section>
 
       <Section title="Reviews">
-        <Link to="/reviews" className="flex items-center gap-3 rounded-2xl border border-border bg-surface p-3 hover:border-lime/40 transition-colors">
+        <Link
+          to="/reviews"
+          className="flex items-center gap-3 rounded-2xl border border-border bg-surface p-3 hover:border-lime/40 transition-colors"
+        >
           <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-lime/15 text-lime">
             <BarChart3 className="h-5 w-5" />
           </div>
           <div className="min-w-0 flex-1">
             <div className="font-semibold text-sm">Reviews Hub</div>
-            <div className="text-xs text-muted-foreground">Trust scores and AI insights across OpenRun</div>
+            <div className="text-xs text-muted-foreground">
+              Trust scores and AI insights across OpenRun
+            </div>
           </div>
           <div className="text-lime text-xs font-bold">→</div>
         </Link>
       </Section>
 
       <Section title="Payments">
-        <Link to="/payments" className="flex items-center gap-3 rounded-2xl border border-border bg-surface p-3 hover:border-lime/40 transition-colors">
+        <Link
+          to="/payments"
+          className="flex items-center gap-3 rounded-2xl border border-border bg-surface p-3 hover:border-lime/40 transition-colors"
+        >
           <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-lime/15 text-lime">
             <CreditCard className="h-5 w-5" />
           </div>
           <div className="min-w-0 flex-1">
             <div className="font-semibold text-sm">Payments</div>
-            <div className="text-xs text-muted-foreground">Manage payout methods & verify player payments</div>
+            <div className="text-xs text-muted-foreground">
+              Manage payout methods & verify player payments
+            </div>
           </div>
           <div className="text-lime text-xs font-bold">→</div>
         </Link>
       </Section>
 
       <Section title="AI Highlight Reels">
-        <Link to="/reels" className="flex items-center gap-3 rounded-2xl border border-border bg-surface p-3 hover:border-lime/40 transition-colors">
+        <Link
+          to="/reels"
+          className="flex items-center gap-3 rounded-2xl border border-border bg-surface p-3 hover:border-lime/40 transition-colors"
+        >
           <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-lime/15 text-lime">
             <Video className="h-5 w-5" />
           </div>
@@ -631,8 +767,12 @@ function EditProfile() {
         >
           <Video className="absolute right-4 top-4 h-16 w-16 opacity-10" />
           <div className="text-xs font-bold uppercase tracking-wider opacity-80">OpenRun Pro</div>
-          <h3 className="font-display text-xl font-bold mt-1">AI highlight reels, unlimited hosting.</h3>
-          <p className="text-sm opacity-90 mt-1">Cinematic clips from raw gameplay. One-tap export to TikTok & Reels.</p>
+          <h3 className="font-display text-xl font-bold mt-1">
+            AI highlight reels, unlimited hosting.
+          </h3>
+          <p className="text-sm opacity-90 mt-1">
+            Cinematic clips from raw gameplay. One-tap export to TikTok & Reels.
+          </p>
           <button className="mt-3 rounded-full bg-background px-4 py-2 text-sm font-bold text-foreground">
             Upgrade · $7.99 / mo
           </button>
@@ -640,7 +780,10 @@ function EditProfile() {
       </Section>
 
       <Section title="Plans & subscriptions">
-        <Link to="/plans" className="flex items-center gap-3 rounded-2xl border border-border bg-surface p-3 hover:border-lime/40 transition-colors">
+        <Link
+          to="/plans"
+          className="flex items-center gap-3 rounded-2xl border border-border bg-surface p-3 hover:border-lime/40 transition-colors"
+        >
           <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-lime/15 text-lime">
             <Trophy className="h-5 w-5" />
           </div>
@@ -653,7 +796,10 @@ function EditProfile() {
       </Section>
 
       <Section title="Notifications">
-        <Link to="/account/notifications" className="flex items-center gap-3 rounded-2xl border border-border bg-surface p-3 hover:border-lime/40 transition-colors">
+        <Link
+          to="/account/notifications"
+          className="flex items-center gap-3 rounded-2xl border border-border bg-surface p-3 hover:border-lime/40 transition-colors"
+        >
           <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-lime/15 text-lime">
             <span className="text-lg">🔔</span>
           </div>
@@ -665,8 +811,14 @@ function EditProfile() {
         </Link>
       </Section>
 
-      <Section title="Feed preferences" right={<button onClick={reset} className="text-xs font-bold text-coral">Reset</button>}>
-
+      <Section
+        title="Feed preferences"
+        right={
+          <button onClick={reset} className="text-xs font-bold text-coral">
+            Reset
+          </button>
+        }
+      >
         <div className="text-xs text-muted-foreground mb-2">Preferred sports (empty = all)</div>
         <div className="flex flex-wrap gap-2 mb-4">
           {SPORTS.map((s) => {
@@ -677,7 +829,8 @@ function EditProfile() {
                 onClick={() => toggleSport(s.name)}
                 className={`inline-flex items-center gap-1 rounded-full border px-3 py-1.5 text-xs font-semibold ${active ? "border-lime bg-lime text-primary-foreground" : "border-border bg-surface"}`}
               >
-                <span>{s.emoji}</span>{s.name}
+                <span>{s.emoji}</span>
+                {s.name}
               </button>
             );
           })}
@@ -685,27 +838,64 @@ function EditProfile() {
 
         <div className="text-xs text-muted-foreground mb-2">Sections to show</div>
         <div className="space-y-2">
-          <Toggle label="Needs players now (urgent)" checked={sections.showUrgent} onChange={() => toggleSection("showUrgent")} />
-          <Toggle label='"For you" list' checked={sections.showForYou} onChange={() => toggleSection("showForYou")} />
-          <Toggle label="Only games I host" checked={sections.hostedByMeOnly} onChange={() => toggleSection("hostedByMeOnly")} />
-          <Toggle label="Only games I joined" checked={sections.joinedOnly} onChange={() => toggleSection("joinedOnly")} />
-          <Toggle label="Free games only" checked={sections.freeOnly} onChange={() => toggleSection("freeOnly")} />
-          <Toggle label="Paid games only" checked={sections.paidOnly} onChange={() => toggleSection("paidOnly")} />
+          <Toggle
+            label="Needs players now (urgent)"
+            checked={sections.showUrgent}
+            onChange={() => toggleSection("showUrgent")}
+          />
+          <Toggle
+            label='"For you" list'
+            checked={sections.showForYou}
+            onChange={() => toggleSection("showForYou")}
+          />
+          <Toggle
+            label="Only games I host"
+            checked={sections.hostedByMeOnly}
+            onChange={() => toggleSection("hostedByMeOnly")}
+          />
+          <Toggle
+            label="Only games I joined"
+            checked={sections.joinedOnly}
+            onChange={() => toggleSection("joinedOnly")}
+          />
+          <Toggle
+            label="Free games only"
+            checked={sections.freeOnly}
+            onChange={() => toggleSection("freeOnly")}
+          />
+          <Toggle
+            label="Paid games only"
+            checked={sections.paidOnly}
+            onChange={() => toggleSection("paidOnly")}
+          />
         </div>
       </Section>
 
-      <button onClick={save} className="mt-6 w-full rounded-full bg-lime-gradient py-3 text-sm font-bold text-primary-foreground">
+      <button
+        onClick={save}
+        className="mt-6 w-full rounded-full bg-lime-gradient py-3 text-sm font-bold text-primary-foreground"
+      >
         Save changes
       </button>
     </div>
   );
 }
 
-function Section({ title, right, children }: { title: string; right?: React.ReactNode; children: React.ReactNode }) {
+function Section({
+  title,
+  right,
+  children,
+}: {
+  title: string;
+  right?: React.ReactNode;
+  children: React.ReactNode;
+}) {
   return (
     <div className="mt-6">
       <div className="flex items-center justify-between mb-2">
-        <h2 className="font-display text-sm font-bold uppercase tracking-wider text-muted-foreground">{title}</h2>
+        <h2 className="font-display text-sm font-bold uppercase tracking-wider text-muted-foreground">
+          {title}
+        </h2>
         {right}
       </div>
       <div>{children}</div>
@@ -722,7 +912,14 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
   );
 }
 
-function Input({ value, onChange, ...rest }: { value: string; onChange: (v: string) => void } & Omit<React.InputHTMLAttributes<HTMLInputElement>, "value" | "onChange">) {
+function Input({
+  value,
+  onChange,
+  ...rest
+}: { value: string; onChange: (v: string) => void } & Omit<
+  React.InputHTMLAttributes<HTMLInputElement>,
+  "value" | "onChange"
+>) {
   return (
     <input
       {...rest}
@@ -733,15 +930,27 @@ function Input({ value, onChange, ...rest }: { value: string; onChange: (v: stri
   );
 }
 
-function Toggle({ label, checked, onChange }: { label: string; checked: boolean; onChange: () => void }) {
+function Toggle({
+  label,
+  checked,
+  onChange,
+}: {
+  label: string;
+  checked: boolean;
+  onChange: () => void;
+}) {
   return (
     <button
       onClick={onChange}
       className="w-full flex items-center justify-between rounded-2xl border border-border bg-surface px-4 py-3 text-sm font-semibold"
     >
       <span>{label}</span>
-      <span className={`h-6 w-10 rounded-full p-0.5 transition-colors ${checked ? "bg-lime" : "bg-secondary"}`}>
-        <span className={`block h-5 w-5 rounded-full bg-background transition-transform ${checked ? "translate-x-4" : ""}`} />
+      <span
+        className={`h-6 w-10 rounded-full p-0.5 transition-colors ${checked ? "bg-lime" : "bg-secondary"}`}
+      >
+        <span
+          className={`block h-5 w-5 rounded-full bg-background transition-transform ${checked ? "translate-x-4" : ""}`}
+        />
       </span>
     </button>
   );

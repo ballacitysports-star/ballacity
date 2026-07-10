@@ -17,9 +17,14 @@ function Stars({ value, size = 14 }: { value: number; size?: number }) {
 }
 
 export function ReputationCard({ rep }: { rep: Reputation }) {
-  const TrendIcon = rep.recentTrend === "up" ? TrendingUp : rep.recentTrend === "down" ? TrendingDown : Minus;
+  const TrendIcon =
+    rep.recentTrend === "up" ? TrendingUp : rep.recentTrend === "down" ? TrendingDown : Minus;
   const trendColor =
-    rep.recentTrend === "up" ? "text-lime" : rep.recentTrend === "down" ? "text-coral" : "text-muted-foreground";
+    rep.recentTrend === "up"
+      ? "text-lime"
+      : rep.recentTrend === "down"
+        ? "text-coral"
+        : "text-muted-foreground";
 
   return (
     <motion.div
@@ -29,12 +34,16 @@ export function ReputationCard({ rep }: { rep: Reputation }) {
     >
       <div className="flex items-start justify-between gap-3">
         <div>
-          <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Reputation</div>
+          <div className="text-[10px] uppercase tracking-wider text-muted-foreground">
+            Reputation
+          </div>
           <div className="mt-1 flex items-baseline gap-2">
             <span className="font-display text-4xl font-bold leading-none">{rep.trustScore}</span>
             <span className="text-xs text-muted-foreground">/ 100 trust</span>
           </div>
-          <div className={`mt-1.5 inline-flex items-center gap-1 text-sm font-bold ${rep.level.color}`}>
+          <div
+            className={`mt-1.5 inline-flex items-center gap-1 text-sm font-bold ${rep.level.color}`}
+          >
             <span className="text-lg leading-none">{rep.level.emoji}</span> {rep.level.name}
           </div>
         </div>
@@ -43,9 +52,15 @@ export function ReputationCard({ rep }: { rep: Reputation }) {
           <div className="mt-0.5 text-xs text-muted-foreground">
             {rep.avg.toFixed(1)} · {rep.count} review{rep.count === 1 ? "" : "s"}
           </div>
-          <div className={`mt-1 inline-flex items-center gap-1 text-[11px] font-semibold ${trendColor}`}>
+          <div
+            className={`mt-1 inline-flex items-center gap-1 text-[11px] font-semibold ${trendColor}`}
+          >
             <TrendIcon className="h-3 w-3" />
-            {rep.recentTrend === "up" ? "Trending up" : rep.recentTrend === "down" ? "Cooling" : "Steady"}
+            {rep.recentTrend === "up"
+              ? "Trending up"
+              : rep.recentTrend === "down"
+                ? "Cooling"
+                : "Steady"}
           </div>
         </div>
       </div>
@@ -90,7 +105,9 @@ export function ReputationCard({ rep }: { rep: Reputation }) {
       {/* Top strengths */}
       {rep.topStrengths.length > 0 && (
         <div className="mt-4">
-          <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-2">Top strengths</div>
+          <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-2">
+            Top strengths
+          </div>
           <div className="flex flex-wrap gap-1.5">
             {rep.topStrengths.map((s) => (
               <span
@@ -107,7 +124,9 @@ export function ReputationCard({ rep }: { rep: Reputation }) {
       {/* Criteria breakdown bars */}
       {rep.criteriaAverages.some((c) => c.avg > 0) && (
         <div className="mt-4">
-          <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-2">Breakdown</div>
+          <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-2">
+            Breakdown
+          </div>
           <div className="grid grid-cols-1 gap-1.5">
             {rep.criteriaAverages.map((c) => (
               <div key={c.key} className="grid grid-cols-[1fr_auto] items-center gap-2">

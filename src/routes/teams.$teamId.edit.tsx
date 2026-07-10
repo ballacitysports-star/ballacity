@@ -2,11 +2,18 @@ import { createFileRoute, Link, useNavigate, notFound } from "@tanstack/react-ro
 import { useMemo, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
-  ArrowLeft, ArrowRight, Check, Sparkles, X, Plus, ChevronUp, ChevronDown, Trash2, Upload,
+  ArrowLeft,
+  ArrowRight,
+  Check,
+  Sparkles,
+  X,
+  Plus,
+  ChevronUp,
+  ChevronDown,
+  Trash2,
+  Upload,
 } from "lucide-react";
-import {
-  SPORTS, imageFor, type Sport, type Org,
-} from "@/lib/sample-data";
+import { SPORTS, imageFor, type Sport, type Org } from "@/lib/sample-data";
 import { getOrgById, updateOrg, deleteOrg, isMyOrg } from "@/lib/org-store";
 import { OrgCard } from "@/components/OrgCard";
 import { LocationAutocomplete } from "@/components/LocationAutocomplete";
@@ -20,7 +27,10 @@ export const Route = createFileRoute("/teams/$teamId/edit")({
   notFoundComponent: () => (
     <div className="mx-auto max-w-md px-6 pt-24 text-center">
       <p className="text-muted-foreground">Organization not found.</p>
-      <Link to="/teams" className="mt-4 inline-block rounded-full bg-lime px-4 py-2 text-sm font-bold text-primary-foreground">
+      <Link
+        to="/teams"
+        className="mt-4 inline-block rounded-full bg-lime px-4 py-2 text-sm font-bold text-primary-foreground"
+      >
         Back to Teams
       </Link>
     </div>
@@ -33,14 +43,14 @@ export const Route = createFileRoute("/teams/$teamId/edit")({
 });
 
 const ACCENTS = [
-  { name: "Lime",    hex: "#a3ff12" },
-  { name: "Coral",   hex: "#ff3d68" },
-  { name: "Mint",    hex: "#7df9c1" },
-  { name: "Amber",   hex: "#ffd166" },
-  { name: "Sky",     hex: "#8ad6ff" },
-  { name: "Orange",  hex: "#ff8a3d" },
+  { name: "Lime", hex: "#a3ff12" },
+  { name: "Coral", hex: "#ff3d68" },
+  { name: "Mint", hex: "#7df9c1" },
+  { name: "Amber", hex: "#ffd166" },
+  { name: "Sky", hex: "#8ad6ff" },
+  { name: "Orange", hex: "#ff8a3d" },
   { name: "Magenta", hex: "#e84393" },
-  { name: "Violet",  hex: "#a78bfa" },
+  { name: "Violet", hex: "#a78bfa" },
 ];
 
 const STEPS = ["Identity", "Details", "Branding"] as const;
@@ -57,17 +67,6 @@ function EditOrg() {
   const nav = useNavigate();
   const [step, setStep] = useState(1);
 
-  if (!isMyOrg(org.id)) {
-    return (
-      <div className="mx-auto max-w-md px-6 pt-24 text-center">
-        <p className="text-muted-foreground">You can only edit organizations you created.</p>
-        <Link to="/teams/$teamId" params={{ teamId: org.id }} className="mt-4 inline-block rounded-full bg-lime px-4 py-2 text-sm font-bold text-primary-foreground">
-          Back to profile
-        </Link>
-      </div>
-    );
-  }
-
   // Pre-fill form state
   const [name, setName] = useState(org.name);
   const [handle, setHandle] = useState(org.handle.replace("@", ""));
@@ -83,7 +82,9 @@ function EditOrg() {
   const [homeCourt, setHomeCourt] = useState(org.homeCourt ?? "");
   const [wins, setWins] = useState(org.record?.w ?? 1);
   const [losses, setLosses] = useState(org.record?.l ?? 0);
-  const [staff, setStaff] = useState<{ name: string; role: string; avatar: string }[]>(org.staff ?? []);
+  const [staff, setStaff] = useState<{ name: string; role: string; avatar: string }[]>(
+    org.staff ?? [],
+  );
   const [staffName, setStaffName] = useState("");
   const [staffRole, setStaffRole] = useState("");
   // Coach-only
@@ -95,15 +96,36 @@ function EditOrg() {
   const [avatar, setAvatar] = useState(org.avatar);
   const [cover, setCover] = useState<string>(org.cover);
 
-  const kind = org.kind;
-  const computedAvatar = avatar || initials(name || "OR");
-
   const canNext = useMemo(() => {
-    if (step === 1) return name.trim().length > 1 && handle.trim().length > 1 && sports.length > 0 && city.trim().length > 0;
+    if (step === 1)
+      return (
+        name.trim().length > 1 &&
+        handle.trim().length > 1 &&
+        sports.length > 0 &&
+        city.trim().length > 0
+      );
     if (step === 2) return bio.trim().length > 10;
     if (step === 3) return true;
     return false;
   }, [step, name, handle, sports, city, bio]);
+
+  if (!isMyOrg(org.id)) {
+    return (
+      <div className="mx-auto max-w-md px-6 pt-24 text-center">
+        <p className="text-muted-foreground">You can only edit organizations you created.</p>
+        <Link
+          to="/teams/$teamId"
+          params={{ teamId: org.id }}
+          className="mt-4 inline-block rounded-full bg-lime px-4 py-2 text-sm font-bold text-primary-foreground"
+        >
+          Back to profile
+        </Link>
+      </div>
+    );
+  }
+
+  const kind = org.kind;
+  const computedAvatar = avatar || initials(name || "OR");
 
   const handlePreview: Org = {
     ...org,
@@ -127,7 +149,9 @@ function EditOrg() {
   };
 
   function save() {
-    const handleClean = (handle.startsWith("@") ? handle.slice(1) : handle).replace(/[^a-zA-Z0-9_]/g, "").toLowerCase();
+    const handleClean = (handle.startsWith("@") ? handle.slice(1) : handle)
+      .replace(/[^a-zA-Z0-9_]/g, "")
+      .toLowerCase();
     updateOrg(org.id, {
       name,
       handle: `@${handleClean || org.handle.slice(1)}`,
@@ -165,8 +189,12 @@ function EditOrg() {
   }
   function addStaff() {
     if (!staffName.trim() || !staffRole.trim()) return;
-    setStaff((s) => [...s, { name: staffName.trim(), role: staffRole.trim(), avatar: initials(staffName) }]);
-    setStaffName(""); setStaffRole("");
+    setStaff((s) => [
+      ...s,
+      { name: staffName.trim(), role: staffRole.trim(), avatar: initials(staffName) },
+    ]);
+    setStaffName("");
+    setStaffRole("");
   }
   function updateStaffAvatar(i: number, file: File) {
     const reader = new FileReader();
@@ -215,16 +243,21 @@ function EditOrg() {
     setSports((arr) => (arr.includes(s) ? arr.filter((x) => x !== s) : [...arr, s]));
   }
 
-
   return (
     <div className="mx-auto max-w-md px-4 pt-6 pb-32">
       {/* Header */}
       <div className="flex items-center gap-3 mb-4">
-        <Link to="/teams/$teamId" params={{ teamId: org.id }} className="grid h-10 w-10 place-items-center rounded-full border border-border bg-surface">
+        <Link
+          to="/teams/$teamId"
+          params={{ teamId: org.id }}
+          className="grid h-10 w-10 place-items-center rounded-full border border-border bg-surface"
+        >
           <ArrowLeft className="h-5 w-5" />
         </Link>
         <div className="flex-1">
-          <div className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold">Step {step} of {STEPS.length}</div>
+          <div className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold">
+            Step {step} of {STEPS.length}
+          </div>
           <h1 className="font-display text-xl font-bold leading-tight">{STEPS[step - 1]}</h1>
         </div>
         <div className="rounded-full bg-secondary px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
@@ -285,11 +318,18 @@ function EditOrg() {
                   placeholder="One line that sums you up"
                   className="w-full rounded-2xl border border-border bg-surface px-4 py-3 text-sm outline-none focus:border-lime"
                 />
-                <div className="text-right text-[10px] text-muted-foreground">{tagline.length}/80</div>
+                <div className="text-right text-[10px] text-muted-foreground">
+                  {tagline.length}/80
+                </div>
               </Section>
 
               <Section title="City">
-                <LocationAutocomplete value={city} onChange={setCity} placeholder="Brooklyn, NY" mode="city" />
+                <LocationAutocomplete
+                  value={city}
+                  onChange={setCity}
+                  placeholder="Brooklyn, NY"
+                  mode="city"
+                />
               </Section>
 
               <Section title="Sports">
@@ -302,7 +342,9 @@ function EditOrg() {
                         type="button"
                         onClick={() => toggleSport(s.name)}
                         className={`flex flex-col items-center gap-1 rounded-2xl border px-2 py-3 text-xs font-semibold transition-all ${
-                          active ? "border-lime bg-lime/10 text-lime" : "border-border bg-surface text-muted-foreground"
+                          active
+                            ? "border-lime bg-lime/10 text-lime"
+                            : "border-border bg-surface text-muted-foreground"
                         }`}
                       >
                         <span className="text-2xl">{s.emoji}</span>
@@ -362,9 +404,16 @@ function EditOrg() {
                 {achievements.length > 0 && (
                   <ul className="mt-2 space-y-1.5">
                     {achievements.map((a, i) => (
-                      <li key={i} className="flex items-center justify-between rounded-2xl border border-border bg-surface px-3 py-2 text-sm">
+                      <li
+                        key={i}
+                        className="flex items-center justify-between rounded-2xl border border-border bg-surface px-3 py-2 text-sm"
+                      >
                         <span>🏆 {a}</span>
-                        <button type="button" onClick={() => setAchievements((arr) => arr.filter((_, j) => j !== i))} className="text-muted-foreground hover:text-coral">
+                        <button
+                          type="button"
+                          onClick={() => setAchievements((arr) => arr.filter((_, j) => j !== i))}
+                          className="text-muted-foreground hover:text-coral"
+                        >
                           <X className="h-4 w-4" />
                         </button>
                       </li>
@@ -396,12 +445,28 @@ function EditOrg() {
                   <Section title="Record (optional)">
                     <div className="grid grid-cols-2 gap-2">
                       <label className="rounded-2xl border border-border bg-surface px-4 py-3">
-                        <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Wins</div>
-                        <input type="number" min={0} value={wins} onChange={(e) => setWins(+e.target.value)} className="w-full bg-transparent font-display text-xl font-bold text-lime outline-none" />
+                        <div className="text-[10px] uppercase tracking-wider text-muted-foreground">
+                          Wins
+                        </div>
+                        <input
+                          type="number"
+                          min={0}
+                          value={wins}
+                          onChange={(e) => setWins(+e.target.value)}
+                          className="w-full bg-transparent font-display text-xl font-bold text-lime outline-none"
+                        />
                       </label>
                       <label className="rounded-2xl border border-border bg-surface px-4 py-3">
-                        <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Losses</div>
-                        <input type="number" min={0} value={losses} onChange={(e) => setLosses(+e.target.value)} className="w-full bg-transparent font-display text-xl font-bold text-coral outline-none" />
+                        <div className="text-[10px] uppercase tracking-wider text-muted-foreground">
+                          Losses
+                        </div>
+                        <input
+                          type="number"
+                          min={0}
+                          value={losses}
+                          onChange={(e) => setLosses(+e.target.value)}
+                          className="w-full bg-transparent font-display text-xl font-bold text-coral outline-none"
+                        />
                       </label>
                     </div>
                   </Section>
@@ -432,7 +497,10 @@ function EditOrg() {
                       {staff.map((m, i) => {
                         const hasCustomAvatar = m.avatar.startsWith("data:");
                         return (
-                          <div key={i} className="flex items-center gap-2 rounded-2xl border border-border bg-surface p-3">
+                          <div
+                            key={i}
+                            className="flex items-center gap-2 rounded-2xl border border-border bg-surface p-3"
+                          >
                             <label className="relative shrink-0 cursor-pointer">
                               <input
                                 type="file"
@@ -444,30 +512,57 @@ function EditOrg() {
                                 }}
                               />
                               {hasCustomAvatar ? (
-                                <img src={m.avatar} alt="" className="h-10 w-10 rounded-full object-cover" />
+                                <img
+                                  src={m.avatar}
+                                  alt=""
+                                  className="h-10 w-10 rounded-full object-cover"
+                                />
                               ) : (
-                                <div className="grid h-10 w-10 place-items-center rounded-full bg-secondary text-xs font-bold">{m.avatar}</div>
+                                <div className="grid h-10 w-10 place-items-center rounded-full bg-secondary text-xs font-bold">
+                                  {m.avatar}
+                                </div>
                               )}
-                              <span className="absolute -bottom-1 -right-1 grid h-4 w-4 place-items-center rounded-full bg-lime text-[8px] font-bold text-primary-foreground">+</span>
+                              <span className="absolute -bottom-1 -right-1 grid h-4 w-4 place-items-center rounded-full bg-lime text-[8px] font-bold text-primary-foreground">
+                                +
+                              </span>
                             </label>
                             <div className="flex-1 min-w-0">
                               <div className="text-sm font-semibold truncate">{m.name}</div>
                               <div className="text-xs text-muted-foreground truncate">{m.role}</div>
                             </div>
                             <div className="flex flex-col">
-                              <button type="button" onClick={() => moveStaff(i, -1)} disabled={i === 0} className="text-muted-foreground hover:text-lime disabled:opacity-20">
+                              <button
+                                type="button"
+                                onClick={() => moveStaff(i, -1)}
+                                disabled={i === 0}
+                                className="text-muted-foreground hover:text-lime disabled:opacity-20"
+                              >
                                 <ChevronUp className="h-4 w-4" />
                               </button>
-                              <button type="button" onClick={() => moveStaff(i, 1)} disabled={i === staff.length - 1} className="text-muted-foreground hover:text-lime disabled:opacity-20">
+                              <button
+                                type="button"
+                                onClick={() => moveStaff(i, 1)}
+                                disabled={i === staff.length - 1}
+                                className="text-muted-foreground hover:text-lime disabled:opacity-20"
+                              >
                                 <ChevronDown className="h-4 w-4" />
                               </button>
                             </div>
                             {hasCustomAvatar && (
-                              <button type="button" onClick={() => resetStaffAvatar(i)} className="text-muted-foreground hover:text-lime" title="Reset to initials">
+                              <button
+                                type="button"
+                                onClick={() => resetStaffAvatar(i)}
+                                className="text-muted-foreground hover:text-lime"
+                                title="Reset to initials"
+                              >
                                 <X className="h-4 w-4" />
                               </button>
                             )}
-                            <button type="button" onClick={() => setStaff((s) => s.filter((_, j) => j !== i))} className="text-muted-foreground hover:text-coral ml-1">
+                            <button
+                              type="button"
+                              onClick={() => setStaff((s) => s.filter((_, j) => j !== i))}
+                              className="text-muted-foreground hover:text-coral ml-1"
+                            >
                               <Trash2 className="h-4 w-4" />
                             </button>
                           </div>
@@ -489,14 +584,26 @@ function EditOrg() {
                         placeholder="USATF Level 2"
                         className="flex-1 rounded-2xl border border-border bg-surface px-4 py-3 text-sm outline-none focus:border-lime"
                       />
-                      <button type="button" onClick={addCred} className="rounded-2xl bg-lime px-4 text-sm font-bold text-primary-foreground">Add</button>
+                      <button
+                        type="button"
+                        onClick={addCred}
+                        className="rounded-2xl bg-lime px-4 text-sm font-bold text-primary-foreground"
+                      >
+                        Add
+                      </button>
                     </div>
                     {credentials.length > 0 && (
                       <div className="mt-2 flex flex-wrap gap-2">
                         {credentials.map((c, i) => (
-                          <span key={i} className="inline-flex items-center gap-1.5 rounded-full border border-lime/40 bg-lime/10 px-3 py-1.5 text-xs font-bold text-lime">
+                          <span
+                            key={i}
+                            className="inline-flex items-center gap-1.5 rounded-full border border-lime/40 bg-lime/10 px-3 py-1.5 text-xs font-bold text-lime"
+                          >
                             {c}
-                            <button type="button" onClick={() => setCredentials((arr) => arr.filter((_, j) => j !== i))}>
+                            <button
+                              type="button"
+                              onClick={() => setCredentials((arr) => arr.filter((_, j) => j !== i))}
+                            >
                               <X className="h-3 w-3" />
                             </button>
                           </span>
@@ -542,7 +649,9 @@ function EditOrg() {
                       style={{ background: `linear-gradient(135deg, ${a.hex}, ${a.hex}aa)` }}
                       aria-label={a.name}
                     >
-                      {accent === a.hex && <Check className="absolute inset-0 m-auto h-5 w-5 text-primary-foreground" />}
+                      {accent === a.hex && (
+                        <Check className="absolute inset-0 m-auto h-5 w-5 text-primary-foreground" />
+                      )}
                     </button>
                   ))}
                 </div>
@@ -556,12 +665,23 @@ function EditOrg() {
                   maxLength={3}
                   className="w-full rounded-2xl border border-border bg-surface px-4 py-3 text-center font-display text-2xl font-bold uppercase tracking-widest outline-none focus:border-lime"
                 />
-                <p className="text-[10px] text-muted-foreground text-center mt-1">Auto-generated from your name — edit if you like.</p>
+                <p className="text-[10px] text-muted-foreground text-center mt-1">
+                  Auto-generated from your name — edit if you like.
+                </p>
               </Section>
 
               <Section title="Cover image">
                 <div className="grid grid-cols-3 gap-2">
-                  {(["Basketball","Soccer","Tennis","Volleyball","Pickleball","Running"] as Sport[]).map((s) => {
+                  {(
+                    [
+                      "Basketball",
+                      "Soccer",
+                      "Tennis",
+                      "Volleyball",
+                      "Pickleball",
+                      "Running",
+                    ] as Sport[]
+                  ).map((s) => {
                     const src = imageFor(s);
                     const active = cover === src;
                     return (
@@ -574,7 +694,11 @@ function EditOrg() {
                         }`}
                       >
                         <img src={src} alt="" className="h-full w-full object-cover" />
-                        {active && <span className="absolute inset-0 bg-lime/20 grid place-items-center"><Check className="h-5 w-5 text-lime" /></span>}
+                        {active && (
+                          <span className="absolute inset-0 bg-lime/20 grid place-items-center">
+                            <Check className="h-5 w-5 text-lime" />
+                          </span>
+                        )}
                       </button>
                     );
                   })}
@@ -586,7 +710,9 @@ function EditOrg() {
                 {cover.startsWith("data:") && (
                   <div className="mt-2 relative aspect-video overflow-hidden rounded-xl border-2 border-lime">
                     <img src={cover} alt="" className="h-full w-full object-cover" />
-                    <span className="absolute top-1.5 left-1.5 rounded-full bg-background/80 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider">Custom</span>
+                    <span className="absolute top-1.5 left-1.5 rounded-full bg-background/80 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider">
+                      Custom
+                    </span>
                   </div>
                 )}
               </Section>
@@ -596,7 +722,8 @@ function EditOrg() {
                   <OrgCard org={handlePreview} />
                 </div>
                 <div className="mt-2 inline-flex items-center gap-1.5 text-[11px] text-muted-foreground">
-                  <Sparkles className="h-3 w-3 text-lime" /> This is how players will see you in feeds.
+                  <Sparkles className="h-3 w-3 text-lime" /> This is how players will see you in
+                  feeds.
                 </div>
               </Section>
 
@@ -608,7 +735,9 @@ function EditOrg() {
                 >
                   <Trash2 className="h-4 w-4" /> Delete organization
                 </button>
-                <p className="text-[11px] text-muted-foreground text-center mt-2">Permanently removes this profile and its posts.</p>
+                <p className="text-[11px] text-muted-foreground text-center mt-2">
+                  Permanently removes this profile and its posts.
+                </p>
               </div>
             </div>
           )}
@@ -656,7 +785,9 @@ function EditOrg() {
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <div>
-      <div className="mb-2 text-xs font-bold uppercase tracking-wider text-muted-foreground">{title}</div>
+      <div className="mb-2 text-xs font-bold uppercase tracking-wider text-muted-foreground">
+        {title}
+      </div>
       <div className="space-y-2">{children}</div>
     </div>
   );

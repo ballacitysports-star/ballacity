@@ -41,7 +41,9 @@ function sessionUserId(): string {
 
 const isTable = (url: string, table: string) => url.includes(`/rest/v1/${table}`);
 
-test("pay page auto-flips from approval gate to payment picker on approval", async ({ browser }) => {
+test("pay page auto-flips from approval gate to payment picker on approval", async ({
+  browser,
+}) => {
   test.setTimeout(60_000);
 
   const userId = sessionUserId();
@@ -49,53 +51,66 @@ test("pay page auto-flips from approval gate to payment picker on approval", asy
   const page = await ctx.newPage();
 
   // Paid, approval-required settings owned by FAKE_HOST_ID.
-  await page.route((u) => isTable(u, "game_payment_settings"), async (route: PWRoute) => {
-    if (route.request().method() !== "GET") return route.fallback();
-    await route.fulfill({
-      status: 200,
-      contentType: "application/json",
-      body: JSON.stringify([{
-        id: "mock-settings-id",
-        game_id: GAME_ID,
-        host_id: FAKE_HOST_ID,
-        entry_fee: ENTRY_FEE,
-        accepted_method_ids: [METHOD_ID],
-        payment_deadline: null,
-        refund_policy: null,
-        payment_instructions: null,
-        requires_approval: true,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      }]),
-    });
-  });
+  await page.route(
+    (u) => isTable(u, "game_payment_settings"),
+    async (route: PWRoute) => {
+      if (route.request().method() !== "GET") return route.fallback();
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify([
+          {
+            id: "mock-settings-id",
+            game_id: GAME_ID,
+            host_id: FAKE_HOST_ID,
+            entry_fee: ENTRY_FEE,
+            accepted_method_ids: [METHOD_ID],
+            payment_deadline: null,
+            refund_policy: null,
+            payment_instructions: null,
+            requires_approval: true,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          },
+        ]),
+      });
+    },
+  );
 
   // One enabled Venmo method for the host so the picker has a row to show.
-  await page.route((u) => isTable(u, "host_payment_methods"), async (route: PWRoute) => {
-    if (route.request().method() !== "GET") return route.fallback();
-    await route.fulfill({
-      status: 200,
-      contentType: "application/json",
-      body: JSON.stringify([{
-        id: METHOD_ID,
-        host_id: FAKE_HOST_ID,
-        payment_type: "venmo",
-        label: "Venmo",
-        username: "@testhost",
-        payment_url: "https://venmo.com/u/testhost",
-        contact_info: null,
-        instructions: null,
-        is_enabled: true,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      }]),
-    });
-  });
+  await page.route(
+    (u) => isTable(u, "host_payment_methods"),
+    async (route: PWRoute) => {
+      if (route.request().method() !== "GET") return route.fallback();
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify([
+          {
+            id: METHOD_ID,
+            host_id: FAKE_HOST_ID,
+            payment_type: "venmo",
+            label: "Venmo",
+            username: "@testhost",
+            payment_url: "https://venmo.com/u/testhost",
+            contact_info: null,
+            instructions: null,
+            is_enabled: true,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          },
+        ]),
+      });
+    },
+  );
 
-  await page.route((u) => isTable(u, "payment_submissions"), async (route: PWRoute) => {
-    if (route.request().method() !== "GET") return route.fallback();
-    await route.fulfill({ status: 200, contentType: "application/json", body: "[]" });
-  });
+  await page.route(
+    (u) => isTable(u, "payment_submissions"),
+    async (route: PWRoute) => {
+      if (route.request().method() !== "GET") return route.fallback();
+      await route.fulfill({ status: 200, contentType: "application/json", body: "[]" });
+    },
+  );
 
   // Join-request GET: starts `pending`, flips to `approved` when we say so.
   let approved = false;
@@ -113,16 +128,19 @@ test("pay page auto-flips from approval gate to payment picker on approval", asy
     reviewed_at: status === "approved" ? new Date().toISOString() : null,
     idempotency_key: `join:${GAME_ID}`,
   });
-  await page.route((u) => isTable(u, "join_requests"), async (route: PWRoute) => {
-    const req = route.request();
-    if (req.method() !== "GET") return route.fallback();
-    joinGets += 1;
-    await route.fulfill({
-      status: 200,
-      contentType: "application/json",
-      body: JSON.stringify([row(approved ? "approved" : "pending")]),
-    });
-  });
+  await page.route(
+    (u) => isTable(u, "join_requests"),
+    async (route: PWRoute) => {
+      const req = route.request();
+      if (req.method() !== "GET") return route.fallback();
+      joinGets += 1;
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify([row(approved ? "approved" : "pending")]),
+      });
+    },
+  );
 
   await restoreSession(page);
   await page.goto(`/games/${GAME_ID}/pay`, { waitUntil: "domcontentloaded" });

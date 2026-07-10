@@ -43,7 +43,6 @@ function Discover() {
     [allGames],
   );
 
-
   return (
     <div className="relative h-dvh overflow-hidden">
       {/* Real Google Map with live GPS */}
@@ -64,16 +63,21 @@ function Discover() {
           <div className="flex items-center gap-2 text-sm">
             <Navigation className="h-4 w-4 text-lime" />
             <span className="font-semibold">{visibleIds ? "This area" : "Live location"}</span>
-            <span className="text-muted-foreground">· {visibleGames.length} game{visibleGames.length === 1 ? "" : "s"} {visibleIds ? "in view" : "nearby"}</span>
+            <span className="text-muted-foreground">
+              · {visibleGames.length} game{visibleGames.length === 1 ? "" : "s"}{" "}
+              {visibleIds ? "in view" : "nearby"}
+            </span>
             {visibleIds && (
-              <button onClick={() => setVisibleIds(null)} className="ml-auto text-xs font-bold text-lime">Reset</button>
+              <button
+                onClick={() => setVisibleIds(null)}
+                className="ml-auto text-xs font-bold text-lime"
+              >
+                Reset
+              </button>
             )}
           </div>
         </div>
       </div>
-
-
-
 
       {/* Bottom card */}
       <div className="absolute bottom-24 left-0 right-0 z-20 px-4">
@@ -125,7 +129,11 @@ function Discover() {
               exit={{ opacity: 0, y: 30 }}
               className="rounded-3xl border border-border bg-surface/90 backdrop-blur-xl p-4 text-center text-sm text-muted-foreground shadow-2xl"
             >
-              No games in this area. Pan the map or <button onClick={() => setVisibleIds(null)} className="font-bold text-lime">reset</button>.
+              No games in this area. Pan the map or{" "}
+              <button onClick={() => setVisibleIds(null)} className="font-bold text-lime">
+                reset
+              </button>
+              .
             </motion.div>
           )}
         </AnimatePresence>

@@ -1,7 +1,16 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
 import { motion } from "framer-motion";
-import { ArrowLeft, Calendar, MapPin, Users, DollarSign, Lock, Home, ShieldCheck } from "lucide-react";
+import {
+  ArrowLeft,
+  Calendar,
+  MapPin,
+  Users,
+  DollarSign,
+  Lock,
+  Home,
+  ShieldCheck,
+} from "lucide-react";
 import { SPORTS, type Sport } from "@/lib/sample-data";
 import { addHostedGame } from "@/lib/hosted-games-store";
 import { useServerFn } from "@tanstack/react-start";
@@ -12,7 +21,6 @@ import { LocationAutocomplete } from "@/components/LocationAutocomplete";
 import { useMyProfile } from "@/lib/user-prefs-store";
 import { useAuth } from "@/hooks/use-auth";
 import { upsertGamePaymentSettings } from "@/lib/payments";
-
 
 export const Route = createFileRoute("/_tabs/create")({
   head: () => ({ meta: [{ title: "Host a game — OpenRun" }] }),
@@ -56,7 +64,6 @@ function Create() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [profile?.city]);
 
-
   // Auto-fill the venue address from the device's current GPS location when
   // the user hasn't typed anything yet. Runs once on mount; manual edits or
   // a profile-city value present at mount take precedence.
@@ -88,12 +95,12 @@ function Create() {
       { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 },
     );
 
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
     // Intentionally run once on mount.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
-
 
   const handleLocationChange = (next: string) => {
     locationEditedRef.current = true;
@@ -200,8 +207,6 @@ function Create() {
               host: hostSnap,
             });
 
-
-
             // Persist host ownership + approval/fee preferences so the host & players see them on the detail page
             if (user) {
               try {
@@ -215,8 +220,6 @@ function Create() {
                 toast.error(err?.message ?? "Saved game, but couldn't lock host ownership.");
               }
             }
-
-
 
             // Note: do NOT auto-join the host. Hosting ≠ playing; the host
             // sees their published games in the profile's hosted section.

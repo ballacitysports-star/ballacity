@@ -23,7 +23,10 @@ export const Route = createFileRoute("/settings")({
   head: () => ({
     meta: [
       { title: "Settings" },
-      { name: "description", content: "Manage your account, notifications, and security settings." },
+      {
+        name: "description",
+        content: "Manage your account, notifications, and security settings.",
+      },
     ],
   }),
 });
@@ -44,27 +47,57 @@ const SECTIONS: Section[] = [
   {
     title: "Account",
     items: [
-      { to: "/profile/edit", label: "Edit profile", description: "Name, photo, bio, and links", icon: UserCog },
-      { to: "/_tabs/profile", label: "My card", description: "View your public player card", icon: IdCard },
+      {
+        to: "/profile/edit",
+        label: "Edit profile",
+        description: "Name, photo, bio, and links",
+        icon: UserCog,
+      },
+      {
+        to: "/_tabs/profile",
+        label: "My card",
+        description: "View your public player card",
+        icon: IdCard,
+      },
     ],
   },
   {
     title: "Preferences",
     items: [
-      { to: "/account/notifications", label: "Notifications", description: "Messages, approvals, join requests", icon: Bell },
+      {
+        to: "/account/notifications",
+        label: "Notifications",
+        description: "Messages, approvals, join requests",
+        icon: Bell,
+      },
     ],
   },
   {
     title: "Security",
     items: [
-      { to: "/account/security", label: "Password & sign-in", description: "Set or change your password", icon: Lock },
-      { to: "/reset-password", label: "Reset password", description: "Send a reset link to your email", icon: Shield },
+      {
+        to: "/account/security",
+        label: "Password & sign-in",
+        description: "Set or change your password",
+        icon: Lock,
+      },
+      {
+        to: "/reset-password",
+        label: "Reset password",
+        description: "Send a reset link to your email",
+        icon: Shield,
+      },
     ],
   },
   {
     title: "Billing",
     items: [
-      { to: "/plans", label: "Subscription", description: "Plans and billing details", icon: CreditCard },
+      {
+        to: "/plans",
+        label: "Subscription",
+        description: "Plans and billing details",
+        icon: CreditCard,
+      },
     ],
   },
 ];
@@ -82,7 +115,6 @@ function SettingsHubPage() {
       toast.error("Couldn't sign out");
     }
   };
-
 
   return (
     <div className="min-h-screen bg-background pb-24">

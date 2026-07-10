@@ -33,8 +33,7 @@ async function restoreSession(page: Page) {
 function sessionDisplayName(): string {
   const session = JSON.parse(SESSION_JSON!);
   const meta = session?.user?.user_metadata ?? {};
-  const name: string | undefined =
-    meta.display_name || meta.full_name || meta.name;
+  const name: string | undefined = meta.display_name || meta.full_name || meta.name;
   expect(name, "test account must have user_metadata.display_name").toBeTruthy();
   return name!;
 }
@@ -52,18 +51,27 @@ function emailLocalPart(): string | null {
 async function createGameAndCaptureUrl(page: Page, title: string): Promise<string> {
   await page.goto("/create");
   await expect(page.getByRole("heading", { name: /host a game/i })).toBeVisible();
-  await page.getByPlaceholder(/title|game/i).first().fill(title).catch(() => {});
+  await page
+    .getByPlaceholder(/title|game/i)
+    .first()
+    .fill(title)
+    .catch(() => {});
   const addressInput = page.getByPlaceholder(/address|location|venue/i).first();
   if (await addressInput.isVisible().catch(() => false)) {
     const current = await addressInput.inputValue();
     if (!current) await addressInput.fill("123 Test Court, Demo City");
   }
-  await page.getByRole("button", { name: /publish|host|create/i }).first().click();
+  await page
+    .getByRole("button", { name: /publish|host|create/i })
+    .first()
+    .click();
   await page.waitForURL(/\/games\/[^/?#]+/, { timeout: 15_000 });
   return page.url();
 }
 
-test("deep-link / hard-refresh of game detail keeps display_name (no email prefix)", async ({ browser }) => {
+test("deep-link / hard-refresh of game detail keeps display_name (no email prefix)", async ({
+  browser,
+}) => {
   const displayName = sessionDisplayName();
   const emailPrefix = emailLocalPart();
 

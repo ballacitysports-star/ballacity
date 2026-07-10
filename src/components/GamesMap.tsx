@@ -191,7 +191,7 @@ export function GamesMap({
       manualLocationRef.current = false;
       setManualLocation(nextLocation);
     } else {
-      setManualLocation((current) => current.trim() ? current : nextLocation);
+      setManualLocation((current) => (current.trim() ? current : nextLocation));
     }
 
     let cancelled = false;
@@ -365,8 +365,6 @@ export function GamesMap({
     void performGeocode(manualLocation);
   };
 
-
-
   const repositionPins = () => {
     const center = pinCenterRef.current || userPosRef.current || { lat: 40.7281, lng: -73.9842 };
     pins.forEach((p) => {
@@ -421,7 +419,11 @@ export function GamesMap({
         className="absolute bottom-48 right-4 z-30 inline-flex h-11 w-11 items-center justify-center rounded-full border border-border bg-surface/95 backdrop-blur-xl text-lime shadow-xl active:scale-95 transition"
         title="Center on my location"
       >
-        {locating ? <Loader2 className="h-5 w-5 animate-spin" /> : <LocateFixed className="h-5 w-5" />}
+        {locating ? (
+          <Loader2 className="h-5 w-5 animate-spin" />
+        ) : (
+          <LocateFixed className="h-5 w-5" />
+        )}
       </button>
       {areaDirty && (
         <button
@@ -437,8 +439,13 @@ export function GamesMap({
           <div className="flex-1 min-w-0 [&>div>div]:bg-surface/95 [&>div>div]:backdrop-blur-xl [&>div>div]:shadow-xl">
             <LocationAutocomplete
               value={manualLocation}
-              onChange={(v) => { setManualLocation(v); setManualError(null); }}
-              onPick={(v) => { void performGeocode(v); }}
+              onChange={(v) => {
+                setManualLocation(v);
+                setManualError(null);
+              }}
+              onPick={(v) => {
+                void performGeocode(v);
+              }}
               placeholder="Change map location"
               showCurrentButton={false}
             />
@@ -451,26 +458,31 @@ export function GamesMap({
             {resolvingLocation ? <Loader2 className="h-4 w-4 animate-spin" /> : "Set"}
           </button>
         </div>
-        {manualError && <p className="mt-2 rounded-xl border border-red-500/40 bg-red-500/10 px-3 py-2 text-xs text-red-200 backdrop-blur-xl">{manualError}</p>}
-        {autoLocateDenied && (() => {
-          const copy = promptCopyFor(denialReason ?? "permission_denied", denialRepeatCount);
-          return (
-            <button
-              type="button"
-              onClick={locateMe}
-              className="mt-2 flex w-full items-start gap-2 rounded-xl border border-border bg-surface/80 px-3 py-2 text-left text-xs text-muted-foreground backdrop-blur-xl transition hover:bg-surface"
-              aria-label={`${copy.title}. ${copy.hint}`}
-              data-denial-reason={denialReason ?? "unknown"}
-            >
-              <MapPin className="mt-0.5 h-3.5 w-3.5 shrink-0 text-lime" />
-              <span className="flex-1">
-                <span className="block font-semibold text-foreground">{copy.title}</span>
-                <span className="block">{copy.hint}</span>
-                <span className="mt-1 block text-lime">{copy.cta} →</span>
-              </span>
-            </button>
-          );
-        })()}
+        {manualError && (
+          <p className="mt-2 rounded-xl border border-red-500/40 bg-red-500/10 px-3 py-2 text-xs text-red-200 backdrop-blur-xl">
+            {manualError}
+          </p>
+        )}
+        {autoLocateDenied &&
+          (() => {
+            const copy = promptCopyFor(denialReason ?? "permission_denied", denialRepeatCount);
+            return (
+              <button
+                type="button"
+                onClick={locateMe}
+                className="mt-2 flex w-full items-start gap-2 rounded-xl border border-border bg-surface/80 px-3 py-2 text-left text-xs text-muted-foreground backdrop-blur-xl transition hover:bg-surface"
+                aria-label={`${copy.title}. ${copy.hint}`}
+                data-denial-reason={denialReason ?? "unknown"}
+              >
+                <MapPin className="mt-0.5 h-3.5 w-3.5 shrink-0 text-lime" />
+                <span className="flex-1">
+                  <span className="block font-semibold text-foreground">{copy.title}</span>
+                  <span className="block">{copy.hint}</span>
+                  <span className="mt-1 block text-lime">{copy.cta} →</span>
+                </span>
+              </button>
+            );
+          })()}
       </form>
     </>
   );
@@ -479,7 +491,9 @@ export function GamesMap({
 function makePinIcon(emoji: string, active: boolean, urgent: boolean) {
   const bg = active ? "#a3e635" : "#1a1f2e";
   const border = active ? "#a3e635" : "#3a4256";
-  const dot = urgent ? `<circle cx="36" cy="6" r="4" fill="#ff5a5f" stroke="#0f1420" stroke-width="1.5"/>` : "";
+  const dot = urgent
+    ? `<circle cx="36" cy="6" r="4" fill="#ff5a5f" stroke="#0f1420" stroke-width="1.5"/>`
+    : "";
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="44" height="44" viewBox="0 0 44 44"><circle cx="22" cy="22" r="18" fill="${bg}" stroke="${border}" stroke-width="2"/><text x="22" y="28" text-anchor="middle" font-size="18">${emoji}</text>${dot}</svg>`;
   return {
     url: `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`,

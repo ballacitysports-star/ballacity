@@ -34,7 +34,6 @@ export type Attachment = {
   size: number;
 };
 
-
 export type ConversationWithMeta = Conversation & {
   other_user_id: string | null;
   other_display_name: string | null;
@@ -44,7 +43,10 @@ export type ConversationWithMeta = Conversation & {
 };
 
 // Find or create a 1:1 conversation between current user and otherUserId
-export async function getOrCreateDirectConversation(otherUserId: string, gameId: string | null = null): Promise<string> {
+export async function getOrCreateDirectConversation(
+  otherUserId: string,
+  gameId: string | null = null,
+): Promise<string> {
   if (!otherUserId) throw new Error("Missing recipient.");
   const { data: u } = await supabase.auth.getUser();
   if (!u.user) {
@@ -87,7 +89,9 @@ export async function listMyConversations(): Promise<ConversationWithMeta[]> {
     .select("conversation_id, user_id")
     .in("conversation_id", ids);
 
-  const otherIds = Array.from(new Set(((allParts ?? []) as any[]).filter((p) => p.user_id !== me).map((p) => p.user_id)));
+  const otherIds = Array.from(
+    new Set(((allParts ?? []) as any[]).filter((p) => p.user_id !== me).map((p) => p.user_id)),
+  );
   let profilesById: Record<string, { display_name: string; avatar_initials: string | null }> = {};
   if (otherIds.length) {
     const { data: profs } = await supabase
@@ -114,14 +118,17 @@ export async function listMyConversations(): Promise<ConversationWithMeta[]> {
   }
 
   return ((convs ?? []) as any[]).map((c) => {
-    const others = ((allParts ?? []) as any[]).filter((p) => p.conversation_id === c.id && p.user_id !== me);
+    const others = ((allParts ?? []) as any[]).filter(
+      (p) => p.conversation_id === c.id && p.user_id !== me,
+    );
     const other = others[0];
     const prof = other ? profilesById[other.user_id] : null;
     return {
       ...c,
       other_user_id: other?.user_id ?? null,
       other_display_name: prof?.display_name ?? "Player",
-      other_initials: prof?.avatar_initials ?? (prof?.display_name?.slice(0, 2).toUpperCase() ?? "PL"),
+      other_initials:
+        prof?.avatar_initials ?? prof?.display_name?.slice(0, 2).toUpperCase() ?? "PL",
       last_message: lastByConv[c.id]?.body ?? null,
       unread: unreadByConv[c.id] ?? 0,
     } as ConversationWithMeta;
@@ -129,12 +136,18 @@ export async function listMyConversations(): Promise<ConversationWithMeta[]> {
 }
 
 export async function getConversation(convId: string) {
-  const { data, error } = await supabase.from("conversations" as any).select("*").eq("id", convId).maybeSingle();
+  const { data, error } = await supabase
+    .from("conversations" as any)
+    .select("*")
+    .eq("id", convId)
+    .maybeSingle();
   if (error) throw error;
   return data as unknown as Conversation | null;
 }
 
-export async function getConversationOther(convId: string): Promise<{ user_id: string; display_name: string; avatar_initials: string | null } | null> {
+export async function getConversationOther(
+  convId: string,
+): Promise<{ user_id: string; display_name: string; avatar_initials: string | null } | null> {
   const { data: u } = await supabase.auth.getUser();
   if (!u.user) return null;
   const { data: parts } = await supabase
@@ -143,7 +156,11 @@ export async function getConversationOther(convId: string): Promise<{ user_id: s
     .eq("conversation_id", convId);
   const otherId = ((parts ?? []) as any[]).map((p) => p.user_id).find((id) => id !== u.user!.id);
   if (!otherId) return null;
-  const { data: prof } = await supabase.from("profiles").select("id, display_name, avatar_initials").eq("id", otherId).maybeSingle();
+  const { data: prof } = await supabase
+    .from("profiles")
+    .select("id, display_name, avatar_initials")
+    .eq("id", otherId)
+    .maybeSingle();
   return {
     user_id: otherId,
     display_name: (prof as any)?.display_name ?? "Player",
@@ -180,8 +197,7 @@ export async function uploadMessageAttachment(
   const contentType = file.type || "application/octet-stream";
 
   // Use a signed upload URL so we can PUT via XHR and report progress / support cancel.
-  const { data: signed, error: signErr } = await supabase
-    .storage
+  const { data: signed, error: signErr } = await supabase.storage
     .from("message-attachments")
     .createSignedUploadUrl(path);
   if (signErr || !signed) throw signErr ?? new Error("Could not start upload.");
@@ -207,7 +223,10 @@ export async function uploadMessageAttachment(
     xhr.onerror = () => reject(new Error("Network error during upload."));
     xhr.onabort = () => reject(new DOMException("Upload cancelled", "AbortError"));
     if (opts.signal) {
-      if (opts.signal.aborted) { xhr.abort(); return; }
+      if (opts.signal.aborted) {
+        xhr.abort();
+        return;
+      }
       opts.signal.addEventListener("abort", () => xhr.abort(), { once: true });
     }
     xhr.send(file);
@@ -217,7 +236,9 @@ export async function uploadMessageAttachment(
 }
 
 export async function getAttachmentUrl(path: string): Promise<string | null> {
-  const { data, error } = await supabase.storage.from("message-attachments").createSignedUrl(path, 60 * 60);
+  const { data, error } = await supabase.storage
+    .from("message-attachments")
+    .createSignedUrl(path, 60 * 60);
   if (error) return null;
   return data?.signedUrl ?? null;
 }
@@ -245,18 +266,24 @@ export async function sendMessage(convId: string, body: string, attachment?: Att
     .select("user_id")
     .eq("conversation_id", convId);
   const others = ((parts ?? []) as any[]).map((p) => p.user_id).filter((id) => id !== me);
-  const { data: meProf } = await supabase.from("profiles").select("display_name").eq("id", me).maybeSingle();
+  const { data: meProf } = await supabase
+    .from("profiles")
+    .select("display_name")
+    .eq("id", me)
+    .maybeSingle();
   const name = (meProf as any)?.display_name ?? "Someone";
   const preview = trimmed ? trimmed.slice(0, 140) : `📎 ${attachment?.name ?? "Attachment"}`;
-  await Promise.all(others.map((uid) =>
-    createNotification({
-      user_id: uid,
-      type: "message",
-      title: `New message from ${name}`,
-      body: preview,
-      link: `/messages/${convId}`,
-    })
-  ));
+  await Promise.all(
+    others.map((uid) =>
+      createNotification({
+        user_id: uid,
+        type: "message",
+        title: `New message from ${name}`,
+        body: preview,
+        link: `/messages/${convId}`,
+      }),
+    ),
+  );
 }
 
 export async function markConversationRead(convId: string) {
@@ -269,4 +296,3 @@ export async function markConversationRead(convId: string) {
     .neq("sender_id", u.user.id)
     .is("read_at", null);
 }
-

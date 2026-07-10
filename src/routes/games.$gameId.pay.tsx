@@ -6,9 +6,16 @@ import { GAMES } from "@/lib/sample-data";
 import { useAuth } from "@/hooks/use-auth";
 import { supabase } from "@/integrations/supabase/client";
 import {
-  type GamePaymentSettings, type PaymentMethod, type PaymentSubmission, type JoinRequest, paymentTypeMeta,
-  getGamePaymentSettings, listPaymentMethodsForHost,
-  uploadProofScreenshot, createPaymentSubmission, listMySubmissionsForGame,
+  type GamePaymentSettings,
+  type PaymentMethod,
+  type PaymentSubmission,
+  type JoinRequest,
+  paymentTypeMeta,
+  getGamePaymentSettings,
+  listPaymentMethodsForHost,
+  uploadProofScreenshot,
+  createPaymentSubmission,
+  listMySubmissionsForGame,
   getMyJoinRequest,
 } from "@/lib/payments";
 import { LegalNotice } from "@/components/LegalNotice";
@@ -26,10 +33,16 @@ export const Route = createFileRoute("/games/$gameId/pay")({
     if (!game) throw notFound();
     return { game };
   },
-  head: ({ loaderData }) => ({ meta: [{ title: `Pay for ${loaderData?.game.title ?? "game"} — OpenRun` }] }),
+  head: ({ loaderData }) => ({
+    meta: [{ title: `Pay for ${loaderData?.game.title ?? "game"} — OpenRun` }],
+  }),
   notFoundComponent: () => <div className="p-6 text-center text-sm">Game not found.</div>,
   errorComponent: ({ reset }) => (
-    <div className="p-6 text-center"><button onClick={reset} className="text-lime font-bold">Try again</button></div>
+    <div className="p-6 text-center">
+      <button onClick={reset} className="text-lime font-bold">
+        Try again
+      </button>
+    </div>
   ),
   component: PayPage,
 });
@@ -60,7 +73,9 @@ function PayPage() {
         }
         return req;
       });
-    } catch { /* ignore polling errors */ }
+    } catch {
+      /* ignore polling errors */
+    }
   }, [game.id, user]);
 
   useEffect(() => {
@@ -73,9 +88,10 @@ function PayPage() {
         if (s) {
           const all = await listPaymentMethodsForHost(s.host_id);
           if (cancelled) return;
-          const filtered = s.accepted_method_ids.length > 0
-            ? all.filter((m) => s.accepted_method_ids.includes(m.id))
-            : all;
+          const filtered =
+            s.accepted_method_ids.length > 0
+              ? all.filter((m) => s.accepted_method_ids.includes(m.id))
+              : all;
           setMethods(filtered);
         }
         if (user) {
@@ -87,16 +103,24 @@ function PayPage() {
           setMySubs(subs);
           setMyReq(req);
         }
-      } catch (e: any) { toast.error(e.message); } finally { if (!cancelled) setFetching(false); }
+      } catch (e: any) {
+        toast.error(e.message);
+      } finally {
+        if (!cancelled) setFetching(false);
+      }
     })();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [game.id, user]);
 
   // Live-update the join-request status so the approval gate flips to the
   // payment picker the moment the host approves. Realtime is primary;
   // a slow poll and refetch-on-focus cover any dropped websocket frames.
   const refreshRef = useRef(refreshJoinRequest);
-  useEffect(() => { refreshRef.current = refreshJoinRequest; }, [refreshJoinRequest]);
+  useEffect(() => {
+    refreshRef.current = refreshJoinRequest;
+  }, [refreshJoinRequest]);
   useEffect(() => {
     if (!user) return;
     const channel = supabase
@@ -119,7 +143,9 @@ function PayPage() {
     const poll = window.setInterval(() => refreshRef.current(), 15_000);
     const onFocus = () => refreshRef.current();
     window.addEventListener("focus", onFocus);
-    const onVisibility = () => { if (document.visibilityState === "visible") refreshRef.current(); };
+    const onVisibility = () => {
+      if (document.visibilityState === "visible") refreshRef.current();
+    };
     document.addEventListener("visibilitychange", onVisibility);
 
     return () => {
@@ -141,7 +167,11 @@ function PayPage() {
   return (
     <div className="mx-auto max-w-md px-4 pt-6 pb-32">
       <div className="flex items-center gap-3 mb-4">
-        <Link to="/games/$gameId" params={{ gameId: game.id }} className="grid h-10 w-10 place-items-center rounded-full border border-border bg-surface">
+        <Link
+          to="/games/$gameId"
+          params={{ gameId: game.id }}
+          className="grid h-10 w-10 place-items-center rounded-full border border-border bg-surface"
+        >
           <ArrowLeft className="h-5 w-5" />
         </Link>
         <div>
@@ -152,10 +182,13 @@ function PayPage() {
 
       <div className="rounded-3xl border border-lime/30 bg-lime/5 p-5 mb-4">
         <div className="text-xs uppercase tracking-wider text-muted-foreground">Game fee</div>
-        <div className="font-display text-4xl font-bold text-lime mt-1">${Number(fee).toFixed(2)}</div>
+        <div className="font-display text-4xl font-bold text-lime mt-1">
+          ${Number(fee).toFixed(2)}
+        </div>
         {settings?.payment_deadline && (
           <div className="mt-2 inline-flex items-center gap-1 text-xs text-coral">
-            <Clock className="h-3 w-3" /> Pay by {new Date(settings.payment_deadline).toLocaleString()}
+            <Clock className="h-3 w-3" /> Pay by{" "}
+            {new Date(settings.payment_deadline).toLocaleString()}
           </div>
         )}
       </div>
@@ -189,8 +222,6 @@ function PayPage() {
         </div>
       )}
 
-
-
       {approvalGateActive ? (
         <div
           className="rounded-2xl border border-coral/40 bg-coral/10 p-5"
@@ -205,8 +236,8 @@ function PayPage() {
             {myReq?.status === "pending"
               ? "Your request to join is pending. Payment unlocks after the host approves you."
               : myReq?.status === "rejected"
-              ? "The host declined your request. You can't submit payment for this game."
-              : "This host reviews every player before payment. Send a request to join first."}
+                ? "The host declined your request. You can't submit payment for this game."
+                : "This host reviews every player before payment. Send a request to join first."}
           </p>
           <Link
             to="/games/$gameId"
@@ -219,20 +250,32 @@ function PayPage() {
       ) : !settings || methods.length === 0 ? (
         <div className="rounded-2xl border border-dashed border-border bg-surface/40 p-5 text-center">
           <div className="font-semibold text-sm">Host hasn't configured payment yet</div>
-          <p className="text-xs text-muted-foreground mt-1">Reach out to the host directly to arrange payment.</p>
+          <p className="text-xs text-muted-foreground mt-1">
+            Reach out to the host directly to arrange payment.
+          </p>
         </div>
       ) : !picked ? (
         <>
-          <h2 className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2">Pay host using</h2>
+          <h2 className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2">
+            Pay host using
+          </h2>
           <div className="space-y-2">
             {methods.map((m) => {
               const meta = paymentTypeMeta(m.payment_type);
               return (
-                <button key={m.id} onClick={() => setPicked(m)} className="w-full flex items-center gap-3 rounded-2xl border border-border bg-surface p-3 text-left hover:border-lime/40">
-                  <div className="grid h-10 w-10 place-items-center rounded-xl bg-secondary text-lg">{meta.emoji}</div>
+                <button
+                  key={m.id}
+                  onClick={() => setPicked(m)}
+                  className="w-full flex items-center gap-3 rounded-2xl border border-border bg-surface p-3 text-left hover:border-lime/40"
+                >
+                  <div className="grid h-10 w-10 place-items-center rounded-xl bg-secondary text-lg">
+                    {meta.emoji}
+                  </div>
                   <div className="flex-1 min-w-0">
                     <div className="font-semibold text-sm">{m.label || meta.name}</div>
-                    <div className="text-xs text-muted-foreground truncate">{m.username || m.contact_info}</div>
+                    <div className="text-xs text-muted-foreground truncate">
+                      {m.username || m.contact_info}
+                    </div>
                   </div>
                   <span className="text-lime text-sm">→</span>
                 </button>
@@ -263,7 +306,9 @@ function PayPage() {
         </div>
       )}
 
-      <div className="mt-5"><LegalNotice /></div>
+      <div className="mt-5">
+        <LegalNotice />
+      </div>
     </div>
   );
 }
@@ -272,18 +317,31 @@ function MySubsList({ subs }: { subs: PaymentSubmission[] }) {
   return (
     <div className="mb-4 space-y-2">
       {subs.map((s) => (
-        <div key={s.id} className={`rounded-2xl border p-3 text-xs ${
-          s.status === "verified" ? "border-lime/40 bg-lime/5" :
-          s.status === "rejected" ? "border-coral/40 bg-coral/5" : "border-border bg-surface"
-        }`}>
+        <div
+          key={s.id}
+          className={`rounded-2xl border p-3 text-xs ${
+            s.status === "verified"
+              ? "border-lime/40 bg-lime/5"
+              : s.status === "rejected"
+                ? "border-coral/40 bg-coral/5"
+                : "border-border bg-surface"
+          }`}
+        >
           <div className="flex items-center justify-between">
-            <span className="font-semibold uppercase">{
-              s.status === "verified" ? "✓ Confirmed" :
-              s.status === "rejected" ? "✗ Rejected — submit again" : "⏳ Pending verification"
-            }</span>
-            <span className="text-muted-foreground">{new Date(s.submitted_at).toLocaleString()}</span>
+            <span className="font-semibold uppercase">
+              {s.status === "verified"
+                ? "✓ Confirmed"
+                : s.status === "rejected"
+                  ? "✗ Rejected — submit again"
+                  : "⏳ Pending verification"}
+            </span>
+            <span className="text-muted-foreground">
+              {new Date(s.submitted_at).toLocaleString()}
+            </span>
           </div>
-          {s.reviewer_notes && <p className="mt-1 text-muted-foreground">Host: {s.reviewer_notes}</p>}
+          {s.reviewer_notes && (
+            <p className="mt-1 text-muted-foreground">Host: {s.reviewer_notes}</p>
+          )}
         </div>
       ))}
     </div>
@@ -291,10 +349,19 @@ function MySubsList({ subs }: { subs: PaymentSubmission[] }) {
 }
 
 function PaymentInstructionsAndProof({
-  game_id, host_id, method, extraInstructions, onCancel, onSubmitted,
+  game_id,
+  host_id,
+  method,
+  extraInstructions,
+  onCancel,
+  onSubmitted,
 }: {
-  game_id: string; host_id: string; method: PaymentMethod;
-  extraInstructions: string | null; onCancel: () => void; onSubmitted: () => void;
+  game_id: string;
+  host_id: string;
+  method: PaymentMethod;
+  extraInstructions: string | null;
+  onCancel: () => void;
+  onSubmitted: () => void;
 }) {
   const meta = paymentTypeMeta(method.payment_type);
   const [file, setFile] = useState<File | null>(null);
@@ -309,7 +376,8 @@ function PaymentInstructionsAndProof({
       let path: string | null = null;
       if (file) path = await uploadProofScreenshot(file);
       await createPaymentSubmission({
-        game_id, host_id,
+        game_id,
+        host_id,
         payment_method_id: method.id,
         payment_type: method.payment_type,
         screenshot_path: path,
@@ -318,25 +386,37 @@ function PaymentInstructionsAndProof({
       });
       toast.success("Submitted — host will verify shortly.");
       onSubmitted();
-    } catch (e: any) { toast.error(e.message); } finally { setSubmitting(false); }
+    } catch (e: any) {
+      toast.error(e.message);
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
     <div className="space-y-3">
       <div className="rounded-2xl border border-lime/30 bg-surface p-4">
         <div className="flex items-center gap-3 mb-3">
-          <div className="grid h-10 w-10 place-items-center rounded-xl bg-secondary text-lg">{meta.emoji}</div>
+          <div className="grid h-10 w-10 place-items-center rounded-xl bg-secondary text-lg">
+            {meta.emoji}
+          </div>
           <div>
             <div className="font-bold text-sm">{meta.name}</div>
             <div className="text-xs text-muted-foreground">Send directly to host</div>
           </div>
-          <button onClick={onCancel} className="ml-auto text-muted-foreground"><X className="h-4 w-4" /></button>
+          <button onClick={onCancel} className="ml-auto text-muted-foreground">
+            <X className="h-4 w-4" />
+          </button>
         </div>
         {method.username && <Field label="Send to" value={method.username} />}
         {method.contact_info && <Field label="Contact" value={method.contact_info} />}
         {method.payment_url && (
-          <a href={method.payment_url} target="_blank" rel="noreferrer"
-            className="mt-2 flex items-center justify-center gap-2 w-full rounded-xl bg-lime-gradient py-3 text-sm font-bold text-primary-foreground">
+          <a
+            href={method.payment_url}
+            target="_blank"
+            rel="noreferrer"
+            className="mt-2 flex items-center justify-center gap-2 w-full rounded-xl bg-lime-gradient py-3 text-sm font-bold text-primary-foreground"
+          >
             <ExternalLink className="h-4 w-4" /> Open {meta.name}
           </a>
         )}
@@ -349,18 +429,40 @@ function PaymentInstructionsAndProof({
       </div>
 
       <form onSubmit={submit} className="rounded-2xl border border-border bg-surface p-4 space-y-3">
-        <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">I have paid — submit proof</h3>
+        <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+          I have paid — submit proof
+        </h3>
         <label className="flex items-center gap-3 rounded-xl border border-dashed border-border bg-background p-3 cursor-pointer">
           <Upload className="h-4 w-4 text-lime" />
-          <span className="text-xs flex-1 truncate">{file ? file.name : "Upload screenshot of payment"}</span>
-          <input type="file" accept="image/*" capture="environment" onChange={(e) => setFile(e.target.files?.[0] ?? null)} className="hidden" />
+          <span className="text-xs flex-1 truncate">
+            {file ? file.name : "Upload screenshot of payment"}
+          </span>
+          <input
+            type="file"
+            accept="image/*"
+            capture="environment"
+            onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+            className="hidden"
+          />
         </label>
-        <input value={ref} onChange={(e) => setRef(e.target.value)} placeholder="Transaction ID (optional)"
-          className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm outline-none focus:border-lime" />
-        <textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} placeholder="Notes for host (optional)"
-          className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm outline-none focus:border-lime resize-none" />
-        <button type="submit" disabled={submitting}
-          className="w-full rounded-xl bg-lime-gradient py-3 text-sm font-bold text-primary-foreground inline-flex items-center justify-center gap-2 disabled:opacity-50">
+        <input
+          value={ref}
+          onChange={(e) => setRef(e.target.value)}
+          placeholder="Transaction ID (optional)"
+          className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm outline-none focus:border-lime"
+        />
+        <textarea
+          value={notes}
+          onChange={(e) => setNotes(e.target.value)}
+          rows={2}
+          placeholder="Notes for host (optional)"
+          className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm outline-none focus:border-lime resize-none"
+        />
+        <button
+          type="submit"
+          disabled={submitting}
+          className="w-full rounded-xl bg-lime-gradient py-3 text-sm font-bold text-primary-foreground inline-flex items-center justify-center gap-2 disabled:opacity-50"
+        >
           <ShieldCheck className="h-4 w-4" /> {submitting ? "Submitting…" : "I have paid"}
         </button>
       </form>

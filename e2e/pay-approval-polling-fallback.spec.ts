@@ -40,7 +40,9 @@ function sessionUserId(): string {
 
 const isTable = (url: string, table: string) => url.includes(`/rest/v1/${table}`);
 
-test("pay page flips from gate to picker via polling when realtime is unavailable", async ({ browser }) => {
+test("pay page flips from gate to picker via polling when realtime is unavailable", async ({
+  browser,
+}) => {
   test.setTimeout(90_000);
 
   const userId = sessionUserId();
@@ -49,54 +51,70 @@ test("pay page flips from gate to picker via polling when realtime is unavailabl
 
   // Block realtime at the network layer — WebSocket handshakes to
   // /realtime/v1/websocket start as HTTP upgrades and can be aborted here.
-  await page.route((u) => u.includes("/realtime/"), (route: PWRoute) => route.abort());
+  await page.route(
+    (u) => u.includes("/realtime/"),
+    (route: PWRoute) => route.abort(),
+  );
 
-  await page.route((u) => isTable(u, "game_payment_settings"), async (route: PWRoute) => {
-    if (route.request().method() !== "GET") return route.fallback();
-    await route.fulfill({
-      status: 200,
-      contentType: "application/json",
-      body: JSON.stringify([{
-        id: "mock-settings-id",
-        game_id: GAME_ID,
-        host_id: FAKE_HOST_ID,
-        entry_fee: ENTRY_FEE,
-        accepted_method_ids: [METHOD_ID],
-        payment_deadline: null,
-        refund_policy: null,
-        payment_instructions: null,
-        requires_approval: true,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      }]),
-    });
-  });
+  await page.route(
+    (u) => isTable(u, "game_payment_settings"),
+    async (route: PWRoute) => {
+      if (route.request().method() !== "GET") return route.fallback();
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify([
+          {
+            id: "mock-settings-id",
+            game_id: GAME_ID,
+            host_id: FAKE_HOST_ID,
+            entry_fee: ENTRY_FEE,
+            accepted_method_ids: [METHOD_ID],
+            payment_deadline: null,
+            refund_policy: null,
+            payment_instructions: null,
+            requires_approval: true,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          },
+        ]),
+      });
+    },
+  );
 
-  await page.route((u) => isTable(u, "host_payment_methods"), async (route: PWRoute) => {
-    if (route.request().method() !== "GET") return route.fallback();
-    await route.fulfill({
-      status: 200,
-      contentType: "application/json",
-      body: JSON.stringify([{
-        id: METHOD_ID,
-        host_id: FAKE_HOST_ID,
-        payment_type: "venmo",
-        label: "Venmo",
-        username: "@testhost",
-        payment_url: "https://venmo.com/u/testhost",
-        contact_info: null,
-        instructions: null,
-        is_enabled: true,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      }]),
-    });
-  });
+  await page.route(
+    (u) => isTable(u, "host_payment_methods"),
+    async (route: PWRoute) => {
+      if (route.request().method() !== "GET") return route.fallback();
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify([
+          {
+            id: METHOD_ID,
+            host_id: FAKE_HOST_ID,
+            payment_type: "venmo",
+            label: "Venmo",
+            username: "@testhost",
+            payment_url: "https://venmo.com/u/testhost",
+            contact_info: null,
+            instructions: null,
+            is_enabled: true,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          },
+        ]),
+      });
+    },
+  );
 
-  await page.route((u) => isTable(u, "payment_submissions"), async (route: PWRoute) => {
-    if (route.request().method() !== "GET") return route.fallback();
-    await route.fulfill({ status: 200, contentType: "application/json", body: "[]" });
-  });
+  await page.route(
+    (u) => isTable(u, "payment_submissions"),
+    async (route: PWRoute) => {
+      if (route.request().method() !== "GET") return route.fallback();
+      await route.fulfill({ status: 200, contentType: "application/json", body: "[]" });
+    },
+  );
 
   let approved = false;
   let joinGets = 0;
@@ -115,16 +133,19 @@ test("pay page flips from gate to picker via polling when realtime is unavailabl
     reviewed_at: status === "approved" ? new Date().toISOString() : null,
     idempotency_key: `join:${GAME_ID}`,
   });
-  await page.route((u) => isTable(u, "join_requests"), async (route: PWRoute) => {
-    if (route.request().method() !== "GET") return route.fallback();
-    joinGets += 1;
-    (approved ? approvedGets : gatingGets).push(Date.now());
-    await route.fulfill({
-      status: 200,
-      contentType: "application/json",
-      body: JSON.stringify([row(approved ? "approved" : "pending")]),
-    });
-  });
+  await page.route(
+    (u) => isTable(u, "join_requests"),
+    async (route: PWRoute) => {
+      if (route.request().method() !== "GET") return route.fallback();
+      joinGets += 1;
+      (approved ? approvedGets : gatingGets).push(Date.now());
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify([row(approved ? "approved" : "pending")]),
+      });
+    },
+  );
 
   await restoreSession(page);
   await page.goto(`/games/${GAME_ID}/pay`, { waitUntil: "domcontentloaded" });
@@ -163,8 +184,9 @@ test("pay page flips from gate to picker via polling when realtime is unavailabl
 
   // The flip took at least a polling tick — not instant like realtime would be.
   const elapsed = Date.now() - approvedAt;
-  expect(elapsed, `polling should take at least a few seconds, took ${elapsed}ms`)
-    .toBeGreaterThan(1_000);
+  expect(elapsed, `polling should take at least a few seconds, took ${elapsed}ms`).toBeGreaterThan(
+    1_000,
+  );
 
   // URL unchanged — no navigation / reload.
   expect(new URL(page.url()).pathname).toBe(`/games/${GAME_ID}/pay`);

@@ -55,7 +55,9 @@ function PlayerProfilePage() {
     Promise.all([
       supabase
         .from("profiles")
-        .select("id, display_name, avatar_initials, bio, sport, username, city, avatar_url, cover_url, birthday, graduating_class, links")
+        .select(
+          "id, display_name, avatar_initials, bio, sport, username, city, avatar_url, cover_url, birthday, graduating_class, links",
+        )
         .eq("id", userId)
         .maybeSingle(),
       supabase
@@ -73,7 +75,9 @@ function PlayerProfilePage() {
       setAvailability((avail.data as unknown as PlayerAvailability) ?? null);
       setLoading(false);
     });
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [userId]);
 
   // If viewing your own card, redirect to the full profile page
@@ -82,14 +86,19 @@ function PlayerProfilePage() {
   }
 
   const handleMessage = async () => {
-    if (!user) { toast.error("Sign in to message this player."); return; }
+    if (!user) {
+      toast.error("Sign in to message this player.");
+      return;
+    }
     setOpening(true);
     try {
       const id = await getOrCreateDirectConversation(userId);
       navigate({ to: "/messages/$conversationId", params: { conversationId: id } });
     } catch (e: any) {
       toast.error(e.message || "Couldn't open chat");
-    } finally { setOpening(false); }
+    } finally {
+      setOpening(false);
+    }
   };
 
   if (loading) {
@@ -104,7 +113,10 @@ function PlayerProfilePage() {
   if (!profile) {
     return (
       <div className="mx-auto max-w-md px-4 pt-6 pb-24">
-        <Link to="/players" className="inline-flex items-center gap-1 text-sm text-muted-foreground mb-4">
+        <Link
+          to="/players"
+          className="inline-flex items-center gap-1 text-sm text-muted-foreground mb-4"
+        >
           <ArrowLeft className="h-4 w-4" /> Back to players
         </Link>
         <div className="rounded-2xl border border-dashed border-border bg-surface/40 p-8 text-center">
@@ -115,9 +127,12 @@ function PlayerProfilePage() {
     );
   }
 
-  const initials = overrides.avatar || profile.avatar_initials || profile.display_name.slice(0, 2).toUpperCase();
+  const initials =
+    overrides.avatar || profile.avatar_initials || profile.display_name.slice(0, 2).toUpperCase();
   const displayName = overrides.name || profile.display_name;
-  const username = (overrides.username || (profile.username ? `@${profile.username.replace(/^@/, "")}` : "")).trim();
+  const username = (
+    overrides.username || (profile.username ? `@${profile.username.replace(/^@/, "")}` : "")
+  ).trim();
   const bio = overrides.bio ?? profile.bio ?? "";
   const city = overrides.city ?? profile.city ?? "";
   const sportsList = overrides.sports?.length
@@ -169,9 +184,15 @@ function PlayerProfilePage() {
           <div className="min-w-0">
             <h1 className="font-display text-2xl font-bold flex items-center gap-2">
               <span className="truncate">{displayName}</span>
-              {profile.birthday && (() => { const a = ageFrom(profile.birthday); return a != null ? (
-                <span className="text-sm font-normal text-muted-foreground shrink-0">· {a}</span>
-              ) : null; })()}
+              {profile.birthday &&
+                (() => {
+                  const a = ageFrom(profile.birthday);
+                  return a != null ? (
+                    <span className="text-sm font-normal text-muted-foreground shrink-0">
+                      · {a}
+                    </span>
+                  ) : null;
+                })()}
               <span className="inline-flex items-center gap-1 rounded-full bg-lime/15 px-2 py-0.5 text-xs font-bold text-lime shrink-0">
                 <Shield className="h-3 w-3" /> Verified
               </span>
@@ -182,7 +203,10 @@ function PlayerProfilePage() {
             {(profile.birthday || profile.graduating_class) && (
               <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-muted-foreground">
                 {profile.birthday && (
-                  <span>🎂 {formatBirthday(profile.birthday)}{ageFrom(profile.birthday) != null ? ` · ${ageFrom(profile.birthday)} yrs` : ""}</span>
+                  <span>
+                    🎂 {formatBirthday(profile.birthday)}
+                    {ageFrom(profile.birthday) != null ? ` · ${ageFrom(profile.birthday)} yrs` : ""}
+                  </span>
                 )}
                 {profile.graduating_class && <span>🎓 Class of {profile.graduating_class}</span>}
               </div>
@@ -194,14 +218,16 @@ function PlayerProfilePage() {
             className="shrink-0 rounded-full bg-lime-gradient text-primary-foreground"
             size="sm"
           >
-            {opening ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <MessageCircle className="h-4 w-4 mr-1" />}
+            {opening ? (
+              <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+            ) : (
+              <MessageCircle className="h-4 w-4 mr-1" />
+            )}
             Message
           </Button>
         </div>
 
-        {bio && (
-          <p className="mt-3 text-sm text-foreground/90 whitespace-pre-wrap">{bio}</p>
-        )}
+        {bio && <p className="mt-3 text-sm text-foreground/90 whitespace-pre-wrap">{bio}</p>}
 
         {/* Profile links */}
         {links.length > 0 && (
@@ -220,7 +246,9 @@ function PlayerProfilePage() {
           ].map((s) => (
             <div key={s.v} className="rounded-2xl border border-border bg-surface p-3 text-center">
               <div className="font-display text-lg font-bold">{s.k}</div>
-              <div className="text-[10px] uppercase tracking-wider text-muted-foreground">{s.v}</div>
+              <div className="text-[10px] uppercase tracking-wider text-muted-foreground">
+                {s.v}
+              </div>
             </div>
           ))}
         </div>
@@ -243,7 +271,9 @@ function PlayerProfilePage() {
         {/* Sports & skill */}
         {sportsList.length > 0 && (
           <div className="mt-6">
-            <h2 className="font-display text-sm font-bold uppercase tracking-wider text-muted-foreground mb-2">Sports</h2>
+            <h2 className="font-display text-sm font-bold uppercase tracking-wider text-muted-foreground mb-2">
+              Sports
+            </h2>
             <div className="space-y-2">
               {sportsList.map((s) => (
                 <div key={s.name} className="rounded-2xl border border-border bg-surface p-3">
@@ -275,7 +305,10 @@ function PlayerProfilePage() {
             </h2>
             <div className="flex flex-wrap gap-2">
               {badges.map((b) => (
-                <span key={b} className="rounded-full border border-border bg-surface px-3 py-1.5 text-xs font-semibold">
+                <span
+                  key={b}
+                  className="rounded-full border border-border bg-surface px-3 py-1.5 text-xs font-semibold"
+                >
                   {b}
                 </span>
               ))}
@@ -297,26 +330,34 @@ function PlayerProfilePage() {
   );
 }
 
-
 function PlayerCard({ a }: { a: PlayerAvailability }) {
   const window = formatWindow(a);
   return (
     <div className="rounded-2xl border border-border bg-surface p-4">
       <div className="flex items-center justify-between gap-2">
-        <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Looking to play</span>
-        <span className="shrink-0 rounded-full bg-lime/15 px-2 py-0.5 text-[10px] font-bold text-lime">{a.skill_level}</span>
+        <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+          Looking to play
+        </span>
+        <span className="shrink-0 rounded-full bg-lime/15 px-2 py-0.5 text-[10px] font-bold text-lime">
+          {a.skill_level}
+        </span>
       </div>
       <div className="mt-2 flex flex-wrap gap-1">
         {a.sports.length === 0 ? (
           <span className="text-xs text-muted-foreground">Any sport</span>
-        ) : a.sports.map((s) => {
-          const emoji = SPORTS.find((sp) => sp.name === s)?.emoji ?? "🎯";
-          return (
-            <span key={s} className="rounded-full border border-border px-2 py-0.5 text-[11px] font-semibold">
-              {emoji} {s}
-            </span>
-          );
-        })}
+        ) : (
+          a.sports.map((s) => {
+            const emoji = SPORTS.find((sp) => sp.name === s)?.emoji ?? "🎯";
+            return (
+              <span
+                key={s}
+                className="rounded-full border border-border px-2 py-0.5 text-[11px] font-semibold"
+              >
+                {emoji} {s}
+              </span>
+            );
+          })
+        )}
       </div>
       {window && (
         <p className="mt-2 flex items-center gap-1 text-xs text-muted-foreground">
@@ -325,7 +366,8 @@ function PlayerCard({ a }: { a: PlayerAvailability }) {
       )}
       {(a.city || a.travel_radius_km) && (
         <p className="mt-1 flex items-center gap-1 text-xs text-muted-foreground">
-          <MapPin className="h-3.5 w-3.5" /> {a.city || "Anywhere"} · up to {kmToMi(a.travel_radius_km)} mi
+          <MapPin className="h-3.5 w-3.5" /> {a.city || "Anywhere"} · up to{" "}
+          {kmToMi(a.travel_radius_km)} mi
         </p>
       )}
       {a.note && <p className="mt-3 text-sm leading-snug">{a.note}</p>}
