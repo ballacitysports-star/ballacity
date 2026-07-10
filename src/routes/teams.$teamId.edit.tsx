@@ -67,21 +67,6 @@ function EditOrg() {
   const nav = useNavigate();
   const [step, setStep] = useState(1);
 
-  if (!isMyOrg(org.id)) {
-    return (
-      <div className="mx-auto max-w-md px-6 pt-24 text-center">
-        <p className="text-muted-foreground">You can only edit organizations you created.</p>
-        <Link
-          to="/teams/$teamId"
-          params={{ teamId: org.id }}
-          className="mt-4 inline-block rounded-full bg-lime px-4 py-2 text-sm font-bold text-primary-foreground"
-        >
-          Back to profile
-        </Link>
-      </div>
-    );
-  }
-
   // Pre-fill form state
   const [name, setName] = useState(org.name);
   const [handle, setHandle] = useState(org.handle.replace("@", ""));
@@ -110,6 +95,22 @@ function EditOrg() {
   const [accent, setAccent] = useState(org.accent);
   const [avatar, setAvatar] = useState(org.avatar);
   const [cover, setCover] = useState<string>(org.cover);
+
+  if (!isMyOrg(org.id)) {
+    return (
+      <div className="mx-auto max-w-md px-6 pt-24 text-center">
+        <p className="text-muted-foreground">You can only edit organizations you created.</p>
+        <Link
+          to="/teams/$teamId"
+          params={{ teamId: org.id }}
+          className="mt-4 inline-block rounded-full bg-lime px-4 py-2 text-sm font-bold text-primary-foreground"
+        >
+          Back to profile
+        </Link>
+      </div>
+    );
+  }
+
 
   const kind = org.kind;
   const computedAvatar = avatar || initials(name || "OR");
