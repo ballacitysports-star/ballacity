@@ -25,7 +25,7 @@ export function BottomNav() {
           {items.map((it) => {
             const active = pathname === it.to || (it.to !== "/feed" && pathname.startsWith(it.to));
             const Icon = it.icon;
-            const badge = it.key === "messages" && unreadMessages > 0 ? unreadMessages : 0;
+            
             return (
               <li key={it.to} className="min-w-0">
                 <Link
@@ -34,11 +34,6 @@ export function BottomNav() {
                 >
                   <span className="relative">
                     <Icon className={`h-5 w-5 ${active ? "text-lime" : "text-muted-foreground"}`} />
-                    {badge > 0 && (
-                      <span className="absolute -top-1.5 -right-2 min-w-[16px] h-[16px] px-1 rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center leading-none">
-                        {badge > 9 ? "9+" : badge}
-                      </span>
-                    )}
                   </span>
                   <span
                     className={`truncate max-w-full ${active ? "text-foreground" : "text-muted-foreground"}`}
