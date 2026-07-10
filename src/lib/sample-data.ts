@@ -1,3 +1,5 @@
+import pickleballCover from "@/assets/pickleball-cover.jpg";
+
 export type Sport =
   | "Basketball"
   | "Soccer"
