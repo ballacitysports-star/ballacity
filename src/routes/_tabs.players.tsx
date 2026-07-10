@@ -28,7 +28,9 @@ import {
   deleteAvailability,
   listOpenAvailabilities,
   type PlayerAvailability,
+  type ExistingRequestSummary,
 } from "@/lib/availability";
+import { RequestStatusPanel } from "@/components/RequestStatusPanel";
 import { getOrCreateDirectConversation } from "@/lib/messages";
 import { useHostedGames } from "@/lib/hosted-games-store";
 import type { Game } from "@/lib/sample-data";
@@ -981,6 +983,11 @@ function ContactDialog({
   const selected = hostedGames.find((g) => g.id === gameId);
   const [msg, setMsg] = useState("");
   const [saving, setSaving] = useState(false);
+  const [refreshKey, setRefreshKey] = useState(0);
+  const [existingStatus, setExistingStatus] = useState<
+    "none" | "pending" | "accepted" | "declined" | "withdrawn"
+  >("none");
+  const isPending = existingStatus === "pending";
 
   const formattedDate = (iso: string) => {
     const d = new Date(iso);
@@ -1022,6 +1029,7 @@ function ContactDialog({
             ? "You already have a pending invite to this player for this game."
             : "You already have a pending request to this player.",
         );
+        setRefreshKey((k) => k + 1);
       } else toast.error(msg || "Couldn't send request");
     } finally {
       setSaving(false);
@@ -1038,6 +1046,15 @@ function ContactDialog({
               : `Contact ${availability.author_name}`}
           </DialogTitle>
         </DialogHeader>
+
+        <RequestStatusPanel
+          availabilityId={availability.id}
+          gameId={isInvite ? (selected?.id ?? null) : null}
+          refreshKey={refreshKey}
+          onLoaded={(s: ExistingRequestSummary) => setExistingStatus(s.status)}
+        />
+
+
 
         {isInvite && (
           <div className="space-y-2">
@@ -1098,11 +1115,17 @@ function ContactDialog({
           </Button>
           <Button
             onClick={send}
-            disabled={saving || (isInvite && !selected)}
+            disabled={saving || isPending || (isInvite && !selected)}
             className="bg-lime-gradient text-primary-foreground"
           >
             {saving && <Loader2 className="h-4 w-4 mr-1 animate-spin" />}
-            {isInvite ? "Send invite" : "Send request"}
+            {isPending
+              ? isInvite
+                ? "Invite pending"
+                : "Request pending"
+              : isInvite
+                ? "Send invite"
+                : "Send request"}
           </Button>
         </DialogFooter>
       </DialogContent>

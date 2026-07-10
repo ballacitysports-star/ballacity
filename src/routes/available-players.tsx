@@ -39,6 +39,8 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { kmToMi, miToKm } from "@/lib/distance";
+import { RequestStatusPanel } from "@/components/RequestStatusPanel";
+import type { ExistingRequestSummary } from "@/lib/availability";
 
 export const Route = createFileRoute("/available-players")({
   head: () => ({
@@ -570,6 +572,11 @@ function ContactDialog({
 }) {
   const [msg, setMsg] = useState("");
   const [saving, setSaving] = useState(false);
+  const [refreshKey, setRefreshKey] = useState(0);
+  const [existingStatus, setExistingStatus] = useState<
+    "none" | "pending" | "accepted" | "declined" | "withdrawn"
+  >("none");
+  const isPending = existingStatus === "pending";
 
   const send = async () => {
     setSaving(true);
@@ -581,6 +588,7 @@ function ContactDialog({
       const msg = String(e?.message ?? "");
       if (msg.includes("duplicate") || (e as { code?: string })?.code === "23505") {
         toast.error("You already have a pending request to this player.");
+        setRefreshKey((k) => k + 1);
       } else toast.error(msg || "Couldn't send request");
     } finally {
       setSaving(false);
@@ -593,6 +601,12 @@ function ContactDialog({
         <DialogHeader>
           <DialogTitle>Contact {availability.author_name}</DialogTitle>
         </DialogHeader>
+        <RequestStatusPanel
+          availabilityId={availability.id}
+          gameId={null}
+          refreshKey={refreshKey}
+          onLoaded={(s: ExistingRequestSummary) => setExistingStatus(s.status)}
+        />
         <p className="text-sm text-muted-foreground">
           Send a short message introducing your team or session. {availability.author_name} can
           accept or decline.
@@ -610,10 +624,11 @@ function ContactDialog({
           </Button>
           <Button
             onClick={send}
-            disabled={saving}
+            disabled={saving || isPending}
             className="bg-lime-gradient text-primary-foreground"
           >
-            {saving && <Loader2 className="h-4 w-4 mr-1 animate-spin" />}Send request
+            {saving && <Loader2 className="h-4 w-4 mr-1 animate-spin" />}
+            {isPending ? "Request pending" : "Send request"}
           </Button>
         </DialogFooter>
       </DialogContent>
