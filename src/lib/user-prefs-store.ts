@@ -295,11 +295,13 @@ export function useFeedPrefs(): FeedPrefs {
       ? parsed.maxDistanceMi
       : null;
   const distanceUnit = parsed.distanceUnit === "km" ? "km" : "mi";
+  const sortBy: FeedSortBy = parsed.sortBy === "soonest" ? "soonest" : "nearest";
   return {
     preferredSports: parsed.preferredSports ?? [],
     sections,
     maxDistanceMi,
     distanceUnit,
+    sortBy,
   };
 }
 
