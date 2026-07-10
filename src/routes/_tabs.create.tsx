@@ -321,8 +321,12 @@ function Create() {
                     .from("game-covers")
                     .upload(path, file, { cacheControl: "3600", upsert: false });
                   if (upErr) throw upErr;
-                  const { data } = supabase.storage.from("game-covers").getPublicUrl(path);
-                  setCoverUrl(data.publicUrl);
+                  const { data, error: urlErr } = await supabase.storage
+                    .from("game-covers")
+                    .createSignedUrl(path, 60 * 60 * 24 * 365 * 10);
+                  if (urlErr || !data?.signedUrl) throw urlErr ?? new Error("Signed URL failed");
+                  setCoverUrl(data.signedUrl);
+
                 } catch (err: any) {
                   toast.error(err?.message ?? "Upload failed");
                 } finally {
