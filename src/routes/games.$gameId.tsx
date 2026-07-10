@@ -27,6 +27,7 @@ import { computeReputation, useReviewsFor } from "@/lib/reviews";
 import { ReputationBadge } from "@/components/ReputationBadge";
 import { joinGame, leaveGame, useIsJoined } from "@/lib/games-store";
 import { useLiveParticipantCount } from "@/lib/game-participants-store";
+import { useLiveParticipants } from "@/lib/game-roster";
 import { toast } from "sonner";
 import { useEffect, useMemo, useState } from "react";
 import {
