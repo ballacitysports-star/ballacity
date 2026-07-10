@@ -335,7 +335,7 @@ function GameDetail() {
         toast("You left the game.");
         // Notify host in real time that a player left.
         if (gameHostId && user && gameHostId !== user.id) {
-          const who = myProfile?.display_name || user.email?.split("@")[0] || "A player";
+          const who = myProfile?.name || user.email?.split("@")[0] || "A player";
           void createNotification({
             user_id: gameHostId,
             type: "participant_left",
