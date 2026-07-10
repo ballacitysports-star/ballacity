@@ -1115,11 +1115,17 @@ function ContactDialog({
           </Button>
           <Button
             onClick={send}
-            disabled={saving || (isInvite && !selected)}
+            disabled={saving || isPending || (isInvite && !selected)}
             className="bg-lime-gradient text-primary-foreground"
           >
             {saving && <Loader2 className="h-4 w-4 mr-1 animate-spin" />}
-            {isInvite ? "Send invite" : "Send request"}
+            {isPending
+              ? isInvite
+                ? "Invite pending"
+                : "Request pending"
+              : isInvite
+                ? "Send invite"
+                : "Send request"}
           </Button>
         </DialogFooter>
       </DialogContent>
