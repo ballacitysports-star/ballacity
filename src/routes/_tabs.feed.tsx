@@ -10,7 +10,7 @@ import { GAMES, SPORTS, type Sport } from "@/lib/sample-data";
 import { useHostedGames } from "@/lib/hosted-games-store";
 import { useJoinedGameIds } from "@/lib/games-store";
 import { useFeedPrefs, setFeedPrefs, DEFAULT_PREFS, useMyProfile } from "@/lib/user-prefs-store";
-import { kmToMi, miToKm } from "@/lib/distance";
+import { miToKm } from "@/lib/distance";
 import { motion, AnimatePresence } from "framer-motion";
 
 export const Route = createFileRoute("/_tabs/feed")({
