@@ -77,12 +77,18 @@ function Feed() {
           : true,
       )
       .sort((a, b) => {
-        // Nearest first when we know the user's city; ties break on distanceMi then date.
-        const la = isLocal(a) ? 0 : 1;
-        const lb = isLocal(b) ? 0 : 1;
-        if (la !== lb) return la - lb;
-        if (a.distanceMi !== b.distanceMi) return a.distanceMi - b.distanceMi;
-        return +new Date(a.date) - +new Date(b.date);
+        if (prefs.sortBy === "nearest") {
+          // Nearest first; prefer local city, then distanceMi, then date.
+          const la = isLocal(a) ? 0 : 1;
+          const lb = isLocal(b) ? 0 : 1;
+          if (la !== lb) return la - lb;
+          if (a.distanceMi !== b.distanceMi) return a.distanceMi - b.distanceMi;
+          return +new Date(a.date) - +new Date(b.date);
+        }
+        // Soonest first; break ties by distance.
+        const da = +new Date(a.date) - +new Date(b.date);
+        if (da !== 0) return da;
+        return a.distanceMi - b.distanceMi;
       });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [q, hosted, prefs, joinedSet, hostedIds, userCityToken]);
@@ -518,6 +524,24 @@ function FilterSheet({ onClose }: { onClose: () => void }) {
           >
             <X className="h-4 w-4" />
           </button>
+        </div>
+
+        <div className="text-xs font-semibold text-muted-foreground mb-2 uppercase tracking-wider">
+          Sort by
+        </div>
+        <div className="flex gap-2 mb-5">
+          {(["nearest", "soonest"] as const).map((s) => {
+            const active = prefs.sortBy === s;
+            return (
+              <button
+                key={s}
+                onClick={() => setFeedPrefs({ ...prefs, sortBy: s })}
+                className={`flex-1 rounded-full border px-3 py-2 text-xs font-semibold ${active ? "border-lime bg-lime text-primary-foreground" : "border-border bg-surface"}`}
+              >
+                {s === "nearest" ? "Nearest" : "Soonest"}
+              </button>
+            );
+          })}
         </div>
 
         <div className="text-xs font-semibold text-muted-foreground mb-2 uppercase tracking-wider">

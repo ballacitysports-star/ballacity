@@ -65,11 +65,14 @@ export type FeedSectionToggles = {
   freeOnly: boolean;
 };
 
+export type FeedSortBy = "nearest" | "soonest";
+
 export type FeedPrefs = {
   preferredSports: Sport[];
   sections: FeedSectionToggles;
   maxDistanceMi: number | null;
   distanceUnit: "mi" | "km";
+  sortBy: FeedSortBy;
 };
 
 export const DEFAULT_PREFS: FeedPrefs = {
@@ -84,6 +87,7 @@ export const DEFAULT_PREFS: FeedPrefs = {
   },
   maxDistanceMi: null,
   distanceUnit: "mi",
+  sortBy: "nearest",
 };
 
 // ---------- Generic JSON store ----------
@@ -291,11 +295,13 @@ export function useFeedPrefs(): FeedPrefs {
       ? parsed.maxDistanceMi
       : null;
   const distanceUnit = parsed.distanceUnit === "km" ? "km" : "mi";
+  const sortBy: FeedSortBy = parsed.sortBy === "soonest" ? "soonest" : "nearest";
   return {
     preferredSports: parsed.preferredSports ?? [],
     sections,
     maxDistanceMi,
     distanceUnit,
+    sortBy,
   };
 }
 
