@@ -1027,6 +1027,7 @@ function ContactDialog({
             ? "You already have a pending invite to this player for this game."
             : "You already have a pending request to this player.",
         );
+        setRefreshKey((k) => k + 1);
       } else toast.error(msg || "Couldn't send request");
     } finally {
       setSaving(false);
