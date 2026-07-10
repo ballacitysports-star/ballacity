@@ -981,6 +981,11 @@ function ContactDialog({
   const selected = hostedGames.find((g) => g.id === gameId);
   const [msg, setMsg] = useState("");
   const [saving, setSaving] = useState(false);
+  const [refreshKey, setRefreshKey] = useState(0);
+  const [existingStatus, setExistingStatus] = useState<
+    "none" | "pending" | "accepted" | "declined" | "withdrawn"
+  >("none");
+  const isPending = existingStatus === "pending";
 
   const formattedDate = (iso: string) => {
     const d = new Date(iso);
