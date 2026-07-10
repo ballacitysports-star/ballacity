@@ -26,35 +26,49 @@ function initAuthStore() {
   if (initialized || typeof window === "undefined") return;
   initialized = true;
 
+  // 1. Subscribe FIRST so no event is missed while we hydrate.
   supabase.auth.onAuthStateChange((event, session) => {
+    // Don't clobber a session we just published from getSession().
     if (event === "INITIAL_SESSION" && !session) return;
     setAuthState({ session, user: session?.user ?? null, loading: false });
   });
 
+  // 2. Hydrate from localStorage-backed session — this is the real
+  //    "auth is ready" signal on mobile webviews. Network-based
+  //    getUser() races with storage rehydration and produces false
+  //    null-user states.
   supabase.auth
-    .getUser()
-    .then(async ({ data, error }) => {
-      if (error || !data.user) {
-        const { data: sessionData } = await supabase.auth.getSession();
-        setAuthState({
-          session: sessionData.session,
-          user: sessionData.session?.user ?? null,
-          loading: false,
-        });
-        return;
-      }
-
-      const { data: sessionData } = await supabase.auth.getSession();
+    .getSession()
+    .then(({ data }) => {
       setAuthState({
-        session: sessionData.session,
-        user: data.user,
+        session: data.session,
+        user: data.session?.user ?? null,
         loading: false,
       });
+
+      // 3. Best-effort server verification. Only downgrade to signed-out
+      //    if Auth explicitly says the user is gone — never on a network
+      //    error, which would falsely sign the user out on flaky mobile.
+      if (data.session) {
+        supabase.auth
+          .getUser()
+          .then(({ data: userData, error }) => {
+            if (userData?.user) {
+              setAuthState({ user: userData.user });
+            } else if (error && /user.*not.*found|invalid|jwt/i.test(error.message ?? "")) {
+              setAuthState({ session: null, user: null });
+            }
+          })
+          .catch(() => {
+            /* network error — keep the persisted session */
+          });
+      }
     })
     .catch(() => {
       setAuthState({ session: null, user: null, loading: false });
     });
 }
+
 
 function subscribe(listener: () => void) {
   initAuthStore();
