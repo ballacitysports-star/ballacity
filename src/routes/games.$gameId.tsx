@@ -880,7 +880,7 @@ function GameDetail() {
                 try {
                   await deleteHostedGame(game.id);
                   toast.success("Game deleted.");
-                  navigate({ to: "/" });
+                  nav({ to: "/" });
                 } catch {
                   toast.error("Couldn't delete this game.");
                 }
