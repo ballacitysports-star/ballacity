@@ -1557,6 +1557,20 @@ function HostRequestRow({
           <div className="flex gap-1.5">
             <button
               disabled={busy}
+              onClick={async () => {
+                if (!confirm(`Block ${name}? They won't be able to join your future games.`))
+                  return;
+                await act("rejected");
+                blockUser(req.host_id, req.player_id);
+                toast.success(`${name} blocked.`);
+              }}
+              className="grid h-9 px-2 place-items-center rounded-xl border border-coral/60 bg-coral/10 text-coral text-[11px] font-bold disabled:opacity-50"
+              title="Block from your games"
+            >
+              Block
+            </button>
+            <button
+              disabled={busy}
               onClick={() => act("rejected")}
               className="grid h-9 w-9 place-items-center rounded-xl border border-coral/40 text-coral disabled:opacity-50"
             >
