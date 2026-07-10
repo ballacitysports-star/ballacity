@@ -7,6 +7,7 @@ import {
   IdCard,
   LogOut,
   Lock,
+  Monitor,
   Moon,
   Shield,
   Sun,
