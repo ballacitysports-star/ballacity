@@ -119,6 +119,18 @@ function AuthPage() {
 
   const google = async () => {
     setBusy(true);
+    // Nudge users on locked-down browsers / in-app webviews where the
+    // OAuth popup is silently blocked and no session ever arrives.
+    const hangTimer = window.setTimeout(async () => {
+      const { data } = await supabase.auth.getSession();
+      if (!data.session) {
+        toast.error("Sign-in didn't complete", {
+          description:
+            "If a Google popup was blocked, allow popups for this site or try Safari. You can also sign in with email below.",
+          duration: 10000,
+        });
+      }
+    }, 8000);
     try {
       const result = await lovable.auth.signInWithOAuth("google", {
         redirect_uri: window.location.origin,
@@ -129,6 +141,7 @@ function AuthPage() {
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Google sign-in failed");
     } finally {
+      window.clearTimeout(hangTimer);
       setBusy(false);
     }
   };
