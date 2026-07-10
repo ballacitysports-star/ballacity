@@ -417,26 +417,56 @@ function GameDetail() {
   const hostPendingReqs = isHost ? hostRequests.filter((r) => r.status === "pending") : [];
   const pendingCount = hostPendingReqs.length;
   type RosterEntry =
-    | { kind: "player"; initials: string; isMe: boolean; pending: false }
+    | {
+        kind: "player";
+        initials: string;
+        isMe: boolean;
+        pending: false;
+        userId?: string;
+        displayName?: string;
+        avatarUrl?: string | null;
+      }
     | { kind: "viewerPending"; initials: "YOU"; isMe: true; pending: true }
     | { kind: "hostPending"; req: JoinRequest; pending: true };
-  // Non-"me" placeholder count: use the live baseline minus the viewer if
-  // the live count already includes them. Falls back to game.joined during
-  // hydration.
-  const otherPlayersCount = Math.max(
-    0,
-    (liveParticipantCount ?? game.joined ?? 0) - (viewerCountsAsJoined && liveParticipantCount !== undefined ? 1 : 0),
-  );
-  const players: RosterEntry[] = [
-    ...(viewerCountsAsJoined
-      ? [{ kind: "player" as const, initials: "YOU", isMe: true, pending: false as const }]
-      : []),
-    ...Array.from({ length: otherPlayersCount }, (_, i) => ({
+
+  // Real confirmed roster from `game_participants` (live via realtime).
+  // Falls back to game.joined-sized placeholders during hydration so the
+  // slot count never briefly collapses to zero.
+  const meId = user?.id ?? null;
+  const rosterOthers: RosterEntry[] = liveRoster
+    .filter((p) => p.userId !== meId)
+    .map((p) => ({
       kind: "player" as const,
-      initials: ["MC", "AG", "JK", "RC", "TB", "SO", "PN", "DP", "EL", "VM"][i % 10],
+      initials: p.avatarInitials,
       isMe: false,
       pending: false as const,
-    })),
+      userId: p.userId,
+      displayName: p.displayName,
+      avatarUrl: p.avatarUrl,
+    }));
+  const usePlaceholderRoster = liveRoster.length === 0 && (game.joined ?? 0) > 0;
+  const placeholderOthers: RosterEntry[] = usePlaceholderRoster
+    ? Array.from({ length: game.joined }, (_, i) => ({
+        kind: "player" as const,
+        initials: ["MC", "AG", "JK", "RC", "TB", "SO", "PN", "DP", "EL", "VM"][i % 10],
+        isMe: false,
+        pending: false as const,
+      }))
+    : [];
+  const players: RosterEntry[] = [
+    ...(viewerCountsAsJoined
+      ? [
+          {
+            kind: "player" as const,
+            initials: "YOU",
+            isMe: true,
+            pending: false as const,
+            userId: meId ?? undefined,
+          },
+        ]
+      : []),
+    ...rosterOthers,
+    ...placeholderOthers,
     ...(viewerPending
       ? [
           {
