@@ -577,17 +577,14 @@ function FilterSheet({ onClose }: { onClose: () => void }) {
           </button>
           {presetsMi.map((mi) => {
             const active = prefs.maxDistanceMi === mi;
-            const label = unit === "mi" ? `${mi} mi` : `${miToKm(kmToMi(miToKm(mi)))} km`;
-            // Show clean km numbers (5/10/25/50/100 mi) → convert mi→km for display.
-            const kmLabel = `${miToKm(mi)} km`;
+            const label = unit === "mi" ? `${mi} mi` : `${miToKm(mi)} km`;
             return (
               <button
                 key={mi}
                 onClick={() => setMaxMi(mi)}
                 className={`rounded-full border px-3 py-1.5 text-xs font-semibold ${active ? "border-lime bg-lime text-primary-foreground" : "border-border bg-surface"}`}
               >
-                {unit === "mi" ? `${mi} mi` : kmLabel}
-                {void label}
+                {label}
               </button>
             );
           })}
