@@ -113,7 +113,7 @@ type ActiveGame = {
   skill: string;
   title: string;
   location: string;
-  date: string | number | Date;
+  date: string;
   maxPlayers: number;
   joined: number;
 };
