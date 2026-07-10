@@ -17,6 +17,7 @@ export const Route = createFileRoute("/auth")({
 
 function AuthPage() {
   const nav = useNavigate();
+  const { next } = Route.useSearch();
   const { user, loading } = useAuth();
   const [mode, setMode] = useState<"signin" | "signup">("signin");
   const [email, setEmail] = useState("");
@@ -24,30 +25,35 @@ function AuthPage() {
   const [displayName, setDisplayName] = useState("");
   const [busy, setBusy] = useState(false);
 
-  useEffect(() => {
-    if (!loading && user) nav({ to: "/profile", replace: true });
-  }, [loading, user, nav]);
+  const goPostAuth = () => {
+    if (next) {
+      window.location.replace(next);
+    } else {
+      nav({ to: "/profile", replace: true });
+    }
+  };
 
-  // Belt-and-suspenders for mobile browsers (esp. iOS Chrome) where the
-  // OAuth popup's postMessage can race useAuth state. Listen directly for
-  // a session and navigate as soon as one exists, and do a one-shot
-  // getSession() check on mount in case the session was hydrated via
-  // storage event from the popup/other tab before this component mounted.
+  useEffect(() => {
+    if (!loading && user) goPostAuth();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loading, user]);
+
   useEffect(() => {
     let cancelled = false;
     supabase.auth.getSession().then(({ data }) => {
-      if (!cancelled && data.session) nav({ to: "/profile", replace: true });
+      if (!cancelled && data.session) goPostAuth();
     });
     const { data: sub } = supabase.auth.onAuthStateChange((event, session) => {
       if (session && (event === "SIGNED_IN" || event === "INITIAL_SESSION" || event === "TOKEN_REFRESHED")) {
-        nav({ to: "/profile", replace: true });
+        goPostAuth();
       }
     });
     return () => {
       cancelled = true;
       sub.subscription.unsubscribe();
     };
-  }, [nav]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
