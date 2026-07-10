@@ -273,8 +273,8 @@ export const GAMES: Game[] = [
     price: 0,
     indoor: false,
     isPrivate: false,
-    image: sportImage.Soccer,
-    description: "Casual flag football. Flags provided. Bring cleats or turfs.",
+    image: sportImage.Football,
+    description: "Casual football. Bring cleats or turfs.",
     equipment: ["Cleats", "Water"],
   },
   {
