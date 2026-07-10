@@ -25,7 +25,9 @@ const sportEmoji: Record<string, string> = {
 
 export function GameCard({ game, index = 0 }: { game: Game; index?: number }) {
   const joinedByMe = useIsJoined(game.id);
-  const joinedCount = Math.min(game.maxPlayers, game.joined + (joinedByMe ? 1 : 0));
+  const liveCount = useLiveParticipantCount(game.id);
+  const baseJoined = liveCount ?? game.joined;
+  const joinedCount = Math.min(game.maxPlayers, baseJoined + (joinedByMe && liveCount === undefined ? 1 : 0));
   const spotsLeft = game.maxPlayers - joinedCount;
   const fillPct = Math.round((joinedCount / game.maxPlayers) * 100);
   const navigate = useNavigate();
