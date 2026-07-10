@@ -241,6 +241,42 @@ function GameDetail() {
     // eslint-disable-next-line
   }, [game?.id, hostsThisGame]);
 
+  // Realtime: surface in-app toasts as other players join or leave.
+  // Compares snapshots of the live roster and skips the viewer's own
+  // actions (they already get a "You're in" / "You left" toast) and the
+  // first hydration (avoids a flood of "X joined" on page load).
+  const rosterInitializedRef = useMemo(() => ({ current: false, ids: new Set<string>() }), []);
+  useEffect(() => {
+    const currentIds = new Set(liveRoster.map((p) => p.userId));
+    if (!rosterInitializedRef.current) {
+      rosterInitializedRef.current = true;
+      rosterInitializedRef.ids = currentIds;
+      return;
+    }
+    const prev = rosterInitializedRef.ids;
+    const meId = user?.id ?? null;
+    for (const p of liveRoster) {
+      if (!prev.has(p.userId) && p.userId !== meId) {
+        toast.success(`${p.displayName} joined the game`, {
+          description: `${liveRoster.length}/${game?.maxPlayers ?? 0} players confirmed.`,
+          duration: 4000,
+        });
+      }
+    }
+    for (const oldId of prev) {
+      if (!currentIds.has(oldId) && oldId !== meId) {
+        const oldName =
+          // best-effort: we no longer have the profile, so keep it generic
+          "A player";
+        toast(`${oldName} left the game`, {
+          description: "A spot just opened up.",
+          duration: 4000,
+        });
+      }
+    }
+    rosterInitializedRef.ids = currentIds;
+  }, [liveRoster, user?.id, game?.maxPlayers, rosterInitializedRef]);
+
   if (!game) {
     return (
       <div className="min-h-dvh grid place-items-center px-6 text-center">
