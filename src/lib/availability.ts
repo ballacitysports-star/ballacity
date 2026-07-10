@@ -189,6 +189,18 @@ export async function setContactRequestStatus(id: string, status: ContactRequest
   if (error) throw error;
 }
 
+/**
+ * Cancel (delete) a pending contact/invite request that the current user sent.
+ * Only works for pending rows the sender owns; RLS enforces `from_user_id = auth.uid()`.
+ */
+export async function cancelContactRequest(id: string) {
+  const { error } = await supabase
+    .from("availability_contact_requests" as any)
+    .delete()
+    .eq("id", id);
+  if (error) throw error;
+}
+
 export type ExistingRequestStatus = "none" | "pending" | "accepted" | "declined" | "withdrawn";
 
 export type ExistingRequestSummary = {
