@@ -1438,14 +1438,13 @@ function RosterPlayerRow({
               ? `${rep.count} review${rep.count === 1 ? "" : "s"} · trust ${rep.trustScore}`
               : "No reviews yet"}
           </div>
-        </div>
         <button
           type="button"
-          onClick={remove}
+          onClick={removeAndBlock}
           disabled={busy}
-          className="inline-flex items-center gap-1 rounded-full border border-coral/40 bg-coral/10 px-3 py-1.5 text-xs font-bold text-coral disabled:opacity-50"
+          className="inline-flex items-center gap-1 rounded-full border border-coral/60 bg-coral/20 px-3 py-1.5 text-xs font-bold text-coral disabled:opacity-50"
         >
-          <XIcon className="h-3.5 w-3.5" /> Remove
+          Block
         </button>
       </div>
       <div className="mt-2 flex flex-wrap items-center gap-1.5">
