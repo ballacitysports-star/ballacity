@@ -1052,6 +1052,7 @@ function ContactDialog({
           gameId={isInvite ? (selected?.id ?? null) : null}
           refreshKey={refreshKey}
           onLoaded={(s: ExistingRequestSummary) => setExistingStatus(s.status)}
+          onCancelled={() => setExistingStatus("none")}
         />
 
 

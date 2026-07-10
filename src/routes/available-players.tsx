@@ -606,6 +606,7 @@ function ContactDialog({
           gameId={null}
           refreshKey={refreshKey}
           onLoaded={(s: ExistingRequestSummary) => setExistingStatus(s.status)}
+          onCancelled={() => setExistingStatus("none")}
         />
         <p className="text-sm text-muted-foreground">
           Send a short message introducing your team or session. {availability.author_name} can
