@@ -1685,20 +1685,35 @@ function HostPendingChip({
               "{req.message}"
             </div>
           )}
-          <div className="flex gap-1.5 mt-1">
+          <div className="flex flex-col gap-1.5 mt-1">
+            <div className="flex gap-1.5">
+              <button
+                disabled={busy}
+                onClick={() => act("rejected")}
+                className="flex-1 inline-flex items-center justify-center gap-1 rounded-xl border border-coral/40 text-coral py-1.5 text-xs font-semibold disabled:opacity-50"
+              >
+                <XIcon className="h-3.5 w-3.5" /> Decline
+              </button>
+              <button
+                disabled={busy}
+                onClick={() => act("approved")}
+                className="flex-1 inline-flex items-center justify-center gap-1 rounded-xl bg-lime-gradient text-primary-foreground py-1.5 text-xs font-semibold disabled:opacity-50"
+              >
+                <Check className="h-3.5 w-3.5" /> Approve
+              </button>
+            </div>
             <button
               disabled={busy}
-              onClick={() => act("rejected")}
-              className="flex-1 inline-flex items-center justify-center gap-1 rounded-xl border border-coral/40 text-coral py-1.5 text-xs font-semibold disabled:opacity-50"
+              onClick={async () => {
+                if (!confirm(`Block ${name}? They won't be able to join your future games.`))
+                  return;
+                await act("rejected");
+                blockUser(req.host_id, req.player_id);
+                toast.success(`${name} blocked.`);
+              }}
+              className="inline-flex items-center justify-center gap-1 rounded-xl border border-coral/60 bg-coral/10 text-coral py-1.5 text-xs font-semibold disabled:opacity-50"
             >
-              <XIcon className="h-3.5 w-3.5" /> Decline
-            </button>
-            <button
-              disabled={busy}
-              onClick={() => act("approved")}
-              className="flex-1 inline-flex items-center justify-center gap-1 rounded-xl bg-lime-gradient text-primary-foreground py-1.5 text-xs font-semibold disabled:opacity-50"
-            >
-              <Check className="h-3.5 w-3.5" /> Approve
+              Block from your games
             </button>
           </div>
         </motion.div>
