@@ -527,6 +527,24 @@ function FilterSheet({ onClose }: { onClose: () => void }) {
         </div>
 
         <div className="text-xs font-semibold text-muted-foreground mb-2 uppercase tracking-wider">
+          Sort by
+        </div>
+        <div className="flex gap-2 mb-5">
+          {(["nearest", "soonest"] as const).map((s) => {
+            const active = prefs.sortBy === s;
+            return (
+              <button
+                key={s}
+                onClick={() => setFeedPrefs({ ...prefs, sortBy: s })}
+                className={`flex-1 rounded-full border px-3 py-2 text-xs font-semibold ${active ? "border-lime bg-lime text-primary-foreground" : "border-border bg-surface"}`}
+              >
+                {s === "nearest" ? "Nearest" : "Soonest"}
+              </button>
+            );
+          })}
+        </div>
+
+        <div className="text-xs font-semibold text-muted-foreground mb-2 uppercase tracking-wider">
           Sport (Games)
         </div>
         <div className="flex flex-wrap gap-2 mb-5">
