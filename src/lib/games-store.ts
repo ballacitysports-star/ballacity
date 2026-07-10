@@ -1,15 +1,19 @@
 import { useMemo, useSyncExternalStore } from "react";
+import { supabase } from "@/integrations/supabase/client";
 
 const joined = new Set<string>();
 const listeners = new Set<() => void>();
 const STORAGE_KEY = "openrun.joinedGameIds.v1";
 let loaded = false;
+let hydrated = false;
+let hydratingPromise: Promise<void> | null = null;
+let realtimeAttached = false;
+let currentUserId: string | null = null;
 const EMPTY_SNAPSHOT = "[]";
 
 function loadJoinedGames() {
   if (loaded || typeof window === "undefined") return false;
   loaded = true;
-
   try {
     const raw = window.localStorage.getItem(STORAGE_KEY);
     const ids = raw ? JSON.parse(raw) : [];
@@ -22,13 +26,16 @@ function loadJoinedGames() {
   } catch {
     joined.clear();
   }
-
   return true;
 }
 
 function saveJoinedGames() {
   if (typeof window === "undefined") return;
-  window.localStorage.setItem(STORAGE_KEY, JSON.stringify(Array.from(joined)));
+  try {
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(Array.from(joined)));
+  } catch {
+    /* ignore */
+  }
 }
 
 function emit() {
@@ -37,6 +44,8 @@ function emit() {
 
 function getSnapshot() {
   loadJoinedGames();
+  ensureHydrated();
+  ensureRealtime();
   return JSON.stringify(Array.from(joined).sort());
 }
 
@@ -45,18 +54,127 @@ function subscribe(cb: () => void) {
   return () => listeners.delete(cb);
 }
 
-export function joinGame(id: string) {
-  loadJoinedGames();
-  joined.add(id);
+async function hydrateFromDb(userId: string) {
+  const { data, error } = await supabase
+    .from("game_participants")
+    .select("game_id")
+    .eq("user_id", userId);
+  if (error) return;
+  // Merge DB truth in; keep local-only entries for sample (non-DB) games.
+  (data ?? []).forEach((r) => joined.add(r.game_id));
   saveJoinedGames();
   emit();
 }
 
+function ensureHydrated() {
+  if (hydrated || typeof window === "undefined" || hydratingPromise) return;
+  hydratingPromise = (async () => {
+    const { data } = await supabase.auth.getUser();
+    currentUserId = data.user?.id ?? null;
+    if (currentUserId) await hydrateFromDb(currentUserId);
+    hydrated = true;
+  })().catch(() => {
+    hydratingPromise = null;
+  });
+}
+
+function ensureRealtime() {
+  if (realtimeAttached || typeof window === "undefined") return;
+  realtimeAttached = true;
+
+  let channel: ReturnType<typeof supabase.channel> | null = null;
+
+  const attach = (userId: string) => {
+    if (channel) supabase.removeChannel(channel);
+    channel = supabase
+      .channel(`game_participants:me:${userId}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "game_participants",
+          filter: `user_id=eq.${userId}`,
+        },
+        (payload) => {
+          if (payload.eventType === "INSERT") {
+            const row = payload.new as { game_id: string };
+            joined.add(row.game_id);
+          } else if (payload.eventType === "DELETE") {
+            const row = payload.old as { game_id: string };
+            joined.delete(row.game_id);
+          }
+          saveJoinedGames();
+          emit();
+        },
+      )
+      .subscribe();
+  };
+
+  if (currentUserId) attach(currentUserId);
+
+  supabase.auth.onAuthStateChange((event, session) => {
+    if (event === "SIGNED_IN" || event === "USER_UPDATED") {
+      const uid = session?.user?.id ?? null;
+      if (uid && uid !== currentUserId) {
+        currentUserId = uid;
+        hydrated = false;
+        hydratingPromise = null;
+        ensureHydrated();
+        attach(uid);
+      }
+    } else if (event === "SIGNED_OUT") {
+      currentUserId = null;
+      if (channel) {
+        supabase.removeChannel(channel);
+        channel = null;
+      }
+      joined.clear();
+      saveJoinedGames();
+      emit();
+    }
+  });
+}
+
+export function joinGame(id: string) {
+  loadJoinedGames();
+  if (joined.has(id)) return;
+  joined.add(id);
+  saveJoinedGames();
+  emit();
+  // Best-effort DB write; realtime will confirm.
+  void (async () => {
+    const { data } = await supabase.auth.getUser();
+    const uid = data.user?.id;
+    if (!uid) return;
+    const { error } = await supabase
+      .from("game_participants")
+      .insert({ game_id: id, user_id: uid });
+    if (error && error.code !== "23505") {
+      // Roll back on real failures (e.g. FK / RLS). Duplicate is fine.
+      joined.delete(id);
+      saveJoinedGames();
+      emit();
+    }
+  })();
+}
+
 export function leaveGame(id: string) {
   loadJoinedGames();
+  if (!joined.has(id)) return;
   joined.delete(id);
   saveJoinedGames();
   emit();
+  void (async () => {
+    const { data } = await supabase.auth.getUser();
+    const uid = data.user?.id;
+    if (!uid) return;
+    await supabase
+      .from("game_participants")
+      .delete()
+      .eq("game_id", id)
+      .eq("user_id", uid);
+  })();
 }
 
 export function isJoined(id: string): boolean {
