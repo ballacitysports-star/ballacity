@@ -48,6 +48,7 @@ import { useHostedGames, updateHostedGame, deleteHostedGame } from "@/lib/hosted
 import type { Game } from "@/lib/sample-data";
 import { LegalNotice } from "@/components/LegalNotice";
 import { useAuth } from "@/hooks/use-auth";
+import { useMyProfile } from "@/lib/user-prefs-store";
 import { getOrCreateDirectConversation } from "@/lib/messages";
 import { createNotification } from "@/lib/notifications";
 import { supabase } from "@/integrations/supabase/client";
@@ -138,6 +139,7 @@ function GameDetail() {
   const { participants: liveRoster } = useLiveParticipants(gameId);
   const nav = useNavigate();
   const { user } = useAuth();
+  const myProfile = useMyProfile(user);
   const [settings, setSettings] = useState<GamePaymentSettings | null>(null);
   const [mySubs, setMySubs] = useState<PaymentSubmission[]>([]);
   const [myReq, setMyReq] = useState<JoinRequest | null>(null);
@@ -239,6 +241,42 @@ function GameDetail() {
     // eslint-disable-next-line
   }, [game?.id, hostsThisGame]);
 
+  // Realtime: surface in-app toasts as other players join or leave.
+  // Compares snapshots of the live roster and skips the viewer's own
+  // actions (they already get a "You're in" / "You left" toast) and the
+  // first hydration (avoids a flood of "X joined" on page load).
+  const rosterInitializedRef = useMemo(() => ({ current: false, ids: new Set<string>() }), []);
+  useEffect(() => {
+    const currentIds = new Set(liveRoster.map((p) => p.userId));
+    if (!rosterInitializedRef.current) {
+      rosterInitializedRef.current = true;
+      rosterInitializedRef.ids = currentIds;
+      return;
+    }
+    const prev = rosterInitializedRef.ids;
+    const meId = user?.id ?? null;
+    for (const p of liveRoster) {
+      if (!prev.has(p.userId) && p.userId !== meId) {
+        toast.success(`${p.displayName} joined the game`, {
+          description: `${liveRoster.length}/${game?.maxPlayers ?? 0} players confirmed.`,
+          duration: 4000,
+        });
+      }
+    }
+    for (const oldId of prev) {
+      if (!currentIds.has(oldId) && oldId !== meId) {
+        const oldName =
+          // best-effort: we no longer have the profile, so keep it generic
+          "A player";
+        toast(`${oldName} left the game`, {
+          description: "A spot just opened up.",
+          duration: 4000,
+        });
+      }
+    }
+    rosterInitializedRef.ids = currentIds;
+  }, [liveRoster, user?.id, game?.maxPlayers, rosterInitializedRef]);
+
   if (!game) {
     return (
       <div className="min-h-dvh grid place-items-center px-6 text-center">
@@ -331,6 +369,17 @@ function GameDetail() {
         }
         leaveGame(game.id);
         toast("You left the game.");
+        // Notify host in real time that a player left.
+        if (gameHostId && user && gameHostId !== user.id) {
+          const who = myProfile?.name || user.email?.split("@")[0] || "A player";
+          void createNotification({
+            user_id: gameHostId,
+            type: "participant_left",
+            title: `${who} left ${game.title}`,
+            body: "Their spot is open again.",
+            link: `/games/${game.id}`,
+          }).catch(() => {});
+        }
         refreshStatus();
       } catch (e: any) {
         toast.error(e.message ?? "Could not leave.");
@@ -410,6 +459,17 @@ function GameDetail() {
     }
     joinGame(game.id);
     toast.success(`You're in! See you at ${game.location}.`);
+    // Notify host in real time that a new player joined.
+    if (gameHostId && user && gameHostId !== user.id) {
+      const who = myProfile?.name || user.email?.split("@")[0] || "A player";
+      void createNotification({
+        user_id: gameHostId,
+        type: "participant_joined",
+        title: `${who} joined ${game.title}`,
+        body: `${effectiveJoined + 1}/${game.maxPlayers} players confirmed.`,
+        link: `/games/${game.id}`,
+      }).catch(() => {});
+    }
   };
 
   const viewerPending =
