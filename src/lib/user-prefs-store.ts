@@ -68,6 +68,8 @@ export type FeedSectionToggles = {
 export type FeedPrefs = {
   preferredSports: Sport[];
   sections: FeedSectionToggles;
+  maxDistanceMi: number | null;
+  distanceUnit: "mi" | "km";
 };
 
 export const DEFAULT_PREFS: FeedPrefs = {
@@ -80,6 +82,8 @@ export const DEFAULT_PREFS: FeedPrefs = {
     paidOnly: false,
     freeOnly: false,
   },
+  maxDistanceMi: null,
+  distanceUnit: "mi",
 };
 
 // ---------- Generic JSON store ----------
