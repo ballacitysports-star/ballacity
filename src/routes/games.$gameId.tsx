@@ -1001,7 +1001,7 @@ function GameDetail() {
             <motion.button
               whileTap={{ scale: 0.97 }}
               onClick={handleJoin}
-              disabled={!joined && !isPending && !isConfirmed && spotsLeft <= 0}
+              disabled={requesting || (!joined && !isPending && !isConfirmed && spotsLeft <= 0)}
               className={`flex-1 rounded-2xl py-3.5 font-bold inline-flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed ${
                 isConfirmed
                   ? "bg-lime/15 border border-lime/40 text-lime"
