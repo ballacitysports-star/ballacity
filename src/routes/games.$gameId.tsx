@@ -1,5 +1,5 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import {
   ArrowLeft,
   Share2,
@@ -1153,53 +1153,86 @@ function GameDetail() {
           >
             <MessageCircle className="h-5 w-5" />
           </button>
-          {!isHost && (
-            <motion.button
-              whileTap={{ scale: 0.97 }}
-              onClick={handleJoin}
-              disabled={requesting || (!joined && !isPending && !isConfirmed && spotsLeft <= 0)}
-              className={`flex-1 rounded-2xl py-3.5 font-bold inline-flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed ${
-                isConfirmed
-                  ? "bg-lime/15 border border-lime/40 text-lime"
-                  : isPending
-                    ? "bg-surface border border-coral/40 text-coral"
-                    : joined
-                      ? "bg-surface border border-lime/40 text-lime"
-                      : "bg-lime-gradient text-primary-foreground glow-lime"
-              }`}
-            >
-              {isConfirmed ? (
-                <>
-                  <Check className="h-4 w-4" /> Confirmed · Tap to leave
-                </>
-              ) : isPending ? (
-                <>
-                  <Clock className="h-4 w-4" />{" "}
-                  {latestSub?.status === "pending"
-                    ? "Payment pending · Tap to withdraw"
-                    : "Request pending · Tap to cancel"}
-                </>
-              ) : joined && !isPaid ? (
-                <>
-                  <Check className="h-4 w-4" /> You're in · Tap to leave
-                </>
-              ) : spotsLeft <= 0 ? (
-                <>Full</>
-              ) : requiresApproval && !isApproved ? (
-                <>
-                  Request to join · {spotsLeft} spot{spotsLeft === 1 ? "" : "s"} left
-                </>
-              ) : isPaid ? (
-                <>
-                  <CreditCard className="h-4 w-4" /> Pay host · ${fee.toFixed(2)}
-                </>
-              ) : (
-                <>
-                  Join free · {spotsLeft} spot{spotsLeft === 1 ? "" : "s"} left
-                </>
-              )}
-            </motion.button>
-          )}
+          {!isHost && (() => {
+            const canJoinAction = joined || isPending || isConfirmed || spotsLeft > 0;
+            const buttonDisabled = requesting || !canJoinAction;
+            const LiveSpots = () => (
+              <span
+                className="inline-flex items-baseline"
+                aria-live="polite"
+                aria-atomic="true"
+                aria-label={`${spotsLeft} spot${spotsLeft === 1 ? "" : "s"} left`}
+              >
+                <AnimatePresence mode="popLayout" initial={false}>
+                  <motion.span
+                    key={spotsLeft}
+                    initial={{ y: -6, opacity: 0 }}
+                    animate={{ y: 0, opacity: 1 }}
+                    exit={{ y: 6, opacity: 0 }}
+                    transition={{ duration: 0.18 }}
+                    className="tabular-nums"
+                  >
+                    {spotsLeft}
+                  </motion.span>
+                </AnimatePresence>
+                <span className="ml-1">spot{spotsLeft === 1 ? "" : "s"} left</span>
+              </span>
+            );
+            return (
+              <motion.button
+                whileTap={{ scale: 0.97 }}
+                onClick={handleJoin}
+                disabled={buttonDisabled}
+                aria-live="polite"
+                aria-disabled={buttonDisabled}
+                className={`flex-1 rounded-2xl py-3.5 font-bold inline-flex items-center justify-center gap-2 transition-colors disabled:opacity-60 disabled:cursor-not-allowed ${
+                  isConfirmed
+                    ? "bg-lime/15 border border-lime/40 text-lime"
+                    : isPending
+                      ? "bg-surface border border-coral/40 text-coral"
+                      : joined
+                        ? "bg-surface border border-lime/40 text-lime"
+                        : spotsLeft <= 0
+                          ? "bg-surface border border-border text-muted-foreground"
+                          : "bg-lime-gradient text-primary-foreground glow-lime"
+                }`}
+              >
+                {isConfirmed ? (
+                  <>
+                    <Check className="h-4 w-4" /> Confirmed · Tap to leave
+                  </>
+                ) : isPending ? (
+                  <>
+                    <Clock className="h-4 w-4" />{" "}
+                    {latestSub?.status === "pending"
+                      ? "Payment pending · Tap to withdraw"
+                      : "Request pending · Tap to cancel"}
+                  </>
+                ) : joined && !isPaid ? (
+                  <>
+                    <Check className="h-4 w-4" /> You're in · Tap to leave
+                  </>
+                ) : spotsLeft <= 0 ? (
+                  <>
+                    <span className="inline-block h-2 w-2 rounded-full bg-coral animate-pulse" aria-hidden />
+                    Full · Waiting for a spot
+                  </>
+                ) : requiresApproval && !isApproved ? (
+                  <>
+                    Request to join · <LiveSpots />
+                  </>
+                ) : isPaid ? (
+                  <>
+                    <CreditCard className="h-4 w-4" /> Pay host · ${fee.toFixed(2)}
+                  </>
+                ) : (
+                  <>
+                    Join free · <LiveSpots />
+                  </>
+                )}
+              </motion.button>
+            );
+          })()}
         </div>
       </div>
 
