@@ -1067,7 +1067,13 @@ function GameDetail() {
         </div>
       </div>
 
-      {isHost && editOpen && <EditGameModal game={game} onClose={() => setEditOpen(false)} />}
+      {isHost && editOpen && (
+        <EditGameModal
+          game={game}
+          hostId={settings?.host_id ?? game.hostUserId ?? user?.id ?? ""}
+          onClose={() => setEditOpen(false)}
+        />
+      )}
     </div>
   );
 }
