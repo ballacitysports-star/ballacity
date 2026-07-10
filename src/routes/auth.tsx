@@ -117,33 +117,53 @@ function AuthPage() {
     }
   };
 
-  const google = async () => {
+  const google = () => {
+    // CRITICAL: call signInWithOAuth SYNCHRONOUSLY as the first statement
+    // in the click handler. iOS Chrome only treats popup.open() as a
+    // trusted user gesture if no awaits / state updates happen first.
+    const promise = lovable.auth.signInWithOAuth("google", {
+      redirect_uri: window.location.origin,
+    });
+
     setBusy(true);
-    // Nudge users on locked-down browsers / in-app webviews where the
-    // OAuth popup is silently blocked and no session ever arrives.
+
+    const showBlockedToast = () => {
+      toast.error("Google popup was blocked", {
+        description:
+          "Enable popups for this site (iOS Chrome: aA menu → Website Settings → Pop-ups), or open this page in Safari.",
+        action: {
+          label: "Copy link",
+          onClick: () => {
+            void navigator.clipboard?.writeText(window.location.href);
+            toast.success("Link copied");
+          },
+        },
+        duration: 12000,
+      });
+    };
+
     const hangTimer = window.setTimeout(async () => {
       const { data } = await supabase.auth.getSession();
-      if (!data.session) {
-        toast.error("Sign-in didn't complete", {
-          description:
-            "If a Google popup was blocked, allow popups for this site or try Safari. You can also sign in with email below.",
-          duration: 10000,
-        });
-      }
+      if (!data.session) showBlockedToast();
     }, 8000);
-    try {
-      const result = await lovable.auth.signInWithOAuth("google", {
-        redirect_uri: window.location.origin,
+
+    promise
+      .then((result) => {
+        if (result?.error) {
+          const msg = result.error.message || "";
+          if (/popup|blocked/i.test(msg)) showBlockedToast();
+          else toast.error(msg || "Google sign-in failed");
+        }
+      })
+      .catch((err: unknown) => {
+        const msg = err instanceof Error ? err.message : String(err);
+        if (/popup|blocked/i.test(msg)) showBlockedToast();
+        else toast.error(msg || "Google sign-in failed");
+      })
+      .finally(() => {
+        window.clearTimeout(hangTimer);
+        setBusy(false);
       });
-      if (result.error) {
-        toast.error(result.error.message || "Google sign-in failed");
-      }
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Google sign-in failed");
-    } finally {
-      window.clearTimeout(hangTimer);
-      setBusy(false);
-    }
   };
 
   return (
