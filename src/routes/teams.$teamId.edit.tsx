@@ -96,6 +96,19 @@ function EditOrg() {
   const [avatar, setAvatar] = useState(org.avatar);
   const [cover, setCover] = useState<string>(org.cover);
 
+  const canNext = useMemo(() => {
+    if (step === 1)
+      return (
+        name.trim().length > 1 &&
+        handle.trim().length > 1 &&
+        sports.length > 0 &&
+        city.trim().length > 0
+      );
+    if (step === 2) return bio.trim().length > 10;
+    if (step === 3) return true;
+    return false;
+  }, [step, name, handle, sports, city, bio]);
+
   if (!isMyOrg(org.id)) {
     return (
       <div className="mx-auto max-w-md px-6 pt-24 text-center">
@@ -111,22 +124,9 @@ function EditOrg() {
     );
   }
 
-
   const kind = org.kind;
   const computedAvatar = avatar || initials(name || "OR");
 
-  const canNext = useMemo(() => {
-    if (step === 1)
-      return (
-        name.trim().length > 1 &&
-        handle.trim().length > 1 &&
-        sports.length > 0 &&
-        city.trim().length > 0
-      );
-    if (step === 2) return bio.trim().length > 10;
-    if (step === 3) return true;
-    return false;
-  }, [step, name, handle, sports, city, bio]);
 
   const handlePreview: Org = {
     ...org,
