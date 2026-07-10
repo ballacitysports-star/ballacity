@@ -323,10 +323,20 @@ export function updateHostedGame(id: string, patch: Partial<Game>): Game | undef
   const dbPatch: TablesUpdate<"hosted_games"> = {};
   if (patch.title !== undefined) dbPatch.title = patch.title;
   if (patch.location !== undefined) dbPatch.location = patch.location;
+  if (patch.neighborhood !== undefined) dbPatch.neighborhood = patch.neighborhood;
   if (patch.date !== undefined) dbPatch.date = patch.date;
+  if (patch.duration !== undefined) dbPatch.duration = patch.duration;
   if (patch.maxPlayers !== undefined) dbPatch.max_players = patch.maxPlayers;
   if (patch.price !== undefined) dbPatch.price = patch.price;
   if (patch.description !== undefined) dbPatch.description = patch.description;
+  if (patch.sport !== undefined) dbPatch.sport = patch.sport;
+  if (patch.skill !== undefined) dbPatch.skill = patch.skill;
+  if (patch.indoor !== undefined) dbPatch.indoor = patch.indoor;
+  if (patch.isPrivate !== undefined) dbPatch.is_private = patch.isPrivate;
+  if (patch.image !== undefined) {
+    dbPatch.image = patch.image && patch.image !== imageFor(updated.sport) ? patch.image : "";
+  }
+  if (patch.equipment !== undefined) dbPatch.equipment = patch.equipment;
   if (patch.status !== undefined) dbPatch.status = patch.status;
   if ((patch as { joinsClosed?: boolean }).joinsClosed !== undefined) {
     dbPatch.joins_closed = (patch as { joinsClosed?: boolean }).joinsClosed;
@@ -341,6 +351,22 @@ export function updateHostedGame(id: string, patch: Partial<Game>): Game | undef
       });
   }
   return updated;
+}
+
+/** Delete a hosted game locally and in the DB. */
+export async function deleteHostedGame(id: string): Promise<void> {
+  loadLocal();
+  const prev = cache;
+  cache = cache.filter((g) => g.id !== id);
+  emit();
+  try {
+    const { error } = await supabase.from("hosted_games").delete().eq("id", id);
+    if (error) throw error;
+  } catch (err) {
+    cache = prev;
+    emit();
+    throw err;
+  }
 }
 
 /** List locally-hosted games that have no hostUserId yet. */
