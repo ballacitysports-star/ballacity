@@ -8,6 +8,7 @@ import { GamesMap, type MapPinItem } from "@/components/GamesMap";
 import { useMyProfile } from "@/lib/user-prefs-store";
 import { useHostedGames } from "@/lib/hosted-games-store";
 import { useAuth } from "@/hooks/use-auth";
+import { useLiveParticipantCount } from "@/lib/game-participants-store";
 
 export const Route = createFileRoute("/_tabs/discover")({
   head: () => ({ meta: [{ title: "Discover — OpenRun" }] }),
