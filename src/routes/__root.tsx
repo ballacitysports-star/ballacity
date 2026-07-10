@@ -213,9 +213,11 @@ function AuthGate({ children }: { children: React.ReactNode }) {
   return (
     <>
       {children}
+      <FloatingActions />
       <BottomNav />
     </>
   );
+
 }
 
 function RootComponent() {
