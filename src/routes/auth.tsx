@@ -118,7 +118,7 @@ function AuthPage() {
     }
   };
 
-  const google = () => {
+  const google = (opts: { isRetry?: boolean } = {}) => {
     // CRITICAL: call signInWithOAuth SYNCHRONOUSLY as the first statement
     // in the click handler. iOS Chrome only treats popup.open() as a
     // trusted user gesture if no awaits / state updates happen first.
@@ -127,6 +127,7 @@ function AuthPage() {
     });
 
     setBusy(true);
+    trackSigninEvent(opts.isRetry ? "retry_clicked" : "attempt");
 
     const ua = navigator.userAgent;
     const isIOS = /iPad|iPhone|iPod/.test(ua);
@@ -141,16 +142,22 @@ function AuthPage() {
           ? "This in-app browser blocks sign-in popups. Tap the ••• menu and choose 'Open in browser', then retry."
           : "Allow popups for this site in your browser settings, then retry.";
 
-    const showBlockedToast = () => {
+    let blockedReported = false;
+    const showBlockedToast = (errorMessage?: string) => {
+      if (!blockedReported) {
+        blockedReported = true;
+        trackSigninEvent("popup_blocked", { errorMessage: errorMessage ?? null });
+      }
       toast.error("Google sign-in popup was blocked", {
         description: browserGuidance,
         action: {
           label: "Retry",
-          onClick: () => google(),
+          onClick: () => google({ isRetry: true }),
         },
         cancel: {
           label: "Copy link",
           onClick: () => {
+            trackSigninEvent("copy_link_clicked");
             void navigator.clipboard?.writeText(window.location.href);
             toast.success("Link copied — paste it in another browser");
           },
@@ -163,21 +170,33 @@ function AuthPage() {
     // seconds. If nothing happens by 6s, it was almost certainly blocked.
     const hangTimer = window.setTimeout(async () => {
       const { data } = await supabase.auth.getSession();
-      if (!data.session) showBlockedToast();
+      if (!data.session) showBlockedToast("hang_timeout");
     }, 6000);
 
     promise
       .then((result) => {
         if (result?.error) {
           const msg = result.error.message || "";
-          if (/popup|blocked|window|opener/i.test(msg)) showBlockedToast();
-          else toast.error(msg || "Google sign-in failed");
+          if (/popup|blocked|window|opener/i.test(msg)) {
+            showBlockedToast(msg);
+          } else {
+            trackSigninEvent("failure", { errorMessage: msg });
+            toast.error(msg || "Google sign-in failed");
+          }
+        } else {
+          // Session may set asynchronously via onAuthStateChange; record
+          // that the OAuth round-trip resolved without error either way.
+          trackSigninEvent("success");
         }
       })
       .catch((err: unknown) => {
         const msg = err instanceof Error ? err.message : String(err);
-        if (/popup|blocked|window|opener/i.test(msg)) showBlockedToast();
-        else toast.error(msg || "Google sign-in failed");
+        if (/popup|blocked|window|opener/i.test(msg)) {
+          showBlockedToast(msg);
+        } else {
+          trackSigninEvent("failure", { errorMessage: msg });
+          toast.error(msg || "Google sign-in failed");
+        }
       })
       .finally(() => {
         window.clearTimeout(hangTimer);
