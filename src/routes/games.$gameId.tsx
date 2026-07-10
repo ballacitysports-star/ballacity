@@ -1078,7 +1078,15 @@ function GameDetail() {
   );
 }
 
-function EditGameModal({ game, onClose }: { game: Game; onClose: () => void }) {
+function EditGameModal({
+  game,
+  hostId,
+  onClose,
+}: {
+  game: Game;
+  hostId: string;
+  onClose: () => void;
+}) {
   const [title, setTitle] = useState(game.title);
   const [location, setLocation] = useState(game.location);
   const [dateLocal, setDateLocal] = useState(() => {
