@@ -10,8 +10,10 @@ import {
   Lock,
   Home,
   ShieldCheck,
+  ImagePlus,
+  X,
 } from "lucide-react";
-import { SPORTS, type Sport } from "@/lib/sample-data";
+import { SPORTS, type Sport, imageFor } from "@/lib/sample-data";
 import { addHostedGame } from "@/lib/hosted-games-store";
 import { useServerFn } from "@tanstack/react-start";
 import { reverseGeocode } from "@/lib/geocode.functions";
@@ -21,6 +23,8 @@ import { LocationAutocomplete } from "@/components/LocationAutocomplete";
 import { useMyProfile } from "@/lib/user-prefs-store";
 import { useAuth } from "@/hooks/use-auth";
 import { upsertGamePaymentSettings } from "@/lib/payments";
+import { supabase } from "@/integrations/supabase/client";
+
 
 export const Route = createFileRoute("/_tabs/create")({
   head: () => ({ meta: [{ title: "Host a game — OpenRun" }] }),
