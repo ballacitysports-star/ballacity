@@ -873,6 +873,22 @@ function GameDetail() {
                 )}
               </button>
             </div>
+            <button
+              type="button"
+              onClick={async () => {
+                if (!window.confirm("Delete this game? This can't be undone.")) return;
+                try {
+                  await deleteHostedGame(game.id);
+                  toast.success("Game deleted.");
+                  navigate({ to: "/" });
+                } catch {
+                  toast.error("Couldn't delete this game.");
+                }
+              }}
+              className="mt-2 w-full inline-flex items-center justify-center gap-2 rounded-xl border border-coral/40 bg-coral/10 text-coral py-2.5 text-xs font-bold"
+            >
+              <Trash2 className="h-4 w-4" /> Delete game
+            </button>
           </div>
 
           <button
