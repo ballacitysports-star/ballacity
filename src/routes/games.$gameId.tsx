@@ -277,7 +277,14 @@ function GameDetail() {
   //  - either there's no approval gate and they've joined locally, OR
   //    the host has confirmed/approved them (paid-verified or approved request).
   const viewerCountsAsJoined = !isHost && (isConfirmed || (joined && !requiresApproval && !isPaid));
-  const effectiveJoined = (game.joined ?? 0) + (viewerCountsAsJoined ? 1 : 0);
+  // Prefer the live participant count from `game_participants` (updates in
+  // real time when anyone joins/leaves on any device) and fall back to the
+  // cached `game.joined` counter until hydration completes. When we already
+  // have the live count, the viewer is already reflected in it — don't
+  // double-count them.
+  const baseJoined = liveParticipantCount ?? (game.joined ?? 0);
+  const viewerDelta = viewerCountsAsJoined && liveParticipantCount === undefined ? 1 : 0;
+  const effectiveJoined = baseJoined + viewerDelta;
   const spotsLeft = Math.max(0, game.maxPlayers - effectiveJoined);
 
   const handleJoin = async () => {
