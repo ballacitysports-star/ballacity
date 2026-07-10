@@ -213,6 +213,8 @@ function Create() {
               description,
               hostUserId: user?.id,
               host: hostSnap,
+              image: coverUrl ?? undefined,
+
             });
 
             // Persist host ownership + approval/fee preferences so the host & players see them on the detail page
