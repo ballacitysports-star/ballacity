@@ -133,6 +133,7 @@ function GameDetail() {
     [hosted, gameId],
   );
   const joined = useIsJoined(gameId);
+  const liveParticipantCount = useLiveParticipantCount(gameId);
   const nav = useNavigate();
   const { user } = useAuth();
   const [settings, setSettings] = useState<GamePaymentSettings | null>(null);
