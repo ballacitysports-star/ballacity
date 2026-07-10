@@ -37,11 +37,6 @@ function AuthPage() {
     });
     const { data: sub } = supabase.auth.onAuthStateChange((event, session) => {
       if (session && (event === "SIGNED_IN" || event === "INITIAL_SESSION" || event === "TOKEN_REFRESHED")) {
-        const email = session.user?.email;
-        const isGoogle = session.user?.app_metadata?.provider === "google";
-        if (email && isGoogle) {
-          try { window.localStorage.setItem("lastGoogleEmail", email); } catch {}
-        }
         nav({ to: "/profile", replace: true });
       }
     });
@@ -127,12 +122,9 @@ function AuthPage() {
     // CRITICAL: call signInWithOAuth SYNCHRONOUSLY as the first statement
     // in the click handler. iOS Chrome only treats popup.open() as a
     // trusted user gesture if no awaits / state updates happen first.
-    // Remember the last Google account so returning users skip the picker.
-    const lastEmail =
-      (typeof window !== "undefined" && window.localStorage.getItem("lastGoogleEmail")) || "";
     const promise = lovable.auth.signInWithOAuth("google", {
       redirect_uri: window.location.origin,
-      extraParams: lastEmail ? { login_hint: lastEmail } : { prompt: "select_account" },
+      extraParams: { prompt: "select_account" },
     });
 
     setBusy(true);
