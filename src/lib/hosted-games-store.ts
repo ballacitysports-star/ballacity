@@ -243,6 +243,7 @@ export type HostedGameInput = {
   description: string;
   host?: { name: string; username: string; avatar: string; rating?: number };
   hostUserId?: string;
+  image?: string; // optional custom cover URL
 };
 
 export async function addHostedGame(input: HostedGameInput): Promise<Game> {
@@ -275,10 +276,11 @@ export async function addHostedGame(input: HostedGameInput): Promise<Game> {
     price: input.price,
     indoor: input.indoor,
     isPrivate: input.isPrivate,
-    image: imageFor(input.sport),
+    image: input.image?.trim() || imageFor(input.sport),
     description: input.description || "",
     equipment: [],
   };
+
 
   // Optimistic local insert.
   cache = [game, ...cache];
