@@ -95,22 +95,22 @@ export function GameCard({ game, index = 0 }: { game: Game; index?: number }) {
                 Joined
               </span>
             )}
-            {game.trending && !game.urgent && !game.status && (
+            {game.trending && !game.urgent && liveStatus === "scheduled" && (
               <span className="inline-flex items-center gap-1 rounded-full bg-background/70 backdrop-blur px-2.5 py-1 text-xs font-semibold text-coral">
                 <Flame className="h-3 w-3" /> Trending
               </span>
             )}
-            {game.status === "in_progress" && (
+            {liveStatus === "in_progress" && (
               <span className="inline-flex items-center gap-1 rounded-full bg-coral px-2.5 py-1 text-xs font-bold text-white">
                 <span className="h-1.5 w-1.5 rounded-full bg-white animate-pulse" /> Live
               </span>
             )}
-            {game.status === "completed" && (
+            {liveStatus === "completed" && (
               <span className="inline-flex items-center gap-1 rounded-full bg-background/70 backdrop-blur px-2.5 py-1 text-xs font-semibold text-muted-foreground">
                 Completed
               </span>
             )}
-            {game.joinsClosed && !game.status && (
+            {game.joinsClosed && liveStatus === "scheduled" && (
               <span className="inline-flex items-center gap-1 rounded-full bg-background/70 backdrop-blur px-2.5 py-1 text-xs font-semibold">
                 <Lock className="h-3 w-3" /> Closed
               </span>
