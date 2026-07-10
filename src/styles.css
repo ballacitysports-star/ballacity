@@ -102,52 +102,72 @@
   --shadow-glow-coral: var(--shadow-glow-secondary);
 }
 
-/* Light theme — opt-in via `html.light` */
+/* Light theme — "Daylight Court": warm paper base, teal primary, amber accent */
 html.light {
-  --background: oklch(0.99 0.005 90);
-  --foreground: oklch(0.18 0.02 250);
-  --surface: oklch(0.97 0.008 90);
-  --surface-2: oklch(0.94 0.01 90);
+  --background: oklch(0.985 0.006 90);          /* warm paper */
+  --foreground: oklch(0.20 0.02 250);           /* near-ink */
+  --surface: oklch(0.965 0.008 90);
+  --surface-2: oklch(0.935 0.01 85);
 
   --card: oklch(1 0 0);
-  --card-foreground: oklch(0.18 0.02 250);
+  --card-foreground: oklch(0.20 0.02 250);
   --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.18 0.02 250);
+  --popover-foreground: oklch(0.20 0.02 250);
 
-  --primary: oklch(0.62 0.13 200);
+  --primary: oklch(0.58 0.13 200);              /* deeper Aurora Teal for AA on white */
   --primary-foreground: oklch(0.99 0.005 90);
-  --secondary: oklch(0.93 0.01 250);
-  --secondary-foreground: oklch(0.18 0.02 250);
+  --secondary: oklch(0.94 0.008 250);
+  --secondary-foreground: oklch(0.22 0.02 250);
 
-  --muted: oklch(0.95 0.008 250);
-  --muted-foreground: oklch(0.45 0.02 250);
+  --muted: oklch(0.955 0.006 90);
+  --muted-foreground: oklch(0.46 0.018 250);
 
-  --accent: oklch(0.72 0.13 65);
+  --accent: oklch(0.68 0.14 60);                /* deeper Champagne Amber */
   --accent-foreground: oklch(0.15 0.02 250);
 
-  --destructive: oklch(0.6 0.22 22);
+  --destructive: oklch(0.58 0.22 22);
   --destructive-foreground: oklch(0.99 0.005 90);
 
-  --success: oklch(0.62 0.15 155);
+  --success: oklch(0.58 0.15 155);
   --success-foreground: oklch(0.99 0.005 90);
-  --warning: oklch(0.72 0.14 82);
-  --warning-foreground: oklch(0.15 0.02 250);
-  --info: oklch(0.6 0.14 230);
+  --warning: oklch(0.68 0.14 78);
+  --warning-foreground: oklch(0.18 0.02 250);
+  --info: oklch(0.56 0.14 230);
   --info-foreground: oklch(0.99 0.005 90);
 
-  --border: oklch(0.18 0.02 250 / 10%);
-  --input: oklch(0.18 0.02 250 / 14%);
-  --ring: oklch(0.62 0.13 200);
+  --border: oklch(0.20 0.02 250 / 10%);
+  --input: oklch(0.20 0.02 250 / 12%);
+  --ring: oklch(0.58 0.13 200);
 
-  --lime: oklch(0.62 0.13 200);
-  --coral: oklch(0.72 0.13 65);
+  --lime: oklch(0.58 0.13 200);
+  --coral: oklch(0.68 0.14 60);
+
+  --gradient-hero:
+    radial-gradient(120% 80% at 80% 0%, oklch(0.68 0.14 60 / 0.16), transparent 60%),
+    radial-gradient(100% 80% at 0% 100%, oklch(0.58 0.13 200 / 0.14), transparent 55%),
+    linear-gradient(180deg, oklch(0.99 0.006 90), oklch(0.96 0.008 85));
+  --gradient-primary: linear-gradient(135deg, oklch(0.58 0.13 200), oklch(0.5 0.13 215));
+  --gradient-secondary: linear-gradient(135deg, oklch(0.72 0.14 60), oklch(0.62 0.16 40));
+  --gradient-lime: var(--gradient-primary);
+  --gradient-coral: var(--gradient-secondary);
+
+  --shadow-glow-primary: 0 10px 30px -12px oklch(0.58 0.13 200 / 0.35);
+  --shadow-glow-secondary: 0 10px 30px -12px oklch(0.68 0.14 60 / 0.3);
+  --shadow-glow-lime: var(--shadow-glow-primary);
+  --shadow-glow-coral: var(--shadow-glow-secondary);
 }
 html.light body {
   background:
-    radial-gradient(60% 40% at 50% -10%, oklch(0.72 0.13 65 / 0.08), transparent 60%),
-    radial-gradient(50% 40% at 100% 100%, oklch(0.62 0.13 200 / 0.06), transparent 60%),
+    radial-gradient(60% 40% at 50% -10%, oklch(0.68 0.14 60 / 0.10), transparent 60%),
+    radial-gradient(50% 40% at 100% 100%, oklch(0.58 0.13 200 / 0.08), transparent 60%),
     var(--background);
 }
+html.light .grid-noise {
+  background-image:
+    linear-gradient(to right, oklch(0.20 0.02 250 / 0.05) 1px, transparent 1px),
+    linear-gradient(to bottom, oklch(0.20 0.02 250 / 0.05) 1px, transparent 1px);
+}
+
 
 @layer base {
   * { border-color: var(--color-border); }
