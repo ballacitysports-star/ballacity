@@ -1045,6 +1045,15 @@ function ContactDialog({
           </DialogTitle>
         </DialogHeader>
 
+        <RequestStatusPanel
+          availabilityId={availability.id}
+          gameId={isInvite ? (selected?.id ?? null) : null}
+          refreshKey={refreshKey}
+          onLoaded={(s: ExistingRequestSummary) => setExistingStatus(s.status)}
+        />
+
+
+
         {isInvite && (
           <div className="space-y-2">
             <Label className="text-xs uppercase tracking-wider text-muted-foreground">
