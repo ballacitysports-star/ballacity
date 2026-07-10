@@ -1,7 +1,7 @@
 import { Link, useLocation } from "@tanstack/react-router";
-import { Home, Map, Plus, IdCard, Users, UserCheck, Dribbble, MessageCircle } from "lucide-react";
+import { Home, Map, Plus, IdCard, Users, UserCheck, Dribbble } from "lucide-react";
 import { motion } from "framer-motion";
-import { useUnreadMessageCount } from "@/lib/notifications";
+
 
 const items: { to: string; icon: typeof Home; label: string; key?: string }[] = [
   { to: "/feed", icon: Dribbble, label: "Pickup" },
