@@ -127,37 +127,55 @@ function AuthPage() {
 
     setBusy(true);
 
+    const ua = navigator.userAgent;
+    const isIOS = /iPad|iPhone|iPod/.test(ua);
+    const isIOSChrome = isIOS && /CriOS/.test(ua);
+    const isInAppWebview = /(FBAN|FBAV|Instagram|Line|Twitter|LinkedInApp|Snapchat|TikTok)/i.test(ua);
+
+    const browserGuidance = isIOSChrome
+      ? "In iOS Chrome, tap the ••• menu → Settings → Content Settings → Block Pop-ups → off. Or open this page in Safari."
+      : isIOS
+        ? "In Safari, go to Settings → Safari → turn off Block Pop-ups, then retry."
+        : isInAppWebview
+          ? "This in-app browser blocks sign-in popups. Tap the ••• menu and choose 'Open in browser', then retry."
+          : "Allow popups for this site in your browser settings, then retry.";
+
     const showBlockedToast = () => {
-      toast.error("Google popup was blocked", {
-        description:
-          "Enable popups for this site (iOS Chrome: aA menu → Website Settings → Pop-ups), or open this page in Safari.",
+      toast.error("Google sign-in popup was blocked", {
+        description: browserGuidance,
         action: {
+          label: "Retry",
+          onClick: () => google(),
+        },
+        cancel: {
           label: "Copy link",
           onClick: () => {
             void navigator.clipboard?.writeText(window.location.href);
-            toast.success("Link copied");
+            toast.success("Link copied — paste it in another browser");
           },
         },
-        duration: 12000,
+        duration: 15000,
       });
     };
 
+    // Shorter timer: if popup opens and completes, session lands within a few
+    // seconds. If nothing happens by 6s, it was almost certainly blocked.
     const hangTimer = window.setTimeout(async () => {
       const { data } = await supabase.auth.getSession();
       if (!data.session) showBlockedToast();
-    }, 8000);
+    }, 6000);
 
     promise
       .then((result) => {
         if (result?.error) {
           const msg = result.error.message || "";
-          if (/popup|blocked/i.test(msg)) showBlockedToast();
+          if (/popup|blocked|window|opener/i.test(msg)) showBlockedToast();
           else toast.error(msg || "Google sign-in failed");
         }
       })
       .catch((err: unknown) => {
         const msg = err instanceof Error ? err.message : String(err);
-        if (/popup|blocked/i.test(msg)) showBlockedToast();
+        if (/popup|blocked|window|opener/i.test(msg)) showBlockedToast();
         else toast.error(msg || "Google sign-in failed");
       })
       .finally(() => {
