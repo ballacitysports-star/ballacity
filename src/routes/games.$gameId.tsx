@@ -26,6 +26,7 @@ import { ReviewsSection } from "@/components/ReviewsSection";
 import { computeReputation, useReviewsFor } from "@/lib/reviews";
 import { ReputationBadge } from "@/components/ReputationBadge";
 import { joinGame, leaveGame, useIsJoined } from "@/lib/games-store";
+import { useLiveParticipantCount } from "@/lib/game-participants-store";
 import { toast } from "sonner";
 import { useEffect, useMemo, useState } from "react";
 import {
@@ -132,6 +133,7 @@ function GameDetail() {
     [hosted, gameId],
   );
   const joined = useIsJoined(gameId);
+  const liveParticipantCount = useLiveParticipantCount(gameId);
   const nav = useNavigate();
   const { user } = useAuth();
   const [settings, setSettings] = useState<GamePaymentSettings | null>(null);
@@ -275,7 +277,14 @@ function GameDetail() {
   //  - either there's no approval gate and they've joined locally, OR
   //    the host has confirmed/approved them (paid-verified or approved request).
   const viewerCountsAsJoined = !isHost && (isConfirmed || (joined && !requiresApproval && !isPaid));
-  const effectiveJoined = (game.joined ?? 0) + (viewerCountsAsJoined ? 1 : 0);
+  // Prefer the live participant count from `game_participants` (updates in
+  // real time when anyone joins/leaves on any device) and fall back to the
+  // cached `game.joined` counter until hydration completes. When we already
+  // have the live count, the viewer is already reflected in it — don't
+  // double-count them.
+  const baseJoined = liveParticipantCount ?? (game.joined ?? 0);
+  const viewerDelta = viewerCountsAsJoined && liveParticipantCount === undefined ? 1 : 0;
+  const effectiveJoined = baseJoined + viewerDelta;
   const spotsLeft = Math.max(0, game.maxPlayers - effectiveJoined);
 
   const handleJoin = async () => {
@@ -409,11 +418,18 @@ function GameDetail() {
     | { kind: "player"; initials: string; isMe: boolean; pending: false }
     | { kind: "viewerPending"; initials: "YOU"; isMe: true; pending: true }
     | { kind: "hostPending"; req: JoinRequest; pending: true };
+  // Non-"me" placeholder count: use the live baseline minus the viewer if
+  // the live count already includes them. Falls back to game.joined during
+  // hydration.
+  const otherPlayersCount = Math.max(
+    0,
+    (liveParticipantCount ?? game.joined ?? 0) - (viewerCountsAsJoined && liveParticipantCount !== undefined ? 1 : 0),
+  );
   const players: RosterEntry[] = [
     ...(viewerCountsAsJoined
       ? [{ kind: "player" as const, initials: "YOU", isMe: true, pending: false as const }]
       : []),
-    ...Array.from({ length: game.joined }, (_, i) => ({
+    ...Array.from({ length: otherPlayersCount }, (_, i) => ({
       kind: "player" as const,
       initials: ["MC", "AG", "JK", "RC", "TB", "SO", "PN", "DP", "EL", "VM"][i % 10],
       isMe: false,
@@ -940,12 +956,12 @@ function GameDetail() {
           {/* Roster (host view) */}
           <div>
             <h2 className="font-display text-sm font-bold uppercase tracking-wider text-muted-foreground mb-2">
-              Roster · {hostRequests.filter((r) => r.status === "approved").length + game.joined} /{" "}
+              Roster · {hostRequests.filter((r) => r.status === "approved").length + (liveParticipantCount ?? game.joined)} /{" "}
               {game.maxPlayers}
             </h2>
             <div className="space-y-2">
               {hostRequests.filter((r) => r.status === "approved").length === 0 &&
-              game.joined === 0 ? (
+              (liveParticipantCount ?? game.joined) === 0 ? (
                 <div className="rounded-2xl border border-dashed border-border bg-surface/40 p-3 text-xs text-muted-foreground">
                   No confirmed players yet.
                 </div>
@@ -962,7 +978,7 @@ function GameDetail() {
                         onChange={refreshHostRequests}
                       />
                     ))}
-                  {Array.from({ length: game.joined }).map((_, i) => (
+                  {Array.from({ length: liveParticipantCount ?? game.joined }).map((_, i) => (
                     <div
                       key={`ph-${i}`}
                       className="flex items-center gap-3 rounded-2xl border border-border bg-surface p-3"
