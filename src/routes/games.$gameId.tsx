@@ -49,6 +49,12 @@ import { getOrCreateDirectConversation } from "@/lib/messages";
 import { createNotification } from "@/lib/notifications";
 import { supabase } from "@/integrations/supabase/client";
 import { useCanReview } from "@/lib/transactions";
+import {
+  blockUser,
+  unblockUser,
+  isUserBlocked,
+  useBlockedUsers,
+} from "@/lib/blocked-users-store";
 
 const emojiBySport: Record<string, string> = Object.fromEntries(
   SPORTS.map((s) => [s.name, s.emoji]),
