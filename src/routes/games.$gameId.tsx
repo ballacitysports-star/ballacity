@@ -1188,7 +1188,9 @@ function EditGameModal({
             />
           </Field>
         </div>
+        <BlockedUsersSection hostId={hostId} />
         <div className="mt-4 flex items-center gap-2">
+
           <button
             onClick={onClose}
             className="flex-1 rounded-xl border border-border bg-background py-2.5 text-sm font-semibold"
