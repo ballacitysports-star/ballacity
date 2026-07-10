@@ -1,46 +1,26 @@
-## Fix: content doesn't load on mobile after Google login
+## Problem
 
-### Root cause
+On a paid game that requires host approval, tapping the CTA ("Request to join") sends the join request server-side but the button doesn't visibly flip to "Request pending · Tap to cancel" until a manual reload. The button state falls out of sync because:
 
-`src/hooks/use-auth.ts` initializes with `supabase.auth.getUser()` — a network call to the Auth server. On mobile webviews (especially the Lovable Android app) this frequently resolves BEFORE the Supabase client finishes rehydrating the persisted session from `localStorage`, so:
+- `handleJoin` fires `refreshStatus()` without awaiting it, and interleaves a `createNotification()` call in between that can delay/interfere with the local state update.
+- There is no optimistic update — `myReq` stays `null` until the next round-trip returns.
+- The button is not disabled while the request is inflight, so users tap again and see a "duplicate/idempotency" toast that further masks the pending state.
 
-1. `getUser()` returns "no user" over the network,
-2. `setAuthState({ user: null, loading: false })` fires,
-3. every screen that reads `useAuth()` renders its signed-out branch (Profile → "Sign in to view your profile"; feed → empty because RLS sees no bearer),
-4. by the time `onAuthStateChange` finally fires `INITIAL_SESSION`/`SIGNED_IN` with the real session, many data hooks have already run their one-shot `useEffect(..., [user?.id])` fetch against `user=null` and don't refetch until a manual reload.
+## Fix
 
-### The fix — restore the session first, then verify
+Edit `src/routes/games.$gameId.tsx` only.
 
-Change `initAuthStore()` in `src/hooks/use-auth.ts` to the pattern documented in `tanstack-supabase-integration` and the stack-overflow reference:
+1. **Optimistic pending state.** In the approval-gate branch of `handleJoin` (around lines 336–362), immediately after `createJoinRequest(...)` resolves, call `setMyReq(created)` with the returned row so `isRequestPending` becomes true on the next render.
+2. **Await the refresh.** Change the trailing `refreshStatus()` to `await refreshStatus()` so any server-side normalization (status, timestamps) lands before the handler returns.
+3. **Move `createNotification` off the critical path.** Fire it as `void createNotification(...).catch(() => {})` after the optimistic state update so a push/notification failure can never leave the CTA stuck.
+4. **Guard against double-taps.** Add a local `const [requesting, setRequesting] = useState(false)` and set it around the approval-gate branch. Include `requesting` in the CTA `disabled` prop so the button greys out during the in-flight request.
+5. **Same treatment for the confirmed-and-approved pay branch (lines 282–288)** for consistency: disable the button while navigating so the user gets a clear visual acknowledgement.
 
-1. Subscribe to `onAuthStateChange` FIRST (so no event is missed while we hydrate).
-2. Call `supabase.auth.getSession()` — this reads from `localStorage` and is what actually gates "auth is ready". Set `{ session, user: session?.user ?? null, loading: false }` from its result.
-3. Do NOT block hydration on `getUser()`. Fire it AFTER we've published the session, and only use it to upgrade `user` with the server-verified copy (or clear state if it returns an explicit "user not found" error, not a network error).
-4. In `onAuthStateChange`, keep ignoring `INITIAL_SESSION` with no session (so we don't clobber a session `getSession()` just published), and on any event WITH a session, update state + set `loading: false`.
+## Verification
 
-Net effect: on mobile, `loading` flips to `false` only once the persisted session is known, and `user` is populated the whole time the tab is signed in.
+- Sign in as a non-host on a paid + requires-approval game.
+- Tap "Request to join": CTA should immediately show "Request pending · Tap to cancel" without a reload.
+- Tap it again: it should cancel the request and revert to "Request to join".
+- Confirm no regression on: free game join, paid-no-approval pay flow, host approving (CTA flips to "Pay host · $X").
 
-### Belt-and-suspenders in the data hooks that showed the symptom
-
-Two hooks fire a Supabase query in `useEffect(..., [user?.id])` and never refetch if `user` arrives late:
-
-- `useMyProfile` in `src/lib/user-prefs-store.ts` (already keyed on `user?.id`, so the fix above resolves it once `user` becomes non-null — no change needed as long as `useAuth` no longer publishes a false-null).
-- The profile page's own `refreshRequests` / realtime subscription (`src/routes/_tabs.profile.tsx`, keyed on `profileUser?.id`) — same story.
-
-Both are correct once `useAuth` stops publishing `{ user: null, loading: false }` prematurely. No changes needed in these files.
-
-### Files changed
-
-- `src/hooks/use-auth.ts` — rewrite `initAuthStore()` per above. ~20 lines. No API change: `useAuth()`, `signOut()`, `getCurrentUser()` signatures stay identical.
-
-### Out of scope
-
-- No changes to `src/routes/auth.tsx` (the Google flow itself works — logs confirm token exchange succeeds and the hard-reload lands on `/profile`).
-- No changes to `__root.tsx`, route tree, or RLS.
-- No new queries or React Query wiring.
-
-### Verification
-
-- Lovable Android app: sign in with Google → land on `/profile` → profile card, cover, name, and joined games render on first paint (no "Sign in" flash, no empty feed).
-- Desktop Chrome: unchanged behavior; loading flips to false just as fast because `getSession()` is a local read.
-- Sign-out: `signOut()` still triggers `onAuthStateChange('SIGNED_OUT', null)` → state clears → profile falls back to signed-out CTA.
+No DB, RLS, or server-function changes required.

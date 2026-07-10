@@ -133,6 +133,7 @@ function GameDetail() {
   const [hostRequests, setHostRequests] = useState<JoinRequest[]>([]);
   const [messaging, setMessaging] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
+  const [requesting, setRequesting] = useState(false);
 
   // effectiveJoined is computed below, after settings/myReq/isHost resolve.
   // Placeholder removed — see definition near line 161.
@@ -283,6 +284,7 @@ function GameDetail() {
       const search: { invite?: true; from?: string } = {};
       if (isInvite) search.invite = true;
       if (inviteFrom) search.from = inviteFrom;
+      setRequesting(true);
       nav({ to: "/games/$gameId/pay", params: { gameId: game.id }, search });
       return;
     }
@@ -345,19 +347,25 @@ function GameDetail() {
         toast.error("This invite link is invalid or has been tampered with.");
         return;
       }
+      setRequesting(true);
       try {
-        await createJoinRequest({ game_id: game.id, host_id: settings.host_id });
-        await createNotification({
+        const created = await createJoinRequest({ game_id: game.id, host_id: settings.host_id });
+        // Optimistic: flip CTA to "Request pending" immediately.
+        setMyReq(created);
+        // Fire notification off the critical path — failure must not stall the UI.
+        void createNotification({
           user_id: settings.host_id,
           type: "join_request",
           title: `New request to join ${game.title}`,
           body: "Tap to review.",
           link: `/games/${game.id}`,
-        });
+        }).catch(() => {});
         toast.success("Request sent. The host will review it.");
-        refreshStatus();
+        await refreshStatus();
       } catch (e: any) {
         toast.error(e.message ?? "Could not send request.");
+      } finally {
+        setRequesting(false);
       }
       return;
     }
@@ -993,7 +1001,7 @@ function GameDetail() {
             <motion.button
               whileTap={{ scale: 0.97 }}
               onClick={handleJoin}
-              disabled={!joined && !isPending && !isConfirmed && spotsLeft <= 0}
+              disabled={requesting || (!joined && !isPending && !isConfirmed && spotsLeft <= 0)}
               className={`flex-1 rounded-2xl py-3.5 font-bold inline-flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed ${
                 isConfirmed
                   ? "bg-lime/15 border border-lime/40 text-lime"
