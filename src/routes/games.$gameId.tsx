@@ -961,7 +961,7 @@ function GameDetail() {
             </h2>
             <div className="space-y-2">
               {hostRequests.filter((r) => r.status === "approved").length === 0 &&
-              game.joined === 0 ? (
+              (liveParticipantCount ?? game.joined) === 0 ? (
                 <div className="rounded-2xl border border-dashed border-border bg-surface/40 p-3 text-xs text-muted-foreground">
                   No confirmed players yet.
                 </div>
