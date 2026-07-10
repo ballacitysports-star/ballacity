@@ -4,6 +4,7 @@ import { MapPin, Users, Clock, Zap, Lock, Flame, MessageCircle } from "lucide-re
 import type { Game } from "@/lib/sample-data";
 import { formatWhen } from "@/lib/format";
 import { useIsJoined } from "@/lib/games-store";
+import { useLiveParticipantCount } from "@/lib/game-participants-store";
 import { useLiveStatus } from "@/lib/live-status";
 import { getOrCreateDirectConversation } from "@/lib/messages";
 import { useAuth } from "@/hooks/use-auth";
