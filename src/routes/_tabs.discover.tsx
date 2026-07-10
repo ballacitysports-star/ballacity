@@ -152,7 +152,7 @@ function ActiveGameCard({ game }: { game: ActiveGame }) {
             <span className="truncate">{game.location}</span>
           </div>
           <div className="flex items-center justify-between mt-1.5">
-            <span className="text-xs">{formatWhen(game.date as Date)}</span>
+            <span className="text-xs">{formatWhen(game.date)}</span>
             <span
               aria-live="polite"
               className="rounded-full bg-lime px-2.5 py-0.5 text-[11px] font-bold text-primary-foreground"
