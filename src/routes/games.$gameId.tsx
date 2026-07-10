@@ -347,19 +347,25 @@ function GameDetail() {
         toast.error("This invite link is invalid or has been tampered with.");
         return;
       }
+      setRequesting(true);
       try {
-        await createJoinRequest({ game_id: game.id, host_id: settings.host_id });
-        await createNotification({
+        const created = await createJoinRequest({ game_id: game.id, host_id: settings.host_id });
+        // Optimistic: flip CTA to "Request pending" immediately.
+        setMyReq(created);
+        // Fire notification off the critical path — failure must not stall the UI.
+        void createNotification({
           user_id: settings.host_id,
           type: "join_request",
           title: `New request to join ${game.title}`,
           body: "Tap to review.",
           link: `/games/${game.id}`,
-        });
+        }).catch(() => {});
         toast.success("Request sent. The host will review it.");
-        refreshStatus();
+        await refreshStatus();
       } catch (e: any) {
         toast.error(e.message ?? "Could not send request.");
+      } finally {
+        setRequesting(false);
       }
       return;
     }
