@@ -28,7 +28,9 @@ import {
   deleteAvailability,
   listOpenAvailabilities,
   type PlayerAvailability,
+  type ExistingRequestSummary,
 } from "@/lib/availability";
+import { RequestStatusPanel } from "@/components/RequestStatusPanel";
 import { getOrCreateDirectConversation } from "@/lib/messages";
 import { useHostedGames } from "@/lib/hosted-games-store";
 import type { Game } from "@/lib/sample-data";
