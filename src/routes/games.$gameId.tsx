@@ -418,11 +418,18 @@ function GameDetail() {
     | { kind: "player"; initials: string; isMe: boolean; pending: false }
     | { kind: "viewerPending"; initials: "YOU"; isMe: true; pending: true }
     | { kind: "hostPending"; req: JoinRequest; pending: true };
+  // Non-"me" placeholder count: use the live baseline minus the viewer if
+  // the live count already includes them. Falls back to game.joined during
+  // hydration.
+  const otherPlayersCount = Math.max(
+    0,
+    (liveParticipantCount ?? game.joined ?? 0) - (viewerCountsAsJoined && liveParticipantCount !== undefined ? 1 : 0),
+  );
   const players: RosterEntry[] = [
     ...(viewerCountsAsJoined
       ? [{ kind: "player" as const, initials: "YOU", isMe: true, pending: false as const }]
       : []),
-    ...Array.from({ length: game.joined }, (_, i) => ({
+    ...Array.from({ length: otherPlayersCount }, (_, i) => ({
       kind: "player" as const,
       initials: ["MC", "AG", "JK", "RC", "TB", "SO", "PN", "DP", "EL", "VM"][i % 10],
       isMe: false,
