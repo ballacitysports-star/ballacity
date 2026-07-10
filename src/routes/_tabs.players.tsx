@@ -1015,8 +1015,14 @@ function ContactDialog({
       toast.success(isInvite ? "Invite sent" : "Contact request sent");
       onClose();
     } catch (e: any) {
-      if (String(e.message).includes("duplicate")) toast.error("You've already sent a request.");
-      else toast.error(e.message);
+      const msg = String(e?.message ?? "");
+      if (msg.includes("duplicate") || (e as { code?: string })?.code === "23505") {
+        toast.error(
+          isInvite
+            ? "You already have a pending invite to this player for this game."
+            : "You already have a pending request to this player.",
+        );
+      } else toast.error(msg || "Couldn't send request");
     } finally {
       setSaving(false);
     }
