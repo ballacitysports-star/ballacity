@@ -228,7 +228,7 @@ function AuthPage() {
         </div>
 
         <button
-          onClick={google}
+          onClick={() => google()}
           disabled={busy}
           className="w-full rounded-full border border-border bg-surface px-4 py-3 text-sm font-bold flex items-center justify-center gap-2 disabled:opacity-50"
         >
