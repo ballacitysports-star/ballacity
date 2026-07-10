@@ -122,9 +122,12 @@ function AuthPage() {
     // CRITICAL: call signInWithOAuth SYNCHRONOUSLY as the first statement
     // in the click handler. iOS Chrome only treats popup.open() as a
     // trusted user gesture if no awaits / state updates happen first.
+    // Remember the last Google account so returning users skip the picker.
+    const lastEmail =
+      (typeof window !== "undefined" && window.localStorage.getItem("lastGoogleEmail")) || "";
     const promise = lovable.auth.signInWithOAuth("google", {
       redirect_uri: window.location.origin,
-      extraParams: { prompt: "select_account" },
+      extraParams: lastEmail ? { login_hint: lastEmail } : { prompt: "select_account" },
     });
 
     setBusy(true);
