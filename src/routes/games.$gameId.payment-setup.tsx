@@ -172,7 +172,7 @@ function SetupPage() {
                   key={m.id}
                   onClick={() => {
                     const n = new Set(selected);
-                    on ? n.delete(m.id) : n.add(m.id);
+                    if (on) n.delete(m.id); else n.add(m.id);
                     setSelected(n);
                   }}
                   className={`w-full flex items-center gap-3 rounded-2xl border p-3 text-left ${
