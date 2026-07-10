@@ -44,12 +44,16 @@ async function assertNoTamperToast(page: Page) {
   await expect(toast).toHaveCount(0);
 }
 
-test("invite=0 with `from` → fallback: no banner, no error, normal Join CTA", async ({ browser }) => {
+test("invite=0 with `from` → fallback: no banner, no error, normal Join CTA", async ({
+  browser,
+}) => {
   const ctx = await browser.newContext();
   const page = await ctx.newPage();
   await restoreSession(page);
 
-  await page.goto(`/games/${GAME_ID}?invite=0&from=${FAKE_HOST_ID}`, { waitUntil: "domcontentloaded" });
+  await page.goto(`/games/${GAME_ID}?invite=0&from=${FAKE_HOST_ID}`, {
+    waitUntil: "domcontentloaded",
+  });
 
   // Land on the game page, invite params stripped/normalized: `invite=0` is not "1".
   await page.waitForURL((u) => u.pathname === `/games/${GAME_ID}`, { timeout: 10_000 });
@@ -89,12 +93,16 @@ test("`from` param alone (no invite) → fallback: no banner, no error", async (
   await ctx.close();
 });
 
-test("invite=bogus with junk `from` → fallback: params stripped, no banner", async ({ browser }) => {
+test("invite=bogus with junk `from` → fallback: params stripped, no banner", async ({
+  browser,
+}) => {
   const ctx = await browser.newContext();
   const page = await ctx.newPage();
   await restoreSession(page);
 
-  await page.goto(`/games/${GAME_ID}?invite=totally-bogus&from=%20`, { waitUntil: "domcontentloaded" });
+  await page.goto(`/games/${GAME_ID}?invite=totally-bogus&from=%20`, {
+    waitUntil: "domcontentloaded",
+  });
   await page.waitForURL((u) => u.pathname === `/games/${GAME_ID}`, { timeout: 10_000 });
 
   await assertNoInviteBanner(page);
@@ -111,15 +119,16 @@ test("invite=bogus with junk `from` → fallback: params stripped, no banner", a
   await ctx.close();
 });
 
-test("unknown gameId with invite params → routes to notFound fallback, not invite flow", async ({ browser }) => {
+test("unknown gameId with invite params → routes to notFound fallback, not invite flow", async ({
+  browser,
+}) => {
   const ctx = await browser.newContext();
   const page = await ctx.newPage();
   await restoreSession(page);
 
-  await page.goto(
-    `/games/does-not-exist?invite=1&from=${FAKE_HOST_ID}`,
-    { waitUntil: "domcontentloaded" },
-  );
+  await page.goto(`/games/does-not-exist?invite=1&from=${FAKE_HOST_ID}`, {
+    waitUntil: "domcontentloaded",
+  });
 
   // The route's notFoundComponent renders "Game not found" with a Back to feed link.
   const notFound = page.getByRole("heading", { name: /game not found/i });

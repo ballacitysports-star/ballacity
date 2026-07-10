@@ -10,8 +10,14 @@ import { useState } from "react";
 import { toast } from "sonner";
 
 const sportEmoji: Record<string, string> = {
-  Basketball: "🏀", Soccer: "⚽", Pickleball: "🥒", Volleyball: "🏐",
-  Tennis: "🎾", "Flag Football": "🏈", Baseball: "⚾", Softball: "🥎",
+  Basketball: "🏀",
+  Soccer: "⚽",
+  Pickleball: "🥒",
+  Volleyball: "🏐",
+  Tennis: "🎾",
+  "Flag Football": "🏈",
+  Baseball: "⚾",
+  Softball: "🥎",
   Running: "🏃",
 };
 
@@ -34,8 +40,14 @@ export function GameCard({ game, index = 0 }: { game: Game; index?: number }) {
     e.preventDefault();
     e.stopPropagation();
     if (!hostUserId) return;
-    if (!user) { toast.error("Sign in to message the host."); return; }
-    if (hostUserId === user.id) { navigate({ to: "/messages" }); return; }
+    if (!user) {
+      toast.error("Sign in to message the host.");
+      return;
+    }
+    if (hostUserId === user.id) {
+      navigate({ to: "/messages" });
+      return;
+    }
     setOpening(true);
     try {
       const id = await getOrCreateDirectConversation(hostUserId, game.id);
@@ -68,7 +80,8 @@ export function GameCard({ game, index = 0 }: { game: Game; index?: number }) {
           <div className="absolute inset-0 bg-gradient-to-t from-surface via-surface/30 to-transparent" />
           <div className="absolute top-3 left-3 flex flex-wrap gap-1.5">
             <span className="inline-flex items-center gap-1 rounded-full bg-background/70 backdrop-blur px-2.5 py-1 text-xs font-semibold">
-              <span>{sportEmoji[game.sport]}</span>{game.sport}
+              <span>{sportEmoji[game.sport]}</span>
+              {game.sport}
             </span>
             {game.urgent && (
               <span className="inline-flex items-center gap-1 rounded-full bg-coral-gradient px-2.5 py-1 text-xs font-bold text-white">
@@ -88,20 +101,32 @@ export function GameCard({ game, index = 0 }: { game: Game; index?: number }) {
           </div>
           <div className="absolute top-3 right-3">
             {game.price === 0 ? (
-              <span className="rounded-full bg-lime px-2.5 py-1 text-xs font-bold text-primary-foreground">FREE</span>
+              <span className="rounded-full bg-lime px-2.5 py-1 text-xs font-bold text-primary-foreground">
+                FREE
+              </span>
             ) : (
-              <span className="rounded-full bg-background/70 backdrop-blur px-2.5 py-1 text-xs font-bold">${game.price}</span>
+              <span className="rounded-full bg-background/70 backdrop-blur px-2.5 py-1 text-xs font-bold">
+                ${game.price}
+              </span>
             )}
           </div>
           <div className="absolute bottom-3 left-3 right-3">
-            <h3 className="font-display text-xl font-bold text-foreground drop-shadow-lg">{game.title}</h3>
+            <h3 className="font-display text-xl font-bold text-foreground drop-shadow-lg">
+              {game.title}
+            </h3>
           </div>
         </div>
 
         <div className="p-4 space-y-3">
           <div className="flex items-center gap-3 text-sm text-muted-foreground">
-            <span className="inline-flex items-center gap-1.5" suppressHydrationWarning><Clock className="h-4 w-4 text-lime" />{formatWhen(game.date)}</span>
-            <span className="inline-flex items-center gap-1.5"><MapPin className="h-4 w-4 text-coral" />{game.distanceMi} mi</span>
+            <span className="inline-flex items-center gap-1.5" suppressHydrationWarning>
+              <Clock className="h-4 w-4 text-lime" />
+              {formatWhen(game.date)}
+            </span>
+            <span className="inline-flex items-center gap-1.5">
+              <MapPin className="h-4 w-4 text-coral" />
+              {game.distanceMi} mi
+            </span>
             {game.isPrivate && <Lock className="h-4 w-4" />}
           </div>
           <div className="flex items-center justify-between gap-3">
@@ -147,7 +172,9 @@ export function GameCard({ game, index = 0 }: { game: Game; index?: number }) {
               )}
               <div className="flex items-center gap-1.5 text-xs font-semibold">
                 <Users className="h-4 w-4 text-lime" />
-                <span className="text-foreground">{joinedCount}/{game.maxPlayers}</span>
+                <span className="text-foreground">
+                  {joinedCount}/{game.maxPlayers}
+                </span>
                 {spotsLeft > 0 && spotsLeft <= 3 && (
                   <span className="text-coral">· {spotsLeft} left</span>
                 )}

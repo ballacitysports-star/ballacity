@@ -16,7 +16,10 @@ export function addOrg(org: Org) {
   emit();
 }
 
-export function updateOrg(id: string, patch: Partial<Omit<Org, "id" | "kind" | "upcoming" | "posts">>) {
+export function updateOrg(
+  id: string,
+  patch: Partial<Omit<Org, "id" | "kind" | "upcoming" | "posts">>,
+) {
   const idx = ORGS.findIndex((o) => o.id === id);
   if (idx === -1) return;
   ORGS[idx] = { ...ORGS[idx], ...patch };
@@ -49,11 +52,19 @@ function subscribe(cb: () => void) {
 }
 
 export function useMyOrgs(): Org[] {
-  useSyncExternalStore(subscribe, () => version, () => version);
+  useSyncExternalStore(
+    subscribe,
+    () => version,
+    () => version,
+  );
   return getMyOrgs();
 }
 
 export function useAllOrgs(): Org[] {
-  useSyncExternalStore(subscribe, () => version, () => version);
+  useSyncExternalStore(
+    subscribe,
+    () => version,
+    () => version,
+  );
   return ORGS;
 }

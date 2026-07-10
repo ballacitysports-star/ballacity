@@ -46,59 +46,74 @@ function sessionUserId(): string {
 
 const isTable = (url: string, table: string) => url.includes(`/rest/v1/${table}`);
 
-test("realtime approval flips pay page from gate to picker (no focus / reload)", async ({ browser }) => {
+test("realtime approval flips pay page from gate to picker (no focus / reload)", async ({
+  browser,
+}) => {
   test.setTimeout(30_000);
 
   const userId = sessionUserId();
   const ctx = await browser.newContext();
   const page = await ctx.newPage();
 
-  await page.route((u) => isTable(u, "game_payment_settings"), async (route: PWRoute) => {
-    if (route.request().method() !== "GET") return route.fallback();
-    await route.fulfill({
-      status: 200,
-      contentType: "application/json",
-      body: JSON.stringify([{
-        id: "mock-settings-id",
-        game_id: GAME_ID,
-        host_id: FAKE_HOST_ID,
-        entry_fee: ENTRY_FEE,
-        accepted_method_ids: [METHOD_ID],
-        payment_deadline: null,
-        refund_policy: null,
-        payment_instructions: null,
-        requires_approval: true,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      }]),
-    });
-  });
+  await page.route(
+    (u) => isTable(u, "game_payment_settings"),
+    async (route: PWRoute) => {
+      if (route.request().method() !== "GET") return route.fallback();
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify([
+          {
+            id: "mock-settings-id",
+            game_id: GAME_ID,
+            host_id: FAKE_HOST_ID,
+            entry_fee: ENTRY_FEE,
+            accepted_method_ids: [METHOD_ID],
+            payment_deadline: null,
+            refund_policy: null,
+            payment_instructions: null,
+            requires_approval: true,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          },
+        ]),
+      });
+    },
+  );
 
-  await page.route((u) => isTable(u, "host_payment_methods"), async (route: PWRoute) => {
-    if (route.request().method() !== "GET") return route.fallback();
-    await route.fulfill({
-      status: 200,
-      contentType: "application/json",
-      body: JSON.stringify([{
-        id: METHOD_ID,
-        host_id: FAKE_HOST_ID,
-        payment_type: "venmo",
-        label: "Venmo",
-        username: "@testhost",
-        payment_url: "https://venmo.com/u/testhost",
-        contact_info: null,
-        instructions: null,
-        is_enabled: true,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      }]),
-    });
-  });
+  await page.route(
+    (u) => isTable(u, "host_payment_methods"),
+    async (route: PWRoute) => {
+      if (route.request().method() !== "GET") return route.fallback();
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify([
+          {
+            id: METHOD_ID,
+            host_id: FAKE_HOST_ID,
+            payment_type: "venmo",
+            label: "Venmo",
+            username: "@testhost",
+            payment_url: "https://venmo.com/u/testhost",
+            contact_info: null,
+            instructions: null,
+            is_enabled: true,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          },
+        ]),
+      });
+    },
+  );
 
-  await page.route((u) => isTable(u, "payment_submissions"), async (route: PWRoute) => {
-    if (route.request().method() !== "GET") return route.fallback();
-    await route.fulfill({ status: 200, contentType: "application/json", body: "[]" });
-  });
+  await page.route(
+    (u) => isTable(u, "payment_submissions"),
+    async (route: PWRoute) => {
+      if (route.request().method() !== "GET") return route.fallback();
+      await route.fulfill({ status: 200, contentType: "application/json", body: "[]" });
+    },
+  );
 
   let approved = false;
   let joinGets = 0;
@@ -115,15 +130,18 @@ test("realtime approval flips pay page from gate to picker (no focus / reload)",
     reviewed_at: status === "approved" ? new Date().toISOString() : null,
     idempotency_key: `join:${GAME_ID}`,
   });
-  await page.route((u) => isTable(u, "join_requests"), async (route: PWRoute) => {
-    if (route.request().method() !== "GET") return route.fallback();
-    joinGets += 1;
-    await route.fulfill({
-      status: 200,
-      contentType: "application/json",
-      body: JSON.stringify([row(approved ? "approved" : "pending")]),
-    });
-  });
+  await page.route(
+    (u) => isTable(u, "join_requests"),
+    async (route: PWRoute) => {
+      if (route.request().method() !== "GET") return route.fallback();
+      joinGets += 1;
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify([row(approved ? "approved" : "pending")]),
+      });
+    },
+  );
 
   await restoreSession(page);
   await page.goto(`/games/${GAME_ID}/pay`, { waitUntil: "domcontentloaded" });
@@ -135,11 +153,17 @@ test("realtime approval flips pay page from gate to picker (no focus / reload)",
 
   // Wait for the pay page's realtime channel to be registered.
   await expect
-    .poll(async () => page.evaluate(async () => {
-      const mod = await import("/src/integrations/supabase/client.ts");
-      const chans = mod.supabase.getChannels();
-      return chans.some((c: any) => typeof c.topic === "string" && c.topic.includes("pay-join-req:"));
-    }), { timeout: 10_000, message: "pay-page realtime channel never registered" })
+    .poll(
+      async () =>
+        page.evaluate(async () => {
+          const mod = await import("/src/integrations/supabase/client.ts");
+          const chans = mod.supabase.getChannels();
+          return chans.some(
+            (c: any) => typeof c.topic === "string" && c.topic.includes("pay-join-req:"),
+          );
+        }),
+      { timeout: 10_000, message: "pay-page realtime channel never registered" },
+    )
     .toBe(true);
 
   const getsBeforeApproval = joinGets;
@@ -152,42 +176,50 @@ test("realtime approval flips pay page from gate to picker (no focus / reload)",
   // callback(s) directly. This is exactly what supabase-js does when a live
   // frame arrives from the realtime server. We deliberately do NOT fire a
   // focus/visibility event or reload the page.
-  const invoked = await page.evaluate(async ({ userId, gameId, hostId }) => {
-    const mod = await import("/src/integrations/supabase/client.ts");
-    const chans = mod.supabase.getChannels();
-    let count = 0;
-    for (const ch of chans as any[]) {
-      if (typeof ch.topic !== "string" || !ch.topic.includes("pay-join-req:")) continue;
-      const bindings =
-        (ch.bindings && (ch.bindings.postgres_changes || ch.bindings["postgres_changes"])) || [];
-      const payload = {
-        schema: "public",
-        table: "join_requests",
-        commit_timestamp: new Date().toISOString(),
-        eventType: "UPDATE",
-        new: {
-          id: "mock-join-id",
-          game_id: gameId,
-          host_id: hostId,
-          player_id: userId,
-          status: "approved",
-          reviewed_at: new Date().toISOString(),
-        },
-        old: {
-          id: "mock-join-id",
-          game_id: gameId,
-          host_id: hostId,
-          player_id: userId,
-          status: "pending",
-        },
-        errors: null,
-      };
-      for (const b of bindings as any[]) {
-        try { b.callback(payload); count += 1; } catch { /* ignore */ }
+  const invoked = await page.evaluate(
+    async ({ userId, gameId, hostId }) => {
+      const mod = await import("/src/integrations/supabase/client.ts");
+      const chans = mod.supabase.getChannels();
+      let count = 0;
+      for (const ch of chans as any[]) {
+        if (typeof ch.topic !== "string" || !ch.topic.includes("pay-join-req:")) continue;
+        const bindings =
+          (ch.bindings && (ch.bindings.postgres_changes || ch.bindings["postgres_changes"])) || [];
+        const payload = {
+          schema: "public",
+          table: "join_requests",
+          commit_timestamp: new Date().toISOString(),
+          eventType: "UPDATE",
+          new: {
+            id: "mock-join-id",
+            game_id: gameId,
+            host_id: hostId,
+            player_id: userId,
+            status: "approved",
+            reviewed_at: new Date().toISOString(),
+          },
+          old: {
+            id: "mock-join-id",
+            game_id: gameId,
+            host_id: hostId,
+            player_id: userId,
+            status: "pending",
+          },
+          errors: null,
+        };
+        for (const b of bindings as any[]) {
+          try {
+            b.callback(payload);
+            count += 1;
+          } catch {
+            /* ignore */
+          }
+        }
       }
-    }
-    return count;
-  }, { userId, gameId: GAME_ID, hostId: FAKE_HOST_ID });
+      return count;
+    },
+    { userId, gameId: GAME_ID, hostId: FAKE_HOST_ID },
+  );
 
   expect(invoked, "at least one postgres_changes binding must be invoked").toBeGreaterThan(0);
 
@@ -197,8 +229,10 @@ test("realtime approval flips pay page from gate to picker (no focus / reload)",
   await expect(page.getByText(/pay host using/i)).toBeVisible({ timeout: 5_000 });
   await expect(page.getByText(/@testhost/i)).toBeVisible();
   const elapsed = Date.now() - t0;
-  expect(elapsed, `UI flip should be fast (realtime, not the 15s poll), took ${elapsed}ms`)
-    .toBeLessThan(10_000);
+  expect(
+    elapsed,
+    `UI flip should be fast (realtime, not the 15s poll), took ${elapsed}ms`,
+  ).toBeLessThan(10_000);
 
   // The realtime handler triggered a refetch.
   expect(joinGets).toBeGreaterThan(getsBeforeApproval);

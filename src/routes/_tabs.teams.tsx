@@ -11,15 +11,18 @@ export const Route = createFileRoute("/_tabs/teams")({
   component: TeamsPage,
 });
 
-const KIND_META: Record<OrgKind, {
-  label: string;
-  title: string;
-  subtitle: string;
-  searchPlaceholder: string;
-  emptyText: string;
-  icon: typeof Users;
-  featuredBadge: string;
-}> = {
+const KIND_META: Record<
+  OrgKind,
+  {
+    label: string;
+    title: string;
+    subtitle: string;
+    searchPlaceholder: string;
+    emptyText: string;
+    icon: typeof Users;
+    featuredBadge: string;
+  }
+> = {
   team: {
     label: "Teams",
     title: "Teams & clubs.",
@@ -61,8 +64,7 @@ function TeamsPage() {
   );
 
   const featured =
-    orgs.find((o) => o.verified && o.kind === kind) ??
-    orgs.find((o) => o.kind === kind);
+    orgs.find((o) => o.verified && o.kind === kind) ?? orgs.find((o) => o.kind === kind);
 
   return (
     <div className="mx-auto w-full max-w-md sm:max-w-2xl lg:max-w-4xl px-4 pt-6">

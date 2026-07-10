@@ -111,7 +111,11 @@ function LocationAnalyticsPage() {
     return new Date(Date.now() - ms).toISOString();
   }, [days]);
 
-  const { data: events, isLoading, refetch } = useQuery({
+  const {
+    data: events,
+    isLoading,
+    refetch,
+  } = useQuery({
     queryKey: ["denial-events", sinceISO],
     enabled: !!adminData?.isAdmin,
     queryFn: async (): Promise<Row[]> => {
@@ -179,9 +183,7 @@ function LocationAnalyticsPage() {
     filtered.forEach((e) => {
       counts[e.reason] = (counts[e.reason] ?? 0) + 1;
     });
-    return REASONS.map((r) => ({ reason: r, count: counts[r] ?? 0 })).filter(
-      (x) => x.count > 0,
-    );
+    return REASONS.map((r) => ({ reason: r, count: counts[r] ?? 0 })).filter((x) => x.count > 0);
   }, [filtered]);
 
   const totalsByBrowser = useMemo(() => {
@@ -225,7 +227,9 @@ function LocationAnalyticsPage() {
           <div>
             <label className="text-xs text-muted-foreground">Timeframe</label>
             <Select value={days} onValueChange={setDays}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
               <SelectContent>
                 <SelectItem value="7">Last 7 days</SelectItem>
                 <SelectItem value="14">Last 14 days</SelectItem>
@@ -238,11 +242,15 @@ function LocationAnalyticsPage() {
           <div>
             <label className="text-xs text-muted-foreground">Sport</label>
             <Select value={sport} onValueChange={setSport}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All sports</SelectItem>
                 {sportOptions.map((s) => (
-                  <SelectItem key={s} value={s}>{s}</SelectItem>
+                  <SelectItem key={s} value={s}>
+                    {s}
+                  </SelectItem>
                 ))}
               </SelectContent>
             </Select>
@@ -250,11 +258,15 @@ function LocationAnalyticsPage() {
           <div>
             <label className="text-xs text-muted-foreground">Browser</label>
             <Select value={browser} onValueChange={setBrowser}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All browsers</SelectItem>
                 {browserOptions.map((b) => (
-                  <SelectItem key={b} value={b}>{b}</SelectItem>
+                  <SelectItem key={b} value={b}>
+                    {b}
+                  </SelectItem>
                 ))}
               </SelectContent>
             </Select>
@@ -262,7 +274,9 @@ function LocationAnalyticsPage() {
           <div>
             <label className="text-xs text-muted-foreground">Session type</label>
             <Select value={sessionType} onValueChange={setSessionType}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All sessions</SelectItem>
                 <SelectItem value="signed_in">Signed-in</SelectItem>
@@ -279,15 +293,8 @@ function LocationAnalyticsPage() {
           label="Unique users"
           value={new Set(filtered.filter((e) => e.user_id).map((e) => e.user_id)).size}
         />
-        <StatCard
-          label="Anonymous events"
-          value={filtered.filter((e) => !e.user_id).length}
-        />
-        <StatCard
-          label="Top reason"
-          value={totalsByReason[0]?.reason ?? "—"}
-          small
-        />
+        <StatCard label="Anonymous events" value={filtered.filter((e) => !e.user_id).length} />
+        <StatCard label="Top reason" value={totalsByReason[0]?.reason ?? "—"} small />
       </div>
 
       <Card>
@@ -340,9 +347,19 @@ function LocationAnalyticsPage() {
             ) : (
               <div className="h-64">
                 <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={totalsByReason} margin={{ top: 8, right: 8, bottom: 0, left: -16 }}>
+                  <BarChart
+                    data={totalsByReason}
+                    margin={{ top: 8, right: 8, bottom: 0, left: -16 }}
+                  >
                     <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
-                    <XAxis dataKey="reason" fontSize={10} interval={0} angle={-20} textAnchor="end" height={60} />
+                    <XAxis
+                      dataKey="reason"
+                      fontSize={10}
+                      interval={0}
+                      angle={-20}
+                      textAnchor="end"
+                      height={60}
+                    />
                     <YAxis fontSize={11} allowDecimals={false} />
                     <Tooltip />
                     <Bar dataKey="count" fill="hsl(var(--primary))" />
@@ -363,7 +380,10 @@ function LocationAnalyticsPage() {
             ) : (
               <div className="h-64">
                 <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={totalsByBrowser} margin={{ top: 8, right: 8, bottom: 0, left: -16 }}>
+                  <BarChart
+                    data={totalsByBrowser}
+                    margin={{ top: 8, right: 8, bottom: 0, left: -16 }}
+                  >
                     <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
                     <XAxis dataKey="browser" fontSize={11} />
                     <YAxis fontSize={11} allowDecimals={false} />
@@ -400,7 +420,9 @@ function LocationAnalyticsPage() {
                     {new Date(e.created_at).toLocaleString()}
                   </td>
                   <td className="py-1.5 pr-3">
-                    <Badge variant="secondary" className="text-[10px]">{e.reason}</Badge>
+                    <Badge variant="secondary" className="text-[10px]">
+                      {e.reason}
+                    </Badge>
                   </td>
                   <td className="py-1.5 pr-3">{e.sportLabel}</td>
                   <td className="py-1.5 pr-3">{e.browser}</td>
@@ -409,7 +431,11 @@ function LocationAnalyticsPage() {
                 </tr>
               ))}
               {filtered.length === 0 && (
-                <tr><td colSpan={6} className="py-4 text-center text-muted-foreground">No events.</td></tr>
+                <tr>
+                  <td colSpan={6} className="py-4 text-center text-muted-foreground">
+                    No events.
+                  </td>
+                </tr>
               )}
             </tbody>
           </table>
@@ -419,7 +445,15 @@ function LocationAnalyticsPage() {
   );
 }
 
-function StatCard({ label, value, small }: { label: string; value: string | number; small?: boolean }) {
+function StatCard({
+  label,
+  value,
+  small,
+}: {
+  label: string;
+  value: string | number;
+  small?: boolean;
+}) {
   return (
     <Card>
       <CardContent className="p-4">

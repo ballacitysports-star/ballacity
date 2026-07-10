@@ -16,7 +16,10 @@ export const DEFAULT_NOTIF_PREFS: NotifPrefs = {
 export const CATEGORY_META: Record<NotifCategory, { label: string; description: string }> = {
   messages: { label: "Messages", description: "New direct messages from players and hosts." },
   approvals: { label: "Approvals", description: "When your join request is approved or declined." },
-  joinRequests: { label: "Join requests", description: "When a player requests to join a game you host." },
+  joinRequests: {
+    label: "Join requests",
+    description: "When a player requests to join a game you host.",
+  },
   general: { label: "General updates", description: "Payments, reminders, and other activity." },
 };
 
@@ -54,18 +57,31 @@ const listeners = new Set<() => void>();
 let snap = JSON.stringify(readLocal());
 let hydratedFor: string | null = null;
 
-function subscribe(cb: () => void) { listeners.add(cb); return () => { listeners.delete(cb); }; }
-function getSnapshot() { return snap; }
+function subscribe(cb: () => void) {
+  listeners.add(cb);
+  return () => {
+    listeners.delete(cb);
+  };
+}
+function getSnapshot() {
+  return snap;
+}
 
 function commit(next: NotifPrefs) {
   snap = JSON.stringify(next);
   if (typeof window !== "undefined") {
-    try { window.localStorage.setItem(KEY, snap); } catch { /* ignore */ }
+    try {
+      window.localStorage.setItem(KEY, snap);
+    } catch {
+      /* ignore */
+    }
   }
   listeners.forEach((l) => l());
 }
 
-export function getNotifPrefs(): NotifPrefs { return JSON.parse(snap) as NotifPrefs; }
+export function getNotifPrefs(): NotifPrefs {
+  return JSON.parse(snap) as NotifPrefs;
+}
 
 export function setNotifPref(category: NotifCategory, channel: NotifChannel, value: boolean) {
   const current = getNotifPrefs();
@@ -96,7 +112,10 @@ export async function hydrateNotifPrefsFromBackend(userId: string) {
       .select("prefs")
       .eq("user_id", userId)
       .maybeSingle();
-    if (error) { hydratedFor = null; return; }
+    if (error) {
+      hydratedFor = null;
+      return;
+    }
     if (data && (data as any).prefs) {
       commit(merge((data as any).prefs as Partial<NotifPrefs>));
     } else {
@@ -108,7 +127,9 @@ export async function hydrateNotifPrefsFromBackend(userId: string) {
   }
 }
 
-export function resetNotifPrefsHydration() { hydratedFor = null; }
+export function resetNotifPrefsHydration() {
+  hydratedFor = null;
+}
 
 export function useNotifPrefs(): NotifPrefs {
   const s = useSyncExternalStore(subscribe, getSnapshot, () => JSON.stringify(DEFAULT_NOTIF_PREFS));
@@ -118,7 +139,10 @@ export function useNotifPrefs(): NotifPrefs {
 /** Hook to hydrate prefs from the DB when a user is signed in. Mount on the Alerts tab. */
 export function useHydrateNotifPrefs(userId: string | undefined | null) {
   useEffect(() => {
-    if (!userId) { resetNotifPrefsHydration(); return; }
+    if (!userId) {
+      resetNotifPrefsHydration();
+      return;
+    }
     void hydrateNotifPrefsFromBackend(userId);
   }, [userId]);
 }

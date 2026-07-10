@@ -5,8 +5,11 @@ import { toast } from "sonner";
 import { GAMES } from "@/lib/sample-data";
 import { useAuth } from "@/hooks/use-auth";
 import {
-  type PaymentMethod, paymentTypeMeta,
-  listMyPaymentMethods, getMyGamePaymentSettings, upsertGamePaymentSettings,
+  type PaymentMethod,
+  paymentTypeMeta,
+  listMyPaymentMethods,
+  getMyGamePaymentSettings,
+  upsertGamePaymentSettings,
 } from "@/lib/payments";
 import { LegalNotice } from "@/components/LegalNotice";
 
@@ -16,9 +19,17 @@ export const Route = createFileRoute("/games/$gameId/payment-setup")({
     if (!game) throw notFound();
     return { game };
   },
-  head: ({ loaderData }) => ({ meta: [{ title: `Payment setup — ${loaderData?.game.title ?? "game"}` }] }),
+  head: ({ loaderData }) => ({
+    meta: [{ title: `Payment setup — ${loaderData?.game.title ?? "game"}` }],
+  }),
   notFoundComponent: () => <div className="p-6 text-sm">Game not found.</div>,
-  errorComponent: ({ reset }) => <div className="p-6"><button onClick={reset} className="text-lime">Try again</button></div>,
+  errorComponent: ({ reset }) => (
+    <div className="p-6">
+      <button onClick={reset} className="text-lime">
+        Try again
+      </button>
+    </div>
+  ),
   component: SetupPage,
 });
 
@@ -35,7 +46,9 @@ function SetupPage() {
   const [requiresApproval, setRequiresApproval] = useState(false);
   const [saving, setSaving] = useState(false);
 
-  useEffect(() => { if (!loading && !user) nav({ to: "/auth" }); }, [loading, user, nav]);
+  useEffect(() => {
+    if (!loading && !user) nav({ to: "/auth" });
+  }, [loading, user, nav]);
 
   useEffect(() => {
     if (!user) return;
@@ -71,13 +84,21 @@ function SetupPage() {
       });
       toast.success("Settings saved");
       nav({ to: "/games/$gameId", params: { gameId: game.id } });
-    } catch (e: any) { toast.error(e.message); } finally { setSaving(false); }
+    } catch (e: any) {
+      toast.error(e.message);
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
     <form onSubmit={submit} className="mx-auto max-w-md px-4 pt-6 pb-24 space-y-5">
       <div className="flex items-center gap-3">
-        <Link to="/games/$gameId" params={{ gameId: game.id }} className="grid h-10 w-10 place-items-center rounded-full border border-border bg-surface">
+        <Link
+          to="/games/$gameId"
+          params={{ gameId: game.id }}
+          className="grid h-10 w-10 place-items-center rounded-full border border-border bg-surface"
+        >
           <ArrowLeft className="h-5 w-5" />
         </Link>
         <div>
@@ -90,35 +111,55 @@ function SetupPage() {
         <Label>Entry fee</Label>
         <div className="relative">
           <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">$</span>
-          <input type="number" min={0} step="0.01" value={fee} onChange={(e) => setFee(e.target.value)}
-            className="w-full rounded-xl border border-border bg-surface pl-7 pr-3 py-3 text-sm outline-none focus:border-lime" />
+          <input
+            type="number"
+            min={0}
+            step="0.01"
+            value={fee}
+            onChange={(e) => setFee(e.target.value)}
+            className="w-full rounded-xl border border-border bg-surface pl-7 pr-3 py-3 text-sm outline-none focus:border-lime"
+          />
         </div>
       </section>
 
       <section>
-        <button type="button" onClick={() => setRequiresApproval((v) => !v)}
+        <button
+          type="button"
+          onClick={() => setRequiresApproval((v) => !v)}
           className={`w-full flex items-center justify-between gap-3 rounded-2xl border p-4 text-left ${
             requiresApproval ? "border-lime bg-lime/5" : "border-border bg-surface"
-          }`}>
+          }`}
+        >
           <div className="min-w-0">
             <div className="font-semibold text-sm">Require my approval to join</div>
             <p className="text-xs text-muted-foreground mt-0.5">
-              Players send a request and you decide who's in. Useful for skill-matched or invite-only games.
+              Players send a request and you decide who's in. Useful for skill-matched or
+              invite-only games.
             </p>
           </div>
-          <div className={`shrink-0 grid h-7 w-12 items-center rounded-full p-0.5 transition-colors ${requiresApproval ? "bg-lime" : "bg-secondary"}`}>
-            <div className={`h-6 w-6 rounded-full bg-background shadow transition-transform ${requiresApproval ? "translate-x-5" : ""}`} />
+          <div
+            className={`shrink-0 grid h-7 w-12 items-center rounded-full p-0.5 transition-colors ${requiresApproval ? "bg-lime" : "bg-secondary"}`}
+          >
+            <div
+              className={`h-6 w-6 rounded-full bg-background shadow transition-transform ${requiresApproval ? "translate-x-5" : ""}`}
+            />
           </div>
         </button>
       </section>
 
-
       <section>
         <Label>Accepted payment methods</Label>
         {methods.length === 0 ? (
-          <Link to="/payments" className="block rounded-2xl border border-dashed border-coral/40 bg-coral/5 p-4 text-sm">
-            <div className="flex items-center gap-2 font-semibold text-coral"><ShieldAlert className="h-4 w-4" /> No payment methods yet</div>
-            <p className="text-xs text-muted-foreground mt-1">Add Venmo, Cash App, Zelle, or others before charging for games.</p>
+          <Link
+            to="/payments"
+            className="block rounded-2xl border border-dashed border-coral/40 bg-coral/5 p-4 text-sm"
+          >
+            <div className="flex items-center gap-2 font-semibold text-coral">
+              <ShieldAlert className="h-4 w-4" /> No payment methods yet
+            </div>
+            <p className="text-xs text-muted-foreground mt-1">
+              Add Venmo, Cash App, Zelle, or others before charging for games.
+            </p>
           </Link>
         ) : (
           <div className="space-y-2">
@@ -126,19 +167,30 @@ function SetupPage() {
               const meta = paymentTypeMeta(m.payment_type);
               const on = selected.has(m.id);
               return (
-                <button type="button" key={m.id}
+                <button
+                  type="button"
+                  key={m.id}
                   onClick={() => {
-                    const n = new Set(selected); on ? n.delete(m.id) : n.add(m.id); setSelected(n);
+                    const n = new Set(selected);
+                    on ? n.delete(m.id) : n.add(m.id);
+                    setSelected(n);
                   }}
                   className={`w-full flex items-center gap-3 rounded-2xl border p-3 text-left ${
                     on ? "border-lime bg-lime/5" : "border-border bg-surface"
-                  }`}>
-                  <div className="grid h-9 w-9 place-items-center rounded-xl bg-secondary text-base">{meta.emoji}</div>
+                  }`}
+                >
+                  <div className="grid h-9 w-9 place-items-center rounded-xl bg-secondary text-base">
+                    {meta.emoji}
+                  </div>
                   <div className="flex-1 min-w-0">
                     <div className="font-semibold text-sm">{m.label || meta.name}</div>
-                    <div className="text-xs text-muted-foreground truncate">{m.username || m.contact_info}</div>
+                    <div className="text-xs text-muted-foreground truncate">
+                      {m.username || m.contact_info}
+                    </div>
                   </div>
-                  <div className={`grid h-6 w-6 place-items-center rounded-full ${on ? "bg-lime text-primary-foreground" : "border border-border"}`}>
+                  <div
+                    className={`grid h-6 w-6 place-items-center rounded-full ${on ? "bg-lime text-primary-foreground" : "border border-border"}`}
+                  >
                     {on && <Check className="h-4 w-4" />}
                   </div>
                 </button>
@@ -150,28 +202,43 @@ function SetupPage() {
 
       <section>
         <Label>Payment deadline (optional)</Label>
-        <input type="datetime-local" value={deadline} onChange={(e) => setDeadline(e.target.value)}
-          className="w-full rounded-xl border border-border bg-surface px-3 py-3 text-sm outline-none focus:border-lime [color-scheme:dark]" />
+        <input
+          type="datetime-local"
+          value={deadline}
+          onChange={(e) => setDeadline(e.target.value)}
+          className="w-full rounded-xl border border-border bg-surface px-3 py-3 text-sm outline-none focus:border-lime [color-scheme:dark]"
+        />
       </section>
 
       <section>
         <Label>Refund policy (optional)</Label>
-        <textarea rows={3} value={refundPolicy} onChange={(e) => setRefundPolicy(e.target.value)}
+        <textarea
+          rows={3}
+          value={refundPolicy}
+          onChange={(e) => setRefundPolicy(e.target.value)}
           placeholder="e.g. Full refund up to 24h before tip-off."
-          className="w-full rounded-xl border border-border bg-surface px-3 py-3 text-sm outline-none focus:border-lime resize-none" />
+          className="w-full rounded-xl border border-border bg-surface px-3 py-3 text-sm outline-none focus:border-lime resize-none"
+        />
       </section>
 
       <section>
         <Label>Payment instructions (optional)</Label>
-        <textarea rows={3} value={instructions} onChange={(e) => setInstructions(e.target.value)}
+        <textarea
+          rows={3}
+          value={instructions}
+          onChange={(e) => setInstructions(e.target.value)}
           placeholder="e.g. Include your full name in the payment note."
-          className="w-full rounded-xl border border-border bg-surface px-3 py-3 text-sm outline-none focus:border-lime resize-none" />
+          className="w-full rounded-xl border border-border bg-surface px-3 py-3 text-sm outline-none focus:border-lime resize-none"
+        />
       </section>
 
       <LegalNotice />
 
-      <button type="submit" disabled={saving || (Number(fee) > 0 && selected.size === 0)}
-        className="w-full rounded-2xl bg-lime-gradient py-4 font-bold text-primary-foreground disabled:opacity-50">
+      <button
+        type="submit"
+        disabled={saving || (Number(fee) > 0 && selected.size === 0)}
+        className="w-full rounded-2xl bg-lime-gradient py-4 font-bold text-primary-foreground disabled:opacity-50"
+      >
         {saving ? "Saving…" : "Save payment settings"}
       </button>
     </form>
@@ -179,5 +246,9 @@ function SetupPage() {
 }
 
 function Label({ children }: { children: React.ReactNode }) {
-  return <div className="mb-1.5 text-xs font-bold uppercase tracking-wider text-muted-foreground">{children}</div>;
+  return (
+    <div className="mb-1.5 text-xs font-bold uppercase tracking-wider text-muted-foreground">
+      {children}
+    </div>
+  );
 }

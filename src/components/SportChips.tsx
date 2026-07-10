@@ -13,7 +13,9 @@ export function SportChips({
       <button
         onClick={() => onSelect?.(null)}
         className={`shrink-0 rounded-full border px-4 py-2 text-sm font-semibold transition-all ${
-          !selected ? "border-lime bg-lime text-primary-foreground" : "border-border bg-surface text-muted-foreground hover:text-foreground"
+          !selected
+            ? "border-lime bg-lime text-primary-foreground"
+            : "border-border bg-surface text-muted-foreground hover:text-foreground"
         }`}
       >
         All sports
@@ -28,7 +30,9 @@ export function SportChips({
             transition={{ delay: i * 0.03 }}
             onClick={() => onSelect?.(s.name)}
             className={`shrink-0 inline-flex items-center gap-1.5 rounded-full border px-4 py-2 text-sm font-semibold transition-all ${
-              active ? "border-lime bg-lime text-primary-foreground" : "border-border bg-surface text-foreground hover:border-lime/40"
+              active
+                ? "border-lime bg-lime text-primary-foreground"
+                : "border-border bg-surface text-foreground hover:border-lime/40"
             }`}
           >
             <span>{s.emoji}</span>

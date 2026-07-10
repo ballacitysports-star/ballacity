@@ -16,8 +16,7 @@ import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { TEST_ACCOUNTS } from "./test-fixtures";
 
 const URL = process.env.VITE_SUPABASE_URL ?? process.env.SUPABASE_URL;
-const KEY =
-  process.env.VITE_SUPABASE_PUBLISHABLE_KEY ?? process.env.SUPABASE_PUBLISHABLE_KEY;
+const KEY = process.env.VITE_SUPABASE_PUBLISHABLE_KEY ?? process.env.SUPABASE_PUBLISHABLE_KEY;
 
 const player = TEST_ACCOUNTS.find((a) => a.key === "player")!;
 const player2 = TEST_ACCOUNTS.find((a) => a.key === "player2")!;

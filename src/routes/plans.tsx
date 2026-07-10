@@ -14,7 +14,11 @@ export const Route = createFileRoute("/plans")({
   head: () => ({
     meta: [
       { title: "Plans & Subscriptions — OpenRun" },
-      { name: "description", content: "Choose a subscription: host games, build a team, or generate unlimited AI highlight reels." },
+      {
+        name: "description",
+        content:
+          "Choose a subscription: host games, build a team, or generate unlimited AI highlight reels.",
+      },
     ],
   }),
   component: PlansPage,
@@ -27,8 +31,14 @@ function PlansPage() {
   const [portalBusy, setPortalBusy] = useState(false);
 
   function handleSubscribe(priceId: string) {
-    if (!user) { toast.error("Sign in to subscribe"); return; }
-    if (hasActive(priceId)) { toast("You're already subscribed to this plan"); return; }
+    if (!user) {
+      toast.error("Sign in to subscribe");
+      return;
+    }
+    if (hasActive(priceId)) {
+      toast("You're already subscribed to this plan");
+      return;
+    }
     openCheckout({
       priceId,
       customerEmail: user.email,
@@ -55,7 +65,10 @@ function PlansPage() {
   if (isOpen) {
     return (
       <div className="mx-auto max-w-2xl px-4 py-6">
-        <button onClick={closeCheckout} className="mb-4 inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground">
+        <button
+          onClick={closeCheckout}
+          className="mb-4 inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground"
+        >
           <ArrowLeft className="h-4 w-4" /> Back to plans
         </button>
         {checkoutElement}
@@ -67,12 +80,16 @@ function PlansPage() {
     <div className="min-h-dvh">
       <PaymentTestModeBanner />
       <div className="mx-auto max-w-2xl px-4 pb-24 pt-6">
-        <Link to="/profile" className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground">
+        <Link
+          to="/profile"
+          className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground"
+        >
           <ArrowLeft className="h-4 w-4" /> Profile
         </Link>
         <h1 className="mt-4 font-display text-3xl font-bold">Plans & Subscriptions</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          Subscribe or upgrade anytime. All plans are no-commitment monthly. <span className="font-semibold text-foreground">No refunds.</span>
+          Subscribe or upgrade anytime. All plans are no-commitment monthly.{" "}
+          <span className="font-semibold text-foreground">No refunds.</span>
         </p>
 
         {anyActiveCustomerId() && (
@@ -81,7 +98,11 @@ function PlansPage() {
             disabled={portalBusy}
             className="mt-4 inline-flex items-center gap-2 rounded-xl border border-border bg-surface px-4 py-2 text-sm font-semibold hover:border-lime/40"
           >
-            {portalBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <ExternalLink className="h-4 w-4" />}
+            {portalBusy ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <ExternalLink className="h-4 w-4" />
+            )}
             Manage billing & cancel
           </button>
         )}
@@ -123,7 +144,9 @@ function PlansPage() {
         </div>
 
         <p className="mt-6 text-xs text-muted-foreground">
-          Upgrades & downgrades are handled through the billing portal. Cancellations take effect at the end of your current period — reels you've already generated stay viewable, but new generations are blocked.
+          Upgrades & downgrades are handled through the billing portal. Cancellations take effect at
+          the end of your current period — reels you've already generated stay viewable, but new
+          generations are blocked.
         </p>
       </div>
     </div>

@@ -122,9 +122,13 @@ describe("persistence", () => {
 
 function sampleTypeFor(cat: NotifCategory): string {
   switch (cat) {
-    case "messages": return "message";
-    case "approvals": return "join_approved";
-    case "joinRequests": return "join_request";
-    case "general": return "payment_received";
+    case "messages":
+      return "message";
+    case "approvals":
+      return "join_approved";
+    case "joinRequests":
+      return "join_request";
+    case "general":
+      return "payment_received";
   }
 }

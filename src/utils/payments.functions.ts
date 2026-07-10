@@ -39,18 +39,20 @@ async function resolveOrCreateCustomer(
 }
 
 export const createCheckoutSession = createServerFn({ method: "POST" })
-  .inputValidator((data: {
-    priceId: string;
-    quantity?: number;
-    customerEmail?: string;
-    userId?: string;
-    returnUrl: string;
-    environment: StripeEnv;
-    collectShipping?: boolean;
-  }) => {
-    if (!/^[a-zA-Z0-9_-]+$/.test(data.priceId)) throw new Error("Invalid priceId");
-    return data;
-  })
+  .inputValidator(
+    (data: {
+      priceId: string;
+      quantity?: number;
+      customerEmail?: string;
+      userId?: string;
+      returnUrl: string;
+      environment: StripeEnv;
+      collectShipping?: boolean;
+    }) => {
+      if (!/^[a-zA-Z0-9_-]+$/.test(data.priceId)) throw new Error("Invalid priceId");
+      return data;
+    },
+  )
   .handler(async ({ data }): Promise<CheckoutSessionResult> => {
     try {
       const stripe = createStripeClient(data.environment);
@@ -60,18 +62,18 @@ export const createCheckoutSession = createServerFn({ method: "POST" })
       const stripePrice = prices.data[0];
       const isRecurring = stripePrice.type === "recurring";
 
-      const customerId = (data.customerEmail || data.userId)
-        ? await resolveOrCreateCustomer(stripe, {
-            email: data.customerEmail,
-            userId: data.userId,
-          })
-        : undefined;
+      const customerId =
+        data.customerEmail || data.userId
+          ? await resolveOrCreateCustomer(stripe, {
+              email: data.customerEmail,
+              userId: data.userId,
+            })
+          : undefined;
 
       let productDescription: string | undefined;
       if (!isRecurring) {
-        const productId = typeof stripePrice.product === "string"
-          ? stripePrice.product
-          : stripePrice.product.id;
+        const productId =
+          typeof stripePrice.product === "string" ? stripePrice.product : stripePrice.product.id;
         const product = await stripe.products.retrieve(productId);
         productDescription = product.name;
       }

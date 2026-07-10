@@ -2,8 +2,18 @@ import { createFileRoute, Link, notFound } from "@tanstack/react-router";
 import { motion } from "framer-motion";
 import { useEffect, useMemo, useState } from "react";
 import {
-  ArrowLeft, ShieldCheck, MapPin, Users, Star, Trophy, Calendar,
-  Award, DollarSign, Share2, Plus, Pencil,
+  ArrowLeft,
+  ShieldCheck,
+  MapPin,
+  Users,
+  Star,
+  Trophy,
+  Calendar,
+  Award,
+  DollarSign,
+  Share2,
+  Plus,
+  Pencil,
 } from "lucide-react";
 import { ORGS, GAMES, POST_KIND_META, type PostKind, type Org } from "@/lib/sample-data";
 import { isMyOrg } from "@/lib/org-store";
@@ -23,7 +33,10 @@ export const Route = createFileRoute("/teams/$teamId")({
   notFoundComponent: () => (
     <div className="mx-auto w-full max-w-md sm:max-w-2xl lg:max-w-4xl px-6 pt-24 text-center">
       <p className="text-muted-foreground">Team not found.</p>
-      <Link to="/teams" className="mt-4 inline-block rounded-full bg-lime px-4 py-2 text-sm font-bold text-primary-foreground">
+      <Link
+        to="/teams"
+        className="mt-4 inline-block rounded-full bg-lime px-4 py-2 text-sm font-bold text-primary-foreground"
+      >
         Back to Teams
       </Link>
     </div>
@@ -65,7 +78,10 @@ function TeamPage() {
       <div className="relative h-56">
         <img src={org.cover} alt="" className="h-full w-full object-cover" />
         <div className="absolute inset-0 bg-gradient-to-b from-background/40 via-background/30 to-background" />
-        <Link to="/teams" className="absolute top-4 left-4 grid h-10 w-10 place-items-center rounded-full border border-border bg-background/70 backdrop-blur">
+        <Link
+          to="/teams"
+          className="absolute top-4 left-4 grid h-10 w-10 place-items-center rounded-full border border-border bg-background/70 backdrop-blur"
+        >
           <ArrowLeft className="h-4 w-4" />
         </Link>
         <button className="absolute top-4 right-4 grid h-10 w-10 place-items-center rounded-full border border-border bg-background/70 backdrop-blur">
@@ -73,7 +89,7 @@ function TeamPage() {
         </button>
       </div>
 
-        <div className="px-4 -mt-14 relative">
+      <div className="px-4 -mt-14 relative">
         {/* Identity */}
         <div className="flex items-end justify-between gap-3">
           <motion.div
@@ -81,7 +97,10 @@ function TeamPage() {
             animate={{ scale: 1, rotate: 0 }}
             transition={{ type: "spring", stiffness: 220, damping: 16 }}
             className="grid h-24 w-24 place-items-center rounded-3xl border-4 border-background font-display text-3xl font-bold text-primary-foreground"
-            style={{ background: `linear-gradient(135deg, ${org.accent}, ${org.accent}aa)`, boxShadow: `0 12px 40px -10px ${org.accent}88` }}
+            style={{
+              background: `linear-gradient(135deg, ${org.accent}, ${org.accent}aa)`,
+              boxShadow: `0 12px 40px -10px ${org.accent}88`,
+            }}
           >
             {org.avatar}
           </motion.div>
@@ -99,12 +118,14 @@ function TeamPage() {
             {useCanReview(org.id) && (
               <Link
                 to="/review/new"
-                search={{
-                  revieweeId: org.id,
-                  revieweeKind: org.kind === "coach" ? "trainer" : "team",
-                  revieweeName: org.name,
-                  kind: "player",
-                } as any}
+                search={
+                  {
+                    revieweeId: org.id,
+                    revieweeKind: org.kind === "coach" ? "trainer" : "team",
+                    revieweeName: org.name,
+                    kind: "player",
+                  } as any
+                }
                 className="rounded-full border border-lime/40 bg-lime/10 px-4 py-2.5 text-sm font-bold inline-flex items-center gap-1.5 text-lime"
               >
                 <Star className="h-3.5 w-3.5" /> Write review
@@ -115,7 +136,9 @@ function TeamPage() {
               onClick={() => setFollowing((f) => !f)}
               data-render="ssr-stable"
               className={`rounded-full px-5 py-2.5 text-sm font-bold transition-all ${
-                following ? "border border-border bg-surface text-foreground" : "bg-lime-gradient text-primary-foreground glow-lime"
+                following
+                  ? "border border-border bg-surface text-foreground"
+                  : "bg-lime-gradient text-primary-foreground glow-lime"
               }`}
             >
               {following ? "Following ✓" : "Follow"}
@@ -135,7 +158,10 @@ function TeamPage() {
           <div className="mt-0.5 text-sm text-muted-foreground flex items-center gap-2 flex-wrap">
             <span>{org.handle}</span>
             <span>·</span>
-            <span className="inline-flex items-center gap-1"><MapPin className="h-3.5 w-3.5" />{org.city}</span>
+            <span className="inline-flex items-center gap-1">
+              <MapPin className="h-3.5 w-3.5" />
+              {org.city}
+            </span>
             <span>·</span>
             <span>Est. {org.founded}</span>
           </div>
@@ -143,23 +169,45 @@ function TeamPage() {
 
           <div className="mt-2 flex flex-wrap gap-1.5">
             {org.sports.map((s) => (
-              <span key={s} className="rounded-full bg-secondary px-2.5 py-1 text-xs font-semibold">{s}</span>
+              <span key={s} className="rounded-full bg-secondary px-2.5 py-1 text-xs font-semibold">
+                {s}
+              </span>
             ))}
           </div>
         </div>
 
         {/* Stats */}
         <div className="mt-5 grid grid-cols-3 gap-2">
-          <Stat label="Followers" value={org.followers.toLocaleString()} icon={<Users className="h-3.5 w-3.5 text-lime" />} />
+          <Stat
+            label="Followers"
+            value={org.followers.toLocaleString()}
+            icon={<Users className="h-3.5 w-3.5 text-lime" />}
+          />
           {org.kind === "team" ? (
             <>
-              <Stat label="Roster" value={String(org.roster)} icon={<Users className="h-3.5 w-3.5 text-lime" />} />
-              <Stat label="Record" value={`${org.record!.w}–${org.record!.l}`} icon={<Trophy className="h-3.5 w-3.5 text-coral" />} />
+              <Stat
+                label="Roster"
+                value={String(org.roster)}
+                icon={<Users className="h-3.5 w-3.5 text-lime" />}
+              />
+              <Stat
+                label="Record"
+                value={`${org.record!.w}–${org.record!.l}`}
+                icon={<Trophy className="h-3.5 w-3.5 text-coral" />}
+              />
             </>
           ) : (
             <>
-              <Stat label="Rating" value={`${org.rating!.toFixed(1)}★`} icon={<Star className="h-3.5 w-3.5 text-coral" />} />
-              <Stat label="Rate" value={`$${org.ratePerHour}/hr`} icon={<DollarSign className="h-3.5 w-3.5 text-lime" />} />
+              <Stat
+                label="Rating"
+                value={`${org.rating!.toFixed(1)}★`}
+                icon={<Star className="h-3.5 w-3.5 text-coral" />}
+              />
+              <Stat
+                label="Rate"
+                value={`$${org.ratePerHour}/hr`}
+                icon={<DollarSign className="h-3.5 w-3.5 text-lime" />}
+              />
             </>
           )}
         </div>
@@ -217,7 +265,9 @@ function TeamPage() {
             </div>
 
             <div className="mt-4 space-y-3">
-              {posts.map((p, i) => <PostCard key={p.id} post={p} index={i} />)}
+              {posts.map((p, i) => (
+                <PostCard key={p.id} post={p} index={i} />
+              ))}
               {posts.length === 0 && (
                 <div className="rounded-2xl border border-border bg-surface p-8 text-center text-sm text-muted-foreground">
                   No {POST_KIND_META[filter as PostKind]?.label.toLowerCase() ?? "posts"} yet.
@@ -234,10 +284,19 @@ function TeamPage() {
               <p className="text-sm text-foreground/90 leading-relaxed">{org.bio}</p>
             </Section>
 
-            <Section title={<><Award className="h-4 w-4" /> Achievements</>}>
+            <Section
+              title={
+                <>
+                  <Award className="h-4 w-4" /> Achievements
+                </>
+              }
+            >
               <ul className="space-y-1.5">
                 {org.achievements.map((a) => (
-                  <li key={a} className="rounded-2xl border border-border bg-surface px-3 py-2 text-sm">
+                  <li
+                    key={a}
+                    className="rounded-2xl border border-border bg-surface px-3 py-2 text-sm"
+                  >
                     🏆 {a}
                   </li>
                 ))}
@@ -248,7 +307,10 @@ function TeamPage() {
               <Section title="Credentials">
                 <div className="flex flex-wrap gap-2">
                   {org.credentials.map((c) => (
-                    <span key={c} className="rounded-full border border-lime/40 bg-lime/10 px-3 py-1.5 text-xs font-bold text-lime">
+                    <span
+                      key={c}
+                      className="rounded-full border border-lime/40 bg-lime/10 px-3 py-1.5 text-xs font-bold text-lime"
+                    >
                       {c}
                     </span>
                   ))}
@@ -261,16 +323,25 @@ function TeamPage() {
                 <Section title="League">
                   <div className="rounded-2xl border border-border bg-surface p-3 text-sm">
                     <div className="font-semibold">{org.league}</div>
-                    <div className="text-muted-foreground text-xs mt-0.5">Home: {org.homeCourt}</div>
+                    <div className="text-muted-foreground text-xs mt-0.5">
+                      Home: {org.homeCourt}
+                    </div>
                   </div>
                 </Section>
                 {org.staff && (
                   <Section title="Staff & captains">
                     <div className="space-y-2">
                       {org.staff.map((s) => (
-                        <div key={s.name} className="flex items-center gap-3 rounded-2xl border border-border bg-surface p-3">
+                        <div
+                          key={s.name}
+                          className="flex items-center gap-3 rounded-2xl border border-border bg-surface p-3"
+                        >
                           {s.avatar.startsWith("data:") ? (
-                            <img src={s.avatar} alt="" className="h-10 w-10 rounded-full object-cover" />
+                            <img
+                              src={s.avatar}
+                              alt=""
+                              className="h-10 w-10 rounded-full object-cover"
+                            />
                           ) : (
                             <div className="grid h-10 w-10 place-items-center rounded-full bg-secondary text-xs font-bold">
                               {s.avatar}
@@ -288,8 +359,16 @@ function TeamPage() {
               </>
             )}
 
-            <Section title={<><Calendar className="h-4 w-4" /> Founded</>}>
-              <p className="text-sm text-muted-foreground">Active on OpenRun since {org.founded}.</p>
+            <Section
+              title={
+                <>
+                  <Calendar className="h-4 w-4" /> Founded
+                </>
+              }
+            >
+              <p className="text-sm text-muted-foreground">
+                Active on OpenRun since {org.founded}.
+              </p>
             </Section>
           </div>
         )}
@@ -302,7 +381,9 @@ function TeamPage() {
                 No upcoming games scheduled.
               </div>
             )}
-            {upcomingGames.map((g, i) => <GameCard key={g.id} game={g} index={i} />)}
+            {upcomingGames.map((g, i) => (
+              <GameCard key={g.id} game={g} index={i} />
+            ))}
           </div>
         )}
 
@@ -323,9 +404,12 @@ function Stat({ label, value, icon }: { label: string; value: string; icon: Reac
   return (
     <div className="rounded-2xl border border-border bg-surface p-3 text-center">
       <div className="font-display text-lg font-bold inline-flex items-center gap-1 justify-center">
-        {icon}{value}
+        {icon}
+        {value}
       </div>
-      <div className="text-[10px] uppercase tracking-wider text-muted-foreground mt-0.5">{label}</div>
+      <div className="text-[10px] uppercase tracking-wider text-muted-foreground mt-0.5">
+        {label}
+      </div>
     </div>
   );
 }

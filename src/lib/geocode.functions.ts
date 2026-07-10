@@ -26,13 +26,20 @@ export const reverseGeocode = createServerFn({ method: "POST" })
     });
     if (!res.ok) throw new Error(`Geocode failed: ${res.status}`);
     const body = (await res.json()) as {
-      results?: Array<{ formatted_address?: string; address_components?: Array<{ long_name: string; types: string[] }> }>;
+      results?: Array<{
+        formatted_address?: string;
+        address_components?: Array<{ long_name: string; types: string[] }>;
+      }>;
     };
     const first = body.results?.[0];
     const formatted = first?.formatted_address ?? "";
     const comp = (type: string) =>
       first?.address_components?.find((c) => c.types.includes(type))?.long_name ?? "";
-    const city = comp("locality") || comp("postal_town") || comp("sublocality") || comp("administrative_area_level_2");
+    const city =
+      comp("locality") ||
+      comp("postal_town") ||
+      comp("sublocality") ||
+      comp("administrative_area_level_2");
     const region = comp("administrative_area_level_1");
     const cityLine = [city, region].filter(Boolean).join(", ");
     return { formatted, city: cityLine };
@@ -69,7 +76,9 @@ export const geocodeAddress = createServerFn({ method: "POST" })
     const lat = first?.geometry?.location?.lat;
     const lng = first?.geometry?.location?.lng;
     if (typeof lat !== "number" || typeof lng !== "number") {
-      throw new Error(body.status === "ZERO_RESULTS" ? "No location found" : "Invalid geocode response");
+      throw new Error(
+        body.status === "ZERO_RESULTS" ? "No location found" : "Invalid geocode response",
+      );
     }
     return { lat, lng, formatted: first?.formatted_address ?? data.address };
   });

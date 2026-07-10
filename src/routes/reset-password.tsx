@@ -68,8 +68,8 @@ function ResetPasswordPage() {
       <div className="px-4 mt-6 space-y-5">
         {!ready ? (
           <p className="text-sm text-muted-foreground text-center">
-            Open this page from the reset link in your email. If you just clicked the link,
-            give it a moment to verify…
+            Open this page from the reset link in your email. If you just clicked the link, give it
+            a moment to verify…
           </p>
         ) : (
           <form onSubmit={submit} className="space-y-3">

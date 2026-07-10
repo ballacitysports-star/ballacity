@@ -20,7 +20,6 @@ import { useAuth } from "@/hooks/use-auth";
 import { useNotificationPush } from "@/lib/notifications";
 import { useOneSignal } from "@/lib/onesignal";
 
-
 function NotFoundComponent() {
   return (
     <div className="flex min-h-screen items-center justify-center bg-background px-4">
@@ -84,10 +83,17 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1, viewport-fit=cover" },
       { title: "OpenRun — Pickup sports, on demand" },
-      { name: "description", content: "Find and host pickup sports games near you. Basketball, soccer, pickleball, tennis and more — join a game in seconds." },
+      {
+        name: "description",
+        content:
+          "Find and host pickup sports games near you. Basketball, soccer, pickleball, tennis and more — join a game in seconds.",
+      },
       { name: "author", content: "OpenRun" },
       { property: "og:title", content: "OpenRun — Pickup sports, on demand" },
-      { property: "og:description", content: "Find and host pickup sports games near you in seconds." },
+      {
+        property: "og:description",
+        content: "Find and host pickup sports games near you in seconds.",
+      },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
       { name: "twitter:site", content: "@Lovable" },
@@ -95,7 +101,10 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     links: [
       { rel: "preconnect", href: "https://fonts.googleapis.com" },
       { rel: "preconnect", href: "https://fonts.gstatic.com", crossOrigin: "anonymous" },
-      { rel: "stylesheet", href: "https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=DM+Sans:wght@400;500;600;700&display=swap" },
+      {
+        rel: "stylesheet",
+        href: "https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=DM+Sans:wght@400;500;600;700&display=swap",
+      },
       { rel: "stylesheet", href: appCss },
     ],
   }),
@@ -150,13 +159,24 @@ function maybeReloadForStaleChunk(reason: unknown) {
 }
 
 const PUBLIC_ROUTES = ["/", "/auth", "/reset-password"];
-const TAB_PATHS = ["/feed", "/players", "/teams", "/create", "/discover", "/profile", "/notifications", "/reels"];
+const TAB_PATHS = [
+  "/feed",
+  "/players",
+  "/teams",
+  "/create",
+  "/discover",
+  "/profile",
+  "/notifications",
+  "/reels",
+];
 
 function AuthGate({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const pathname = router.state.location.pathname;
   const { user, loading } = useAuth();
-  const isPublic = pathname === "/" || PUBLIC_ROUTES.some((p) => p !== "/" && (pathname === p || pathname.startsWith(`${p}/`)));
+  const isPublic =
+    pathname === "/" ||
+    PUBLIC_ROUTES.some((p) => p !== "/" && (pathname === p || pathname.startsWith(`${p}/`)));
   const isTab = TAB_PATHS.includes(pathname);
   useNotificationPush();
   useOneSignal();
@@ -243,4 +263,3 @@ function RootComponent() {
     </QueryClientProvider>
   );
 }
-

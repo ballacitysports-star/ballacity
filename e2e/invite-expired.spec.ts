@@ -39,7 +39,9 @@ const GAME_ID = "g1";
 const FAKE_HOST_ID = "11111111-2222-3333-4444-555555555555";
 const EXPIRED_MS = Date.now() - 60 * 60 * 1000; // 1 hour ago
 
-test("expired invite → renders Invite expired banner, CTA routes to /discover fallback", async ({ browser }) => {
+test("expired invite → renders Invite expired banner, CTA routes to /discover fallback", async ({
+  browser,
+}) => {
   const userId = sessionUserId();
   const link = `/games/${GAME_ID}?invite=1&from=${FAKE_HOST_ID}&exp=${EXPIRED_MS}`;
   const title = `E2E expired invite ${Date.now()}`;
@@ -49,17 +51,20 @@ test("expired invite → renders Invite expired banner, CTA routes to /discover 
   await restoreSession(page);
 
   // Seed the expired invite notification.
-  const insertRes = await page.evaluate(async ({ userId, title, link }) => {
-    const mod = await import("/src/integrations/supabase/client.ts");
-    const { error } = await mod.supabase.from("notifications").insert({
-      user_id: userId,
-      type: "game_invite",
-      title,
-      body: "This invite has expired.",
-      link,
-    } as any);
-    return error ? { ok: false, message: error.message } : { ok: true };
-  }, { userId, title, link });
+  const insertRes = await page.evaluate(
+    async ({ userId, title, link }) => {
+      const mod = await import("/src/integrations/supabase/client.ts");
+      const { error } = await mod.supabase.from("notifications").insert({
+        user_id: userId,
+        type: "game_invite",
+        title,
+        body: "This invite has expired.",
+        link,
+      } as any);
+      return error ? { ok: false, message: error.message } : { ok: true };
+    },
+    { userId, title, link },
+  );
   expect(insertRes.ok, `seed insert failed: ${(insertRes as any).message ?? ""}`).toBe(true);
 
   // Track any join_requests / payment_submissions writes — must NOT fire.

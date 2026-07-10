@@ -36,7 +36,9 @@ export type AvailabilityContactRequest = {
   updated_at: string;
 };
 
-export async function listOpenAvailabilities(opts: { sport?: string; city?: string } = {}): Promise<AvailabilityWithAuthor[]> {
+export async function listOpenAvailabilities(
+  opts: { sport?: string; city?: string } = {},
+): Promise<AvailabilityWithAuthor[]> {
   let q = supabase
     .from("player_availabilities" as any)
     .select("*")
@@ -108,7 +110,10 @@ export async function updateAvailability(id: string, patch: Partial<PlayerAvaila
 }
 
 export async function deleteAvailability(id: string) {
-  const { error } = await supabase.from("player_availabilities" as any).delete().eq("id", id);
+  const { error } = await supabase
+    .from("player_availabilities" as any)
+    .delete()
+    .eq("id", id);
   if (error) throw error;
 }
 
@@ -129,21 +134,19 @@ export async function createContactRequest(
   const { data: u } = await supabase.auth.getUser();
   if (!u.user) throw new Error("Sign in to contact this player.");
   if (u.user.id === toUserId) throw new Error("You can't contact yourself.");
-  const { error } = await supabase
-    .from("availability_contact_requests" as any)
-    .insert({
-      availability_id: availabilityId,
-      from_user_id: u.user.id,
-      to_user_id: toUserId,
-      message: message.trim().slice(0, 500) || null,
-      status: "pending",
-      kind: invite ? "invite" : "contact",
-      game_id: invite?.gameId ?? null,
-      game_title: invite?.title ? invite.title.slice(0, 200) : null,
-      game_starts_at: invite?.startsAt ?? null,
-      game_sport: invite?.sport ? invite.sport.slice(0, 60) : null,
-      game_location: invite?.location ? invite.location.slice(0, 300) : null,
-    } as any);
+  const { error } = await supabase.from("availability_contact_requests" as any).insert({
+    availability_id: availabilityId,
+    from_user_id: u.user.id,
+    to_user_id: toUserId,
+    message: message.trim().slice(0, 500) || null,
+    status: "pending",
+    kind: invite ? "invite" : "contact",
+    game_id: invite?.gameId ?? null,
+    game_title: invite?.title ? invite.title.slice(0, 200) : null,
+    game_starts_at: invite?.startsAt ?? null,
+    game_sport: invite?.sport ? invite.sport.slice(0, 60) : null,
+    game_location: invite?.location ? invite.location.slice(0, 300) : null,
+  } as any);
   if (error) throw error;
 
   // Fire a best-effort in-app + push notification to the recipient.
@@ -163,7 +166,9 @@ export async function createContactRequest(
   }
 }
 
-export async function listMyContactRequests(box: "inbox" | "outbox"): Promise<AvailabilityContactRequest[]> {
+export async function listMyContactRequests(
+  box: "inbox" | "outbox",
+): Promise<AvailabilityContactRequest[]> {
   const { data: u } = await supabase.auth.getUser();
   if (!u.user) return [];
   const col = box === "inbox" ? "to_user_id" : "from_user_id";

@@ -39,9 +39,13 @@ function ReelCard({ reel }: { reel: Reel }) {
       supabase.storage
         .from("highlight-videos")
         .createSignedUrl(reel.thumbnail_path, 3600)
-        .then(({ data }) => { if (!cancelled) setThumb(data?.signedUrl ?? null); });
+        .then(({ data }) => {
+          if (!cancelled) setThumb(data?.signedUrl ?? null);
+        });
     }
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [reel.thumbnail_path]);
 
   async function handlePlay() {
@@ -110,7 +114,11 @@ function ReelsPage() {
   useEffect(() => {
     if (!user) return;
     let env: string;
-    try { env = getStripeEnvironment(); } catch { return; }
+    try {
+      env = getStripeEnvironment();
+    } catch {
+      return;
+    }
     supabase
       .from("highlight_reels")
       .select("*")
@@ -268,11 +276,17 @@ function ReelsPage() {
           className="flex w-full items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-border bg-surface/50 py-8 text-sm font-medium disabled:opacity-50"
         >
           {busy ? (
-            <><Loader2 className="h-4 w-4 animate-spin" /> Uploading…</>
+            <>
+              <Loader2 className="h-4 w-4 animate-spin" /> Uploading…
+            </>
           ) : canGenerate ? (
-            <><Upload className="h-5 w-5 text-lime" /> Upload a clip to generate a reel</>
+            <>
+              <Upload className="h-5 w-5 text-lime" /> Upload a clip to generate a reel
+            </>
           ) : (
-            <><Lock className="h-5 w-5" /> Subscribe to create more reels</>
+            <>
+              <Lock className="h-5 w-5" /> Subscribe to create more reels
+            </>
           )}
         </button>
         {lockedReason && (
@@ -285,7 +299,9 @@ function ReelsPage() {
           Your reels
         </h2>
         {reels.length === 0 ? (
-          <p className="text-sm text-muted-foreground">No reels yet — upload your first clip above.</p>
+          <p className="text-sm text-muted-foreground">
+            No reels yet — upload your first clip above.
+          </p>
         ) : (
           <ul className="space-y-2">
             {reels.map((r) => (

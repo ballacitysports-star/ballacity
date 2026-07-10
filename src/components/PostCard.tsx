@@ -7,9 +7,11 @@ export function PostCard({ post, index = 0 }: { post: OrgPost; index?: number })
   const meta = POST_KIND_META[post.kind];
   const isEvent = post.kind === "tryout" || post.kind === "pickup" || post.kind === "clinic";
   const accent =
-    meta.color === "coral" ? "text-coral border-coral/40 bg-coral/10"
-    : meta.color === "lime" ? "text-lime border-lime/40 bg-lime/10"
-    : "text-muted-foreground border-border bg-secondary";
+    meta.color === "coral"
+      ? "text-coral border-coral/40 bg-coral/10"
+      : meta.color === "lime"
+        ? "text-lime border-lime/40 bg-lime/10"
+        : "text-muted-foreground border-border bg-secondary";
 
   const fillPct = post.spots ? Math.round((post.spots.taken / post.spots.max) * 100) : 0;
   const spotsLeft = post.spots ? post.spots.max - post.spots.taken : 0;
@@ -28,7 +30,9 @@ export function PostCard({ post, index = 0 }: { post: OrgPost; index?: number })
       )}
 
       <div className="flex items-center justify-between mb-2">
-        <span className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs font-bold ${accent}`}>
+        <span
+          className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs font-bold ${accent}`}
+        >
           <span>{meta.emoji}</span> {meta.label}
         </span>
         <span className="text-[11px] text-muted-foreground">{formatWhen(post.postedAt)}</span>
@@ -41,16 +45,19 @@ export function PostCard({ post, index = 0 }: { post: OrgPost; index?: number })
         <div className="mt-3 space-y-2.5">
           <div className="flex flex-wrap gap-x-4 gap-y-1.5 text-xs text-muted-foreground">
             <span className="inline-flex items-center gap-1.5">
-              <Calendar className="h-3.5 w-3.5 text-lime" />{formatWhen(post.date)}
+              <Calendar className="h-3.5 w-3.5 text-lime" />
+              {formatWhen(post.date)}
             </span>
             {post.location && (
               <span className="inline-flex items-center gap-1.5">
-                <MapPin className="h-3.5 w-3.5 text-coral" />{post.location}
+                <MapPin className="h-3.5 w-3.5 text-coral" />
+                {post.location}
               </span>
             )}
             {typeof post.price === "number" && (
               <span className="inline-flex items-center gap-1.5">
-                <DollarSign className="h-3.5 w-3.5" />{post.price === 0 ? "Free" : `$${post.price}`}
+                <DollarSign className="h-3.5 w-3.5" />
+                {post.price === 0 ? "Free" : `$${post.price}`}
               </span>
             )}
           </div>

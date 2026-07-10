@@ -40,37 +40,47 @@ function sessionUserId(): string {
 
 const isTable = (url: string, table: string) => url.includes(`/rest/v1/${table}`);
 
-test("network error on first Request-to-join blocks a mid-flight second tap, then allows a successful retry", async ({ browser }) => {
+test("network error on first Request-to-join blocks a mid-flight second tap, then allows a successful retry", async ({
+  browser,
+}) => {
   const userId = sessionUserId();
 
   const ctx = await browser.newContext();
   const page = await ctx.newPage();
 
-  await page.route((u) => isTable(u, "game_payment_settings"), async (route: PWRoute) => {
-    if (route.request().method() !== "GET") return route.fallback();
-    await route.fulfill({
-      status: 200,
-      contentType: "application/json",
-      body: JSON.stringify([{
-        id: "mock-settings-id",
-        game_id: GAME_ID,
-        host_id: FAKE_HOST_ID,
-        entry_fee: 0,
-        accepted_method_ids: [],
-        payment_deadline: null,
-        refund_policy: null,
-        payment_instructions: null,
-        requires_approval: true,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      }]),
-    });
-  });
+  await page.route(
+    (u) => isTable(u, "game_payment_settings"),
+    async (route: PWRoute) => {
+      if (route.request().method() !== "GET") return route.fallback();
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify([
+          {
+            id: "mock-settings-id",
+            game_id: GAME_ID,
+            host_id: FAKE_HOST_ID,
+            entry_fee: 0,
+            accepted_method_ids: [],
+            payment_deadline: null,
+            refund_policy: null,
+            payment_instructions: null,
+            requires_approval: true,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          },
+        ]),
+      });
+    },
+  );
 
-  await page.route((u) => isTable(u, "payment_submissions"), async (route: PWRoute) => {
-    if (route.request().method() !== "GET") return route.fallback();
-    await route.fulfill({ status: 200, contentType: "application/json", body: "[]" });
-  });
+  await page.route(
+    (u) => isTable(u, "payment_submissions"),
+    async (route: PWRoute) => {
+      if (route.request().method() !== "GET") return route.fallback();
+      await route.fulfill({ status: 200, contentType: "application/json", body: "[]" });
+    },
+  );
 
   let postAttempt = 0;
   let firstPostStartedAt = 0;
@@ -90,47 +100,53 @@ test("network error on first Request-to-join blocks a mid-flight second tap, the
     updated_at: new Date().toISOString(),
   });
 
-  await page.route((u) => isTable(u, "join_requests"), async (route: PWRoute) => {
-    const req = route.request();
-    const method = req.method();
-    if (method === "GET") {
-      await route.fulfill({
-        status: 200,
-        contentType: "application/json",
-        body: JSON.stringify(retrySucceeded ? [pendingRow()] : []),
-      });
-      return;
-    }
-    if (method === "POST") {
-      postAttempt += 1;
-      const attempt = postAttempt;
-      joinPosts.push({ attempt, at: Date.now() });
-      if (attempt === 1) {
-        firstPostStartedAt = Date.now();
-        // Hold the first request open so the second tap fires while it's in flight,
-        // then fail it with a network-style error.
-        await new Promise((r) => setTimeout(r, FIRST_POST_DELAY_MS));
-        firstPostSettledAt = Date.now();
-        await route.abort("failed");
+  await page.route(
+    (u) => isTable(u, "join_requests"),
+    async (route: PWRoute) => {
+      const req = route.request();
+      const method = req.method();
+      if (method === "GET") {
+        await route.fulfill({
+          status: 200,
+          contentType: "application/json",
+          body: JSON.stringify(retrySucceeded ? [pendingRow()] : []),
+        });
         return;
       }
-      // Retry succeeds.
-      retrySucceeded = true;
-      await route.fulfill({
-        status: 201,
-        contentType: "application/json",
-        headers: { "content-range": "0-0/1" },
-        body: JSON.stringify([pendingRow()]),
-      });
-      return;
-    }
-    return route.fallback();
-  });
+      if (method === "POST") {
+        postAttempt += 1;
+        const attempt = postAttempt;
+        joinPosts.push({ attempt, at: Date.now() });
+        if (attempt === 1) {
+          firstPostStartedAt = Date.now();
+          // Hold the first request open so the second tap fires while it's in flight,
+          // then fail it with a network-style error.
+          await new Promise((r) => setTimeout(r, FIRST_POST_DELAY_MS));
+          firstPostSettledAt = Date.now();
+          await route.abort("failed");
+          return;
+        }
+        // Retry succeeds.
+        retrySucceeded = true;
+        await route.fulfill({
+          status: 201,
+          contentType: "application/json",
+          headers: { "content-range": "0-0/1" },
+          body: JSON.stringify([pendingRow()]),
+        });
+        return;
+      }
+      return route.fallback();
+    },
+  );
 
   await restoreSession(page);
   await page.goto(INVITE_URL, { waitUntil: "domcontentloaded" });
 
-  const banner = page.getByRole("status").filter({ hasText: /you're invited to this game/i }).first();
+  const banner = page
+    .getByRole("status")
+    .filter({ hasText: /you're invited to this game/i })
+    .first();
   await expect(banner).toBeVisible({ timeout: 10_000 });
 
   const cta = page.getByRole("button", { name: /request to join/i }).first();
@@ -147,8 +163,12 @@ test("network error on first Request-to-join blocks a mid-flight second tap, the
   expect(firstPostSettledAt, "first POST settled before we could double-tap").toBe(0);
 
   // Second tap while still in flight — must be swallowed.
-  await cta.click({ force: true, noWaitAfter: true }).catch(() => { /* button may be disabled */ });
-  await cta.click({ force: true, noWaitAfter: true }).catch(() => { /* ignore */ });
+  await cta.click({ force: true, noWaitAfter: true }).catch(() => {
+    /* button may be disabled */
+  });
+  await cta.click({ force: true, noWaitAfter: true }).catch(() => {
+    /* ignore */
+  });
 
   // Wait for the first POST to fail.
   await expect
@@ -156,11 +176,15 @@ test("network error on first Request-to-join blocks a mid-flight second tap, the
     .toBeGreaterThan(0);
 
   // Only one POST should have been sent so far.
-  expect(joinPosts.length, `expected exactly 1 POST during in-flight window, saw ${joinPosts.length}`).toBe(1);
+  expect(
+    joinPosts.length,
+    `expected exactly 1 POST during in-flight window, saw ${joinPosts.length}`,
+  ).toBe(1);
 
   // Error surfaces via a toast + the CTA returns to "Request to join" (not pending).
-  await expect(page.getByText(/could not send request|failed|network/i).first())
-    .toBeVisible({ timeout: 5_000 });
+  await expect(page.getByText(/could not send request|failed|network/i).first()).toBeVisible({
+    timeout: 5_000,
+  });
 
   const retryCta = page.getByRole("button", { name: /request to join/i }).first();
   await expect(retryCta).toBeVisible({ timeout: 5_000 });
@@ -171,8 +195,9 @@ test("network error on first Request-to-join blocks a mid-flight second tap, the
   // Retry — succeeds this time.
   await retryCta.click({ force: true });
 
-  await expect(page.getByText(/request pending · tap to cancel/i).first())
-    .toBeVisible({ timeout: 10_000 });
+  await expect(page.getByText(/request pending · tap to cancel/i).first()).toBeVisible({
+    timeout: 10_000,
+  });
   await expect(page.getByRole("button", { name: /^request to join/i })).toHaveCount(0);
 
   // Exactly two POSTs total: one failed, one successful retry.

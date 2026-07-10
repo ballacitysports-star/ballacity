@@ -1,7 +1,22 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { motion, useMotionValue, useTransform, animate } from "framer-motion";
 import { Logo } from "@/components/Logo";
-import { Bell, BellRing, MessageCircle, Users, CreditCard, Zap, X, CheckCheck, Check, Dot, Trash2, Mail, MailOpen, Settings } from "lucide-react";
+import {
+  Bell,
+  BellRing,
+  MessageCircle,
+  Users,
+  CreditCard,
+  Zap,
+  X,
+  CheckCheck,
+  Check,
+  Dot,
+  Trash2,
+  Mail,
+  MailOpen,
+  Settings,
+} from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import {
@@ -50,18 +65,32 @@ function Notifications() {
 
   useEffect(() => {
     if (loading) return;
-    if (!user) { setFetching(false); return; }
+    if (!user) {
+      setFetching(false);
+      return;
+    }
     let cancelled = false;
     const load = async () => {
-      try { const data = await listMyNotifications(); if (!cancelled) setItems(data); }
-      finally { if (!cancelled) setFetching(false); }
+      try {
+        const data = await listMyNotifications();
+        if (!cancelled) setItems(data);
+      } finally {
+        if (!cancelled) setFetching(false);
+      }
     };
     load();
     const channel = supabase
       .channel(`notif-list-${user.id}`)
-      .on("postgres_changes", { event: "*", schema: "public", table: "notifications", filter: `user_id=eq.${user.id}` }, load)
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "notifications", filter: `user_id=eq.${user.id}` },
+        load,
+      )
       .subscribe();
-    return () => { cancelled = true; supabase.removeChannel(channel); };
+    return () => {
+      cancelled = true;
+      supabase.removeChannel(channel);
+    };
   }, [user?.id, loading]);
 
   const unreadCount = useMemo(() => items.filter((n) => !n.read_at).length, [items]);
@@ -76,12 +105,18 @@ function Notifications() {
       <div className="mx-auto w-full max-w-md sm:max-w-2xl lg:max-w-4xl px-4 pt-10 text-center">
         <Bell className="mx-auto h-10 w-10 text-muted-foreground mb-3" />
         <h1 className="font-display text-2xl font-bold mb-2">Sign in for alerts</h1>
-        <p className="text-sm text-muted-foreground mb-4">Stay on top of join requests, payments, and messages.</p>
-        <Link to="/auth" className="inline-flex rounded-full bg-lime-gradient px-5 py-2.5 text-sm font-bold text-primary-foreground">Sign in</Link>
+        <p className="text-sm text-muted-foreground mb-4">
+          Stay on top of join requests, payments, and messages.
+        </p>
+        <Link
+          to="/auth"
+          className="inline-flex rounded-full bg-lime-gradient px-5 py-2.5 text-sm font-bold text-primary-foreground"
+        >
+          Sign in
+        </Link>
       </div>
     );
   }
-
 
   const toggleRead = async (n: Notification) => {
     const willMarkRead = !n.read_at;
@@ -150,12 +185,13 @@ function Notifications() {
         </div>
       </div>
       <h1 className="font-display text-3xl font-bold leading-tight mb-1">Alerts</h1>
-      <p className="text-muted-foreground text-sm mb-5">Real-time updates from your games & crew.</p>
+      <p className="text-muted-foreground text-sm mb-5">
+        Real-time updates from your games & crew.
+      </p>
 
       <PushPrompt />
       <PushDeliveryFallback userId={user?.id} />
       <NotificationPreferences />
-
 
       {fetching ? (
         <div className="text-sm text-muted-foreground">Loading…</div>
@@ -259,10 +295,14 @@ function SwipeableAlert({
       >
         <button
           type="button"
-          onClick={() => { if (!dragging) onOpen(n); }}
+          onClick={() => {
+            if (!dragging) onOpen(n);
+          }}
           className="flex flex-1 min-w-0 gap-3 text-left"
         >
-          <div className={`grid h-10 w-10 shrink-0 place-items-center rounded-xl ${unread ? "bg-lime/15 text-lime" : "bg-muted/30 text-muted-foreground"}`}>
+          <div
+            className={`grid h-10 w-10 shrink-0 place-items-center rounded-xl ${unread ? "bg-lime/15 text-lime" : "bg-muted/30 text-muted-foreground"}`}
+          >
             <Icon className="h-5 w-5" />
           </div>
           <div className="flex-1 min-w-0">
@@ -271,15 +311,22 @@ function SwipeableAlert({
                 {unread && <Dot className="h-4 w-4 -ml-1 text-lime" />}
                 {n.title}
               </h3>
-              <span className="text-[10px] text-muted-foreground shrink-0">{timeAgo(n.created_at)}</span>
+              <span className="text-[10px] text-muted-foreground shrink-0">
+                {timeAgo(n.created_at)}
+              </span>
             </div>
-            {n.body && <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{n.body}</p>}
+            {n.body && (
+              <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{n.body}</p>
+            )}
           </div>
         </button>
         <div className="shrink-0 flex flex-col gap-1">
           <button
             type="button"
-            onClick={(e) => { e.stopPropagation(); onToggleRead(n); }}
+            onClick={(e) => {
+              e.stopPropagation();
+              onToggleRead(n);
+            }}
             aria-label={unread ? "Mark as read" : "Mark as unread"}
             title={unread ? "Mark as read" : "Mark as unread"}
             className="rounded-full p-1.5 text-muted-foreground hover:bg-muted/30 hover:text-lime"
@@ -288,7 +335,10 @@ function SwipeableAlert({
           </button>
           <button
             type="button"
-            onClick={(e) => { e.stopPropagation(); onDelete(n); }}
+            onClick={(e) => {
+              e.stopPropagation();
+              onDelete(n);
+            }}
             aria-label="Delete notification"
             title="Delete"
             className="rounded-full p-1.5 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
@@ -301,8 +351,6 @@ function SwipeableAlert({
   );
 }
 
-
-
 function NotificationPreferences() {
   const prefs = useNotifPrefs();
   const { user } = useAuth();
@@ -314,7 +362,9 @@ function NotificationPreferences() {
       <summary className="cursor-pointer list-none p-3 flex items-center justify-between">
         <div>
           <div className="text-sm font-semibold">Notification preferences</div>
-          <div className="text-xs text-muted-foreground">Choose what fires in-app vs. as a push alert.</div>
+          <div className="text-xs text-muted-foreground">
+            Choose what fires in-app vs. as a push alert.
+          </div>
         </div>
         <span className="text-xs text-muted-foreground group-open:hidden">Edit</span>
         <span className="text-xs text-muted-foreground hidden group-open:inline">Close</span>
@@ -322,8 +372,12 @@ function NotificationPreferences() {
       <div className="border-t border-border px-3 py-3 space-y-4">
         <div className="grid grid-cols-[1fr_auto_auto] gap-x-4 gap-y-1 items-center">
           <div />
-          <div className="text-[10px] uppercase tracking-wide text-muted-foreground text-center">In-app</div>
-          <div className="text-[10px] uppercase tracking-wide text-muted-foreground text-center">Push</div>
+          <div className="text-[10px] uppercase tracking-wide text-muted-foreground text-center">
+            In-app
+          </div>
+          <div className="text-[10px] uppercase tracking-wide text-muted-foreground text-center">
+            Push
+          </div>
           {categories.map((cat) => (
             <PrefRow key={cat} category={cat} prefs={prefs} />
           ))}
@@ -333,7 +387,13 @@ function NotificationPreferences() {
   );
 }
 
-function PrefRow({ category, prefs }: { category: NotifCategory; prefs: ReturnType<typeof useNotifPrefs> }) {
+function PrefRow({
+  category,
+  prefs,
+}: {
+  category: NotifCategory;
+  prefs: ReturnType<typeof useNotifPrefs>;
+}) {
   const meta = CATEGORY_META[category];
   const toggle = (channel: NotifChannel, value: boolean) => setNotifPref(category, channel, value);
   return (
@@ -343,15 +403,22 @@ function PrefRow({ category, prefs }: { category: NotifCategory; prefs: ReturnTy
         <div className="text-xs text-muted-foreground">{meta.description}</div>
       </div>
       <div className="grid place-items-center">
-        <Switch checked={prefs[category].inApp} onCheckedChange={(v) => toggle("inApp", v)} aria-label={`${meta.label} in-app`} />
+        <Switch
+          checked={prefs[category].inApp}
+          onCheckedChange={(v) => toggle("inApp", v)}
+          aria-label={`${meta.label} in-app`}
+        />
       </div>
       <div className="grid place-items-center">
-        <Switch checked={prefs[category].push} onCheckedChange={(v) => toggle("push", v)} aria-label={`${meta.label} push`} />
+        <Switch
+          checked={prefs[category].push}
+          onCheckedChange={(v) => toggle("push", v)}
+          aria-label={`${meta.label} push`}
+        />
       </div>
     </>
   );
 }
-
 
 function PushPrompt() {
   const [perm, setPerm] = useState<"granted" | "denied" | "default" | "unsupported">("default");
@@ -398,7 +465,10 @@ function PushPrompt() {
         )}
       </div>
       <button
-        onClick={() => { dismissPushPrompt(); setDismissed(true); }}
+        onClick={() => {
+          dismissPushPrompt();
+          setDismissed(true);
+        }}
         className="shrink-0 rounded-full p-1 text-muted-foreground hover:text-foreground"
         aria-label="Dismiss"
       >
@@ -409,11 +479,18 @@ function PushPrompt() {
 }
 
 function PushDeliveryFallback({ userId }: { userId: string | undefined }) {
-  const [failures, setFailures] = useState<Array<{ id: string; created_at: string; error: string | null; notification_id: string | null }>>([]);
+  const [failures, setFailures] = useState<
+    Array<{ id: string; created_at: string; error: string | null; notification_id: string | null }>
+  >([]);
   const [dismissedIds, setDismissedIds] = useState<Set<string>>(() => {
     if (typeof window === "undefined") return new Set();
-    try { return new Set(JSON.parse(window.localStorage.getItem("openrun.pushFailDismissed.v1") ?? "[]")); }
-    catch { return new Set(); }
+    try {
+      return new Set(
+        JSON.parse(window.localStorage.getItem("openrun.pushFailDismissed.v1") ?? "[]"),
+      );
+    } catch {
+      return new Set();
+    }
   });
 
   useEffect(() => {
@@ -430,16 +507,34 @@ function PushDeliveryFallback({ userId }: { userId: string | undefined }) {
         .gte("created_at", since)
         .order("created_at", { ascending: false })
         .limit(10);
-      if (!cancelled) setFailures(((data ?? []) as any[]).map((r) => ({
-        id: r.id, created_at: r.created_at, error: r.error, notification_id: r.notification_id,
-      })));
+      if (!cancelled)
+        setFailures(
+          ((data ?? []) as any[]).map((r) => ({
+            id: r.id,
+            created_at: r.created_at,
+            error: r.error,
+            notification_id: r.notification_id,
+          })),
+        );
     };
     load();
     const channel = supabase
       .channel(`notif-deliv-${userId}`)
-      .on("postgres_changes", { event: "INSERT", schema: "public", table: "notification_delivery_log", filter: `user_id=eq.${userId}` }, load)
+      .on(
+        "postgres_changes",
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "notification_delivery_log",
+          filter: `user_id=eq.${userId}`,
+        },
+        load,
+      )
       .subscribe();
-    return () => { cancelled = true; supabase.removeChannel(channel); };
+    return () => {
+      cancelled = true;
+      supabase.removeChannel(channel);
+    };
   }, [userId]);
 
   const active = failures.filter((f) => !dismissedIds.has(f.id));
@@ -449,15 +544,22 @@ function PushDeliveryFallback({ userId }: { userId: string | undefined }) {
     const next = new Set(dismissedIds);
     active.forEach((f) => next.add(f.id));
     setDismissedIds(next);
-    try { window.localStorage.setItem("openrun.pushFailDismissed.v1", JSON.stringify(Array.from(next))); } catch { /* ignore */ }
+    try {
+      window.localStorage.setItem("openrun.pushFailDismissed.v1", JSON.stringify(Array.from(next)));
+    } catch {
+      /* ignore */
+    }
   };
 
   const reason = active[0].error ?? "unknown";
   const label =
-    reason === "no_subscribers" ? "No push device is subscribed yet — alerts are showing here instead."
-    : reason === "not_configured" ? "Push provider isn't configured — alerts are showing here instead."
-    : reason === "fetch_failed" ? "Push service is unreachable — alerts are showing here instead."
-    : `${active.length} push${active.length > 1 ? "es" : ""} couldn't be delivered — alerts are showing here instead.`;
+    reason === "no_subscribers"
+      ? "No push device is subscribed yet — alerts are showing here instead."
+      : reason === "not_configured"
+        ? "Push provider isn't configured — alerts are showing here instead."
+        : reason === "fetch_failed"
+          ? "Push service is unreachable — alerts are showing here instead."
+          : `${active.length} push${active.length > 1 ? "es" : ""} couldn't be delivered — alerts are showing here instead.`;
 
   return (
     <div className="mb-4 rounded-2xl border border-coral/40 bg-coral/10 p-3 flex items-start gap-3">
@@ -476,7 +578,6 @@ function PushDeliveryFallback({ userId }: { userId: string | undefined }) {
     </div>
   );
 }
-
 
 function timeAgo(iso: string) {
   const diff = Date.now() - new Date(iso).getTime();

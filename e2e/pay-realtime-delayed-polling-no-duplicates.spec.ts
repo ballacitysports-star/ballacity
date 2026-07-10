@@ -48,44 +48,54 @@ function sessionUserId(): string {
 const isTable = (url: string, table: string) => url.includes(`/rest/v1/${table}`);
 
 async function fireLateRealtimeFrame(page: Page, userId: string) {
-  return page.evaluate(async ({ userId, gameId, hostId }) => {
-    const mod = await import("/src/integrations/supabase/client.ts");
-    const chans = mod.supabase.getChannels();
-    let count = 0;
-    for (const ch of chans as any[]) {
-      if (typeof ch.topic !== "string" || !ch.topic.includes("pay-join-req:")) continue;
-      const bindings =
-        (ch.bindings && (ch.bindings.postgres_changes || ch.bindings["postgres_changes"])) || [];
-      const payload = {
-        schema: "public",
-        table: "join_requests",
-        commit_timestamp: new Date().toISOString(),
-        eventType: "UPDATE",
-        new: {
-          id: "mock-join-id",
-          game_id: gameId,
-          host_id: hostId,
-          player_id: userId,
-          status: "approved",
-        },
-        old: {
-          id: "mock-join-id",
-          game_id: gameId,
-          host_id: hostId,
-          player_id: userId,
-          status: "pending",
-        },
-        errors: null,
-      };
-      for (const b of bindings as any[]) {
-        try { b.callback(payload); count += 1; } catch { /* ignore */ }
+  return page.evaluate(
+    async ({ userId, gameId, hostId }) => {
+      const mod = await import("/src/integrations/supabase/client.ts");
+      const chans = mod.supabase.getChannels();
+      let count = 0;
+      for (const ch of chans as any[]) {
+        if (typeof ch.topic !== "string" || !ch.topic.includes("pay-join-req:")) continue;
+        const bindings =
+          (ch.bindings && (ch.bindings.postgres_changes || ch.bindings["postgres_changes"])) || [];
+        const payload = {
+          schema: "public",
+          table: "join_requests",
+          commit_timestamp: new Date().toISOString(),
+          eventType: "UPDATE",
+          new: {
+            id: "mock-join-id",
+            game_id: gameId,
+            host_id: hostId,
+            player_id: userId,
+            status: "approved",
+          },
+          old: {
+            id: "mock-join-id",
+            game_id: gameId,
+            host_id: hostId,
+            player_id: userId,
+            status: "pending",
+          },
+          errors: null,
+        };
+        for (const b of bindings as any[]) {
+          try {
+            b.callback(payload);
+            count += 1;
+          } catch {
+            /* ignore */
+          }
+        }
       }
-    }
-    return count;
-  }, { userId, gameId: GAME_ID, hostId: FAKE_HOST_ID });
+      return count;
+    },
+    { userId, gameId: GAME_ID, hostId: FAKE_HOST_ID },
+  );
 }
 
-test("delayed realtime: polling flips gate once, late frames create no duplicate submissions", async ({ browser }) => {
+test("delayed realtime: polling flips gate once, late frames create no duplicate submissions", async ({
+  browser,
+}) => {
   test.setTimeout(120_000);
 
   const userId = sessionUserId();
@@ -96,104 +106,120 @@ test("delayed realtime: polling flips gate once, late frames create no duplicate
   // keep the realtime WebSocket unavailable. The client will still create
   // channel objects (with bindings) so we can synthesize a "late" frame
   // later in the test.
-  await page.route((u) => u.includes("/realtime/"), (route: PWRoute) => route.abort());
+  await page.route(
+    (u) => u.includes("/realtime/"),
+    (route: PWRoute) => route.abort(),
+  );
 
-  await page.route((u) => isTable(u, "game_payment_settings"), async (route: PWRoute) => {
-    if (route.request().method() !== "GET") return route.fallback();
-    await route.fulfill({
-      status: 200,
-      contentType: "application/json",
-      body: JSON.stringify([{
-        id: "mock-settings-id",
-        game_id: GAME_ID,
-        host_id: FAKE_HOST_ID,
-        entry_fee: ENTRY_FEE,
-        accepted_method_ids: [METHOD_ID],
-        payment_deadline: null,
-        refund_policy: null,
-        payment_instructions: null,
-        requires_approval: true,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      }]),
-    });
-  });
+  await page.route(
+    (u) => isTable(u, "game_payment_settings"),
+    async (route: PWRoute) => {
+      if (route.request().method() !== "GET") return route.fallback();
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify([
+          {
+            id: "mock-settings-id",
+            game_id: GAME_ID,
+            host_id: FAKE_HOST_ID,
+            entry_fee: ENTRY_FEE,
+            accepted_method_ids: [METHOD_ID],
+            payment_deadline: null,
+            refund_policy: null,
+            payment_instructions: null,
+            requires_approval: true,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          },
+        ]),
+      });
+    },
+  );
 
-  await page.route((u) => isTable(u, "host_payment_methods"), async (route: PWRoute) => {
-    if (route.request().method() !== "GET") return route.fallback();
-    await route.fulfill({
-      status: 200,
-      contentType: "application/json",
-      body: JSON.stringify([{
-        id: METHOD_ID,
-        host_id: FAKE_HOST_ID,
-        payment_type: "venmo",
-        label: "Venmo",
-        username: "@testhost",
-        payment_url: "https://venmo.com/u/testhost",
-        contact_info: null,
-        instructions: null,
-        is_enabled: true,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      }]),
-    });
-  });
+  await page.route(
+    (u) => isTable(u, "host_payment_methods"),
+    async (route: PWRoute) => {
+      if (route.request().method() !== "GET") return route.fallback();
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify([
+          {
+            id: METHOD_ID,
+            host_id: FAKE_HOST_ID,
+            payment_type: "venmo",
+            label: "Venmo",
+            username: "@testhost",
+            payment_url: "https://venmo.com/u/testhost",
+            contact_info: null,
+            instructions: null,
+            is_enabled: true,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          },
+        ]),
+      });
+    },
+  );
 
   // Track EVERY payment_submissions POST.
   type PostAttempt = { at: number; whenApproved: boolean };
   const posts: PostAttempt[] = [];
   const createdRows: any[] = [];
   let approved = false;
-  await page.route((u) => isTable(u, "payment_submissions"), async (route: PWRoute) => {
-    const req = route.request();
-    if (req.method() === "GET") {
-      await route.fulfill({
-        status: 200,
-        contentType: "application/json",
-        body: JSON.stringify(createdRows),
-      });
-      return;
-    }
-    if (req.method() === "POST") {
-      posts.push({ at: Date.now(), whenApproved: approved });
-      if (!approved) {
+  await page.route(
+    (u) => isTable(u, "payment_submissions"),
+    async (route: PWRoute) => {
+      const req = route.request();
+      if (req.method() === "GET") {
         await route.fulfill({
-          status: 403,
+          status: 200,
           contentType: "application/json",
-          body: JSON.stringify({
-            code: "42501",
-            message: "Host approval required before payment can be submitted for this game.",
-          }),
+          body: JSON.stringify(createdRows),
         });
         return;
       }
-      const row = {
-        id: `sub-${createdRows.length + 1}`,
-        player_id: userId,
-        game_id: GAME_ID,
-        host_id: FAKE_HOST_ID,
-        payment_method_id: METHOD_ID,
-        payment_type: "venmo",
-        screenshot_path: null,
-        transaction_reference: null,
-        notes: null,
-        status: "pending",
-        reviewer_notes: null,
-        submitted_at: new Date().toISOString(),
-        reviewed_at: null,
-      };
-      createdRows.push(row);
-      await route.fulfill({
-        status: 201,
-        contentType: "application/json",
-        headers: { "content-range": "0-0/1" },
-        body: JSON.stringify([row]),
-      });
-      return;
-    }
-    return route.fallback();
-  });
+      if (req.method() === "POST") {
+        posts.push({ at: Date.now(), whenApproved: approved });
+        if (!approved) {
+          await route.fulfill({
+            status: 403,
+            contentType: "application/json",
+            body: JSON.stringify({
+              code: "42501",
+              message: "Host approval required before payment can be submitted for this game.",
+            }),
+          });
+          return;
+        }
+        const row = {
+          id: `sub-${createdRows.length + 1}`,
+          player_id: userId,
+          game_id: GAME_ID,
+          host_id: FAKE_HOST_ID,
+          payment_method_id: METHOD_ID,
+          payment_type: "venmo",
+          screenshot_path: null,
+          transaction_reference: null,
+          notes: null,
+          status: "pending",
+          reviewer_notes: null,
+          submitted_at: new Date().toISOString(),
+          reviewed_at: null,
+        };
+        createdRows.push(row);
+        await route.fulfill({
+          status: 201,
+          contentType: "application/json",
+          headers: { "content-range": "0-0/1" },
+          body: JSON.stringify([row]),
+        });
+        return;
+      }
+      return route.fallback();
+    },
+  );
 
   let joinGets = 0;
   const row = (status: "pending" | "approved") => ({
@@ -209,15 +235,18 @@ test("delayed realtime: polling flips gate once, late frames create no duplicate
     reviewed_at: status === "approved" ? new Date().toISOString() : null,
     idempotency_key: `join:${GAME_ID}`,
   });
-  await page.route((u) => isTable(u, "join_requests"), async (route: PWRoute) => {
-    if (route.request().method() !== "GET") return route.fallback();
-    joinGets += 1;
-    await route.fulfill({
-      status: 200,
-      contentType: "application/json",
-      body: JSON.stringify([row(approved ? "approved" : "pending")]),
-    });
-  });
+  await page.route(
+    (u) => isTable(u, "join_requests"),
+    async (route: PWRoute) => {
+      if (route.request().method() !== "GET") return route.fallback();
+      joinGets += 1;
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify([row(approved ? "approved" : "pending")]),
+      });
+    },
+  );
 
   await restoreSession(page);
   await page.goto(`/games/${GAME_ID}/pay`, { waitUntil: "domcontentloaded" });
@@ -229,7 +258,9 @@ test("delayed realtime: polling flips gate once, late frames create no duplicate
   // No realtime channel should have joined (WS blocked).
   const joined = await page.evaluate(async () => {
     const mod = await import("/src/integrations/supabase/client.ts");
-    return mod.supabase.getChannels().some((c: any) => c.state === "joined" || c.state === "SUBSCRIBED");
+    return mod.supabase
+      .getChannels()
+      .some((c: any) => c.state === "joined" || c.state === "SUBSCRIBED");
   });
   expect(joined).toBe(false);
 
@@ -258,13 +289,17 @@ test("delayed realtime: polling flips gate once, late frames create no duplicate
 
   // Player picks method and submits — exactly ONE submission via the
   // approved path.
-  await page.getByText(/@testhost/i).first().click();
+  await page
+    .getByText(/@testhost/i)
+    .first()
+    .click();
   const submitBtn = page.getByRole("button", { name: /i have paid/i });
   await expect(submitBtn).toBeVisible({ timeout: 10_000 });
   await submitBtn.click();
 
-  await expect(page.getByText(/submitted — host will verify/i).first())
-    .toBeVisible({ timeout: 10_000 });
+  await expect(page.getByText(/submitted — host will verify/i).first()).toBeVisible({
+    timeout: 10_000,
+  });
 
   await page.waitForTimeout(400);
   expect(createdRows.length, "exactly one submission after approval").toBe(1);

@@ -18,13 +18,18 @@ function CheckoutReturn() {
           {session_id ? "Payment complete" : "Checkout complete"}
         </h1>
         <p className="mt-2 text-sm text-muted-foreground">
-          Thanks for supporting OpenRun! Subscriptions activate immediately. For merch orders, you'll receive a confirmation email with shipping details.
+          Thanks for supporting OpenRun! Subscriptions activate immediately. For merch orders,
+          you'll receive a confirmation email with shipping details.
         </p>
         <p className="mt-3 text-xs text-muted-foreground">
-          All sales are final. No refunds. Manage subscriptions anytime from the billing portal on the Plans page.
+          All sales are final. No refunds. Manage subscriptions anytime from the billing portal on
+          the Plans page.
         </p>
         <div className="mt-6 flex gap-2 justify-center">
-          <Link to="/plans" className="rounded-xl border border-border px-4 py-2 text-sm font-semibold hover:border-lime/40">
+          <Link
+            to="/plans"
+            className="rounded-xl border border-border px-4 py-2 text-sm font-semibold hover:border-lime/40"
+          >
             Plans
           </Link>
           <Link to="/reels" className="rounded-xl bg-lime px-4 py-2 text-sm font-bold text-black">

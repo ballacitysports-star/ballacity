@@ -50,92 +50,110 @@ test("payment submission is blocked while join request is unapproved", async ({ 
   const ctx = await browser.newContext();
   const page = await ctx.newPage();
 
-  await page.route((u) => isTable(u, "game_payment_settings"), async (route: PWRoute) => {
-    if (route.request().method() !== "GET") return route.fallback();
-    await route.fulfill({
-      status: 200,
-      contentType: "application/json",
-      body: JSON.stringify([{
-        id: "mock-settings-id",
-        game_id: GAME_ID,
-        host_id: FAKE_HOST_ID,
-        entry_fee: ENTRY_FEE,
-        accepted_method_ids: [METHOD_ID],
-        payment_deadline: null,
-        refund_policy: null,
-        payment_instructions: null,
-        requires_approval: true,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      }]),
-    });
-  });
+  await page.route(
+    (u) => isTable(u, "game_payment_settings"),
+    async (route: PWRoute) => {
+      if (route.request().method() !== "GET") return route.fallback();
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify([
+          {
+            id: "mock-settings-id",
+            game_id: GAME_ID,
+            host_id: FAKE_HOST_ID,
+            entry_fee: ENTRY_FEE,
+            accepted_method_ids: [METHOD_ID],
+            payment_deadline: null,
+            refund_policy: null,
+            payment_instructions: null,
+            requires_approval: true,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          },
+        ]),
+      });
+    },
+  );
 
-  await page.route((u) => isTable(u, "host_payment_methods"), async (route: PWRoute) => {
-    if (route.request().method() !== "GET") return route.fallback();
-    await route.fulfill({
-      status: 200,
-      contentType: "application/json",
-      body: JSON.stringify([{
-        id: METHOD_ID,
-        host_id: FAKE_HOST_ID,
-        payment_type: "venmo",
-        label: "Venmo",
-        username: "@testhost",
-        payment_url: "https://venmo.com/u/testhost",
-        contact_info: null,
-        instructions: null,
-        is_enabled: true,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      }]),
-    });
-  });
+  await page.route(
+    (u) => isTable(u, "host_payment_methods"),
+    async (route: PWRoute) => {
+      if (route.request().method() !== "GET") return route.fallback();
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify([
+          {
+            id: METHOD_ID,
+            host_id: FAKE_HOST_ID,
+            payment_type: "venmo",
+            label: "Venmo",
+            username: "@testhost",
+            payment_url: "https://venmo.com/u/testhost",
+            contact_info: null,
+            instructions: null,
+            is_enabled: true,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          },
+        ]),
+      });
+    },
+  );
 
   const submissionPosts: Array<{ at: number; body: string }> = [];
-  await page.route((u) => isTable(u, "payment_submissions"), async (route: PWRoute) => {
-    const req = route.request();
-    if (req.method() === "GET") {
-      await route.fulfill({ status: 200, contentType: "application/json", body: "[]" });
-      return;
-    }
-    if (req.method() === "POST") {
-      submissionPosts.push({ at: Date.now(), body: req.postData() ?? "" });
-      // Mirror the DB trigger: reject with the approval-required error.
-      await route.fulfill({
-        status: 403,
-        contentType: "application/json",
-        body: JSON.stringify({
-          code: "42501",
-          message: "Host approval required before payment can be submitted for this game.",
-        }),
-      });
-      return;
-    }
-    return route.fallback();
-  });
+  await page.route(
+    (u) => isTable(u, "payment_submissions"),
+    async (route: PWRoute) => {
+      const req = route.request();
+      if (req.method() === "GET") {
+        await route.fulfill({ status: 200, contentType: "application/json", body: "[]" });
+        return;
+      }
+      if (req.method() === "POST") {
+        submissionPosts.push({ at: Date.now(), body: req.postData() ?? "" });
+        // Mirror the DB trigger: reject with the approval-required error.
+        await route.fulfill({
+          status: 403,
+          contentType: "application/json",
+          body: JSON.stringify({
+            code: "42501",
+            message: "Host approval required before payment can be submitted for this game.",
+          }),
+        });
+        return;
+      }
+      return route.fallback();
+    },
+  );
 
   // Join request stays `pending` for the whole test.
-  await page.route((u) => isTable(u, "join_requests"), async (route: PWRoute) => {
-    if (route.request().method() !== "GET") return route.fallback();
-    await route.fulfill({
-      status: 200,
-      contentType: "application/json",
-      body: JSON.stringify([{
-        id: "mock-join-id",
-        game_id: GAME_ID,
-        host_id: FAKE_HOST_ID,
-        player_id: userId,
-        status: "pending",
-        message: null,
-        reviewer_notes: null,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-        reviewed_at: null,
-        idempotency_key: `join:${GAME_ID}`,
-      }]),
-    });
-  });
+  await page.route(
+    (u) => isTable(u, "join_requests"),
+    async (route: PWRoute) => {
+      if (route.request().method() !== "GET") return route.fallback();
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify([
+          {
+            id: "mock-join-id",
+            game_id: GAME_ID,
+            host_id: FAKE_HOST_ID,
+            player_id: userId,
+            status: "pending",
+            message: null,
+            reviewer_notes: null,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+            reviewed_at: null,
+            idempotency_key: `join:${GAME_ID}`,
+          },
+        ]),
+      });
+    },
+  );
 
   await restoreSession(page);
   await page.goto(`/games/${GAME_ID}/pay`, { waitUntil: "domcontentloaded" });
@@ -159,22 +177,28 @@ test("payment submission is blocked while join request is unapproved", async ({ 
 
   // 3. A direct programmatic insert via the browser Supabase client must be
   //    rejected — mirroring the server-side trigger.
-  const attempt = await page.evaluate(async ({ gameId, hostId, methodId }) => {
-    const mod = await import("/src/integrations/supabase/client.ts");
-    const { data, error } = await mod.supabase.from("payment_submissions").insert({
-      game_id: gameId,
-      host_id: hostId,
-      payment_method_id: methodId,
-      payment_type: "venmo",
-      screenshot_path: null,
-      transaction_reference: null,
-      notes: null,
-    } as any).select("id");
-    return {
-      data,
-      error: error ? { code: (error as any).code, message: (error as any).message } : null,
-    };
-  }, { gameId: GAME_ID, hostId: FAKE_HOST_ID, methodId: METHOD_ID });
+  const attempt = await page.evaluate(
+    async ({ gameId, hostId, methodId }) => {
+      const mod = await import("/src/integrations/supabase/client.ts");
+      const { data, error } = await mod.supabase
+        .from("payment_submissions")
+        .insert({
+          game_id: gameId,
+          host_id: hostId,
+          payment_method_id: methodId,
+          payment_type: "venmo",
+          screenshot_path: null,
+          transaction_reference: null,
+          notes: null,
+        } as any)
+        .select("id");
+      return {
+        data,
+        error: error ? { code: (error as any).code, message: (error as any).message } : null,
+      };
+    },
+    { gameId: GAME_ID, hostId: FAKE_HOST_ID, methodId: METHOD_ID },
+  );
 
   expect(attempt.data).toBeNull();
   expect(attempt.error, "programmatic insert must be rejected").not.toBeNull();

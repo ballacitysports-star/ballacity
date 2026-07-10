@@ -52,7 +52,6 @@ export type MyProfile = {
   links: ProfileLink[];
 };
 
-
 const PROFILE_KEY_PREFIX = "openrun.profile.v2.";
 const PREFS_KEY = "openrun.feedPrefs.v1";
 
@@ -103,22 +102,33 @@ function makeStore<T>(key: string, fallback: T) {
       cache = fallback;
     }
   }
-  function getSnapshot() { load(); return snap; }
-  function subscribe(cb: () => void) { listeners.add(cb); return () => listeners.delete(cb); }
+  function getSnapshot() {
+    load();
+    return snap;
+  }
+  function subscribe(cb: () => void) {
+    listeners.add(cb);
+    return () => listeners.delete(cb);
+  }
   function set(next: T) {
     cache = next;
     snap = JSON.stringify(next);
     if (typeof window !== "undefined") window.localStorage.setItem(key, snap);
     listeners.forEach((l) => l());
   }
-  function get(): T { load(); return cache; }
+  function get(): T {
+    load();
+    return cache;
+  }
   return { getSnapshot, subscribe, set, get };
 }
 
 const prefsStore = makeStore<FeedPrefs>(PREFS_KEY, DEFAULT_PREFS);
 
 // ---------- Per-user profile overrides ----------
-function profileKey(userId: string) { return PROFILE_KEY_PREFIX + userId; }
+function profileKey(userId: string) {
+  return PROFILE_KEY_PREFIX + userId;
+}
 
 export function readOverrides(userId: string | null): ProfileOverrides {
   if (!userId || typeof window === "undefined") return {};
@@ -135,14 +145,18 @@ export function useProfileOverrides(userId: string | null | undefined): ProfileO
   useEffect(() => {
     const cb = () => setTick((t) => t + 1);
     overrideListeners.add(cb);
-    return () => { overrideListeners.delete(cb); };
+    return () => {
+      overrideListeners.delete(cb);
+    };
   }, []);
   void tick;
   return readOverrides(userId ?? null);
 }
 
 const overrideListeners = new Set<() => void>();
-function notifyOverrides() { overrideListeners.forEach((l) => l()); }
+function notifyOverrides() {
+  overrideListeners.forEach((l) => l());
+}
 
 export function setProfileOverrides(userId: string, next: ProfileOverrides) {
   if (typeof window === "undefined") return;
@@ -166,7 +180,7 @@ function defaultsFromUser(user: User): MyProfile {
     (meta.name as string) ||
     (user.email ? user.email.split("@")[0] : "Player");
 
-  const username = user.email ? "@" + user.email.split("@")[0] : "@" + (user.id.slice(0, 6));
+  const username = user.email ? "@" + user.email.split("@")[0] : "@" + user.id.slice(0, 6);
   return {
     name,
     username,
@@ -178,7 +192,6 @@ function defaultsFromUser(user: User): MyProfile {
     badges: [],
     links: [],
   };
-
 }
 
 // ---------- Hooks ----------
@@ -201,27 +214,42 @@ export function useMyProfile(currentUser?: User | null): MyProfile | null {
   useEffect(() => {
     const cb = () => setTick((t) => t + 1);
     overrideListeners.add(cb);
-    return () => { overrideListeners.delete(cb); };
+    return () => {
+      overrideListeners.delete(cb);
+    };
   }, []);
   useEffect(() => {
-    if (!user) { setDbProfile(null); return; }
+    if (!user) {
+      setDbProfile(null);
+      return;
+    }
     let cancelled = false;
     supabase
       .from("profiles")
-      .select("display_name, username, avatar_initials, bio, city, avatar_url, cover_url, birthday, graduating_class, links")
+      .select(
+        "display_name, username, avatar_initials, bio, city, avatar_url, cover_url, birthday, graduating_class, links",
+      )
       .eq("id", user.id)
       .maybeSingle()
-      .then(({ data }) => { if (!cancelled) setDbProfile(data as any); });
-    return () => { cancelled = true; };
+      .then(({ data }) => {
+        if (!cancelled) setDbProfile(data as any);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [user?.id]);
   if (!user) return null;
   const overrides = readOverrides(user.id);
   const base = defaultsFromUser(user);
   void tick;
-  const dbLinks: ProfileLink[] = Array.isArray(dbProfile?.links) ? (dbProfile!.links as ProfileLink[]) : [];
+  const dbLinks: ProfileLink[] = Array.isArray(dbProfile?.links)
+    ? (dbProfile!.links as ProfileLink[])
+    : [];
   return {
     name: overrides.name ?? dbProfile?.display_name ?? base.name,
-    username: overrides.username ?? (dbProfile?.username ? `@${dbProfile.username.replace(/^@/, "")}` : base.username),
+    username:
+      overrides.username ??
+      (dbProfile?.username ? `@${dbProfile.username.replace(/^@/, "")}` : base.username),
     avatar: overrides.avatar ?? dbProfile?.avatar_initials ?? base.avatar,
     avatarUrl: overrides.avatarUrl ?? dbProfile?.avatar_url ?? undefined,
     coverUrl: overrides.coverUrl ?? dbProfile?.cover_url ?? undefined,
@@ -237,10 +265,8 @@ export function useMyProfile(currentUser?: User | null): MyProfile | null {
 }
 
 export function useFeedPrefs(): FeedPrefs {
-  const s = useSyncExternalStore(
-    prefsStore.subscribe,
-    prefsStore.getSnapshot,
-    () => JSON.stringify(DEFAULT_PREFS),
+  const s = useSyncExternalStore(prefsStore.subscribe, prefsStore.getSnapshot, () =>
+    JSON.stringify(DEFAULT_PREFS),
   );
   const parsed = JSON.parse(s) as FeedPrefs;
   const sections = { ...DEFAULT_PREFS.sections, ...(parsed.sections ?? {}) };

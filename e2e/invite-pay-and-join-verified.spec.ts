@@ -45,7 +45,9 @@ function sessionUserId(): string {
 
 const isTable = (url: string, table: string) => url.includes(`/rest/v1/${table}`);
 
-test("invite → Pay & join → host-verified → Confirmed on game page (invite params preserved)", async ({ browser }) => {
+test("invite → Pay & join → host-verified → Confirmed on game page (invite params preserved)", async ({
+  browser,
+}) => {
   const userId = sessionUserId();
   const link = `/games/${GAME_ID}?invite=1&from=${FAKE_HOST_ID}`;
   const notifTitle = `E2E pay-join-verified ${Date.now()}`;
@@ -54,51 +56,64 @@ test("invite → Pay & join → host-verified → Confirmed on game page (invite
   const page = await ctx.newPage();
 
   // Paid, no-approval settings.
-  await page.route((u) => isTable(u, "game_payment_settings"), async (route: Route) => {
-    if (route.request().method() !== "GET") return route.fallback();
-    await route.fulfill({
-      status: 200,
-      contentType: "application/json",
-      body: JSON.stringify([{
-        id: "mock-settings-id",
-        game_id: GAME_ID,
-        host_id: FAKE_HOST_ID,
-        entry_fee: ENTRY_FEE,
-        accepted_method_ids: [],
-        payment_deadline: null,
-        refund_policy: null,
-        payment_instructions: null,
-        requires_approval: false,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      }]),
-    });
-  });
+  await page.route(
+    (u) => isTable(u, "game_payment_settings"),
+    async (route: Route) => {
+      if (route.request().method() !== "GET") return route.fallback();
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify([
+          {
+            id: "mock-settings-id",
+            game_id: GAME_ID,
+            host_id: FAKE_HOST_ID,
+            entry_fee: ENTRY_FEE,
+            accepted_method_ids: [],
+            payment_deadline: null,
+            refund_policy: null,
+            payment_instructions: null,
+            requires_approval: false,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          },
+        ]),
+      });
+    },
+  );
 
-  await page.route((u) => isTable(u, "host_payment_methods"), async (route: Route) => {
-    if (route.request().method() !== "GET") return route.fallback();
-    await route.fulfill({
-      status: 200,
-      contentType: "application/json",
-      body: JSON.stringify([{
-        id: METHOD_ID,
-        host_id: FAKE_HOST_ID,
-        payment_type: "venmo",
-        label: "Venmo",
-        username: "@fakehost",
-        contact_info: null,
-        payment_url: null,
-        instructions: null,
-        is_enabled: true,
-        created_at: new Date().toISOString(),
-      }]),
-    });
-  });
+  await page.route(
+    (u) => isTable(u, "host_payment_methods"),
+    async (route: Route) => {
+      if (route.request().method() !== "GET") return route.fallback();
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify([
+          {
+            id: METHOD_ID,
+            host_id: FAKE_HOST_ID,
+            payment_type: "venmo",
+            label: "Venmo",
+            username: "@fakehost",
+            contact_info: null,
+            payment_url: null,
+            instructions: null,
+            is_enabled: true,
+            created_at: new Date().toISOString(),
+          },
+        ]),
+      });
+    },
+  );
 
-  await page.route((u) => isTable(u, "join_requests"), async (route: Route) => {
-    if (route.request().method() !== "GET") return route.fallback();
-    await route.fulfill({ status: 200, contentType: "application/json", body: "[]" });
-  });
+  await page.route(
+    (u) => isTable(u, "join_requests"),
+    async (route: Route) => {
+      if (route.request().method() !== "GET") return route.fallback();
+      await route.fulfill({ status: 200, contentType: "application/json", body: "[]" });
+    },
+  );
 
   // payment_submissions state machine:
   //   before POST → []
@@ -106,59 +121,67 @@ test("invite → Pay & join → host-verified → Confirmed on game page (invite
   //   once we simulate host verification.
   let submitted = false;
   let subStatus: "pending" | "verified" = "pending";
-  await page.route((u) => isTable(u, "payment_submissions"), async (route: Route) => {
-    const method = route.request().method();
-    if (method === "POST") {
-      submitted = true;
-      await route.fulfill({
-        status: 201,
-        contentType: "application/json",
-        body: JSON.stringify([{ id: SUB_ID }]),
-      });
-      return;
-    }
-    if (method === "GET") {
-      const rows = submitted
-        ? [{
-            id: SUB_ID,
-            game_id: GAME_ID,
-            host_id: FAKE_HOST_ID,
-            player_id: userId,
-            payment_method_id: METHOD_ID,
-            payment_type: "venmo",
-            screenshot_path: null,
-            transaction_reference: null,
-            notes: null,
-            status: subStatus,
-            reviewer_notes: subStatus === "verified" ? "Confirmed by host" : null,
-            submitted_at: new Date().toISOString(),
-            reviewed_at: subStatus === "verified" ? new Date().toISOString() : null,
-          }]
-        : [];
-      await route.fulfill({
-        status: 200,
-        contentType: "application/json",
-        body: JSON.stringify(rows),
-      });
-      return;
-    }
-    return route.fallback();
-  });
+  await page.route(
+    (u) => isTable(u, "payment_submissions"),
+    async (route: Route) => {
+      const method = route.request().method();
+      if (method === "POST") {
+        submitted = true;
+        await route.fulfill({
+          status: 201,
+          contentType: "application/json",
+          body: JSON.stringify([{ id: SUB_ID }]),
+        });
+        return;
+      }
+      if (method === "GET") {
+        const rows = submitted
+          ? [
+              {
+                id: SUB_ID,
+                game_id: GAME_ID,
+                host_id: FAKE_HOST_ID,
+                player_id: userId,
+                payment_method_id: METHOD_ID,
+                payment_type: "venmo",
+                screenshot_path: null,
+                transaction_reference: null,
+                notes: null,
+                status: subStatus,
+                reviewer_notes: subStatus === "verified" ? "Confirmed by host" : null,
+                submitted_at: new Date().toISOString(),
+                reviewed_at: subStatus === "verified" ? new Date().toISOString() : null,
+              },
+            ]
+          : [];
+        await route.fulfill({
+          status: 200,
+          contentType: "application/json",
+          body: JSON.stringify(rows),
+        });
+        return;
+      }
+      return route.fallback();
+    },
+  );
 
   await restoreSession(page);
 
   // Seed invite notification.
-  const insertRes = await page.evaluate(async ({ userId, title, link }) => {
-    const mod = await import("/src/integrations/supabase/client.ts");
-    const { error } = await mod.supabase.from("notifications").insert({
-      user_id: userId,
-      type: "game_invite",
-      title,
-      body: "Soccer · Test Field",
-      link,
-    } as any);
-    return error ? { ok: false, message: error.message } : { ok: true };
-  }, { userId, title: notifTitle, link });
+  const insertRes = await page.evaluate(
+    async ({ userId, title, link }) => {
+      const mod = await import("/src/integrations/supabase/client.ts");
+      const { error } = await mod.supabase.from("notifications").insert({
+        user_id: userId,
+        type: "game_invite",
+        title,
+        body: "Soccer · Test Field",
+        link,
+      } as any);
+      return error ? { ok: false, message: error.message } : { ok: true };
+    },
+    { userId, title: notifTitle, link },
+  );
   expect(insertRes.ok, `seed insert failed: ${(insertRes as any).message ?? ""}`).toBe(true);
 
   // Tap invite.
@@ -168,18 +191,23 @@ test("invite → Pay & join → host-verified → Confirmed on game page (invite
   await item.click();
 
   await page.waitForURL(
-    (u) => u.pathname === `/games/${GAME_ID}` &&
-           u.searchParams.get("invite") === "1" &&
-           u.searchParams.get("from") === FAKE_HOST_ID,
+    (u) =>
+      u.pathname === `/games/${GAME_ID}` &&
+      u.searchParams.get("invite") === "1" &&
+      u.searchParams.get("from") === FAKE_HOST_ID,
     { timeout: 10_000 },
   );
 
   // Pay host → /pay.
-  await page.getByRole("button", { name: /pay host/i }).first().click();
+  await page
+    .getByRole("button", { name: /pay host/i })
+    .first()
+    .click();
   await page.waitForURL(
-    (u) => u.pathname === `/games/${GAME_ID}/pay` &&
-           u.searchParams.get("invite") === "1" &&
-           u.searchParams.get("from") === FAKE_HOST_ID,
+    (u) =>
+      u.pathname === `/games/${GAME_ID}/pay` &&
+      u.searchParams.get("invite") === "1" &&
+      u.searchParams.get("from") === FAKE_HOST_ID,
     { timeout: 10_000 },
   );
 
@@ -201,7 +229,9 @@ test("invite → Pay & join → host-verified → Confirmed on game page (invite
   subStatus = "verified";
 
   // Navigate back to the game page with invite params intact.
-  await page.goto(`/games/${GAME_ID}?invite=1&from=${FAKE_HOST_ID}`, { waitUntil: "domcontentloaded" });
+  await page.goto(`/games/${GAME_ID}?invite=1&from=${FAKE_HOST_ID}`, {
+    waitUntil: "domcontentloaded",
+  });
 
   // Confirmed CTA renders — user is marked as joined via host-verified payment.
   const confirmedCta = page.getByRole("button", { name: /confirmed.*tap to leave/i });

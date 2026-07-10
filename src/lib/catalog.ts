@@ -53,7 +53,25 @@ export type MerchItem = {
 };
 
 export const MERCH_ITEMS: MerchItem[] = [
-  { priceId: "merch_tee_onetime", name: "Logo Tee", description: "Soft cotton tee with embroidered logo", priceLabel: "$25", emoji: "👕" },
-  { priceId: "merch_hoodie_onetime", name: "Pullover Hoodie", description: "Heavyweight pullover with logo", priceLabel: "$55", emoji: "🧥" },
-  { priceId: "merch_hat_onetime", name: "Snapback Hat", description: "Adjustable snapback with embroidered logo", priceLabel: "$20", emoji: "🧢" },
+  {
+    priceId: "merch_tee_onetime",
+    name: "Logo Tee",
+    description: "Soft cotton tee with embroidered logo",
+    priceLabel: "$25",
+    emoji: "👕",
+  },
+  {
+    priceId: "merch_hoodie_onetime",
+    name: "Pullover Hoodie",
+    description: "Heavyweight pullover with logo",
+    priceLabel: "$55",
+    emoji: "🧥",
+  },
+  {
+    priceId: "merch_hat_onetime",
+    name: "Snapback Hat",
+    description: "Adjustable snapback with embroidered logo",
+    priceLabel: "$20",
+    emoji: "🧢",
+  },
 ];

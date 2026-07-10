@@ -3,7 +3,6 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
 import { isAllowed } from "@/lib/notification-prefs";
 
-
 export type Notification = {
   id: string;
   user_id: string;
@@ -41,7 +40,6 @@ export async function createNotification(input: {
   }
 }
 
-
 export async function listMyNotifications(): Promise<Notification[]> {
   const { data, error } = await supabase
     .from("notifications" as any)
@@ -53,15 +51,24 @@ export async function listMyNotifications(): Promise<Notification[]> {
 }
 
 export async function markNotificationRead(id: string) {
-  await supabase.from("notifications" as any).update({ read_at: new Date().toISOString() } as any).eq("id", id);
+  await supabase
+    .from("notifications" as any)
+    .update({ read_at: new Date().toISOString() } as any)
+    .eq("id", id);
 }
 
 export async function markNotificationUnread(id: string) {
-  await supabase.from("notifications" as any).update({ read_at: null } as any).eq("id", id);
+  await supabase
+    .from("notifications" as any)
+    .update({ read_at: null } as any)
+    .eq("id", id);
 }
 
 export async function deleteNotification(id: string) {
-  const { error } = await supabase.from("notifications" as any).delete().eq("id", id);
+  const { error } = await supabase
+    .from("notifications" as any)
+    .delete()
+    .eq("id", id);
   if (error) throw error;
 }
 
@@ -80,7 +87,10 @@ export function useUnreadNotificationCount() {
   const [count, setCount] = useState(0);
 
   useEffect(() => {
-    if (!user) { setCount(0); return; }
+    if (!user) {
+      setCount(0);
+      return;
+    }
     let cancelled = false;
     const fetchCount = async () => {
       const { count: c } = await supabase
@@ -94,9 +104,16 @@ export function useUnreadNotificationCount() {
 
     const channel = supabase
       .channel(`notif-count-${user.id}`)
-      .on("postgres_changes", { event: "*", schema: "public", table: "notifications", filter: `user_id=eq.${user.id}` }, fetchCount)
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "notifications", filter: `user_id=eq.${user.id}` },
+        fetchCount,
+      )
       .subscribe();
-    return () => { cancelled = true; supabase.removeChannel(channel); };
+    return () => {
+      cancelled = true;
+      supabase.removeChannel(channel);
+    };
   }, [user?.id]);
 
   return count;
@@ -107,7 +124,10 @@ export function useUnreadMessageCount() {
   const [count, setCount] = useState(0);
 
   useEffect(() => {
-    if (!user) { setCount(0); return; }
+    if (!user) {
+      setCount(0);
+      return;
+    }
     let cancelled = false;
     const fetchCount = async () => {
       const { count: c } = await supabase
@@ -122,9 +142,16 @@ export function useUnreadMessageCount() {
 
     const channel = supabase
       .channel(`notif-msg-count-${user.id}`)
-      .on("postgres_changes", { event: "*", schema: "public", table: "notifications", filter: `user_id=eq.${user.id}` }, fetchCount)
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "notifications", filter: `user_id=eq.${user.id}` },
+        fetchCount,
+      )
       .subscribe();
-    return () => { cancelled = true; supabase.removeChannel(channel); };
+    return () => {
+      cancelled = true;
+      supabase.removeChannel(channel);
+    };
   }, [user?.id]);
 
   return count;
@@ -151,12 +178,20 @@ export async function requestPushPermission(): Promise<NotificationPermission | 
 
 export function dismissPushPrompt() {
   if (typeof window === "undefined") return;
-  try { window.localStorage.setItem(PUSH_DISMISS_KEY, "1"); } catch { /* ignore */ }
+  try {
+    window.localStorage.setItem(PUSH_DISMISS_KEY, "1");
+  } catch {
+    /* ignore */
+  }
 }
 
 export function isPushPromptDismissed(): boolean {
   if (typeof window === "undefined") return true;
-  try { return window.localStorage.getItem(PUSH_DISMISS_KEY) === "1"; } catch { return false; }
+  try {
+    return window.localStorage.getItem(PUSH_DISMISS_KEY) === "1";
+  } catch {
+    return false;
+  }
 }
 
 function showBrowserNotification(n: Pick<Notification, "title" | "body" | "link" | "type">) {
@@ -198,7 +233,12 @@ export function useNotificationPush() {
       .channel(`notif-push-${user.id}`)
       .on(
         "postgres_changes",
-        { event: "INSERT", schema: "public", table: "notifications", filter: `user_id=eq.${user.id}` },
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "notifications",
+          filter: `user_id=eq.${user.id}`,
+        },
         (payload) => {
           if (!active) return;
           const n = payload.new as Notification;
@@ -219,7 +259,12 @@ export function useNotificationPush() {
           if (isAllowed(n.type, "inApp")) {
             import("sonner").then(({ toast }) => {
               const isApproval = n.type === "join_approved" || n.type === "join_declined";
-              const fn = n.type === "join_approved" ? toast.success : n.type === "join_declined" ? toast.error : toast;
+              const fn =
+                n.type === "join_approved"
+                  ? toast.success
+                  : n.type === "join_declined"
+                    ? toast.error
+                    : toast;
 
               // Group consecutive messages from the same conversation under one toast
               if (n.type === "message" && convId) {
@@ -228,17 +273,19 @@ export function useNotificationPush() {
                 messageGroups.set(convId, next);
                 const toastId = `msg-${convId}`;
                 const title = next > 1 ? `${next} new messages` : n.title;
-                const description = next > 1
-                  ? `${n.title}${n.body ? `: ${n.body}` : ""}`
-                  : (n.body ?? undefined);
+                const description =
+                  next > 1 ? `${n.title}${n.body ? `: ${n.body}` : ""}` : (n.body ?? undefined);
                 toast(title, {
                   id: toastId,
                   description,
                   action: n.link
-                    ? { label: "Open", onClick: () => {
-                        messageGroups.delete(convId!);
-                        if (n.link) window.location.assign(n.link);
-                      } }
+                    ? {
+                        label: "Open",
+                        onClick: () => {
+                          messageGroups.delete(convId!);
+                          if (n.link) window.location.assign(n.link);
+                        },
+                      }
                     : undefined,
                   duration: 5000,
                   onDismiss: () => messageGroups.delete(convId!),
@@ -248,7 +295,12 @@ export function useNotificationPush() {
                 fn(n.title, {
                   description: n.body ?? undefined,
                   action: n.link
-                    ? { label: "Open", onClick: () => { if (n.link) window.location.assign(n.link); } }
+                    ? {
+                        label: "Open",
+                        onClick: () => {
+                          if (n.link) window.location.assign(n.link);
+                        },
+                      }
                     : undefined,
                   duration: isApproval ? 8000 : 5000,
                 });
@@ -259,7 +311,9 @@ export function useNotificationPush() {
         },
       )
       .subscribe();
-    return () => { active = false; supabase.removeChannel(channel); };
+    return () => {
+      active = false;
+      supabase.removeChannel(channel);
+    };
   }, [user?.id]);
 }
-

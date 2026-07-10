@@ -188,26 +188,22 @@ function ensureRealtime() {
   realtimeAttached = true;
   const channel = supabase
     .channel("hosted_games:all")
-    .on(
-      "postgres_changes",
-      { event: "*", schema: "public", table: "hosted_games" },
-      (payload) => {
-        const newRow = payload.new as DbRow | null;
-        const oldRow = payload.old as DbRow | null;
-        if (payload.eventType === "DELETE" && oldRow) {
-          cache = cache.filter((g) => g.id !== oldRow.id);
-          emit();
-          return;
-        }
-        if (newRow) {
-          const g = rowToGame(newRow);
-          const idx = cache.findIndex((x) => x.id === g.id);
-          if (idx >= 0) cache = cache.map((x) => (x.id === g.id ? g : x));
-          else cache = [g, ...cache];
-          emit();
-        }
-      },
-    )
+    .on("postgres_changes", { event: "*", schema: "public", table: "hosted_games" }, (payload) => {
+      const newRow = payload.new as DbRow | null;
+      const oldRow = payload.old as DbRow | null;
+      if (payload.eventType === "DELETE" && oldRow) {
+        cache = cache.filter((g) => g.id !== oldRow.id);
+        emit();
+        return;
+      }
+      if (newRow) {
+        const g = rowToGame(newRow);
+        const idx = cache.findIndex((x) => x.id === g.id);
+        if (idx >= 0) cache = cache.map((x) => (x.id === g.id ? g : x));
+        else cache = [g, ...cache];
+        emit();
+      }
+    })
     .subscribe();
 
   if (typeof window !== "undefined") {
@@ -253,7 +249,12 @@ export async function addHostedGame(input: HostedGameInput): Promise<Game> {
   loadLocal();
   const id = `host-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
   const host = input.host
-    ? { name: input.host.name, username: input.host.username, avatar: input.host.avatar, rating: input.host.rating ?? 5 }
+    ? {
+        name: input.host.name,
+        username: input.host.username,
+        avatar: input.host.avatar,
+        rating: input.host.rating ?? 5,
+      }
     : { name: ME.name, username: ME.username, avatar: ME.avatar, rating: ME.stats.sportsmanship };
   const game: Game = {
     id,
@@ -329,7 +330,13 @@ export function updateHostedGame(id: string, patch: Partial<Game>): Game | undef
     dbPatch.joins_closed = (patch as { joinsClosed?: boolean }).joinsClosed;
   }
   if (Object.keys(dbPatch).length > 0) {
-    supabase.from("hosted_games").update(dbPatch).eq("id", id).then(() => { /* noop */ });
+    supabase
+      .from("hosted_games")
+      .update(dbPatch)
+      .eq("id", id)
+      .then(() => {
+        /* noop */
+      });
   }
   return updated;
 }
@@ -354,7 +361,9 @@ export function claimHostedGame(gameId: string, userId: string): void {
   supabase
     .from("hosted_games")
     .upsert(gameToInsertRow(updated), { onConflict: "id" })
-    .then(() => { /* noop */ });
+    .then(() => {
+      /* noop */
+    });
 }
 
 export function useHostedGames(): Game[] {

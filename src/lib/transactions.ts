@@ -14,15 +14,14 @@ export type TxnKind = "game" | "training" | "tryout" | "event";
 
 export type ClosedTxn = {
   id: string;
-  counterpartyId: string;   // revieweeId you may now review
+  counterpartyId: string; // revieweeId you may now review
   counterpartyName: string;
   kind: TxnKind;
-  context: string;          // e.g. "Friday Night Run · 5v5"
-  date: string;             // ISO, when it closed
+  context: string; // e.g. "Friday Night Run · 5v5"
+  date: string; // ISO, when it closed
 };
 
-const hostIdFor = (username: string) =>
-  `host-${username.replace(/^@/, "").toLowerCase()}`;
+const hostIdFor = (username: string) => `host-${username.replace(/^@/, "").toLowerCase()}`;
 
 function ago(days: number) {
   return new Date(Date.now() - days * 86400_000).toISOString();
@@ -96,11 +95,19 @@ function subscribe(cb: () => void) {
 }
 
 export function useCanReview(revieweeId: string): boolean {
-  useSyncExternalStore(subscribe, () => version, () => version);
+  useSyncExternalStore(
+    subscribe,
+    () => version,
+    () => version,
+  );
   return canReviewUser(revieweeId);
 }
 
 export function useTransactionsWith(revieweeId: string): ClosedTxn[] {
-  useSyncExternalStore(subscribe, () => version, () => version);
+  useSyncExternalStore(
+    subscribe,
+    () => version,
+    () => version,
+  );
   return transactionsWith(revieweeId);
 }

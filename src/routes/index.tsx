@@ -5,15 +5,20 @@ import { Logo } from "@/components/Logo";
 import { HERO_IMAGE, SPORTS, GAMES } from "@/lib/sample-data";
 import { GameCard } from "@/components/GameCard";
 
-
-
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
       { title: "OpenRun — Pickup sports, on demand" },
-      { name: "description", content: "Find and host pickup sports games near you. Basketball, soccer, pickleball, tennis and more — join a game in seconds." },
+      {
+        name: "description",
+        content:
+          "Find and host pickup sports games near you. Basketball, soccer, pickleball, tennis and more — join a game in seconds.",
+      },
       { property: "og:title", content: "OpenRun — Pickup sports, on demand" },
-      { property: "og:description", content: "Find and host pickup sports games near you in seconds." },
+      {
+        property: "og:description",
+        content: "Find and host pickup sports games near you in seconds.",
+      },
     ],
   }),
   component: Landing,
@@ -29,9 +34,15 @@ function Landing() {
         <div className="mx-auto max-w-6xl flex items-center justify-between px-5 py-3">
           <Logo />
           <nav className="hidden md:flex items-center gap-7 text-sm font-medium text-muted-foreground">
-            <a href="#features" className="hover:text-foreground">Features</a>
-            <a href="#sports" className="hover:text-foreground">Sports</a>
-            <a href="#trending" className="hover:text-foreground">Trending</a>
+            <a href="#features" className="hover:text-foreground">
+              Features
+            </a>
+            <a href="#sports" className="hover:text-foreground">
+              Sports
+            </a>
+            <a href="#trending" className="hover:text-foreground">
+              Trending
+            </a>
           </nav>
           <Link
             to="/feed"
@@ -61,7 +72,8 @@ function Landing() {
               transition={{ delay: 0.05 }}
               className="mt-5 font-display text-5xl md:text-7xl font-bold leading-[0.95] tracking-tight"
             >
-              Pickup sports.<br />
+              Pickup sports.
+              <br />
               <span className="text-lime">On demand.</span>
             </motion.h1>
             <motion.p
@@ -70,8 +82,8 @@ function Landing() {
               transition={{ delay: 0.12 }}
               className="mt-5 max-w-md text-lg text-muted-foreground"
             >
-              Find a game in 15 seconds. Host your court. Build a crew.
-              From hoops to pickleball — OpenRun connects the players around you.
+              Find a game in 15 seconds. Host your court. Build a crew. From hoops to pickleball —
+              OpenRun connects the players around you.
             </motion.p>
             <motion.div
               initial={{ opacity: 0, y: 20 }}
@@ -101,7 +113,9 @@ function Landing() {
               ].map((s) => (
                 <div key={s.v}>
                   <div className="font-display text-3xl font-bold">{s.k}</div>
-                  <div className="text-xs uppercase tracking-wider text-muted-foreground">{s.v}</div>
+                  <div className="text-xs uppercase tracking-wider text-muted-foreground">
+                    {s.v}
+                  </div>
                 </div>
               ))}
             </div>
@@ -115,14 +129,24 @@ function Landing() {
           >
             {/* Phone frame */}
             <div className="relative rounded-[2.5rem] border-[10px] border-surface-2 bg-background shadow-2xl glow-coral overflow-hidden">
-              <img src={HERO_IMAGE} alt="OpenRun app preview" className="h-[560px] w-full object-cover" />
+              <img
+                src={HERO_IMAGE}
+                alt="OpenRun app preview"
+                className="h-[560px] w-full object-cover"
+              />
               <div className="absolute inset-0 bg-gradient-to-t from-background via-background/20 to-transparent" />
               <div className="absolute top-4 left-4 right-4 flex items-center justify-between">
-                <span className="rounded-full bg-background/70 backdrop-blur px-2.5 py-1 text-[10px] font-semibold">🏀 Basketball</span>
-                <span className="rounded-full bg-coral-gradient px-2.5 py-1 text-[10px] font-bold text-white">2 spots left</span>
+                <span className="rounded-full bg-background/70 backdrop-blur px-2.5 py-1 text-[10px] font-semibold">
+                  🏀 Basketball
+                </span>
+                <span className="rounded-full bg-coral-gradient px-2.5 py-1 text-[10px] font-bold text-white">
+                  2 spots left
+                </span>
               </div>
               <div className="absolute bottom-5 left-4 right-4 space-y-2">
-                <h3 className="font-display text-xl font-bold leading-tight">Friday Night Run · 5v5</h3>
+                <h3 className="font-display text-xl font-bold leading-tight">
+                  Friday Night Run · 5v5
+                </h3>
                 <div className="flex items-center gap-2 text-xs text-muted-foreground">
                   <MapPin className="h-3.5 w-3.5 text-coral" /> Tompkins Square · 0.8 mi
                 </div>
@@ -137,7 +161,9 @@ function Landing() {
               className="absolute -left-10 top-10 rounded-2xl border border-border bg-surface/90 backdrop-blur p-3 shadow-xl"
             >
               <div className="flex items-center gap-2 text-xs font-semibold">
-                <span className="grid h-7 w-7 place-items-center rounded-full bg-coral-gradient text-white">⚡</span>
+                <span className="grid h-7 w-7 place-items-center rounded-full bg-coral-gradient text-white">
+                  ⚡
+                </span>
                 Marcus joined your game
               </div>
             </motion.div>
@@ -146,7 +172,9 @@ function Landing() {
               transition={{ duration: 5, repeat: Infinity, ease: "easeInOut", delay: 0.5 }}
               className="absolute -right-6 bottom-24 rounded-2xl border border-border bg-surface/90 backdrop-blur p-3 shadow-xl"
             >
-              <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Reliability</div>
+              <div className="text-[10px] uppercase tracking-wider text-muted-foreground">
+                Reliability
+              </div>
               <div className="font-display text-xl font-bold text-lime">98%</div>
             </motion.div>
           </motion.div>
@@ -158,7 +186,9 @@ function Landing() {
         <div className="flex items-end justify-between gap-4 mb-6">
           <div>
             <h2 className="font-display text-3xl md:text-4xl font-bold">Every sport. One app.</h2>
-            <p className="text-muted-foreground mt-1">From the cage to the court — find your run.</p>
+            <p className="text-muted-foreground mt-1">
+              From the cage to the court — find your run.
+            </p>
           </div>
         </div>
         <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
@@ -173,7 +203,9 @@ function Landing() {
             >
               <div className="text-3xl mb-2">{s.emoji}</div>
               <div className="font-semibold">{s.name}</div>
-              <div className="text-xs text-muted-foreground">{20 + ((s.name.charCodeAt(0) * 7 + s.name.length * 13) % 80)} nearby</div>
+              <div className="text-xs text-muted-foreground">
+                {20 + ((s.name.charCodeAt(0) * 7 + s.name.length * 13) % 80)} nearby
+              </div>
             </motion.div>
           ))}
         </div>
@@ -181,15 +213,47 @@ function Landing() {
 
       {/* Features */}
       <section id="features" className="mx-auto max-w-6xl px-5 py-16">
-        <h2 className="font-display text-3xl md:text-4xl font-bold mb-10">Built for players, not paperwork.</h2>
+        <h2 className="font-display text-3xl md:text-4xl font-bold mb-10">
+          Built for players, not paperwork.
+        </h2>
         <div className="grid md:grid-cols-3 gap-4">
           {[
-            { icon: Zap, title: "Join in 15 seconds", body: "Tap a game, claim a spot. No back-and-forth in group chats.", color: "lime" },
-            { icon: Users, title: "Real community", body: "Reliability scores and sportsmanship ratings keep games great.", color: "coral" },
-            { icon: Video, title: "AI highlight reels", body: "Upload raw footage. Get cinematic clips ready for Reels & TikTok.", color: "lime" },
-            { icon: Trophy, title: "Skill-balanced teams", body: "AI matchmaking builds even sides so every game is competitive.", color: "coral" },
-            { icon: MapPin, title: "Map-first discovery", body: "See every pickup game on a live map of your neighborhood.", color: "lime" },
-            { icon: Sparkles, title: "Pro tools, free to start", body: "Host unlimited games. Upgrade for analytics & priority visibility.", color: "coral" },
+            {
+              icon: Zap,
+              title: "Join in 15 seconds",
+              body: "Tap a game, claim a spot. No back-and-forth in group chats.",
+              color: "lime",
+            },
+            {
+              icon: Users,
+              title: "Real community",
+              body: "Reliability scores and sportsmanship ratings keep games great.",
+              color: "coral",
+            },
+            {
+              icon: Video,
+              title: "AI highlight reels",
+              body: "Upload raw footage. Get cinematic clips ready for Reels & TikTok.",
+              color: "lime",
+            },
+            {
+              icon: Trophy,
+              title: "Skill-balanced teams",
+              body: "AI matchmaking builds even sides so every game is competitive.",
+              color: "coral",
+            },
+            {
+              icon: MapPin,
+              title: "Map-first discovery",
+              body: "See every pickup game on a live map of your neighborhood.",
+              color: "lime",
+            },
+            {
+              icon: Sparkles,
+              title: "Pro tools, free to start",
+              body: "Host unlimited games. Upgrade for analytics & priority visibility.",
+              color: "coral",
+            },
           ].map((f, i) => {
             const Icon = f.icon;
             return (
@@ -201,7 +265,9 @@ function Landing() {
                 transition={{ delay: i * 0.05 }}
                 className="rounded-3xl border border-border bg-surface p-6"
               >
-                <div className={`inline-grid h-11 w-11 place-items-center rounded-2xl mb-4 ${f.color === "lime" ? "bg-lime/15 text-lime" : "bg-coral/15 text-coral"}`}>
+                <div
+                  className={`inline-grid h-11 w-11 place-items-center rounded-2xl mb-4 ${f.color === "lime" ? "bg-lime/15 text-lime" : "bg-coral/15 text-coral"}`}
+                >
                   <Icon className="h-5 w-5" />
                 </div>
                 <h3 className="font-display text-xl font-semibold">{f.title}</h3>
@@ -216,15 +282,19 @@ function Landing() {
       <section id="trending" className="mx-auto max-w-6xl px-5 py-16">
         <div className="flex items-end justify-between mb-6">
           <h2 className="font-display text-3xl md:text-4xl font-bold">Trending near you</h2>
-          <Link to="/feed" className="text-sm font-semibold text-lime hover:underline inline-flex items-center gap-1">
+          <Link
+            to="/feed"
+            className="text-sm font-semibold text-lime hover:underline inline-flex items-center gap-1"
+          >
             See all <ArrowRight className="h-4 w-4" />
           </Link>
         </div>
         <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-4">
-          {trending.map((g, i) => <GameCard key={g.id} game={g} index={i} />)}
+          {trending.map((g, i) => (
+            <GameCard key={g.id} game={g} index={i} />
+          ))}
         </div>
       </section>
-
 
       {/* CTA */}
 

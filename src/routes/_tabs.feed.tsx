@@ -12,7 +12,6 @@ import { useJoinedGameIds } from "@/lib/games-store";
 import { useFeedPrefs, setFeedPrefs, DEFAULT_PREFS, useMyProfile } from "@/lib/user-prefs-store";
 import { motion, AnimatePresence } from "framer-motion";
 
-
 export const Route = createFileRoute("/_tabs/feed")({
   head: () => ({ meta: [{ title: "Feed — OpenRun" }] }),
   component: Feed,
@@ -49,14 +48,28 @@ function Feed() {
   const filtered = useMemo(() => {
     const all = [...hosted, ...GAMES];
     return all
-      .filter((g) => (prefs.preferredSports.length ? prefs.preferredSports.includes(g.sport) : true))
+      .filter((g) =>
+        prefs.preferredSports.length ? prefs.preferredSports.includes(g.sport) : true,
+      )
       .filter((g) => (prefs.sections.hostedByMeOnly ? hostedIds.has(g.id) : true))
       .filter((g) => (prefs.sections.joinedOnly ? joinedSet.has(g.id) : true))
       .filter((g) => (prefs.sections.freeOnly ? g.price === 0 : true))
       .filter((g) => (prefs.sections.paidOnly ? g.price > 0 : true))
       .filter((g) =>
         q
-          ? (g.title + " " + g.location + " " + g.host.name + " " + g.sport + " " + (g.neighborhood ?? "")).toLowerCase().includes(q.toLowerCase())
+          ? (
+              g.title +
+              " " +
+              g.location +
+              " " +
+              g.host.name +
+              " " +
+              g.sport +
+              " " +
+              (g.neighborhood ?? "")
+            )
+              .toLowerCase()
+              .includes(q.toLowerCase())
           : true,
       )
       .sort((a, b) => {
@@ -93,13 +106,11 @@ function Feed() {
     return out;
   }, [q, hosted]);
 
-
-
   const urgent = filtered.filter((g) => g.urgent);
   const activeFilterCount =
     (prefs.preferredSports.length > 0 ? 1 : 0) +
-    Object.entries(prefs.sections).filter(([k, v]) =>
-      k in DEFAULT_PREFS.sections && v !== (DEFAULT_PREFS.sections as any)[k],
+    Object.entries(prefs.sections).filter(
+      ([k, v]) => k in DEFAULT_PREFS.sections && v !== (DEFAULT_PREFS.sections as any)[k],
     ).length;
 
   // Infinite scroll: paginate the main filtered list. Page size scales with
@@ -113,7 +124,9 @@ function Feed() {
   // (or the IO sentinel fires multiple times during a single scroll).
   const loadingMoreRef = useRef(false);
   const refreshingRef = useRef(false);
-  useEffect(() => { setVisibleCount(PAGE_SIZE); }, [filterKey]);
+  useEffect(() => {
+    setVisibleCount(PAGE_SIZE);
+  }, [filterKey]);
   const hasMore = visibleCount < filtered.length;
   useEffect(() => {
     if (!hasMore) return;
@@ -126,7 +139,9 @@ function Feed() {
         loadingMoreRef.current = true;
         setVisibleCount((c) => Math.min(c + PAGE_SIZE, filtered.length));
         // Release on next frame so a single sentinel crossing yields a single page bump.
-        requestAnimationFrame(() => { loadingMoreRef.current = false; });
+        requestAnimationFrame(() => {
+          loadingMoreRef.current = false;
+        });
       },
       { rootMargin: "600px 0px" },
     );
@@ -166,8 +181,15 @@ function Feed() {
     const onTouchMove = (e: TouchEvent) => {
       if (startYRef.current == null || refreshing) return;
       const dy = e.touches[0].clientY - startYRef.current;
-      if (dy <= 0) { setPull(0); return; }
-      if (window.scrollY > 0) { startYRef.current = null; setPull(0); return; }
+      if (dy <= 0) {
+        setPull(0);
+        return;
+      }
+      if (window.scrollY > 0) {
+        startYRef.current = null;
+        setPull(0);
+        return;
+      }
       // Rubber-band resistance.
       const resisted = Math.min(PULL_MAX, dy * 0.5);
       setPull(resisted);
@@ -199,33 +221,48 @@ function Feed() {
   return (
     <div
       className="relative mx-auto w-full max-w-md sm:max-w-2xl lg:max-w-5xl xl:max-w-6xl px-4 pt-6"
-      style={{ transform: `translateY(${indicatorOffset}px)`, transition: pull === 0 || refreshing ? "transform 200ms ease" : "none" }}
+      style={{
+        transform: `translateY(${indicatorOffset}px)`,
+        transition: pull === 0 || refreshing ? "transform 200ms ease" : "none",
+      }}
     >
-      <PullIndicator offset={indicatorOffset} progress={indicatorProgress} refreshing={refreshing} />
+      <PullIndicator
+        offset={indicatorOffset}
+        progress={indicatorProgress}
+        refreshing={refreshing}
+      />
       <div className="flex items-center justify-between mb-5">
         <Logo />
         <div className="flex items-center gap-2">
-          <Link to="/messages" className="grid h-10 w-10 place-items-center rounded-full border border-border bg-surface" aria-label="Messages">
+          <Link
+            to="/messages"
+            className="grid h-10 w-10 place-items-center rounded-full border border-border bg-surface"
+            aria-label="Messages"
+          >
             <MessageCircle className="h-5 w-5" />
           </Link>
           <BellLink />
         </div>
       </div>
 
-      <motion.div
-        initial={{ opacity: 0, y: 8 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="mb-4"
-      >
+      <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="mb-4">
         <h1 className="font-display text-3xl font-bold leading-tight">Tonight's run.</h1>
         <p className="text-muted-foreground text-sm inline-flex items-center gap-1">
           {userCityToken ? (
-            <><MapPin className="h-3.5 w-3.5 text-lime" /> Nearest to {profile?.city} · {filtered.length} games</>
+            <>
+              <MapPin className="h-3.5 w-3.5 text-lime" /> Nearest to {profile?.city} ·{" "}
+              {filtered.length} games
+            </>
           ) : (
-            <>{filtered.length} games · <Link to="/profile/edit" className="text-lime font-semibold">Set your city</Link> for nearby</>
+            <>
+              {filtered.length} games ·{" "}
+              <Link to="/profile/edit" className="text-lime font-semibold">
+                Set your city
+              </Link>{" "}
+              for nearby
+            </>
           )}
         </p>
-
       </motion.div>
 
       <div className="flex gap-2 mb-4 relative">
@@ -280,7 +317,9 @@ function Feed() {
             {filtered.length} result{filtered.length === 1 ? "" : "s"} for "{q}"
           </h2>
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {visible.map((g, i) => <GameCard key={g.id} game={g} index={i} />)}
+            {visible.map((g, i) => (
+              <GameCard key={g.id} game={g} index={i} />
+            ))}
             {filtered.length === 0 && (
               <div className="sm:col-span-2 lg:col-span-3 rounded-2xl border border-border bg-surface p-8 text-center text-muted-foreground">
                 No games match "{q}".
@@ -300,7 +339,9 @@ function Feed() {
                 <span className="text-xs text-muted-foreground">{urgent.length} games</span>
               </div>
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                {urgent.map((g, i) => <GameCard key={g.id} game={g} index={i} />)}
+                {urgent.map((g, i) => (
+                  <GameCard key={g.id} game={g} index={i} />
+                ))}
               </div>
             </div>
           )}
@@ -311,7 +352,9 @@ function Feed() {
                 For you
               </h2>
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                {visible.map((g, i) => <GameCard key={g.id} game={g} index={i} />)}
+                {visible.map((g, i) => (
+                  <GameCard key={g.id} game={g} index={i} />
+                ))}
                 {filtered.length === 0 && (
                   <div className="sm:col-span-2 lg:col-span-3 rounded-2xl border border-border bg-surface p-8 text-center text-muted-foreground space-y-3">
                     <div>No games match your filters.</div>
@@ -331,15 +374,21 @@ function Feed() {
       )}
 
       <AnimatePresence>
-        {filtersOpen && (
-          <FilterSheet onClose={() => setFiltersOpen(false)} />
-        )}
+        {filtersOpen && <FilterSheet onClose={() => setFiltersOpen(false)} />}
       </AnimatePresence>
     </div>
   );
 }
 
-function PullIndicator({ offset, progress, refreshing }: { offset: number; progress: number; refreshing: boolean }) {
+function PullIndicator({
+  offset,
+  progress,
+  refreshing,
+}: {
+  offset: number;
+  progress: number;
+  refreshing: boolean;
+}) {
   if (offset <= 0 && !refreshing) return null;
   return (
     <div
@@ -358,7 +407,6 @@ function PullIndicator({ offset, progress, refreshing }: { offset: number; progr
     </div>
   );
 }
-
 
 const InfiniteSentinel = ({
   ref,
@@ -389,14 +437,19 @@ const InfiniteSentinel = ({
   );
 };
 
-
 function BellLink() {
   const unread = useUnreadNotificationCount();
   return (
-    <Link to="/notifications" className="relative grid h-10 w-10 place-items-center rounded-full border border-border bg-surface" aria-label="Notifications">
+    <Link
+      to="/notifications"
+      className="relative grid h-10 w-10 place-items-center rounded-full border border-border bg-surface"
+      aria-label="Notifications"
+    >
       <Bell className="h-5 w-5" />
       {unread > 0 && (
-        <span className="absolute -top-1 -right-1 grid h-4 min-w-4 px-1 place-items-center rounded-full bg-coral text-[10px] font-bold text-white">{unread > 9 ? "9+" : unread}</span>
+        <span className="absolute -top-1 -right-1 grid h-4 min-w-4 px-1 place-items-center rounded-full bg-coral text-[10px] font-bold text-white">
+          {unread > 9 ? "9+" : unread}
+        </span>
       )}
     </Link>
   );
@@ -425,69 +478,97 @@ function FilterSheet({ onClose }: { onClose: () => void }) {
 
   const reset = () => setFeedPrefs({ preferredSports: [], sections: DEFAULT_PREFS.sections });
 
-
   return (
     <motion.div
-      initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
       className="fixed inset-0 z-50 bg-background/70 backdrop-blur flex items-end justify-center"
       onClick={onClose}
     >
       <motion.div
-        initial={{ y: "100%" }} animate={{ y: 0 }} exit={{ y: "100%" }}
+        initial={{ y: "100%" }}
+        animate={{ y: 0 }}
+        exit={{ y: "100%" }}
         transition={{ type: "spring", stiffness: 280, damping: 30 }}
         onClick={(e) => e.stopPropagation()}
         className="w-full max-w-md rounded-t-3xl border-t border-border bg-background p-5 max-h-[85vh] overflow-y-auto pb-10"
       >
         <div className="flex items-center justify-between mb-4">
           <h2 className="font-display text-lg font-bold">Feed filters</h2>
-          <button onClick={onClose} className="grid h-9 w-9 place-items-center rounded-full border border-border">
+          <button
+            onClick={onClose}
+            className="grid h-9 w-9 place-items-center rounded-full border border-border"
+          >
             <X className="h-4 w-4" />
           </button>
         </div>
 
-        <div className="text-xs font-semibold text-muted-foreground mb-2 uppercase tracking-wider">Sport (Games)</div>
+        <div className="text-xs font-semibold text-muted-foreground mb-2 uppercase tracking-wider">
+          Sport (Games)
+        </div>
         <div className="flex flex-wrap gap-2 mb-5">
           {SPORTS.map((s) => {
             const active = preferredSports.includes(s.name);
             return (
               <button
-                key={s.name} onClick={() => toggleSport(s.name)}
+                key={s.name}
+                onClick={() => toggleSport(s.name)}
                 className={`inline-flex items-center gap-1 rounded-full border px-3 py-1.5 text-xs font-semibold ${active ? "border-lime bg-lime text-primary-foreground" : "border-border bg-surface"}`}
               >
-                <span>{s.emoji}</span>{s.name}
+                <span>{s.emoji}</span>
+                {s.name}
               </button>
             );
           })}
         </div>
 
-        <div className="text-xs font-semibold text-muted-foreground mb-2 uppercase tracking-wider">Sections</div>
+        <div className="text-xs font-semibold text-muted-foreground mb-2 uppercase tracking-wider">
+          Sections
+        </div>
         <div className="space-y-2 mb-5">
-          {([
-            ["showUrgent", "Needs players now"],
-            ["showForYou", '"For you" list'],
-            ["hostedByMeOnly", "Games I host"],
-            ["joinedOnly", "Games I joined"],
-            ["freeOnly", "Free games"],
-            ["paidOnly", "Paid games"],
-          ] as const).map(([k, label]) => (
+          {(
+            [
+              ["showUrgent", "Needs players now"],
+              ["showForYou", '"For you" list'],
+              ["hostedByMeOnly", "Games I host"],
+              ["joinedOnly", "Games I joined"],
+              ["freeOnly", "Free games"],
+              ["paidOnly", "Paid games"],
+            ] as const
+          ).map(([k, label]) => (
             <button
-              key={k} onClick={() => toggleSection(k)}
+              key={k}
+              onClick={() => toggleSection(k)}
               className="w-full flex items-center justify-between rounded-2xl border border-border bg-surface px-4 py-3 text-sm font-semibold"
             >
               <span>{label}</span>
-              <span className={`h-6 w-10 rounded-full p-0.5 transition-colors ${sections[k] ? "bg-lime" : "bg-secondary"}`}>
-                <span className={`block h-5 w-5 rounded-full bg-background transition-transform ${sections[k] ? "translate-x-4" : ""}`} />
+              <span
+                className={`h-6 w-10 rounded-full p-0.5 transition-colors ${sections[k] ? "bg-lime" : "bg-secondary"}`}
+              >
+                <span
+                  className={`block h-5 w-5 rounded-full bg-background transition-transform ${sections[k] ? "translate-x-4" : ""}`}
+                />
               </span>
             </button>
           ))}
         </div>
 
         <div className="flex gap-2">
-          <button onClick={reset} className="flex-1 rounded-full border border-border py-3 text-sm font-bold">Reset</button>
-          <button onClick={onClose} className="flex-1 rounded-full bg-lime-gradient py-3 text-sm font-bold text-primary-foreground">Done</button>
+          <button
+            onClick={reset}
+            className="flex-1 rounded-full border border-border py-3 text-sm font-bold"
+          >
+            Reset
+          </button>
+          <button
+            onClick={onClose}
+            className="flex-1 rounded-full bg-lime-gradient py-3 text-sm font-bold text-primary-foreground"
+          >
+            Done
+          </button>
         </div>
       </motion.div>
     </motion.div>
   );
 }
-

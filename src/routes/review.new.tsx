@@ -45,7 +45,7 @@ function ReviewNew() {
   const revieweeKind: RevieweeKind = search.revieweeKind ?? "player";
   const lockReviewerToPlayer = revieweeKind !== "player";
   const [kind, setKind] = useState<ReviewerKind>(
-    lockReviewerToPlayer ? "player" : search.kind ?? "player",
+    lockReviewerToPlayer ? "player" : (search.kind ?? "player"),
   );
   const [rating, setRating] = useState(5);
   const [title, setTitle] = useState("");
@@ -144,9 +144,9 @@ function ReviewNew() {
               <Lock className="h-4 w-4" /> Reviews are verified-only
             </div>
             <p className="mt-2 text-foreground/80">
-              You can only review {search.revieweeName ?? "this user"} after a
-              completed transaction together — a game played, a training
-              session, a team tryout, or a hosted event you paid for.
+              You can only review {search.revieweeName ?? "this user"} after a completed transaction
+              together — a game played, a training session, a team tryout, or a hosted event you
+              paid for.
             </p>
             <Link
               to="/profile"
@@ -244,9 +244,7 @@ function ReviewNew() {
                     max={5}
                     step={1}
                     value={value}
-                    onChange={(e) =>
-                      setScores((s) => ({ ...s, [c.key]: Number(e.target.value) }))
-                    }
+                    onChange={(e) => setScores((s) => ({ ...s, [c.key]: Number(e.target.value) }))}
                     className="mt-1 w-full accent-lime"
                   />
                 </div>
@@ -311,7 +309,9 @@ function ReviewNew() {
             <button
               onClick={() => setIsPrivate(false)}
               className={`flex items-center gap-2 rounded-2xl border px-3 py-3 text-sm font-semibold ${
-                !isPrivate ? "border-lime bg-lime/10" : "border-border bg-surface text-muted-foreground"
+                !isPrivate
+                  ? "border-lime bg-lime/10"
+                  : "border-border bg-surface text-muted-foreground"
               }`}
             >
               <Globe className="h-4 w-4" /> Public
@@ -319,7 +319,9 @@ function ReviewNew() {
             <button
               onClick={() => setIsPrivate(true)}
               className={`flex items-center gap-2 rounded-2xl border px-3 py-3 text-sm font-semibold ${
-                isPrivate ? "border-coral bg-coral/10 text-coral" : "border-border bg-surface text-muted-foreground"
+                isPrivate
+                  ? "border-coral bg-coral/10 text-coral"
+                  : "border-border bg-surface text-muted-foreground"
               }`}
             >
               <Lock className="h-4 w-4" /> Private to them
@@ -332,10 +334,7 @@ function ReviewNew() {
           </p>
         </section>
 
-        <Link
-          to="/profile"
-          className="block text-center text-xs text-muted-foreground py-2"
-        >
+        <Link to="/profile" className="block text-center text-xs text-muted-foreground py-2">
           Cancel
         </Link>
       </div>

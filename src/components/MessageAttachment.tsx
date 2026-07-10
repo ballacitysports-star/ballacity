@@ -14,14 +14,21 @@ export function MessageAttachment({ path, type, name, size, mine }: Props) {
   const [url, setUrl] = useState<string | null>(null);
   useEffect(() => {
     let cancelled = false;
-    getAttachmentUrl(path).then((u) => { if (!cancelled) setUrl(u); });
-    return () => { cancelled = true; };
+    getAttachmentUrl(path).then((u) => {
+      if (!cancelled) setUrl(u);
+    });
+    return () => {
+      cancelled = true;
+    };
   }, [path]);
 
   const isImage = (type ?? "").startsWith("image/");
   const isVideo = (type ?? "").startsWith("video/");
   const label = name ?? path.split("/").pop() ?? "Attachment";
-  const sizeKb = typeof size === "number" ? `${(size / 1024).toFixed(size > 1024 * 1024 ? 1 : 0)} ${size > 1024 * 1024 ? "MB" : "KB"}` : "";
+  const sizeKb =
+    typeof size === "number"
+      ? `${(size / 1024).toFixed(size > 1024 * 1024 ? 1 : 0)} ${size > 1024 * 1024 ? "MB" : "KB"}`
+      : "";
 
   if (isImage) {
     return url ? (

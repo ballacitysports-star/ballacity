@@ -36,47 +36,58 @@ async function restoreSession(page: Page) {
 const isTable = (url: string, table: string) => url.includes(`/rest/v1/${table}`);
 
 async function installMocks(page: Page, onJoinPost: () => void) {
-  await page.route((u) => isTable(u, "game_payment_settings"), async (route: PWRoute) => {
-    if (route.request().method() !== "GET") return route.fallback();
-    await route.fulfill({
-      status: 200,
-      contentType: "application/json",
-      body: JSON.stringify([{
-        id: "mock-settings-id",
-        game_id: GAME_ID,
-        host_id: REAL_HOST_ID,
-        entry_fee: 0,
-        accepted_method_ids: [],
-        payment_deadline: null,
-        refund_policy: null,
-        payment_instructions: null,
-        requires_approval: true,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      }]),
-    });
-  });
-  await page.route((u) => isTable(u, "payment_submissions"), async (route: PWRoute) => {
-    if (route.request().method() !== "GET") return route.fallback();
-    await route.fulfill({ status: 200, contentType: "application/json", body: "[]" });
-  });
-  await page.route((u) => isTable(u, "join_requests"), async (route: PWRoute) => {
-    const method = route.request().method();
-    if (method === "GET") {
-      await route.fulfill({ status: 200, contentType: "application/json", body: "[]" });
-      return;
-    }
-    if (method === "POST") {
-      onJoinPost();
+  await page.route(
+    (u) => isTable(u, "game_payment_settings"),
+    async (route: PWRoute) => {
+      if (route.request().method() !== "GET") return route.fallback();
       await route.fulfill({
-        status: 201,
+        status: 200,
         contentType: "application/json",
-        body: JSON.stringify([{ id: "should-not-happen" }]),
+        body: JSON.stringify([
+          {
+            id: "mock-settings-id",
+            game_id: GAME_ID,
+            host_id: REAL_HOST_ID,
+            entry_fee: 0,
+            accepted_method_ids: [],
+            payment_deadline: null,
+            refund_policy: null,
+            payment_instructions: null,
+            requires_approval: true,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          },
+        ]),
       });
-      return;
-    }
-    return route.fallback();
-  });
+    },
+  );
+  await page.route(
+    (u) => isTable(u, "payment_submissions"),
+    async (route: PWRoute) => {
+      if (route.request().method() !== "GET") return route.fallback();
+      await route.fulfill({ status: 200, contentType: "application/json", body: "[]" });
+    },
+  );
+  await page.route(
+    (u) => isTable(u, "join_requests"),
+    async (route: PWRoute) => {
+      const method = route.request().method();
+      if (method === "GET") {
+        await route.fulfill({ status: 200, contentType: "application/json", body: "[]" });
+        return;
+      }
+      if (method === "POST") {
+        onJoinPost();
+        await route.fulfill({
+          status: 201,
+          contentType: "application/json",
+          body: JSON.stringify([{ id: "should-not-happen" }]),
+        });
+        return;
+      }
+      return route.fallback();
+    },
+  );
 }
 
 const MALFORMED_CASES: Array<{ label: string; expParam: string }> = [
@@ -87,12 +98,16 @@ const MALFORMED_CASES: Array<{ label: string; expParam: string }> = [
 ];
 
 for (const { label, expParam } of MALFORMED_CASES) {
-  test(`malformed exp (${label}) → Request to join is blocked, no join_requests POST`, async ({ browser }) => {
+  test(`malformed exp (${label}) → Request to join is blocked, no join_requests POST`, async ({
+    browser,
+  }) => {
     const ctx = await browser.newContext();
     const page = await ctx.newPage();
 
     let joinPostFired = false;
-    await installMocks(page, () => { joinPostFired = true; });
+    await installMocks(page, () => {
+      joinPostFired = true;
+    });
     await restoreSession(page);
 
     await page.goto(
@@ -106,7 +121,9 @@ for (const { label, expParam } of MALFORMED_CASES) {
     await expect(expired).toBeVisible({ timeout: 10_000 });
     await expect(expired).toContainText(/invite expired/i);
 
-    const normalBanner = page.getByRole("status").filter({ hasText: /you're invited to this game/i });
+    const normalBanner = page
+      .getByRole("status")
+      .filter({ hasText: /you're invited to this game/i });
     await expect(normalBanner).toHaveCount(0);
 
     // Sticky "Request to join" CTA still renders on approval-gated games.
@@ -121,7 +138,9 @@ for (const { label, expParam } of MALFORMED_CASES) {
 
     // Give any illegitimate POST a chance to land before asserting.
     await page.waitForTimeout(500);
-    expect(joinPostFired, "join_requests POST must NOT fire for a malformed-exp invite").toBe(false);
+    expect(joinPostFired, "join_requests POST must NOT fire for a malformed-exp invite").toBe(
+      false,
+    );
 
     await ctx.close();
   });

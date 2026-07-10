@@ -49,62 +49,76 @@ const isTable = (url: string, table: string) => url.includes(`/rest/v1/${table}`
 
 async function installMocks(page: Page, onJoinPost: () => void) {
   // Approval-gated settings owned by REAL_HOST_ID.
-  await page.route((u) => isTable(u, "game_payment_settings"), async (route: PWRoute) => {
-    if (route.request().method() !== "GET") return route.fallback();
-    await route.fulfill({
-      status: 200,
-      contentType: "application/json",
-      body: JSON.stringify([{
-        id: "mock-settings-id",
-        game_id: GAME_ID,
-        host_id: REAL_HOST_ID,
-        entry_fee: 0,
-        accepted_method_ids: [],
-        payment_deadline: null,
-        refund_policy: null,
-        payment_instructions: null,
-        requires_approval: true,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      }]),
-    });
-  });
-  await page.route((u) => isTable(u, "payment_submissions"), async (route: PWRoute) => {
-    if (route.request().method() !== "GET") return route.fallback();
-    await route.fulfill({ status: 200, contentType: "application/json", body: "[]" });
-  });
-  await page.route((u) => isTable(u, "join_requests"), async (route: PWRoute) => {
-    const method = route.request().method();
-    if (method === "GET") {
-      await route.fulfill({ status: 200, contentType: "application/json", body: "[]" });
-      return;
-    }
-    if (method === "POST") {
-      // Fail loudly — this test asserts the POST never fires.
-      onJoinPost();
+  await page.route(
+    (u) => isTable(u, "game_payment_settings"),
+    async (route: PWRoute) => {
+      if (route.request().method() !== "GET") return route.fallback();
       await route.fulfill({
-        status: 201,
+        status: 200,
         contentType: "application/json",
-        body: JSON.stringify([{ id: "should-not-happen" }]),
+        body: JSON.stringify([
+          {
+            id: "mock-settings-id",
+            game_id: GAME_ID,
+            host_id: REAL_HOST_ID,
+            entry_fee: 0,
+            accepted_method_ids: [],
+            payment_deadline: null,
+            refund_policy: null,
+            payment_instructions: null,
+            requires_approval: true,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          },
+        ]),
       });
-      return;
-    }
-    return route.fallback();
-  });
+    },
+  );
+  await page.route(
+    (u) => isTable(u, "payment_submissions"),
+    async (route: PWRoute) => {
+      if (route.request().method() !== "GET") return route.fallback();
+      await route.fulfill({ status: 200, contentType: "application/json", body: "[]" });
+    },
+  );
+  await page.route(
+    (u) => isTable(u, "join_requests"),
+    async (route: PWRoute) => {
+      const method = route.request().method();
+      if (method === "GET") {
+        await route.fulfill({ status: 200, contentType: "application/json", body: "[]" });
+        return;
+      }
+      if (method === "POST") {
+        // Fail loudly — this test asserts the POST never fires.
+        onJoinPost();
+        await route.fulfill({
+          status: 201,
+          contentType: "application/json",
+          body: JSON.stringify([{ id: "should-not-happen" }]),
+        });
+        return;
+      }
+      return route.fallback();
+    },
+  );
 }
 
 async function seedInvite(page: Page, userId: string, title: string, link: string) {
-  const res = await page.evaluate(async ({ userId, title, link }) => {
-    const mod = await import("/src/integrations/supabase/client.ts");
-    const { error } = await mod.supabase.from("notifications").insert({
-      user_id: userId,
-      type: "game_invite",
-      title,
-      body: "Soccer · Test Field",
-      link,
-    } as any);
-    return error ? { ok: false, message: error.message } : { ok: true };
-  }, { userId, title, link });
+  const res = await page.evaluate(
+    async ({ userId, title, link }) => {
+      const mod = await import("/src/integrations/supabase/client.ts");
+      const { error } = await mod.supabase.from("notifications").insert({
+        user_id: userId,
+        type: "game_invite",
+        title,
+        body: "Soccer · Test Field",
+        link,
+      } as any);
+      return error ? { ok: false, message: error.message } : { ok: true };
+    },
+    { userId, title, link },
+  );
   expect(res.ok, `seed insert failed: ${(res as any).message ?? ""}`).toBe(true);
 }
 
@@ -121,7 +135,9 @@ async function runTamperedCase(
   const page = await ctx.newPage();
 
   let joinPostFired = false;
-  await installMocks(page, () => { joinPostFired = true; });
+  await installMocks(page, () => {
+    joinPostFired = true;
+  });
   await restoreSession(page);
   await seedInvite(page, userId, notifTitle, link);
 
@@ -164,10 +180,14 @@ async function runTamperedCase(
   await ctx.close();
 }
 
-test("invite tampered: missing `from` → CTA errors and no join_requests POST", async ({ browser }) => {
+test("invite tampered: missing `from` → CTA errors and no join_requests POST", async ({
+  browser,
+}) => {
   await runTamperedCase(browser, "missing-from");
 });
 
-test("invite tampered: wrong `from` → CTA errors and no join_requests POST", async ({ browser }) => {
+test("invite tampered: wrong `from` → CTA errors and no join_requests POST", async ({
+  browser,
+}) => {
   await runTamperedCase(browser, "wrong-from");
 });

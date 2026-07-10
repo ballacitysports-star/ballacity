@@ -2,10 +2,22 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
-  ArrowLeft, ArrowRight, Check, Users, GraduationCap, Sparkles, X, Plus,
+  ArrowLeft,
+  ArrowRight,
+  Check,
+  Users,
+  GraduationCap,
+  Sparkles,
+  X,
+  Plus,
 } from "lucide-react";
 import {
-  SPORTS, HERO_IMAGE, imageFor, type Sport, type Org, type OrgKind,
+  SPORTS,
+  HERO_IMAGE,
+  imageFor,
+  type Sport,
+  type Org,
+  type OrgKind,
 } from "@/lib/sample-data";
 import { addOrg } from "@/lib/org-store";
 import { OrgCard } from "@/components/OrgCard";
@@ -17,14 +29,14 @@ export const Route = createFileRoute("/teams/create")({
 });
 
 const ACCENTS = [
-  { name: "Lime",    hex: "#a3ff12" },
-  { name: "Coral",   hex: "#ff3d68" },
-  { name: "Mint",    hex: "#7df9c1" },
-  { name: "Amber",   hex: "#ffd166" },
-  { name: "Sky",     hex: "#8ad6ff" },
-  { name: "Orange",  hex: "#ff8a3d" },
+  { name: "Lime", hex: "#a3ff12" },
+  { name: "Coral", hex: "#ff3d68" },
+  { name: "Mint", hex: "#7df9c1" },
+  { name: "Amber", hex: "#ffd166" },
+  { name: "Sky", hex: "#8ad6ff" },
+  { name: "Orange", hex: "#ff8a3d" },
   { name: "Magenta", hex: "#e84393" },
-  { name: "Violet",  hex: "#a78bfa" },
+  { name: "Violet", hex: "#a78bfa" },
 ];
 
 const STEPS = ["Type", "Identity", "Details", "Branding"] as const;
@@ -72,7 +84,13 @@ function CreateOrg() {
 
   const canNext = useMemo(() => {
     if (step === 0) return !!kind;
-    if (step === 1) return name.trim().length > 1 && handle.trim().length > 1 && sports.length > 0 && city.trim().length > 0;
+    if (step === 1)
+      return (
+        name.trim().length > 1 &&
+        handle.trim().length > 1 &&
+        sports.length > 0 &&
+        city.trim().length > 0
+      );
     if (step === 2) return bio.trim().length > 10;
     if (step === 3) return true;
     return false;
@@ -109,7 +127,9 @@ function CreateOrg() {
 
   function submit() {
     const id = `${kind === "team" ? "t" : "c"}-${(name || "org").toLowerCase().replace(/[^a-z0-9]+/g, "-")}-${Date.now().toString(36).slice(-4)}`;
-    const handleClean = (handle.startsWith("@") ? handle.slice(1) : handle).replace(/[^a-zA-Z0-9_]/g, "").toLowerCase();
+    const handleClean = (handle.startsWith("@") ? handle.slice(1) : handle)
+      .replace(/[^a-zA-Z0-9_]/g, "")
+      .toLowerCase();
     const org: Org = {
       ...handlePreview,
       id,
@@ -133,8 +153,12 @@ function CreateOrg() {
   }
   function addStaff() {
     if (!staffName.trim() || !staffRole.trim()) return;
-    setStaff((s) => [...s, { name: staffName.trim(), role: staffRole.trim(), avatar: initials(staffName) }]);
-    setStaffName(""); setStaffRole("");
+    setStaff((s) => [
+      ...s,
+      { name: staffName.trim(), role: staffRole.trim(), avatar: initials(staffName) },
+    ]);
+    setStaffName("");
+    setStaffRole("");
   }
   function updateStaffAvatar(i: number, file: File) {
     const reader = new FileReader();
@@ -166,11 +190,16 @@ function CreateOrg() {
     <div className="mx-auto max-w-md px-4 pt-6 pb-32">
       {/* Header */}
       <div className="flex items-center gap-3 mb-4">
-        <Link to="/teams" className="grid h-10 w-10 place-items-center rounded-full border border-border bg-surface">
+        <Link
+          to="/teams"
+          className="grid h-10 w-10 place-items-center rounded-full border border-border bg-surface"
+        >
           <ArrowLeft className="h-5 w-5" />
         </Link>
         <div className="flex-1">
-          <div className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold">Step {step + 1} of {STEPS.length}</div>
+          <div className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold">
+            Step {step + 1} of {STEPS.length}
+          </div>
           <h1 className="font-display text-xl font-bold leading-tight">{STEPS[step]}</h1>
         </div>
       </div>
@@ -250,11 +279,18 @@ function CreateOrg() {
                   placeholder="One line that sums you up"
                   className="w-full rounded-2xl border border-border bg-surface px-4 py-3 text-sm outline-none focus:border-lime"
                 />
-                <div className="text-right text-[10px] text-muted-foreground">{tagline.length}/80</div>
+                <div className="text-right text-[10px] text-muted-foreground">
+                  {tagline.length}/80
+                </div>
               </Section>
 
               <Section title="City">
-                <LocationAutocomplete value={city} onChange={setCity} placeholder="Brooklyn, NY" mode="city" />
+                <LocationAutocomplete
+                  value={city}
+                  onChange={setCity}
+                  placeholder="Brooklyn, NY"
+                  mode="city"
+                />
               </Section>
 
               <Section title="Sports">
@@ -267,7 +303,9 @@ function CreateOrg() {
                         type="button"
                         onClick={() => toggleSport(s.name)}
                         className={`flex flex-col items-center gap-1 rounded-2xl border px-2 py-3 text-xs font-semibold transition-all ${
-                          active ? "border-lime bg-lime/10 text-lime" : "border-border bg-surface text-muted-foreground"
+                          active
+                            ? "border-lime bg-lime/10 text-lime"
+                            : "border-border bg-surface text-muted-foreground"
                         }`}
                       >
                         <span className="text-2xl">{s.emoji}</span>
@@ -327,9 +365,16 @@ function CreateOrg() {
                 {achievements.length > 0 && (
                   <ul className="mt-2 space-y-1.5">
                     {achievements.map((a, i) => (
-                      <li key={i} className="flex items-center justify-between rounded-2xl border border-border bg-surface px-3 py-2 text-sm">
+                      <li
+                        key={i}
+                        className="flex items-center justify-between rounded-2xl border border-border bg-surface px-3 py-2 text-sm"
+                      >
                         <span>🏆 {a}</span>
-                        <button type="button" onClick={() => setAchievements((arr) => arr.filter((_, j) => j !== i))} className="text-muted-foreground hover:text-coral">
+                        <button
+                          type="button"
+                          onClick={() => setAchievements((arr) => arr.filter((_, j) => j !== i))}
+                          className="text-muted-foreground hover:text-coral"
+                        >
                           <X className="h-4 w-4" />
                         </button>
                       </li>
@@ -361,12 +406,28 @@ function CreateOrg() {
                   <Section title="Record (optional)">
                     <div className="grid grid-cols-2 gap-2">
                       <label className="rounded-2xl border border-border bg-surface px-4 py-3">
-                        <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Wins</div>
-                        <input type="number" min={0} value={wins} onChange={(e) => setWins(+e.target.value)} className="w-full bg-transparent font-display text-xl font-bold text-lime outline-none" />
+                        <div className="text-[10px] uppercase tracking-wider text-muted-foreground">
+                          Wins
+                        </div>
+                        <input
+                          type="number"
+                          min={0}
+                          value={wins}
+                          onChange={(e) => setWins(+e.target.value)}
+                          className="w-full bg-transparent font-display text-xl font-bold text-lime outline-none"
+                        />
                       </label>
                       <label className="rounded-2xl border border-border bg-surface px-4 py-3">
-                        <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Losses</div>
-                        <input type="number" min={0} value={losses} onChange={(e) => setLosses(+e.target.value)} className="w-full bg-transparent font-display text-xl font-bold text-coral outline-none" />
+                        <div className="text-[10px] uppercase tracking-wider text-muted-foreground">
+                          Losses
+                        </div>
+                        <input
+                          type="number"
+                          min={0}
+                          value={losses}
+                          onChange={(e) => setLosses(+e.target.value)}
+                          className="w-full bg-transparent font-display text-xl font-bold text-coral outline-none"
+                        />
                       </label>
                     </div>
                   </Section>
@@ -397,7 +458,10 @@ function CreateOrg() {
                       {staff.map((m, i) => {
                         const hasCustomAvatar = m.avatar.startsWith("data:");
                         return (
-                          <div key={i} className="flex items-center gap-2 rounded-2xl border border-border bg-surface p-3">
+                          <div
+                            key={i}
+                            className="flex items-center gap-2 rounded-2xl border border-border bg-surface p-3"
+                          >
                             <label className="relative shrink-0 cursor-pointer">
                               <input
                                 type="file"
@@ -409,22 +473,39 @@ function CreateOrg() {
                                 }}
                               />
                               {hasCustomAvatar ? (
-                                <img src={m.avatar} alt="" className="h-10 w-10 rounded-full object-cover" />
+                                <img
+                                  src={m.avatar}
+                                  alt=""
+                                  className="h-10 w-10 rounded-full object-cover"
+                                />
                               ) : (
-                                <div className="grid h-10 w-10 place-items-center rounded-full bg-secondary text-xs font-bold">{m.avatar}</div>
+                                <div className="grid h-10 w-10 place-items-center rounded-full bg-secondary text-xs font-bold">
+                                  {m.avatar}
+                                </div>
                               )}
-                              <span className="absolute -bottom-1 -right-1 grid h-4 w-4 place-items-center rounded-full bg-lime text-[8px] font-bold text-primary-foreground">+</span>
+                              <span className="absolute -bottom-1 -right-1 grid h-4 w-4 place-items-center rounded-full bg-lime text-[8px] font-bold text-primary-foreground">
+                                +
+                              </span>
                             </label>
                             <div className="flex-1 min-w-0">
                               <div className="text-sm font-semibold truncate">{m.name}</div>
                               <div className="text-xs text-muted-foreground truncate">{m.role}</div>
                             </div>
                             {hasCustomAvatar && (
-                              <button type="button" onClick={() => resetStaffAvatar(i)} className="text-muted-foreground hover:text-lime" title="Reset to initials">
+                              <button
+                                type="button"
+                                onClick={() => resetStaffAvatar(i)}
+                                className="text-muted-foreground hover:text-lime"
+                                title="Reset to initials"
+                              >
                                 <X className="h-4 w-4" />
                               </button>
                             )}
-                            <button type="button" onClick={() => setStaff((s) => s.filter((_, j) => j !== i))} className="text-muted-foreground hover:text-coral">
+                            <button
+                              type="button"
+                              onClick={() => setStaff((s) => s.filter((_, j) => j !== i))}
+                              className="text-muted-foreground hover:text-coral"
+                            >
                               <X className="h-4 w-4" />
                             </button>
                           </div>
@@ -446,14 +527,26 @@ function CreateOrg() {
                         placeholder="USATF Level 2"
                         className="flex-1 rounded-2xl border border-border bg-surface px-4 py-3 text-sm outline-none focus:border-lime"
                       />
-                      <button type="button" onClick={addCred} className="rounded-2xl bg-lime px-4 text-sm font-bold text-primary-foreground">Add</button>
+                      <button
+                        type="button"
+                        onClick={addCred}
+                        className="rounded-2xl bg-lime px-4 text-sm font-bold text-primary-foreground"
+                      >
+                        Add
+                      </button>
                     </div>
                     {credentials.length > 0 && (
                       <div className="mt-2 flex flex-wrap gap-2">
                         {credentials.map((c, i) => (
-                          <span key={i} className="inline-flex items-center gap-1.5 rounded-full border border-lime/40 bg-lime/10 px-3 py-1.5 text-xs font-bold text-lime">
+                          <span
+                            key={i}
+                            className="inline-flex items-center gap-1.5 rounded-full border border-lime/40 bg-lime/10 px-3 py-1.5 text-xs font-bold text-lime"
+                          >
                             {c}
-                            <button type="button" onClick={() => setCredentials((arr) => arr.filter((_, j) => j !== i))}>
+                            <button
+                              type="button"
+                              onClick={() => setCredentials((arr) => arr.filter((_, j) => j !== i))}
+                            >
                               <X className="h-3 w-3" />
                             </button>
                           </span>
@@ -499,7 +592,9 @@ function CreateOrg() {
                       style={{ background: `linear-gradient(135deg, ${a.hex}, ${a.hex}aa)` }}
                       aria-label={a.name}
                     >
-                      {accent === a.hex && <Check className="absolute inset-0 m-auto h-5 w-5 text-primary-foreground" />}
+                      {accent === a.hex && (
+                        <Check className="absolute inset-0 m-auto h-5 w-5 text-primary-foreground" />
+                      )}
                     </button>
                   ))}
                 </div>
@@ -513,12 +608,23 @@ function CreateOrg() {
                   maxLength={3}
                   className="w-full rounded-2xl border border-border bg-surface px-4 py-3 text-center font-display text-2xl font-bold uppercase tracking-widest outline-none focus:border-lime"
                 />
-                <p className="text-[10px] text-muted-foreground text-center mt-1">Auto-generated from your name — edit if you like.</p>
+                <p className="text-[10px] text-muted-foreground text-center mt-1">
+                  Auto-generated from your name — edit if you like.
+                </p>
               </Section>
 
               <Section title="Cover image">
                 <div className="grid grid-cols-3 gap-2">
-                  {(["Basketball","Soccer","Tennis","Volleyball","Pickleball","Running"] as Sport[]).map((s) => {
+                  {(
+                    [
+                      "Basketball",
+                      "Soccer",
+                      "Tennis",
+                      "Volleyball",
+                      "Pickleball",
+                      "Running",
+                    ] as Sport[]
+                  ).map((s) => {
                     const src = imageFor(s);
                     const active = cover === src;
                     return (
@@ -531,7 +637,11 @@ function CreateOrg() {
                         }`}
                       >
                         <img src={src} alt="" className="h-full w-full object-cover" />
-                        {active && <span className="absolute inset-0 bg-lime/20 grid place-items-center"><Check className="h-5 w-5 text-lime" /></span>}
+                        {active && (
+                          <span className="absolute inset-0 bg-lime/20 grid place-items-center">
+                            <Check className="h-5 w-5 text-lime" />
+                          </span>
+                        )}
                       </button>
                     );
                   })}
@@ -543,7 +653,8 @@ function CreateOrg() {
                   <OrgCard org={handlePreview} />
                 </div>
                 <div className="mt-2 inline-flex items-center gap-1.5 text-[11px] text-muted-foreground">
-                  <Sparkles className="h-3 w-3 text-lime" /> This is how players will see you in feeds.
+                  <Sparkles className="h-3 w-3 text-lime" /> This is how players will see you in
+                  feeds.
                 </div>
               </Section>
             </div>
@@ -590,9 +701,19 @@ function CreateOrg() {
 }
 
 function TypeCard({
-  active, onClick, icon, title, desc, badges,
+  active,
+  onClick,
+  icon,
+  title,
+  desc,
+  badges,
 }: {
-  active: boolean; onClick: () => void; icon: React.ReactNode; title: string; desc: string; badges: string[];
+  active: boolean;
+  onClick: () => void;
+  icon: React.ReactNode;
+  title: string;
+  desc: string;
+  badges: string[];
 }) {
   return (
     <motion.button
@@ -600,11 +721,15 @@ function TypeCard({
       whileTap={{ scale: 0.98 }}
       onClick={onClick}
       className={`block w-full text-left rounded-3xl border-2 p-5 transition-all ${
-        active ? "border-lime bg-lime/10 glow-lime" : "border-border bg-surface hover:border-lime/40"
+        active
+          ? "border-lime bg-lime/10 glow-lime"
+          : "border-border bg-surface hover:border-lime/40"
       }`}
     >
       <div className="flex items-start gap-4">
-        <div className={`grid h-12 w-12 shrink-0 place-items-center rounded-2xl ${active ? "bg-lime text-primary-foreground" : "bg-secondary text-foreground"}`}>
+        <div
+          className={`grid h-12 w-12 shrink-0 place-items-center rounded-2xl ${active ? "bg-lime text-primary-foreground" : "bg-secondary text-foreground"}`}
+        >
           {icon}
         </div>
         <div className="flex-1 min-w-0">
@@ -615,7 +740,10 @@ function TypeCard({
           <p className="text-sm text-muted-foreground mt-1">{desc}</p>
           <div className="mt-2 flex flex-wrap gap-1.5">
             {badges.map((b) => (
-              <span key={b} className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider ${active ? "bg-background/40 text-foreground" : "bg-secondary text-muted-foreground"}`}>
+              <span
+                key={b}
+                className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider ${active ? "bg-background/40 text-foreground" : "bg-secondary text-muted-foreground"}`}
+              >
                 {b}
               </span>
             ))}
@@ -629,7 +757,9 @@ function TypeCard({
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <div>
-      <div className="mb-2 text-xs font-bold uppercase tracking-wider text-muted-foreground">{title}</div>
+      <div className="mb-2 text-xs font-bold uppercase tracking-wider text-muted-foreground">
+        {title}
+      </div>
       <div className="space-y-2">{children}</div>
     </div>
   );

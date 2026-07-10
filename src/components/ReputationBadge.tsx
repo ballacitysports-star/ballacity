@@ -17,9 +17,14 @@ function Stars({ value, size = 12 }: { value: number; size?: number }) {
 }
 
 export function ReputationBadge({ rep, compact = false }: { rep: Reputation; compact?: boolean }) {
-  const TrendIcon = rep.recentTrend === "up" ? TrendingUp : rep.recentTrend === "down" ? TrendingDown : Minus;
+  const TrendIcon =
+    rep.recentTrend === "up" ? TrendingUp : rep.recentTrend === "down" ? TrendingDown : Minus;
   const trendColor =
-    rep.recentTrend === "up" ? "text-lime" : rep.recentTrend === "down" ? "text-coral" : "text-muted-foreground";
+    rep.recentTrend === "up"
+      ? "text-lime"
+      : rep.recentTrend === "down"
+        ? "text-coral"
+        : "text-muted-foreground";
 
   if (compact) {
     return (
@@ -89,7 +94,11 @@ export function ReputationBadge({ rep, compact = false }: { rep: Reputation; com
         </div>
         <div className={`inline-flex items-center gap-1 text-[11px] font-semibold ${trendColor}`}>
           <TrendIcon className="h-3.5 w-3.5" />
-          {rep.recentTrend === "up" ? "Trending up" : rep.recentTrend === "down" ? "Cooling" : "Steady"}
+          {rep.recentTrend === "up"
+            ? "Trending up"
+            : rep.recentTrend === "down"
+              ? "Cooling"
+              : "Steady"}
         </div>
       </div>
 

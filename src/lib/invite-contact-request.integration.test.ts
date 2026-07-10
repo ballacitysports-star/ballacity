@@ -22,8 +22,7 @@ import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { TEST_ACCOUNTS } from "./test-fixtures";
 
 const URL = process.env.VITE_SUPABASE_URL ?? process.env.SUPABASE_URL;
-const KEY =
-  process.env.VITE_SUPABASE_PUBLISHABLE_KEY ?? process.env.SUPABASE_PUBLISHABLE_KEY;
+const KEY = process.env.VITE_SUPABASE_PUBLISHABLE_KEY ?? process.env.SUPABASE_PUBLISHABLE_KEY;
 
 const host = TEST_ACCOUNTS.find((a) => a.key === "host")!;
 const player = TEST_ACCOUNTS.find((a) => a.key === "player")!;
@@ -80,10 +79,7 @@ describe.skipIf(skipIfNoBackend)("availability invite endpoint", () => {
   afterAll(async () => {
     if (canRun && createdRequestIds.length) {
       // Cleanup using the host client (sender owns the row by RLS).
-      await hostClient
-        .from("availability_contact_requests")
-        .delete()
-        .in("id", createdRequestIds);
+      await hostClient.from("availability_contact_requests").delete().in("id", createdRequestIds);
     }
   });
 
@@ -287,7 +283,10 @@ describe.skipIf(skipIfNoBackend)("availability invite endpoint", () => {
         .gte("created_at", before)
         .order("created_at", { ascending: false })
         .limit(1);
-      if (data && data.length) { found = data[0]; break; }
+      if (data && data.length) {
+        found = data[0];
+        break;
+      }
       await new Promise((r) => setTimeout(r, 250));
     }
     expect(found).toBeTruthy();

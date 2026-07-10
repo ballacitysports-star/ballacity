@@ -46,8 +46,7 @@ async function readDisplayName(page: Page): Promise<string> {
   // at sign-up). We compare the rendered host name against this exact value.
   const session = JSON.parse(SESSION_JSON!);
   const meta = session?.user?.user_metadata ?? {};
-  const name: string | undefined =
-    meta.display_name || meta.full_name || meta.name;
+  const name: string | undefined = meta.display_name || meta.full_name || meta.name;
   expect(name, "test account must have user_metadata.display_name").toBeTruthy();
   return name!;
 }
@@ -62,7 +61,9 @@ function emailLocalPart(): string | null {
   }
 }
 
-test("host name uses user_metadata.display_name under throttled profile loading", async ({ page }) => {
+test("host name uses user_metadata.display_name under throttled profile loading", async ({
+  page,
+}) => {
   const displayName = await readDisplayName(page);
   const emailPrefix = emailLocalPart();
 
@@ -75,7 +76,11 @@ test("host name uses user_metadata.display_name under throttled profile loading"
 
   // 2. Fill the bare minimum required to publish.
   const title = `E2E throttled host ${Date.now()}`;
-  await page.getByPlaceholder(/title|game/i).first().fill(title).catch(() => {});
+  await page
+    .getByPlaceholder(/title|game/i)
+    .first()
+    .fill(title)
+    .catch(() => {});
   // Address: rely on whatever is pre-populated; if empty, type a placeholder.
   const addressInput = page.getByPlaceholder(/address|location|venue/i).first();
   if (await addressInput.isVisible().catch(() => false)) {
@@ -85,7 +90,10 @@ test("host name uses user_metadata.display_name under throttled profile loading"
 
   // 3. Publish — this triggers the throttled `profiles` SELECT inside
   //    `resolveHostSnapshot` before the hosted game is saved.
-  await page.getByRole("button", { name: /publish|host|create/i }).first().click();
+  await page
+    .getByRole("button", { name: /publish|host|create/i })
+    .first()
+    .click();
 
   // 4. Detail page should render the host's display_name (not the email prefix).
   await page.waitForURL(/\/games\//, { timeout: 15_000 });

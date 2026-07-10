@@ -21,8 +21,7 @@ import { TEST_ACCOUNTS } from "./test-fixtures";
 import { Route as GameRoute } from "@/routes/games.$gameId";
 
 const URL = process.env.VITE_SUPABASE_URL ?? process.env.SUPABASE_URL;
-const KEY =
-  process.env.VITE_SUPABASE_PUBLISHABLE_KEY ?? process.env.SUPABASE_PUBLISHABLE_KEY;
+const KEY = process.env.VITE_SUPABASE_PUBLISHABLE_KEY ?? process.env.SUPABASE_PUBLISHABLE_KEY;
 
 const host = TEST_ACCOUNTS.find((a) => a.key === "host")!;
 const player = TEST_ACCOUNTS.find((a) => a.key === "player")!;
@@ -68,10 +67,7 @@ describe.skipIf(skipIfNoBackend)("invite notification deep link", () => {
 
   afterAll(async () => {
     if (canRun && createdRequestIds.length) {
-      await hostClient
-        .from("availability_contact_requests")
-        .delete()
-        .in("id", createdRequestIds);
+      await hostClient.from("availability_contact_requests").delete().in("id", createdRequestIds);
     }
   });
 

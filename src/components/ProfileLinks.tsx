@@ -1,9 +1,23 @@
-import { ExternalLink, Globe, Instagram, Youtube, Facebook, Linkedin, Twitch, Github, Music } from "lucide-react";
+import {
+  ExternalLink,
+  Globe,
+  Instagram,
+  Youtube,
+  Facebook,
+  Linkedin,
+  Twitch,
+  Github,
+  Music,
+} from "lucide-react";
 import type { ProfileLink, ProfileLinkType } from "@/lib/user-prefs-store";
 import perfectGameLogo from "@/assets/perfect-game-logo.png.asset.json";
 
 export const LINK_TYPES: { type: ProfileLinkType; label: string; placeholder: string }[] = [
-  { type: "perfect_game", label: "Perfect Game", placeholder: "https://perfectgame.org/players/..." },
+  {
+    type: "perfect_game",
+    label: "Perfect Game",
+    placeholder: "https://perfectgame.org/players/...",
+  },
   { type: "pbr", label: "Prep Baseball Report", placeholder: "https://prepbaseballreport.com/..." },
   { type: "hudl", label: "Hudl", placeholder: "https://hudl.com/profile/..." },
   { type: "instagram", label: "Instagram", placeholder: "https://instagram.com/yourhandle" },
@@ -41,7 +55,8 @@ function detectTypeFromUrl(url: string): ProfileLinkType | null {
     if (host.includes("instagram.com")) return "instagram";
     if (host.includes("youtube.com") || host === "youtu.be") return "youtube";
     if (host.includes("tiktok.com")) return "tiktok";
-    if (host === "x.com" || host.endsWith(".x.com") || host.includes("twitter.com")) return "twitter";
+    if (host === "x.com" || host.endsWith(".x.com") || host.includes("twitter.com"))
+      return "twitter";
     if (host.includes("perfectgame.org")) return "perfect_game";
     if (host.includes("prepbaseballreport.com")) return "pbr";
     if (host.includes("hudl.com")) return "hudl";
@@ -92,18 +107,29 @@ function BrandIcon({ brand, className = "h-4 w-4" }: { brand: BrandKey; classNam
           className={`${className} w-auto object-contain dark:invert`}
         />
       );
-    case "instagram": return <Instagram className={className} />;
-    case "youtube": return <Youtube className={className} />;
-    case "twitter": return <XIcon className={className} />;
-    case "tiktok": return <TikTokIcon className={className} />;
-    case "facebook": return <Facebook className={className} />;
-    case "linkedin": return <Linkedin className={className} />;
-    case "twitch": return <Twitch className={className} />;
-    case "github": return <Github className={className} />;
+    case "instagram":
+      return <Instagram className={className} />;
+    case "youtube":
+      return <Youtube className={className} />;
+    case "twitter":
+      return <XIcon className={className} />;
+    case "tiktok":
+      return <TikTokIcon className={className} />;
+    case "facebook":
+      return <Facebook className={className} />;
+    case "linkedin":
+      return <Linkedin className={className} />;
+    case "twitch":
+      return <Twitch className={className} />;
+    case "github":
+      return <Github className={className} />;
     case "spotify":
-    case "soundcloud": return <Music className={className} />;
-    case "website": return <Globe className={className} />;
-    default: return <ExternalLink className={className} />;
+    case "soundcloud":
+      return <Music className={className} />;
+    case "website":
+      return <Globe className={className} />;
+    default:
+      return <ExternalLink className={className} />;
   }
 }
 
