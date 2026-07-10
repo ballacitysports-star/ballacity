@@ -51,6 +51,10 @@ function Create() {
   const [description, setDescription] = useState("");
   const [requiresApproval, setRequiresApproval] = useState(false);
   const [publishing, setPublishing] = useState(false);
+  const [coverUrl, setCoverUrl] = useState<string | null>(null);
+  const [coverUploading, setCoverUploading] = useState(false);
+  const coverInputRef = useRef<HTMLInputElement>(null);
+
 
   useEffect(() => {
     const nextCity = profile?.city?.trim() ?? "";
