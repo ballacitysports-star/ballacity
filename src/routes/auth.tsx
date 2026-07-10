@@ -21,8 +21,29 @@ function AuthPage() {
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
-    if (!loading && user) nav({ to: "/profile" });
+    if (!loading && user) nav({ to: "/profile", replace: true });
   }, [loading, user, nav]);
+
+  // Belt-and-suspenders for mobile browsers (esp. iOS Chrome) where the
+  // OAuth popup's postMessage can race useAuth state. Listen directly for
+  // a session and navigate as soon as one exists, and do a one-shot
+  // getSession() check on mount in case the session was hydrated via
+  // storage event from the popup/other tab before this component mounted.
+  useEffect(() => {
+    let cancelled = false;
+    supabase.auth.getSession().then(({ data }) => {
+      if (!cancelled && data.session) nav({ to: "/profile", replace: true });
+    });
+    const { data: sub } = supabase.auth.onAuthStateChange((event, session) => {
+      if (session && (event === "SIGNED_IN" || event === "INITIAL_SESSION" || event === "TOKEN_REFRESHED")) {
+        nav({ to: "/profile", replace: true });
+      }
+    });
+    return () => {
+      cancelled = true;
+      sub.subscription.unsubscribe();
+    };
+  }, [nav]);
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
