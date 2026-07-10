@@ -166,13 +166,11 @@ function AuthPage() {
       });
     };
 
-    // Shorter timer: if popup opens and completes, session lands within a few
-    // seconds. If nothing happens by 6s, it was almost certainly blocked.
-    const hangTimer = window.setTimeout(async () => {
-      const { data } = await supabase.auth.getSession();
-      if (!data.session) showBlockedToast("hang_timeout");
-    }, 6000);
-
+    // No hang timer: the popup stays open while the user completes Google's
+    // account picker + password + 2FA, which can easily take 30–60s. Only
+    // treat the sign-in as blocked/failed when the OAuth helper's promise
+    // itself rejects or returns an error — that IS the signal that the
+    // popup couldn't open. onAuthStateChange handles the success redirect.
     promise
       .then((result) => {
         if (result?.error) {
@@ -184,8 +182,6 @@ function AuthPage() {
             toast.error(msg || "Google sign-in failed");
           }
         } else {
-          // Session may set asynchronously via onAuthStateChange; record
-          // that the OAuth round-trip resolved without error either way.
           trackSigninEvent("success");
         }
       })
@@ -199,7 +195,6 @@ function AuthPage() {
         }
       })
       .finally(() => {
-        window.clearTimeout(hangTimer);
         setBusy(false);
       });
   };
