@@ -48,6 +48,7 @@ import { useHostedGames, updateHostedGame, deleteHostedGame } from "@/lib/hosted
 import type { Game } from "@/lib/sample-data";
 import { LegalNotice } from "@/components/LegalNotice";
 import { useAuth } from "@/hooks/use-auth";
+import { useMyProfile } from "@/lib/user-prefs-store";
 import { getOrCreateDirectConversation } from "@/lib/messages";
 import { createNotification } from "@/lib/notifications";
 import { supabase } from "@/integrations/supabase/client";
