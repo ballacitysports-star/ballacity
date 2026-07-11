@@ -739,16 +739,24 @@ function MineTab({
                 <p className="text-xs text-muted-foreground mt-1">
                   {formatWindow(m) || "No date set"} · {m.city || "Anywhere"}
                 </p>
-                <button
-                  onClick={async () => {
-                    if (!confirm("Remove this post?")) return;
-                    await deleteAvailability(m.id);
-                    setMine((arr) => (arr ?? []).filter((x) => x.id !== m.id));
-                  }}
-                  className="mt-2 text-xs font-semibold text-coral"
-                >
-                  Remove
-                </button>
+                <div className="mt-2 flex gap-3">
+                  <button
+                    onClick={() => onEdit(m)}
+                    className="text-xs font-semibold text-lime"
+                  >
+                    Edit
+                  </button>
+                  <button
+                    onClick={async () => {
+                      if (!confirm("Remove this post?")) return;
+                      await deleteAvailability(m.id);
+                      setMine((arr) => (arr ?? []).filter((x) => x.id !== m.id));
+                    }}
+                    className="text-xs font-semibold text-coral"
+                  >
+                    Remove
+                  </button>
+                </div>
               </li>
             ))}
           </ul>
