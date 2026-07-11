@@ -111,6 +111,53 @@ export async function updateAvailability(id: string, patch: Partial<PlayerAvaila
     .update(patch as any)
     .eq("id", id);
   if (error) throw error;
+
+  // Best-effort: notify players who previously reached out about this post that
+  // it was updated, so they can revisit the new details (times, sports, city…).
+  try {
+    await notifyInterestedOnEdit(id);
+  } catch (e) {
+    console.warn("availability edit notify failed", e);
+  }
+}
+
+async function notifyInterestedOnEdit(availabilityId: string) {
+  const { data: u } = await supabase.auth.getUser();
+  const editorId = u.user?.id ?? null;
+
+  const { data: reqs } = await supabase
+    .from("availability_contact_requests" as any)
+    .select("from_user_id")
+    .eq("availability_id", availabilityId);
+  const rows = (reqs ?? []) as unknown as { from_user_id: string }[];
+  const recipients = Array.from(
+    new Set(rows.map((r) => r.from_user_id).filter((id) => id && id !== editorId)),
+  );
+  if (recipients.length === 0) return;
+
+  // Pull a friendly label for the notification body: editor's display name.
+  let editorName = "A player";
+  if (editorId) {
+    const { data: prof } = await supabase
+      .from("profiles")
+      .select("display_name")
+      .eq("id", editorId)
+      .maybeSingle();
+    if (prof?.display_name) editorName = prof.display_name;
+  }
+
+  const { createNotification } = await import("@/lib/notifications");
+  await Promise.all(
+    recipients.map((uid) =>
+      createNotification({
+        user_id: uid,
+        type: "availability_updated",
+        title: `${editorName} updated their availability`,
+        body: "Tap to see the new details.",
+        link: `/available-players`,
+      }),
+    ),
+  );
 }
 
 export async function deleteAvailability(id: string) {
