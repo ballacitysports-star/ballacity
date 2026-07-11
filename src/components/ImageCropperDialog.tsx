@@ -1,13 +1,29 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { X, Check, ZoomIn, ZoomOut, RotateCcw, Maximize2 } from "lucide-react";
 
+export type CropSizePreset = { label: string; maxSize: number };
+export type CropQualityPreset = { label: string; quality: number };
+
+const DEFAULT_SIZE_PRESETS: CropSizePreset[] = [
+  { label: "S", maxSize: 512 },
+  { label: "M", maxSize: 1024 },
+  { label: "L", maxSize: 1600 },
+];
+const DEFAULT_QUALITY_PRESETS: CropQualityPreset[] = [
+  { label: "Standard", quality: 0.8 },
+  { label: "High", quality: 0.9 },
+  { label: "Max", quality: 0.95 },
+];
+
 type Props = {
   open: boolean;
   file: File | null;
   aspect: number; // width / height, e.g. 1 for avatar, 16/9 for cover
-  outputMaxSize: number; // longest edge of output
+  outputMaxSize: number; // default longest edge of output
   shape?: "square" | "rect" | "circle";
   title?: string;
+  sizePresets?: CropSizePreset[];
+  qualityPresets?: CropQualityPreset[];
   onCancel: () => void;
   onConfirm: (dataUrl: string) => void;
 };
@@ -19,6 +35,8 @@ export function ImageCropperDialog({
   outputMaxSize,
   shape = "rect",
   title = "Crop image",
+  sizePresets = DEFAULT_SIZE_PRESETS,
+  qualityPresets = DEFAULT_QUALITY_PRESETS,
   onCancel,
   onConfirm,
 }: Props) {
@@ -29,6 +47,21 @@ export function ImageCropperDialog({
   const [scale, setScale] = useState(1);
   const [minScale, setMinScale] = useState(1);
   const [offset, setOffset] = useState({ x: 0, y: 0 });
+
+  // Pick the preset closest to the parent-provided default as the initial choice
+  const initialSizeIndex = (() => {
+    let best = 0;
+    let bestDiff = Infinity;
+    sizePresets.forEach((p, i) => {
+      const d = Math.abs(p.maxSize - outputMaxSize);
+      if (d < bestDiff) { bestDiff = d; best = i; }
+    });
+    return best;
+  })();
+  const [sizeIdx, setSizeIdx] = useState(initialSizeIndex);
+  const [qualityIdx, setQualityIdx] = useState(1); // default High
+  const outMax = sizePresets[sizeIdx]?.maxSize ?? outputMaxSize;
+  const outQuality = qualityPresets[qualityIdx]?.quality ?? 0.9;
 
   // Multi-pointer tracking for pinch + pan
   const pointersRef = useRef<Map<number, { x: number; y: number }>>(new Map());
@@ -243,19 +276,21 @@ export function ImageCropperDialog({
 
   const confirm = () => {
     if (!img) return;
-    const outW = aspect >= 1 ? outputMaxSize : Math.round(outputMaxSize * aspect);
-    const outH = aspect >= 1 ? Math.round(outputMaxSize / aspect) : outputMaxSize;
+    const outW = aspect >= 1 ? outMax : Math.round(outMax * aspect);
+    const outH = aspect >= 1 ? Math.round(outMax / aspect) : outMax;
     const canvas = document.createElement("canvas");
     canvas.width = outW;
     canvas.height = outH;
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = "high";
     const sW = cropW / scale;
     const sH = cropH / scale;
     const sx = img.width / 2 - sW / 2 - offset.x / scale;
     const sy = img.height / 2 - sH / 2 - offset.y / scale;
     ctx.drawImage(img, sx, sy, sW, sH, 0, 0, outW, outH);
-    const dataUrl = canvas.toDataURL("image/jpeg", 0.9);
+    const dataUrl = canvas.toDataURL("image/jpeg", outQuality);
     onConfirm(dataUrl);
   };
 
@@ -373,6 +408,48 @@ export function ImageCropperDialog({
           >
             <RotateCcw className="h-3.5 w-3.5" /> Reset
           </button>
+        </div>
+        <div className="flex flex-col gap-1.5 pt-1">
+          <div className="flex items-center gap-2">
+            <span className="w-14 text-[10px] font-semibold uppercase tracking-wider opacity-60">Size</span>
+            <div className="flex flex-1 gap-1 rounded-full bg-white/5 p-1">
+              {sizePresets.map((p, i) => {
+                const w = aspect >= 1 ? p.maxSize : Math.round(p.maxSize * aspect);
+                const h = aspect >= 1 ? Math.round(p.maxSize / aspect) : p.maxSize;
+                return (
+                  <button
+                    key={p.label}
+                    type="button"
+                    onClick={() => setSizeIdx(i)}
+                    className={`flex-1 rounded-full px-2 py-1 text-[11px] font-semibold transition ${
+                      i === sizeIdx ? "bg-white text-black" : "text-white/80 hover:bg-white/10"
+                    }`}
+                    aria-pressed={i === sizeIdx}
+                  >
+                    {p.label} <span className="opacity-60">· {w}×{h}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="w-14 text-[10px] font-semibold uppercase tracking-wider opacity-60">Quality</span>
+            <div className="flex flex-1 gap-1 rounded-full bg-white/5 p-1">
+              {qualityPresets.map((q, i) => (
+                <button
+                  key={q.label}
+                  type="button"
+                  onClick={() => setQualityIdx(i)}
+                  className={`flex-1 rounded-full px-2 py-1 text-[11px] font-semibold transition ${
+                    i === qualityIdx ? "bg-white text-black" : "text-white/80 hover:bg-white/10"
+                  }`}
+                  aria-pressed={i === qualityIdx}
+                >
+                  {q.label}
+                </button>
+              ))}
+            </div>
+          </div>
         </div>
       </div>
     </div>
