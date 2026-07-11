@@ -584,7 +584,8 @@ function PostAvailabilityDialog({
             disabled={saving}
             className="bg-lime-gradient text-primary-foreground"
           >
-            {saving && <Loader2 className="h-4 w-4 mr-1 animate-spin" />}Post
+            {saving && <Loader2 className="h-4 w-4 mr-1 animate-spin" />}
+            {isEdit ? "Save changes" : "Post"}
           </Button>
         </DialogFooter>
       </DialogContent>
