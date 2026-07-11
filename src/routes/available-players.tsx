@@ -185,26 +185,29 @@ function AvailablePlayersPage() {
                   onContact={() =>
                     user ? setContactFor(a) : toast.error("Sign in to contact this player.")
                   }
+                  onEdit={() => setEditingPost(a)}
                 />
               ))}
             </ul>
           )}
         </>
       ) : (
-        <MineTab user={user} />
+        <MineTab user={user} onEdit={(m) => setEditingPost(m)} refreshKey={refreshKey} />
       )}
 
-      {postOpen && (
+      {(postOpen || editingPost) && (
         <PostAvailabilityDialog
-          onClose={() => setPostOpen(false)}
-          onPosted={() => {
+          initial={editingPost ?? undefined}
+          onClose={() => {
             setPostOpen(false);
-            // refetch list
-            listOpenAvailabilities({
-              sport: sport || undefined,
-              city: city.trim() || undefined,
-            }).then(setList);
-            toast.success("Availability posted");
+            setEditingPost(null);
+          }}
+          onPosted={() => {
+            const wasEdit = !!editingPost;
+            setPostOpen(false);
+            setEditingPost(null);
+            setRefreshKey((k) => k + 1);
+            toast.success(wasEdit ? "Availability updated" : "Availability posted");
           }}
         />
       )}
