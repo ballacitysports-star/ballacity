@@ -652,11 +652,18 @@ function PostAvailabilityDialog({
 
 function ContactDialog({
   availability,
+  hostedGames = [],
+  mode = "contact",
   onClose,
 }: {
   availability: AvailabilityWithAuthor;
+  hostedGames?: Game[];
+  mode?: "contact" | "invite";
   onClose: () => void;
 }) {
+  const isInvite = mode === "invite" && hostedGames.length > 0;
+  const [gameId, setGameId] = useState<string>(hostedGames[0]?.id ?? "");
+  const selected = hostedGames.find((g) => g.id === gameId);
   const [msg, setMsg] = useState("");
   const [saving, setSaving] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
@@ -665,18 +672,48 @@ function ContactDialog({
   >("none");
   const isPending = existingStatus === "pending";
 
+  const formattedDate = (iso: string) => {
+    const d = new Date(iso);
+    return d.toLocaleString(undefined, {
+      weekday: "short",
+      month: "short",
+      day: "numeric",
+      hour: "numeric",
+      minute: "2-digit",
+    });
+  };
+
   const send = async () => {
     setSaving(true);
     try {
-      await createContactRequest(availability.id, availability.user_id, msg);
-      toast.success("Contact request sent");
+      let body = msg.trim();
+      const invite =
+        isInvite && selected
+          ? {
+              gameId: selected.id,
+              title: selected.title,
+              startsAt: selected.date,
+              sport: selected.sport,
+              location: selected.location,
+            }
+          : null;
+      if (invite) {
+        const header = `You're invited to ${selected!.title} — ${selected!.sport} on ${formattedDate(selected!.date)} at ${selected!.location}.`;
+        body = body ? `${header}\n\n${body}` : header;
+      }
+      await createContactRequest(availability.id, availability.user_id, body, invite);
+      toast.success(isInvite ? "Invite sent" : "Contact request sent");
       onClose();
     } catch (e: any) {
-      const msg = String(e?.message ?? "");
-      if (msg.includes("duplicate") || (e as { code?: string })?.code === "23505") {
-        toast.error("You already have a pending request to this player.");
+      const err = String(e?.message ?? "");
+      if (err.includes("duplicate") || (e as { code?: string })?.code === "23505") {
+        toast.error(
+          isInvite
+            ? "You already have a pending invite to this player for this game."
+            : "You already have a pending request to this player.",
+        );
         setRefreshKey((k) => k + 1);
-      } else toast.error(msg || "Couldn't send request");
+      } else toast.error(err || "Couldn't send request");
     } finally {
       setSaving(false);
     }
@@ -684,27 +721,74 @@ function ContactDialog({
 
   return (
     <Dialog open onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="max-w-md">
+      <DialogContent className="max-w-md max-h-[90dvh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Contact {availability.author_name}</DialogTitle>
+          <DialogTitle>
+            {isInvite
+              ? `Invite ${availability.author_name}`
+              : `Contact ${availability.author_name}`}
+          </DialogTitle>
         </DialogHeader>
         <RequestStatusPanel
           availabilityId={availability.id}
-          gameId={null}
+          gameId={isInvite ? (selected?.id ?? null) : null}
           refreshKey={refreshKey}
           onLoaded={(s: ExistingRequestSummary) => setExistingStatus(s.status)}
           onCancelled={() => setExistingStatus("none")}
         />
+
+        {isInvite && (
+          <div className="space-y-2">
+            <Label className="text-xs uppercase tracking-wider text-muted-foreground">
+              {hostedGames.length > 1 ? "Pick an event" : "Event"}
+            </Label>
+            {hostedGames.length === 1 ? (
+              <div className="rounded-2xl border border-border bg-surface p-3">
+                <p className="font-semibold text-sm truncate">{hostedGames[0].title}</p>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  {hostedGames[0].sport} · {formattedDate(hostedGames[0].date)}
+                </p>
+                <p className="text-xs text-muted-foreground truncate">{hostedGames[0].location}</p>
+              </div>
+            ) : (
+              <div className="space-y-2 max-h-56 overflow-y-auto">
+                {hostedGames.map((g) => {
+                  const active = g.id === gameId;
+                  return (
+                    <button
+                      key={g.id}
+                      type="button"
+                      onClick={() => setGameId(g.id)}
+                      className={`w-full text-left rounded-2xl border p-3 transition ${active ? "border-lime bg-lime/10" : "border-border bg-surface"}`}
+                    >
+                      <p className="font-semibold text-sm truncate">{g.title}</p>
+                      <p className="text-xs text-muted-foreground mt-0.5">
+                        {g.sport} · {formattedDate(g.date)}
+                      </p>
+                      <p className="text-xs text-muted-foreground truncate">{g.location}</p>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
+
         <p className="text-sm text-muted-foreground">
-          Send a short message introducing your team or session. {availability.author_name} can
-          accept or decline.
+          {isInvite
+            ? `Add a short note. ${availability.author_name} can accept or decline.`
+            : `Send a short message introducing your team or session. ${availability.author_name} can accept or decline.`}
         </p>
         <Textarea
           value={msg}
           onChange={(e) => setMsg(e.target.value)}
           rows={4}
           maxLength={500}
-          placeholder="Hey! We're a Tuesday-night 7v7 squad short a midfielder…"
+          placeholder={
+            isInvite
+              ? "We'd love to have you — let me know if you can make it!"
+              : "Hey! We're a Tuesday-night 7v7 squad short a midfielder…"
+          }
         />
         <DialogFooter>
           <Button variant="ghost" onClick={onClose}>
@@ -712,17 +796,24 @@ function ContactDialog({
           </Button>
           <Button
             onClick={send}
-            disabled={saving || isPending}
+            disabled={saving || isPending || (isInvite && !selected)}
             className="bg-lime-gradient text-primary-foreground"
           >
             {saving && <Loader2 className="h-4 w-4 mr-1 animate-spin" />}
-            {isPending ? "Request pending" : "Send request"}
+            {isPending
+              ? isInvite
+                ? "Invite pending"
+                : "Request pending"
+              : isInvite
+                ? "Send invite"
+                : "Send request"}
           </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
   );
 }
+
 
 function MineTab({
   user,
