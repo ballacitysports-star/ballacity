@@ -73,7 +73,9 @@ function AvailablePlayersPage() {
   const [city, setCity] = useState("");
   const [list, setList] = useState<AvailabilityWithAuthor[] | null>(null);
   const [postOpen, setPostOpen] = useState(false);
+  const [editingPost, setEditingPost] = useState<PlayerAvailability | null>(null);
   const [contactFor, setContactFor] = useState<AvailabilityWithAuthor | null>(null);
+  const [refreshKey, setRefreshKey] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
