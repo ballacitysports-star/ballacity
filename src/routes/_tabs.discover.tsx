@@ -120,8 +120,7 @@ type ActiveGame = {
 
 function ActiveGameCard({ game }: { game: ActiveGame }) {
   const liveCount = useLiveParticipantCount(game.id);
-  const joinedCount = Math.min(game.maxPlayers, liveCount ?? game.joined);
-  const spotsLeft = Math.max(0, game.maxPlayers - joinedCount);
+  const spotsLeft = computeSpotsLeft(game.maxPlayers, game.joined, liveCount);
   return (
     <motion.div
       initial={{ opacity: 0, y: 30 }}
