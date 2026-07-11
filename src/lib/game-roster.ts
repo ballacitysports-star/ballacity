@@ -8,12 +8,15 @@ export type LiveParticipant = {
   avatarInitials: string;
   avatarUrl: string | null;
   username: string | null;
+  position: string | null;
 };
 
 type Row = {
   user_id: string;
   created_at: string;
+  position: string | null;
 };
+
 
 type ProfileRow = {
   id: string;
