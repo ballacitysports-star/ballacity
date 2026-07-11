@@ -47,6 +47,7 @@ import {
 } from "@/lib/payments";
 import { useHostedGames, updateHostedGame, deleteHostedGame } from "@/lib/hosted-games-store";
 import type { Game } from "@/lib/sample-data";
+import { PositionsPicker, positionsCleanup } from "@/components/PositionsPicker";
 import { LegalNotice } from "@/components/LegalNotice";
 import { useAuth } from "@/hooks/use-auth";
 import { useMyProfile } from "@/lib/user-prefs-store";
@@ -837,6 +838,28 @@ function GameDetail() {
           )}
         </div>
 
+        {/* Positions needed */}
+        {game.positionsNeeded && Object.keys(game.positionsNeeded).length > 0 && (
+          <div>
+            <h2 className="font-display text-sm font-bold uppercase tracking-wider text-muted-foreground mb-2">
+              Positions needed
+            </h2>
+            <div className="flex flex-wrap gap-2">
+              {Object.entries(game.positionsNeeded).map(([name, count]) => (
+                <span
+                  key={name}
+                  className="inline-flex items-center gap-1.5 rounded-full border border-lime/40 bg-lime/10 px-3 py-1 text-xs font-semibold text-lime"
+                >
+                  <span>{name}</span>
+                  <span className="rounded-full bg-lime/20 px-1.5 py-0.5 text-[10px] tabular-nums">
+                    ×{count}
+                  </span>
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* Players */}
         <div>
           <div className="flex items-center justify-between mb-2">
@@ -1345,6 +1368,9 @@ function EditGameModal({
   const [isPrivate, setIsPrivate] = useState(!!game.isPrivate);
   const [image, setImage] = useState(game.image ?? "");
   const [description, setDescription] = useState(game.description);
+  const [positionsNeeded, setPositionsNeeded] = useState<Record<string, number>>(
+    game.positionsNeeded ?? {},
+  );
 
   const save = () => {
     const mp = Math.max(2, Math.min(200, Number(maxPlayers) || game.maxPlayers));
@@ -1364,6 +1390,7 @@ function EditGameModal({
       isPrivate,
       image: image.trim(),
       description,
+      positionsNeeded: positionsCleanup(positionsNeeded),
     });
     if (!updated) {
       toast.error("This game can't be edited here.");
@@ -1511,6 +1538,13 @@ function EditGameModal({
               onChange={(e) => setDescription(e.target.value)}
               rows={3}
               className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm"
+            />
+          </Field>
+          <Field label="Positions needed">
+            <PositionsPicker
+              sport={sport}
+              value={positionsNeeded}
+              onChange={setPositionsNeeded}
             />
           </Field>
         </div>

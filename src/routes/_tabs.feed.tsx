@@ -7,7 +7,7 @@ import { Logo } from "@/components/Logo";
 import { MyAvatar } from "@/components/UserAvatar";
 import { SportChips } from "@/components/SportChips";
 import { GameCard } from "@/components/GameCard";
-import { GAMES, SPORTS, type Sport } from "@/lib/sample-data";
+import { GAMES, SPORTS, POSITIONS_BY_SPORT, type Sport } from "@/lib/sample-data";
 import { useHostedGames } from "@/lib/hosted-games-store";
 import { useJoinedGameIds } from "@/lib/games-store";
 import { useFeedPrefs, setFeedPrefs, DEFAULT_PREFS, useMyProfile } from "@/lib/user-prefs-store";
@@ -22,6 +22,7 @@ export const Route = createFileRoute("/_tabs/feed")({
 function Feed() {
   const [q, setQ] = useState("");
   const [filtersOpen, setFiltersOpen] = useState(false);
+  const [positionFilter, setPositionFilter] = useState<string | null>(null);
   const hosted = useHostedGames();
   const joinedIds = useJoinedGameIds();
   const prefs = useFeedPrefs();
@@ -45,6 +46,7 @@ function Feed() {
     prefs.preferredSports.length === 1 ? prefs.preferredSports[0] : null;
   const setChipSport = (s: string | null) => {
     setFeedPrefs({ ...prefs, preferredSports: s ? [s as Sport] : [] });
+    setPositionFilter(null);
   };
 
   const filtered = useMemo(() => {
@@ -52,6 +54,11 @@ function Feed() {
     return all
       .filter((g) =>
         prefs.preferredSports.length ? prefs.preferredSports.includes(g.sport) : true,
+      )
+      .filter((g) =>
+        positionFilter
+          ? !!(g.positionsNeeded && (g.positionsNeeded[positionFilter] ?? 0) > 0)
+          : true,
       )
       .filter((g) => (prefs.sections.hostedByMeOnly ? hostedIds.has(g.id) : true))
       .filter((g) => (prefs.sections.joinedOnly ? joinedSet.has(g.id) : true))
@@ -92,7 +99,7 @@ function Feed() {
         return a.distanceMi - b.distanceMi;
       });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [q, hosted, prefs, joinedSet, hostedIds, userCityToken]);
+  }, [q, hosted, prefs, joinedSet, hostedIds, userCityToken, positionFilter]);
 
   const suggestions = useMemo(() => {
     if (!q) return [] as { label: string; sub: string }[];
@@ -329,6 +336,36 @@ function Feed() {
 
       <div className="mb-5">
         <SportChips selected={chipSport} onSelect={setChipSport} />
+        {chipSport && POSITIONS_BY_SPORT[chipSport as Sport]?.length > 0 && (
+          <div className="mt-2 flex gap-2 overflow-x-auto scrollbar-hide -mx-4 px-4 pb-1">
+            <button
+              onClick={() => setPositionFilter(null)}
+              className={`shrink-0 rounded-full border px-3 py-1.5 text-xs font-semibold transition-all ${
+                !positionFilter
+                  ? "border-lime bg-lime text-primary-foreground"
+                  : "border-border bg-surface text-muted-foreground"
+              }`}
+            >
+              Any position
+            </button>
+            {POSITIONS_BY_SPORT[chipSport as Sport].map((p) => {
+              const active = positionFilter === p;
+              return (
+                <button
+                  key={p}
+                  onClick={() => setPositionFilter(active ? null : p)}
+                  className={`shrink-0 rounded-full border px-3 py-1.5 text-xs font-semibold transition-all ${
+                    active
+                      ? "border-lime bg-lime text-primary-foreground"
+                      : "border-border bg-surface text-foreground hover:border-lime/40"
+                  }`}
+                >
+                  {p}
+                </button>
+              );
+            })}
+          </div>
+        )}
       </div>
 
       {q ? (

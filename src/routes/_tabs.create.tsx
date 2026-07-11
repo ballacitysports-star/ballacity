@@ -24,6 +24,8 @@ import { useMyProfile } from "@/lib/user-prefs-store";
 import { useAuth } from "@/hooks/use-auth";
 import { upsertGamePaymentSettings } from "@/lib/payments";
 import { supabase } from "@/integrations/supabase/client";
+import { PositionsPicker, positionsCleanup, type PositionsNeeded } from "@/components/PositionsPicker";
+
 
 
 export const Route = createFileRoute("/_tabs/create")({
@@ -54,6 +56,8 @@ function Create() {
   const [coverUrl, setCoverUrl] = useState<string | null>(null);
   const [coverUploading, setCoverUploading] = useState(false);
   const coverInputRef = useRef<HTMLInputElement>(null);
+  const [positionsNeeded, setPositionsNeeded] = useState<PositionsNeeded>({});
+
 
 
   useEffect(() => {
@@ -214,7 +218,7 @@ function Create() {
               hostUserId: user?.id,
               host: hostSnap,
               image: coverUrl ?? undefined,
-
+              positionsNeeded: positionsCleanup(positionsNeeded),
             });
 
             // Persist host ownership + approval/fee preferences so the host & players see them on the detail page
@@ -250,7 +254,7 @@ function Create() {
                 <button
                   type="button"
                   key={s.name}
-                  onClick={() => setSport(s.name)}
+                  onClick={() => { setSport(s.name); setPositionsNeeded({}); }}
                   className={`flex flex-col items-center gap-1 rounded-2xl border px-2 py-3 text-xs font-semibold transition-all ${
                     active
                       ? "border-lime bg-lime/10 text-lime"
@@ -392,6 +396,15 @@ function Create() {
               </button>
             ))}
           </div>
+        </Section>
+
+        {/* Positions needed */}
+        <Section title="Positions needed">
+          <PositionsPicker
+            sport={sport}
+            value={positionsNeeded}
+            onChange={setPositionsNeeded}
+          />
         </Section>
 
         {/* Players */}

@@ -369,6 +369,7 @@ export type Database = {
           location: string
           max_players: number
           neighborhood: string
+          positions_needed: Json
           price: number
           skill: string
           sport: string
@@ -398,6 +399,7 @@ export type Database = {
           location?: string
           max_players?: number
           neighborhood?: string
+          positions_needed?: Json
           price?: number
           skill?: string
           sport: string
@@ -427,6 +429,7 @@ export type Database = {
           location?: string
           max_players?: number
           neighborhood?: string
+          positions_needed?: Json
           price?: number
           skill?: string
           sport?: string

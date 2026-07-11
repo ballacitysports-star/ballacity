@@ -70,7 +70,9 @@ export type Game = {
   equipment: string[];
   status?: "scheduled" | "in_progress" | "completed";
   joinsClosed?: boolean;
+  positionsNeeded?: Record<string, number>;
 };
+
 
 // Simple default cover: a soft duotone gradient tuned to each sport's accent
 // color, with the sport's emoji centered. Rendered as an inline SVG data URI
