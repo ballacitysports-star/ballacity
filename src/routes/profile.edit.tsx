@@ -30,6 +30,7 @@ import { OrgCard } from "@/components/OrgCard";
 import { getCurrentUser, useAuth } from "@/hooks/use-auth";
 import { LocationAutocomplete } from "@/components/LocationAutocomplete";
 import { LINK_TYPES, LinkIcon } from "@/components/ProfileLinks";
+import { ImageCropperDialog } from "@/components/ImageCropperDialog";
 
 export const Route = createFileRoute("/profile/edit")({
   head: () => ({ meta: [{ title: "Edit profile — OpenRun" }] }),
@@ -79,34 +80,35 @@ function EditProfile() {
 
   const markDirty = () => setIsDirty(true);
 
-  const onPickAvatar = async (file: File | null) => {
+  const [cropTarget, setCropTarget] = useState<"avatar" | "cover" | null>(null);
+  const [cropFile, setCropFile] = useState<File | null>(null);
+
+  const onPickAvatar = (file: File | null) => {
     if (!file) return;
-    markDirty();
     if (!file.type.startsWith("image/")) {
       toast.error("Please choose an image");
       return;
     }
-    try {
-      const dataUrl = await resizeImageToDataUrl(file, 256);
-      setAvatarUrl(dataUrl);
-    } catch {
-      toast.error("Couldn't load that image");
-    }
+    setCropFile(file);
+    setCropTarget("avatar");
   };
 
-  const onPickCover = async (file: File | null) => {
+  const onPickCover = (file: File | null) => {
     if (!file) return;
-    markDirty();
     if (!file.type.startsWith("image/")) {
       toast.error("Please choose an image");
       return;
     }
-    try {
-      const dataUrl = await resizeImageToDataUrl(file, 1600);
-      setCoverUrl(dataUrl);
-    } catch {
-      toast.error("Couldn't load that image");
-    }
+    setCropFile(file);
+    setCropTarget("cover");
+  };
+
+  const onCropConfirm = (dataUrl: string) => {
+    markDirty();
+    if (cropTarget === "avatar") setAvatarUrl(dataUrl);
+    else if (cropTarget === "cover") setCoverUrl(dataUrl);
+    setCropTarget(null);
+    setCropFile(null);
   };
 
   const addLink = (type: ProfileLinkType) => {
@@ -352,6 +354,19 @@ function EditProfile() {
 
   return (
     <div className="mx-auto w-full max-w-md sm:max-w-2xl lg:max-w-4xl px-4 py-6 pb-32">
+      <ImageCropperDialog
+        open={cropTarget !== null}
+        file={cropFile}
+        aspect={cropTarget === "avatar" ? 1 : 16 / 9}
+        outputMaxSize={cropTarget === "avatar" ? 512 : 1600}
+        shape={cropTarget === "avatar" ? "circle" : "rect"}
+        title={cropTarget === "avatar" ? "Crop photo" : "Crop cover"}
+        onCancel={() => {
+          setCropTarget(null);
+          setCropFile(null);
+        }}
+        onConfirm={onCropConfirm}
+      />
       <div className="flex items-center justify-between mb-5">
         <Link
           to="/profile"
@@ -956,27 +971,4 @@ function Toggle({
   );
 }
 
-async function resizeImageToDataUrl(file: File, maxSize: number): Promise<string> {
-  const dataUrl = await new Promise<string>((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(reader.result as string);
-    reader.onerror = () => reject(reader.error);
-    reader.readAsDataURL(file);
-  });
-  const img = await new Promise<HTMLImageElement>((resolve, reject) => {
-    const el = new Image();
-    el.onload = () => resolve(el);
-    el.onerror = () => reject(new Error("image load failed"));
-    el.src = dataUrl;
-  });
-  const scale = Math.min(1, maxSize / Math.max(img.width, img.height));
-  const w = Math.max(1, Math.round(img.width * scale));
-  const h = Math.max(1, Math.round(img.height * scale));
-  const canvas = document.createElement("canvas");
-  canvas.width = w;
-  canvas.height = h;
-  const ctx = canvas.getContext("2d");
-  if (!ctx) return dataUrl;
-  ctx.drawImage(img, 0, 0, w, h);
-  return canvas.toDataURL("image/jpeg", 0.85);
-}
+
