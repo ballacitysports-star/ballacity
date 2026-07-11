@@ -152,6 +152,17 @@ function EditProfile() {
     markDirty();
     setSports(sports.map((x) => (x.name === s ? { ...x, skill } : x)));
   };
+  const togglePosition = (s: Sport, pos: string) => {
+    markDirty();
+    setSports(
+      sports.map((x) => {
+        if (x.name !== s) return x;
+        const cur = x.positions ?? [];
+        const next = cur.includes(pos) ? cur.filter((p) => p !== pos) : [...cur, pos];
+        return { ...x, positions: next };
+      }),
+    );
+  };
 
   useEffect(() => {
     if (user) setConfirmedUser(user);
