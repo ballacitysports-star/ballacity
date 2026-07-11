@@ -409,6 +409,48 @@ export function ImageCropperDialog({
             <RotateCcw className="h-3.5 w-3.5" /> Reset
           </button>
         </div>
+        <div className="flex flex-col gap-1.5 pt-1">
+          <div className="flex items-center gap-2">
+            <span className="w-14 text-[10px] font-semibold uppercase tracking-wider opacity-60">Size</span>
+            <div className="flex flex-1 gap-1 rounded-full bg-white/5 p-1">
+              {sizePresets.map((p, i) => {
+                const w = aspect >= 1 ? p.maxSize : Math.round(p.maxSize * aspect);
+                const h = aspect >= 1 ? Math.round(p.maxSize / aspect) : p.maxSize;
+                return (
+                  <button
+                    key={p.label}
+                    type="button"
+                    onClick={() => setSizeIdx(i)}
+                    className={`flex-1 rounded-full px-2 py-1 text-[11px] font-semibold transition ${
+                      i === sizeIdx ? "bg-white text-black" : "text-white/80 hover:bg-white/10"
+                    }`}
+                    aria-pressed={i === sizeIdx}
+                  >
+                    {p.label} <span className="opacity-60">· {w}×{h}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="w-14 text-[10px] font-semibold uppercase tracking-wider opacity-60">Quality</span>
+            <div className="flex flex-1 gap-1 rounded-full bg-white/5 p-1">
+              {qualityPresets.map((q, i) => (
+                <button
+                  key={q.label}
+                  type="button"
+                  onClick={() => setQualityIdx(i)}
+                  className={`flex-1 rounded-full px-2 py-1 text-[11px] font-semibold transition ${
+                    i === qualityIdx ? "bg-white text-black" : "text-white/80 hover:bg-white/10"
+                  }`}
+                  aria-pressed={i === qualityIdx}
+                >
+                  {q.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   );
