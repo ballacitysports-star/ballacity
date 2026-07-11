@@ -1150,6 +1150,13 @@ function AvailabilityDetailDialog({
             >
               <Search className="h-4 w-4 mr-1" /> Find a game
             </Button>
+            <Button
+              variant="outline"
+              onClick={handleShare}
+              className="rounded-full col-span-2"
+            >
+              <Share2 className="h-4 w-4 mr-1" /> Share this availability
+            </Button>
           </div>
         )}
       </DialogContent>
