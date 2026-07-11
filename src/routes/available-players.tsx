@@ -10,6 +10,7 @@ import {
   X,
   Loader2,
   Inbox,
+  Pencil,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/use-auth";
@@ -24,6 +25,7 @@ import {
   listMyContactRequests,
   listOpenAvailabilities,
   setContactRequestStatus,
+  updateAvailability,
   type PlayerAvailability,
 } from "@/lib/availability";
 import { getOrCreateDirectConversation } from "@/lib/messages";
