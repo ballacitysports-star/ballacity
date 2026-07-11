@@ -34,10 +34,36 @@ describe("SpotsPill (a11y)", () => {
     expect(html).toContain('aria-label="1 spot left"');
   });
 
-  it("announces the zero-spots (full) state instead of going silent", () => {
+  it("announces the full state assertively with an explicit message", () => {
+    // When the game hits capacity, further join attempts will fail.
+    // SR users need immediate feedback (assertive interrupts current
+    // speech) and a human-readable label — not a bare "0 spots left"
+    // which is easy to miss mid-sentence.
     const html = renderToStaticMarkup(<SpotsPill spotsLeft={0} />);
-    expect(html).toContain('aria-label="0 spots left"');
-    expect(html).toContain(">0 spots<");
+    expect(html).toContain('aria-live="assertive"');
+    expect(html).toContain('aria-label="Game is full — no spots remaining"');
+    // Still status, not alert — this is expected state, not an error.
+    expect(html).toContain('role="status"');
+    expect(html).not.toContain('role="alert"');
+    // Visible text switches to "Full" for sighted users.
+    expect(html).toContain(">Full<");
+  });
+
+  it("stays polite while spots remain so decrements don't spam the SR", () => {
+    const html = renderToStaticMarkup(<SpotsPill spotsLeft={3} />);
+    expect(html).toContain('aria-live="polite"');
+    expect(html).not.toContain('aria-live="assertive"');
+  });
+
+  it("escalates from polite to assertive when the last spot is taken", () => {
+    // Simulate the realtime transition from 1 -> 0. The politeness
+    // MUST change so SR users hear the "full" message even if they
+    // were mid-sentence.
+    const beforeFull = renderToStaticMarkup(<SpotsPill spotsLeft={1} />);
+    const atFull = renderToStaticMarkup(<SpotsPill spotsLeft={0} />);
+    expect(beforeFull).toContain('aria-live="polite"');
+    expect(atFull).toContain('aria-live="assertive"');
+    expect(atFull).toContain('aria-label="Game is full — no spots remaining"');
   });
 
   it("re-renders with the new count so aria-live picks up the change", () => {
