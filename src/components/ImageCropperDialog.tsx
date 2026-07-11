@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, useCallback } from "react";
-import { X, Check, ZoomIn, ZoomOut } from "lucide-react";
+import { X, Check, ZoomIn, ZoomOut, RotateCcw, Maximize2 } from "lucide-react";
 
 type Props = {
   open: boolean;
