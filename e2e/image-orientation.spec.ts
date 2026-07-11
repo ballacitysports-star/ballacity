@@ -61,48 +61,95 @@ test.describe("image orientation normalization", () => {
     await page.goto("/", { waitUntil: "domcontentloaded" });
   });
 
+  // Load the upright reference PNG once — passed into each browser evaluate() so
+  // we can pixel-diff the normalized output against a known-good bitmap.
+  const referenceB64 = readFileSync(
+    join(__dirname, "fixtures", "exif", "upright-reference.png"),
+  ).toString("base64");
+
   for (const { file, orientation } of CASES) {
     test(`upright export for EXIF orientation ${orientation} (${file})`, async ({ page }) => {
       const b64 = fixtureBase64(file);
 
       const result = await page.evaluate(
-        async ({ name, b64 }): Promise<Sample> => {
+        async ({ name, b64, refB64, perChannelTol }): Promise<Sample> => {
           // Import the real production module through Vite so this test breaks
           // if the normalization logic is removed or regressed.
           // @ts-expect-error - dev-server module path
           const mod = await import("/src/lib/image-orientation.ts");
-          const bin = atob(b64);
-          const buf = new Uint8Array(bin.length);
-          for (let i = 0; i < bin.length; i++) buf[i] = bin.charCodeAt(i);
-          const f = new File([buf], name, { type: "image/jpeg" });
-
+          const toBytes = (s: string) => {
+            const bin = atob(s);
+            const buf = new Uint8Array(bin.length);
+            for (let i = 0; i < bin.length; i++) buf[i] = bin.charCodeAt(i);
+            return buf;
+          };
+          const f = new File([toBytes(b64)], name, { type: "image/jpeg" });
           const dataUrl: string = await mod.loadNormalizedDataUrl(f);
 
-          // Decode the normalized data URL and sample corner pixels.
-          const img = await new Promise<HTMLImageElement>((resolve, reject) => {
-            const el = new Image();
-            el.onload = () => resolve(el);
-            el.onerror = () => reject(new Error("decode failed"));
-            el.src = dataUrl;
-          });
-          const canvas = document.createElement("canvas");
-          canvas.width = img.naturalWidth;
-          canvas.height = img.naturalHeight;
-          const ctx = canvas.getContext("2d")!;
-          ctx.drawImage(img, 0, 0);
+          const decode = (src: string) =>
+            new Promise<HTMLImageElement>((resolve, reject) => {
+              const el = new Image();
+              el.onload = () => resolve(el);
+              el.onerror = () => reject(new Error("decode failed"));
+              el.src = src;
+            });
+          const rasterize = (image: HTMLImageElement) => {
+            const c = document.createElement("canvas");
+            c.width = image.naturalWidth;
+            c.height = image.naturalHeight;
+            const cx = c.getContext("2d")!;
+            cx.drawImage(image, 0, 0);
+            return { canvas: c, ctx: cx, w: c.width, h: c.height };
+          };
+
+          const out = rasterize(await decode(dataUrl));
+          const ref = rasterize(await decode(`data:image/png;base64,${refB64}`));
+
           const sample = (x: number, y: number) =>
-            Array.from(ctx.getImageData(x, y, 1, 1).data).slice(0, 3);
-          const w = canvas.width;
-          const h = canvas.height;
+            Array.from(out.ctx.getImageData(x, y, 1, 1).data).slice(0, 3);
+
+          // Pixel-diff the entire normalized output against the reference.
+          let mismatched = 0;
+          let maxDelta = 0;
+          let sumDelta = 0;
+          let samples = 0;
+          if (out.w === ref.w && out.h === ref.h) {
+            const a = out.ctx.getImageData(0, 0, out.w, out.h).data;
+            const b = ref.ctx.getImageData(0, 0, ref.w, ref.h).data;
+            for (let i = 0; i < a.length; i += 4) {
+              const dr = Math.abs(a[i] - b[i]);
+              const dg = Math.abs(a[i + 1] - b[i + 1]);
+              const db = Math.abs(a[i + 2] - b[i + 2]);
+              const d = Math.max(dr, dg, db);
+              if (d > maxDelta) maxDelta = d;
+              sumDelta += dr + dg + db;
+              samples += 3;
+              if (d > perChannelTol) mismatched++;
+            }
+          } else {
+            // Dimension mismatch is itself a regression — surface it via impossible diff.
+            mismatched = out.w * out.h;
+            maxDelta = 255;
+            sumDelta = 255;
+            samples = 1;
+          }
+
           return {
-            w, h,
+            w: out.w,
+            h: out.h,
             tl: sample(5, 5),
-            tr: sample(w - 6, 5),
-            bl: sample(5, h - 6),
-            br: sample(w - 6, h - 6),
+            tr: sample(out.w - 6, 5),
+            bl: sample(5, out.h - 6),
+            br: sample(out.w - 6, out.h - 6),
+            diff: {
+              totalPixels: out.w * out.h,
+              mismatched,
+              maxChannelDelta: maxDelta,
+              meanChannelDelta: sumDelta / samples,
+            },
           };
         },
-        { name: file, b64 },
+        { name: file, b64, refB64: referenceB64, perChannelTol: PER_CHANNEL_TOL },
       );
 
       // Upright dimensions: the source is 200×100 regardless of stored orientation.
@@ -114,6 +161,21 @@ test.describe("image orientation normalization", () => {
       expect(close(result.tr, EXPECTED.tr), `TR for orientation ${orientation}: got ${result.tr}`).toBe(true);
       expect(close(result.bl, EXPECTED.bl), `BL for orientation ${orientation}: got ${result.bl}`).toBe(true);
       expect(close(result.br, EXPECTED.br), `BR for orientation ${orientation}: got ${result.br}`).toBe(true);
+
+      // Whole-image pixel diff against the upright reference — catches subtle
+      // orientation/crop regressions (wrong flip axis, 1px shift, wrong scale)
+      // that quadrant sampling would miss.
+      const { diff } = result;
+      const mismatchRatio = diff.mismatched / diff.totalPixels;
+      expect(
+        mismatchRatio,
+        `orientation ${orientation}: ${diff.mismatched}/${diff.totalPixels} pixels exceed ±${PER_CHANNEL_TOL} (max Δ=${diff.maxChannelDelta}, mean Δ=${diff.meanChannelDelta.toFixed(2)})`,
+      ).toBeLessThanOrEqual(MAX_MISMATCH_RATIO);
+      expect(
+        diff.meanChannelDelta,
+        `orientation ${orientation}: mean per-channel delta ${diff.meanChannelDelta.toFixed(2)} exceeds ${MAX_MEAN_CHANNEL_DELTA}`,
+      ).toBeLessThanOrEqual(MAX_MEAN_CHANNEL_DELTA);
     });
   }
 });
+
