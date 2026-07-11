@@ -153,12 +153,8 @@ function ActiveGameCard({ game }: { game: ActiveGame }) {
           </div>
           <div className="flex items-center justify-between mt-1.5">
             <span className="text-xs">{formatWhen(game.date)}</span>
-            <span
-              aria-live="polite"
-              className="rounded-full bg-lime px-2.5 py-0.5 text-[11px] font-bold text-primary-foreground"
-            >
-              {spotsLeft} spots
-            </span>
+            <SpotsPill spotsLeft={spotsLeft} />
+
           </div>
         </div>
       </Link>
