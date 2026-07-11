@@ -80,34 +80,35 @@ function EditProfile() {
 
   const markDirty = () => setIsDirty(true);
 
-  const onPickAvatar = async (file: File | null) => {
+  const [cropTarget, setCropTarget] = useState<"avatar" | "cover" | null>(null);
+  const [cropFile, setCropFile] = useState<File | null>(null);
+
+  const onPickAvatar = (file: File | null) => {
     if (!file) return;
-    markDirty();
     if (!file.type.startsWith("image/")) {
       toast.error("Please choose an image");
       return;
     }
-    try {
-      const dataUrl = await resizeImageToDataUrl(file, 256);
-      setAvatarUrl(dataUrl);
-    } catch {
-      toast.error("Couldn't load that image");
-    }
+    setCropFile(file);
+    setCropTarget("avatar");
   };
 
-  const onPickCover = async (file: File | null) => {
+  const onPickCover = (file: File | null) => {
     if (!file) return;
-    markDirty();
     if (!file.type.startsWith("image/")) {
       toast.error("Please choose an image");
       return;
     }
-    try {
-      const dataUrl = await resizeImageToDataUrl(file, 1600);
-      setCoverUrl(dataUrl);
-    } catch {
-      toast.error("Couldn't load that image");
-    }
+    setCropFile(file);
+    setCropTarget("cover");
+  };
+
+  const onCropConfirm = (dataUrl: string) => {
+    markDirty();
+    if (cropTarget === "avatar") setAvatarUrl(dataUrl);
+    else if (cropTarget === "cover") setCoverUrl(dataUrl);
+    setCropTarget(null);
+    setCropFile(null);
   };
 
   const addLink = (type: ProfileLinkType) => {
