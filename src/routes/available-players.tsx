@@ -14,7 +14,8 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/use-auth";
-import { SPORTS } from "@/lib/sample-data";
+import { SPORTS, type Game } from "@/lib/sample-data";
+import { useHostedGames } from "@/lib/hosted-games-store";
 import {
   type AvailabilityWithAuthor,
   type AvailabilityContactRequest,
