@@ -259,6 +259,13 @@ export function ImageCropperDialog({
     onConfirm(dataUrl);
   };
 
+  const fitToFrame = useCallback(() => {
+    setScale(minScale);
+    setOffset({ x: 0, y: 0 });
+  }, [minScale]);
+
+  const resetView = fitToFrame;
+
   if (!open) return null;
 
   const imgW = img ? img.width * scale : 0;
