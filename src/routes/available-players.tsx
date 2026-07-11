@@ -1004,13 +1004,15 @@ function MineTab({
 function AvailabilityDetailDialog({
   a,
   isMine,
+  canInvite,
   onContact,
   onEdit,
   onClose,
 }: {
   a: AvailabilityWithAuthor;
   isMine: boolean;
-  onContact: () => void;
+  canInvite: boolean;
+  onContact: (mode: "contact" | "invite") => void;
   onEdit: () => void;
   onClose: () => void;
 }) {
@@ -1080,26 +1082,50 @@ function AvailabilityDetailDialog({
             </div>
           </div>
         </div>
-        <DialogFooter className="gap-2 sm:gap-2">
-          {isMine ? (
-            <Button onClick={onEdit} className="rounded-full bg-lime-gradient text-primary-foreground">
+
+        {isMine ? (
+          <DialogFooter className="gap-2 sm:gap-2">
+            <Button
+              onClick={onEdit}
+              className="rounded-full bg-lime-gradient text-primary-foreground"
+            >
               <Pencil className="h-4 w-4 mr-1" /> Edit
             </Button>
-          ) : (
-            <>
-              <Button variant="outline" onClick={handleMessage} className="rounded-full">
-                <MessageCircle className="h-4 w-4 mr-1" /> Message
-              </Button>
+          </DialogFooter>
+        ) : (
+          <div className="mt-2 grid grid-cols-2 gap-2">
+            <Button variant="outline" onClick={handleMessage} className="rounded-full">
+              <MessageCircle className="h-4 w-4 mr-1" /> Message
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => onContact("contact")}
+              className="rounded-full"
+            >
+              <Send className="h-4 w-4 mr-1" /> Contact
+            </Button>
+            {canInvite && (
               <Button
-                onClick={onContact}
+                onClick={() => onContact("invite")}
                 className="rounded-full bg-lime-gradient text-primary-foreground"
               >
-                <Send className="h-4 w-4 mr-1" /> Contact request
+                <Ticket className="h-4 w-4 mr-1" /> Invite to game
               </Button>
-            </>
-          )}
-        </DialogFooter>
+            )}
+            <Button
+              variant="outline"
+              onClick={() => {
+                onClose();
+                navigate({ to: "/pickup" });
+              }}
+              className="rounded-full"
+            >
+              <Search className="h-4 w-4 mr-1" /> Find a game
+            </Button>
+          </div>
+        )}
       </DialogContent>
     </Dialog>
   );
+}
 }
