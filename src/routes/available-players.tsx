@@ -93,7 +93,7 @@ function AvailablePlayersPage() {
     return () => {
       cancelled = true;
     };
-  }, [sport, city]);
+  }, [sport, city, refreshKey]);
 
   return (
     <div className="mx-auto max-w-md px-4 pt-6 pb-32">
