@@ -150,6 +150,23 @@ export function GameCard({ game, index = 0 }: { game: Game; index?: number }) {
             </span>
             {game.isPrivate && <Lock className="h-4 w-4" />}
           </div>
+          {game.positionsNeeded && Object.keys(game.positionsNeeded).length > 0 && (
+            <div className="flex flex-wrap gap-1">
+              {Object.entries(game.positionsNeeded).slice(0, 3).map(([name, count]) => (
+                <span
+                  key={name}
+                  className="inline-flex items-center gap-1 rounded-full border border-lime/40 bg-lime/10 px-2 py-0.5 text-[10px] font-semibold text-lime"
+                >
+                  {name} <span className="tabular-nums opacity-80">×{count}</span>
+                </span>
+              ))}
+              {Object.keys(game.positionsNeeded).length > 3 && (
+                <span className="text-[10px] font-semibold text-muted-foreground">
+                  +{Object.keys(game.positionsNeeded).length - 3} more
+                </span>
+              )}
+            </div>
+          )}
           <div className="flex items-center justify-between gap-3">
             <div className="flex items-center gap-2 text-xs text-muted-foreground">
               {hostUserId ? (
