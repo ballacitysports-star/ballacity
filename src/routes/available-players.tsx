@@ -429,18 +429,21 @@ function fmtDate(iso: string) {
 function PostAvailabilityDialog({
   onClose,
   onPosted,
+  initial,
 }: {
   onClose: () => void;
   onPosted: () => void;
+  initial?: PlayerAvailability;
 }) {
-  const [sports, setSports] = useState<string[]>([]);
-  const [skill, setSkill] = useState<string>("All Levels");
-  const [starts, setStarts] = useState("");
-  const [ends, setEnds] = useState("");
-  const [days, setDays] = useState<string[]>([]);
-  const [city, setCity] = useState("");
-  const [radius, setRadius] = useState(25);
-  const [note, setNote] = useState("");
+  const isEdit = !!initial;
+  const [sports, setSports] = useState<string[]>(initial?.sports ?? []);
+  const [skill, setSkill] = useState<string>(initial?.skill_level ?? "All Levels");
+  const [starts, setStarts] = useState(initial?.starts_on ?? "");
+  const [ends, setEnds] = useState(initial?.ends_on ?? "");
+  const [days, setDays] = useState<string[]>(initial?.recurring_days ?? []);
+  const [city, setCity] = useState(initial?.city ?? "");
+  const [radius, setRadius] = useState(initial ? kmToMi(initial.travel_radius_km) : 25);
+  const [note, setNote] = useState(initial?.note ?? "");
   const [saving, setSaving] = useState(false);
 
   const toggle = (arr: string[], v: string) =>
@@ -453,7 +456,7 @@ function PostAvailabilityDialog({
     }
     setSaving(true);
     try {
-      await createAvailability({
+      const payload = {
         sports,
         skill_level: skill,
         starts_on: starts || null,
@@ -462,7 +465,12 @@ function PostAvailabilityDialog({
         city,
         travel_radius_km: miToKm(radius),
         note,
-      });
+      };
+      if (isEdit && initial) {
+        await updateAvailability(initial.id, payload);
+      } else {
+        await createAvailability(payload);
+      }
       onPosted();
     } catch (e: any) {
       toast.error(e.message);
@@ -475,7 +483,7 @@ function PostAvailabilityDialog({
     <Dialog open onOpenChange={(o) => !o && onClose()}>
       <DialogContent className="max-w-md max-h-[90dvh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Post availability</DialogTitle>
+          <DialogTitle>{isEdit ? "Edit availability" : "Post availability"}</DialogTitle>
         </DialogHeader>
         <div className="space-y-4">
           <div>
