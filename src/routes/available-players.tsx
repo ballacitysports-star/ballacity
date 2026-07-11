@@ -46,6 +46,9 @@ import { UserAvatar } from "@/components/UserAvatar";
 import type { ExistingRequestSummary } from "@/lib/availability";
 
 export const Route = createFileRoute("/available-players")({
+  validateSearch: (s: Record<string, unknown>) => ({
+    post: typeof s.post === "string" ? s.post : undefined,
+  }),
   head: () => ({
     meta: [
       { title: "Available Players — OpenRun" },
