@@ -837,6 +837,28 @@ function GameDetail() {
           )}
         </div>
 
+        {/* Positions needed */}
+        {game.positionsNeeded && Object.keys(game.positionsNeeded).length > 0 && (
+          <div>
+            <h2 className="font-display text-sm font-bold uppercase tracking-wider text-muted-foreground mb-2">
+              Positions needed
+            </h2>
+            <div className="flex flex-wrap gap-2">
+              {Object.entries(game.positionsNeeded).map(([name, count]) => (
+                <span
+                  key={name}
+                  className="inline-flex items-center gap-1.5 rounded-full border border-lime/40 bg-lime/10 px-3 py-1 text-xs font-semibold text-lime"
+                >
+                  <span>{name}</span>
+                  <span className="rounded-full bg-lime/20 px-1.5 py-0.5 text-[10px] tabular-nums">
+                    ×{count}
+                  </span>
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* Players */}
         <div>
           <div className="flex items-center justify-between mb-2">
