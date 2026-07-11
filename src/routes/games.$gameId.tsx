@@ -1367,6 +1367,9 @@ function EditGameModal({
   const [isPrivate, setIsPrivate] = useState(!!game.isPrivate);
   const [image, setImage] = useState(game.image ?? "");
   const [description, setDescription] = useState(game.description);
+  const [positionsNeeded, setPositionsNeeded] = useState<Record<string, number>>(
+    game.positionsNeeded ?? {},
+  );
 
   const save = () => {
     const mp = Math.max(2, Math.min(200, Number(maxPlayers) || game.maxPlayers));
@@ -1386,6 +1389,7 @@ function EditGameModal({
       isPrivate,
       image: image.trim(),
       description,
+      positionsNeeded: positionsCleanup(positionsNeeded),
     });
     if (!updated) {
       toast.error("This game can't be edited here.");
