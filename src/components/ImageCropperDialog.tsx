@@ -1,13 +1,29 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { X, Check, ZoomIn, ZoomOut, RotateCcw, Maximize2 } from "lucide-react";
 
+export type CropSizePreset = { label: string; maxSize: number };
+export type CropQualityPreset = { label: string; quality: number };
+
+const DEFAULT_SIZE_PRESETS: CropSizePreset[] = [
+  { label: "S", maxSize: 512 },
+  { label: "M", maxSize: 1024 },
+  { label: "L", maxSize: 1600 },
+];
+const DEFAULT_QUALITY_PRESETS: CropQualityPreset[] = [
+  { label: "Standard", quality: 0.8 },
+  { label: "High", quality: 0.9 },
+  { label: "Max", quality: 0.95 },
+];
+
 type Props = {
   open: boolean;
   file: File | null;
   aspect: number; // width / height, e.g. 1 for avatar, 16/9 for cover
-  outputMaxSize: number; // longest edge of output
+  outputMaxSize: number; // default longest edge of output
   shape?: "square" | "rect" | "circle";
   title?: string;
+  sizePresets?: CropSizePreset[];
+  qualityPresets?: CropQualityPreset[];
   onCancel: () => void;
   onConfirm: (dataUrl: string) => void;
 };
@@ -19,6 +35,8 @@ export function ImageCropperDialog({
   outputMaxSize,
   shape = "rect",
   title = "Crop image",
+  sizePresets = DEFAULT_SIZE_PRESETS,
+  qualityPresets = DEFAULT_QUALITY_PRESETS,
   onCancel,
   onConfirm,
 }: Props) {
