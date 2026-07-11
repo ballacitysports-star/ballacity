@@ -10,6 +10,7 @@ import {
   X,
   Loader2,
   Inbox,
+  Pencil,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/use-auth";
@@ -24,6 +25,7 @@ import {
   listMyContactRequests,
   listOpenAvailabilities,
   setContactRequestStatus,
+  updateAvailability,
   type PlayerAvailability,
 } from "@/lib/availability";
 import { getOrCreateDirectConversation } from "@/lib/messages";
@@ -71,7 +73,9 @@ function AvailablePlayersPage() {
   const [city, setCity] = useState("");
   const [list, setList] = useState<AvailabilityWithAuthor[] | null>(null);
   const [postOpen, setPostOpen] = useState(false);
+  const [editingPost, setEditingPost] = useState<PlayerAvailability | null>(null);
   const [contactFor, setContactFor] = useState<AvailabilityWithAuthor | null>(null);
+  const [refreshKey, setRefreshKey] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
@@ -89,7 +93,7 @@ function AvailablePlayersPage() {
     return () => {
       cancelled = true;
     };
-  }, [sport, city]);
+  }, [sport, city, refreshKey]);
 
   return (
     <div className="mx-auto max-w-md px-4 pt-6 pb-32">
@@ -181,26 +185,29 @@ function AvailablePlayersPage() {
                   onContact={() =>
                     user ? setContactFor(a) : toast.error("Sign in to contact this player.")
                   }
+                  onEdit={() => setEditingPost(a)}
                 />
               ))}
             </ul>
           )}
         </>
       ) : (
-        <MineTab user={user} />
+        <MineTab user={user} onEdit={(m) => setEditingPost(m)} refreshKey={refreshKey} />
       )}
 
-      {postOpen && (
+      {(postOpen || editingPost) && (
         <PostAvailabilityDialog
-          onClose={() => setPostOpen(false)}
-          onPosted={() => {
+          initial={editingPost ?? undefined}
+          onClose={() => {
             setPostOpen(false);
-            // refetch list
-            listOpenAvailabilities({
-              sport: sport || undefined,
-              city: city.trim() || undefined,
-            }).then(setList);
-            toast.success("Availability posted");
+            setEditingPost(null);
+          }}
+          onPosted={() => {
+            const wasEdit = !!editingPost;
+            setPostOpen(false);
+            setEditingPost(null);
+            setRefreshKey((k) => k + 1);
+            toast.success(wasEdit ? "Availability updated" : "Availability posted");
           }}
         />
       )}
@@ -278,10 +285,12 @@ function AvailabilityCard({
   a,
   isMine,
   onContact,
+  onEdit,
 }: {
   a: AvailabilityWithAuthor;
   isMine: boolean;
   onContact: () => void;
+  onEdit: () => void;
 }) {
   const navigate = useNavigate();
   const router = useRouter();
@@ -373,9 +382,14 @@ function AvailabilityCard({
 
       <div className="mt-3 flex gap-2">
         {isMine ? (
-          <Button variant="outline" size="sm" className="rounded-full" onClick={handleDelete}>
-            <X className="h-4 w-4 mr-1" /> Remove
-          </Button>
+          <>
+            <Button variant="outline" size="sm" className="rounded-full" onClick={onEdit}>
+              <Pencil className="h-4 w-4 mr-1" /> Edit
+            </Button>
+            <Button variant="outline" size="sm" className="rounded-full" onClick={handleDelete}>
+              <X className="h-4 w-4 mr-1" /> Remove
+            </Button>
+          </>
         ) : (
           <>
             <Button
@@ -415,18 +429,21 @@ function fmtDate(iso: string) {
 function PostAvailabilityDialog({
   onClose,
   onPosted,
+  initial,
 }: {
   onClose: () => void;
   onPosted: () => void;
+  initial?: PlayerAvailability;
 }) {
-  const [sports, setSports] = useState<string[]>([]);
-  const [skill, setSkill] = useState<string>("All Levels");
-  const [starts, setStarts] = useState("");
-  const [ends, setEnds] = useState("");
-  const [days, setDays] = useState<string[]>([]);
-  const [city, setCity] = useState("");
-  const [radius, setRadius] = useState(25);
-  const [note, setNote] = useState("");
+  const isEdit = !!initial;
+  const [sports, setSports] = useState<string[]>(initial?.sports ?? []);
+  const [skill, setSkill] = useState<string>(initial?.skill_level ?? "All Levels");
+  const [starts, setStarts] = useState(initial?.starts_on ?? "");
+  const [ends, setEnds] = useState(initial?.ends_on ?? "");
+  const [days, setDays] = useState<string[]>(initial?.recurring_days ?? []);
+  const [city, setCity] = useState(initial?.city ?? "");
+  const [radius, setRadius] = useState(initial ? kmToMi(initial.travel_radius_km) : 25);
+  const [note, setNote] = useState(initial?.note ?? "");
   const [saving, setSaving] = useState(false);
 
   const toggle = (arr: string[], v: string) =>
@@ -439,7 +456,7 @@ function PostAvailabilityDialog({
     }
     setSaving(true);
     try {
-      await createAvailability({
+      const payload = {
         sports,
         skill_level: skill,
         starts_on: starts || null,
@@ -448,7 +465,12 @@ function PostAvailabilityDialog({
         city,
         travel_radius_km: miToKm(radius),
         note,
-      });
+      };
+      if (isEdit && initial) {
+        await updateAvailability(initial.id, payload);
+      } else {
+        await createAvailability(payload);
+      }
       onPosted();
     } catch (e: any) {
       toast.error(e.message);
@@ -461,7 +483,7 @@ function PostAvailabilityDialog({
     <Dialog open onOpenChange={(o) => !o && onClose()}>
       <DialogContent className="max-w-md max-h-[90dvh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Post availability</DialogTitle>
+          <DialogTitle>{isEdit ? "Edit availability" : "Post availability"}</DialogTitle>
         </DialogHeader>
         <div className="space-y-4">
           <div>
@@ -562,7 +584,8 @@ function PostAvailabilityDialog({
             disabled={saving}
             className="bg-lime-gradient text-primary-foreground"
           >
-            {saving && <Loader2 className="h-4 w-4 mr-1 animate-spin" />}Post
+            {saving && <Loader2 className="h-4 w-4 mr-1 animate-spin" />}
+            {isEdit ? "Save changes" : "Post"}
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -644,7 +667,15 @@ function ContactDialog({
   );
 }
 
-function MineTab({ user }: { user: { id: string } | null }) {
+function MineTab({
+  user,
+  onEdit,
+  refreshKey,
+}: {
+  user: { id: string } | null;
+  onEdit: (m: PlayerAvailability) => void;
+  refreshKey: number;
+}) {
   const [mine, setMine] = useState<PlayerAvailability[] | null>(null);
   const [inbox, setInbox] = useState<AvailabilityContactRequest[] | null>(null);
   const [outbox, setOutbox] = useState<AvailabilityContactRequest[] | null>(null);
@@ -656,7 +687,7 @@ function MineTab({ user }: { user: { id: string } | null }) {
       listMyContactRequests("inbox").then(setInbox),
       listMyContactRequests("outbox").then(setOutbox),
     ]).catch((e) => toast.error(e.message));
-  }, [user?.id]);
+  }, [user?.id, refreshKey]);
 
   if (!user) {
     return (
@@ -708,16 +739,24 @@ function MineTab({ user }: { user: { id: string } | null }) {
                 <p className="text-xs text-muted-foreground mt-1">
                   {formatWindow(m) || "No date set"} · {m.city || "Anywhere"}
                 </p>
-                <button
-                  onClick={async () => {
-                    if (!confirm("Remove this post?")) return;
-                    await deleteAvailability(m.id);
-                    setMine((arr) => (arr ?? []).filter((x) => x.id !== m.id));
-                  }}
-                  className="mt-2 text-xs font-semibold text-coral"
-                >
-                  Remove
-                </button>
+                <div className="mt-2 flex gap-3">
+                  <button
+                    onClick={() => onEdit(m)}
+                    className="text-xs font-semibold text-lime"
+                  >
+                    Edit
+                  </button>
+                  <button
+                    onClick={async () => {
+                      if (!confirm("Remove this post?")) return;
+                      await deleteAvailability(m.id);
+                      setMine((arr) => (arr ?? []).filter((x) => x.id !== m.id));
+                    }}
+                    className="text-xs font-semibold text-coral"
+                  >
+                    Remove
+                  </button>
+                </div>
               </li>
             ))}
           </ul>
