@@ -1,0 +1,1 @@
+ALTER TABLE public.hosted_games ADD COLUMN IF NOT EXISTS positions_needed jsonb NOT NULL DEFAULT '{}'::jsonb;
