@@ -29,8 +29,22 @@ export function ImageCropperDialog({
   const [scale, setScale] = useState(1);
   const [minScale, setMinScale] = useState(1);
   const [offset, setOffset] = useState({ x: 0, y: 0 });
-  const dragRef = useRef<{ x: number; y: number; ox: number; oy: number } | null>(null);
-  const pinchRef = useRef<{ dist: number; scale: number } | null>(null);
+
+  // Multi-pointer tracking for pinch + pan
+  const pointersRef = useRef<Map<number, { x: number; y: number }>>(new Map());
+  const gestureRef = useRef<{
+    mode: "none" | "pan" | "pinch";
+    startOffset: { x: number; y: number };
+    startScale: number;
+    startCenter: { x: number; y: number };
+    startDist: number;
+  }>({
+    mode: "none",
+    startOffset: { x: 0, y: 0 },
+    startScale: 1,
+    startCenter: { x: 0, y: 0 },
+    startDist: 0,
+  });
 
   useEffect(() => {
     if (!open || !file) {
@@ -70,6 +84,8 @@ export function ImageCropperDialog({
     : 0;
   const cropH = cropW / aspect;
 
+  const maxScale = minScale * 8;
+
   // Reset scale/offset when image or crop box changes
   useEffect(() => {
     if (!img || cropW === 0) return;
@@ -94,32 +110,135 @@ export function ImageCropperDialog({
     [img, cropW, cropH],
   );
 
+  // Prevent native page pinch-zoom / scroll while cropper is open
+  useEffect(() => {
+    if (!open) return;
+    const el = containerRef.current;
+    if (!el) return;
+    const prevent = (e: TouchEvent) => {
+      if (e.touches.length >= 1) e.preventDefault();
+    };
+    el.addEventListener("touchstart", prevent, { passive: false });
+    el.addEventListener("touchmove", prevent, { passive: false });
+    return () => {
+      el.removeEventListener("touchstart", prevent);
+      el.removeEventListener("touchmove", prevent);
+    };
+  }, [open]);
+
+  const getPointersArray = () => Array.from(pointersRef.current.values());
+
+  const startGesture = useCallback(() => {
+    const pts = getPointersArray();
+    if (pts.length === 1) {
+      gestureRef.current = {
+        mode: "pan",
+        startOffset: { x: offset.x, y: offset.y },
+        startScale: scale,
+        startCenter: { x: pts[0].x, y: pts[0].y },
+        startDist: 0,
+      };
+    } else if (pts.length >= 2) {
+      const [a, b] = pts;
+      const cx = (a.x + b.x) / 2;
+      const cy = (a.y + b.y) / 2;
+      const dist = Math.hypot(a.x - b.x, a.y - b.y);
+      gestureRef.current = {
+        mode: "pinch",
+        startOffset: { x: offset.x, y: offset.y },
+        startScale: scale,
+        startCenter: { x: cx, y: cy },
+        startDist: dist || 1,
+      };
+    } else {
+      gestureRef.current.mode = "none";
+    }
+  }, [offset.x, offset.y, scale]);
+
   const onPointerDown = (e: React.PointerEvent) => {
     (e.target as Element).setPointerCapture?.(e.pointerId);
-    dragRef.current = { x: e.clientX, y: e.clientY, ox: offset.x, oy: offset.y };
+    pointersRef.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    startGesture();
   };
+
   const onPointerMove = (e: React.PointerEvent) => {
-    if (!dragRef.current) return;
-    const dx = e.clientX - dragRef.current.x;
-    const dy = e.clientY - dragRef.current.y;
-    setOffset(clampOffset(dragRef.current.ox + dx, dragRef.current.oy + dy, scale));
+    if (!pointersRef.current.has(e.pointerId)) return;
+    pointersRef.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    const g = gestureRef.current;
+    const pts = getPointersArray();
+
+    if (g.mode === "pan" && pts.length === 1) {
+      const dx = pts[0].x - g.startCenter.x;
+      const dy = pts[0].y - g.startCenter.y;
+      setOffset(clampOffset(g.startOffset.x + dx, g.startOffset.y + dy, scale));
+    } else if (g.mode === "pinch" && pts.length >= 2) {
+      const [a, b] = pts;
+      const cx = (a.x + b.x) / 2;
+      const cy = (a.y + b.y) / 2;
+      const dist = Math.hypot(a.x - b.x, a.y - b.y);
+      const ratio = dist / g.startDist;
+      const nextScale = Math.max(minScale, Math.min(maxScale, g.startScale * ratio));
+
+      // Zoom around the pinch center: keep the image point under the gesture center stable,
+      // and follow the two-finger center as it moves (allows repositioning while zooming).
+      const el = containerRef.current;
+      const rect = el?.getBoundingClientRect();
+      if (rect) {
+        const containerCx = rect.left + rect.width / 2;
+        const containerCy = rect.top + rect.height / 2;
+        // Image-space point under the initial pinch center at start of gesture
+        const focalX = (g.startCenter.x - containerCx - g.startOffset.x) / g.startScale;
+        const focalY = (g.startCenter.y - containerCy - g.startOffset.y) / g.startScale;
+        // New offset so that focal point sits under the current pinch center
+        const nx = cx - containerCx - focalX * nextScale;
+        const ny = cy - containerCy - focalY * nextScale;
+        setScale(nextScale);
+        setOffset(clampOffset(nx, ny, nextScale));
+      } else {
+        setScale(nextScale);
+      }
+    }
   };
-  const onPointerUp = (e: React.PointerEvent) => {
+
+  const endPointer = (e: React.PointerEvent) => {
     (e.target as Element).releasePointerCapture?.(e.pointerId);
-    dragRef.current = null;
+    pointersRef.current.delete(e.pointerId);
+    if (pointersRef.current.size === 0) {
+      gestureRef.current.mode = "none";
+    } else {
+      // Re-anchor remaining pointers so transitioning pinch→pan is smooth
+      startGesture();
+    }
   };
 
   const onWheel = (e: React.WheelEvent) => {
     e.preventDefault();
-    const delta = -e.deltaY * 0.002;
-    const next = Math.max(minScale, Math.min(minScale * 6, scale * (1 + delta)));
-    setScale(next);
-    setOffset(clampOffset(offset.x, offset.y, next));
+    const el = containerRef.current;
+    const rect = el?.getBoundingClientRect();
+    const delta = -e.deltaY * 0.0015;
+    const next = Math.max(minScale, Math.min(maxScale, scale * (1 + delta)));
+    if (rect) {
+      const containerCx = rect.left + rect.width / 2;
+      const containerCy = rect.top + rect.height / 2;
+      const focalX = (e.clientX - containerCx - offset.x) / scale;
+      const focalY = (e.clientY - containerCy - offset.y) / scale;
+      const nx = e.clientX - containerCx - focalX * next;
+      const ny = e.clientY - containerCy - focalY * next;
+      setScale(next);
+      setOffset(clampOffset(nx, ny, next));
+    } else {
+      setScale(next);
+      setOffset(clampOffset(offset.x, offset.y, next));
+    }
   };
 
   const onScale = (v: number) => {
+    // Zoom around image center for the slider
+    const ratio = v / scale;
+    const nx = offset.x * ratio;
+    const ny = offset.y * ratio;
     setScale(v);
-    setOffset(clampOffset(offset.x, offset.y, v));
+    setOffset(clampOffset(nx, ny, v));
   };
 
   const confirm = () => {
@@ -131,7 +250,6 @@ export function ImageCropperDialog({
     canvas.height = outH;
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
-    // Source rectangle from the image
     const sW = cropW / scale;
     const sH = cropH / scale;
     const sx = img.width / 2 - sW / 2 - offset.x / scale;
@@ -170,11 +288,13 @@ export function ImageCropperDialog({
 
       <div
         ref={containerRef}
-        className="relative flex-1 overflow-hidden touch-none select-none"
+        className="relative flex-1 overflow-hidden touch-none select-none overscroll-none"
+        style={{ touchAction: "none" }}
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
-        onPointerUp={onPointerUp}
-        onPointerCancel={onPointerUp}
+        onPointerUp={endPointer}
+        onPointerCancel={endPointer}
+        onPointerLeave={endPointer}
         onWheel={onWheel}
       >
         {img && cropW > 0 && (
@@ -192,16 +312,10 @@ export function ImageCropperDialog({
                 transform: `translate(calc(-50% + ${offset.x}px), calc(-50% + ${offset.y}px))`,
                 pointerEvents: "none",
                 userSelect: "none",
+                willChange: "transform",
               }}
             />
-            {/* Overlay mask */}
-            <div
-              className="pointer-events-none absolute inset-0"
-              style={{
-                background: "rgba(0,0,0,0.6)",
-                WebkitMaskImage: `radial-gradient(circle, transparent 0, transparent 0)`,
-              }}
-            >
+            <div className="pointer-events-none absolute inset-0">
               <div
                 className="absolute left-1/2 top-1/2"
                 style={{
@@ -223,8 +337,8 @@ export function ImageCropperDialog({
         <input
           type="range"
           min={minScale}
-          max={minScale * 6}
-          step={(minScale * 5) / 100 || 0.01}
+          max={maxScale}
+          step={(maxScale - minScale) / 200 || 0.01}
           value={scale}
           onChange={(e) => onScale(parseFloat(e.target.value))}
           className="flex-1 accent-lime"
