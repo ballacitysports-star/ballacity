@@ -182,8 +182,16 @@ function Notifications() {
             <CheckCheck className="h-3.5 w-3.5" />
             Mark all read{unreadCount > 0 ? ` (${unreadCount})` : ""}
           </button>
+          <Link
+            to="/profile"
+            aria-label="Your profile"
+            className="grid h-9 w-9 place-items-center rounded-full border border-border bg-surface"
+          >
+            <MyAvatar size="sm" />
+          </Link>
         </div>
       </div>
+
       <h1 className="font-display text-3xl font-bold leading-tight mb-1">Alerts</h1>
       <p className="text-muted-foreground text-sm mb-5">
         Real-time updates from your games & crew.
