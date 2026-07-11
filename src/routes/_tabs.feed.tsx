@@ -7,7 +7,7 @@ import { Logo } from "@/components/Logo";
 import { MyAvatar } from "@/components/UserAvatar";
 import { SportChips } from "@/components/SportChips";
 import { GameCard } from "@/components/GameCard";
-import { GAMES, SPORTS, type Sport } from "@/lib/sample-data";
+import { GAMES, SPORTS, POSITIONS_BY_SPORT, type Sport } from "@/lib/sample-data";
 import { useHostedGames } from "@/lib/hosted-games-store";
 import { useJoinedGameIds } from "@/lib/games-store";
 import { useFeedPrefs, setFeedPrefs, DEFAULT_PREFS, useMyProfile } from "@/lib/user-prefs-store";
@@ -22,6 +22,7 @@ export const Route = createFileRoute("/_tabs/feed")({
 function Feed() {
   const [q, setQ] = useState("");
   const [filtersOpen, setFiltersOpen] = useState(false);
+  const [positionFilter, setPositionFilter] = useState<string | null>(null);
   const hosted = useHostedGames();
   const joinedIds = useJoinedGameIds();
   const prefs = useFeedPrefs();
