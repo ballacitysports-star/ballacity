@@ -86,7 +86,9 @@ type DbRow = {
   status: string | null;
   joins_closed: boolean;
   host_snapshot: { name?: string; username?: string; avatar?: string; rating?: number } | null;
+  positions_needed?: Record<string, number> | null;
 };
+
 
 function rowToGame(r: DbRow): Game {
   const snap = r.host_snapshot ?? {};
@@ -121,6 +123,7 @@ function rowToGame(r: DbRow): Game {
     equipment: r.equipment ?? [],
     status: (r.status as Game["status"]) ?? undefined,
     joinsClosed: !!r.joins_closed,
+    positionsNeeded: (r.positions_needed ?? {}) as Record<string, number>,
   } as Game;
 }
 
@@ -151,6 +154,7 @@ function gameToInsertRow(g: Game): TablesInsert<"hosted_games"> {
     status: g.status ?? null,
     joins_closed: !!(g as { joinsClosed?: boolean }).joinsClosed,
     host_snapshot: (g.host ?? {}) as TablesInsert<"hosted_games">["host_snapshot"],
+    positions_needed: (g.positionsNeeded ?? {}) as TablesInsert<"hosted_games">["positions_needed"],
   };
 }
 
@@ -244,6 +248,7 @@ export type HostedGameInput = {
   host?: { name: string; username: string; avatar: string; rating?: number };
   hostUserId?: string;
   image?: string; // optional custom cover URL
+  positionsNeeded?: Record<string, number>;
 };
 
 export async function addHostedGame(input: HostedGameInput): Promise<Game> {
@@ -279,6 +284,7 @@ export async function addHostedGame(input: HostedGameInput): Promise<Game> {
     image: input.image?.trim() || imageFor(input.sport),
     description: input.description || "",
     equipment: [],
+    positionsNeeded: input.positionsNeeded ?? {},
   };
 
 
@@ -340,6 +346,9 @@ export function updateHostedGame(id: string, patch: Partial<Game>): Game | undef
   if (patch.status !== undefined) dbPatch.status = patch.status;
   if ((patch as { joinsClosed?: boolean }).joinsClosed !== undefined) {
     dbPatch.joins_closed = (patch as { joinsClosed?: boolean }).joinsClosed;
+  }
+  if (patch.positionsNeeded !== undefined) {
+    dbPatch.positions_needed = patch.positionsNeeded as TablesUpdate<"hosted_games">["positions_needed"];
   }
   if (Object.keys(dbPatch).length > 0) {
     supabase
