@@ -1,5 +1,7 @@
 import { useMemo, useSyncExternalStore } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import type { TablesInsert } from "@/integrations/supabase/types";
+
 
 const joined = new Set<string>();
 const listeners = new Set<() => void>();
@@ -136,7 +138,7 @@ function ensureRealtime() {
   });
 }
 
-export function joinGame(id: string) {
+export function joinGame(id: string, position?: string) {
   loadJoinedGames();
   if (joined.has(id)) return;
   joined.add(id);
@@ -147,9 +149,9 @@ export function joinGame(id: string) {
     const { data } = await supabase.auth.getUser();
     const uid = data.user?.id;
     if (!uid) return;
-    const { error } = await supabase
-      .from("game_participants")
-      .insert({ game_id: id, user_id: uid });
+    const insert: TablesInsert<"game_participants"> = { game_id: id, user_id: uid };
+    if (position && position.trim()) insert.position = position.trim();
+    const { error } = await supabase.from("game_participants").insert(insert);
     if (error && error.code !== "23505") {
       // Roll back on real failures (e.g. FK / RLS). Duplicate is fine.
       joined.delete(id);
@@ -158,6 +160,7 @@ export function joinGame(id: string) {
     }
   })();
 }
+
 
 export function leaveGame(id: string) {
   loadJoinedGames();
