@@ -46,6 +46,7 @@ function Feed() {
     prefs.preferredSports.length === 1 ? prefs.preferredSports[0] : null;
   const setChipSport = (s: string | null) => {
     setFeedPrefs({ ...prefs, preferredSports: s ? [s as Sport] : [] });
+    setPositionFilter(null);
   };
 
   const filtered = useMemo(() => {
@@ -53,6 +54,11 @@ function Feed() {
     return all
       .filter((g) =>
         prefs.preferredSports.length ? prefs.preferredSports.includes(g.sport) : true,
+      )
+      .filter((g) =>
+        positionFilter
+          ? !!(g.positionsNeeded && (g.positionsNeeded[positionFilter] ?? 0) > 0)
+          : true,
       )
       .filter((g) => (prefs.sections.hostedByMeOnly ? hostedIds.has(g.id) : true))
       .filter((g) => (prefs.sections.joinedOnly ? joinedSet.has(g.id) : true))
@@ -93,7 +99,7 @@ function Feed() {
         return a.distanceMi - b.distanceMi;
       });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [q, hosted, prefs, joinedSet, hostedIds, userCityToken]);
+  }, [q, hosted, prefs, joinedSet, hostedIds, userCityToken, positionFilter]);
 
   const suggestions = useMemo(() => {
     if (!q) return [] as { label: string; sub: string }[];
