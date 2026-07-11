@@ -1540,6 +1540,13 @@ function EditGameModal({
               className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm"
             />
           </Field>
+          <Field label="Positions needed">
+            <PositionsPicker
+              sport={sport}
+              value={positionsNeeded}
+              onChange={setPositionsNeeded}
+            />
+          </Field>
         </div>
         <BlockedUsersSection hostId={hostId} />
         <div className="mt-4 flex items-center gap-2">
