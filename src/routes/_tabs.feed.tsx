@@ -336,6 +336,36 @@ function Feed() {
 
       <div className="mb-5">
         <SportChips selected={chipSport} onSelect={setChipSport} />
+        {chipSport && POSITIONS_BY_SPORT[chipSport as Sport]?.length > 0 && (
+          <div className="mt-2 flex gap-2 overflow-x-auto scrollbar-hide -mx-4 px-4 pb-1">
+            <button
+              onClick={() => setPositionFilter(null)}
+              className={`shrink-0 rounded-full border px-3 py-1.5 text-xs font-semibold transition-all ${
+                !positionFilter
+                  ? "border-lime bg-lime text-primary-foreground"
+                  : "border-border bg-surface text-muted-foreground"
+              }`}
+            >
+              Any position
+            </button>
+            {POSITIONS_BY_SPORT[chipSport as Sport].map((p) => {
+              const active = positionFilter === p;
+              return (
+                <button
+                  key={p}
+                  onClick={() => setPositionFilter(active ? null : p)}
+                  className={`shrink-0 rounded-full border px-3 py-1.5 text-xs font-semibold transition-all ${
+                    active
+                      ? "border-lime bg-lime text-primary-foreground"
+                      : "border-border bg-surface text-foreground hover:border-lime/40"
+                  }`}
+                >
+                  {p}
+                </button>
+              );
+            })}
+          </div>
+        )}
       </div>
 
       {q ? (
