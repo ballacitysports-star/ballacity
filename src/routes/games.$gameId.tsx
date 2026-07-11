@@ -23,6 +23,7 @@ import {
 import { GAMES, SPORTS } from "@/lib/sample-data";
 import { formatWhen } from "@/lib/format";
 import { ReviewsSection } from "@/components/ReviewsSection";
+import { UserAvatar } from "@/components/UserAvatar";
 import { computeReputation, useReviewsFor } from "@/lib/reviews";
 import { ReputationBadge } from "@/components/ReputationBadge";
 import { joinGame, leaveGame, useIsJoined } from "@/lib/games-store";
@@ -735,10 +736,6 @@ function GameDetail() {
         <div className="flex items-center gap-3 rounded-3xl border border-border bg-surface p-4">
           {(() => {
             const hostId = settings?.host_id ?? game.hostUserId;
-            const AvatarTag: any = hostId ? Link : "div";
-            const avatarProps = hostId
-              ? { to: "/players/$userId", params: { userId: hostId } }
-              : {};
             const NameTag: any = hostId ? Link : "span";
             const nameProps = hostId
               ? {
@@ -747,14 +744,28 @@ function GameDetail() {
                   className: "hover:text-lime hover:underline",
                 }
               : {};
+            const avatarEl = (
+              <UserAvatar
+                avatarUrl={(game as { hostAvatarUrl?: string | null }).hostAvatarUrl ?? null}
+                initials={game.host.avatar}
+                name={game.host.name}
+                size="lg"
+                rounded="square"
+              />
+            );
             return (
               <>
-                <AvatarTag
-                  {...avatarProps}
-                  className="grid h-12 w-12 place-items-center rounded-2xl bg-lime-gradient font-bold text-primary-foreground"
-                >
-                  {game.host.avatar}
-                </AvatarTag>
+                {hostId ? (
+                  <Link
+                    to="/players/$userId"
+                    params={{ userId: hostId }}
+                    aria-label={`View ${game.host.name}'s profile`}
+                  >
+                    {avatarEl}
+                  </Link>
+                ) : (
+                  avatarEl
+                )}
                 <div className="flex-1">
                   <div className="text-xs uppercase tracking-wider text-muted-foreground">
                     Hosted by
@@ -772,6 +783,7 @@ function GameDetail() {
               </>
             );
           })()}
+
           {canReviewHost ? (
             <Link
               to="/review/new"

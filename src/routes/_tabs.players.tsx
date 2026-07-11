@@ -18,6 +18,7 @@ import { AnimatePresence } from "framer-motion";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
 import { Logo } from "@/components/Logo";
+import { MyAvatar, UserAvatar } from "@/components/UserAvatar";
 import { useAuth } from "@/hooks/use-auth";
 import { useUnreadNotificationCount } from "@/lib/notifications";
 import { SPORTS } from "@/lib/sample-data";
@@ -218,8 +219,16 @@ function PlayersPage() {
             <MessageCircle className="h-5 w-5" />
           </Link>
           <BellLink />
+          <Link
+            to="/profile"
+            aria-label="Your profile"
+            className="grid h-10 w-10 place-items-center rounded-full border border-border bg-surface"
+          >
+            <MyAvatar size="sm" />
+          </Link>
         </div>
       </div>
+
 
       <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="mb-4">
         <h1 className="font-display text-3xl font-bold leading-tight">Players ready to run.</h1>
@@ -676,7 +685,6 @@ function AvailabilityCard({
   onChanged: () => void;
 }) {
   const navigate = useNavigate();
-  const initials = a.author_initials ?? a.author_name.slice(0, 2).toUpperCase();
   const when = formatWindow(a);
 
   const handleMessage = async () => {
@@ -705,11 +713,18 @@ function AvailabilityCard({
         <Link
           to="/players/$userId"
           params={{ userId: a.user_id }}
-          className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-lime-gradient font-bold text-primary-foreground"
           aria-label={`View ${a.author_name}'s profile`}
+          className="shrink-0"
         >
-          {initials}
+          <UserAvatar
+            avatarUrl={a.author_avatar_url}
+            initials={a.author_initials}
+            name={a.author_name}
+            size="lg"
+            rounded="square"
+          />
         </Link>
+
         <div className="flex-1 min-w-0">
           <div className="flex items-center justify-between gap-2">
             <Link

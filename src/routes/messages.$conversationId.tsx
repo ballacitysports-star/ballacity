@@ -12,6 +12,7 @@ import {
   type Message,
 } from "@/lib/messages";
 import { MessageAttachment } from "@/components/MessageAttachment";
+import { UserAvatar } from "@/components/UserAvatar";
 import { supabase } from "@/integrations/supabase/client";
 
 export const Route = createFileRoute("/messages/$conversationId")({
@@ -27,6 +28,7 @@ function Thread() {
     user_id: string;
     display_name: string;
     avatar_initials: string | null;
+    avatar_url: string | null;
   } | null>(null);
   const [text, setText] = useState("");
   const [sending, setSending] = useState(false);
@@ -185,15 +187,26 @@ function Thread() {
           <Link
             to="/players/$userId"
             params={{ userId: other.user_id }}
-            className="grid h-10 w-10 place-items-center rounded-2xl bg-lime-gradient text-sm font-bold text-primary-foreground"
+            aria-label={`View ${other.display_name}'s profile`}
           >
-            {other.avatar_initials ?? "PL"}
+            <UserAvatar
+              avatarUrl={other.avatar_url}
+              initials={other.avatar_initials}
+              name={other.display_name}
+              size="md"
+              rounded="square"
+            />
           </Link>
         ) : (
-          <div className="grid h-10 w-10 place-items-center rounded-2xl bg-lime-gradient text-sm font-bold text-primary-foreground">
-            {other?.avatar_initials ?? "PL"}
-          </div>
+          <UserAvatar
+            avatarUrl={other?.avatar_url}
+            initials={other?.avatar_initials}
+            name={other?.display_name}
+            size="md"
+            rounded="square"
+          />
         )}
+
         <div className="flex-1 min-w-0">
           {other?.user_id ? (
             <Link

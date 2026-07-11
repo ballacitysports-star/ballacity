@@ -4,6 +4,7 @@ import { Loader2, RefreshCw } from "lucide-react";
 import { Search, SlidersHorizontal, Bell, MessageCircle, X, MapPin } from "lucide-react";
 import { useUnreadNotificationCount } from "@/lib/notifications";
 import { Logo } from "@/components/Logo";
+import { MyAvatar } from "@/components/UserAvatar";
 import { SportChips } from "@/components/SportChips";
 import { GameCard } from "@/components/GameCard";
 import { GAMES, SPORTS, type Sport } from "@/lib/sample-data";
@@ -253,8 +254,16 @@ function Feed() {
             <MessageCircle className="h-5 w-5" />
           </Link>
           <BellLink />
+          <Link
+            to="/profile"
+            aria-label="Your profile"
+            className="grid h-10 w-10 place-items-center rounded-full border border-border bg-surface"
+          >
+            <MyAvatar size="sm" />
+          </Link>
         </div>
       </div>
+
 
       <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="mb-4">
         <h1 className="font-display text-3xl font-bold leading-tight">Tonight's run.</h1>

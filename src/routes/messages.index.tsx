@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { ArrowLeft, MessageCircle } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import { listMyConversations, type ConversationWithMeta } from "@/lib/messages";
+import { UserAvatar } from "@/components/UserAvatar";
 import { supabase } from "@/integrations/supabase/client";
 
 export const Route = createFileRoute("/messages/")({
@@ -85,9 +86,14 @@ function MessagesInbox() {
               params={{ conversationId: c.id }}
               className="flex items-center gap-3 rounded-2xl border border-border bg-surface p-3 hover:border-lime/40"
             >
-              <div className="grid h-12 w-12 place-items-center rounded-2xl bg-lime-gradient font-bold text-primary-foreground">
-                {c.other_initials ?? "PL"}
-              </div>
+              <UserAvatar
+                avatarUrl={c.other_avatar_url}
+                initials={c.other_initials}
+                name={c.other_display_name}
+                size="lg"
+                rounded="square"
+              />
+
               <div className="flex-1 min-w-0">
                 <div className="flex items-center justify-between gap-2">
                   <span className="font-semibold text-sm truncate">{c.other_display_name}</span>

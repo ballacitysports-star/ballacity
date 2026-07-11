@@ -40,6 +40,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { kmToMi, miToKm } from "@/lib/distance";
 import { RequestStatusPanel } from "@/components/RequestStatusPanel";
+import { UserAvatar } from "@/components/UserAvatar";
 import type { ExistingRequestSummary } from "@/lib/availability";
 
 export const Route = createFileRoute("/available-players")({
@@ -284,7 +285,6 @@ function AvailabilityCard({
 }) {
   const navigate = useNavigate();
   const router = useRouter();
-  const initials = a.author_initials ?? a.author_name.slice(0, 2).toUpperCase();
   const when = formatWindow(a);
 
   const handleMessage = async () => {
@@ -314,11 +314,18 @@ function AvailabilityCard({
         <Link
           to="/players/$userId"
           params={{ userId: a.user_id }}
-          className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-lime-gradient font-bold text-primary-foreground"
           aria-label={`View ${a.author_name}'s profile`}
+          className="shrink-0"
         >
-          {initials}
+          <UserAvatar
+            avatarUrl={a.author_avatar_url}
+            initials={a.author_initials}
+            name={a.author_name}
+            size="lg"
+            rounded="square"
+          />
         </Link>
+
         <div className="flex-1 min-w-0">
           <div className="flex items-center justify-between gap-2">
             <Link

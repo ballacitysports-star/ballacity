@@ -38,9 +38,11 @@ export type ConversationWithMeta = Conversation & {
   other_user_id: string | null;
   other_display_name: string | null;
   other_initials: string | null;
+  other_avatar_url: string | null;
   last_message: string | null;
   unread: number;
 };
+
 
 // Find or create a 1:1 conversation between current user and otherUserId
 export async function getOrCreateDirectConversation(
@@ -92,14 +94,18 @@ export async function listMyConversations(): Promise<ConversationWithMeta[]> {
   const otherIds = Array.from(
     new Set(((allParts ?? []) as any[]).filter((p) => p.user_id !== me).map((p) => p.user_id)),
   );
-  let profilesById: Record<string, { display_name: string; avatar_initials: string | null }> = {};
+  let profilesById: Record<
+    string,
+    { display_name: string; avatar_initials: string | null; avatar_url: string | null }
+  > = {};
   if (otherIds.length) {
     const { data: profs } = await supabase
       .from("profiles")
-      .select("id, display_name, avatar_initials")
+      .select("id, display_name, avatar_initials, avatar_url")
       .in("id", otherIds);
     profilesById = Object.fromEntries(((profs ?? []) as any[]).map((p) => [p.id, p]));
   }
+
 
   // Last message per conversation
   const { data: lastMsgs } = await supabase
@@ -129,11 +135,13 @@ export async function listMyConversations(): Promise<ConversationWithMeta[]> {
       other_display_name: prof?.display_name ?? "Player",
       other_initials:
         prof?.avatar_initials ?? prof?.display_name?.slice(0, 2).toUpperCase() ?? "PL",
+      other_avatar_url: prof?.avatar_url ?? null,
       last_message: lastByConv[c.id]?.body ?? null,
       unread: unreadByConv[c.id] ?? 0,
     } as ConversationWithMeta;
   });
 }
+
 
 export async function getConversation(convId: string) {
   const { data, error } = await supabase
@@ -147,7 +155,12 @@ export async function getConversation(convId: string) {
 
 export async function getConversationOther(
   convId: string,
-): Promise<{ user_id: string; display_name: string; avatar_initials: string | null } | null> {
+): Promise<{
+  user_id: string;
+  display_name: string;
+  avatar_initials: string | null;
+  avatar_url: string | null;
+} | null> {
   const { data: u } = await supabase.auth.getUser();
   if (!u.user) return null;
   const { data: parts } = await supabase
@@ -158,15 +171,17 @@ export async function getConversationOther(
   if (!otherId) return null;
   const { data: prof } = await supabase
     .from("profiles")
-    .select("id, display_name, avatar_initials")
+    .select("id, display_name, avatar_initials, avatar_url")
     .eq("id", otherId)
     .maybeSingle();
   return {
     user_id: otherId,
     display_name: (prof as any)?.display_name ?? "Player",
     avatar_initials: (prof as any)?.avatar_initials ?? null,
+    avatar_url: (prof as any)?.avatar_url ?? null,
   };
 }
+
 
 export async function listMessages(convId: string): Promise<Message[]> {
   const { data, error } = await supabase

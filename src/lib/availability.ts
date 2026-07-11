@@ -22,8 +22,10 @@ export type PlayerAvailability = {
 export type AvailabilityWithAuthor = PlayerAvailability & {
   author_name: string;
   author_initials: string | null;
+  author_avatar_url: string | null;
   author_birthday: string | null;
 };
+
 
 export type AvailabilityContactRequest = {
   id: string;
@@ -54,16 +56,18 @@ export async function listOpenAvailabilities(
   const ids = Array.from(new Set(rows.map((r) => r.user_id)));
   const { data: profs } = await supabase
     .from("profiles")
-    .select("id, display_name, avatar_initials, birthday")
+    .select("id, display_name, avatar_initials, avatar_url, birthday")
     .in("id", ids);
   const byId = Object.fromEntries(((profs ?? []) as any[]).map((p) => [p.id, p]));
   return rows.map((r) => ({
     ...r,
     author_name: byId[r.user_id]?.display_name ?? "Player",
     author_initials: byId[r.user_id]?.avatar_initials ?? null,
+    author_avatar_url: byId[r.user_id]?.avatar_url ?? null,
     author_birthday: byId[r.user_id]?.birthday ?? null,
   }));
 }
+
 
 export async function listMyAvailabilities(): Promise<PlayerAvailability[]> {
   const { data: u } = await supabase.auth.getUser();
