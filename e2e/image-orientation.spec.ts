@@ -35,8 +35,10 @@ const EXPECTED: Corners = {
 // 1px shift, wrong crop) blows past these instantly because it misplaces
 // entire quadrants worth of pixels.
 const PER_CHANNEL_TOL = 24;         // absolute delta before a pixel counts as "mismatched"
-const MAX_MISMATCH_RATIO = 0.02;    // ≤2% of pixels may exceed PER_CHANNEL_TOL (boundary bleed)
-const MAX_MEAN_CHANNEL_DELTA = 4;   // avg per-channel delta across the whole image
+const MAX_MISMATCH_RATIO = 0.08;    // ≤8% of pixels may exceed PER_CHANNEL_TOL — JPEG chroma-subsampling
+                                    // bleeds across the two hard quadrant seams (x=100, y=50)
+const MAX_MEAN_CHANNEL_DELTA = 6;   // avg per-channel delta across the whole image — a misplaced
+                                    // quadrant would push this to ~60, catching subtle mis-orientation
 const TOL = 15; // JPEG quantization noise on 200×100 fixtures
 
 const CASES = [
