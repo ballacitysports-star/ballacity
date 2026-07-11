@@ -4,6 +4,7 @@ import { Loader2, RefreshCw } from "lucide-react";
 import { Search, SlidersHorizontal, Bell, MessageCircle, X, MapPin } from "lucide-react";
 import { useUnreadNotificationCount } from "@/lib/notifications";
 import { Logo } from "@/components/Logo";
+import { MyAvatar } from "@/components/UserAvatar";
 import { SportChips } from "@/components/SportChips";
 import { GameCard } from "@/components/GameCard";
 import { GAMES, SPORTS, type Sport } from "@/lib/sample-data";
