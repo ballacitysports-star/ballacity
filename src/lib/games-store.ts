@@ -1,5 +1,7 @@
 import { useMemo, useSyncExternalStore } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import type { TablesInsert } from "@/integrations/supabase/types";
+
 
 const joined = new Set<string>();
 const listeners = new Set<() => void>();
