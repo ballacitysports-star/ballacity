@@ -1031,6 +1031,25 @@ function AvailabilityDetailDialog({
     }
   };
 
+  const handleShare = async () => {
+    const url = `${window.location.origin}/available-players?post=${encodeURIComponent(a.id)}`;
+    try {
+      if (navigator.clipboard && window.isSecureContext) {
+        await navigator.clipboard.writeText(url);
+      } else {
+        const ta = document.createElement("textarea");
+        ta.value = url;
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand("copy");
+        document.body.removeChild(ta);
+      }
+      toast.success("Link copied", { description: "Share it with anyone you want to reach this post." });
+    } catch (e: any) {
+      toast.error("Couldn't copy link", { description: e.message || "Please copy the URL manually." });
+    }
+  };
+
   return (
     <Dialog open onOpenChange={(o) => !o && onClose()}>
       <DialogContent className="max-w-md">
