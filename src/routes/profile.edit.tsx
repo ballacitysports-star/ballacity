@@ -354,6 +354,19 @@ function EditProfile() {
 
   return (
     <div className="mx-auto w-full max-w-md sm:max-w-2xl lg:max-w-4xl px-4 py-6 pb-32">
+      <ImageCropperDialog
+        open={cropTarget !== null}
+        file={cropFile}
+        aspect={cropTarget === "avatar" ? 1 : 16 / 9}
+        outputMaxSize={cropTarget === "avatar" ? 512 : 1600}
+        shape={cropTarget === "avatar" ? "circle" : "rect"}
+        title={cropTarget === "avatar" ? "Crop photo" : "Crop cover"}
+        onCancel={() => {
+          setCropTarget(null);
+          setCropFile(null);
+        }}
+        onConfirm={onCropConfirm}
+      />
       <div className="flex items-center justify-between mb-5">
         <Link
           to="/profile"
