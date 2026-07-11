@@ -276,19 +276,21 @@ export function ImageCropperDialog({
 
   const confirm = () => {
     if (!img) return;
-    const outW = aspect >= 1 ? outputMaxSize : Math.round(outputMaxSize * aspect);
-    const outH = aspect >= 1 ? Math.round(outputMaxSize / aspect) : outputMaxSize;
+    const outW = aspect >= 1 ? outMax : Math.round(outMax * aspect);
+    const outH = aspect >= 1 ? Math.round(outMax / aspect) : outMax;
     const canvas = document.createElement("canvas");
     canvas.width = outW;
     canvas.height = outH;
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = "high";
     const sW = cropW / scale;
     const sH = cropH / scale;
     const sx = img.width / 2 - sW / 2 - offset.x / scale;
     const sy = img.height / 2 - sH / 2 - offset.y / scale;
     ctx.drawImage(img, sx, sy, sW, sH, 0, 0, outW, outH);
-    const dataUrl = canvas.toDataURL("image/jpeg", 0.9);
+    const dataUrl = canvas.toDataURL("image/jpeg", outQuality);
     onConfirm(dataUrl);
   };
 
