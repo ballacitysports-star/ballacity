@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { X, Check, ZoomIn, ZoomOut, RotateCcw, Maximize2 } from "lucide-react";
+import { loadNormalizedDataUrl } from "@/lib/image-orientation";
 
 export type CropSizePreset = { label: string; maxSize: number };
 export type CropQualityPreset = { label: string; quality: number };
