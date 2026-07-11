@@ -9,26 +9,26 @@ import softballCover from "@/assets/sport-softball.jpg";
 import runningCover from "@/assets/sport-running.jpg";
 
 export type Sport =
-  | "Basketball"
-  | "Soccer"
-  | "Pickleball"
-  | "Volleyball"
-  | "Tennis"
-  | "Football"
   | "Baseball"
+  | "Basketball"
+  | "Football"
+  | "Pickleball"
+  | "Running"
+  | "Soccer"
   | "Softball"
-  | "Running";
+  | "Tennis"
+  | "Volleyball";
 
 export const SPORTS: { name: Sport; emoji: string; color: string }[] = [
-  { name: "Basketball", emoji: "🏀", color: "#ff8a3d" },
-  { name: "Soccer", emoji: "⚽", color: "#a3ff12" },
-  { name: "Pickleball", emoji: "🥒", color: "#7df9c1" },
-  { name: "Volleyball", emoji: "🏐", color: "#ffd166" },
-  { name: "Tennis", emoji: "🎾", color: "#c8ff5b" },
-  { name: "Football", emoji: "🏈", color: "#ff6b35" },
   { name: "Baseball", emoji: "⚾", color: "#ffffff" },
-  { name: "Softball", emoji: "🥎", color: "#ffe27a" },
+  { name: "Basketball", emoji: "🏀", color: "#ff8a3d" },
+  { name: "Football", emoji: "🏈", color: "#ff6b35" },
+  { name: "Pickleball", emoji: "🥒", color: "#7df9c1" },
   { name: "Running", emoji: "🏃", color: "#ff3d68" },
+  { name: "Soccer", emoji: "⚽", color: "#a3ff12" },
+  { name: "Softball", emoji: "🥎", color: "#ffe27a" },
+  { name: "Tennis", emoji: "🎾", color: "#c8ff5b" },
+  { name: "Volleyball", emoji: "🏐", color: "#ffd166" },
 ];
 
 export type Game = {
