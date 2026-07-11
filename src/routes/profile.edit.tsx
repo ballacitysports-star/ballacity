@@ -30,7 +30,6 @@ import { OrgCard } from "@/components/OrgCard";
 import { getCurrentUser, useAuth } from "@/hooks/use-auth";
 import { LocationAutocomplete } from "@/components/LocationAutocomplete";
 import { LINK_TYPES, LinkIcon } from "@/components/ProfileLinks";
-import { ImageCropperDialog } from "@/components/ImageCropperDialog";
 
 export const Route = createFileRoute("/profile/edit")({
   head: () => ({ meta: [{ title: "Edit profile — OpenRun" }] }),
@@ -80,30 +79,35 @@ function EditProfile() {
 
   const markDirty = () => setIsDirty(true);
 
-  const [pendingCrop, setPendingCrop] = useState<
-    | { file: File; kind: "avatar" }
-    | { file: File; kind: "cover" }
-    | null
-  >(null);
-
-  const onPickAvatar = (file: File | null) => {
+  const onPickAvatar = async (file: File | null) => {
     if (!file) return;
+    markDirty();
     if (!file.type.startsWith("image/")) {
       toast.error("Please choose an image");
       return;
     }
-    setPendingCrop({ file, kind: "avatar" });
+    try {
+      const dataUrl = await resizeImageToDataUrl(file, 256);
+      setAvatarUrl(dataUrl);
+    } catch {
+      toast.error("Couldn't load that image");
+    }
   };
 
-  const onPickCover = (file: File | null) => {
+  const onPickCover = async (file: File | null) => {
     if (!file) return;
+    markDirty();
     if (!file.type.startsWith("image/")) {
       toast.error("Please choose an image");
       return;
     }
-    setPendingCrop({ file, kind: "cover" });
+    try {
+      const dataUrl = await resizeImageToDataUrl(file, 1600);
+      setCoverUrl(dataUrl);
+    } catch {
+      toast.error("Couldn't load that image");
+    }
   };
-
 
   const addLink = (type: ProfileLinkType) => {
     markDirty();
