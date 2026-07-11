@@ -382,9 +382,14 @@ function AvailabilityCard({
 
       <div className="mt-3 flex gap-2">
         {isMine ? (
-          <Button variant="outline" size="sm" className="rounded-full" onClick={handleDelete}>
-            <X className="h-4 w-4 mr-1" /> Remove
-          </Button>
+          <>
+            <Button variant="outline" size="sm" className="rounded-full" onClick={onEdit}>
+              <Pencil className="h-4 w-4 mr-1" /> Edit
+            </Button>
+            <Button variant="outline" size="sm" className="rounded-full" onClick={handleDelete}>
+              <X className="h-4 w-4 mr-1" /> Remove
+            </Button>
+          </>
         ) : (
           <>
             <Button
