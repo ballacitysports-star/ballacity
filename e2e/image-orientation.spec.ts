@@ -1,6 +1,9 @@
 import { test, expect } from "@playwright/test";
 import { readFileSync } from "node:fs";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
 
 /**
  * Regression: EXIF-tagged photos from iPhone/Android cameras must render
