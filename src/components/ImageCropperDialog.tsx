@@ -339,19 +339,41 @@ export function ImageCropperDialog({
         )}
       </div>
 
-      <div className="flex items-center gap-3 px-6 py-4 text-white">
-        <ZoomOut className="h-4 w-4 opacity-70" />
-        <input
-          type="range"
-          min={minScale}
-          max={maxScale}
-          step={(maxScale - minScale) / 200 || 0.01}
-          value={scale}
-          onChange={(e) => onScale(parseFloat(e.target.value))}
-          className="flex-1 accent-lime"
-          aria-label="Zoom"
-        />
-        <ZoomIn className="h-4 w-4 opacity-70" />
+      <div className="flex flex-col gap-2 px-6 py-4 text-white">
+        <div className="flex items-center gap-3">
+          <ZoomOut className="h-4 w-4 opacity-70" />
+          <input
+            type="range"
+            min={minScale}
+            max={maxScale}
+            step={(maxScale - minScale) / 200 || 0.01}
+            value={scale}
+            onChange={(e) => onScale(parseFloat(e.target.value))}
+            className="flex-1 accent-lime"
+            aria-label="Zoom"
+          />
+          <ZoomIn className="h-4 w-4 opacity-70" />
+        </div>
+        <div className="flex items-center justify-center gap-2">
+          <button
+            type="button"
+            onClick={fitToFrame}
+            disabled={!img}
+            className="inline-flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-1.5 text-xs font-semibold text-white hover:bg-white/20 disabled:opacity-50"
+            aria-label="Fit to frame"
+          >
+            <Maximize2 className="h-3.5 w-3.5" /> Fit
+          </button>
+          <button
+            type="button"
+            onClick={resetView}
+            disabled={!img}
+            className="inline-flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-1.5 text-xs font-semibold text-white hover:bg-white/20 disabled:opacity-50"
+            aria-label="Reset crop"
+          >
+            <RotateCcw className="h-3.5 w-3.5" /> Reset
+          </button>
+        </div>
       </div>
     </div>
   );
