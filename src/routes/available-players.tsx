@@ -888,3 +888,106 @@ function MineTab({
     </div>
   );
 }
+
+function AvailabilityDetailDialog({
+  a,
+  isMine,
+  onContact,
+  onEdit,
+  onClose,
+}: {
+  a: AvailabilityWithAuthor;
+  isMine: boolean;
+  onContact: () => void;
+  onEdit: () => void;
+  onClose: () => void;
+}) {
+  const navigate = useNavigate();
+  const when = formatWindow(a);
+
+  const handleMessage = async () => {
+    try {
+      const id = await getOrCreateDirectConversation(a.user_id);
+      navigate({ to: "/messages/$conversationId", params: { conversationId: id } });
+    } catch (e: any) {
+      toast.error(e.message || "Couldn't open chat");
+    }
+  };
+
+  return (
+    <Dialog open onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle>Updated availability</DialogTitle>
+        </DialogHeader>
+        <div className="rounded-2xl border border-lime/40 bg-lime/5 p-4">
+          <div className="flex items-start gap-3">
+            <UserAvatar
+              avatarUrl={a.author_avatar_url}
+              initials={a.author_initials}
+              name={a.author_name}
+              size="lg"
+              rounded="square"
+            />
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center justify-between gap-2">
+                <p className="font-semibold truncate">{a.author_name}</p>
+                <span className="shrink-0 rounded-full bg-lime/15 px-2 py-0.5 text-[10px] font-bold text-lime">
+                  {a.skill_level}
+                </span>
+              </div>
+              <div className="mt-1 flex flex-wrap gap-1">
+                {a.sports.length === 0 ? (
+                  <span className="text-xs text-muted-foreground">Any sport</span>
+                ) : (
+                  a.sports.map((s) => {
+                    const emoji = SPORTS.find((sp) => sp.name === s)?.emoji ?? "🎯";
+                    return (
+                      <span
+                        key={s}
+                        className="rounded-full border border-border px-2 py-0.5 text-[10px] font-semibold"
+                      >
+                        {emoji} {s}
+                      </span>
+                    );
+                  })
+                )}
+              </div>
+              {when && (
+                <p className="mt-2 flex items-center gap-1 text-xs text-muted-foreground">
+                  <Calendar className="h-3.5 w-3.5" /> {when}
+                </p>
+              )}
+              {(a.city || a.travel_radius_km) && (
+                <p className="mt-1 flex items-center gap-1 text-xs text-muted-foreground">
+                  <MapPin className="h-3.5 w-3.5" />
+                  {a.city || "Anywhere"} · up to {kmToMi(a.travel_radius_km)} mi
+                </p>
+              )}
+              {a.note && <p className="mt-2 text-sm leading-snug">{a.note}</p>}
+            </div>
+          </div>
+        </div>
+        <DialogFooter className="gap-2 sm:gap-2">
+          {isMine ? (
+            <Button onClick={onEdit} className="rounded-full bg-lime-gradient text-primary-foreground">
+              <Pencil className="h-4 w-4 mr-1" /> Edit
+            </Button>
+          ) : (
+            <>
+              <Button variant="outline" onClick={handleMessage} className="rounded-full">
+                <MessageCircle className="h-4 w-4 mr-1" /> Message
+              </Button>
+              <Button
+                onClick={onContact}
+                className="rounded-full bg-lime-gradient text-primary-foreground"
+              >
+                <Send className="h-4 w-4 mr-1" /> Contact request
+              </Button>
+            </>
+          )}
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
