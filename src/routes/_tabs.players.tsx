@@ -685,7 +685,6 @@ function AvailabilityCard({
   onChanged: () => void;
 }) {
   const navigate = useNavigate();
-  const initials = a.author_initials ?? a.author_name.slice(0, 2).toUpperCase();
   const when = formatWindow(a);
 
   const handleMessage = async () => {
