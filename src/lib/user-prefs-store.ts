@@ -47,7 +47,7 @@ export type MyProfile = {
   birthday?: string;
   graduatingClass?: number;
   stats: typeof ME.stats;
-  sports: { name: Sport; skill: number }[];
+  sports: { name: Sport; skill: number; positions?: string[] }[];
   badges: string[];
   links: ProfileLink[];
 };
