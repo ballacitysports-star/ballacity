@@ -48,6 +48,21 @@ export function ImageCropperDialog({
   const [minScale, setMinScale] = useState(1);
   const [offset, setOffset] = useState({ x: 0, y: 0 });
 
+  // Pick the preset closest to the parent-provided default as the initial choice
+  const initialSizeIndex = (() => {
+    let best = 0;
+    let bestDiff = Infinity;
+    sizePresets.forEach((p, i) => {
+      const d = Math.abs(p.maxSize - outputMaxSize);
+      if (d < bestDiff) { bestDiff = d; best = i; }
+    });
+    return best;
+  })();
+  const [sizeIdx, setSizeIdx] = useState(initialSizeIndex);
+  const [qualityIdx, setQualityIdx] = useState(1); // default High
+  const outMax = sizePresets[sizeIdx]?.maxSize ?? outputMaxSize;
+  const outQuality = qualityPresets[qualityIdx]?.quality ?? 0.9;
+
   // Multi-pointer tracking for pinch + pan
   const pointersRef = useRef<Map<number, { x: number; y: number }>>(new Map());
   const gestureRef = useRef<{
