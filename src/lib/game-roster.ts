@@ -83,9 +83,10 @@ export function useLiveParticipants(gameId: string | undefined): {
     const load = async () => {
       const { data, error } = await supabase
         .from("game_participants")
-        .select("user_id, created_at")
+        .select("user_id, created_at, position")
         .eq("game_id", gameId)
         .order("created_at", { ascending: true });
+
       if (cancelled) return;
       if (error) {
         setLoading(false);
