@@ -1,6 +1,7 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { motion, useMotionValue, useTransform, animate } from "framer-motion";
 import { Logo } from "@/components/Logo";
+import { MyAvatar } from "@/components/UserAvatar";
 import {
   Bell,
   BellRing,
