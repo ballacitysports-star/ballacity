@@ -20,7 +20,8 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
  */
 
 type Corners = { tl: number[]; tr: number[]; bl: number[]; br: number[] };
-type Sample = { w: number; h: number } & Corners;
+type Diff = { totalPixels: number; mismatched: number; maxChannelDelta: number; meanChannelDelta: number };
+type Sample = { w: number; h: number; diff: Diff } & Corners;
 
 const EXPECTED: Corners = {
   tl: [255, 0, 0],
@@ -28,6 +29,14 @@ const EXPECTED: Corners = {
   bl: [0, 0, 255],
   br: [255, 255, 0],
 };
+
+// Pixel-diff thresholds — tuned for JPEG quantization noise on 200×100 fixtures
+// with a hard-edged 4-quadrant reference. A subtle regression (wrong flip axis,
+// 1px shift, wrong crop) blows past these instantly because it misplaces
+// entire quadrants worth of pixels.
+const PER_CHANNEL_TOL = 24;         // absolute delta before a pixel counts as "mismatched"
+const MAX_MISMATCH_RATIO = 0.02;    // ≤2% of pixels may exceed PER_CHANNEL_TOL (boundary bleed)
+const MAX_MEAN_CHANNEL_DELTA = 4;   // avg per-channel delta across the whole image
 const TOL = 15; // JPEG quantization noise on 200×100 fixtures
 
 const CASES = [
