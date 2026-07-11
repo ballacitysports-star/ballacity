@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { X, Check, ZoomIn, ZoomOut, RotateCcw, Maximize2 } from "lucide-react";
+import { loadNormalizedDataUrl } from "@/lib/image-orientation";
 
 export type CropSizePreset = { label: string; maxSize: number };
 export type CropQualityPreset = { label: string; quality: number };
@@ -86,48 +87,15 @@ export function ImageCropperDialog({
       return;
     }
     let cancelled = false;
-
-    // Normalize EXIF orientation: browsers apply it to <img> inconsistently.
-    // createImageBitmap({ imageOrientation: 'from-image' }) gives us pixels
-    // already rotated/flipped correctly; we then bake them into a data URL.
-    const loadNormalized = async () => {
-      try {
-        if (typeof createImageBitmap === "function") {
-          const bmp = await createImageBitmap(file, {
-            imageOrientation: "from-image",
-          } as ImageBitmapOptions);
-          if (cancelled) { bmp.close?.(); return; }
-          const canvas = document.createElement("canvas");
-          canvas.width = bmp.width;
-          canvas.height = bmp.height;
-          const ctx = canvas.getContext("2d");
-          if (ctx) {
-            ctx.drawImage(bmp, 0, 0);
-            bmp.close?.();
-            const mime = file.type === "image/png" ? "image/png" : "image/jpeg";
-            const url = canvas.toDataURL(mime, 0.95);
-            if (!cancelled) setImgSrc(url);
-            return;
-          }
-          bmp.close?.();
-        }
-      } catch {
-        // fall through to FileReader path
-      }
-      const reader = new FileReader();
-      reader.onload = () => { if (!cancelled) setImgSrc(reader.result as string); };
-      reader.readAsDataURL(file);
-    };
-
-    void loadNormalized();
+    loadNormalizedDataUrl(file)
+      .then((url) => { if (!cancelled) setImgSrc(url); })
+      .catch(() => { if (!cancelled) setImgSrc(null); });
     return () => { cancelled = true; };
   }, [open, file]);
 
   useEffect(() => {
     if (!imgSrc) return;
     const el = new Image();
-    // Hint to the browser to respect EXIF on the <img> too, as a belt-and-braces
-    // measure for the FileReader fallback path.
     el.style.imageOrientation = "from-image";
     el.onload = () => setImg(el);
     el.src = imgSrc;
