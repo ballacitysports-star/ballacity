@@ -247,6 +247,31 @@ function AvailablePlayersPage() {
       {contactFor && (
         <ContactDialog availability={contactFor} onClose={() => setContactFor(null)} />
       )}
+
+      {detailPost && (
+        <AvailabilityDetailDialog
+          a={detailPost}
+          isMine={user?.id === detailPost.user_id}
+          onContact={() => {
+            if (!user) {
+              toast.error("Sign in to contact this player.");
+              return;
+            }
+            setContactFor(detailPost);
+            setDetailPost(null);
+            navigate({ to: "/available-players", search: {}, replace: true });
+          }}
+          onEdit={() => {
+            setEditingPost(detailPost);
+            setDetailPost(null);
+            navigate({ to: "/available-players", search: {}, replace: true });
+          }}
+          onClose={() => {
+            setDetailPost(null);
+            navigate({ to: "/available-players", search: {}, replace: true });
+          }}
+        />
+      )}
     </div>
   );
 }
