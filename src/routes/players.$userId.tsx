@@ -291,6 +291,18 @@ function PlayerProfilePage() {
                       className="h-full bg-lime-gradient"
                     />
                   </div>
+                  {"positions" in s && Array.isArray((s as any).positions) && (s as any).positions.length > 0 && (
+                    <div className="mt-2 flex flex-wrap gap-1.5">
+                      {((s as any).positions as string[]).map((p) => (
+                        <span
+                          key={p}
+                          className="rounded-full border border-lime/30 bg-lime/10 px-2 py-0.5 text-[10px] font-semibold text-lime"
+                        >
+                          {p}
+                        </span>
+                      ))}
+                    </div>
+                  )}
                 </div>
               ))}
             </div>

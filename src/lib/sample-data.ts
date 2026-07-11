@@ -31,6 +31,19 @@ export const SPORTS: { name: Sport; emoji: string; color: string }[] = [
   { name: "Volleyball", emoji: "🏐", color: "#ffd166" },
 ];
 
+// Common positions per sport. Users can pick one or more (or none).
+export const POSITIONS_BY_SPORT: Record<Sport, string[]> = {
+  Baseball: ["Pitcher", "Catcher", "1B", "2B", "3B", "SS", "LF", "CF", "RF", "DH", "Utility"],
+  Basketball: ["Point Guard", "Shooting Guard", "Small Forward", "Power Forward", "Center"],
+  Football: ["QB", "RB", "WR", "TE", "OL", "DL", "LB", "CB", "S", "K/P"],
+  Pickleball: ["Singles", "Doubles - Left", "Doubles - Right"],
+  Running: ["Sprints", "Middle Distance", "Long Distance", "Trail", "Ultra"],
+  Soccer: ["Goalkeeper", "Defender", "Midfielder", "Forward", "Winger"],
+  Softball: ["Pitcher", "Catcher", "1B", "2B", "3B", "SS", "LF", "CF", "RF", "Utility"],
+  Tennis: ["Singles", "Doubles"],
+  Volleyball: ["Setter", "Outside Hitter", "Opposite", "Middle Blocker", "Libero", "Defensive Specialist"],
+};
+
 export type Game = {
   id: string;
   sport: Sport;
