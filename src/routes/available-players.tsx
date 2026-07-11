@@ -228,7 +228,9 @@ function AvailablePlayersPage() {
                   a={a}
                   isMine={user?.id === a.user_id}
                   onContact={() =>
-                    user ? setContactFor(a) : toast.error("Sign in to contact this player.")
+                    user
+                      ? setContactFor({ availability: a, mode: "contact" })
+                      : toast.error("Sign in to contact this player.")
                   }
                   onEdit={() => setEditingPost(a)}
                 />
