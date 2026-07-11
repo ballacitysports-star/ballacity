@@ -9,6 +9,7 @@ import { useMyProfile } from "@/lib/user-prefs-store";
 import { useHostedGames } from "@/lib/hosted-games-store";
 import { useAuth } from "@/hooks/use-auth";
 import { useLiveParticipantCount } from "@/lib/game-participants-store";
+import { computeSpotsLeft } from "@/lib/spots-left";
 
 export const Route = createFileRoute("/_tabs/discover")({
   head: () => ({ meta: [{ title: "Discover — OpenRun" }] }),
