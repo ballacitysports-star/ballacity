@@ -398,6 +398,15 @@ function Create() {
           </div>
         </Section>
 
+        {/* Positions needed */}
+        <Section title="Positions needed">
+          <PositionsPicker
+            sport={sport}
+            value={positionsNeeded}
+            onChange={setPositionsNeeded}
+          />
+        </Section>
+
         {/* Players */}
         <Section title="Max players" icon={<Users className="h-4 w-4" />}>
           <div className="rounded-2xl border border-border bg-surface p-4">
