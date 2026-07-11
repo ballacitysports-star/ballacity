@@ -667,7 +667,15 @@ function ContactDialog({
   );
 }
 
-function MineTab({ user }: { user: { id: string } | null }) {
+function MineTab({
+  user,
+  onEdit,
+  refreshKey,
+}: {
+  user: { id: string } | null;
+  onEdit: (m: PlayerAvailability) => void;
+  refreshKey: number;
+}) {
   const [mine, setMine] = useState<PlayerAvailability[] | null>(null);
   const [inbox, setInbox] = useState<AvailabilityContactRequest[] | null>(null);
   const [outbox, setOutbox] = useState<AvailabilityContactRequest[] | null>(null);
@@ -679,7 +687,7 @@ function MineTab({ user }: { user: { id: string } | null }) {
       listMyContactRequests("inbox").then(setInbox),
       listMyContactRequests("outbox").then(setOutbox),
     ]).catch((e) => toast.error(e.message));
-  }, [user?.id]);
+  }, [user?.id, refreshKey]);
 
   if (!user) {
     return (
