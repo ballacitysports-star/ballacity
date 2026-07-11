@@ -285,10 +285,12 @@ function AvailabilityCard({
   a,
   isMine,
   onContact,
+  onEdit,
 }: {
   a: AvailabilityWithAuthor;
   isMine: boolean;
   onContact: () => void;
+  onEdit: () => void;
 }) {
   const navigate = useNavigate();
   const router = useRouter();
