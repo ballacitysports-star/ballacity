@@ -1,6 +1,7 @@
 import { Link, useNavigate } from "@tanstack/react-router";
 import { motion } from "framer-motion";
 import { MapPin, Users, Clock, Zap, Lock, Flame, MessageCircle } from "lucide-react";
+import { UserAvatar } from "@/components/UserAvatar";
 import type { Game } from "@/lib/sample-data";
 import { formatWhen } from "@/lib/format";
 import { useIsJoined } from "@/lib/games-store";
@@ -155,16 +156,19 @@ export function GameCard({ game, index = 0 }: { game: Game; index?: number }) {
                 <button
                   type="button"
                   onClick={goToHost}
-                  className="grid h-6 w-6 place-items-center rounded-full bg-secondary text-[10px] font-bold hover:ring-2 hover:ring-lime"
+                  className="rounded-full hover:ring-2 hover:ring-lime"
                   aria-label={`View ${game.host.name}'s profile`}
                 >
-                  {game.host.avatar}
+                  <UserAvatar
+                    initials={game.host.avatar}
+                    name={game.host.name}
+                    size="xs"
+                  />
                 </button>
               ) : (
-                <span className="grid h-6 w-6 place-items-center rounded-full bg-secondary text-[10px] font-bold">
-                  {game.host.avatar}
-                </span>
+                <UserAvatar initials={game.host.avatar} name={game.host.name} size="xs" />
               )}
+
               {hostUserId ? (
                 <button
                   type="button"
