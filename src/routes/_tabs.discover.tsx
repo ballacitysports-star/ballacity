@@ -9,6 +9,7 @@ import { useMyProfile } from "@/lib/user-prefs-store";
 import { useHostedGames } from "@/lib/hosted-games-store";
 import { useAuth } from "@/hooks/use-auth";
 import { useLiveParticipantCount } from "@/lib/game-participants-store";
+import { computeSpotsLeft } from "@/lib/spots-left";
 
 export const Route = createFileRoute("/_tabs/discover")({
   head: () => ({ meta: [{ title: "Discover — OpenRun" }] }),
@@ -120,8 +121,7 @@ type ActiveGame = {
 
 function ActiveGameCard({ game }: { game: ActiveGame }) {
   const liveCount = useLiveParticipantCount(game.id);
-  const joinedCount = Math.min(game.maxPlayers, liveCount ?? game.joined);
-  const spotsLeft = Math.max(0, game.maxPlayers - joinedCount);
+  const spotsLeft = computeSpotsLeft(game.maxPlayers, game.joined, liveCount);
   return (
     <motion.div
       initial={{ opacity: 0, y: 30 }}
