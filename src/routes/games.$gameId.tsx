@@ -47,6 +47,7 @@ import {
 } from "@/lib/payments";
 import { useHostedGames, updateHostedGame, deleteHostedGame } from "@/lib/hosted-games-store";
 import type { Game } from "@/lib/sample-data";
+import { PositionsPicker, positionsCleanup } from "@/components/PositionsPicker";
 import { LegalNotice } from "@/components/LegalNotice";
 import { useAuth } from "@/hooks/use-auth";
 import { useMyProfile } from "@/lib/user-prefs-store";
