@@ -1113,6 +1113,9 @@ function AvailabilityDetailDialog({
 
         {isMine ? (
           <DialogFooter className="gap-2 sm:gap-2">
+            <Button variant="outline" onClick={handleShare} className="rounded-full">
+              <Share2 className="h-4 w-4 mr-1" /> Share
+            </Button>
             <Button
               onClick={onEdit}
               className="rounded-full bg-lime-gradient text-primary-foreground"
