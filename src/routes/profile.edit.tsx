@@ -574,6 +574,32 @@ function EditProfile() {
                 onChange={(e) => setSkill(s.name, parseFloat(e.target.value))}
                 className="mt-2 w-full accent-lime"
               />
+              {POSITIONS_BY_SPORT[s.name]?.length > 0 && (
+                <div className="mt-3">
+                  <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1.5">
+                    Positions
+                  </div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {POSITIONS_BY_SPORT[s.name].map((pos) => {
+                      const active = (s.positions ?? []).includes(pos);
+                      return (
+                        <button
+                          key={pos}
+                          type="button"
+                          onClick={() => togglePosition(s.name, pos)}
+                          className={`rounded-full border px-2.5 py-1 text-[11px] font-semibold transition-colors ${
+                            active
+                              ? "border-lime bg-lime/15 text-lime"
+                              : "border-border bg-background text-muted-foreground hover:border-lime/40 hover:text-foreground"
+                          }`}
+                        >
+                          {pos}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
             </div>
           ))}
         </div>
