@@ -69,6 +69,29 @@ export async function listOpenAvailabilities(
 }
 
 
+export async function getAvailabilityById(id: string): Promise<AvailabilityWithAuthor | null> {
+  const { data, error } = await supabase
+    .from("player_availabilities" as any)
+    .select("*")
+    .eq("id", id)
+    .maybeSingle();
+  if (error) throw error;
+  if (!data) return null;
+  const row = data as unknown as PlayerAvailability;
+  const { data: prof } = await supabase
+    .from("profiles")
+    .select("id, display_name, avatar_initials, avatar_url, birthday")
+    .eq("id", row.user_id)
+    .maybeSingle();
+  return {
+    ...row,
+    author_name: (prof as any)?.display_name ?? "Player",
+    author_initials: (prof as any)?.avatar_initials ?? null,
+    author_avatar_url: (prof as any)?.avatar_url ?? null,
+    author_birthday: (prof as any)?.birthday ?? null,
+  };
+}
+
 export async function listMyAvailabilities(): Promise<PlayerAvailability[]> {
   const { data: u } = await supabase.auth.getUser();
   if (!u.user) return [];
@@ -154,7 +177,7 @@ async function notifyInterestedOnEdit(availabilityId: string) {
         type: "availability_updated",
         title: `${editorName} updated their availability`,
         body: "Tap to see the new details.",
-        link: `/available-players`,
+        link: `/available-players?post=${availabilityId}`,
       }),
     ),
   );
