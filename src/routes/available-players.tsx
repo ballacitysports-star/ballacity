@@ -1128,4 +1128,3 @@ function AvailabilityDetailDialog({
     </Dialog>
   );
 }
-}
