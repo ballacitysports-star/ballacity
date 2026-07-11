@@ -13,6 +13,7 @@ import {
   Pencil,
   Ticket,
   Search,
+  Share2,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/use-auth";
@@ -1030,6 +1031,25 @@ function AvailabilityDetailDialog({
     }
   };
 
+  const handleShare = async () => {
+    const url = `${window.location.origin}/available-players?post=${encodeURIComponent(a.id)}`;
+    try {
+      if (navigator.clipboard && window.isSecureContext) {
+        await navigator.clipboard.writeText(url);
+      } else {
+        const ta = document.createElement("textarea");
+        ta.value = url;
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand("copy");
+        document.body.removeChild(ta);
+      }
+      toast.success("Link copied", { description: "Share it with anyone you want to reach this post." });
+    } catch (e: any) {
+      toast.error("Couldn't copy link", { description: e.message || "Please copy the URL manually." });
+    }
+  };
+
   return (
     <Dialog open onOpenChange={(o) => !o && onClose()}>
       <DialogContent className="max-w-md">
@@ -1093,6 +1113,9 @@ function AvailabilityDetailDialog({
 
         {isMine ? (
           <DialogFooter className="gap-2 sm:gap-2">
+            <Button variant="outline" onClick={handleShare} className="rounded-full">
+              <Share2 className="h-4 w-4 mr-1" /> Share
+            </Button>
             <Button
               onClick={onEdit}
               className="rounded-full bg-lime-gradient text-primary-foreground"
@@ -1129,6 +1152,13 @@ function AvailabilityDetailDialog({
               className="rounded-full"
             >
               <Search className="h-4 w-4 mr-1" /> Find a game
+            </Button>
+            <Button
+              variant="outline"
+              onClick={handleShare}
+              className="rounded-full col-span-2"
+            >
+              <Share2 className="h-4 w-4 mr-1" /> Share this availability
             </Button>
           </div>
         )}
