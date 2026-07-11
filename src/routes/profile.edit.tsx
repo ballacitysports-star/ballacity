@@ -971,7 +971,4 @@ function Toggle({
   );
 }
 
-async function resizeImageToDataUrl(_file: File, _maxSize: number): Promise<string> {
-  return "";
-}
-void resizeImageToDataUrl;
+
