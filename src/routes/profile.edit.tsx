@@ -80,35 +80,30 @@ function EditProfile() {
 
   const markDirty = () => setIsDirty(true);
 
-  const onPickAvatar = async (file: File | null) => {
+  const [pendingCrop, setPendingCrop] = useState<
+    | { file: File; kind: "avatar" }
+    | { file: File; kind: "cover" }
+    | null
+  >(null);
+
+  const onPickAvatar = (file: File | null) => {
     if (!file) return;
-    markDirty();
     if (!file.type.startsWith("image/")) {
       toast.error("Please choose an image");
       return;
     }
-    try {
-      const dataUrl = await resizeImageToDataUrl(file, 256);
-      setAvatarUrl(dataUrl);
-    } catch {
-      toast.error("Couldn't load that image");
-    }
+    setPendingCrop({ file, kind: "avatar" });
   };
 
-  const onPickCover = async (file: File | null) => {
+  const onPickCover = (file: File | null) => {
     if (!file) return;
-    markDirty();
     if (!file.type.startsWith("image/")) {
       toast.error("Please choose an image");
       return;
     }
-    try {
-      const dataUrl = await resizeImageToDataUrl(file, 1600);
-      setCoverUrl(dataUrl);
-    } catch {
-      toast.error("Couldn't load that image");
-    }
+    setPendingCrop({ file, kind: "cover" });
   };
+
 
   const addLink = (type: ProfileLinkType) => {
     markDirty();
