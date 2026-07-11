@@ -30,6 +30,7 @@ import { OrgCard } from "@/components/OrgCard";
 import { getCurrentUser, useAuth } from "@/hooks/use-auth";
 import { LocationAutocomplete } from "@/components/LocationAutocomplete";
 import { LINK_TYPES, LinkIcon } from "@/components/ProfileLinks";
+import { ImageCropperDialog } from "@/components/ImageCropperDialog";
 
 export const Route = createFileRoute("/profile/edit")({
   head: () => ({ meta: [{ title: "Edit profile — OpenRun" }] }),
