@@ -1080,10 +1080,16 @@ function AvailabilityDetailDialog({
                   {a.city || "Anywhere"} · up to {kmToMi(a.travel_radius_km)} mi
                 </p>
               )}
-              {a.note && <p className="mt-2 text-sm leading-snug">{a.note}</p>}
+          {a.note && <p className="mt-2 text-sm leading-snug">{a.note}</p>}
             </div>
           </div>
         </div>
+
+        {!isMine && (
+          <div className="mt-3">
+            <RequestStatusPanel availabilityId={a.id} />
+          </div>
+        )}
 
         {isMine ? (
           <DialogFooter className="gap-2 sm:gap-2">
@@ -1095,7 +1101,7 @@ function AvailabilityDetailDialog({
             </Button>
           </DialogFooter>
         ) : (
-          <div className="mt-2 grid grid-cols-2 gap-2">
+          <div className="mt-3 grid grid-cols-2 gap-2">
             <Button variant="outline" onClick={handleMessage} className="rounded-full">
               <MessageCircle className="h-4 w-4 mr-1" /> Message
             </Button>
