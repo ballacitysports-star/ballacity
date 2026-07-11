@@ -1,15 +1,26 @@
 import { Link, useLocation } from "@tanstack/react-router";
-import { Home, Map, Plus, IdCard, Users, UserCheck, Dribbble } from "lucide-react";
+import { Home, Map, Plus, Users, UserCheck, Dribbble } from "lucide-react";
 import { motion } from "framer-motion";
+import { UserAvatar } from "@/components/UserAvatar";
 
+type NavItem = {
+  to: string;
+  label: string;
+  icon?: typeof Home;
+  render?: (active: boolean) => React.ReactNode;
+};
 
-const items: { to: string; icon: typeof Home; label: string }[] = [
+const items: NavItem[] = [
   { to: "/feed", icon: Dribbble, label: "Pickup" },
   { to: "/players", icon: UserCheck, label: "Players" },
   { to: "/teams", icon: Users, label: "Teams" },
   { to: "/create", icon: Plus, label: "Host" },
   { to: "/discover", icon: Map, label: "Map" },
-  { to: "/profile", icon: IdCard, label: "My Card" },
+  {
+    to: "/profile",
+    label: "My Card",
+    render: (active) => <UserAvatar ringWhenActive active={active} />,
+  },
 ];
 
 export function BottomNav() {
