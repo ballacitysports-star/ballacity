@@ -253,8 +253,16 @@ function Feed() {
             <MessageCircle className="h-5 w-5" />
           </Link>
           <BellLink />
+          <Link
+            to="/profile"
+            aria-label="Your profile"
+            className="grid h-10 w-10 place-items-center rounded-full border border-border bg-surface"
+          >
+            <MyAvatar size="sm" />
+          </Link>
         </div>
       </div>
+
 
       <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="mb-4">
         <h1 className="font-display text-3xl font-bold leading-tight">Tonight's run.</h1>
