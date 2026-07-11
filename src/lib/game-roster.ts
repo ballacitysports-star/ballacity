@@ -54,8 +54,10 @@ function toParticipant(row: Row, profile: ProfileRow | undefined): LiveParticipa
     avatarInitials: profile?.avatar_initials || initialsFrom(displayName),
     avatarUrl: profile?.avatar_url ?? null,
     username: profile?.username ?? null,
+    position: row.position ?? null,
   };
 }
+
 
 /**
  * Live participant list for a single game. Fetches confirmed players from
