@@ -81,9 +81,21 @@ function AvailablePlayersPage() {
   const [list, setList] = useState<AvailabilityWithAuthor[] | null>(null);
   const [postOpen, setPostOpen] = useState(false);
   const [editingPost, setEditingPost] = useState<PlayerAvailability | null>(null);
-  const [contactFor, setContactFor] = useState<AvailabilityWithAuthor | null>(null);
+  const [contactFor, setContactFor] = useState<
+    { availability: AvailabilityWithAuthor; mode: "contact" | "invite" } | null
+  >(null);
   const [detailPost, setDetailPost] = useState<AvailabilityWithAuthor | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
+  const allHosted = useHostedGames();
+  const myHostedGames = useMemo(
+    () =>
+      user
+        ? allHosted
+            .filter((g) => g.hostUserId === user.id && new Date(g.date).getTime() >= Date.now())
+            .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
+        : [],
+    [allHosted, user?.id],
+  );
 
   useEffect(() => {
     if (!postParam) {
