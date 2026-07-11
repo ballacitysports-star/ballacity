@@ -24,6 +24,8 @@ import { useMyProfile } from "@/lib/user-prefs-store";
 import { useAuth } from "@/hooks/use-auth";
 import { upsertGamePaymentSettings } from "@/lib/payments";
 import { supabase } from "@/integrations/supabase/client";
+import { PositionsPicker, positionsCleanup, type PositionsNeeded } from "@/components/PositionsPicker";
+
 
 
 export const Route = createFileRoute("/_tabs/create")({
@@ -54,6 +56,8 @@ function Create() {
   const [coverUrl, setCoverUrl] = useState<string | null>(null);
   const [coverUploading, setCoverUploading] = useState(false);
   const coverInputRef = useRef<HTMLInputElement>(null);
+  const [positionsNeeded, setPositionsNeeded] = useState<PositionsNeeded>({});
+
 
 
   useEffect(() => {
