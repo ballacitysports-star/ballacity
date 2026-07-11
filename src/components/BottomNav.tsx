@@ -36,7 +36,7 @@ export function BottomNav() {
           {items.map((it) => {
             const active = pathname === it.to || (it.to !== "/feed" && pathname.startsWith(it.to));
             const Icon = it.icon;
-            
+
             return (
               <li key={it.to} className="min-w-0">
                 <Link
@@ -44,7 +44,11 @@ export function BottomNav() {
                   className="relative flex flex-col items-center gap-1 px-1 py-3 text-[10px] sm:text-[11px] font-medium"
                 >
                   <span className="relative">
-                    <Icon className={`h-5 w-5 ${active ? "text-lime" : "text-muted-foreground"}`} />
+                    {it.render
+                      ? it.render(active)
+                      : Icon
+                        ? <Icon className={`h-5 w-5 ${active ? "text-lime" : "text-muted-foreground"}`} />
+                        : null}
                   </span>
                   <span
                     className={`truncate max-w-full ${active ? "text-foreground" : "text-muted-foreground"}`}
