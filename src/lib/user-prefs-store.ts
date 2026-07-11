@@ -31,7 +31,7 @@ export type ProfileOverrides = {
   city?: string;
   birthday?: string; // ISO date (YYYY-MM-DD)
   graduatingClass?: number;
-  sports?: { name: Sport; skill: number }[];
+  sports?: { name: Sport; skill: number; positions?: string[] }[];
   badges?: string[];
   links?: ProfileLink[];
 };
