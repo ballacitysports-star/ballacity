@@ -713,11 +713,18 @@ function AvailabilityCard({
         <Link
           to="/players/$userId"
           params={{ userId: a.user_id }}
-          className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-lime-gradient font-bold text-primary-foreground"
           aria-label={`View ${a.author_name}'s profile`}
+          className="shrink-0"
         >
-          {initials}
+          <UserAvatar
+            avatarUrl={a.author_avatar_url}
+            initials={a.author_initials}
+            name={a.author_name}
+            size="lg"
+            rounded="square"
+          />
         </Link>
+
         <div className="flex-1 min-w-0">
           <div className="flex items-center justify-between gap-2">
             <Link
