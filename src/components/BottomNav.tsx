@@ -1,7 +1,7 @@
 import { Link, useLocation } from "@tanstack/react-router";
 import { Home, Map, Plus, Users, UserCheck, Dribbble } from "lucide-react";
 import { motion } from "framer-motion";
-import { UserAvatar } from "@/components/UserAvatar";
+import { MyAvatar } from "@/components/UserAvatar";
 
 type NavItem = {
   to: string;
@@ -19,7 +19,7 @@ const items: NavItem[] = [
   {
     to: "/profile",
     label: "My Card",
-    render: (active) => <UserAvatar ringWhenActive active={active} />,
+    render: (active) => <MyAvatar ringWhenActive active={active} />,
   },
 ];
 
