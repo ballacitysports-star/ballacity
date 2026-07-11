@@ -72,6 +72,8 @@ type Tab = "browse" | "mine";
 
 function AvailablePlayersPage() {
   const { user } = useAuth();
+  const navigate = useNavigate();
+  const { post: postParam } = Route.useSearch();
   const [tab, setTab] = useState<Tab>("browse");
   const [sport, setSport] = useState<string>("");
   const [city, setCity] = useState("");
@@ -79,7 +81,33 @@ function AvailablePlayersPage() {
   const [postOpen, setPostOpen] = useState(false);
   const [editingPost, setEditingPost] = useState<PlayerAvailability | null>(null);
   const [contactFor, setContactFor] = useState<AvailabilityWithAuthor | null>(null);
+  const [detailPost, setDetailPost] = useState<AvailabilityWithAuthor | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
+
+  useEffect(() => {
+    if (!postParam) {
+      setDetailPost(null);
+      return;
+    }
+    let cancelled = false;
+    getAvailabilityById(postParam)
+      .then((row) => {
+        if (cancelled) return;
+        if (!row) {
+          toast.error("That availability post is no longer available.");
+          navigate({ to: "/available-players", search: {}, replace: true });
+          return;
+        }
+        setDetailPost(row);
+      })
+      .catch((e) => {
+        if (!cancelled) toast.error(e.message || "Failed to load post");
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [postParam, navigate]);
+
 
   useEffect(() => {
     let cancelled = false;
