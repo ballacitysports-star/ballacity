@@ -21,6 +21,7 @@ import {
   createAvailability,
   createContactRequest,
   deleteAvailability,
+  getAvailabilityById,
   listMyAvailabilities,
   listMyContactRequests,
   listOpenAvailabilities,
