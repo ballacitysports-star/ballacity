@@ -845,18 +845,39 @@ function GameDetail() {
               Positions needed
             </h2>
             <div className="flex flex-wrap gap-2">
-              {Object.entries(game.positionsNeeded).map(([name, count]) => (
-                <span
-                  key={name}
-                  className="inline-flex items-center gap-1.5 rounded-full border border-lime/40 bg-lime/10 px-3 py-1 text-xs font-semibold text-lime"
-                >
-                  <span>{name}</span>
-                  <span className="rounded-full bg-lime/20 px-1.5 py-0.5 text-[10px] tabular-nums">
-                    ×{count}
+              {Object.entries(game.positionsNeeded).map(([name, count]) => {
+                const filled = liveRoster.filter((p) => p.position === name).length;
+                const remaining = Math.max(0, count - filled);
+                const isFull = remaining === 0;
+                return (
+                  <span
+                    key={name}
+                    className={
+                      isFull
+                        ? "inline-flex items-center gap-1.5 rounded-full border border-border bg-surface px-3 py-1 text-xs font-semibold text-muted-foreground line-through"
+                        : "inline-flex items-center gap-1.5 rounded-full border border-lime/40 bg-lime/10 px-3 py-1 text-xs font-semibold text-lime"
+                    }
+                    aria-label={
+                      isFull
+                        ? `${name}: filled`
+                        : `${name}: ${remaining} of ${count} spots remaining`
+                    }
+                  >
+                    <span>{name}</span>
+                    <span
+                      className={
+                        isFull
+                          ? "rounded-full bg-secondary px-1.5 py-0.5 text-[10px] tabular-nums"
+                          : "rounded-full bg-lime/20 px-1.5 py-0.5 text-[10px] tabular-nums"
+                      }
+                    >
+                      {isFull ? "Filled" : `${remaining} of ${count} left`}
+                    </span>
                   </span>
-                </span>
-              ))}
+                );
+              })}
             </div>
+
           </div>
         )}
 
