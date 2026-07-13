@@ -221,6 +221,8 @@ export async function createPaymentSubmission(input: {
   payment_type: string | null;
   screenshot_path: string | null;
   transaction_reference?: string | null;
+  paid_amount?: number | null;
+  paid_at?: string | null;
   notes?: string | null;
 }) {
   const { data: u } = await supabase.auth.getUser();
