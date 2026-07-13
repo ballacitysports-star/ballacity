@@ -1297,7 +1297,7 @@ function GameDetail() {
             return (
               <motion.button
                 whileTap={{ scale: 0.97 }}
-                onClick={handleJoin}
+                onClick={() => handleJoin()}
                 disabled={buttonDisabled}
                 aria-live="polite"
                 aria-disabled={buttonDisabled}
