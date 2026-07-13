@@ -88,11 +88,9 @@ function PayPage() {
         if (s) {
           const all = await listPaymentMethodsForHost(s.host_id);
           if (cancelled) return;
-          const filtered =
-            s.accepted_method_ids.length > 0
-              ? all.filter((m) => s.accepted_method_ids.includes(m.id))
-              : all;
-          setMethods(filtered);
+          // Show every enabled method the host offers so players can pick any,
+          // including ones with direct payment URLs.
+          setMethods(all);
         }
         if (user) {
           const [subs, req] = await Promise.all([
