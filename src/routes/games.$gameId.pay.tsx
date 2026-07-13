@@ -704,6 +704,97 @@ function PaymentInstructionsAndProof({
     };
   }, [opened, resumeAtProof]);
 
+  // Revoke object URL previews on unmount / replacement to avoid leaks.
+  useEffect(() => {
+    return () => {
+      if (previewUrl) URL.revokeObjectURL(previewUrl);
+      if (uploadTickRef.current !== null) window.clearInterval(uploadTickRef.current);
+    };
+  }, [previewUrl]);
+
+  const stopProgressTick = () => {
+    if (uploadTickRef.current !== null) {
+      window.clearInterval(uploadTickRef.current);
+      uploadTickRef.current = null;
+    }
+  };
+
+  // The Storage JS client doesn't surface XHR progress events, so we
+  // animate a determinate-looking bar toward 90% while the request is in
+  // flight, then snap to 100% on success. This gives clear feedback that
+  // something is happening for large image/video proofs.
+  const startProgressTick = () => {
+    stopProgressTick();
+    setUploadProgress(5);
+    uploadTickRef.current = window.setInterval(() => {
+      setUploadProgress((p) => (p >= 90 ? p : p + Math.max(1, (90 - p) * 0.08)));
+    }, 250);
+  };
+
+  const uploadFile = useCallback(
+    async (f: File) => {
+      setUploadState("uploading");
+      setUploadError(null);
+      startProgressTick();
+      try {
+        const path = await uploadProofScreenshot(f);
+        stopProgressTick();
+        setUploadProgress(100);
+        setUploadedPath(path);
+        setUploadState("success");
+        toast.success("Proof uploaded — ready to submit.");
+      } catch (err: unknown) {
+        stopProgressTick();
+        setUploadProgress(0);
+        setUploadedPath(null);
+        setUploadState("error");
+        const msg =
+          err instanceof Error ? err.message : "Upload failed. Check your connection and retry.";
+        setUploadError(msg);
+        toast.error(`Upload failed: ${msg}`);
+      }
+    },
+    [],
+  );
+
+  const pickFile = (f: File | null) => {
+    if (!f) return;
+    // Validate type + size client-side before we hit the network.
+    const isImage = f.type.startsWith("image/");
+    const isVideo = f.type.startsWith("video/");
+    if (!isImage && !isVideo) {
+      toast.error("Choose an image or video file.");
+      return;
+    }
+    if (f.size > MAX_UPLOAD_BYTES) {
+      toast.error(
+        `File is too large (${(f.size / (1024 * 1024)).toFixed(1)} MB). Max is 20 MB.`,
+      );
+      return;
+    }
+    if (previewUrl) URL.revokeObjectURL(previewUrl);
+    setFile(f);
+    setPreviewUrl(isImage ? URL.createObjectURL(f) : null);
+    void uploadFile(f);
+  };
+
+  const retryUpload = () => {
+    if (file) void uploadFile(file);
+  };
+
+  const clearProof = () => {
+    stopProgressTick();
+    if (previewUrl) URL.revokeObjectURL(previewUrl);
+    setFile(null);
+    setPreviewUrl(null);
+    setUploadedPath(null);
+    setUploadState("idle");
+    setUploadError(null);
+    setUploadProgress(0);
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  };
+
+
 
 
   const submit = async (e: React.FormEvent) => {
