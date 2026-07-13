@@ -680,7 +680,6 @@ function PaymentInstructionsAndProof({
         /* ignore */
       }
       onSubmitted();
-      onSubmitted();
     } catch (e: any) {
       toast.error(e.message);
     } finally {
