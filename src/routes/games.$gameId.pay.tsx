@@ -956,20 +956,18 @@ function PaymentInstructionsAndProof({
         <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
           I have paid — submit proof
         </h3>
-        <label className="flex items-center gap-3 rounded-xl border border-dashed border-border bg-background p-3 cursor-pointer">
-          <Upload className="h-4 w-4 text-lime" />
-          <span className="text-xs flex-1 truncate">
-            {file ? file.name : "Upload screenshot of payment"}
-          </span>
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept="image/*"
-            capture="environment"
-            onChange={(e) => setFile(e.target.files?.[0] ?? null)}
-            className="hidden"
-          />
-        </label>
+        <ProofUploader
+          file={file}
+          previewUrl={previewUrl}
+          uploadState={uploadState}
+          uploadProgress={uploadProgress}
+          uploadError={uploadError}
+          fileInputRef={fileInputRef}
+          onPick={pickFile}
+          onRetry={retryUpload}
+          onClear={clearProof}
+          maxBytes={MAX_UPLOAD_BYTES}
+        />
         <div className="grid grid-cols-2 gap-2">
           <div>
             <label
