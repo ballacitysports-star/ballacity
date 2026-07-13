@@ -449,9 +449,11 @@ function PaymentInstructionsAndProof({
             href={method.payment_url}
             target="_blank"
             rel="noreferrer"
+            onClick={handleOpenExternal}
+            aria-label={`Open ${meta.name} in a new tab to pay the host`}
             className="mt-2 flex items-center justify-center gap-2 w-full rounded-xl bg-lime-gradient py-3 text-sm font-bold text-primary-foreground"
           >
-            <ExternalLink className="h-4 w-4" /> Open {meta.name}
+            <ExternalLink className="h-4 w-4" /> Open {meta.name} to pay
           </a>
         )}
         {(method.instructions || extraInstructions) && (
@@ -460,9 +462,53 @@ function PaymentInstructionsAndProof({
             {extraInstructions && <p>{extraInstructions}</p>}
           </div>
         )}
+
+        <div className="mt-3 rounded-xl border border-border bg-background p-3 text-xs">
+          <div className="font-bold uppercase tracking-wider text-muted-foreground mb-2">
+            How to pay
+          </div>
+          <ol className="list-decimal pl-4 space-y-1 text-foreground/90">
+            {method.payment_url ? (
+              <li>
+                Tap <span className="font-semibold">Open {meta.name} to pay</span> above — it opens
+                in a new tab.
+              </li>
+            ) : (
+              <li>
+                Open {meta.name} and send the fee to{" "}
+                <span className="font-semibold">{method.username || method.contact_info}</span>.
+              </li>
+            )}
+            <li>Complete the payment inside {meta.name}.</li>
+            <li>Screenshot the confirmation screen.</li>
+            <li>
+              Come back to this tab and upload the screenshot below, then tap{" "}
+              <span className="font-semibold">I have paid</span>.
+            </li>
+          </ol>
+        </div>
       </div>
 
-      <form onSubmit={submit} className="rounded-2xl border border-border bg-surface p-4 space-y-3">
+      {opened && (
+        <div
+          role="status"
+          aria-live="polite"
+          className="rounded-2xl border border-lime/40 bg-lime/10 p-3 text-xs"
+        >
+          <div className="font-bold text-lime mb-0.5">Welcome back — finish here</div>
+          <p className="text-muted-foreground">
+            Upload your payment screenshot and tap <span className="font-semibold">I have paid</span>
+            . The host verifies and confirms your spot.
+          </p>
+        </div>
+      )}
+
+      <form
+        ref={proofRef}
+        onSubmit={submit}
+        className="rounded-2xl border border-border bg-surface p-4 space-y-3"
+      >
+
         <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
           I have paid — submit proof
         </h3>
