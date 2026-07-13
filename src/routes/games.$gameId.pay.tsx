@@ -674,6 +674,12 @@ function PaymentInstructionsAndProof({
         notes: notes || null,
       });
       toast.success("Submitted — host will verify shortly.");
+      try {
+        window.sessionStorage.removeItem(resumeKey);
+      } catch {
+        /* ignore */
+      }
+      onSubmitted();
       onSubmitted();
     } catch (e: any) {
       toast.error(e.message);
