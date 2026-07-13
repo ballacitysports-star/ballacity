@@ -857,19 +857,101 @@ function PaymentInstructionsAndProof({
             className="hidden"
           />
         </label>
-        <input
-          value={ref}
-          onChange={(e) => setRef(e.target.value)}
-          placeholder="Transaction ID (optional)"
-          className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm outline-none focus:border-lime"
-        />
-        <textarea
-          value={notes}
-          onChange={(e) => setNotes(e.target.value)}
-          rows={2}
-          placeholder="Notes for host (optional)"
-          className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm outline-none focus:border-lime resize-none"
-        />
+        <div className="grid grid-cols-2 gap-2">
+          <div>
+            <label
+              htmlFor="paid-amount"
+              className="block text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-1"
+            >
+              Amount paid *
+            </label>
+            <div className="relative">
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">
+                $
+              </span>
+              <input
+                id="paid-amount"
+                type="text"
+                inputMode="decimal"
+                value={paidAmount}
+                onChange={(e) => setPaidAmount(e.target.value)}
+                placeholder="0.00"
+                aria-invalid={!!errors.paidAmount}
+                aria-describedby={errors.paidAmount ? "paid-amount-err" : undefined}
+                className={`w-full rounded-xl border bg-background pl-6 pr-3 py-2 text-sm outline-none focus:border-lime ${
+                  errors.paidAmount ? "border-coral" : "border-border"
+                }`}
+              />
+            </div>
+            {errors.paidAmount && (
+              <p id="paid-amount-err" className="mt-1 text-[11px] text-coral">
+                {errors.paidAmount}
+              </p>
+            )}
+          </div>
+          <div>
+            <label
+              htmlFor="paid-at"
+              className="block text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-1"
+            >
+              Payment date *
+            </label>
+            <input
+              id="paid-at"
+              type="date"
+              value={paidAt}
+              max={toLocalDateInputValue(new Date())}
+              onChange={(e) => setPaidAt(e.target.value)}
+              aria-invalid={!!errors.paidAt}
+              aria-describedby={errors.paidAt ? "paid-at-err" : undefined}
+              className={`w-full rounded-xl border bg-background px-3 py-2 text-sm outline-none focus:border-lime ${
+                errors.paidAt ? "border-coral" : "border-border"
+              }`}
+            />
+            {errors.paidAt && (
+              <p id="paid-at-err" className="mt-1 text-[11px] text-coral">
+                {errors.paidAt}
+              </p>
+            )}
+          </div>
+        </div>
+        <div>
+          <input
+            value={ref}
+            onChange={(e) => setRef(e.target.value)}
+            placeholder="Transaction ID (optional)"
+            maxLength={120}
+            aria-invalid={!!errors.transactionRef}
+            aria-describedby={errors.transactionRef ? "tx-ref-err" : undefined}
+            className={`w-full rounded-xl border bg-background px-3 py-2 text-sm outline-none focus:border-lime ${
+              errors.transactionRef ? "border-coral" : "border-border"
+            }`}
+          />
+          {errors.transactionRef && (
+            <p id="tx-ref-err" className="mt-1 text-[11px] text-coral">
+              {errors.transactionRef}
+            </p>
+          )}
+        </div>
+        <div>
+          <textarea
+            value={notes}
+            onChange={(e) => setNotes(e.target.value)}
+            rows={2}
+            maxLength={500}
+            placeholder="Notes for host (optional)"
+            aria-invalid={!!errors.notes}
+            aria-describedby={errors.notes ? "notes-err" : undefined}
+            className={`w-full rounded-xl border bg-background px-3 py-2 text-sm outline-none focus:border-lime resize-none ${
+              errors.notes ? "border-coral" : "border-border"
+            }`}
+          />
+          {errors.notes && (
+            <p id="notes-err" className="mt-1 text-[11px] text-coral">
+              {errors.notes}
+            </p>
+          )}
+        </div>
         <button
           type="submit"
           disabled={submitting}
