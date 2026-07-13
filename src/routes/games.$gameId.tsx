@@ -909,7 +909,10 @@ function GameDetail() {
                     {canJoinAs && (
                       <button
                         type="button"
-                        onClick={() => handleJoin(name)}
+                        onClick={() => {
+                          void leaveWaitlist(game.id, name).catch(() => {});
+                          handleJoin(name);
+                        }}
                         aria-label={`Join as ${name}`}
                         className="rounded-full border border-lime bg-lime px-2.5 py-1 text-[11px] font-bold text-background hover:opacity-90 active:scale-95 transition"
                       >
