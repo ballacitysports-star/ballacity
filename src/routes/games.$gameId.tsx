@@ -1033,7 +1033,7 @@ function GameDetail() {
                               name={p.displayName}
                               initials={p.avatarInitials}
                               avatarUrl={p.avatarUrl}
-                              size={28}
+                              size="sm"
                             />
                             <span className="text-sm">{p.displayName}</span>
                           </div>
@@ -1065,7 +1065,7 @@ function GameDetail() {
                             name={p.displayName}
                             initials={p.avatarInitials}
                             avatarUrl={p.avatarUrl}
-                            size={28}
+                            size="sm"
                           />
                           <span className="text-sm">{p.displayName}</span>
                         </div>
