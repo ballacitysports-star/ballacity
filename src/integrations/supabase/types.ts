@@ -240,6 +240,30 @@ export type Database = {
         }
         Relationships: []
       }
+      game_position_waitlist: {
+        Row: {
+          created_at: string
+          game_id: string
+          id: string
+          position: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          game_id: string
+          id?: string
+          position: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          game_id?: string
+          id?: string
+          position?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       highlight_reels: {
         Row: {
           ai_caption: string | null
