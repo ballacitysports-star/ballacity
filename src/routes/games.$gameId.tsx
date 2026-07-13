@@ -329,7 +329,7 @@ function GameDetail() {
   const effectiveJoined = baseJoined + viewerDelta;
   const spotsLeft = Math.max(0, game.maxPlayers - effectiveJoined);
 
-  const handleJoin = async () => {
+  const handleJoin = async (preselectedPosition?: string) => {
     // Expired invite → block all join actions and steer to discovery.
     if (inviteExpired && !isHost && !viewerCountsAsJoined && !viewerPending) {
       toast.error("This invite has expired. Browse open games instead.");
