@@ -29,6 +29,7 @@ import { ReputationBadge } from "@/components/ReputationBadge";
 import { joinGame, leaveGame, useIsJoined } from "@/lib/games-store";
 import { useLiveParticipantCount } from "@/lib/game-participants-store";
 import { useLiveParticipants } from "@/lib/game-roster";
+import { useGameWaitlist, joinWaitlist, leaveWaitlist } from "@/lib/waitlist-store";
 import { toast } from "sonner";
 import { useEffect, useMemo, useState } from "react";
 import {
@@ -139,6 +140,7 @@ function GameDetail() {
   const joined = useIsJoined(gameId);
   const liveParticipantCount = useLiveParticipantCount(gameId);
   const { participants: liveRoster } = useLiveParticipants(gameId);
+  const { entries: waitlistEntries } = useGameWaitlist(gameId);
   const nav = useNavigate();
   const { user } = useAuth();
   const myProfile = useMyProfile(user);
@@ -849,6 +851,9 @@ function GameDetail() {
                 const filled = liveRoster.filter((p) => p.position === name).length;
                 const remaining = Math.max(0, count - filled);
                 const isFull = remaining === 0;
+                const posWaitlist = waitlistEntries.filter((w) => w.position === name);
+                const viewerOnWaitlist =
+                  !!user && posWaitlist.some((w) => w.userId === user.id);
                 const canJoinAs =
                   !isFull &&
                   !isHost &&
@@ -862,6 +867,15 @@ function GameDetail() {
                   game.status !== "completed" &&
                   spotsLeft > 0 &&
                   !!user;
+                const canWaitlist =
+                  isFull &&
+                  !isHost &&
+                  !isConfirmed &&
+                  !joined &&
+                  !game.joinsClosed &&
+                  game.status !== "in_progress" &&
+                  game.status !== "completed" &&
+                  !!user;
                 return (
                   <div key={name} className="inline-flex items-center gap-1">
                     <span
@@ -872,7 +886,7 @@ function GameDetail() {
                       }
                       aria-label={
                         isFull
-                          ? `${name}: filled`
+                          ? `${name}: filled, ${posWaitlist.length} on waitlist`
                           : `${name}: ${remaining} of ${count} spots remaining`
                       }
                     >
@@ -886,15 +900,69 @@ function GameDetail() {
                       >
                         {isFull ? "Filled" : `${remaining} of ${count} left`}
                       </span>
+                      {isFull && posWaitlist.length > 0 && (
+                        <span className="rounded-full bg-coral/20 px-1.5 py-0.5 text-[10px] font-semibold text-coral tabular-nums normal-case">
+                          {posWaitlist.length} waiting
+                        </span>
+                      )}
                     </span>
                     {canJoinAs && (
                       <button
                         type="button"
-                        onClick={() => handleJoin(name)}
+                        onClick={() => {
+                          void leaveWaitlist(game.id, name).catch(() => {});
+                          handleJoin(name);
+                        }}
                         aria-label={`Join as ${name}`}
                         className="rounded-full border border-lime bg-lime px-2.5 py-1 text-[11px] font-bold text-background hover:opacity-90 active:scale-95 transition"
                       >
                         Join as {name}
+                      </button>
+                    )}
+                    {canWaitlist && !viewerOnWaitlist && (
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          try {
+                            await joinWaitlist(game.id, name);
+                            toast.success(`You're on the ${name} waitlist.`);
+                            const gameHostId = settings?.host_id ?? game.hostUserId ?? null;
+                            if (gameHostId && user && gameHostId !== user.id) {
+                              const who =
+                                myProfile?.name || user.email?.split("@")[0] || "A player";
+                              void createNotification({
+                                user_id: gameHostId,
+                                type: "waitlist_join",
+                                title: `${who} joined the ${name} waitlist`,
+                                body: `${game.title}`,
+                                link: `/games/${game.id}`,
+                              }).catch(() => {});
+                            }
+                          } catch (e: any) {
+                            toast.error(e.message ?? "Could not join waitlist.");
+                          }
+                        }}
+                        aria-label={`Join ${name} waitlist`}
+                        className="rounded-full border border-coral/60 bg-coral/10 px-2.5 py-1 text-[11px] font-bold text-coral hover:bg-coral/20 active:scale-95 transition"
+                      >
+                        Join waitlist
+                      </button>
+                    )}
+                    {canWaitlist && viewerOnWaitlist && (
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          try {
+                            await leaveWaitlist(game.id, name);
+                            toast(`Removed from the ${name} waitlist.`);
+                          } catch (e: any) {
+                            toast.error(e.message ?? "Could not leave waitlist.");
+                          }
+                        }}
+                        aria-label={`Leave ${name} waitlist`}
+                        className="rounded-full border border-coral bg-coral px-2.5 py-1 text-[11px] font-bold text-background hover:opacity-90 active:scale-95 transition"
+                      >
+                        On waitlist · tap to leave
                       </button>
                     )}
                   </div>
