@@ -1,6 +1,6 @@
 import { createFileRoute, Link, notFound, useNavigate } from "@tanstack/react-router";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { ArrowLeft, ExternalLink, Upload, ShieldCheck, Clock, X, Check, CircleDashed, AlertCircle } from "lucide-react";
+import { ArrowLeft, ExternalLink, Upload, ShieldCheck, Clock, X, Check, CircleDashed, AlertCircle, RotateCw, Film, Image as ImageIcon, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { GAMES } from "@/lib/sample-data";
 import { useAuth } from "@/hooks/use-auth";
@@ -625,7 +625,16 @@ function PaymentInstructionsAndProof({
   onSubmitted: () => void;
 }) {
   const meta = paymentTypeMeta(method.payment_type);
+  const MAX_UPLOAD_BYTES = 20 * 1024 * 1024; // 20 MB
   const [file, setFile] = useState<File | null>(null);
+  const [uploadedPath, setUploadedPath] = useState<string | null>(null);
+  const [uploadState, setUploadState] = useState<"idle" | "uploading" | "success" | "error">(
+    "idle",
+  );
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const uploadTickRef = useRef<number | null>(null);
   const [ref, setRef] = useState("");
   const [paidAmount, setPaidAmount] = useState("");
   const [paidAt, setPaidAt] = useState(() => toLocalDateInputValue(new Date()));
@@ -695,6 +704,97 @@ function PaymentInstructionsAndProof({
     };
   }, [opened, resumeAtProof]);
 
+  // Revoke object URL previews on unmount / replacement to avoid leaks.
+  useEffect(() => {
+    return () => {
+      if (previewUrl) URL.revokeObjectURL(previewUrl);
+      if (uploadTickRef.current !== null) window.clearInterval(uploadTickRef.current);
+    };
+  }, [previewUrl]);
+
+  const stopProgressTick = () => {
+    if (uploadTickRef.current !== null) {
+      window.clearInterval(uploadTickRef.current);
+      uploadTickRef.current = null;
+    }
+  };
+
+  // The Storage JS client doesn't surface XHR progress events, so we
+  // animate a determinate-looking bar toward 90% while the request is in
+  // flight, then snap to 100% on success. This gives clear feedback that
+  // something is happening for large image/video proofs.
+  const startProgressTick = () => {
+    stopProgressTick();
+    setUploadProgress(5);
+    uploadTickRef.current = window.setInterval(() => {
+      setUploadProgress((p) => (p >= 90 ? p : p + Math.max(1, (90 - p) * 0.08)));
+    }, 250);
+  };
+
+  const uploadFile = useCallback(
+    async (f: File) => {
+      setUploadState("uploading");
+      setUploadError(null);
+      startProgressTick();
+      try {
+        const path = await uploadProofScreenshot(f);
+        stopProgressTick();
+        setUploadProgress(100);
+        setUploadedPath(path);
+        setUploadState("success");
+        toast.success("Proof uploaded — ready to submit.");
+      } catch (err: unknown) {
+        stopProgressTick();
+        setUploadProgress(0);
+        setUploadedPath(null);
+        setUploadState("error");
+        const msg =
+          err instanceof Error ? err.message : "Upload failed. Check your connection and retry.";
+        setUploadError(msg);
+        toast.error(`Upload failed: ${msg}`);
+      }
+    },
+    [],
+  );
+
+  const pickFile = (f: File | null) => {
+    if (!f) return;
+    // Validate type + size client-side before we hit the network.
+    const isImage = f.type.startsWith("image/");
+    const isVideo = f.type.startsWith("video/");
+    if (!isImage && !isVideo) {
+      toast.error("Choose an image or video file.");
+      return;
+    }
+    if (f.size > MAX_UPLOAD_BYTES) {
+      toast.error(
+        `File is too large (${(f.size / (1024 * 1024)).toFixed(1)} MB). Max is 20 MB.`,
+      );
+      return;
+    }
+    if (previewUrl) URL.revokeObjectURL(previewUrl);
+    setFile(f);
+    setPreviewUrl(isImage ? URL.createObjectURL(f) : null);
+    void uploadFile(f);
+  };
+
+  const retryUpload = () => {
+    if (file) void uploadFile(file);
+  };
+
+  const clearProof = () => {
+    stopProgressTick();
+    if (previewUrl) URL.revokeObjectURL(previewUrl);
+    setFile(null);
+    setPreviewUrl(null);
+    setUploadedPath(null);
+    setUploadState("idle");
+    setUploadError(null);
+    setUploadProgress(0);
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  };
+
+
 
 
   const submit = async (e: React.FormEvent) => {
@@ -718,10 +818,23 @@ function PaymentInstructionsAndProof({
     }
     setErrors({});
 
+    // Block submit while the upload is in flight or has failed. Users can
+    // retry or clear the file — but we don't quietly re-upload here.
+    if (uploadState === "uploading") {
+      toast.error("Wait for the upload to finish before submitting.");
+      return;
+    }
+    if (file && uploadState === "error") {
+      toast.error("Retry the upload or remove the file, then submit again.");
+      return;
+    }
+
     setSubmitting(true);
     try {
-      let path: string | null = null;
-      if (file) path = await uploadProofScreenshot(file);
+      let path: string | null = uploadedPath;
+      // Fallback: user attached a file but it hasn't been uploaded (unlikely
+      // in the normal flow — pickFile auto-uploads). Upload now inline.
+      if (file && !path) path = await uploadProofScreenshot(file);
       // Store paid_at at local noon so a date-only value doesn't shift a day in UTC.
       const paidAtIso = new Date(`${parsed.data.paidAt}T12:00:00`).toISOString();
       await createPaymentSubmission({
@@ -843,20 +956,18 @@ function PaymentInstructionsAndProof({
         <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
           I have paid — submit proof
         </h3>
-        <label className="flex items-center gap-3 rounded-xl border border-dashed border-border bg-background p-3 cursor-pointer">
-          <Upload className="h-4 w-4 text-lime" />
-          <span className="text-xs flex-1 truncate">
-            {file ? file.name : "Upload screenshot of payment"}
-          </span>
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept="image/*"
-            capture="environment"
-            onChange={(e) => setFile(e.target.files?.[0] ?? null)}
-            className="hidden"
-          />
-        </label>
+        <ProofUploader
+          file={file}
+          previewUrl={previewUrl}
+          uploadState={uploadState}
+          uploadProgress={uploadProgress}
+          uploadError={uploadError}
+          fileInputRef={fileInputRef}
+          onPick={pickFile}
+          onRetry={retryUpload}
+          onClear={clearProof}
+          maxBytes={MAX_UPLOAD_BYTES}
+        />
         <div className="grid grid-cols-2 gap-2">
           <div>
             <label
@@ -954,12 +1065,195 @@ function PaymentInstructionsAndProof({
         </div>
         <button
           type="submit"
-          disabled={submitting}
+          disabled={submitting || uploadState === "uploading"}
           className="w-full rounded-xl bg-lime-gradient py-3 text-sm font-bold text-primary-foreground inline-flex items-center justify-center gap-2 disabled:opacity-50"
         >
-          <ShieldCheck className="h-4 w-4" /> {submitting ? "Submitting…" : "I have paid"}
+          <ShieldCheck className="h-4 w-4" />{" "}
+          {submitting
+            ? "Submitting…"
+            : uploadState === "uploading"
+              ? "Uploading proof…"
+              : "I have paid"}
         </button>
       </form>
+    </div>
+  );
+}
+
+function ProofUploader({
+  file,
+  previewUrl,
+  uploadState,
+  uploadProgress,
+  uploadError,
+  fileInputRef,
+  onPick,
+  onRetry,
+  onClear,
+  maxBytes,
+}: {
+  file: File | null;
+  previewUrl: string | null;
+  uploadState: "idle" | "uploading" | "success" | "error";
+  uploadProgress: number;
+  uploadError: string | null;
+  fileInputRef: React.RefObject<HTMLInputElement | null>;
+  onPick: (f: File | null) => void;
+  onRetry: () => void;
+  onClear: () => void;
+  maxBytes: number;
+}) {
+  const openPicker = () => fileInputRef.current?.click();
+  const isVideo = !!file?.type.startsWith("video/");
+  const sizeMb = file ? (file.size / (1024 * 1024)).toFixed(1) : null;
+
+  return (
+    <div
+      className={`rounded-xl border p-3 text-xs ${
+        uploadState === "error"
+          ? "border-coral/50 bg-coral/5"
+          : uploadState === "success"
+            ? "border-lime/50 bg-lime/5"
+            : "border-dashed border-border bg-background"
+      }`}
+      data-testid="proof-uploader"
+      data-upload-state={uploadState}
+    >
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/*,video/*"
+        capture="environment"
+        onChange={(e) => {
+          onPick(e.target.files?.[0] ?? null);
+          // Allow re-picking the same file after clear/retry.
+          if (e.target) e.target.value = "";
+        }}
+        className="hidden"
+      />
+
+      {!file ? (
+        <button
+          type="button"
+          onClick={openPicker}
+          className="flex w-full items-center gap-3 text-left"
+        >
+          <span className="grid h-9 w-9 place-items-center rounded-lg bg-secondary text-lime">
+            <Upload className="h-4 w-4" />
+          </span>
+          <span className="flex-1">
+            <span className="block font-semibold text-foreground">
+              Upload proof (image or video)
+            </span>
+            <span className="block text-[11px] text-muted-foreground">
+              Screenshot or short clip · max {Math.round(maxBytes / (1024 * 1024))} MB
+            </span>
+          </span>
+        </button>
+      ) : (
+        <div className="space-y-2">
+          <div className="flex items-center gap-3">
+            {previewUrl ? (
+              <img
+                src={previewUrl}
+                alt="Payment proof preview"
+                className="h-12 w-12 rounded-lg object-cover border border-border"
+              />
+            ) : (
+              <span className="grid h-12 w-12 place-items-center rounded-lg bg-secondary text-lime">
+                {isVideo ? <Film className="h-5 w-5" /> : <ImageIcon className="h-5 w-5" />}
+              </span>
+            )}
+            <div className="flex-1 min-w-0">
+              <div className="truncate font-semibold text-foreground">{file.name}</div>
+              <div className="text-[11px] text-muted-foreground">
+                {isVideo ? "Video" : "Image"} · {sizeMb} MB
+                {uploadState === "success" && (
+                  <span className="ml-1 text-lime">· Uploaded</span>
+                )}
+                {uploadState === "uploading" && (
+                  <span className="ml-1 text-muted-foreground">· Uploading…</span>
+                )}
+                {uploadState === "error" && (
+                  <span className="ml-1 text-coral">· Upload failed</span>
+                )}
+              </div>
+            </div>
+            <div className="flex items-center gap-1">
+              {uploadState === "error" && (
+                <button
+                  type="button"
+                  onClick={onRetry}
+                  aria-label="Retry upload"
+                  className="inline-flex items-center gap-1 rounded-full bg-lime-gradient px-2.5 py-1 text-[11px] font-bold text-primary-foreground"
+                >
+                  <RotateCw className="h-3 w-3" /> Retry
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={openPicker}
+                aria-label="Choose a different file"
+                disabled={uploadState === "uploading"}
+                className="rounded-full border border-border px-2.5 py-1 text-[11px] font-semibold text-foreground disabled:opacity-50"
+              >
+                Replace
+              </button>
+              <button
+                type="button"
+                onClick={onClear}
+                aria-label="Remove file"
+                disabled={uploadState === "uploading"}
+                className="grid h-6 w-6 place-items-center rounded-full text-muted-foreground hover:text-coral disabled:opacity-50"
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+              </button>
+            </div>
+          </div>
+
+          {(uploadState === "uploading" || uploadState === "success") && (
+            <div className="space-y-1">
+              <div
+                className="h-1.5 w-full overflow-hidden rounded-full bg-border/60"
+                role="progressbar"
+                aria-valuemin={0}
+                aria-valuemax={100}
+                aria-valuenow={Math.round(uploadProgress)}
+                aria-label="Upload progress"
+              >
+                <div
+                  className={`h-full transition-[width] duration-200 ${
+                    uploadState === "success" ? "bg-lime" : "bg-lime/80"
+                  }`}
+                  style={{ width: `${Math.min(100, Math.max(0, uploadProgress))}%` }}
+                />
+              </div>
+              <div className="flex items-center justify-between text-[10px] text-muted-foreground">
+                <span>{Math.round(uploadProgress)}%</span>
+                <span>
+                  {uploadState === "success" ? "Ready to submit" : "Keep this tab open"}
+                </span>
+              </div>
+            </div>
+          )}
+
+          {uploadState === "error" && (
+            <div
+              role="alert"
+              className="rounded-lg border border-coral/40 bg-coral/10 p-2 text-[11px] text-coral"
+            >
+              <div className="font-bold mb-0.5 flex items-center gap-1">
+                <AlertCircle className="h-3 w-3" /> Upload didn't finish
+              </div>
+              <p className="text-coral/90">
+                {uploadError || "Something went wrong."} Tap{" "}
+                <span className="font-semibold">Retry</span> to try again, or{" "}
+                <span className="font-semibold">Replace</span> to pick a different file.
+              </p>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }
