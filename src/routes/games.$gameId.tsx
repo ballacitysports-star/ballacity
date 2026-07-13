@@ -843,9 +843,19 @@ function GameDetail() {
         {/* Positions needed */}
         {game.positionsNeeded && Object.keys(game.positionsNeeded).length > 0 && (
           <div>
-            <h2 className="font-display text-sm font-bold uppercase tracking-wider text-muted-foreground mb-2">
-              Positions needed
-            </h2>
+            <div className="flex items-center justify-between mb-2">
+              <h2 className="font-display text-sm font-bold uppercase tracking-wider text-muted-foreground">
+                Positions needed
+              </h2>
+              <button
+                type="button"
+                onClick={() => setPositionRosterOpen(true)}
+                className="text-xs font-semibold text-lime hover:underline"
+                aria-label="View roster by position"
+              >
+                View roster
+              </button>
+            </div>
             <div className="flex flex-wrap gap-2">
               {Object.entries(game.positionsNeeded).map(([name, count]) => {
                 const filled = liveRoster.filter((p) => p.position === name).length;
