@@ -390,6 +390,18 @@ function PaymentInstructionsAndProof({
   const [ref, setRef] = useState("");
   const [notes, setNotes] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [opened, setOpened] = useState(false);
+  const proofRef = useRef<HTMLFormElement | null>(null);
+
+  const handleOpenExternal = () => {
+    setOpened(true);
+    // Give the new tab a beat to open, then scroll the proof form into view
+    // so the user sees the return steps as soon as they come back.
+    window.setTimeout(() => {
+      proofRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 300);
+  };
+
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
