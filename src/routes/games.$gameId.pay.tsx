@@ -625,7 +625,16 @@ function PaymentInstructionsAndProof({
   onSubmitted: () => void;
 }) {
   const meta = paymentTypeMeta(method.payment_type);
+  const MAX_UPLOAD_BYTES = 20 * 1024 * 1024; // 20 MB
   const [file, setFile] = useState<File | null>(null);
+  const [uploadedPath, setUploadedPath] = useState<string | null>(null);
+  const [uploadState, setUploadState] = useState<"idle" | "uploading" | "success" | "error">(
+    "idle",
+  );
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const uploadTickRef = useRef<number | null>(null);
   const [ref, setRef] = useState("");
   const [paidAmount, setPaidAmount] = useState("");
   const [paidAt, setPaidAt] = useState(() => toLocalDateInputValue(new Date()));
