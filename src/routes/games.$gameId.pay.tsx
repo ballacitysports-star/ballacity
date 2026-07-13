@@ -593,17 +593,69 @@ function PaymentInstructionsAndProof({
   const [ref, setRef] = useState("");
   const [notes, setNotes] = useState("");
   const [submitting, setSubmitting] = useState(false);
-  const [opened, setOpened] = useState(false);
+  // Persist "opened" across the round-trip so a hard refresh, a webview
+  // relaunch, or a mobile OS backgrounding still resumes at the proof step.
+  const resumeKey = `pay-opened:${game_id}:${method.id}`;
+  const [opened, setOpened] = useState<boolean>(() => {
+    if (typeof window === "undefined") return false;
+    try {
+      return window.sessionStorage.getItem(resumeKey) === "1";
+    } catch {
+      return false;
+    }
+  });
+  const [returned, setReturned] = useState(false);
   const proofRef = useRef<HTMLFormElement | null>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+
+  // Scroll the proof form into view and focus the screenshot picker so the
+  // user lands on the next action without hunting for it.
+  const resumeAtProof = useCallback(() => {
+    proofRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    // Delay focus until after the smooth scroll settles.
+    window.setTimeout(() => {
+      fileInputRef.current?.focus({ preventScroll: true });
+    }, 400);
+  }, []);
 
   const handleOpenExternal = () => {
     setOpened(true);
+    try {
+      window.sessionStorage.setItem(resumeKey, "1");
+    } catch {
+      /* storage unavailable — resume still works within this tab */
+    }
     // Give the new tab a beat to open, then scroll the proof form into view
     // so the user sees the return steps as soon as they come back.
-    window.setTimeout(() => {
-      proofRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
-    }, 300);
+    window.setTimeout(resumeAtProof, 300);
   };
+
+  // Auto-resume when the user comes back to this tab after paying externally.
+  // Fires on tab focus, page-visibility change, and pageshow (mobile
+  // back/forward cache). Guarded on `opened` so it only triggers post-tap.
+  useEffect(() => {
+    if (!opened) return;
+    let didResume = false;
+    const trigger = () => {
+      if (didResume) return;
+      didResume = true;
+      setReturned(true);
+      resumeAtProof();
+    };
+    const onVisibility = () => {
+      if (document.visibilityState === "visible") trigger();
+    };
+    const onPageShow = () => trigger();
+    window.addEventListener("focus", trigger);
+    document.addEventListener("visibilitychange", onVisibility);
+    window.addEventListener("pageshow", onPageShow);
+    return () => {
+      window.removeEventListener("focus", trigger);
+      document.removeEventListener("visibilitychange", onVisibility);
+      window.removeEventListener("pageshow", onPageShow);
+    };
+  }, [opened, resumeAtProof]);
+
 
 
   const submit = async (e: React.FormEvent) => {
