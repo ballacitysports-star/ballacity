@@ -154,6 +154,70 @@ function PayPage() {
     };
   }, [game.id, user]);
 
+  // Live-update payment submissions so the status timeline reflects host
+  // review (verified/rejected) in real time. Realtime primary, poll fallback.
+  const refreshSubs = useCallback(async () => {
+    if (!user) return;
+    try {
+      const subs = await listMySubmissionsForGame(game.id);
+      setMySubs((prev) => {
+        const prevLatest = prev[0];
+        const nextLatest = subs[0];
+        if (
+          nextLatest &&
+          prevLatest &&
+          nextLatest.id === prevLatest.id &&
+          nextLatest.status !== prevLatest.status
+        ) {
+          if (nextLatest.status === "verified") toast.success("Payment verified by host!");
+          if (nextLatest.status === "rejected") toast.error("Host rejected your payment — try again.");
+        }
+        return subs;
+      });
+    } catch {
+      /* ignore polling errors */
+    }
+  }, [game.id, user]);
+
+  const refreshSubsRef = useRef(refreshSubs);
+  useEffect(() => {
+    refreshSubsRef.current = refreshSubs;
+  }, [refreshSubs]);
+  useEffect(() => {
+    if (!user) return;
+    const channel = supabase
+      .channel(`pay-subs:${game.id}:${user.id}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "payment_submissions",
+          filter: `player_id=eq.${user.id}`,
+        },
+        (payload) => {
+          const row = (payload.new ?? payload.old) as PaymentSubmission | undefined;
+          if (row?.game_id === game.id) refreshSubsRef.current();
+        },
+      )
+      .subscribe();
+
+    const poll = window.setInterval(() => refreshSubsRef.current(), 15_000);
+    const onFocus = () => refreshSubsRef.current();
+    window.addEventListener("focus", onFocus);
+    const onVisibility = () => {
+      if (document.visibilityState === "visible") refreshSubsRef.current();
+    };
+    document.addEventListener("visibilitychange", onVisibility);
+
+    return () => {
+      supabase.removeChannel(channel);
+      window.clearInterval(poll);
+      window.removeEventListener("focus", onFocus);
+      document.removeEventListener("visibilitychange", onVisibility);
+    };
+  }, [game.id, user]);
+
   if (loading || fetching) return <div className="p-6 text-sm text-muted-foreground">Loading…</div>;
   if (!user) return null;
 
