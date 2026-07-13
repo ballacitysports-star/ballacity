@@ -284,10 +284,12 @@ function PayPage() {
                       href={m.payment_url}
                       target="_blank"
                       rel="noreferrer"
+                      onClick={() => setPicked(m)}
                       className="inline-flex items-center gap-1 rounded-full bg-lime-gradient px-3 py-1.5 text-xs font-bold text-primary-foreground"
-                      title={`Open ${meta.name}`}
+                      title={`Open ${meta.name} in a new tab`}
+                      aria-label={`Open ${meta.name} in a new tab to pay`}
                     >
-                      <ExternalLink className="h-3.5 w-3.5" /> Pay
+                      <ExternalLink className="h-3.5 w-3.5" /> Open {meta.name}
                     </a>
                   ) : (
                     <button
