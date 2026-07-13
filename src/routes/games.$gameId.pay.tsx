@@ -627,7 +627,10 @@ function PaymentInstructionsAndProof({
   const meta = paymentTypeMeta(method.payment_type);
   const [file, setFile] = useState<File | null>(null);
   const [ref, setRef] = useState("");
+  const [paidAmount, setPaidAmount] = useState("");
+  const [paidAt, setPaidAt] = useState(() => toLocalDateInputValue(new Date()));
   const [notes, setNotes] = useState("");
+  const [errors, setErrors] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState(false);
   // Persist "opened" across the round-trip so a hard refresh, a webview
   // relaunch, or a mobile OS backgrounding still resumes at the proof step.
