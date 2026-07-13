@@ -1065,12 +1065,195 @@ function PaymentInstructionsAndProof({
         </div>
         <button
           type="submit"
-          disabled={submitting}
+          disabled={submitting || uploadState === "uploading"}
           className="w-full rounded-xl bg-lime-gradient py-3 text-sm font-bold text-primary-foreground inline-flex items-center justify-center gap-2 disabled:opacity-50"
         >
-          <ShieldCheck className="h-4 w-4" /> {submitting ? "Submitting…" : "I have paid"}
+          <ShieldCheck className="h-4 w-4" />{" "}
+          {submitting
+            ? "Submitting…"
+            : uploadState === "uploading"
+              ? "Uploading proof…"
+              : "I have paid"}
         </button>
       </form>
+    </div>
+  );
+}
+
+function ProofUploader({
+  file,
+  previewUrl,
+  uploadState,
+  uploadProgress,
+  uploadError,
+  fileInputRef,
+  onPick,
+  onRetry,
+  onClear,
+  maxBytes,
+}: {
+  file: File | null;
+  previewUrl: string | null;
+  uploadState: "idle" | "uploading" | "success" | "error";
+  uploadProgress: number;
+  uploadError: string | null;
+  fileInputRef: React.RefObject<HTMLInputElement | null>;
+  onPick: (f: File | null) => void;
+  onRetry: () => void;
+  onClear: () => void;
+  maxBytes: number;
+}) {
+  const openPicker = () => fileInputRef.current?.click();
+  const isVideo = !!file?.type.startsWith("video/");
+  const sizeMb = file ? (file.size / (1024 * 1024)).toFixed(1) : null;
+
+  return (
+    <div
+      className={`rounded-xl border p-3 text-xs ${
+        uploadState === "error"
+          ? "border-coral/50 bg-coral/5"
+          : uploadState === "success"
+            ? "border-lime/50 bg-lime/5"
+            : "border-dashed border-border bg-background"
+      }`}
+      data-testid="proof-uploader"
+      data-upload-state={uploadState}
+    >
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/*,video/*"
+        capture="environment"
+        onChange={(e) => {
+          onPick(e.target.files?.[0] ?? null);
+          // Allow re-picking the same file after clear/retry.
+          if (e.target) e.target.value = "";
+        }}
+        className="hidden"
+      />
+
+      {!file ? (
+        <button
+          type="button"
+          onClick={openPicker}
+          className="flex w-full items-center gap-3 text-left"
+        >
+          <span className="grid h-9 w-9 place-items-center rounded-lg bg-secondary text-lime">
+            <Upload className="h-4 w-4" />
+          </span>
+          <span className="flex-1">
+            <span className="block font-semibold text-foreground">
+              Upload proof (image or video)
+            </span>
+            <span className="block text-[11px] text-muted-foreground">
+              Screenshot or short clip · max {Math.round(maxBytes / (1024 * 1024))} MB
+            </span>
+          </span>
+        </button>
+      ) : (
+        <div className="space-y-2">
+          <div className="flex items-center gap-3">
+            {previewUrl ? (
+              <img
+                src={previewUrl}
+                alt="Payment proof preview"
+                className="h-12 w-12 rounded-lg object-cover border border-border"
+              />
+            ) : (
+              <span className="grid h-12 w-12 place-items-center rounded-lg bg-secondary text-lime">
+                {isVideo ? <Film className="h-5 w-5" /> : <ImageIcon className="h-5 w-5" />}
+              </span>
+            )}
+            <div className="flex-1 min-w-0">
+              <div className="truncate font-semibold text-foreground">{file.name}</div>
+              <div className="text-[11px] text-muted-foreground">
+                {isVideo ? "Video" : "Image"} · {sizeMb} MB
+                {uploadState === "success" && (
+                  <span className="ml-1 text-lime">· Uploaded</span>
+                )}
+                {uploadState === "uploading" && (
+                  <span className="ml-1 text-muted-foreground">· Uploading…</span>
+                )}
+                {uploadState === "error" && (
+                  <span className="ml-1 text-coral">· Upload failed</span>
+                )}
+              </div>
+            </div>
+            <div className="flex items-center gap-1">
+              {uploadState === "error" && (
+                <button
+                  type="button"
+                  onClick={onRetry}
+                  aria-label="Retry upload"
+                  className="inline-flex items-center gap-1 rounded-full bg-lime-gradient px-2.5 py-1 text-[11px] font-bold text-primary-foreground"
+                >
+                  <RotateCw className="h-3 w-3" /> Retry
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={openPicker}
+                aria-label="Choose a different file"
+                disabled={uploadState === "uploading"}
+                className="rounded-full border border-border px-2.5 py-1 text-[11px] font-semibold text-foreground disabled:opacity-50"
+              >
+                Replace
+              </button>
+              <button
+                type="button"
+                onClick={onClear}
+                aria-label="Remove file"
+                disabled={uploadState === "uploading"}
+                className="grid h-6 w-6 place-items-center rounded-full text-muted-foreground hover:text-coral disabled:opacity-50"
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+              </button>
+            </div>
+          </div>
+
+          {(uploadState === "uploading" || uploadState === "success") && (
+            <div className="space-y-1">
+              <div
+                className="h-1.5 w-full overflow-hidden rounded-full bg-border/60"
+                role="progressbar"
+                aria-valuemin={0}
+                aria-valuemax={100}
+                aria-valuenow={Math.round(uploadProgress)}
+                aria-label="Upload progress"
+              >
+                <div
+                  className={`h-full transition-[width] duration-200 ${
+                    uploadState === "success" ? "bg-lime" : "bg-lime/80"
+                  }`}
+                  style={{ width: `${Math.min(100, Math.max(0, uploadProgress))}%` }}
+                />
+              </div>
+              <div className="flex items-center justify-between text-[10px] text-muted-foreground">
+                <span>{Math.round(uploadProgress)}%</span>
+                <span>
+                  {uploadState === "success" ? "Ready to submit" : "Keep this tab open"}
+                </span>
+              </div>
+            </div>
+          )}
+
+          {uploadState === "error" && (
+            <div
+              role="alert"
+              className="rounded-lg border border-coral/40 bg-coral/10 p-2 text-[11px] text-coral"
+            >
+              <div className="font-bold mb-0.5 flex items-center gap-1">
+                <AlertCircle className="h-3 w-3" /> Upload didn't finish
+              </div>
+              <p className="text-coral/90">
+                {uploadError || "Something went wrong."} Tap{" "}
+                <span className="font-semibold">Retry</span> to try again, or{" "}
+                <span className="font-semibold">Replace</span> to pick a different file.
+              </p>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }
