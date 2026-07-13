@@ -30,6 +30,13 @@ import { joinGame, leaveGame, useIsJoined } from "@/lib/games-store";
 import { useLiveParticipantCount } from "@/lib/game-participants-store";
 import { useLiveParticipants } from "@/lib/game-roster";
 import { useGameWaitlist, joinWaitlist, leaveWaitlist } from "@/lib/waitlist-store";
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetDescription,
+} from "@/components/ui/sheet";
 import { toast } from "sonner";
 import { useEffect, useMemo, useState } from "react";
 import {
@@ -151,6 +158,7 @@ function GameDetail() {
   const [messaging, setMessaging] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
   const [requesting, setRequesting] = useState(false);
+  const [positionRosterOpen, setPositionRosterOpen] = useState(false);
 
   // effectiveJoined is computed below, after settings/myReq/isHost resolve.
   // Placeholder removed — see definition near line 161.
@@ -843,9 +851,19 @@ function GameDetail() {
         {/* Positions needed */}
         {game.positionsNeeded && Object.keys(game.positionsNeeded).length > 0 && (
           <div>
-            <h2 className="font-display text-sm font-bold uppercase tracking-wider text-muted-foreground mb-2">
-              Positions needed
-            </h2>
+            <div className="flex items-center justify-between mb-2">
+              <h2 className="font-display text-sm font-bold uppercase tracking-wider text-muted-foreground">
+                Positions needed
+              </h2>
+              <button
+                type="button"
+                onClick={() => setPositionRosterOpen(true)}
+                className="text-xs font-semibold text-lime hover:underline"
+                aria-label="View roster by position"
+              >
+                View roster
+              </button>
+            </div>
             <div className="flex flex-wrap gap-2">
               {Object.entries(game.positionsNeeded).map(([name, count]) => {
                 const filled = liveRoster.filter((p) => p.position === name).length;
@@ -972,6 +990,94 @@ function GameDetail() {
 
           </div>
         )}
+
+        <Sheet open={positionRosterOpen} onOpenChange={setPositionRosterOpen}>
+          <SheetContent side="right" className="w-full sm:max-w-md overflow-y-auto">
+            <SheetHeader>
+              <SheetTitle>Roster by position</SheetTitle>
+              <SheetDescription>
+                {effectiveJoined}/{game.maxPlayers} confirmed
+                {game.positionsNeeded && Object.keys(game.positionsNeeded).length > 0
+                  ? " — grouped by role"
+                  : null}
+              </SheetDescription>
+            </SheetHeader>
+
+            <div className="mt-4 space-y-4">
+              {Object.entries(game.positionsNeeded ?? {}).map(([name, count]) => {
+                const filledPlayers = liveRoster.filter((p) => p.position === name);
+                const remaining = Math.max(0, count - filledPlayers.length);
+                const isFull = remaining === 0;
+                const posWait = waitlistEntries.filter((w) => w.position === name);
+                return (
+                  <div key={name} className="rounded-2xl border border-border bg-surface p-3">
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="font-display font-bold">{name}</div>
+                      <span
+                        className={`rounded-full px-2 py-0.5 text-[10px] font-bold tabular-nums ${
+                          isFull
+                            ? "bg-secondary text-muted-foreground"
+                            : "bg-lime/20 text-lime"
+                        }`}
+                      >
+                        {isFull ? "Filled" : `${remaining} of ${count} left`}
+                      </span>
+                    </div>
+                    {filledPlayers.length === 0 ? (
+                      <div className="text-xs text-muted-foreground">No one confirmed yet.</div>
+                    ) : (
+                      <div className="flex flex-col gap-2">
+                        {filledPlayers.map((p) => (
+                          <div key={p.userId} className="flex items-center gap-2">
+                            <UserAvatar
+                              name={p.displayName}
+                              initials={p.avatarInitials}
+                              avatarUrl={p.avatarUrl}
+                              size="sm"
+                            />
+                            <span className="text-sm">{p.displayName}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    {posWait.length > 0 && (
+                      <div className="mt-2 pt-2 border-t border-border/60 text-[11px] text-coral font-semibold">
+                        {posWait.length} on waitlist
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+
+              {(() => {
+                const namedPositions = new Set(Object.keys(game.positionsNeeded ?? {}));
+                const unassigned = liveRoster.filter(
+                  (p) => !p.position || !namedPositions.has(p.position),
+                );
+                if (unassigned.length === 0) return null;
+                return (
+                  <div className="rounded-2xl border border-dashed border-border bg-surface p-3">
+                    <div className="font-display font-bold mb-2">Unassigned</div>
+                    <div className="flex flex-col gap-2">
+                      {unassigned.map((p) => (
+                        <div key={p.userId} className="flex items-center gap-2">
+                          <UserAvatar
+                            name={p.displayName}
+                            initials={p.avatarInitials}
+                            avatarUrl={p.avatarUrl}
+                            size="sm"
+                          />
+                          <span className="text-sm">{p.displayName}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })()}
+            </div>
+          </SheetContent>
+        </Sheet>
+
 
         {/* Players */}
         <div>
