@@ -694,6 +694,8 @@ export type Database = {
           host_id: string
           id: string
           notes: string | null
+          paid_amount: number | null
+          paid_at: string | null
           payment_method_id: string | null
           payment_type: string | null
           player_id: string
@@ -709,6 +711,8 @@ export type Database = {
           host_id: string
           id?: string
           notes?: string | null
+          paid_amount?: number | null
+          paid_at?: string | null
           payment_method_id?: string | null
           payment_type?: string | null
           player_id: string
@@ -724,6 +728,8 @@ export type Database = {
           host_id?: string
           id?: string
           notes?: string | null
+          paid_amount?: number | null
+          paid_at?: string | null
           payment_method_id?: string | null
           payment_type?: string | null
           player_id?: string

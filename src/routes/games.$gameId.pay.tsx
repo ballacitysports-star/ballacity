@@ -20,6 +20,42 @@ import {
 } from "@/lib/payments";
 import { LegalNotice } from "@/components/LegalNotice";
 import { joinGame } from "@/lib/games-store";
+import { z } from "zod";
+
+// Local YYYY-MM-DD for a Date, avoiding UTC shift from toISOString().
+function toLocalDateInputValue(d: Date) {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
+const proofSchema = z.object({
+  paidAmount: z
+    .string()
+    .trim()
+    .nonempty({ message: "Enter the amount you paid." })
+    .refine((v) => /^\d+(\.\d{1,2})?$/.test(v), {
+      message: "Use a number like 15 or 15.00.",
+    })
+    .refine((v) => Number(v) > 0, { message: "Amount must be greater than 0." })
+    .refine((v) => Number(v) <= 100000, { message: "Amount looks too large." }),
+  paidAt: z
+    .string()
+    .nonempty({ message: "Pick the date you paid." })
+    .refine((v) => !Number.isNaN(new Date(v).getTime()), {
+      message: "Invalid date.",
+    })
+    .refine((v) => new Date(v) <= new Date(new Date().setHours(23, 59, 59, 999)), {
+      message: "Payment date can't be in the future.",
+    }),
+  transactionRef: z
+    .string()
+    .trim()
+    .max(120, { message: "Transaction ID must be under 120 characters." })
+    .optional(),
+  notes: z.string().trim().max(500, { message: "Notes must be under 500 characters." }).optional(),
+});
 
 export const Route = createFileRoute("/games/$gameId/pay")({
   validateSearch: (search: Record<string, unknown>) => {
@@ -591,7 +627,10 @@ function PaymentInstructionsAndProof({
   const meta = paymentTypeMeta(method.payment_type);
   const [file, setFile] = useState<File | null>(null);
   const [ref, setRef] = useState("");
+  const [paidAmount, setPaidAmount] = useState("");
+  const [paidAt, setPaidAt] = useState(() => toLocalDateInputValue(new Date()));
   const [notes, setNotes] = useState("");
+  const [errors, setErrors] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState(false);
   // Persist "opened" across the round-trip so a hard refresh, a webview
   // relaunch, or a mobile OS backgrounding still resumes at the proof step.
@@ -660,18 +699,41 @@ function PaymentInstructionsAndProof({
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    const parsed = proofSchema.safeParse({
+      paidAmount,
+      paidAt,
+      transactionRef: ref,
+      notes,
+    });
+    if (!parsed.success) {
+      const fieldErrors: Record<string, string> = {};
+      for (const issue of parsed.error.issues) {
+        const key = issue.path[0];
+        if (typeof key === "string" && !fieldErrors[key]) fieldErrors[key] = issue.message;
+      }
+      setErrors(fieldErrors);
+      toast.error("Please fix the highlighted fields.");
+      return;
+    }
+    setErrors({});
+
     setSubmitting(true);
     try {
       let path: string | null = null;
       if (file) path = await uploadProofScreenshot(file);
+      // Store paid_at at local noon so a date-only value doesn't shift a day in UTC.
+      const paidAtIso = new Date(`${parsed.data.paidAt}T12:00:00`).toISOString();
       await createPaymentSubmission({
         game_id,
         host_id,
         payment_method_id: method.id,
         payment_type: method.payment_type,
         screenshot_path: path,
-        transaction_reference: ref || null,
-        notes: notes || null,
+        transaction_reference: parsed.data.transactionRef || null,
+        paid_amount: Number(parsed.data.paidAmount),
+        paid_at: paidAtIso,
+        notes: parsed.data.notes || null,
       });
       toast.success("Submitted — host will verify shortly.");
       try {
@@ -795,19 +857,101 @@ function PaymentInstructionsAndProof({
             className="hidden"
           />
         </label>
-        <input
-          value={ref}
-          onChange={(e) => setRef(e.target.value)}
-          placeholder="Transaction ID (optional)"
-          className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm outline-none focus:border-lime"
-        />
-        <textarea
-          value={notes}
-          onChange={(e) => setNotes(e.target.value)}
-          rows={2}
-          placeholder="Notes for host (optional)"
-          className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm outline-none focus:border-lime resize-none"
-        />
+        <div className="grid grid-cols-2 gap-2">
+          <div>
+            <label
+              htmlFor="paid-amount"
+              className="block text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-1"
+            >
+              Amount paid *
+            </label>
+            <div className="relative">
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">
+                $
+              </span>
+              <input
+                id="paid-amount"
+                type="text"
+                inputMode="decimal"
+                value={paidAmount}
+                onChange={(e) => setPaidAmount(e.target.value)}
+                placeholder="0.00"
+                aria-invalid={!!errors.paidAmount}
+                aria-describedby={errors.paidAmount ? "paid-amount-err" : undefined}
+                className={`w-full rounded-xl border bg-background pl-6 pr-3 py-2 text-sm outline-none focus:border-lime ${
+                  errors.paidAmount ? "border-coral" : "border-border"
+                }`}
+              />
+            </div>
+            {errors.paidAmount && (
+              <p id="paid-amount-err" className="mt-1 text-[11px] text-coral">
+                {errors.paidAmount}
+              </p>
+            )}
+          </div>
+          <div>
+            <label
+              htmlFor="paid-at"
+              className="block text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-1"
+            >
+              Payment date *
+            </label>
+            <input
+              id="paid-at"
+              type="date"
+              value={paidAt}
+              max={toLocalDateInputValue(new Date())}
+              onChange={(e) => setPaidAt(e.target.value)}
+              aria-invalid={!!errors.paidAt}
+              aria-describedby={errors.paidAt ? "paid-at-err" : undefined}
+              className={`w-full rounded-xl border bg-background px-3 py-2 text-sm outline-none focus:border-lime ${
+                errors.paidAt ? "border-coral" : "border-border"
+              }`}
+            />
+            {errors.paidAt && (
+              <p id="paid-at-err" className="mt-1 text-[11px] text-coral">
+                {errors.paidAt}
+              </p>
+            )}
+          </div>
+        </div>
+        <div>
+          <input
+            value={ref}
+            onChange={(e) => setRef(e.target.value)}
+            placeholder="Transaction ID (optional)"
+            maxLength={120}
+            aria-invalid={!!errors.transactionRef}
+            aria-describedby={errors.transactionRef ? "tx-ref-err" : undefined}
+            className={`w-full rounded-xl border bg-background px-3 py-2 text-sm outline-none focus:border-lime ${
+              errors.transactionRef ? "border-coral" : "border-border"
+            }`}
+          />
+          {errors.transactionRef && (
+            <p id="tx-ref-err" className="mt-1 text-[11px] text-coral">
+              {errors.transactionRef}
+            </p>
+          )}
+        </div>
+        <div>
+          <textarea
+            value={notes}
+            onChange={(e) => setNotes(e.target.value)}
+            rows={2}
+            maxLength={500}
+            placeholder="Notes for host (optional)"
+            aria-invalid={!!errors.notes}
+            aria-describedby={errors.notes ? "notes-err" : undefined}
+            className={`w-full rounded-xl border bg-background px-3 py-2 text-sm outline-none focus:border-lime resize-none ${
+              errors.notes ? "border-coral" : "border-border"
+            }`}
+          />
+          {errors.notes && (
+            <p id="notes-err" className="mt-1 text-[11px] text-coral">
+              {errors.notes}
+            </p>
+          )}
+        </div>
         <button
           type="submit"
           disabled={submitting}
