@@ -818,10 +818,23 @@ function PaymentInstructionsAndProof({
     }
     setErrors({});
 
+    // Block submit while the upload is in flight or has failed. Users can
+    // retry or clear the file — but we don't quietly re-upload here.
+    if (uploadState === "uploading") {
+      toast.error("Wait for the upload to finish before submitting.");
+      return;
+    }
+    if (file && uploadState === "error") {
+      toast.error("Retry the upload or remove the file, then submit again.");
+      return;
+    }
+
     setSubmitting(true);
     try {
-      let path: string | null = null;
-      if (file) path = await uploadProofScreenshot(file);
+      let path: string | null = uploadedPath;
+      // Fallback: user attached a file but it hasn't been uploaded (unlikely
+      // in the normal flow — pickFile auto-uploads). Upload now inline.
+      if (file && !path) path = await uploadProofScreenshot(file);
       // Store paid_at at local noon so a date-only value doesn't shift a day in UTC.
       const paidAtIso = new Date(`${parsed.data.paidAt}T12:00:00`).toISOString();
       await createPaymentSubmission({
