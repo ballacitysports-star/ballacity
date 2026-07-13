@@ -699,18 +699,41 @@ function PaymentInstructionsAndProof({
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    const parsed = proofSchema.safeParse({
+      paidAmount,
+      paidAt,
+      transactionRef: ref,
+      notes,
+    });
+    if (!parsed.success) {
+      const fieldErrors: Record<string, string> = {};
+      for (const issue of parsed.error.issues) {
+        const key = issue.path[0];
+        if (typeof key === "string" && !fieldErrors[key]) fieldErrors[key] = issue.message;
+      }
+      setErrors(fieldErrors);
+      toast.error("Please fix the highlighted fields.");
+      return;
+    }
+    setErrors({});
+
     setSubmitting(true);
     try {
       let path: string | null = null;
       if (file) path = await uploadProofScreenshot(file);
+      // Store paid_at at local noon so a date-only value doesn't shift a day in UTC.
+      const paidAtIso = new Date(`${parsed.data.paidAt}T12:00:00`).toISOString();
       await createPaymentSubmission({
         game_id,
         host_id,
         payment_method_id: method.id,
         payment_type: method.payment_type,
         screenshot_path: path,
-        transaction_reference: ref || null,
-        notes: notes || null,
+        transaction_reference: parsed.data.transactionRef || null,
+        paid_amount: Number(parsed.data.paidAmount),
+        paid_at: paidAtIso,
+        notes: parsed.data.notes || null,
       });
       toast.success("Submitted — host will verify shortly.");
       try {
