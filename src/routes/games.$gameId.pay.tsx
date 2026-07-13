@@ -255,7 +255,7 @@ function PayPage() {
         )}
       </div>
 
-      {mySubs.length > 0 && <MySubsList subs={mySubs} />}
+      {mySubs.length > 0 && <PaymentStatusTimeline latest={mySubs[0]} history={mySubs.slice(1)} />}
 
       {requiresApproval && (myReq?.status === "pending" || myReq?.status === "approved") && (
         <div
