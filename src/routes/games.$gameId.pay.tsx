@@ -284,10 +284,12 @@ function PayPage() {
                       href={m.payment_url}
                       target="_blank"
                       rel="noreferrer"
+                      onClick={() => setPicked(m)}
                       className="inline-flex items-center gap-1 rounded-full bg-lime-gradient px-3 py-1.5 text-xs font-bold text-primary-foreground"
-                      title={`Open ${meta.name}`}
+                      title={`Open ${meta.name} in a new tab`}
+                      aria-label={`Open ${meta.name} in a new tab to pay`}
                     >
-                      <ExternalLink className="h-3.5 w-3.5" /> Pay
+                      <ExternalLink className="h-3.5 w-3.5" /> Open {meta.name}
                     </a>
                   ) : (
                     <button
@@ -388,6 +390,18 @@ function PaymentInstructionsAndProof({
   const [ref, setRef] = useState("");
   const [notes, setNotes] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [opened, setOpened] = useState(false);
+  const proofRef = useRef<HTMLFormElement | null>(null);
+
+  const handleOpenExternal = () => {
+    setOpened(true);
+    // Give the new tab a beat to open, then scroll the proof form into view
+    // so the user sees the return steps as soon as they come back.
+    window.setTimeout(() => {
+      proofRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 300);
+  };
+
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -435,9 +449,11 @@ function PaymentInstructionsAndProof({
             href={method.payment_url}
             target="_blank"
             rel="noreferrer"
+            onClick={handleOpenExternal}
+            aria-label={`Open ${meta.name} in a new tab to pay the host`}
             className="mt-2 flex items-center justify-center gap-2 w-full rounded-xl bg-lime-gradient py-3 text-sm font-bold text-primary-foreground"
           >
-            <ExternalLink className="h-4 w-4" /> Open {meta.name}
+            <ExternalLink className="h-4 w-4" /> Open {meta.name} to pay
           </a>
         )}
         {(method.instructions || extraInstructions) && (
@@ -446,9 +462,53 @@ function PaymentInstructionsAndProof({
             {extraInstructions && <p>{extraInstructions}</p>}
           </div>
         )}
+
+        <div className="mt-3 rounded-xl border border-border bg-background p-3 text-xs">
+          <div className="font-bold uppercase tracking-wider text-muted-foreground mb-2">
+            How to pay
+          </div>
+          <ol className="list-decimal pl-4 space-y-1 text-foreground/90">
+            {method.payment_url ? (
+              <li>
+                Tap <span className="font-semibold">Open {meta.name} to pay</span> above — it opens
+                in a new tab.
+              </li>
+            ) : (
+              <li>
+                Open {meta.name} and send the fee to{" "}
+                <span className="font-semibold">{method.username || method.contact_info}</span>.
+              </li>
+            )}
+            <li>Complete the payment inside {meta.name}.</li>
+            <li>Screenshot the confirmation screen.</li>
+            <li>
+              Come back to this tab and upload the screenshot below, then tap{" "}
+              <span className="font-semibold">I have paid</span>.
+            </li>
+          </ol>
+        </div>
       </div>
 
-      <form onSubmit={submit} className="rounded-2xl border border-border bg-surface p-4 space-y-3">
+      {opened && (
+        <div
+          role="status"
+          aria-live="polite"
+          className="rounded-2xl border border-lime/40 bg-lime/10 p-3 text-xs"
+        >
+          <div className="font-bold text-lime mb-0.5">Welcome back — finish here</div>
+          <p className="text-muted-foreground">
+            Upload your payment screenshot and tap <span className="font-semibold">I have paid</span>
+            . The host verifies and confirms your spot.
+          </p>
+        </div>
+      )}
+
+      <form
+        ref={proofRef}
+        onSubmit={submit}
+        className="rounded-2xl border border-border bg-surface p-4 space-y-3"
+      >
+
         <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
           I have paid — submit proof
         </h3>
