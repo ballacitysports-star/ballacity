@@ -747,13 +747,22 @@ function PaymentInstructionsAndProof({
       {opened && (
         <div
           role="status"
-          aria-live="polite"
-          className="rounded-2xl border border-lime/40 bg-lime/10 p-3 text-xs"
+          aria-live="assertive"
+          data-testid="return-from-payment-callout"
+          data-returned={returned ? "1" : "0"}
+          className={`rounded-2xl border p-3 text-xs transition-colors ${
+            returned
+              ? "border-lime/60 bg-lime/15 shadow-[0_0_0_2px_rgba(163,230,53,0.2)]"
+              : "border-lime/40 bg-lime/10"
+          }`}
         >
-          <div className="font-bold text-lime mb-0.5">Welcome back — finish here</div>
+          <div className="font-bold text-lime mb-0.5">
+            {returned ? "Welcome back — upload your screenshot" : "Paying in a new tab…"}
+          </div>
           <p className="text-muted-foreground">
-            Upload your payment screenshot and tap <span className="font-semibold">I have paid</span>
-            . The host verifies and confirms your spot.
+            {returned
+              ? "You're on the proof step. Add your screenshot below and tap I have paid."
+              : "Finish the payment, screenshot the confirmation, then come back here."}
           </p>
         </div>
       )}
@@ -773,6 +782,7 @@ function PaymentInstructionsAndProof({
             {file ? file.name : "Upload screenshot of payment"}
           </span>
           <input
+            ref={fileInputRef}
             type="file"
             accept="image/*"
             capture="environment"
