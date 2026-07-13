@@ -459,7 +459,7 @@ function GameDetail() {
       nav({ to: "/games/$gameId/pay", params: { gameId: game.id }, search });
       return;
     }
-    joinGame(game.id);
+    joinGame(game.id, preselectedPosition);
     toast.success(`You're in! See you at ${game.location}.`);
     // Notify host in real time that a new player joined.
     if (gameHostId && user && gameHostId !== user.id) {
