@@ -1,6 +1,6 @@
 import { createFileRoute, Link, notFound, useNavigate } from "@tanstack/react-router";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { ArrowLeft, ExternalLink, Upload, ShieldCheck, Clock, X } from "lucide-react";
+import { ArrowLeft, ExternalLink, Upload, ShieldCheck, Clock, X, Check, CircleDashed, AlertCircle } from "lucide-react";
 import { toast } from "sonner";
 import { GAMES } from "@/lib/sample-data";
 import { useAuth } from "@/hooks/use-auth";
@@ -154,6 +154,70 @@ function PayPage() {
     };
   }, [game.id, user]);
 
+  // Live-update payment submissions so the status timeline reflects host
+  // review (verified/rejected) in real time. Realtime primary, poll fallback.
+  const refreshSubs = useCallback(async () => {
+    if (!user) return;
+    try {
+      const subs = await listMySubmissionsForGame(game.id);
+      setMySubs((prev) => {
+        const prevLatest = prev[0];
+        const nextLatest = subs[0];
+        if (
+          nextLatest &&
+          prevLatest &&
+          nextLatest.id === prevLatest.id &&
+          nextLatest.status !== prevLatest.status
+        ) {
+          if (nextLatest.status === "verified") toast.success("Payment verified by host!");
+          if (nextLatest.status === "rejected") toast.error("Host rejected your payment — try again.");
+        }
+        return subs;
+      });
+    } catch {
+      /* ignore polling errors */
+    }
+  }, [game.id, user]);
+
+  const refreshSubsRef = useRef(refreshSubs);
+  useEffect(() => {
+    refreshSubsRef.current = refreshSubs;
+  }, [refreshSubs]);
+  useEffect(() => {
+    if (!user) return;
+    const channel = supabase
+      .channel(`pay-subs:${game.id}:${user.id}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "payment_submissions",
+          filter: `player_id=eq.${user.id}`,
+        },
+        (payload) => {
+          const row = (payload.new ?? payload.old) as PaymentSubmission | undefined;
+          if (row?.game_id === game.id) refreshSubsRef.current();
+        },
+      )
+      .subscribe();
+
+    const poll = window.setInterval(() => refreshSubsRef.current(), 15_000);
+    const onFocus = () => refreshSubsRef.current();
+    window.addEventListener("focus", onFocus);
+    const onVisibility = () => {
+      if (document.visibilityState === "visible") refreshSubsRef.current();
+    };
+    document.addEventListener("visibilitychange", onVisibility);
+
+    return () => {
+      supabase.removeChannel(channel);
+      window.clearInterval(poll);
+      window.removeEventListener("focus", onFocus);
+      document.removeEventListener("visibilitychange", onVisibility);
+    };
+  }, [game.id, user]);
+
   if (loading || fetching) return <div className="p-6 text-sm text-muted-foreground">Loading…</div>;
   if (!user) return null;
 
@@ -191,7 +255,7 @@ function PayPage() {
         )}
       </div>
 
-      {mySubs.length > 0 && <MySubsList subs={mySubs} />}
+      {mySubs.length > 0 && <PaymentStatusTimeline latest={mySubs[0]} history={mySubs.slice(1)} />}
 
       {requiresApproval && (myReq?.status === "pending" || myReq?.status === "approved") && (
         <div
@@ -335,37 +399,176 @@ function PayPage() {
   );
 }
 
-function MySubsList({ subs }: { subs: PaymentSubmission[] }) {
+function PaymentStatusTimeline({
+  latest,
+  history,
+}: {
+  latest: PaymentSubmission;
+  history: PaymentSubmission[];
+}) {
+  const isRejected = latest.status === "rejected";
+  const isVerified = latest.status === "verified";
+  const isPending = latest.status === "pending";
+
+  // Three canonical steps; the third splits into verified vs rejected.
+  type StepState = "done" | "current" | "upcoming" | "failed";
+  const steps: { key: string; label: string; hint: string; state: StepState; at?: string | null }[] =
+    [
+      {
+        key: "submitted",
+        label: "Proof submitted",
+        hint: "You sent payment details to the host.",
+        state: "done",
+        at: latest.submitted_at,
+      },
+      {
+        key: "review",
+        label: "Host reviewing",
+        hint: isPending
+          ? "Waiting on the host to confirm your payment."
+          : "Host reviewed your submission.",
+        state: isPending ? "current" : "done",
+        at: isPending ? null : latest.reviewed_at,
+      },
+      isRejected
+        ? {
+            key: "rejected",
+            label: "Rejected — try again",
+            hint: latest.reviewer_notes || "Host couldn't verify this payment.",
+            state: "failed",
+            at: latest.reviewed_at,
+          }
+        : {
+            key: "verified",
+            label: "Payment verified",
+            hint: isVerified
+              ? latest.reviewer_notes || "You're all set — see you at the game."
+              : "You'll be confirmed once the host verifies.",
+            state: isVerified ? "done" : "upcoming",
+            at: isVerified ? latest.reviewed_at : null,
+          },
+    ];
+
   return (
-    <div className="mb-4 space-y-2">
-      {subs.map((s) => (
-        <div
-          key={s.id}
-          className={`rounded-2xl border p-3 text-xs ${
-            s.status === "verified"
-              ? "border-lime/40 bg-lime/5"
-              : s.status === "rejected"
-                ? "border-coral/40 bg-coral/5"
-                : "border-border bg-surface"
+    <div
+      className="mb-4 rounded-2xl border border-border bg-surface p-4"
+      role="status"
+      aria-live="polite"
+      aria-atomic="true"
+      data-testid="payment-status-timeline"
+      data-status={latest.status}
+    >
+      <div className="flex items-center justify-between mb-3">
+        <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+          Payment status
+        </h3>
+        <span
+          className={`text-[10px] font-bold uppercase rounded-full px-2 py-0.5 border ${
+            isVerified
+              ? "border-lime/40 bg-lime/10 text-lime"
+              : isRejected
+                ? "border-coral/40 bg-coral/10 text-coral"
+                : "border-border bg-background text-muted-foreground"
           }`}
         >
-          <div className="flex items-center justify-between">
-            <span className="font-semibold uppercase">
-              {s.status === "verified"
-                ? "✓ Confirmed"
-                : s.status === "rejected"
-                  ? "✗ Rejected — submit again"
-                  : "⏳ Pending verification"}
-            </span>
-            <span className="text-muted-foreground">
-              {new Date(s.submitted_at).toLocaleString()}
-            </span>
-          </div>
-          {s.reviewer_notes && (
-            <p className="mt-1 text-muted-foreground">Host: {s.reviewer_notes}</p>
-          )}
-        </div>
-      ))}
+          {isVerified ? "Verified" : isRejected ? "Rejected" : "Pending"}
+        </span>
+      </div>
+
+      <ol className="space-y-3">
+        {steps.map((s, i) => {
+          const isLast = i === steps.length - 1;
+          return (
+            <li key={s.key} className="relative flex gap-3">
+              <div className="flex flex-col items-center">
+                <span
+                  className={`grid h-6 w-6 place-items-center rounded-full border ${
+                    s.state === "done"
+                      ? "border-lime/50 bg-lime/15 text-lime"
+                      : s.state === "current"
+                        ? "border-coral/50 bg-coral/10 text-coral"
+                        : s.state === "failed"
+                          ? "border-coral/60 bg-coral/15 text-coral"
+                          : "border-border bg-background text-muted-foreground"
+                  }`}
+                  aria-hidden="true"
+                >
+                  {s.state === "done" ? (
+                    <Check className="h-3.5 w-3.5" />
+                  ) : s.state === "current" ? (
+                    <Clock className="h-3.5 w-3.5 animate-pulse" />
+                  ) : s.state === "failed" ? (
+                    <AlertCircle className="h-3.5 w-3.5" />
+                  ) : (
+                    <CircleDashed className="h-3.5 w-3.5" />
+                  )}
+                </span>
+                {!isLast && (
+                  <span
+                    className={`w-px flex-1 mt-1 ${
+                      s.state === "done" ? "bg-lime/40" : "bg-border"
+                    }`}
+                    aria-hidden="true"
+                  />
+                )}
+              </div>
+              <div className="flex-1 pb-1 -mt-0.5">
+                <div className="flex items-baseline justify-between gap-2">
+                  <div
+                    className={`text-sm font-semibold ${
+                      s.state === "failed"
+                        ? "text-coral"
+                        : s.state === "upcoming"
+                          ? "text-muted-foreground"
+                          : "text-foreground"
+                    }`}
+                  >
+                    {s.label}
+                  </div>
+                  {s.at && (
+                    <div className="text-[10px] text-muted-foreground whitespace-nowrap">
+                      {new Date(s.at).toLocaleString()}
+                    </div>
+                  )}
+                </div>
+                <p className="text-xs text-muted-foreground mt-0.5">{s.hint}</p>
+              </div>
+            </li>
+          );
+        })}
+      </ol>
+
+      {history.length > 0 && (
+        <details className="mt-3 rounded-xl border border-border/70 bg-background/60 p-2 text-xs">
+          <summary className="cursor-pointer font-semibold text-muted-foreground">
+            Previous attempts ({history.length})
+          </summary>
+          <ul className="mt-2 space-y-1.5">
+            {history.map((h) => (
+              <li key={h.id} className="flex items-center justify-between gap-2">
+                <span
+                  className={`font-semibold ${
+                    h.status === "verified"
+                      ? "text-lime"
+                      : h.status === "rejected"
+                        ? "text-coral"
+                        : "text-muted-foreground"
+                  }`}
+                >
+                  {h.status === "verified"
+                    ? "✓ Verified"
+                    : h.status === "rejected"
+                      ? "✗ Rejected"
+                      : "⏳ Pending"}
+                </span>
+                <span className="text-muted-foreground">
+                  {new Date(h.submitted_at).toLocaleString()}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </details>
+      )}
     </div>
   );
 }
