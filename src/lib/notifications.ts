@@ -21,8 +21,12 @@ export async function createNotification(input: {
   body?: string | null;
   link?: string | null;
 }) {
-  const { error } = await supabase.from("notifications" as any).insert(input as any);
-  if (error) console.warn("notification insert failed", error.message);
+  try {
+    const { createNotificationForUser } = await import("@/lib/notifications.functions");
+    await createNotificationForUser({ data: input });
+  } catch (e: any) {
+    console.warn("notification insert failed", e?.message ?? e);
+  }
 
   // Best-effort OneSignal push (background/closed-app delivery). Never blocks.
   try {
@@ -39,6 +43,7 @@ export async function createNotification(input: {
     console.warn("push module load failed", e);
   }
 }
+
 
 export async function listMyNotifications(): Promise<Notification[]> {
   const { data, error } = await supabase
