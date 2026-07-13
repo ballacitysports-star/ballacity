@@ -849,31 +849,55 @@ function GameDetail() {
                 const filled = liveRoster.filter((p) => p.position === name).length;
                 const remaining = Math.max(0, count - filled);
                 const isFull = remaining === 0;
+                const canJoinAs =
+                  !isFull &&
+                  !isHost &&
+                  !isConfirmed &&
+                  !joined &&
+                  !isPending &&
+                  !requiresApproval &&
+                  !isPaid &&
+                  !game.joinsClosed &&
+                  game.status !== "in_progress" &&
+                  game.status !== "completed" &&
+                  spotsLeft > 0 &&
+                  !!user;
                 return (
-                  <span
-                    key={name}
-                    className={
-                      isFull
-                        ? "inline-flex items-center gap-1.5 rounded-full border border-border bg-surface px-3 py-1 text-xs font-semibold text-muted-foreground line-through"
-                        : "inline-flex items-center gap-1.5 rounded-full border border-lime/40 bg-lime/10 px-3 py-1 text-xs font-semibold text-lime"
-                    }
-                    aria-label={
-                      isFull
-                        ? `${name}: filled`
-                        : `${name}: ${remaining} of ${count} spots remaining`
-                    }
-                  >
-                    <span>{name}</span>
+                  <div key={name} className="inline-flex items-center gap-1">
                     <span
                       className={
                         isFull
-                          ? "rounded-full bg-secondary px-1.5 py-0.5 text-[10px] tabular-nums"
-                          : "rounded-full bg-lime/20 px-1.5 py-0.5 text-[10px] tabular-nums"
+                          ? "inline-flex items-center gap-1.5 rounded-full border border-border bg-surface px-3 py-1 text-xs font-semibold text-muted-foreground line-through"
+                          : "inline-flex items-center gap-1.5 rounded-full border border-lime/40 bg-lime/10 px-3 py-1 text-xs font-semibold text-lime"
+                      }
+                      aria-label={
+                        isFull
+                          ? `${name}: filled`
+                          : `${name}: ${remaining} of ${count} spots remaining`
                       }
                     >
-                      {isFull ? "Filled" : `${remaining} of ${count} left`}
+                      <span>{name}</span>
+                      <span
+                        className={
+                          isFull
+                            ? "rounded-full bg-secondary px-1.5 py-0.5 text-[10px] tabular-nums"
+                            : "rounded-full bg-lime/20 px-1.5 py-0.5 text-[10px] tabular-nums"
+                        }
+                      >
+                        {isFull ? "Filled" : `${remaining} of ${count} left`}
+                      </span>
                     </span>
-                  </span>
+                    {canJoinAs && (
+                      <button
+                        type="button"
+                        onClick={() => handleJoin(name)}
+                        aria-label={`Join as ${name}`}
+                        className="rounded-full border border-lime bg-lime px-2.5 py-1 text-[11px] font-bold text-background hover:opacity-90 active:scale-95 transition"
+                      >
+                        Join as {name}
+                      </button>
+                    )}
+                  </div>
                 );
               })}
             </div>
