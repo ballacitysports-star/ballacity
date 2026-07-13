@@ -20,6 +20,42 @@ import {
 } from "@/lib/payments";
 import { LegalNotice } from "@/components/LegalNotice";
 import { joinGame } from "@/lib/games-store";
+import { z } from "zod";
+
+// Local YYYY-MM-DD for a Date, avoiding UTC shift from toISOString().
+function toLocalDateInputValue(d: Date) {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
+const proofSchema = z.object({
+  paidAmount: z
+    .string()
+    .trim()
+    .nonempty({ message: "Enter the amount you paid." })
+    .refine((v) => /^\d+(\.\d{1,2})?$/.test(v), {
+      message: "Use a number like 15 or 15.00.",
+    })
+    .refine((v) => Number(v) > 0, { message: "Amount must be greater than 0." })
+    .refine((v) => Number(v) <= 100000, { message: "Amount looks too large." }),
+  paidAt: z
+    .string()
+    .nonempty({ message: "Pick the date you paid." })
+    .refine((v) => !Number.isNaN(new Date(v).getTime()), {
+      message: "Invalid date.",
+    })
+    .refine((v) => new Date(v) <= new Date(new Date().setHours(23, 59, 59, 999)), {
+      message: "Payment date can't be in the future.",
+    }),
+  transactionRef: z
+    .string()
+    .trim()
+    .max(120, { message: "Transaction ID must be under 120 characters." })
+    .optional(),
+  notes: z.string().trim().max(500, { message: "Notes must be under 500 characters." }).optional(),
+});
 
 export const Route = createFileRoute("/games/$gameId/pay")({
   validateSearch: (search: Record<string, unknown>) => {
