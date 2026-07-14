@@ -480,6 +480,23 @@ function PayPage() {
             {myReq ? "Back to game" : "Request to join"}
           </Link>
         </div>
+      ) : fetching ? (
+        <div className="rounded-2xl border border-dashed border-border bg-surface/40 p-5 text-center text-sm text-muted-foreground">
+          Loading payment options…
+        </div>
+      ) : fetchTimedOut ? (
+        <div className="rounded-2xl border border-dashed border-coral/40 bg-coral/5 p-5 text-center space-y-2">
+          <div className="text-sm text-muted-foreground">
+            Couldn't reach the payment service.
+          </div>
+          <button
+            type="button"
+            onClick={() => setFetchAttempt((n) => n + 1)}
+            className="inline-flex items-center rounded-full bg-lime-gradient px-4 py-1.5 text-xs font-bold text-primary-foreground"
+          >
+            Retry
+          </button>
+        </div>
       ) : !settings || methods.length === 0 ? (
         <div className="rounded-2xl border border-dashed border-border bg-surface/40 p-5 text-center">
           <div className="font-semibold text-sm">Host hasn't configured payment yet</div>
