@@ -24,7 +24,7 @@ import {
   Home,
   ShieldCheck,
 } from "lucide-react";
-import { GAMES, SPORTS } from "@/lib/sample-data";
+import { GAMES, SPORTS, imageFor } from "@/lib/sample-data";
 import { formatWhen } from "@/lib/format";
 import { ReviewsSection } from "@/components/ReviewsSection";
 import { UserAvatar } from "@/components/UserAvatar";
