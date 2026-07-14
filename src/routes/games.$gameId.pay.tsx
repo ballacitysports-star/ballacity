@@ -223,15 +223,32 @@ function PayPage() {
           );
           if (cancelled) return;
           setMethods(all);
+        } else {
+          setMethods([]);
         }
+
+        // Payment settings + host payment methods are the critical path for
+        // rendering the pay UI. User-specific status is helpful, but should
+        // never blank the screen or show the payment-service retry if a
+        // realtime/status lookup is slow on mobile.
+        if (!cancelled) setFetching(false);
+
         if (user) {
-          const [subs, req] = await withTimeout(
-            Promise.all([listMySubmissionsForGame(gameId), getMyJoinRequest(gameId)]),
-            "listMySubmissionsForGame+getMyJoinRequest",
-          );
+          const [subsResult, reqResult] = await Promise.allSettled([
+            withTimeout(listMySubmissionsForGame(gameId), "listMySubmissionsForGame"),
+            withTimeout(getMyJoinRequest(gameId), "getMyJoinRequest"),
+          ]);
           if (cancelled) return;
-          setMySubs(subs);
-          setMyReq(req);
+          if (subsResult.status === "fulfilled") {
+            setMySubs(subsResult.value);
+          } else {
+            console.warn(`[pay] optional submissions lookup failed: ${subsResult.reason}`);
+          }
+          if (reqResult.status === "fulfilled") {
+            setMyReq(reqResult.value);
+          } else {
+            console.warn(`[pay] optional join-request lookup failed: ${reqResult.reason}`);
+          }
         }
       } catch (e: any) {
         if (cancelled) return;

@@ -107,6 +107,14 @@ async function mockPaymentBackend(
     },
   );
 
+  await page.route(
+    (url) => String(url).includes("/rest/v1/rpc/get_host_payment_methods"),
+    async (route) => {
+      if (route.request().method() !== "POST") return route.fallback();
+      await route.fulfill({ status: 200, contentType: "application/json", body: "[]" });
+    },
+  );
+
   const submissions = options.submissions ?? [];
   await page.route((url) => tableUrl(url, "payment_submissions"), async (route) => {
     const method = route.request().method();
@@ -165,6 +173,84 @@ test("Pay host button on a custom (sample) game routes to the pay screen", async
   await assertPayScreenRendered(page, CUSTOM_GAME_ID);
   await expect(page.locator("h1").first()).toContainText(CUSTOM_GAME_TITLE_MATCH);
   expect(writeAttempts, "opening pay should not join/cancel/delete from the detail CTA").toEqual([]);
+
+  await ctx.close();
+});
+
+test("Pay host still renders when optional status lookups hang", async ({ browser }) => {
+  const ctx = await browser.newContext();
+  const page = await ctx.newPage();
+  const writeAttempts: string[] = [];
+
+  await page.route(
+    (url) => tableUrl(url, "game_payment_settings"),
+    async (route) => {
+      if (route.request().method() !== "GET") return route.fallback();
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        headers: { "content-range": "0-0/1" },
+        body: JSON.stringify([
+          {
+            id: `mock-settings-${CUSTOM_GAME_ID}`,
+            game_id: CUSTOM_GAME_ID,
+            host_id: FAKE_HOST_ID,
+            entry_fee: 10,
+            accepted_method_ids: [],
+            payment_deadline: null,
+            refund_policy: null,
+            payment_instructions: null,
+            requires_approval: false,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          },
+        ]),
+      });
+    },
+  );
+  await page.route(
+    (url) => String(url).includes("/rest/v1/rpc/get_host_payment_methods"),
+    async (route) => {
+      if (route.request().method() !== "POST") return route.fallback();
+      await route.fulfill({ status: 200, contentType: "application/json", body: "[]" });
+    },
+  );
+  await page.route((url) => tableUrl(url, "payment_submissions"), async (route) => {
+    if (route.request().method() !== "GET" && route.request().method() !== "HEAD") {
+      writeAttempts.push(`payment_submissions:${route.request().method()}`);
+      return route.fulfill({ status: 204, contentType: "application/json", body: "" });
+    }
+    await new Promise(() => {});
+  });
+  await page.route((url) => tableUrl(url, "join_requests"), async (route) => {
+    if (route.request().method() !== "GET" && route.request().method() !== "HEAD") {
+      writeAttempts.push(`join_requests:${route.request().method()}`);
+      return route.fulfill({ status: 204, contentType: "application/json", body: "" });
+    }
+    await new Promise(() => {});
+  });
+  await page.route((url) => tableUrl(url, "game_participants"), async (route) => {
+    if (route.request().method() !== "GET") return route.fallback();
+    await route.fulfill({ status: 200, contentType: "application/json", body: "[]" });
+  });
+  await page.route((url) => tableUrl(url, "host_payment_methods"), async (route) => {
+    if (route.request().method() !== "GET") return route.fallback();
+    await route.fulfill({ status: 200, contentType: "application/json", body: "[]" });
+  });
+
+  await restoreSession(page);
+  await page.goto(`/games/${CUSTOM_GAME_ID}`, { waitUntil: "domcontentloaded" });
+
+  const cta = page.getByRole("link", { name: /pay host/i }).first();
+  await expect(cta).toBeVisible({ timeout: 10_000 });
+  await cta.click();
+
+  await assertPayScreenRendered(page, CUSTOM_GAME_ID);
+  await expect(
+    page.getByText(/host hasn't configured payment yet/i).first(),
+  ).toBeVisible({ timeout: 10_000 });
+  await expect(page.getByText(/couldn't reach the payment service/i)).toHaveCount(0);
+  expect(writeAttempts, "opening pay should remain read-only").toEqual([]);
 
   await ctx.close();
 });
