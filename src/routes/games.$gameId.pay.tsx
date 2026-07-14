@@ -797,8 +797,8 @@ function PaymentInstructionsAndProof({
 
 
 
-  const submit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const submitProof = async () => {
+    if (submitting) return;
 
     const parsed = proofSchema.safeParse({
       paidAmount,
@@ -860,6 +860,11 @@ function PaymentInstructionsAndProof({
     } finally {
       setSubmitting(false);
     }
+  };
+
+  const submit = (e: React.FormEvent) => {
+    e.preventDefault();
+    void submitProof();
   };
 
   return (
@@ -1064,8 +1069,9 @@ function PaymentInstructionsAndProof({
           )}
         </div>
         <button
-          type="submit"
-          disabled={submitting || uploadState === "uploading"}
+          type="button"
+          onClick={() => void submitProof()}
+          disabled={uploadState === "uploading"}
           className="w-full rounded-xl bg-lime-gradient py-3 text-sm font-bold text-primary-foreground inline-flex items-center justify-center gap-2 disabled:opacity-50"
         >
           <ShieldCheck className="h-4 w-4" />{" "}
