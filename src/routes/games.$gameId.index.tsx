@@ -1735,10 +1735,10 @@ function EditGameModal({
         await upsertGamePaymentSettings({
           game_id: game.id,
           entry_fee: pr,
-          accepted_method_ids: settings?.accepted_method_ids ?? [],
-          payment_deadline: settings?.payment_deadline ?? null,
-          refund_policy: settings?.refund_policy ?? null,
-          payment_instructions: settings?.payment_instructions ?? null,
+          accepted_method_ids: pr > 0 ? Array.from(acceptedMethodIds) : [],
+          payment_deadline: paymentDeadline ? new Date(paymentDeadline).toISOString() : null,
+          refund_policy: refundPolicy.trim() || null,
+          payment_instructions: paymentInstructions.trim() || null,
           requires_approval: requiresApproval,
         });
         const next = await getGamePaymentSettings(game.id);
@@ -1746,6 +1746,7 @@ function EditGameModal({
       } catch (err: any) {
         toast.error(err?.message ?? "Saved game, but couldn't update host settings.");
       }
+
       toast.success("Game updated.");
       onClose();
     } finally {
