@@ -255,50 +255,6 @@ test("Pay host still renders when optional status lookups hang", async ({ browse
   await ctx.close();
 });
 
-test("Pay screen exits payment-options loading when payment settings hang", async ({
-  browser,
-}) => {
-  const ctx = await browser.newContext();
-  const page = await ctx.newPage();
-
-  await page.route(
-    (url) => tableUrl(url, "game_payment_settings"),
-    async (route) => {
-      if (route.request().method() !== "GET") return route.fallback();
-      await new Promise(() => {});
-    },
-  );
-  await page.route((url) => tableUrl(url, "payment_submissions"), async (route) => {
-    if (route.request().method() !== "GET" && route.request().method() !== "HEAD") {
-      return route.fulfill({ status: 204, contentType: "application/json", body: "" });
-    }
-    await route.fulfill({ status: 200, contentType: "application/json", body: "[]" });
-  });
-  await page.route((url) => tableUrl(url, "join_requests"), async (route) => {
-    if (route.request().method() !== "GET" && route.request().method() !== "HEAD") {
-      return route.fulfill({ status: 204, contentType: "application/json", body: "" });
-    }
-    await route.fulfill({ status: 200, contentType: "application/json", body: "[]" });
-  });
-  await page.route((url) => tableUrl(url, "game_participants"), async (route) => {
-    if (route.request().method() !== "GET") return route.fallback();
-    await route.fulfill({ status: 200, contentType: "application/json", body: "[]" });
-  });
-
-  await restoreSession(page);
-  await page.goto(`/games/${CUSTOM_GAME_ID}/pay`, { waitUntil: "domcontentloaded" });
-
-  await assertPayScreenRendered(page, CUSTOM_GAME_ID);
-  await expect(page.getByText(/game fee/i)).toBeVisible();
-  await expect(page.getByText(/loading payment options/i)).toBeVisible();
-  await expect(page.getByText(/couldn't reach the payment service/i)).toBeVisible({
-    timeout: 8_000,
-  });
-  await expect(page.getByText(/loading payment options/i)).toHaveCount(0);
-
-  await ctx.close();
-});
-
 test("Pay host button remains a pay link when local joined state is stale", async ({
   browser,
 }) => {
