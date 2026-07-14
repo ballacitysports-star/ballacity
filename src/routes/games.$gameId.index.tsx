@@ -19,6 +19,10 @@ import {
   Lock,
   Unlock,
   Trash2,
+  ImagePlus,
+  DollarSign,
+  Home,
+  ShieldCheck,
 } from "lucide-react";
 import { GAMES, SPORTS } from "@/lib/sample-data";
 import { formatWhen } from "@/lib/format";
