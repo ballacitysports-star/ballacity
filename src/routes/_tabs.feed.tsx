@@ -431,7 +431,6 @@ function Feed() {
         </>
       )}
 
-      <AnimatePresence>
       {typeof document !== "undefined" &&
         createPortal(
           <AnimatePresence>
