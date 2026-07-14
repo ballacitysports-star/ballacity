@@ -1695,7 +1695,7 @@ function EditGameModal({
         return;
       }
       try {
-        const nextSettings = await upsertGamePaymentSettings({
+        await upsertGamePaymentSettings({
           game_id: game.id,
           entry_fee: pr,
           accepted_method_ids: settings?.accepted_method_ids ?? [],
@@ -1704,7 +1704,8 @@ function EditGameModal({
           payment_instructions: settings?.payment_instructions ?? null,
           requires_approval: requiresApproval,
         });
-        if (nextSettings) onSettingsSaved(nextSettings);
+        const next = await getGamePaymentSettings(game.id);
+        if (next) onSettingsSaved(next);
       } catch (err: any) {
         toast.error(err?.message ?? "Saved game, but couldn't update host settings.");
       }
