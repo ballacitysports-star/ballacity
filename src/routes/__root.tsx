@@ -185,11 +185,10 @@ function AuthGate({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (loading) return;
     if (!user && !isPublic) {
-      const search = router.state.location.search as Record<string, unknown> | undefined;
-      const next = `${pathname}${router.state.location.searchStr ?? ""}`;
+      const href = router.state.location.href;
       router.navigate({
         to: "/auth",
-        search: { next: next && next !== "/" ? next : undefined },
+        search: { next: href && href !== "/" ? href : undefined },
         replace: true,
       });
     }
