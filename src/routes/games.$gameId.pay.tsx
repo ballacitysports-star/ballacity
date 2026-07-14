@@ -570,7 +570,9 @@ function PayPage() {
           extraInstructions={settings.payment_instructions}
           onCancel={() => setPicked(null)}
           onSubmitted={async () => {
-            joinGame(game.id);
+            // Do NOT join the roster yet — player is only added after the
+            // host verifies the payment (handled on the game details page
+            // via a realtime listener on payment_submissions).
             const subs = await listMySubmissionsForGame(game.id);
             setMySubs(subs);
             setPicked(null);
