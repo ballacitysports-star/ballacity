@@ -1627,12 +1627,17 @@ function GameDetail() {
 function EditGameModal({
   game,
   hostId,
+  settings,
   onClose,
+  onSettingsSaved,
 }: {
   game: Game;
   hostId: string;
+  settings: GamePaymentSettings | null;
   onClose: () => void;
+  onSettingsSaved: (s: GamePaymentSettings) => void;
 }) {
+  const { user } = useAuth();
   const [title, setTitle] = useState(game.title);
   const [sport, setSport] = useState<Game["sport"]>(game.sport);
   const [skill, setSkill] = useState<Game["skill"]>(game.skill);
@@ -1644,8 +1649,10 @@ function EditGameModal({
     return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
   });
   const [duration, setDuration] = useState(game.duration);
-  const [maxPlayers, setMaxPlayers] = useState(String(game.maxPlayers));
-  const [price, setPrice] = useState(String(game.price));
+  const [maxPlayers, setMaxPlayers] = useState<number>(
+    Math.max(2, Math.min(30, Number(game.maxPlayers) || 10)),
+  );
+  const [price, setPrice] = useState<number>(Math.max(0, Number(game.price) || 0));
   const [indoor, setIndoor] = useState(!!game.indoor);
   const [isPrivate, setIsPrivate] = useState(!!game.isPrivate);
   const [image, setImage] = useState(game.image ?? "");
@@ -1653,33 +1660,59 @@ function EditGameModal({
   const [positionsNeeded, setPositionsNeeded] = useState<Record<string, number>>(
     game.positionsNeeded ?? {},
   );
+  const [requiresApproval, setRequiresApproval] = useState<boolean>(
+    !!settings?.requires_approval,
+  );
+  const [coverUploading, setCoverUploading] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const coverInputRef = useRef<HTMLInputElement>(null);
 
-  const save = () => {
-    const mp = Math.max(2, Math.min(200, Number(maxPlayers) || game.maxPlayers));
-    const pr = Math.max(0, Number(price) || 0);
-    const iso = new Date(dateLocal).toISOString();
-    const updated = updateHostedGame(game.id, {
-      title: title.trim() || game.title,
-      sport,
-      skill,
-      location: location.trim() || game.location,
-      neighborhood: neighborhood.trim(),
-      date: Number.isFinite(new Date(dateLocal).getTime()) ? iso : game.date,
-      duration: duration.trim() || game.duration,
-      maxPlayers: mp,
-      price: pr,
-      indoor,
-      isPrivate,
-      image: image.trim(),
-      description,
-      positionsNeeded: positionsCleanup(positionsNeeded),
-    });
-    if (!updated) {
-      toast.error("This game can't be edited here.");
-      return;
+  const save = async () => {
+    if (saving) return;
+    setSaving(true);
+    try {
+      const mp = Math.max(2, Math.min(30, Number(maxPlayers) || game.maxPlayers));
+      const pr = Math.max(0, Number(price) || 0);
+      const iso = new Date(dateLocal).toISOString();
+      const updated = updateHostedGame(game.id, {
+        title: title.trim() || game.title,
+        sport,
+        skill,
+        location: location.trim() || game.location,
+        neighborhood: neighborhood.trim(),
+        date: Number.isFinite(new Date(dateLocal).getTime()) ? iso : game.date,
+        duration: duration.trim() || game.duration,
+        maxPlayers: mp,
+        price: pr,
+        indoor,
+        isPrivate,
+        image: image.trim(),
+        description,
+        positionsNeeded: positionsCleanup(positionsNeeded),
+      });
+      if (!updated) {
+        toast.error("This game can't be edited here.");
+        return;
+      }
+      try {
+        const nextSettings = await upsertGamePaymentSettings({
+          game_id: game.id,
+          entry_fee: pr,
+          accepted_method_ids: settings?.accepted_method_ids ?? [],
+          payment_deadline: settings?.payment_deadline ?? null,
+          refund_policy: settings?.refund_policy ?? null,
+          payment_instructions: settings?.payment_instructions ?? null,
+          requires_approval: requiresApproval,
+        });
+        if (nextSettings) onSettingsSaved(nextSettings);
+      } catch (err: any) {
+        toast.error(err?.message ?? "Saved game, but couldn't update host settings.");
+      }
+      toast.success("Game updated.");
+      onClose();
+    } finally {
+      setSaving(false);
     }
-    toast.success("Game updated.");
-    onClose();
   };
 
   return (
@@ -1699,7 +1732,111 @@ function EditGameModal({
             <XIcon className="h-4 w-4" />
           </button>
         </div>
-        <div className="mt-3 space-y-3">
+        <div className="mt-3 space-y-4">
+          {/* Sport grid */}
+          <Field label="Sport">
+            <div className="grid grid-cols-3 gap-2">
+              {SPORTS.map((s) => {
+                const active = sport === s.name;
+                return (
+                  <button
+                    type="button"
+                    key={s.name}
+                    onClick={() => {
+                      setSport(s.name);
+                      setPositionsNeeded({});
+                    }}
+                    className={`flex flex-col items-center gap-1 rounded-2xl border px-2 py-3 text-xs font-semibold transition-all ${
+                      active
+                        ? "border-lime bg-lime/10 text-lime"
+                        : "border-border bg-background text-muted-foreground"
+                    }`}
+                  >
+                    <span className="text-2xl">{s.emoji}</span>
+                    <span>{s.name}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </Field>
+
+          {/* Cover photo */}
+          <Field label="Cover photo">
+            <div className="relative overflow-hidden rounded-2xl border border-border bg-background">
+              <img
+                src={image || imageFor(sport)}
+                alt="Game cover preview"
+                className="h-32 w-full object-cover"
+              />
+              <div className="absolute inset-x-0 bottom-0 flex items-center justify-between gap-2 bg-gradient-to-t from-black/70 to-transparent p-2">
+                <span className="text-[11px] text-white/90">
+                  {image ? "Custom cover" : "Default cover"}
+                </span>
+                <div className="flex items-center gap-2">
+                  {image && (
+                    <button
+                      type="button"
+                      onClick={() => setImage("")}
+                      className="grid h-7 w-7 place-items-center rounded-full bg-black/60 text-white"
+                      aria-label="Remove cover"
+                    >
+                      <XIcon className="h-3.5 w-3.5" />
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    disabled={coverUploading || !user}
+                    onClick={() => coverInputRef.current?.click()}
+                    className="rounded-full bg-lime px-3 py-1 text-[11px] font-bold text-primary-foreground disabled:opacity-60"
+                  >
+                    {coverUploading ? "Uploading…" : image ? "Replace" : "Upload"}
+                  </button>
+                </div>
+              </div>
+              <input
+                ref={coverInputRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={async (e) => {
+                  const file = e.target.files?.[0];
+                  e.target.value = "";
+                  if (!file || !user) return;
+                  if (file.size > 5 * 1024 * 1024) {
+                    toast.error("Image too large (max 5MB).");
+                    return;
+                  }
+                  setCoverUploading(true);
+                  try {
+                    const ext = file.name.split(".").pop() || "jpg";
+                    const path = `${user.id}/${Date.now()}-${Math.random()
+                      .toString(36)
+                      .slice(2, 8)}.${ext}`;
+                    const { error: upErr } = await supabase.storage
+                      .from("game-covers")
+                      .upload(path, file, { cacheControl: "3600", upsert: false });
+                    if (upErr) throw upErr;
+                    const { data, error: urlErr } = await supabase.storage
+                      .from("game-covers")
+                      .createSignedUrl(path, 60 * 60 * 24 * 365 * 10);
+                    if (urlErr || !data?.signedUrl) throw urlErr ?? new Error("Signed URL failed");
+                    setImage(data.signedUrl);
+                  } catch (err: any) {
+                    toast.error(err?.message ?? "Upload failed");
+                  } finally {
+                    setCoverUploading(false);
+                  }
+                }}
+              />
+            </div>
+            <input
+              value={image}
+              onChange={(e) => setImage(e.target.value)}
+              placeholder="Or paste image URL…"
+              className="mt-2 w-full rounded-xl border border-border bg-background px-3 py-2 text-xs"
+            />
+          </Field>
+
           <Field label="Title">
             <input
               value={title}
@@ -1707,41 +1844,15 @@ function EditGameModal({
               className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm"
             />
           </Field>
-          <div className="grid grid-cols-2 gap-3">
-            <Field label="Sport">
-              <select
-                value={sport}
-                onChange={(e) => setSport(e.target.value as Game["sport"])}
-                className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm"
-              >
-                {SPORTS.map((s) => (
-                  <option key={s.name} value={s.name}>
-                    {s.emoji} {s.name}
-                  </option>
-                ))}
-              </select>
-            </Field>
-            <Field label="Skill">
-              <select
-                value={skill}
-                onChange={(e) => setSkill(e.target.value as Game["skill"])}
-                className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm"
-              >
-                {(["All Levels", "Beginner", "Intermediate", "Advanced"] as const).map((s) => (
-                  <option key={s} value={s}>
-                    {s}
-                  </option>
-                ))}
-              </select>
-            </Field>
-          </div>
-          <Field label="Location">
-            <input
+
+          <Field label="Venue address">
+            <LocationAutocomplete
               value={location}
-              onChange={(e) => setLocation(e.target.value)}
-              className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm"
+              onChange={setLocation}
+              placeholder="Search court, park or venue"
             />
           </Field>
+
           <Field label="Neighborhood">
             <input
               value={neighborhood}
@@ -1749,13 +1860,34 @@ function EditGameModal({
               className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm"
             />
           </Field>
+
+          {/* Skill chips */}
+          <Field label="Skill level">
+            <div className="flex gap-2 overflow-x-auto scrollbar-hide">
+              {(["All Levels", "Beginner", "Intermediate", "Advanced"] as const).map((s) => (
+                <button
+                  type="button"
+                  key={s}
+                  onClick={() => setSkill(s)}
+                  className={`shrink-0 rounded-full border px-4 py-2 text-xs font-semibold ${
+                    skill === s
+                      ? "border-lime bg-lime text-primary-foreground"
+                      : "border-border bg-background text-muted-foreground"
+                  }`}
+                >
+                  {s}
+                </button>
+              ))}
+            </div>
+          </Field>
+
           <div className="grid grid-cols-2 gap-3">
             <Field label="Date & time">
               <input
                 type="datetime-local"
                 value={dateLocal}
                 onChange={(e) => setDateLocal(e.target.value)}
-                className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm"
+                className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm [color-scheme:dark]"
               />
             </Field>
             <Field label="Duration">
@@ -1767,53 +1899,94 @@ function EditGameModal({
               />
             </Field>
           </div>
-          <div className="grid grid-cols-2 gap-3">
-            <Field label="Max players">
+
+          {/* Max players slider */}
+          <Field label="Max players">
+            <div className="rounded-2xl border border-border bg-background p-3">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-xs text-muted-foreground">Total spots</span>
+                <span className="font-display text-xl font-bold text-lime">{maxPlayers}</span>
+              </div>
               <input
-                type="number"
+                type="range"
                 min={2}
+                max={30}
                 value={maxPlayers}
-                onChange={(e) => setMaxPlayers(e.target.value)}
-                className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm"
+                onChange={(e) => setMaxPlayers(+e.target.value)}
+                className="w-full accent-lime"
               />
-            </Field>
-            <Field label="Price ($)">
-              <input
-                type="number"
-                min={0}
-                step="0.01"
-                value={price}
-                onChange={(e) => setPrice(e.target.value)}
-                className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm"
-              />
-            </Field>
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            <label className="flex items-center gap-2 rounded-xl border border-border bg-background px-3 py-2 text-sm">
-              <input
-                type="checkbox"
-                checked={indoor}
-                onChange={(e) => setIndoor(e.target.checked)}
-              />
-              Indoor
-            </label>
-            <label className="flex items-center gap-2 rounded-xl border border-border bg-background px-3 py-2 text-sm">
-              <input
-                type="checkbox"
-                checked={isPrivate}
-                onChange={(e) => setIsPrivate(e.target.checked)}
-              />
-              Private (invite only)
-            </label>
-          </div>
-          <Field label="Cover image URL (optional)">
-            <input
-              value={image}
-              onChange={(e) => setImage(e.target.value)}
-              placeholder="https://…"
-              className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm"
-            />
+            </div>
           </Field>
+
+          {/* Paid game toggle */}
+          <Field label="Details">
+            <div className="rounded-2xl border border-border bg-background px-3 py-2.5">
+              <div className="flex items-center justify-between">
+                <span className="flex items-center gap-2 text-sm">
+                  <DollarSign
+                    className={`h-4 w-4 ${price > 0 ? "text-lime" : "text-muted-foreground"}`}
+                  />
+                  <span className="font-medium">Paid game</span>
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setPrice(price > 0 ? 0 : 10)}
+                  className={`relative h-6 w-10 rounded-full transition-colors ${price > 0 ? "bg-lime" : "bg-secondary"}`}
+                  aria-label="Toggle paid game"
+                >
+                  <span
+                    className="absolute top-0.5 h-5 w-5 rounded-full bg-background shadow transition-all"
+                    style={{ left: price > 0 ? "calc(100% - 1.375rem)" : "0.125rem" }}
+                  />
+                </button>
+              </div>
+              {price > 0 && (
+                <div className="mt-2 flex items-center gap-2">
+                  <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                    Entry fee
+                  </span>
+                  <div className="relative flex-1">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">
+                      $
+                    </span>
+                    <input
+                      type="number"
+                      min={1}
+                      step="0.01"
+                      value={price}
+                      onChange={(e) => setPrice(Math.max(0, Number(e.target.value) || 0))}
+                      className="w-full rounded-xl border border-border bg-surface pl-7 pr-3 py-1.5 text-sm outline-none focus:border-lime"
+                    />
+                  </div>
+                  <span className="text-[11px] text-muted-foreground">per player</span>
+                </div>
+              )}
+            </div>
+            <EditToggle
+              icon={<Home className="h-4 w-4" />}
+              label="Indoor venue"
+              value={indoor}
+              onChange={setIndoor}
+            />
+            <EditToggle
+              icon={<Lock className="h-4 w-4" />}
+              label="Private (invite only)"
+              value={isPrivate}
+              onChange={setIsPrivate}
+            />
+            <EditToggle
+              icon={<ShieldCheck className="h-4 w-4" />}
+              label="Require my approval to join"
+              value={requiresApproval}
+              onChange={setRequiresApproval}
+            />
+            {requiresApproval && (
+              <p className="px-1 text-[11px] text-muted-foreground">
+                Players send a pickup request and you approve or decline each one.
+              </p>
+            )}
+          </Field>
+
           <Field label="Description">
             <textarea
               value={description}
@@ -1822,6 +1995,7 @@ function EditGameModal({
               className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm"
             />
           </Field>
+
           <Field label="Positions needed">
             <PositionsPicker
               sport={sport}
@@ -1832,22 +2006,56 @@ function EditGameModal({
         </div>
         <BlockedUsersSection hostId={hostId} />
         <div className="mt-4 flex items-center gap-2">
-
           <button
             onClick={onClose}
-            className="flex-1 rounded-xl border border-border bg-background py-2.5 text-sm font-semibold"
+            disabled={saving}
+            className="flex-1 rounded-xl border border-border bg-background py-2.5 text-sm font-semibold disabled:opacity-60"
           >
             Cancel
           </button>
           <button
             onClick={save}
-            className="flex-1 rounded-xl bg-lime-gradient py-2.5 text-sm font-bold text-primary-foreground"
+            disabled={saving}
+            className="flex-1 rounded-xl bg-lime-gradient py-2.5 text-sm font-bold text-primary-foreground disabled:opacity-60"
           >
-            Save changes
+            {saving ? "Saving…" : "Save changes"}
           </button>
         </div>
       </div>
     </div>
+  );
+}
+
+function EditToggle({
+  icon,
+  label,
+  value,
+  onChange,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  value: boolean;
+  onChange: (v: boolean) => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={() => onChange(!value)}
+      className="mt-2 flex w-full items-center justify-between rounded-2xl border border-border bg-background px-3 py-2.5 text-sm"
+    >
+      <span className="flex items-center gap-2">
+        <span className={value ? "text-lime" : "text-muted-foreground"}>{icon}</span>
+        <span className="font-medium">{label}</span>
+      </span>
+      <span
+        className={`relative h-6 w-10 rounded-full transition-colors ${value ? "bg-lime" : "bg-secondary"}`}
+      >
+        <span
+          className="absolute top-0.5 h-5 w-5 rounded-full bg-background shadow transition-all"
+          style={{ left: value ? "calc(100% - 1.375rem)" : "0.125rem" }}
+        />
+      </span>
+    </button>
   );
 }
 
