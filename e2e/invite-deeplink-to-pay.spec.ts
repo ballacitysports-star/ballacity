@@ -119,9 +119,10 @@ test("opening an invite deeplink lands on the game and the pay CTA routes to che
   await expect(banner).toBeVisible({ timeout: 10_000 });
   await expect(banner).toContainText(/Pay & join/i);
 
-  // Paid CTA — variant shows "Pay host · $X".
-  const cta = page.getByRole("button", { name: /pay host/i }).first();
+  // Paid CTA — variant shows "Pay host · $X" (rendered as a link on paid games).
+  const cta = page.getByRole("link", { name: /pay host/i }).first();
   await expect(cta).toBeVisible({ timeout: 10_000 });
+  await expect(cta).toHaveAttribute("href", new RegExp(`/games/${GAME_ID}/pay`));
   await cta.click();
 
   // Should route to the checkout page with BOTH invite params preserved.
