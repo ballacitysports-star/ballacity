@@ -313,6 +313,22 @@ export function getHostedGame(id: string): Game | undefined {
   return cache.find((g) => g.id === id);
 }
 
+export async function fetchHostedGame(id: string): Promise<Game | null> {
+  loadLocal();
+  const local = cache.find((g) => g.id === id);
+  if (local) return local;
+
+  const { data, error } = await supabase.from("hosted_games").select("*").eq("id", id).maybeSingle();
+  if (error) throw error;
+  if (!data) return null;
+
+  const game = rowToGame(data as DbRow);
+  const exists = cache.some((g) => g.id === game.id);
+  cache = exists ? cache.map((g) => (g.id === game.id ? game : g)) : [game, ...cache];
+  emit();
+  return game;
+}
+
 /** Patch a hosted game locally, and mirror the change to the DB. */
 export function updateHostedGame(id: string, patch: Partial<Game>): Game | undefined {
   loadLocal();

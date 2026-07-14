@@ -1,5 +1,5 @@
 import { createFileRoute, Link, notFound, useNavigate } from "@tanstack/react-router";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ArrowLeft, ExternalLink, Upload, ShieldCheck, Clock, X, Check, CircleDashed, AlertCircle, RotateCw, Film, Image as ImageIcon, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { GAMES } from "@/lib/sample-data";
@@ -20,6 +20,7 @@ import {
 } from "@/lib/payments";
 import { LegalNotice } from "@/components/LegalNotice";
 import { joinGame } from "@/lib/games-store";
+import { fetchHostedGame, useHostedGames } from "@/lib/hosted-games-store";
 import { z } from "zod";
 
 // Local YYYY-MM-DD for a Date, avoiding UTC shift from toISOString().
@@ -57,6 +58,23 @@ const proofSchema = z.object({
   notes: z.string().trim().max(500, { message: "Notes must be under 500 characters." }).optional(),
 });
 
+function externalPaymentResumeKey(gameId: string, methodId: string) {
+  return `pay-opened:${gameId}:${methodId}`;
+}
+
+function markExternalPaymentOpened(gameId: string, methodId: string) {
+  try {
+    window.sessionStorage.setItem(externalPaymentResumeKey(gameId, methodId), "1");
+  } catch {
+    /* storage unavailable — resume still works within this tab */
+  }
+}
+
+function launchExternalPayment(url: string) {
+  const externalWindow = window.open(url, "_blank", "noopener,noreferrer");
+  if (!externalWindow) window.location.assign(url);
+}
+
 export const Route = createFileRoute("/games/$gameId/pay")({
   validateSearch: (search: Record<string, unknown>) => {
     const out: { invite?: true; from?: string } = {};
@@ -64,13 +82,12 @@ export const Route = createFileRoute("/games/$gameId/pay")({
     if (typeof search.from === "string" && search.from.length > 0) out.from = search.from;
     return out;
   },
-  loader: ({ params }) => {
-    const game = GAMES.find((g) => g.id === params.gameId);
-    if (!game) throw notFound();
-    return { game };
-  },
+  loader: ({ params }) => ({
+    gameId: params.gameId,
+    game: GAMES.find((g) => g.id === params.gameId) ?? null,
+  }),
   head: ({ loaderData }) => ({
-    meta: [{ title: `Pay for ${loaderData?.game.title ?? "game"} — OpenRun` }],
+    meta: [{ title: `Pay for ${loaderData?.game?.title ?? "game"} — OpenRun` }],
   }),
   notFoundComponent: () => <div className="p-6 text-center text-sm">Game not found.</div>,
   errorComponent: ({ reset }) => (
@@ -84,7 +101,13 @@ export const Route = createFileRoute("/games/$gameId/pay")({
 });
 
 function PayPage() {
-  const { game } = Route.useLoaderData();
+  const { gameId, game: loaderGame } = Route.useLoaderData();
+  const hostedGames = useHostedGames();
+  const [remoteGame, setRemoteGame] = useState<typeof loaderGame>(null);
+  const game = useMemo(
+    () => hostedGames.find((g) => g.id === gameId) ?? remoteGame ?? loaderGame ?? null,
+    [hostedGames, remoteGame, loaderGame, gameId],
+  );
   const { user, loading } = useAuth();
   const nav = useNavigate();
   const [settings, setSettings] = useState<GamePaymentSettings | null>(null);
@@ -93,6 +116,7 @@ function PayPage() {
   const [mySubs, setMySubs] = useState<PaymentSubmission[]>([]);
   const [myReq, setMyReq] = useState<JoinRequest | null>(null);
   const [fetching, setFetching] = useState(true);
+  const [lookupTimedOut, setLookupTimedOut] = useState(false);
 
   useEffect(() => {
     if (!loading && !user) nav({ to: "/auth" });
@@ -101,7 +125,7 @@ function PayPage() {
   const refreshJoinRequest = useCallback(async () => {
     if (!user) return;
     try {
-      const req = await getMyJoinRequest(game.id);
+      const req = await getMyJoinRequest(gameId);
       setMyReq((prev) => {
         // Toast on approval transition (pending/rejected/none → approved).
         if (req?.status === "approved" && prev?.status !== "approved") {
@@ -112,13 +136,40 @@ function PayPage() {
     } catch {
       /* ignore polling errors */
     }
-  }, [game.id, user]);
+  }, [gameId, user]);
 
   useEffect(() => {
+    if (loaderGame || hostedGames.some((g) => g.id === gameId)) {
+      setLookupTimedOut(true);
+      return;
+    }
+
     let cancelled = false;
+    setLookupTimedOut(false);
+    setRemoteGame(null);
+    fetchHostedGame(gameId)
+      .then((found) => {
+        if (!cancelled) setRemoteGame(found);
+      })
+      .catch(() => {
+        if (!cancelled) setRemoteGame(null);
+      })
+      .finally(() => {
+        if (!cancelled) setLookupTimedOut(true);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [gameId, hostedGames, loaderGame]);
+
+  useEffect(() => {
+    if (!game) return;
+    let cancelled = false;
+    setFetching(true);
     (async () => {
       try {
-        const s = await getGamePaymentSettings(game.id);
+        const s = await getGamePaymentSettings(gameId);
         if (cancelled) return;
         setSettings(s);
         if (s) {
@@ -130,8 +181,8 @@ function PayPage() {
         }
         if (user) {
           const [subs, req] = await Promise.all([
-            listMySubmissionsForGame(game.id),
-            getMyJoinRequest(game.id),
+            listMySubmissionsForGame(gameId),
+            getMyJoinRequest(gameId),
           ]);
           if (cancelled) return;
           setMySubs(subs);
@@ -146,7 +197,15 @@ function PayPage() {
     return () => {
       cancelled = true;
     };
-  }, [game.id, user]);
+  }, [game, gameId, user]);
+
+  useEffect(() => {
+    if (picked || methods.length === 0 || typeof window === "undefined") return;
+    const resumed = methods.find(
+      (method) => window.sessionStorage.getItem(externalPaymentResumeKey(gameId, method.id)) === "1",
+    );
+    if (resumed) setPicked(resumed);
+  }, [gameId, methods, picked]);
 
   // Live-update the join-request status so the approval gate flips to the
   // payment picker the moment the host approves. Realtime is primary;
@@ -158,7 +217,7 @@ function PayPage() {
   useEffect(() => {
     if (!user) return;
     const channel = supabase
-      .channel(`pay-join-req:${game.id}:${user.id}`)
+      .channel(`pay-join-req:${gameId}:${user.id}`)
       .on(
         "postgres_changes",
         {
@@ -169,7 +228,7 @@ function PayPage() {
         },
         (payload) => {
           const row = (payload.new ?? payload.old) as JoinRequest | undefined;
-          if (row?.game_id === game.id) refreshRef.current();
+          if (row?.game_id === gameId) refreshRef.current();
         },
       )
       .subscribe();
@@ -188,14 +247,14 @@ function PayPage() {
       window.removeEventListener("focus", onFocus);
       document.removeEventListener("visibilitychange", onVisibility);
     };
-  }, [game.id, user]);
+  }, [gameId, user]);
 
   // Live-update payment submissions so the status timeline reflects host
   // review (verified/rejected) in real time. Realtime primary, poll fallback.
   const refreshSubs = useCallback(async () => {
     if (!user) return;
     try {
-      const subs = await listMySubmissionsForGame(game.id);
+      const subs = await listMySubmissionsForGame(gameId);
       setMySubs((prev) => {
         const prevLatest = prev[0];
         const nextLatest = subs[0];
@@ -213,7 +272,7 @@ function PayPage() {
     } catch {
       /* ignore polling errors */
     }
-  }, [game.id, user]);
+  }, [gameId, user]);
 
   const refreshSubsRef = useRef(refreshSubs);
   useEffect(() => {
@@ -222,7 +281,7 @@ function PayPage() {
   useEffect(() => {
     if (!user) return;
     const channel = supabase
-      .channel(`pay-subs:${game.id}:${user.id}`)
+      .channel(`pay-subs:${gameId}:${user.id}`)
       .on(
         "postgres_changes",
         {
@@ -233,7 +292,7 @@ function PayPage() {
         },
         (payload) => {
           const row = (payload.new ?? payload.old) as PaymentSubmission | undefined;
-          if (row?.game_id === game.id) refreshSubsRef.current();
+          if (row?.game_id === gameId) refreshSubsRef.current();
         },
       )
       .subscribe();
@@ -252,9 +311,14 @@ function PayPage() {
       window.removeEventListener("focus", onFocus);
       document.removeEventListener("visibilitychange", onVisibility);
     };
-  }, [game.id, user]);
+  }, [gameId, user]);
 
-  if (loading || fetching) return <div className="p-6 text-sm text-muted-foreground">Loading…</div>;
+  if (loading || (!game && !lookupTimedOut) || (game && fetching)) {
+    return <div className="p-6 text-sm text-muted-foreground">Loading…</div>;
+  }
+  if (!game) {
+    return <div className="p-6 text-center text-sm">Game not found.</div>;
+  }
   if (!user) return null;
 
   const fee = settings?.entry_fee ?? game.price;
@@ -380,17 +444,19 @@ function PayPage() {
                     </div>
                   </button>
                   {m.payment_url ? (
-                    <a
-                      href={m.payment_url}
-                      target="_blank"
-                      rel="noreferrer"
-                      onClick={() => setPicked(m)}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setPicked(m);
+                        markExternalPaymentOpened(game.id, m.id);
+                        launchExternalPayment(m.payment_url as string);
+                      }}
                       className="inline-flex items-center gap-1 rounded-full bg-lime-gradient px-3 py-1.5 text-xs font-bold text-primary-foreground"
                       title={`Open ${meta.name} in a new tab`}
                       aria-label={`Open ${meta.name} in a new tab to pay`}
                     >
                       <ExternalLink className="h-3.5 w-3.5" /> Open {meta.name}
-                    </a>
+                    </button>
                   ) : (
                     <button
                       onClick={() => setPicked(m)}
@@ -643,7 +709,7 @@ function PaymentInstructionsAndProof({
   const [submitting, setSubmitting] = useState(false);
   // Persist "opened" across the round-trip so a hard refresh, a webview
   // relaunch, or a mobile OS backgrounding still resumes at the proof step.
-  const resumeKey = `pay-opened:${game_id}:${method.id}`;
+  const resumeKey = externalPaymentResumeKey(game_id, method.id);
   const [opened, setOpened] = useState<boolean>(() => {
     if (typeof window === "undefined") return false;
     try {
@@ -668,11 +734,8 @@ function PaymentInstructionsAndProof({
 
   const handleOpenExternal = () => {
     setOpened(true);
-    try {
-      window.sessionStorage.setItem(resumeKey, "1");
-    } catch {
-      /* storage unavailable — resume still works within this tab */
-    }
+    markExternalPaymentOpened(game_id, method.id);
+    if (method.payment_url) launchExternalPayment(method.payment_url);
     // Give the new tab a beat to open, then scroll the proof form into view
     // so the user sees the return steps as soon as they come back.
     window.setTimeout(resumeAtProof, 300);
@@ -878,23 +941,21 @@ function PaymentInstructionsAndProof({
             <div className="font-bold text-sm">{meta.name}</div>
             <div className="text-xs text-muted-foreground">Send directly to host</div>
           </div>
-          <button onClick={onCancel} className="ml-auto text-muted-foreground">
+          <button type="button" onClick={onCancel} className="ml-auto text-muted-foreground">
             <X className="h-4 w-4" />
           </button>
         </div>
         {method.username && <Field label="Send to" value={method.username} />}
         {method.contact_info && <Field label="Contact" value={method.contact_info} />}
         {method.payment_url && (
-          <a
-            href={method.payment_url}
-            target="_blank"
-            rel="noreferrer"
+          <button
+            type="button"
             onClick={handleOpenExternal}
             aria-label={`Open ${meta.name} in a new tab to pay the host`}
             className="mt-2 flex items-center justify-center gap-2 w-full rounded-xl bg-lime-gradient py-3 text-sm font-bold text-primary-foreground"
           >
             <ExternalLink className="h-4 w-4" /> Open {meta.name} to pay
-          </a>
+          </button>
         )}
         {(method.instructions || extraInstructions) && (
           <div className="mt-3 rounded-xl bg-background p-3 text-xs text-muted-foreground space-y-1">

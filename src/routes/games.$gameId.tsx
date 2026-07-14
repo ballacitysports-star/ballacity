@@ -366,7 +366,6 @@ function GameDetail() {
       const search: { invite?: true; from?: string } = {};
       if (isInvite) search.invite = true;
       if (inviteFrom) search.from = inviteFrom;
-      setRequesting(true);
       nav({ to: "/games/$gameId/pay", params: { gameId: game.id }, search });
       return;
     }
@@ -1470,6 +1469,10 @@ function GameDetail() {
           {!isHost && (() => {
             const canJoinAction = joined || isPending || isConfirmed || spotsLeft > 0;
             const buttonDisabled = requesting || !canJoinAction;
+            const paymentAction = isPaid && !paymentCleared && !isPending && (isApproved || !requiresApproval);
+            const paymentSearch: { invite?: true; from?: string } = {};
+            if (isInvite) paymentSearch.invite = true;
+            if (inviteFrom) paymentSearch.from = inviteFrom;
             const LiveSpots = () => (
               <span
                 className="inline-flex items-baseline"
@@ -1492,6 +1495,20 @@ function GameDetail() {
                 <span className="ml-1">spot{spotsLeft === 1 ? "" : "s"} left</span>
               </span>
             );
+            if (paymentAction && canJoinAction) {
+              return (
+                <motion.div whileTap={{ scale: 0.97 }} className="flex-1">
+                  <Link
+                    to="/games/$gameId/pay"
+                    params={{ gameId: game.id }}
+                    search={paymentSearch}
+                    className="flex w-full items-center justify-center gap-2 rounded-2xl bg-lime-gradient py-3.5 font-bold text-primary-foreground glow-lime transition-colors"
+                  >
+                    <CreditCard className="h-4 w-4" /> Pay host · ${fee.toFixed(2)}
+                  </Link>
+                </motion.div>
+              );
+            }
             return (
               <motion.button
                 whileTap={{ scale: 0.97 }}
