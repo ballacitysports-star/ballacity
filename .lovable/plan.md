@@ -1,36 +1,49 @@
-## Problem
+## Goal
 
-On the Pickup/Feed page, tapping the sliders (filter) button appears to do nothing.
+Bring the host's Edit Game modal on `/games/$gameId` to feature parity with the initial "Host a game" form (`/create`) so a host can fully edit any posted game.
 
-The button's `onClick` correctly flips `filtersOpen` to `true`, and `<FilterSheet>` does render — but it renders invisibly off-screen.
+## Gaps today
 
-### Root cause
+`EditGameModal` in `src/routes/games.$gameId.index.tsx` (lines 1620-1845) is missing options the Create form exposes:
 
-The Feed's outer container applies an inline `transform: translateY(...)` for the pull-to-refresh indicator (in `src/routes/_tabs.feed.tsx`, around line 240):
+- No cover photo upload — only a raw image URL text field.
+- Plain text input for venue address; Create uses `LocationAutocomplete`.
+- No "Require my approval to join" toggle (payment settings `requires_approval`).
+- No polished paid/free toggle + entry-fee UI (Create wraps price in a toggle).
+- Sport picker is a select; Create shows the sport grid with emoji.
+- Skill picker is a select; Create uses chips.
+- Max players is a numeric input; Create uses a range slider (2–30) — align edit to same range/pattern.
 
-```tsx
-<div className="relative mx-auto w-full max-w-md ..." style={{ transform: `translateY(${indicatorOffset}px)`, ... }}>
-```
+## Changes
 
-Per CSS spec, any ancestor with a `transform` becomes the containing block for `position: fixed` descendants. `FilterSheet` uses `fixed inset-0 z-50 ... flex items-end` — so instead of covering the viewport, it covers only the (very tall) Feed container and anchors its bottom sheet to the bottom of that container, which sits far below the visible viewport. Nothing visible changes on tap.
+All edits stay in `src/routes/games.$gameId.index.tsx` (plus reading existing payment settings already loaded on the page).
 
-## Fix
+1. **Extend `EditGameModal` props** to also receive current `requiresApproval` (from `settings.requires_approval`) and pass it back on save. Load it into local state.
 
-Render `FilterSheet` outside the transformed container using a React portal, so its `fixed` positioning resolves against the viewport again.
+2. **Cover photo section**: replace the plain URL field with the same upload UI as Create — preview, Upload/Replace/Remove, and Supabase Storage upload to the `game-covers` bucket using `${user.id}/…` path, then a long-lived signed URL. Keep an optional manual URL fallback if the host prefers to paste a link. Store the final URL in `image` state.
 
-### Changes in `src/routes/_tabs.feed.tsx`
+3. **Venue address**: swap the text input for `LocationAutocomplete` (already used in Create). Keep the separate Neighborhood field.
 
-1. Import `createPortal` from `react-dom`.
-2. Wrap the existing `<AnimatePresence>{filtersOpen && <FilterSheet ... />}</AnimatePresence>` block in `createPortal(..., document.body)`, guarded by a `typeof document !== "undefined"` check so SSR doesn't crash.
-3. Leave the button, state, and `FilterSheet` component itself unchanged.
+4. **Sport & skill pickers**: replace selects with the Create-style grid (sport) and chip row (skill).
 
-### Verification
+5. **Paid game toggle + entry fee**: mirror Create's "Paid game" toggle that flips price between 0 and last non-zero value, and show the `$ … per player` input only when price > 0.
 
-- Manually tap the filter button on `/feed` (and via `/pickup` redirect) at mobile viewport — sheet slides up from the bottom of the viewport and the backdrop covers the full screen.
-- Reset / Done / backdrop-tap close the sheet.
-- Pull-to-refresh still works (unrelated container transform is untouched).
-- No regressions to sport chips or search suggestions dropdown.
+6. **Max players**: replace numeric input with the same range slider (min 2, max 30) plus the big lime count readout.
+
+7. **Approval toggle**: add the `Require my approval to join` Toggle. On save, call `upsertGamePaymentSettings({ game_id, entry_fee: price, accepted_method_ids: settings?.accepted_method_ids ?? [], requires_approval })` in addition to `updateHostedGame(...)`. Show the same helper text when enabled.
+
+8. **Save flow**: keep `updateHostedGame(...)` for game fields; wrap payment-settings upsert in try/catch and toast on failure without blocking the game update. Close modal on success.
+
+9. **Keep existing sections** that aren't in Create: Neighborhood, Duration, Description, PositionsPicker, BlockedUsersSection — unchanged.
 
 ## Out of scope
 
-No changes to filter logic, styling of the sheet, or the pull-to-refresh behavior.
+- No changes to the Create page, hosted-games store, or DB schema.
+- Payment methods management stays on `/games/$gameId/payment-setup`.
+- No changes to non-host users or to the game detail page outside the modal.
+
+## Verification
+
+- Open a hosted game as the host → tap Edit → all Create fields are present and pre-filled from the current game/settings.
+- Upload a new cover, change sport (positions reset like Create), toggle approval, save → detail page reflects updates and reloading the game shows the new cover, price/free state, and approval requirement.
+- Non-host viewers still see no Edit button.
