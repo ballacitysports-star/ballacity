@@ -20,7 +20,7 @@ import {
 } from "@/lib/payments";
 import { LegalNotice } from "@/components/LegalNotice";
 import { joinGame } from "@/lib/games-store";
-import { useHostedGames } from "@/lib/hosted-games-store";
+import { fetchHostedGame, useHostedGames } from "@/lib/hosted-games-store";
 import { z } from "zod";
 
 // Local YYYY-MM-DD for a Date, avoiding UTC shift from toISOString().
@@ -103,9 +103,10 @@ export const Route = createFileRoute("/games/$gameId/pay")({
 function PayPage() {
   const { gameId, game: loaderGame } = Route.useLoaderData();
   const hostedGames = useHostedGames();
+  const [remoteGame, setRemoteGame] = useState<typeof loaderGame>(null);
   const game = useMemo(
-    () => hostedGames.find((g) => g.id === gameId) ?? loaderGame ?? null,
-    [hostedGames, loaderGame, gameId],
+    () => hostedGames.find((g) => g.id === gameId) ?? remoteGame ?? loaderGame ?? null,
+    [hostedGames, remoteGame, loaderGame, gameId],
   );
   const { user, loading } = useAuth();
   const nav = useNavigate();
@@ -138,10 +139,29 @@ function PayPage() {
   }, [gameId, user]);
 
   useEffect(() => {
+    if (loaderGame || hostedGames.some((g) => g.id === gameId)) {
+      setLookupTimedOut(true);
+      return;
+    }
+
+    let cancelled = false;
     setLookupTimedOut(false);
-    const timeout = window.setTimeout(() => setLookupTimedOut(true), 1200);
-    return () => window.clearTimeout(timeout);
-  }, [gameId]);
+    setRemoteGame(null);
+    fetchHostedGame(gameId)
+      .then((found) => {
+        if (!cancelled) setRemoteGame(found);
+      })
+      .catch(() => {
+        if (!cancelled) setRemoteGame(null);
+      })
+      .finally(() => {
+        if (!cancelled) setLookupTimedOut(true);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [gameId, hostedGames, loaderGame]);
 
   useEffect(() => {
     if (!game) return;
