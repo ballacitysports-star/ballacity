@@ -1,10 +1,10 @@
 import { Link, useNavigate } from "@tanstack/react-router";
 import { motion } from "framer-motion";
-import { MapPin, Users, Clock, Zap, Lock, Flame, MessageCircle } from "lucide-react";
+import { MapPin, Users, Clock, Zap, Lock, Flame, MessageCircle, Check, CreditCard } from "lucide-react";
 import { UserAvatar } from "@/components/UserAvatar";
 import type { Game } from "@/lib/sample-data";
 import { formatWhen } from "@/lib/format";
-import { useIsJoined } from "@/lib/games-store";
+import { joinGame, useIsJoined } from "@/lib/games-store";
 import { useLiveParticipantCount } from "@/lib/game-participants-store";
 import { useLiveStatus } from "@/lib/live-status";
 import { getOrCreateDirectConversation } from "@/lib/messages";
