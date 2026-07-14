@@ -44,6 +44,7 @@ import { Route as TabsDiscoverRouteImport } from './routes/_tabs.discover'
 import { Route as TabsCreateRouteImport } from './routes/_tabs.create'
 import { Route as Char91DotwellKnownChar93OauthProtectedResourceRouteImport } from './routes/[.well-known]/oauth-protected-resource'
 import { Route as Char91DotmcpChar93ListToolsRouteImport } from './routes/[.mcp]/list-tools'
+import { Route as GamesGameIdIndexRouteImport } from './routes/games.$gameId.index'
 import { Route as TeamsTeamIdEditRouteImport } from './routes/teams.$teamId.edit'
 import { Route as GamesGameIdPaymentSetupRouteImport } from './routes/games.$gameId.payment-setup'
 import { Route as GamesGameIdPayRouteImport } from './routes/games.$gameId.pay'
@@ -228,6 +229,11 @@ const Char91DotmcpChar93ListToolsRoute =
     path: '/.mcp/list-tools',
     getParentRoute: () => rootRouteImport,
   } as any)
+const GamesGameIdIndexRoute = GamesGameIdIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => GamesGameIdRoute,
+} as any)
 const TeamsTeamIdEditRoute = TeamsTeamIdEditRouteImport.update({
   id: '/edit',
   path: '/edit',
@@ -306,6 +312,7 @@ export interface FileRoutesByFullPath {
   '/games/$gameId/pay': typeof GamesGameIdPayRoute
   '/games/$gameId/payment-setup': typeof GamesGameIdPaymentSetupRoute
   '/teams/$teamId/edit': typeof TeamsTeamIdEditRoute
+  '/games/$gameId/': typeof GamesGameIdIndexRoute
   '/api/public/payments/webhook': typeof ApiPublicPaymentsWebhookRoute
   '/api/public/reels/process': typeof ApiPublicReelsProcessRoute
 }
@@ -336,7 +343,6 @@ export interface FileRoutesByTo {
   '/account/security': typeof AccountSecurityRoute
   '/admin/location-analytics': typeof AdminLocationAnalyticsRoute
   '/checkout/return': typeof CheckoutReturnRoute
-  '/games/$gameId': typeof GamesGameIdRouteWithChildren
   '/messages/$conversationId': typeof MessagesConversationIdRoute
   '/players/$userId': typeof PlayersUserIdRoute
   '/profile/edit': typeof ProfileEditRoute
@@ -349,6 +355,7 @@ export interface FileRoutesByTo {
   '/games/$gameId/pay': typeof GamesGameIdPayRoute
   '/games/$gameId/payment-setup': typeof GamesGameIdPaymentSetupRoute
   '/teams/$teamId/edit': typeof TeamsTeamIdEditRoute
+  '/games/$gameId': typeof GamesGameIdIndexRoute
   '/api/public/payments/webhook': typeof ApiPublicPaymentsWebhookRoute
   '/api/public/reels/process': typeof ApiPublicReelsProcessRoute
 }
@@ -394,6 +401,7 @@ export interface FileRoutesById {
   '/games/$gameId/pay': typeof GamesGameIdPayRoute
   '/games/$gameId/payment-setup': typeof GamesGameIdPaymentSetupRoute
   '/teams/$teamId/edit': typeof TeamsTeamIdEditRoute
+  '/games/$gameId/': typeof GamesGameIdIndexRoute
   '/api/public/payments/webhook': typeof ApiPublicPaymentsWebhookRoute
   '/api/public/reels/process': typeof ApiPublicReelsProcessRoute
 }
@@ -439,6 +447,7 @@ export interface FileRouteTypes {
     | '/games/$gameId/pay'
     | '/games/$gameId/payment-setup'
     | '/teams/$teamId/edit'
+    | '/games/$gameId/'
     | '/api/public/payments/webhook'
     | '/api/public/reels/process'
   fileRoutesByTo: FileRoutesByTo
@@ -469,7 +478,6 @@ export interface FileRouteTypes {
     | '/account/security'
     | '/admin/location-analytics'
     | '/checkout/return'
-    | '/games/$gameId'
     | '/messages/$conversationId'
     | '/players/$userId'
     | '/profile/edit'
@@ -482,6 +490,7 @@ export interface FileRouteTypes {
     | '/games/$gameId/pay'
     | '/games/$gameId/payment-setup'
     | '/teams/$teamId/edit'
+    | '/games/$gameId'
     | '/api/public/payments/webhook'
     | '/api/public/reels/process'
   id:
@@ -526,6 +535,7 @@ export interface FileRouteTypes {
     | '/games/$gameId/pay'
     | '/games/$gameId/payment-setup'
     | '/teams/$teamId/edit'
+    | '/games/$gameId/'
     | '/api/public/payments/webhook'
     | '/api/public/reels/process'
   fileRoutesById: FileRoutesById
@@ -810,6 +820,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof Char91DotmcpChar93ListToolsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/games/$gameId/': {
+      id: '/games/$gameId/'
+      path: '/'
+      fullPath: '/games/$gameId/'
+      preLoaderRoute: typeof GamesGameIdIndexRouteImport
+      parentRoute: typeof GamesGameIdRoute
+    }
     '/teams/$teamId/edit': {
       id: '/teams/$teamId/edit'
       path: '/edit'
@@ -899,11 +916,13 @@ const AdminRouteWithChildren = AdminRoute._addFileChildren(AdminRouteChildren)
 interface GamesGameIdRouteChildren {
   GamesGameIdPayRoute: typeof GamesGameIdPayRoute
   GamesGameIdPaymentSetupRoute: typeof GamesGameIdPaymentSetupRoute
+  GamesGameIdIndexRoute: typeof GamesGameIdIndexRoute
 }
 
 const GamesGameIdRouteChildren: GamesGameIdRouteChildren = {
   GamesGameIdPayRoute: GamesGameIdPayRoute,
   GamesGameIdPaymentSetupRoute: GamesGameIdPaymentSetupRoute,
+  GamesGameIdIndexRoute: GamesGameIdIndexRoute,
 }
 
 const GamesGameIdRouteWithChildren = GamesGameIdRoute._addFileChildren(
