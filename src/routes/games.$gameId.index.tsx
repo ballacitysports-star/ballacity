@@ -2026,6 +2026,96 @@ function EditGameModal({
             )}
           </Field>
 
+          {price > 0 && (
+            <Field label="Accepted payment methods">
+              {myMethods.length === 0 ? (
+                <div className="rounded-2xl border border-dashed border-coral/40 bg-coral/5 p-3 text-xs">
+                  <div className="font-semibold text-coral">No payment methods yet</div>
+                  <p className="mt-1 text-muted-foreground">
+                    Add Venmo, Cash App, Zelle, or others in the Payments tab so players can pay.
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {myMethods.map((m) => {
+                    const meta = paymentTypeMeta(m.payment_type);
+                    const on = acceptedMethodIds.has(m.id);
+                    return (
+                      <button
+                        type="button"
+                        key={m.id}
+                        onClick={() => {
+                          const n = new Set(acceptedMethodIds);
+                          if (on) n.delete(m.id);
+                          else n.add(m.id);
+                          setAcceptedMethodIds(n);
+                        }}
+                        className={`flex w-full items-center gap-3 rounded-2xl border p-2.5 text-left ${
+                          on ? "border-lime bg-lime/5" : "border-border bg-background"
+                        }`}
+                      >
+                        <div className="grid h-8 w-8 place-items-center rounded-xl bg-secondary text-base">
+                          {meta.emoji}
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <div className="truncate text-sm font-semibold">
+                            {m.label || meta.name}
+                          </div>
+                          <div className="truncate text-[11px] text-muted-foreground">
+                            {m.username || m.contact_info}
+                          </div>
+                        </div>
+                        <div
+                          className={`grid h-5 w-5 place-items-center rounded-full ${
+                            on ? "bg-lime text-primary-foreground" : "border border-border"
+                          }`}
+                        >
+                          {on && <Check className="h-3 w-3" />}
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </Field>
+          )}
+
+          {price > 0 && (
+            <Field label="Payment deadline (optional)">
+              <input
+                type="datetime-local"
+                value={paymentDeadline}
+                onChange={(e) => setPaymentDeadline(e.target.value)}
+                className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm [color-scheme:dark]"
+              />
+            </Field>
+          )}
+
+          {price > 0 && (
+            <Field label="Refund policy (optional)">
+              <textarea
+                value={refundPolicy}
+                onChange={(e) => setRefundPolicy(e.target.value)}
+                rows={2}
+                placeholder="e.g. Full refund up to 24h before tip-off."
+                className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm resize-none"
+              />
+            </Field>
+          )}
+
+          {price > 0 && (
+            <Field label="Payment instructions (optional)">
+              <textarea
+                value={paymentInstructions}
+                onChange={(e) => setPaymentInstructions(e.target.value)}
+                rows={2}
+                placeholder="e.g. Include your full name in the payment note."
+                className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm resize-none"
+              />
+            </Field>
+          )}
+
+
           <Field label="Description">
             <textarea
               value={description}
