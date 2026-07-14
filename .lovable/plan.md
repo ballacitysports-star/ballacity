@@ -1,44 +1,36 @@
 ## Problem
 
-On `/games/:gameId/pay`, tapping the pay CTA lands on the pay screen, which then sticks on `Loading…` forever. Console has no errors and no request is pending, so the hang is state-level, not network-level.
+The RLS SELECT policy on `host_payment_methods` is:
 
-The pay page renders `Loading…` while ANY of these are true:
-
-```ts
-loading                        // auth store still bootstrapping
-|| (!game && !lookupTimedOut)  // game lookup not finished
-|| (game && fetching)          // payment-settings/methods/subs/req fetch running
+```
+(is_enabled = true) OR (host_id = auth.uid())
 ```
 
-There is no timeout, no error surfacing for the fetch phase, and no way for the user (or us) to see which of the three branches is stuck. If any single `await` inside the "fetch phase" resolves oddly (a Supabase call that never throws and never returns, an auth-store race, a query for a hosted-game id that never completes), `fetching` stays `true` forever with zero visible signal.
+This lets **any authenticated user read every enabled host's payment methods** — including `username`, `payment_url`, `contact_info` (email/phone), and `instructions`. Combined with `listMyPaymentMethods()` in `src/lib/payments.ts` which does `SELECT * FROM host_payment_methods` with **no `host_id` filter** (relies purely on RLS), the "My payment methods" panel on `/payments` renders every host's payment details to the current user. That's what the user is seeing as "payment option data showing in other users' profile".
 
-I want to (a) fix that class of hang, (b) surface which branch is stuck, and (c) never leave the user staring at a blank spinner.
+## Fix
 
-## Plan
+Tighten RLS so only the owner can read their own methods, and expose the minimum data needed for the pay screen through a security-definer RPC that filters by a specific host.
 
-1. **Instrument the pay page's three loading branches**
-   - In `src/routes/games.$gameId.pay.tsx`, add a small `stage` state (`"auth" | "lookup" | "fetch" | "ready"`) and log transitions with `console.info("[pay] …")` including `gameId` and elapsed ms.
-   - Render the current stage under the `Loading…` text so the user sees "Loading… (fetch)" instead of a blank spinner. Purely diagnostic UI — no design change.
+### 1. Migration
 
-2. **Guarantee the fetch phase always resolves**
-   - Wrap the `getGamePaymentSettings` / `listPaymentMethodsForHost` / `listMySubmissionsForGame` / `getMyJoinRequest` awaits in `Promise.race([fetch, timeout(8000)])`.
-   - On timeout: log a warning, set `fetching = false`, toast "Couldn't reach the payment service — retry?", and render an inline `Retry` button that re-runs the effect. This kills the infinite spinner in the worst case and gives a recovery path.
+- Drop the broad SELECT policy on `host_payment_methods`.
+- Add owner-only SELECT: `USING (host_id = auth.uid())`.
+- Create `public.get_host_payment_methods(_host_id uuid)` — `SECURITY DEFINER`, `STABLE`, `SET search_path = public` — returns only the columns the pay screen needs (`id`, `host_id`, `payment_type`, `label`, `username`, `payment_url`, `contact_info`, `instructions`, `is_enabled`) filtered by `host_id = _host_id AND is_enabled = true`. Grant EXECUTE to `authenticated`.
+  - Rationale: players paying a host legitimately need `username`/`payment_url`/`contact_info` for that one host, but should not be able to enumerate all hosts.
 
-3. **Same treatment for the hosted-game lookup**
-   - `fetchHostedGame(gameId)` is already wrapped in `.finally(setLookupTimedOut(true))`, but if the awaited promise itself never settles the finally never runs. Add the same 8s race so `lookupTimedOut` always flips.
+### 2. Client code (`src/lib/payments.ts`)
 
-4. **Auth branch guard**
-   - If `loading` from `useAuth()` is still `true` after 5s on this route, log `[pay] auth-stuck` with the current `authState` snapshot so we can tell "auth store never hydrated" apart from "payments call hung". No behavior change unless it fires.
+- `listMyPaymentMethods`: add explicit `.eq("host_id", user.id)` (defense in depth alongside the tightened policy).
+- `listPaymentMethodsForHost(hostId)`: switch to `supabase.rpc("get_host_payment_methods", { _host_id: hostId })` so it keeps working under the new policy.
 
-5. **Verify**
-   - Load `/games/g2/pay` signed-out → still redirects to `/auth` (regression check).
-   - Load `/games/g2/pay` signed-in → stage moves `auth → lookup → fetch → ready` in the console and the page renders (either the payment picker or "Host hasn't configured payment yet").
-   - Force a hang by mocking `getGamePaymentSettings` to a never-resolving promise → after 8s the timeout toast + Retry button appear instead of an infinite spinner.
-   - Re-run `e2e/pay-button-navigates.spec.ts` to confirm nothing regressed on the happy paths.
+### Out of scope
 
-## Technical notes
+- No UI changes; `/payments`, `/games/$gameId/payment-setup`, and `/games/$gameId/pay` continue to work with the same shapes.
+- The unrelated "Couldn't reach the payment service" timeout is not touched here.
 
-- No changes to routing, join logic, sample data, or the CTA on the detail page — this is scoped to the pay screen's loading lifecycle.
-- New `stage` state and timeout wrappers live entirely in `src/routes/games.$gameId.pay.tsx`; no shared util changes.
-- Timeout values (`5s` for auth stall warning, `8s` for data-fetch recovery) are chosen so a slow mobile network still succeeds normally but a genuine hang recovers within ~10s.
-- The added `console.info` lines are the primary diagnostic signal: on the next report the logs will pinpoint which branch is stuck, at which point we can remove the instrumentation and land the real root-cause fix.
+## Verification
+
+- On `/payments` as user A, only A's own methods appear.
+- On `/games/$gameId/pay` for a game hosted by B, B's enabled methods still render for the paying player.
+- `SELECT * FROM host_payment_methods` from the browser as a non-owner returns 0 rows.
