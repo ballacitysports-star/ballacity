@@ -87,7 +87,7 @@ export const Route = createFileRoute("/games/$gameId/pay")({
     game: GAMES.find((g) => g.id === params.gameId) ?? null,
   }),
   head: ({ loaderData }) => ({
-    meta: [{ title: `Pay for ${loaderData?.game.title ?? "game"} — OpenRun` }],
+    meta: [{ title: `Pay for ${loaderData?.game?.title ?? "game"} — OpenRun` }],
   }),
   notFoundComponent: () => <div className="p-6 text-center text-sm">Game not found.</div>,
   errorComponent: ({ reset }) => (
