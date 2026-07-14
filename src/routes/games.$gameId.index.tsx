@@ -1266,10 +1266,10 @@ function GameDetail() {
                 type="button"
                 onClick={() => {
                   if (game.status === "in_progress") {
-                    updateHostedGame(game.id, { status: "completed" });
+                    void updateHostedGame(game.id, { status: "completed" }).catch(() => {});
                     toast.success("Game marked as ended.");
                   } else {
-                    updateHostedGame(game.id, { status: "in_progress", joinsClosed: true });
+                    void updateHostedGame(game.id, { status: "in_progress", joinsClosed: true }).catch(() => {});
                     toast.success("Game started. Have fun!");
                   }
                 }}
@@ -1283,9 +1283,10 @@ function GameDetail() {
                 type="button"
                 onClick={() => {
                   const next = !game.joinsClosed;
-                  updateHostedGame(game.id, { joinsClosed: next });
+                  void updateHostedGame(game.id, { joinsClosed: next }).catch(() => {});
                   toast.success(next ? "Joining closed." : "Joining reopened.");
                 }}
+
                 disabled={game.status !== "scheduled" && game.status !== undefined}
                 className="inline-flex flex-col items-center justify-center gap-1 rounded-xl border border-border bg-background py-2.5 text-xs font-semibold disabled:opacity-50"
               >
