@@ -317,7 +317,7 @@ function PayPage() {
     return <div className="p-6 text-sm text-muted-foreground">Loading…</div>;
   }
   if (!game) {
-    throw notFound();
+    return <div className="p-6 text-center text-sm">Game not found.</div>;
   }
   if (!user) return null;
 
