@@ -76,7 +76,7 @@ const emojiBySport: Record<string, string> = Object.fromEntries(
 
 const hostIdFor = (username: string) => `host-${username.replace(/^@/, "").toLowerCase()}`;
 
-export const Route = createFileRoute("/games/$gameId")({
+export const Route = createFileRoute("/games/$gameId/")({
   validateSearch: (search: Record<string, unknown>) => {
     const out: { invite?: true; from?: string; exp?: number; expInvalid?: true } = {};
     if (search.invite === "1" || search.invite === 1 || search.invite === true) out.invite = true;
