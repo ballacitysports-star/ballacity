@@ -206,8 +206,8 @@ function PayPage() {
         p,
         new Promise<T>((_, reject) =>
           window.setTimeout(
-            () => reject(new Error(`[pay] ${label} timed out after 8s`)),
-            8000,
+            () => reject(new Error(`[pay] ${label} timed out after 6s`)),
+            6000,
           ),
         ),
       ]);
@@ -256,9 +256,6 @@ function PayPage() {
         console.warn(`[pay] fetch failed: ${msg}`);
         if (msg.includes("timed out")) {
           setFetchTimedOut(true);
-          toast.error("Couldn't reach the payment service — tap Retry.");
-        } else {
-          toast.error(msg);
         }
       } finally {
         if (!cancelled) setFetching(false);
@@ -383,23 +380,7 @@ function PayPage() {
     };
   }, [gameId, user]);
 
-  if (game && !fetching && fetchTimedOut) {
-    return (
-      <div className="p-6 text-center text-sm space-y-3">
-        <div className="text-muted-foreground">
-          Couldn't reach the payment service.
-        </div>
-        <button
-          type="button"
-          onClick={() => setFetchAttempt((n) => n + 1)}
-          className="inline-flex items-center rounded-full bg-lime-gradient px-4 py-2 text-xs font-bold text-primary-foreground"
-        >
-          Retry
-        </button>
-      </div>
-    );
-  }
-  if (loading || (!game && !lookupTimedOut) || (game && fetching)) {
+  if (loading || (!game && !lookupTimedOut)) {
     return (
       <div className="p-6 text-sm text-muted-foreground">
         Loading… <span className="opacity-60">({stage})</span>
@@ -498,6 +479,23 @@ function PayPage() {
           >
             {myReq ? "Back to game" : "Request to join"}
           </Link>
+        </div>
+      ) : fetching ? (
+        <div className="rounded-2xl border border-dashed border-border bg-surface/40 p-5 text-center text-sm text-muted-foreground">
+          Loading payment options…
+        </div>
+      ) : fetchTimedOut ? (
+        <div className="rounded-2xl border border-dashed border-coral/40 bg-coral/5 p-5 text-center space-y-2">
+          <div className="text-sm text-muted-foreground">
+            Couldn't reach the payment service.
+          </div>
+          <button
+            type="button"
+            onClick={() => setFetchAttempt((n) => n + 1)}
+            className="inline-flex items-center rounded-full bg-lime-gradient px-4 py-1.5 text-xs font-bold text-primary-foreground"
+          >
+            Retry
+          </button>
         </div>
       ) : !settings || methods.length === 0 ? (
         <div className="rounded-2xl border border-dashed border-border bg-surface/40 p-5 text-center">
