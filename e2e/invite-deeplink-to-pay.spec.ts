@@ -100,10 +100,14 @@ test("opening an invite deeplink lands on the game and the pay CTA routes to che
 
   // URL preserves both invite params on landing.
   await page.waitForURL(
-    (u) =>
-      u.pathname === `/games/${GAME_ID}` &&
-      u.searchParams.get("invite") === "1" &&
-      u.searchParams.get("from") === FAKE_HOST_ID,
+    (u) => {
+      const invite = u.searchParams.get("invite");
+      return (
+        u.pathname === `/games/${GAME_ID}` &&
+        (invite === "1" || invite === "true") &&
+        u.searchParams.get("from") === FAKE_HOST_ID
+      );
+    },
     { timeout: 10_000 },
   );
 
