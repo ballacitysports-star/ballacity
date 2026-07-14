@@ -1,22 +1,35 @@
-## Plan
+## Problem
 
-1. **Confirm the failing request path**
-   - Inspect the pay screen network behavior around `getGamePaymentSettings`, `get_host_payment_methods`, payment submissions, and join requests.
-   - Keep the existing host-scoped RPC path intact so payment method data is still limited to the intended host.
+On mobile, tapping **Pay host** lands on `/games/:id/pay` and gets stuck at `Loading… (fetch)` indefinitely. The screen is fully blocked until `getGamePaymentSettings` + `listPaymentMethodsForHost` both resolve (or 8s timeout fires). On flaky mobile networks the user only sees a blank loader with no context.
 
-2. **Make the pay screen tolerate optional lookup failures**
-   - Change the pay screen load sequence so a failure or timeout in non-critical user-status reads, like previous submissions or join request status, does not blank the whole pay screen.
-   - Keep payment settings and host payment methods as the required data for showing the payment UI.
-   - If the host has no methods, show the existing empty state instead of the red retry error.
+## Fix
 
-3. **Keep security behavior unchanged**
-   - Continue using `listPaymentMethodsForHost()` through `get_host_payment_methods` only.
-   - Do not reintroduce direct public reads from `host_payment_methods` on the pay screen.
+Stop blocking the whole screen on payment data. Render the pay screen shell (back button, game title, fee from `game.price`) as soon as the game object is available, and load payment settings/methods inline with their own small loading + empty/error states.
 
-4. **Add/adjust regression coverage**
-   - Add an E2E case for pressing Pay Host where the pay screen still reaches either the ready UI or empty state without showing the full-screen payment-service retry when optional status reads are slow or unavailable.
-   - Keep the existing tests that assert the RPC-only payment-method fetch and no cross-host leakage.
+### Changes to `src/routes/games.$gameId.pay.tsx`
 
-5. **Verify**
-   - Run the targeted pay-screen E2E test(s) after implementation.
-   - Check the rendered pay screen no longer shows “Couldn't reach the payment service — tap Retry” for the normal Pay Host flow.
+1. **Remove the full-screen `(fetch)` gate.**
+   - Keep the `loading` (auth) and `!game && !lookupTimedOut` (game lookup) loaders.
+   - Once `game` exists, always render the pay page shell (header, fee card) regardless of `fetching`.
+
+2. **Inline payment-methods loading state.**
+   - Where the payment method picker renders, show:
+     - a small skeleton/spinner while `fetching` is true,
+     - the existing empty state ("host hasn't configured payment yet") when settings loaded but no methods,
+     - the existing Retry button (small, inline — not full-screen) when `fetchTimedOut` is true.
+
+3. **Reduce the timeout from 8s to 6s** so users see the inline retry sooner on slow connections.
+
+4. **Keep behavior unchanged for:**
+   - Host-scoped RPC (`listPaymentMethodsForHost` → `get_host_payment_methods`).
+   - Optional lookups via `Promise.allSettled` (submissions, join request).
+   - Approval-gate UI, realtime subscriptions, submission flow.
+
+### Regression coverage
+
+Add an E2E case to `e2e/pay-button-navigates.spec.ts` where `game_payment_settings` GET hangs indefinitely: the pay screen shell (h1 with game title, fee) must still render, and no full-screen "Loading… (fetch)" text should be visible after a short wait.
+
+### Verify
+
+- Run the pay-screen E2E tests.
+- Manually load `/games/g2/pay` on mobile viewport in the preview and confirm the header + fee render immediately, with the methods area showing its own loading/empty state.
