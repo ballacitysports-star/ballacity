@@ -1,22 +1,36 @@
-## Plan
+## Problem
 
-1. **Make payment loading fail closed instead of hanging**
-   - Update the pay screen so any slow or failed payment settings/methods request always leaves the `Loading payment options…` state and shows either retry or the host-not-configured message.
-   - Clear old payment state at the start of each retry so stale partial data does not keep the UI ambiguous.
+On the Pickup/Feed page, tapping the sliders (filter) button appears to do nothing.
 
-2. **Decouple the payment fetch from unstable page state**
-   - Prevent the fetch effect from restarting just because the `game` object or auth user object changes identity.
-   - Key the payment fetch on stable values only: `gameId`, the resolved host id, and retry attempt.
+The button's `onClick` correctly flips `filtersOpen` to `true`, and `<FilterSheet>` does render — but it renders invisibly off-screen.
 
-3. **Show retry sooner and clearer on mobile**
-   - Keep the pay screen shell visible.
-   - Replace the indefinite inline loader with a timed inline error/retry state when payment options do not load promptly.
-   - Keep the existing empty state when the host has no configured methods.
+### Root cause
 
-4. **Add regression coverage**
-   - Add an E2E test where the payment settings request hangs forever.
-   - Assert the page does not stay on `Loading payment options…` and shows the inline retry/empty state instead.
+The Feed's outer container applies an inline `transform: translateY(...)` for the pull-to-refresh indicator (in `src/routes/_tabs.feed.tsx`, around line 240):
 
-5. **Verify**
-   - Run the targeted pay-screen E2E coverage.
-   - Manually check `/games/g2/pay` on a mobile viewport and confirm the payment section exits loading.
+```tsx
+<div className="relative mx-auto w-full max-w-md ..." style={{ transform: `translateY(${indicatorOffset}px)`, ... }}>
+```
+
+Per CSS spec, any ancestor with a `transform` becomes the containing block for `position: fixed` descendants. `FilterSheet` uses `fixed inset-0 z-50 ... flex items-end` — so instead of covering the viewport, it covers only the (very tall) Feed container and anchors its bottom sheet to the bottom of that container, which sits far below the visible viewport. Nothing visible changes on tap.
+
+## Fix
+
+Render `FilterSheet` outside the transformed container using a React portal, so its `fixed` positioning resolves against the viewport again.
+
+### Changes in `src/routes/_tabs.feed.tsx`
+
+1. Import `createPortal` from `react-dom`.
+2. Wrap the existing `<AnimatePresence>{filtersOpen && <FilterSheet ... />}</AnimatePresence>` block in `createPortal(..., document.body)`, guarded by a `typeof document !== "undefined"` check so SSR doesn't crash.
+3. Leave the button, state, and `FilterSheet` component itself unchanged.
+
+### Verification
+
+- Manually tap the filter button on `/feed` (and via `/pickup` redirect) at mobile viewport — sheet slides up from the bottom of the viewport and the backdrop covers the full screen.
+- Reset / Done / backdrop-tap close the sheet.
+- Pull-to-refresh still works (unrelated container transform is untouched).
+- No regressions to sport chips or search suggestions dropdown.
+
+## Out of scope
+
+No changes to filter logic, styling of the sheet, or the pull-to-refresh behavior.
