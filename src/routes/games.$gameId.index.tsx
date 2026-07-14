@@ -42,7 +42,8 @@ import {
   SheetDescription,
 } from "@/components/ui/sheet";
 import { toast } from "sonner";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { LocationAutocomplete } from "@/components/LocationAutocomplete";
 import {
   getGamePaymentSettings,
   listMySubmissionsForGame,
