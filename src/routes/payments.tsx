@@ -373,10 +373,15 @@ function Input({
 function VerifyPanel() {
   const [filter, setFilter] = useState<"pending" | "verified" | "rejected">("pending");
   const [subs, setSubs] = useState<PaymentSubmission[]>([]);
-  const refresh = () =>
+  const [pendingCount, setPendingCount] = useState(0);
+  const refresh = () => {
     listHostSubmissions(filter)
       .then(setSubs)
       .catch((e) => toast.error(e.message));
+    listHostSubmissions("pending")
+      .then((p) => setPendingCount(p.length))
+      .catch(() => {});
+  };
   useEffect(() => {
     refresh();
   }, [filter]);
@@ -388,13 +393,22 @@ function VerifyPanel() {
           <button
             key={s}
             onClick={() => setFilter(s)}
-            className={`flex-1 rounded-full px-3 py-1.5 text-xs font-bold capitalize ${
+            className={`flex-1 rounded-full px-3 py-1.5 text-xs font-bold capitalize inline-flex items-center justify-center gap-1.5 ${
               filter === s
                 ? "bg-lime text-primary-foreground"
                 : "border border-border bg-surface text-muted-foreground"
             }`}
           >
             {s}
+            {s === "pending" && pendingCount > 0 && (
+              <span
+                className={`rounded-full px-1.5 py-[1px] text-[10px] font-extrabold ${
+                  filter === s ? "bg-primary-foreground/20 text-primary-foreground" : "bg-coral/15 text-coral"
+                }`}
+              >
+                {pendingCount}
+              </span>
+            )}
           </button>
         ))}
       </div>
@@ -413,6 +427,12 @@ function VerifyPanel() {
 function SubmissionCard({ sub, onReviewed }: { sub: PaymentSubmission; onReviewed: () => void }) {
   const [proofUrl, setProofUrl] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [note, setNote] = useState("");
+  const [player, setPlayer] = useState<{
+    display_name: string | null;
+    username: string | null;
+    avatar_initials: string | null;
+  } | null>(null);
   const game = GAMES.find((g) => g.id === sub.game_id);
   const meta = sub.payment_type ? paymentTypeMeta(sub.payment_type) : null;
 
@@ -420,10 +440,27 @@ function SubmissionCard({ sub, onReviewed }: { sub: PaymentSubmission; onReviewe
     if (sub.screenshot_path) getSignedProofUrl(sub.screenshot_path).then(setProofUrl);
   }, [sub.screenshot_path]);
 
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const { supabase } = await import("@/integrations/supabase/client");
+      const { data } = await supabase
+        .from("profiles")
+        .select("display_name, username, avatar_initials")
+        .eq("id", sub.player_id)
+        .maybeSingle();
+      if (!cancelled) setPlayer(data as any);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [sub.player_id]);
+
   const review = async (status: "verified" | "rejected") => {
     setBusy(true);
     try {
-      await reviewSubmission(sub.id, status);
+      const trimmed = note.trim();
+      await reviewSubmission(sub.id, status, trimmed || undefined);
       toast.success(status === "verified" ? "Payment approved" : "Payment rejected");
       if (status === "verified") {
         const { createNotification } = await import("@/lib/notifications");
@@ -431,10 +468,20 @@ function SubmissionCard({ sub, onReviewed }: { sub: PaymentSubmission; onReviewe
           user_id: sub.player_id,
           type: "payment_verified",
           title: `Payment verified for ${game?.title ?? "your game"}`,
-          body: "You're on the roster. See you there!",
+          body: trimmed || "You're on the roster. See you there!",
           link: `/games/${sub.game_id}`,
         }).catch(() => {});
+      } else {
+        const { createNotification } = await import("@/lib/notifications");
+        void createNotification({
+          user_id: sub.player_id,
+          type: "payment_rejected",
+          title: `Payment rejected for ${game?.title ?? "your game"}`,
+          body: trimmed || "The host was not able to verify your payment.",
+          link: `/games/${sub.game_id}/pay`,
+        }).catch(() => {});
       }
+      setNote("");
       onReviewed();
     } catch (e: any) {
       toast.error(e.message);
@@ -443,23 +490,70 @@ function SubmissionCard({ sub, onReviewed }: { sub: PaymentSubmission; onReviewe
     }
   };
 
+  const playerLabel =
+    player?.display_name ||
+    (player?.username ? `@${player.username}` : `Player ${sub.player_id.slice(0, 8)}…`);
+  const initials =
+    player?.avatar_initials ||
+    (player?.display_name ? player.display_name.slice(0, 2).toUpperCase() : "P");
+
   return (
     <div className="rounded-2xl border border-border bg-surface p-4 space-y-3">
       <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <div className="font-semibold text-sm truncate">{game?.title ?? sub.game_id}</div>
-          <div className="text-[11px] text-muted-foreground">
-            Player ID: {sub.player_id.slice(0, 8)}… · {new Date(sub.submitted_at).toLocaleString()}
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2 mb-1">
+            <div className="h-7 w-7 rounded-full bg-lime/20 text-lime text-[10px] font-bold inline-flex items-center justify-center shrink-0">
+              {initials}
+            </div>
+            <div className="min-w-0">
+              <div className="text-sm font-semibold truncate">{playerLabel}</div>
+              <div className="text-[10px] text-muted-foreground">
+                {new Date(sub.submitted_at).toLocaleString()}
+              </div>
+            </div>
           </div>
-          {meta && (
-            <div className="text-xs mt-1">
-              {meta.emoji} {meta.name}
+          <div className="text-xs font-semibold truncate">{game?.title ?? sub.game_id}</div>
+          {game && (
+            <div className="text-[11px] text-muted-foreground">
+              {formatWhen(game.date)} · {game.location}
             </div>
           )}
-          {sub.transaction_reference && (
-            <div className="text-xs text-muted-foreground">Ref: {sub.transaction_reference}</div>
+          <div className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1 text-xs">
+            {meta && (
+              <div>
+                <span className="text-muted-foreground">Method</span>
+                <div className="font-medium">
+                  {meta.emoji} {meta.name}
+                </div>
+              </div>
+            )}
+            {sub.paid_amount != null && (
+              <div>
+                <span className="text-muted-foreground">Amount</span>
+                <div className="font-medium">${Number(sub.paid_amount).toFixed(2)}</div>
+              </div>
+            )}
+            {sub.paid_at && (
+              <div>
+                <span className="text-muted-foreground">Paid at</span>
+                <div className="font-medium">{new Date(sub.paid_at).toLocaleString()}</div>
+              </div>
+            )}
+            {sub.transaction_reference && (
+              <div className="col-span-2 min-w-0">
+                <span className="text-muted-foreground">Reference</span>
+                <div className="font-medium truncate">{sub.transaction_reference}</div>
+              </div>
+            )}
+          </div>
+          {sub.notes && (
+            <div className="mt-2 rounded-lg bg-background p-2 text-xs">
+              <div className="text-[10px] uppercase font-bold text-muted-foreground mb-0.5">
+                Player note
+              </div>
+              {sub.notes}
+            </div>
           )}
-          {sub.notes && <p className="text-xs mt-1">{sub.notes}</p>}
         </div>
         <span
           className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase ${
@@ -482,22 +576,40 @@ function SubmissionCard({ sub, onReviewed }: { sub: PaymentSubmission; onReviewe
           />
         </a>
       )}
+      {sub.status !== "pending" && sub.reviewer_notes && (
+        <div className="rounded-lg border border-border bg-background p-2 text-xs">
+          <div className="text-[10px] uppercase font-bold text-muted-foreground mb-0.5">
+            Your note
+          </div>
+          {sub.reviewer_notes}
+        </div>
+      )}
       {sub.status === "pending" && (
-        <div className="flex gap-2">
-          <button
-            onClick={() => review("rejected")}
-            disabled={busy}
-            className="flex-1 rounded-xl border border-coral/40 bg-coral/10 py-2 text-sm font-bold text-coral disabled:opacity-50"
-          >
-            Reject
-          </button>
-          <button
-            onClick={() => review("verified")}
-            disabled={busy}
-            className="flex-1 rounded-xl bg-lime-gradient py-2 text-sm font-bold text-primary-foreground inline-flex items-center justify-center gap-1 disabled:opacity-50"
-          >
-            <ShieldCheck className="h-4 w-4" /> Approve
-          </button>
+        <div className="space-y-2">
+          <textarea
+            value={note}
+            onChange={(e) => setNote(e.target.value)}
+            placeholder="Optional note to the player (e.g. why rejected, or a thanks)"
+            rows={2}
+            maxLength={1000}
+            className="w-full rounded-xl border border-border bg-background px-3 py-2 text-xs outline-none focus:border-lime resize-none"
+          />
+          <div className="flex gap-2">
+            <button
+              onClick={() => review("rejected")}
+              disabled={busy}
+              className="flex-1 rounded-xl border border-coral/40 bg-coral/10 py-2 text-sm font-bold text-coral disabled:opacity-50"
+            >
+              Reject
+            </button>
+            <button
+              onClick={() => review("verified")}
+              disabled={busy}
+              className="flex-1 rounded-xl bg-lime-gradient py-2 text-sm font-bold text-primary-foreground inline-flex items-center justify-center gap-1 disabled:opacity-50"
+            >
+              <ShieldCheck className="h-4 w-4" /> Approve
+            </button>
+          </div>
         </div>
       )}
     </div>
