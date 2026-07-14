@@ -19,7 +19,7 @@ import {
   getMyJoinRequest,
 } from "@/lib/payments";
 import { LegalNotice } from "@/components/LegalNotice";
-import { joinGame } from "@/lib/games-store";
+// joinGame no longer called here — player is added to roster only after host verifies payment.
 import { fetchHostedGame, useHostedGames } from "@/lib/hosted-games-store";
 import { z } from "zod";
 
