@@ -206,8 +206,8 @@ function PayPage() {
         p,
         new Promise<T>((_, reject) =>
           window.setTimeout(
-            () => reject(new Error(`[pay] ${label} timed out after 8s`)),
-            8000,
+            () => reject(new Error(`[pay] ${label} timed out after 6s`)),
+            6000,
           ),
         ),
       ]);
