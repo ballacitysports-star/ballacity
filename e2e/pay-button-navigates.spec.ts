@@ -42,10 +42,34 @@ async function restoreSession(page: Page) {
 
 /**
  * Common mocks that let the pay page render without any real data:
- * paid, no-approval settings; no prior submissions/join requests;
+ * paid, no-approval settings; configurable submissions; no join requests;
  * empty payment methods list.
  */
-async function mockPaymentBackend(page: Page, gameId: string) {
+function mockPendingSubmission(gameId: string) {
+  return {
+    id: `mock-pending-${gameId}`,
+    player_id: "mock-player",
+    game_id: gameId,
+    host_id: FAKE_HOST_ID,
+    payment_method_id: null,
+    payment_type: "venmo",
+    screenshot_path: null,
+    transaction_reference: null,
+    paid_amount: 10,
+    paid_at: new Date().toISOString(),
+    notes: null,
+    status: "pending",
+    reviewer_notes: null,
+    submitted_at: new Date().toISOString(),
+    reviewed_at: null,
+  };
+}
+
+async function mockPaymentBackend(
+  page: Page,
+  gameId: string,
+  options: { submissions?: unknown[]; writeAttempts?: string[] } = {},
+) {
   await page.route(
     (url) => tableUrl(url, "game_payment_settings"),
     async (route) => {
@@ -73,13 +97,28 @@ async function mockPaymentBackend(page: Page, gameId: string) {
     },
   );
 
+  const submissions = options.submissions ?? [];
+  await page.route((url) => tableUrl(url, "payment_submissions"), async (route) => {
+    const method = route.request().method();
+    if (method !== "GET") {
+      options.writeAttempts?.push(`payment_submissions:${method}`);
+      return route.fulfill({ status: 204, contentType: "application/json", body: "" });
+    }
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      headers: { "content-range": `0-${Math.max(0, submissions.length - 1)}/${submissions.length}` },
+      body: JSON.stringify(submissions),
+    });
+  });
+
   const emptyList = async (route: Route) => {
     if (route.request().method() !== "GET") return route.fallback();
     await route.fulfill({ status: 200, contentType: "application/json", body: "[]" });
   };
-  await page.route((url) => tableUrl(url, "payment_submissions"), emptyList);
   await page.route((url) => tableUrl(url, "join_requests"), emptyList);
-  await page.route((url) => tableUrl(url, "payment_methods"), emptyList);
+  await page.route((url) => tableUrl(url, "host_payment_methods"), emptyList);
+  await page.route((url) => tableUrl(url, "game_participants"), emptyList);
 }
 
 async function assertPayScreenRendered(page: Page, gameId: string) {
@@ -114,6 +153,36 @@ test("Pay host button on a custom (sample) game routes to the pay screen", async
   await ctx.close();
 });
 
+test("Payment status button with a pending submission still routes to the pay screen", async ({
+  browser,
+}) => {
+  const ctx = await browser.newContext();
+  const page = await ctx.newPage();
+  const writeAttempts: string[] = [];
+
+  await mockPaymentBackend(page, CUSTOM_GAME_ID, {
+    submissions: [mockPendingSubmission(CUSTOM_GAME_ID)],
+    writeAttempts,
+  });
+  await restoreSession(page);
+  await page.evaluate(
+    (gameId) => window.localStorage.setItem("openrun.joinedGameIds.v1", JSON.stringify([gameId])),
+    CUSTOM_GAME_ID,
+  );
+
+  await page.goto(`/games/${CUSTOM_GAME_ID}`, { waitUntil: "domcontentloaded" });
+
+  const cta = page.getByRole("link", { name: /payment pending|pay host/i }).first();
+  await expect(cta).toBeVisible({ timeout: 10_000 });
+  await cta.click();
+
+  await assertPayScreenRendered(page, CUSTOM_GAME_ID);
+  await expect(page.getByTestId("payment-status-timeline")).toHaveAttribute("data-status", "pending");
+  expect(writeAttempts, "viewing a pending payment should not withdraw/delete it").toEqual([]);
+
+  await ctx.close();
+});
+
 test("Pay host button on a hosted game routes to the pay screen", async ({ browser }) => {
   const ctx = await browser.newContext();
   const page = await ctx.newPage();
@@ -131,7 +200,7 @@ test("Pay host button on a hosted game routes to the pay screen", async ({ brows
       avatar: "",
       rating: 5,
     },
-    host_user_id: FAKE_HOST_ID,
+    host_id: FAKE_HOST_ID,
     date: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
     duration: "60 min",
     location: "E2E Court",

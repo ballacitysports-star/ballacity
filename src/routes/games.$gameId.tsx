@@ -360,9 +360,9 @@ function GameDetail() {
       toast.error("The host has blocked you from joining their games.");
       return;
     }
-    // Approved-but-unpaid on a paid game → route to pay page (don't treat as
-    // "confirmed → leave" if a prior auto-join left `joined` stale-true).
-    if (isPaid && !paymentCleared && !isPending && (isApproved || !requiresApproval)) {
+    // Approved-but-unpaid on a paid game → route to pay page/status (don't
+    // treat stale joined/pending payment state as leave/withdraw from here).
+    if (isPaid && !paymentCleared && approvalCleared) {
       const search: { invite?: true; from?: string } = {};
       if (isInvite) search.invite = true;
       if (inviteFrom) search.from = inviteFrom;
@@ -1469,10 +1469,16 @@ function GameDetail() {
           {!isHost && (() => {
             const canJoinAction = joined || isPending || isConfirmed || spotsLeft > 0;
             const buttonDisabled = requesting || !canJoinAction;
-            const paymentAction = isPaid && !paymentCleared && !isPending && (isApproved || !requiresApproval);
+            const paymentAction = isPaid && !paymentCleared && approvalCleared && canJoinAction;
             const paymentSearch: { invite?: true; from?: string } = {};
             if (isInvite) paymentSearch.invite = true;
             if (inviteFrom) paymentSearch.from = inviteFrom;
+            const paymentCtaLabel =
+              latestSub?.status === "pending"
+                ? "Payment pending · View status"
+                : latestSub?.status === "rejected"
+                  ? "Payment rejected · Pay again"
+                  : `Pay host · $${fee.toFixed(2)}`;
             const LiveSpots = () => (
               <span
                 className="inline-flex items-baseline"
@@ -1504,7 +1510,7 @@ function GameDetail() {
                     search={paymentSearch}
                     className="flex w-full items-center justify-center gap-2 rounded-2xl bg-lime-gradient py-3.5 font-bold text-primary-foreground glow-lime transition-colors"
                   >
-                    <CreditCard className="h-4 w-4" /> Pay host · ${fee.toFixed(2)}
+                    <CreditCard className="h-4 w-4" /> {paymentCtaLabel}
                   </Link>
                 </motion.div>
               );
