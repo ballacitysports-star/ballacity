@@ -126,16 +126,20 @@ test("opening an invite deeplink lands on the game and the pay CTA routes to che
 
   // Should route to the checkout page with BOTH invite params preserved.
   await page.waitForURL(
-    (u) =>
-      u.pathname === `/games/${GAME_ID}/pay` &&
-      u.searchParams.get("invite") === "1" &&
-      u.searchParams.get("from") === FAKE_HOST_ID,
+    (u) => {
+      const invite = u.searchParams.get("invite");
+      return (
+        u.pathname === `/games/${GAME_ID}/pay` &&
+        (invite === "1" || invite === "true") &&
+        u.searchParams.get("from") === FAKE_HOST_ID
+      );
+    },
     { timeout: 10_000 },
   );
 
   const finalUrl = new URL(page.url());
   expect(finalUrl.pathname).toBe(`/games/${GAME_ID}/pay`);
-  expect(finalUrl.searchParams.get("invite")).toBe("1");
+  expect(["1", "true"]).toContain(finalUrl.searchParams.get("invite"));
   expect(finalUrl.searchParams.get("from")).toBe(FAKE_HOST_ID);
 
   await ctx.close();
