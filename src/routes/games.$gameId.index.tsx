@@ -289,6 +289,35 @@ function GameDetail() {
     // eslint-disable-next-line
   }, [game?.id, hostsThisGame]);
 
+  // Realtime: when the host verifies/updates my payment submission for this
+  // game, re-run refreshStatus so the auto-join effect can add me to the
+  // roster (game_participants) as soon as the fee is verified.
+  useEffect(() => {
+    if (!game?.id || !user?.id) return;
+    const channel = supabase
+      .channel(`payment_submissions:me:${game.id}:${user.id}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "payment_submissions",
+          filter: `game_id=eq.${game.id}`,
+        },
+        (payload) => {
+          const row = (payload.new ?? payload.old) as { player_id?: string } | null;
+          if (row?.player_id && row.player_id === user.id) {
+            refreshStatus();
+          }
+        },
+      )
+      .subscribe();
+    return () => {
+      supabase.removeChannel(channel);
+    };
+    // eslint-disable-next-line
+  }, [game?.id, user?.id]);
+
   // Realtime: surface in-app toasts as other players join or leave.
   // Compares snapshots of the live roster and skips the viewer's own
   // actions (they already get a "You're in" / "You left" toast) and the
