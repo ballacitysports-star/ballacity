@@ -689,7 +689,7 @@ function PaymentInstructionsAndProof({
   const [submitting, setSubmitting] = useState(false);
   // Persist "opened" across the round-trip so a hard refresh, a webview
   // relaunch, or a mobile OS backgrounding still resumes at the proof step.
-  const resumeKey = `pay-opened:${game_id}:${method.id}`;
+  const resumeKey = externalPaymentResumeKey(game_id, method.id);
   const [opened, setOpened] = useState<boolean>(() => {
     if (typeof window === "undefined") return false;
     try {
@@ -714,11 +714,8 @@ function PaymentInstructionsAndProof({
 
   const handleOpenExternal = () => {
     setOpened(true);
-    try {
-      window.sessionStorage.setItem(resumeKey, "1");
-    } catch {
-      /* storage unavailable — resume still works within this tab */
-    }
+    markExternalPaymentOpened(game_id, method.id);
+    if (method.payment_url) launchExternalPayment(method.payment_url);
     // Give the new tab a beat to open, then scroll the proof form into view
     // so the user sees the return steps as soon as they come back.
     window.setTimeout(resumeAtProof, 300);
@@ -924,23 +921,21 @@ function PaymentInstructionsAndProof({
             <div className="font-bold text-sm">{meta.name}</div>
             <div className="text-xs text-muted-foreground">Send directly to host</div>
           </div>
-          <button onClick={onCancel} className="ml-auto text-muted-foreground">
+          <button type="button" onClick={onCancel} className="ml-auto text-muted-foreground">
             <X className="h-4 w-4" />
           </button>
         </div>
         {method.username && <Field label="Send to" value={method.username} />}
         {method.contact_info && <Field label="Contact" value={method.contact_info} />}
         {method.payment_url && (
-          <a
-            href={method.payment_url}
-            target="_blank"
-            rel="noreferrer"
+          <button
+            type="button"
             onClick={handleOpenExternal}
             aria-label={`Open ${meta.name} in a new tab to pay the host`}
             className="mt-2 flex items-center justify-center gap-2 w-full rounded-xl bg-lime-gradient py-3 text-sm font-bold text-primary-foreground"
           >
             <ExternalLink className="h-4 w-4" /> Open {meta.name} to pay
-          </a>
+          </button>
         )}
         {(method.instructions || extraInstructions) && (
           <div className="mt-3 rounded-xl bg-background p-3 text-xs text-muted-foreground space-y-1">
