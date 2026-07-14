@@ -110,7 +110,7 @@ async function mockPaymentBackend(
   const submissions = options.submissions ?? [];
   await page.route((url) => tableUrl(url, "payment_submissions"), async (route) => {
     const method = route.request().method();
-    if (method !== "GET") {
+    if (method !== "GET" && method !== "HEAD") {
       options.writeAttempts?.push(`payment_submissions:${method}`);
       return route.fulfill({ status: 204, contentType: "application/json", body: "" });
     }
@@ -123,7 +123,7 @@ async function mockPaymentBackend(
   });
 
   const emptyList = async (route: Route) => {
-    if (route.request().method() !== "GET") {
+    if (route.request().method() !== "GET" && route.request().method() !== "HEAD") {
       options.writeAttempts?.push(`${new URL(route.request().url()).pathname.split("/rest/v1/")[1]?.split("?")[0] ?? "unknown"}:${route.request().method()}`);
       return route.fulfill({ status: 204, contentType: "application/json", body: "" });
     }

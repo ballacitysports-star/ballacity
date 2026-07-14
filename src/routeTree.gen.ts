@@ -29,6 +29,7 @@ import { Route as ReviewNewRouteImport } from './routes/review.new'
 import { Route as ProfileEditRouteImport } from './routes/profile.edit'
 import { Route as PlayersUserIdRouteImport } from './routes/players.$userId'
 import { Route as MessagesConversationIdRouteImport } from './routes/messages.$conversationId'
+import { Route as GamesGameIdRouteImport } from './routes/games.$gameId'
 import { Route as CheckoutReturnRouteImport } from './routes/checkout.return'
 import { Route as AdminLocationAnalyticsRouteImport } from './routes/admin.location-analytics'
 import { Route as AccountSecurityRouteImport } from './routes/account.security'
@@ -151,6 +152,11 @@ const MessagesConversationIdRoute = MessagesConversationIdRouteImport.update({
   path: '/messages/$conversationId',
   getParentRoute: () => rootRouteImport,
 } as any)
+const GamesGameIdRoute = GamesGameIdRouteImport.update({
+  id: '/games/$gameId',
+  path: '/games/$gameId',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const CheckoutReturnRoute = CheckoutReturnRouteImport.update({
   id: '/checkout/return',
   path: '/checkout/return',
@@ -224,9 +230,9 @@ const Char91DotmcpChar93ListToolsRoute =
     getParentRoute: () => rootRouteImport,
   } as any)
 const GamesGameIdIndexRoute = GamesGameIdIndexRouteImport.update({
-  id: '/games/$gameId/',
-  path: '/games/$gameId/',
-  getParentRoute: () => rootRouteImport,
+  id: '/',
+  path: '/',
+  getParentRoute: () => GamesGameIdRoute,
 } as any)
 const TeamsTeamIdEditRoute = TeamsTeamIdEditRouteImport.update({
   id: '/edit',
@@ -234,14 +240,14 @@ const TeamsTeamIdEditRoute = TeamsTeamIdEditRouteImport.update({
   getParentRoute: () => TeamsTeamIdRoute,
 } as any)
 const GamesGameIdPaymentSetupRoute = GamesGameIdPaymentSetupRouteImport.update({
-  id: '/games/$gameId/payment-setup',
-  path: '/games/$gameId/payment-setup',
-  getParentRoute: () => rootRouteImport,
+  id: '/payment-setup',
+  path: '/payment-setup',
+  getParentRoute: () => GamesGameIdRoute,
 } as any)
 const GamesGameIdPayRoute = GamesGameIdPayRouteImport.update({
-  id: '/games/$gameId/pay',
-  path: '/games/$gameId/pay',
-  getParentRoute: () => rootRouteImport,
+  id: '/pay',
+  path: '/pay',
+  getParentRoute: () => GamesGameIdRoute,
 } as any)
 const Char91DotmcpChar93InvokeToolToolRoute =
   Char91DotmcpChar93InvokeToolToolRouteImport.update({
@@ -293,6 +299,7 @@ export interface FileRoutesByFullPath {
   '/account/security': typeof AccountSecurityRoute
   '/admin/location-analytics': typeof AdminLocationAnalyticsRoute
   '/checkout/return': typeof CheckoutReturnRoute
+  '/games/$gameId': typeof GamesGameIdRouteWithChildren
   '/messages/$conversationId': typeof MessagesConversationIdRoute
   '/players/$userId': typeof PlayersUserIdRoute
   '/profile/edit': typeof ProfileEditRoute
@@ -381,6 +388,7 @@ export interface FileRoutesById {
   '/account/security': typeof AccountSecurityRoute
   '/admin/location-analytics': typeof AdminLocationAnalyticsRoute
   '/checkout/return': typeof CheckoutReturnRoute
+  '/games/$gameId': typeof GamesGameIdRouteWithChildren
   '/messages/$conversationId': typeof MessagesConversationIdRoute
   '/players/$userId': typeof PlayersUserIdRoute
   '/profile/edit': typeof ProfileEditRoute
@@ -426,6 +434,7 @@ export interface FileRouteTypes {
     | '/account/security'
     | '/admin/location-analytics'
     | '/checkout/return'
+    | '/games/$gameId'
     | '/messages/$conversationId'
     | '/players/$userId'
     | '/profile/edit'
@@ -513,6 +522,7 @@ export interface FileRouteTypes {
     | '/account/security'
     | '/admin/location-analytics'
     | '/checkout/return'
+    | '/games/$gameId'
     | '/messages/$conversationId'
     | '/players/$userId'
     | '/profile/edit'
@@ -549,6 +559,7 @@ export interface RootRouteChildren {
   AccountNotificationsRoute: typeof AccountNotificationsRoute
   AccountSecurityRoute: typeof AccountSecurityRoute
   CheckoutReturnRoute: typeof CheckoutReturnRoute
+  GamesGameIdRoute: typeof GamesGameIdRouteWithChildren
   MessagesConversationIdRoute: typeof MessagesConversationIdRoute
   PlayersUserIdRoute: typeof PlayersUserIdRoute
   ProfileEditRoute: typeof ProfileEditRoute
@@ -558,9 +569,6 @@ export interface RootRouteChildren {
   MessagesIndexRoute: typeof MessagesIndexRoute
   DotlovableOauthConsentRoute: typeof DotlovableOauthConsentRoute
   Char91DotmcpChar93InvokeToolToolRoute: typeof Char91DotmcpChar93InvokeToolToolRoute
-  GamesGameIdPayRoute: typeof GamesGameIdPayRoute
-  GamesGameIdPaymentSetupRoute: typeof GamesGameIdPaymentSetupRoute
-  GamesGameIdIndexRoute: typeof GamesGameIdIndexRoute
   ApiPublicPaymentsWebhookRoute: typeof ApiPublicPaymentsWebhookRoute
   ApiPublicReelsProcessRoute: typeof ApiPublicReelsProcessRoute
 }
@@ -707,6 +715,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof MessagesConversationIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/games/$gameId': {
+      id: '/games/$gameId'
+      path: '/games/$gameId'
+      fullPath: '/games/$gameId'
+      preLoaderRoute: typeof GamesGameIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/checkout/return': {
       id: '/checkout/return'
       path: '/checkout/return'
@@ -807,10 +822,10 @@ declare module '@tanstack/react-router' {
     }
     '/games/$gameId/': {
       id: '/games/$gameId/'
-      path: '/games/$gameId'
+      path: '/'
       fullPath: '/games/$gameId/'
       preLoaderRoute: typeof GamesGameIdIndexRouteImport
-      parentRoute: typeof rootRouteImport
+      parentRoute: typeof GamesGameIdRoute
     }
     '/teams/$teamId/edit': {
       id: '/teams/$teamId/edit'
@@ -821,17 +836,17 @@ declare module '@tanstack/react-router' {
     }
     '/games/$gameId/payment-setup': {
       id: '/games/$gameId/payment-setup'
-      path: '/games/$gameId/payment-setup'
+      path: '/payment-setup'
       fullPath: '/games/$gameId/payment-setup'
       preLoaderRoute: typeof GamesGameIdPaymentSetupRouteImport
-      parentRoute: typeof rootRouteImport
+      parentRoute: typeof GamesGameIdRoute
     }
     '/games/$gameId/pay': {
       id: '/games/$gameId/pay'
-      path: '/games/$gameId/pay'
+      path: '/pay'
       fullPath: '/games/$gameId/pay'
       preLoaderRoute: typeof GamesGameIdPayRouteImport
-      parentRoute: typeof rootRouteImport
+      parentRoute: typeof GamesGameIdRoute
     }
     '/.mcp/invoke-tool/$tool': {
       id: '/.mcp/invoke-tool/$tool'
@@ -898,6 +913,22 @@ const AdminRouteChildren: AdminRouteChildren = {
 
 const AdminRouteWithChildren = AdminRoute._addFileChildren(AdminRouteChildren)
 
+interface GamesGameIdRouteChildren {
+  GamesGameIdPayRoute: typeof GamesGameIdPayRoute
+  GamesGameIdPaymentSetupRoute: typeof GamesGameIdPaymentSetupRoute
+  GamesGameIdIndexRoute: typeof GamesGameIdIndexRoute
+}
+
+const GamesGameIdRouteChildren: GamesGameIdRouteChildren = {
+  GamesGameIdPayRoute: GamesGameIdPayRoute,
+  GamesGameIdPaymentSetupRoute: GamesGameIdPaymentSetupRoute,
+  GamesGameIdIndexRoute: GamesGameIdIndexRoute,
+}
+
+const GamesGameIdRouteWithChildren = GamesGameIdRoute._addFileChildren(
+  GamesGameIdRouteChildren,
+)
+
 interface TeamsTeamIdRouteChildren {
   TeamsTeamIdEditRoute: typeof TeamsTeamIdEditRoute
 }
@@ -930,6 +961,7 @@ const rootRouteChildren: RootRouteChildren = {
   AccountNotificationsRoute: AccountNotificationsRoute,
   AccountSecurityRoute: AccountSecurityRoute,
   CheckoutReturnRoute: CheckoutReturnRoute,
+  GamesGameIdRoute: GamesGameIdRouteWithChildren,
   MessagesConversationIdRoute: MessagesConversationIdRoute,
   PlayersUserIdRoute: PlayersUserIdRoute,
   ProfileEditRoute: ProfileEditRoute,
@@ -939,9 +971,6 @@ const rootRouteChildren: RootRouteChildren = {
   MessagesIndexRoute: MessagesIndexRoute,
   DotlovableOauthConsentRoute: DotlovableOauthConsentRoute,
   Char91DotmcpChar93InvokeToolToolRoute: Char91DotmcpChar93InvokeToolToolRoute,
-  GamesGameIdPayRoute: GamesGameIdPayRoute,
-  GamesGameIdPaymentSetupRoute: GamesGameIdPaymentSetupRoute,
-  GamesGameIdIndexRoute: GamesGameIdIndexRoute,
   ApiPublicPaymentsWebhookRoute: ApiPublicPaymentsWebhookRoute,
   ApiPublicReelsProcessRoute: ApiPublicReelsProcessRoute,
 }
