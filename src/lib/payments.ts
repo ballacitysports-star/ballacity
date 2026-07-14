@@ -106,23 +106,23 @@ export function paymentTypeMeta(t: string) {
 
 // ----- Host payment methods -----
 export async function listMyPaymentMethods(): Promise<PaymentMethod[]> {
+  const { data: u } = await supabase.auth.getUser();
+  if (!u.user) return [];
   const { data, error } = await supabase
     .from("host_payment_methods")
     .select("*")
+    .eq("host_id", u.user.id)
     .order("created_at", { ascending: true });
   if (error) throw error;
   return (data ?? []) as PaymentMethod[];
 }
 
 export async function listPaymentMethodsForHost(hostId: string): Promise<PaymentMethod[]> {
-  const { data, error } = await supabase
-    .from("host_payment_methods")
-    .select("*")
-    .eq("host_id", hostId)
-    .eq("is_enabled", true);
+  const { data, error } = await supabase.rpc("get_host_payment_methods", { _host_id: hostId });
   if (error) throw error;
   return (data ?? []) as PaymentMethod[];
 }
+
 
 export async function createPaymentMethod(
   input: Omit<PaymentMethod, "id" | "host_id" | "is_enabled"> & { is_enabled?: boolean },
