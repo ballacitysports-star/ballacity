@@ -263,6 +263,35 @@ export function GameCard({ game, index = 0 }: { game: Game; index?: number }) {
               className={`h-full rounded-full ${spotsLeft <= 2 ? "bg-coral-gradient" : "bg-lime-gradient"}`}
             />
           </div>
+          {canQuickJoin ? (
+            <button
+              type="button"
+              onClick={quickJoin}
+              className="mt-1 w-full rounded-2xl bg-lime-gradient py-2.5 text-sm font-bold text-primary-foreground glow-lime inline-flex items-center justify-center gap-1.5"
+            >
+              {ctaLabel}
+            </button>
+          ) : (
+            <div
+              className={`mt-1 w-full rounded-2xl py-2.5 text-sm font-bold inline-flex items-center justify-center gap-1.5 ${
+                joinedByMe
+                  ? "bg-lime/15 border border-lime/40 text-lime"
+                  : spotsLeft <= 0 || liveStatus === "completed"
+                    ? "border border-border bg-surface text-muted-foreground"
+                    : liveStatus === "in_progress"
+                      ? "bg-coral/15 border border-coral/40 text-coral"
+                      : game.price > 0
+                        ? "bg-lime-gradient text-primary-foreground glow-lime"
+                        : "border border-border bg-surface text-foreground"
+              }`}
+            >
+              {joinedByMe && <Check className="h-4 w-4" />}
+              {!joinedByMe && game.price > 0 && spotsLeft > 0 && liveStatus === "scheduled" && (
+                <CreditCard className="h-4 w-4" />
+              )}
+              {ctaLabel}
+            </div>
+          )}
         </div>
       </Link>
     </motion.div>
