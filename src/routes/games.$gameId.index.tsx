@@ -1668,9 +1668,36 @@ function EditGameModal({
   const [requiresApproval, setRequiresApproval] = useState<boolean>(
     !!settings?.requires_approval,
   );
+  const [acceptedMethodIds, setAcceptedMethodIds] = useState<Set<string>>(
+    () => new Set(settings?.accepted_method_ids ?? []),
+  );
+  const [paymentDeadline, setPaymentDeadline] = useState<string>(
+    settings?.payment_deadline ? settings.payment_deadline.slice(0, 16) : "",
+  );
+  const [refundPolicy, setRefundPolicy] = useState<string>(settings?.refund_policy ?? "");
+  const [paymentInstructions, setPaymentInstructions] = useState<string>(
+    settings?.payment_instructions ?? "",
+  );
+  const [myMethods, setMyMethods] = useState<PaymentMethod[]>([]);
   const [coverUploading, setCoverUploading] = useState(false);
   const [saving, setSaving] = useState(false);
   const coverInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    let cancel = false;
+    (async () => {
+      try {
+        const m = await listMyPaymentMethods();
+        if (!cancel) setMyMethods(m.filter((x) => x.is_enabled));
+      } catch {
+        /* ignore */
+      }
+    })();
+    return () => {
+      cancel = true;
+    };
+  }, []);
+
 
   const save = async () => {
     if (saving) return;
