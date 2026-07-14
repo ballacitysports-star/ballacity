@@ -109,6 +109,8 @@ function PayPage() {
     [hostedGames, remoteGame, loaderGame, gameId],
   );
   const { user, loading } = useAuth();
+  const userId = user?.id ?? null;
+  const hasGame = !!game;
   const nav = useNavigate();
   const [settings, setSettings] = useState<GamePaymentSettings | null>(null);
   const [methods, setMethods] = useState<PaymentMethod[]>([]);
@@ -149,11 +151,11 @@ function PayPage() {
   }, [loading, gameId]);
 
   useEffect(() => {
-    if (!loading && !user) nav({ to: "/auth" });
-  }, [loading, user, nav]);
+    if (!loading && !userId) nav({ to: "/auth" });
+  }, [loading, userId, nav]);
 
   const refreshJoinRequest = useCallback(async () => {
-    if (!user) return;
+    if (!userId) return;
     try {
       const req = await getMyJoinRequest(gameId);
       setMyReq((prev) => {
@@ -166,7 +168,7 @@ function PayPage() {
     } catch {
       /* ignore polling errors */
     }
-  }, [gameId, user]);
+  }, [gameId, userId]);
 
   useEffect(() => {
     if (loaderGame || hostedGames.some((g) => g.id === gameId)) {
@@ -197,10 +199,13 @@ function PayPage() {
   }, [gameId, hostedGames, loaderGame]);
 
   useEffect(() => {
-    if (!game) return;
+    if (!hasGame) return;
     let cancelled = false;
     setFetching(true);
     setFetchTimedOut(false);
+    setSettings(null);
+    setMethods([]);
+    setPicked(null);
     const withTimeout = <T,>(p: Promise<T>, label: string): Promise<T> =>
       Promise.race([
         p,
@@ -233,7 +238,7 @@ function PayPage() {
         // realtime/status lookup is slow on mobile.
         if (!cancelled) setFetching(false);
 
-        if (user) {
+        if (userId) {
           const [subsResult, reqResult] = await Promise.allSettled([
             withTimeout(listMySubmissionsForGame(gameId), "listMySubmissionsForGame"),
             withTimeout(getMyJoinRequest(gameId), "getMyJoinRequest"),
@@ -254,9 +259,7 @@ function PayPage() {
         if (cancelled) return;
         const msg: string = e?.message ?? String(e);
         console.warn(`[pay] fetch failed: ${msg}`);
-        if (msg.includes("timed out")) {
-          setFetchTimedOut(true);
-        }
+        setFetchTimedOut(true);
       } finally {
         if (!cancelled) setFetching(false);
       }
@@ -264,7 +267,7 @@ function PayPage() {
     return () => {
       cancelled = true;
     };
-  }, [game, gameId, user, fetchAttempt]);
+  }, [hasGame, gameId, userId, fetchAttempt]);
 
   useEffect(() => {
     if (picked || methods.length === 0 || typeof window === "undefined") return;
@@ -282,16 +285,16 @@ function PayPage() {
     refreshRef.current = refreshJoinRequest;
   }, [refreshJoinRequest]);
   useEffect(() => {
-    if (!user) return;
+    if (!userId) return;
     const channel = supabase
-      .channel(`pay-join-req:${gameId}:${user.id}`)
+      .channel(`pay-join-req:${gameId}:${userId}`)
       .on(
         "postgres_changes",
         {
           event: "*",
           schema: "public",
           table: "join_requests",
-          filter: `player_id=eq.${user.id}`,
+          filter: `player_id=eq.${userId}`,
         },
         (payload) => {
           const row = (payload.new ?? payload.old) as JoinRequest | undefined;
@@ -314,12 +317,12 @@ function PayPage() {
       window.removeEventListener("focus", onFocus);
       document.removeEventListener("visibilitychange", onVisibility);
     };
-  }, [gameId, user]);
+  }, [gameId, userId]);
 
   // Live-update payment submissions so the status timeline reflects host
   // review (verified/rejected) in real time. Realtime primary, poll fallback.
   const refreshSubs = useCallback(async () => {
-    if (!user) return;
+    if (!userId) return;
     try {
       const subs = await listMySubmissionsForGame(gameId);
       setMySubs((prev) => {
@@ -339,23 +342,23 @@ function PayPage() {
     } catch {
       /* ignore polling errors */
     }
-  }, [gameId, user]);
+  }, [gameId, userId]);
 
   const refreshSubsRef = useRef(refreshSubs);
   useEffect(() => {
     refreshSubsRef.current = refreshSubs;
   }, [refreshSubs]);
   useEffect(() => {
-    if (!user) return;
+    if (!userId) return;
     const channel = supabase
-      .channel(`pay-subs:${gameId}:${user.id}`)
+      .channel(`pay-subs:${gameId}:${userId}`)
       .on(
         "postgres_changes",
         {
           event: "*",
           schema: "public",
           table: "payment_submissions",
-          filter: `player_id=eq.${user.id}`,
+          filter: `player_id=eq.${userId}`,
         },
         (payload) => {
           const row = (payload.new ?? payload.old) as PaymentSubmission | undefined;
@@ -378,7 +381,7 @@ function PayPage() {
       window.removeEventListener("focus", onFocus);
       document.removeEventListener("visibilitychange", onVisibility);
     };
-  }, [gameId, user]);
+  }, [gameId, userId]);
 
   if (loading || (!game && !lookupTimedOut)) {
     return (
