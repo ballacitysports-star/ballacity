@@ -1674,7 +1674,9 @@ function EditGameModal({
       const mp = Math.max(2, Math.min(30, Number(maxPlayers) || game.maxPlayers));
       const pr = Math.max(0, Number(price) || 0);
       const iso = new Date(dateLocal).toISOString();
-      const updated = updateHostedGame(game.id, {
+      const trimmedImage = image.trim();
+      const finalImage = trimmedImage || imageFor(sport);
+      const updated = await updateHostedGame(game.id, {
         title: title.trim() || game.title,
         sport,
         skill,
@@ -1686,14 +1688,17 @@ function EditGameModal({
         price: pr,
         indoor,
         isPrivate,
-        image: image.trim(),
+        image: finalImage,
         description,
         positionsNeeded: positionsCleanup(positionsNeeded),
+      }).catch((err: any) => {
+        toast.error(err?.message ?? "Couldn't save changes.");
+        return undefined;
       });
       if (!updated) {
-        toast.error("This game can't be edited here.");
         return;
       }
+
       try {
         await upsertGamePaymentSettings({
           game_id: game.id,
