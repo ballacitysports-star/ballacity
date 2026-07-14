@@ -270,11 +270,20 @@ function PayPage() {
   }, [hasGame, gameId, userId, fetchAttempt]);
 
   useEffect(() => {
-    if (picked || methods.length === 0 || typeof window === "undefined") return;
-    const resumed = methods.find(
-      (method) => window.sessionStorage.getItem(externalPaymentResumeKey(gameId, method.id)) === "1",
-    );
-    if (resumed) setPicked(resumed);
+    if (picked || methods.length === 0) return;
+    // Resume a payment where the player previously bounced out to Venmo/etc.
+    if (typeof window !== "undefined") {
+      const resumed = methods.find(
+        (method) => window.sessionStorage.getItem(externalPaymentResumeKey(gameId, method.id)) === "1",
+      );
+      if (resumed) {
+        setPicked(resumed);
+        return;
+      }
+    }
+    // If the host only enabled one payment method, skip the picker step
+    // entirely — one less tap on the critical path.
+    if (methods.length === 1) setPicked(methods[0]);
   }, [gameId, methods, picked]);
 
   // Live-update the join-request status so the approval gate flips to the

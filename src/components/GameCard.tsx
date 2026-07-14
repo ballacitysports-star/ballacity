@@ -1,10 +1,10 @@
 import { Link, useNavigate } from "@tanstack/react-router";
 import { motion } from "framer-motion";
-import { MapPin, Users, Clock, Zap, Lock, Flame, MessageCircle } from "lucide-react";
+import { MapPin, Users, Clock, Zap, Lock, Flame, MessageCircle, Check, CreditCard } from "lucide-react";
 import { UserAvatar } from "@/components/UserAvatar";
 import type { Game } from "@/lib/sample-data";
 import { formatWhen } from "@/lib/format";
-import { useIsJoined } from "@/lib/games-store";
+import { joinGame, useIsJoined } from "@/lib/games-store";
 import { useLiveParticipantCount } from "@/lib/game-participants-store";
 import { useLiveStatus } from "@/lib/live-status";
 import { getOrCreateDirectConversation } from "@/lib/messages";
@@ -64,6 +64,39 @@ export function GameCard({ game, index = 0 }: { game: Game; index?: number }) {
       setOpening(false);
     }
   };
+
+  // Quick-join for free games where the viewer clearly can join: signed in,
+  // spots available, not already joined, not the host, game still scheduled.
+  // Paid or approval-gated games still route through the details page so the
+  // player can review the fee / request-to-join copy before committing.
+  const canQuickJoin =
+    !!user &&
+    !joinedByMe &&
+    game.price === 0 &&
+    spotsLeft > 0 &&
+    liveStatus === "scheduled" &&
+    !game.joinsClosed &&
+    (!hostUserId || hostUserId !== user.id);
+  const quickJoin = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    joinGame(game.id);
+    toast.success(`You're in! See you at ${game.location}.`);
+  };
+  const ctaLabel =
+    joinedByMe
+      ? "You're in"
+      : liveStatus === "completed"
+        ? "Completed"
+        : liveStatus === "in_progress"
+          ? "Live now"
+          : spotsLeft <= 0
+            ? "Full"
+            : game.price > 0
+              ? `Pay $${game.price}`
+              : user
+                ? "Join free"
+                : "Sign in to join";
 
   return (
     <motion.div
@@ -230,6 +263,35 @@ export function GameCard({ game, index = 0 }: { game: Game; index?: number }) {
               className={`h-full rounded-full ${spotsLeft <= 2 ? "bg-coral-gradient" : "bg-lime-gradient"}`}
             />
           </div>
+          {canQuickJoin ? (
+            <button
+              type="button"
+              onClick={quickJoin}
+              className="mt-1 w-full rounded-2xl bg-lime-gradient py-2.5 text-sm font-bold text-primary-foreground glow-lime inline-flex items-center justify-center gap-1.5"
+            >
+              {ctaLabel}
+            </button>
+          ) : (
+            <div
+              className={`mt-1 w-full rounded-2xl py-2.5 text-sm font-bold inline-flex items-center justify-center gap-1.5 ${
+                joinedByMe
+                  ? "bg-lime/15 border border-lime/40 text-lime"
+                  : spotsLeft <= 0 || liveStatus === "completed"
+                    ? "border border-border bg-surface text-muted-foreground"
+                    : liveStatus === "in_progress"
+                      ? "bg-coral/15 border border-coral/40 text-coral"
+                      : game.price > 0
+                        ? "bg-lime-gradient text-primary-foreground glow-lime"
+                        : "border border-border bg-surface text-foreground"
+              }`}
+            >
+              {joinedByMe && <Check className="h-4 w-4" />}
+              {!joinedByMe && game.price > 0 && spotsLeft > 0 && liveStatus === "scheduled" && (
+                <CreditCard className="h-4 w-4" />
+              )}
+              {ctaLabel}
+            </div>
+          )}
         </div>
       </Link>
     </motion.div>
