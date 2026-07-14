@@ -65,6 +65,16 @@ function mockPendingSubmission(gameId: string) {
   };
 }
 
+function mockRejectedSubmission(gameId: string) {
+  return {
+    ...mockPendingSubmission(gameId),
+    id: `mock-rejected-${gameId}`,
+    status: "rejected",
+    reviewer_notes: "Could not match the transaction.",
+    reviewed_at: new Date().toISOString(),
+  };
+}
+
 async function mockPaymentBackend(
   page: Page,
   gameId: string,
@@ -113,7 +123,10 @@ async function mockPaymentBackend(
   });
 
   const emptyList = async (route: Route) => {
-    if (route.request().method() !== "GET") return route.fallback();
+    if (route.request().method() !== "GET") {
+      options.writeAttempts?.push(`${new URL(route.request().url()).pathname.split("/rest/v1/")[1]?.split("?")[0] ?? "unknown"}:${route.request().method()}`);
+      return route.fulfill({ status: 204, contentType: "application/json", body: "" });
+    }
     await route.fulfill({ status: 200, contentType: "application/json", body: "[]" });
   };
   await page.route((url) => tableUrl(url, "join_requests"), emptyList);
@@ -137,18 +150,48 @@ test("Pay host button on a custom (sample) game routes to the pay screen", async
 }) => {
   const ctx = await browser.newContext();
   const page = await ctx.newPage();
+  const writeAttempts: string[] = [];
 
-  await mockPaymentBackend(page, CUSTOM_GAME_ID);
+  await mockPaymentBackend(page, CUSTOM_GAME_ID, { writeAttempts });
   await restoreSession(page);
 
   await page.goto(`/games/${CUSTOM_GAME_ID}`, { waitUntil: "domcontentloaded" });
 
   const cta = page.getByRole("link", { name: /pay host/i }).first();
   await expect(cta).toBeVisible({ timeout: 10_000 });
+  await expect(cta).toHaveAttribute("href", new RegExp(`/games/${CUSTOM_GAME_ID}/pay`));
   await cta.click();
 
   await assertPayScreenRendered(page, CUSTOM_GAME_ID);
   await expect(page.locator("h1").first()).toContainText(CUSTOM_GAME_TITLE_MATCH);
+  expect(writeAttempts, "opening pay should not join/cancel/delete from the detail CTA").toEqual([]);
+
+  await ctx.close();
+});
+
+test("Pay host button remains a pay link when local joined state is stale", async ({
+  browser,
+}) => {
+  const ctx = await browser.newContext();
+  const page = await ctx.newPage();
+  const writeAttempts: string[] = [];
+
+  await mockPaymentBackend(page, CUSTOM_GAME_ID, { writeAttempts });
+  await restoreSession(page);
+  await page.evaluate(
+    (gameId) => window.localStorage.setItem("openrun.joinedGameIds.v1", JSON.stringify([gameId])),
+    CUSTOM_GAME_ID,
+  );
+
+  await page.goto(`/games/${CUSTOM_GAME_ID}`, { waitUntil: "domcontentloaded" });
+
+  const cta = page.getByRole("link", { name: /pay host/i }).first();
+  await expect(cta).toBeVisible({ timeout: 10_000 });
+  await expect(cta).toHaveAttribute("href", new RegExp(`/games/${CUSTOM_GAME_ID}/pay`));
+  await cta.click();
+
+  await assertPayScreenRendered(page, CUSTOM_GAME_ID);
+  expect(writeAttempts, "stale joined state should not trigger leave/cancel/delete").toEqual([]);
 
   await ctx.close();
 });
@@ -174,11 +217,43 @@ test("Payment status button with a pending submission still routes to the pay sc
 
   const cta = page.getByRole("link", { name: /payment pending|pay host/i }).first();
   await expect(cta).toBeVisible({ timeout: 10_000 });
+  await expect(cta).toHaveAttribute("href", new RegExp(`/games/${CUSTOM_GAME_ID}/pay`));
   await cta.click();
 
   await assertPayScreenRendered(page, CUSTOM_GAME_ID);
   await expect(page.getByTestId("payment-status-timeline")).toHaveAttribute("data-status", "pending");
   expect(writeAttempts, "viewing a pending payment should not withdraw/delete it").toEqual([]);
+
+  await ctx.close();
+});
+
+test("Payment rejected button routes back to the pay screen without deleting the attempt", async ({
+  browser,
+}) => {
+  const ctx = await browser.newContext();
+  const page = await ctx.newPage();
+  const writeAttempts: string[] = [];
+
+  await mockPaymentBackend(page, CUSTOM_GAME_ID, {
+    submissions: [mockRejectedSubmission(CUSTOM_GAME_ID)],
+    writeAttempts,
+  });
+  await restoreSession(page);
+  await page.evaluate(
+    (gameId) => window.localStorage.setItem("openrun.joinedGameIds.v1", JSON.stringify([gameId])),
+    CUSTOM_GAME_ID,
+  );
+
+  await page.goto(`/games/${CUSTOM_GAME_ID}`, { waitUntil: "domcontentloaded" });
+
+  const cta = page.getByRole("link", { name: /payment rejected|pay again|pay host/i }).first();
+  await expect(cta).toBeVisible({ timeout: 10_000 });
+  await expect(cta).toHaveAttribute("href", new RegExp(`/games/${CUSTOM_GAME_ID}/pay`));
+  await cta.click();
+
+  await assertPayScreenRendered(page, CUSTOM_GAME_ID);
+  await expect(page.getByTestId("payment-status-timeline")).toHaveAttribute("data-status", "rejected");
+  expect(writeAttempts, "viewing a rejected payment should not withdraw/delete it").toEqual([]);
 
   await ctx.close();
 });
@@ -246,6 +321,7 @@ test("Pay host button on a hosted game routes to the pay screen", async ({ brows
 
   const cta = page.getByRole("link", { name: /pay host/i }).first();
   await expect(cta).toBeVisible({ timeout: 10_000 });
+  await expect(cta).toHaveAttribute("href", new RegExp(`/games/${HOSTED_GAME_ID}/pay`));
   await cta.click();
 
   await assertPayScreenRendered(page, HOSTED_GAME_ID);
