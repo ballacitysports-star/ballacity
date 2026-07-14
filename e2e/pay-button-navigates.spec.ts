@@ -28,8 +28,8 @@ const CUSTOM_GAME_TITLE_MATCH = /./; // just require a non-empty h1
 const HOSTED_GAME_ID = "e2e-hosted-pay-0001";
 const HOSTED_GAME_TITLE = "E2E Hosted Paid Game";
 
-function tableUrl(url: string, table: string) {
-  return url.includes(`/rest/v1/${table}`);
+function tableUrl(url: URL | string, table: string) {
+  return String(url).includes(`/rest/v1/${table}`);
 }
 
 async function restoreSession(page: Page) {
