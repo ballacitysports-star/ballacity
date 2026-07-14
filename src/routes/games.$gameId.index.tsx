@@ -1615,7 +1615,9 @@ function GameDetail() {
         <EditGameModal
           game={game}
           hostId={settings?.host_id ?? game.hostUserId ?? user?.id ?? ""}
+          settings={settings}
           onClose={() => setEditOpen(false)}
+          onSettingsSaved={(s) => setSettings(s)}
         />
       )}
     </div>
