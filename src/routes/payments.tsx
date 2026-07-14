@@ -425,6 +425,16 @@ function SubmissionCard({ sub, onReviewed }: { sub: PaymentSubmission; onReviewe
     try {
       await reviewSubmission(sub.id, status);
       toast.success(status === "verified" ? "Payment approved" : "Payment rejected");
+      if (status === "verified") {
+        const { createNotification } = await import("@/lib/notifications");
+        void createNotification({
+          user_id: sub.player_id,
+          type: "payment_verified",
+          title: `Payment verified for ${game?.title ?? "your game"}`,
+          body: "You're on the roster. See you there!",
+          link: `/games/${sub.game_id}`,
+        }).catch(() => {});
+      }
       onReviewed();
     } catch (e: any) {
       toast.error(e.message);
