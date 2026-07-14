@@ -330,7 +330,10 @@ export async function fetchHostedGame(id: string): Promise<Game | null> {
 }
 
 /** Patch a hosted game locally, and mirror the change to the DB. */
-export function updateHostedGame(id: string, patch: Partial<Game>): Game | undefined {
+export async function updateHostedGame(
+  id: string,
+  patch: Partial<Game>,
+): Promise<Game | undefined> {
   loadLocal();
   let updated: Game | undefined;
   cache = cache.map((g) => {
@@ -367,16 +370,12 @@ export function updateHostedGame(id: string, patch: Partial<Game>): Game | undef
     dbPatch.positions_needed = patch.positionsNeeded as TablesUpdate<"hosted_games">["positions_needed"];
   }
   if (Object.keys(dbPatch).length > 0) {
-    supabase
-      .from("hosted_games")
-      .update(dbPatch)
-      .eq("id", id)
-      .then(() => {
-        /* noop */
-      });
+    const { error } = await supabase.from("hosted_games").update(dbPatch).eq("id", id);
+    if (error) throw error;
   }
   return updated;
 }
+
 
 /** Delete a hosted game locally and in the DB. */
 export async function deleteHostedGame(id: string): Promise<void> {
