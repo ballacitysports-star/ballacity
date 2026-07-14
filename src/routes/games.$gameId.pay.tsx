@@ -117,6 +117,36 @@ function PayPage() {
   const [myReq, setMyReq] = useState<JoinRequest | null>(null);
   const [fetching, setFetching] = useState(true);
   const [lookupTimedOut, setLookupTimedOut] = useState(false);
+  const [fetchAttempt, setFetchAttempt] = useState(0);
+  const [fetchTimedOut, setFetchTimedOut] = useState(false);
+  const stage: "auth" | "lookup" | "fetch" | "ready" = loading
+    ? "auth"
+    : !game && !lookupTimedOut
+      ? "lookup"
+      : game && fetching
+        ? "fetch"
+        : "ready";
+  const prevStageRef = useRef<string>("");
+  const stageStartRef = useRef<number>(typeof performance !== "undefined" ? performance.now() : 0);
+  useEffect(() => {
+    if (prevStageRef.current === stage) return;
+    const now = typeof performance !== "undefined" ? performance.now() : 0;
+    const elapsed = Math.round(now - stageStartRef.current);
+    console.info(
+      `[pay] stage ${prevStageRef.current || "(init)"} -> ${stage} (${elapsed}ms) game=${gameId}`,
+    );
+    prevStageRef.current = stage;
+    stageStartRef.current = now;
+  }, [stage, gameId]);
+
+  // Auth-stall diagnostic: warn if auth store never hydrates.
+  useEffect(() => {
+    if (!loading) return;
+    const t = window.setTimeout(() => {
+      console.warn(`[pay] auth-stuck after 5s game=${gameId}`);
+    }, 5000);
+    return () => window.clearTimeout(t);
+  }, [loading, gameId]);
 
   useEffect(() => {
     if (!loading && !user) nav({ to: "/auth" });
@@ -147,9 +177,12 @@ function PayPage() {
     let cancelled = false;
     setLookupTimedOut(false);
     setRemoteGame(null);
-    fetchHostedGame(gameId)
+    const timeout = new Promise<null>((resolve) =>
+      window.setTimeout(() => resolve(null), 8000),
+    );
+    Promise.race([fetchHostedGame(gameId), timeout])
       .then((found) => {
-        if (!cancelled) setRemoteGame(found);
+        if (!cancelled) setRemoteGame(found ?? null);
       })
       .catch(() => {
         if (!cancelled) setRemoteGame(null);
@@ -167,29 +200,49 @@ function PayPage() {
     if (!game) return;
     let cancelled = false;
     setFetching(true);
+    setFetchTimedOut(false);
+    const withTimeout = <T,>(p: Promise<T>, label: string): Promise<T> =>
+      Promise.race([
+        p,
+        new Promise<T>((_, reject) =>
+          window.setTimeout(
+            () => reject(new Error(`[pay] ${label} timed out after 8s`)),
+            8000,
+          ),
+        ),
+      ]);
     (async () => {
       try {
-        const s = await getGamePaymentSettings(gameId);
+        const s = await withTimeout(getGamePaymentSettings(gameId), "getGamePaymentSettings");
         if (cancelled) return;
         setSettings(s);
         if (s) {
-          const all = await listPaymentMethodsForHost(s.host_id);
+          const all = await withTimeout(
+            listPaymentMethodsForHost(s.host_id),
+            "listPaymentMethodsForHost",
+          );
           if (cancelled) return;
-          // Show every enabled method the host offers so players can pick any,
-          // including ones with direct payment URLs.
           setMethods(all);
         }
         if (user) {
-          const [subs, req] = await Promise.all([
-            listMySubmissionsForGame(gameId),
-            getMyJoinRequest(gameId),
-          ]);
+          const [subs, req] = await withTimeout(
+            Promise.all([listMySubmissionsForGame(gameId), getMyJoinRequest(gameId)]),
+            "listMySubmissionsForGame+getMyJoinRequest",
+          );
           if (cancelled) return;
           setMySubs(subs);
           setMyReq(req);
         }
       } catch (e: any) {
-        toast.error(e.message);
+        if (cancelled) return;
+        const msg: string = e?.message ?? String(e);
+        console.warn(`[pay] fetch failed: ${msg}`);
+        if (msg.includes("timed out")) {
+          setFetchTimedOut(true);
+          toast.error("Couldn't reach the payment service — tap Retry.");
+        } else {
+          toast.error(msg);
+        }
       } finally {
         if (!cancelled) setFetching(false);
       }
@@ -197,7 +250,7 @@ function PayPage() {
     return () => {
       cancelled = true;
     };
-  }, [game, gameId, user]);
+  }, [game, gameId, user, fetchAttempt]);
 
   useEffect(() => {
     if (picked || methods.length === 0 || typeof window === "undefined") return;
