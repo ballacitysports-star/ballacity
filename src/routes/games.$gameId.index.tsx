@@ -887,6 +887,40 @@ function GameDetail() {
           )}
         </div>
 
+        {/* Payment settings summary */}
+        {(settings?.payment_deadline || settings?.refund_policy || settings?.payment_instructions) && (
+          <div className="rounded-3xl border border-border bg-surface p-4">
+            <div className="flex items-center gap-2 mb-3">
+              <CreditCard className="h-4 w-4 text-lime" />
+              <h2 className="font-display text-sm font-bold uppercase tracking-wider text-muted-foreground">
+                Payment settings
+              </h2>
+            </div>
+            <div className="space-y-3">
+              {settings?.payment_deadline && (
+                <div>
+                  <div className="text-xs text-muted-foreground mb-0.5">Payment deadline</div>
+                  <div className="text-sm font-semibold">
+                    {new Date(settings.payment_deadline).toLocaleString()}
+                  </div>
+                </div>
+              )}
+              {settings?.refund_policy && (
+                <div>
+                  <div className="text-xs text-muted-foreground mb-0.5">Refund policy</div>
+                  <p className="text-sm leading-relaxed">{settings.refund_policy}</p>
+                </div>
+              )}
+              {settings?.payment_instructions && (
+                <div>
+                  <div className="text-xs text-muted-foreground mb-0.5">Payment instructions</div>
+                  <p className="text-sm leading-relaxed">{settings.payment_instructions}</p>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
         {/* Positions needed */}
         {game.positionsNeeded && Object.keys(game.positionsNeeded).length > 0 && (
           <div>
