@@ -53,7 +53,7 @@ import {
   type PaymentSubmission,
   type JoinRequest,
 } from "@/lib/payments";
-import { useHostedGames, updateHostedGame, deleteHostedGame } from "@/lib/hosted-games-store";
+import { useHostedGames, fetchHostedGame, updateHostedGame, deleteHostedGame } from "@/lib/hosted-games-store";
 import type { Game } from "@/lib/sample-data";
 import { PositionsPicker, positionsCleanup } from "@/components/PositionsPicker";
 import { LegalNotice } from "@/components/LegalNotice";
@@ -140,9 +140,11 @@ function GameDetail() {
   const inviteExpired = !!(isInvite && ((inviteExp && inviteExp < Date.now()) || expInvalid));
 
   const hosted = useHostedGames();
+  const [remoteGame, setRemoteGame] = useState<Game | null>(null);
+  const [lookupComplete, setLookupComplete] = useState(false);
   const game = useMemo<Game | undefined>(
-    () => hosted.find((g) => g.id === gameId) ?? GAMES.find((g) => g.id === gameId),
-    [hosted, gameId],
+    () => hosted.find((g) => g.id === gameId) ?? remoteGame ?? GAMES.find((g) => g.id === gameId),
+    [hosted, remoteGame, gameId],
   );
   const joined = useIsJoined(gameId);
   const liveParticipantCount = useLiveParticipantCount(gameId);
@@ -228,6 +230,31 @@ function GameDetail() {
   };
 
   useEffect(() => {
+    if (GAMES.some((g) => g.id === gameId) || hosted.some((g) => g.id === gameId)) {
+      setLookupComplete(true);
+      return;
+    }
+
+    let cancelled = false;
+    setLookupComplete(false);
+    setRemoteGame(null);
+    fetchHostedGame(gameId)
+      .then((found) => {
+        if (!cancelled) setRemoteGame(found);
+      })
+      .catch(() => {
+        if (!cancelled) setRemoteGame(null);
+      })
+      .finally(() => {
+        if (!cancelled) setLookupComplete(true);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [gameId, hosted]);
+
+  useEffect(() => {
     refreshStatus(); /* eslint-disable-next-line */
   }, [game?.id]);
   useEffect(() => {
@@ -288,6 +315,10 @@ function GameDetail() {
     }
     rosterInitializedRef.ids = currentIds;
   }, [liveRoster, user?.id, game?.maxPlayers, rosterInitializedRef]);
+
+  if (!game && !lookupComplete) {
+    return <div className="p-6 text-sm text-muted-foreground">Loading…</div>;
+  }
 
   if (!game) {
     return (
@@ -1469,7 +1500,9 @@ function GameDetail() {
           {!isHost && (() => {
             const canJoinAction = joined || isPending || isConfirmed || spotsLeft > 0;
             const buttonDisabled = requesting || !canJoinAction;
-            const paymentAction = isPaid && !paymentCleared && approvalCleared && canJoinAction;
+            const hasPaymentAttempt = latestSub?.status === "pending" || latestSub?.status === "rejected";
+            const canEnterPaymentFlow = spotsLeft > 0 || joined || hasPaymentAttempt || isApproved;
+            const paymentAction = isPaid && !paymentCleared && approvalCleared && canEnterPaymentFlow;
             const paymentSearch: { invite?: true; from?: string } = {};
             if (isInvite) paymentSearch.invite = true;
             if (inviteFrom) paymentSearch.from = inviteFrom;
@@ -1501,7 +1534,7 @@ function GameDetail() {
                 <span className="ml-1">spot{spotsLeft === 1 ? "" : "s"} left</span>
               </span>
             );
-            if (paymentAction && canJoinAction) {
+            if (paymentAction) {
               return (
                 <motion.div whileTap={{ scale: 0.97 }} className="flex-1">
                   <Link
