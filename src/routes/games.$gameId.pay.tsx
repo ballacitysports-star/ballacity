@@ -256,9 +256,6 @@ function PayPage() {
         console.warn(`[pay] fetch failed: ${msg}`);
         if (msg.includes("timed out")) {
           setFetchTimedOut(true);
-          toast.error("Couldn't reach the payment service — tap Retry.");
-        } else {
-          toast.error(msg);
         }
       } finally {
         if (!cancelled) setFetching(false);
