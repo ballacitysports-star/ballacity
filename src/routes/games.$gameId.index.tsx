@@ -2847,11 +2847,11 @@ function RosterPlayerRow({
 function HostRequestRow({
   req,
   gameTitle,
-  onChange,
+  onOptimistic,
 }: {
   req: JoinRequest;
   gameTitle: string;
-  onChange: () => void;
+  onOptimistic: (reqId: string, status: "approved" | "rejected") => () => void;
 }) {
   const [busy, setBusy] = useState(false);
   const [name, setName] = useState<string>("Player");
@@ -2868,6 +2868,7 @@ function HostRequestRow({
 
   const act = async (status: "approved" | "rejected") => {
     setBusy(true);
+    const rollback = onOptimistic(req.id, status);
     try {
       await reviewJoinRequest(req.id, status);
       await createNotification({
@@ -2881,13 +2882,14 @@ function HostRequestRow({
         link: `/games/${req.game_id}`,
       });
       toast.success(status === "approved" ? "Approved" : "Declined");
-      onChange();
     } catch (e: any) {
+      rollback();
       toast.error(e.message);
     } finally {
       setBusy(false);
     }
   };
+
 
   return (
     <div
