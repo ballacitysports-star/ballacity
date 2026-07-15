@@ -21,7 +21,7 @@ import {
 import { LegalNotice } from "@/components/LegalNotice";
 import { PrimaryCTA } from "@/components/PrimaryCTA";
 import { SpotsPill } from "@/components/SpotsPill";
-import { UserAvatar } from "@/components/UserAvatar";
+
 import { useLiveParticipantCount } from "@/lib/game-participants-store";
 import { useLiveParticipants } from "@/lib/game-roster";
 // joinGame no longer called here — player is added to roster only after host verifies payment.
