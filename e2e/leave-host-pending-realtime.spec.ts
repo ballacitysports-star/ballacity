@@ -195,7 +195,7 @@ test("host's pending list clears in realtime when the player's join_request is d
         table: "join_requests",
         commit_timestamp: new Date().toISOString(),
         eventType: "DELETE",
-        new: {},
+        new: null,
         old: {
           id: reqId,
           game_id: gameId,
