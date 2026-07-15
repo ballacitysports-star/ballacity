@@ -317,7 +317,10 @@ function GameDetail() {
         },
         (payload) => {
           const row = (payload.new ?? payload.old) as { game_id?: string } | null;
-          if (row?.game_id === game.id) refreshStatus();
+          if (row?.game_id === game.id) {
+            refreshStatus();
+            void refetchRoster();
+          }
         },
       )
       .subscribe((status) => {
@@ -402,6 +405,7 @@ function GameDetail() {
         },
         () => {
           refreshStatus();
+          if (hostsThisGame) refreshHostRequests();
         },
       )
       .subscribe((status) => {
@@ -434,6 +438,7 @@ function GameDetail() {
           const row = (payload.new ?? payload.old) as { player_id?: string } | null;
           if (row?.player_id && row.player_id === user.id) {
             refreshStatus();
+            void refetchRoster();
           }
         },
       )
