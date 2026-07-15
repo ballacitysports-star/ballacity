@@ -164,14 +164,12 @@ export function joinGame(id: string, position?: string) {
 
 export function leaveGame(id: string) {
   loadJoinedGames();
-  console.log("[leave-dbg] leaveGame call", id, "has?", joined.has(id));
   // Clear local optimistic state (may be a no-op for confirmed players who
   // got onto the roster server-side via approval/payment auto-join).
   const wasJoined = joined.has(id);
   if (wasJoined) {
     joined.delete(id);
     saveJoinedGames();
-    console.log("[leave-dbg] leaveGame after delete", Array.from(joined));
     emit();
   }
   // Always attempt the DB delete — confirmed players are on the roster
@@ -185,12 +183,10 @@ export function leaveGame(id: string) {
       .delete()
       .eq("game_id", id)
       .eq("user_id", uid);
-    console.log("[leave-dbg] leaveGame DB delete", id, "error?", error, "wasJoined?", wasJoined);
     if (error && wasJoined) {
       // Roll back optimistic local removal on real failure.
       joined.add(id);
       saveJoinedGames();
-      console.log("[leave-dbg] leaveGame ROLLBACK");
       emit();
     }
   })();
