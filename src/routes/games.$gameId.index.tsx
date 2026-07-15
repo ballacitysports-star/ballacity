@@ -1460,12 +1460,10 @@ function GameDetail() {
                     key={`pending-${p.req.id}`}
                     req={p.req}
                     gameTitle={game.title}
-                    onChange={() => {
-                      refreshHostRequests();
-                      refreshStatus();
-                    }}
+                    onOptimistic={applyOptimisticReview}
                     index={i}
                   />
+
                 );
               }
               const isRealPlayer =
