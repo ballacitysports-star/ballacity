@@ -3008,7 +3008,7 @@ function HostPendingChip({
               onClick={async () => {
                 if (!confirm(`Block ${name}? They won't be able to join your future games.`))
                   return;
-                await act("rejected");
+                await act("rejected", "Blocked by host");
                 blockUser(req.host_id, req.player_id);
                 toast.success(`${name} blocked.`);
               }}
