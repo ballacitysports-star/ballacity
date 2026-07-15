@@ -605,6 +605,7 @@ function GameDetail() {
           }).catch(() => {});
         }
       } catch (e: any) {
+        console.log("[leave-dbg] catch", e);
         // Rollback optimistic state.
         setMyReq(prevReq);
         setMySubs(prevSubs);
