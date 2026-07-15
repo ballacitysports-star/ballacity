@@ -20,6 +20,10 @@ import {
 } from "@/lib/payments";
 import { LegalNotice } from "@/components/LegalNotice";
 import { PrimaryCTA } from "@/components/PrimaryCTA";
+import { SpotsPill } from "@/components/SpotsPill";
+import { UserAvatar } from "@/components/UserAvatar";
+import { useLiveParticipantCount } from "@/lib/game-participants-store";
+import { useLiveParticipants } from "@/lib/game-roster";
 // joinGame no longer called here — player is added to roster only after host verifies payment.
 import { fetchHostedGame, useHostedGames } from "@/lib/hosted-games-store";
 import { z } from "zod";
@@ -112,6 +116,18 @@ function PayPage() {
   const { user, loading } = useAuth();
   const userId = user?.id ?? null;
   const hasGame = !!game;
+  // Live roster + spots — updates in real time as others join/leave while
+  // the viewer is on the pay screen. Falls back to the static snapshot on
+  // sample games and during hydration so nothing briefly flashes to zero.
+  const liveCount = useLiveParticipantCount(game?.id);
+  const { participants: liveRoster } = useLiveParticipants(game?.id);
+  const maxPlayers = game?.maxPlayers ?? 0;
+  const effectiveJoined = Math.min(
+    maxPlayers,
+    liveCount ?? game?.joined ?? 0,
+  );
+  const spotsLeft = Math.max(0, maxPlayers - effectiveJoined);
+  const justFilledDuringPay = liveCount !== undefined && spotsLeft <= 0;
   const nav = useNavigate();
   const [settings, setSettings] = useState<GamePaymentSettings | null>(null);
   const [methods, setMethods] = useState<PaymentMethod[]>([]);
@@ -438,6 +454,52 @@ function PayPage() {
           </div>
         )}
       </div>
+
+      {/* Live roster strip — see spots tick down and who else is in while
+          the viewer completes payment. Uses game_participants realtime;
+          hidden until we have live data so sample games (no live rows)
+          don't render a stale zero. */}
+      {liveCount !== undefined && maxPlayers > 0 && (
+        <div
+          className="mb-4 rounded-2xl border border-border bg-surface px-4 py-3"
+          data-testid="pay-live-roster"
+        >
+          <div className="flex items-center justify-between gap-3">
+            <div className="text-xs uppercase tracking-wider text-muted-foreground font-bold">
+              Roster · {effectiveJoined}/{maxPlayers}
+            </div>
+            <SpotsPill spotsLeft={spotsLeft} maxPlayers={maxPlayers} />
+          </div>
+          {liveRoster.length > 0 && (
+            <div className="mt-2 flex items-center gap-1.5">
+              {liveRoster.slice(0, 6).map((p) => (
+                <UserAvatar
+                  key={p.userId}
+                  initials={p.avatarInitials}
+                  name={p.displayName}
+                  avatarUrl={p.avatarUrl}
+                  size="xs"
+                />
+              ))}
+              {liveRoster.length > 6 && (
+                <span className="ml-1 text-[11px] font-semibold text-muted-foreground">
+                  +{liveRoster.length - 6}
+                </span>
+              )}
+            </div>
+          )}
+          {justFilledDuringPay && (
+            <p
+              role="status"
+              aria-live="assertive"
+              className="mt-2 text-[11px] font-semibold text-coral"
+            >
+              This game just filled up while you were paying — your spot isn't
+              guaranteed. Message the host before submitting.
+            </p>
+          )}
+        </div>
+      )}
 
       {mySubs.length > 0 && <PaymentStatusTimeline latest={mySubs[0]} history={mySubs.slice(1)} />}
 
