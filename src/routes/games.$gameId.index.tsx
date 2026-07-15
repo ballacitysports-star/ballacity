@@ -2581,11 +2581,13 @@ function RosterPlayerRow({
   gameTitle,
   feeRequired,
   onOptimistic,
+  onRemoved,
 }: {
   req: JoinRequest;
   gameTitle: string;
   feeRequired: boolean;
   onOptimistic: (reqId: string, status: "approved" | "rejected") => () => void;
+  onRemoved?: (playerId: string) => void;
 }) {
   const [busy, setBusy] = useState(false);
   const [name, setName] = useState<string>("Player");
