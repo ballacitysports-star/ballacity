@@ -632,6 +632,20 @@ function GameDetail() {
         toast.error("This invite link is invalid or has been tampered with.");
         return;
       }
+      // Client-side gate on resubmit: mirror the DB trigger so the user gets
+      // an instant, human-readable message before the network round-trip.
+      if (myReq?.status === "rejected") {
+        if (capReached) {
+          toast.error(
+            `You've reached the ${JOIN_RESUBMIT_MAX_ATTEMPTS}-attempt limit for this game. Message the host instead.`,
+          );
+          return;
+        }
+        if (cooldownMs > 0) {
+          toast.error(`Please wait ${formatCooldownLabel(cooldownMs)} before resubmitting.`);
+          return;
+        }
+      }
       setRequesting(true);
       // Optimistic: flip CTA to "Request pending" immediately using a
       // synthetic row. Realtime `join_requests:me:*` reconciles with the
