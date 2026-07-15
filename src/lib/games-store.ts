@@ -186,10 +186,12 @@ export function leaveGame(id: string) {
       .delete()
       .eq("game_id", id)
       .eq("user_id", uid);
+    console.log("[leave-dbg] leaveGame DB delete", id, "error?", error, "wasJoined?", wasJoined);
     if (error && wasJoined) {
       // Roll back optimistic local removal on real failure.
       joined.add(id);
       saveJoinedGames();
+      console.log("[leave-dbg] leaveGame ROLLBACK");
       emit();
     }
   })();
