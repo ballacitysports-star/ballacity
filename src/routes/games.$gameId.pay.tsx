@@ -120,7 +120,7 @@ function PayPage() {
   // the viewer is on the pay screen. Falls back to the static snapshot on
   // sample games and during hydration so nothing briefly flashes to zero.
   const liveCount = useLiveParticipantCount(game?.id);
-  const { participants: _liveRoster } = useLiveParticipants(game?.id);
+  
   const maxPlayers = game?.maxPlayers ?? 0;
   const effectiveJoined = Math.min(
     maxPlayers,
