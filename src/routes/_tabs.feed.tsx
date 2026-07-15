@@ -24,6 +24,14 @@ export const Route = createFileRoute("/_tabs/feed")({
 function Feed() {
   const [q, setQ] = useState("");
   const [filtersOpen, setFiltersOpen] = useState(false);
+  const [viewMode, setViewMode] = useState<"list" | "map">(() => {
+    if (typeof window === "undefined") return "list";
+    return (localStorage.getItem("openrun:play-view") as "list" | "map") ?? "list";
+  });
+  const switchView = (m: "list" | "map") => {
+    setViewMode(m);
+    try { localStorage.setItem("openrun:play-view", m); } catch { /* ignore */ }
+  };
   const [positionFilter, setPositionFilter] = useState<string | null>(null);
   const hosted = useHostedGames();
   const joinedIds = useJoinedGameIds();
