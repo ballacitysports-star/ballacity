@@ -519,7 +519,6 @@ function GameDetail() {
   const [confirmAction, setConfirmAction] = useState<"join" | "leave" | null>(null);
 
   const executeJoinAction = async (preselectedPosition?: string) => {
-    console.log("[leave-dbg] enter", { isConfirmed, joined, requiresApproval, isPaid, isPending, isPaymentPending, paymentCleared, approvalCleared, gameId: game.id, settings: !!settings });
     // Expired invite → block all join actions and steer to discovery.
     if (inviteExpired && !isHost && !viewerCountsAsJoined && !viewerPending) {
       toast.error("This invite has expired. Browse open games instead.");
