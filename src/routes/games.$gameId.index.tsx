@@ -276,18 +276,26 @@ function GameDetail() {
     };
   }, [gameId, hosted]);
 
+  // Re-run status/roster fetches whenever the viewed game OR the signed-in
+  // user changes so switching games or accounts always yields fresh data
+  // matched to the current view (subscriptions below re-key on the same
+  // ids and auto-resubscribe).
   useEffect(() => {
-    refreshStatus(); /* eslint-disable-next-line */
-  }, [game?.id]);
+    refreshStatus();
+    void refetchRoster();
+    /* eslint-disable-next-line */
+  }, [game?.id, user?.id]);
   useEffect(() => {
     refreshHostRequests();
   }, [game?.id, user?.id, settings?.host_id, hostsThisGame]);
 
   // Realtime: refresh roster/requests when any join_request for this game changes.
+  // Channel key + deps include game.id AND user.id so we automatically tear
+  // down and re-subscribe when the viewer switches games or accounts.
   useEffect(() => {
-    if (!game?.id || !hostsThisGame) return;
+    if (!game?.id || !user?.id || !hostsThisGame) return;
     const channel = supabase
-      .channel(`join_requests:host:${game.id}`)
+      .channel(`join_requests:host:${game.id}:${user.id}`)
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "join_requests", filter: `game_id=eq.${game.id}` },
@@ -306,7 +314,7 @@ function GameDetail() {
       supabase.removeChannel(channel);
     };
     // eslint-disable-next-line
-  }, [game?.id, hostsThisGame]);
+  }, [game?.id, user?.id, hostsThisGame]);
 
   // Realtime: live approval updates for my own join_request on this game.
   useEffect(() => {
