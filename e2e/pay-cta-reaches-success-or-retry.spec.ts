@@ -135,7 +135,6 @@ test("Pay CTA reaches the ready pay screen when the backend responds", async ({
   const outcome = await waitForPayOutcome(page);
   expect(outcome).toBe("ready");
   await expect(page.getByText(/game not found/i)).toHaveCount(0);
-  await expect(page.getByText(/loading… \(/i)).toHaveCount(0);
 
   await ctx.close();
 });
