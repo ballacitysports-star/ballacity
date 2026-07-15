@@ -67,6 +67,7 @@ import {
   type PaymentSubmission,
   type JoinRequest,
 } from "@/lib/payments";
+import { shouldTriggerLeaveBranch } from "@/lib/leave-branch";
 
 import { useHostedGames, fetchHostedGame, updateHostedGame, deleteHostedGame } from "@/lib/hosted-games-store";
 import type { Game } from "@/lib/sample-data";
