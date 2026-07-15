@@ -55,7 +55,7 @@ export function SpotsPill({
   return (
     <span
       role="status"
-      aria-live={isFull || isCritical ? "assertive" : "polite"}
+      aria-live={isFull ? "assertive" : "polite"}
       aria-atomic="true"
       aria-label={label}
       className={cls}
