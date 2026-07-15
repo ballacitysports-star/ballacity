@@ -546,8 +546,11 @@ function GameDetail() {
       nav({ to: "/games/$gameId/pay", params: { gameId: game.id }, search });
       return;
     }
-    // Confirmed → leave / withdraw
-    if (isConfirmed || joined) {
+    // Confirmed → leave / withdraw. Only treat as leave when the viewer is
+    // actually on the roster — a stale local `joined` flag on an approval-
+    // or payment-gated game (e.g. right after leaving, before refetch) must
+    // NOT re-trigger the leave branch when the user taps "Request to join".
+    if (isConfirmed || (joined && !requiresApproval && !isPaid)) {
       // Snapshot for rollback on server error.
       const prevReq = myReq;
       const prevSubs = mySubs;
