@@ -116,6 +116,18 @@ function PayPage() {
   const { user, loading } = useAuth();
   const userId = user?.id ?? null;
   const hasGame = !!game;
+  // Live roster + spots — updates in real time as others join/leave while
+  // the viewer is on the pay screen. Falls back to the static snapshot on
+  // sample games and during hydration so nothing briefly flashes to zero.
+  const liveCount = useLiveParticipantCount(game?.id);
+  const { participants: liveRoster } = useLiveParticipants(game?.id);
+  const maxPlayers = game?.maxPlayers ?? 0;
+  const effectiveJoined = Math.min(
+    maxPlayers,
+    liveCount ?? game?.joined ?? 0,
+  );
+  const spotsLeft = Math.max(0, maxPlayers - effectiveJoined);
+  const justFilledDuringPay = liveCount !== undefined && spotsLeft <= 0;
   const nav = useNavigate();
   const [settings, setSettings] = useState<GamePaymentSettings | null>(null);
   const [methods, setMethods] = useState<PaymentMethod[]>([]);
