@@ -1235,8 +1235,7 @@ function PaymentInstructionsAndProof({
         <PrimaryCTA
           type="button"
           onClick={() => void submitProof()}
-          disabled={uploadState === "uploading"}
-          loading={submitting || uploadState === "uploading"}
+          disabled={uploadState === "uploading" || submitting}
           icon={<ShieldCheck className="h-4 w-4" />}
         >
           {submitting
