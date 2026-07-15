@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 
 export type LiveParticipant = {
@@ -68,7 +68,9 @@ function toParticipant(row: Row, profile: ProfileRow | undefined): LiveParticipa
 export function useLiveParticipants(gameId: string | undefined): {
   participants: LiveParticipant[];
   loading: boolean;
+  refetch: () => Promise<void>;
 } {
+  const reloadRef = useRef<() => Promise<void>>(async () => {});
   const [participants, setParticipants] = useState<LiveParticipant[]>([]);
   const [loading, setLoading] = useState(true);
 
