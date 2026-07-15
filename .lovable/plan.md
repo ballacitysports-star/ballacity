@@ -1,31 +1,38 @@
-## Problem
+## Symptom
 
-`/games/host-mrfdyr16-9lhs` (a game that no longer exists in the database) is stuck in an infinite loop, flipping between "Loading…" and "Game not found" and firing hundreds of identical `hosted_games?id=eq.…` requests per second.
+On `/games/g7` (a sample game the viewer has joined locally), tapping "You're in · Tap to leave" → "Leave game" leaves the CTA unchanged; localStorage still lists `g7` in `openrun.joinedGameIds.v1` and the roster/counter don't update.
 
-## Root cause
+## Suspected root cause
 
-`useHostedGames()` returns `JSON.parse(snap)` — a **new array reference on every render**. In `src/routes/games.$gameId.index.tsx` the lookup effect declares its deps as `[gameId, hosted]`, so it re-runs every render:
+The `AlertDialog` action calls `void handleJoin()` immediately after `setConfirmAction(null)`. The `handleJoin` closure reads `joined`, `isConfirmed`, `myReq`, `mySubs`, and `settings` from the render at the time the button was clicked — not from a fresh render — so the leave branch appears to run, but then the `try` block calls `refreshStatus()` in `finally` which re-fetches sample-game state that never existed and, more importantly, `leavingRef.current` is toggled back to false before the realtime channel emits.
 
-1. Render → `hosted` is a new reference → effect fires
-2. Effect calls `setLookupComplete(false)` + `setRemoteGame(null)` → re-render as "Loading…"
-3. `fetchHostedGame` resolves (null) → `setLookupComplete(true)` → re-render as "Game not found"
-4. New render → new `hosted` reference → back to step 1
+The likelier concrete cause (needs one confirmation via a temporary `console.log`): the leave branch IS being taken, `leaveGame("g7")` runs, but the try-block `supabase.from("game_participants").delete()...` returns a `{ error }` that we ignore, THEN `refreshStatus()` in `finally` re-hydrates and something re-adds `g7` — OR the leave branch is not entered at all because one of the earlier guards (block check, paid redirect) short-circuits.
 
-## Fix
+## Diagnostic step (build-mode)
 
-Narrow the effect's dependency array so the lookup runs only when `gameId` actually changes:
+Add one-shot `console.log` at these four points in `src/routes/games.$gameId.index.tsx` and reproduce the click:
+1. Top of `executeJoinAction` — log `{ isConfirmed, joined, requiresApproval, isPaid, isPending, gameId: game.id }`.
+2. Right before each early-return guard (invite expired, blocked, approved-but-unpaid) — log which guard fired.
+3. Inside the `if (shouldTriggerLeaveBranch(...))` block — log "entered leave branch".
+4. In the `catch` — log the error object.
 
-- In `src/routes/games.$gameId.index.tsx`, change the lookup `useEffect` deps from `[gameId, hosted]` to `[gameId]`. Inside the effect we already re-check `hosted.some(...)` / `GAMES.some(...)` up front, so we don't need to re-fire when the hosted list emits. Add an eslint-disable-next-line for exhaustive-deps (matching the pattern used elsewhere in this file).
+Run leave → read console logs → identify which branch fires or which error re-adds the id.
 
-That single change stops the render loop, stops the request storm, and leaves the "Game not found" screen visible (correct terminal state for a deleted game).
+## Fix (contingent on diagnosis)
 
-## Out of scope
+Most likely one of:
 
-- Not changing `useHostedGames()` itself (broader refactor; the local fix is sufficient and low-risk).
-- No UI/design changes.
-- No backend changes; the game genuinely doesn't exist in `hosted_games`.
+- **Leave branch not entered**: correct the guard (e.g. a stale `settings` from a previous game caused `paymentCleared` to be false).
+- **`joinGame` rollback in catch**: replace the broad `catch` with a narrower one that only rolls back on the specific delete failure, not on downstream notification/refresh failures.
+- **`refreshStatus`/realtime re-adds the id**: gate `hydrateFromDb` / realtime merge in `src/lib/games-store.ts` so it skips ids the user has just removed locally (small "recently-left" tombstone Set with a short TTL, cleared once server confirms).
+
+Remove all diagnostic `console.log`s before finishing.
 
 ## Verification
 
-- Reload `/games/host-mrfdyr16-9lhs`: page settles on "Game not found" with a single (or zero) hosted_games fetch, no repeating network requests.
-- Navigate to an existing game id: still loads normally.
+- Reproduce with Playwright on `/games/g7`: tap leave → CTA flips to the free-join style, roster shows 7/10, `localStorage.getItem('openrun.joinedGameIds.v1')` no longer contains `"g7"`, and reload keeps it out.
+- Repeat on a hosted DB game the viewer joined: leave still tears down `game_participants` + `join_requests` + `payment_submissions` as before (existing behavior preserved).
+
+## Out of scope
+
+- No UI/design changes; no schema changes; no changes to the leave-branch predicate itself unless step 1 shows it's the culprit.
