@@ -228,6 +228,26 @@ function GameDetail() {
     } catch {}
   };
 
+  // Optimistically flip a host-side join_request row's status. Returns an
+  // undo function the caller runs on server error so the UI reverts to the
+  // pre-tap state. Realtime `join_requests:host:*` events reconcile with
+  // authoritative rows on success; we don't need a manual refetch.
+  const applyOptimisticReview = (
+    reqId: string,
+    status: "approved" | "rejected",
+  ): (() => void) => {
+    let snapshot: JoinRequest[] = [];
+    setHostRequests((prev) => {
+      snapshot = prev;
+      return prev.map((r) =>
+        r.id === reqId
+          ? { ...r, status, reviewed_at: new Date().toISOString() }
+          : r,
+      );
+    });
+    return () => setHostRequests(snapshot);
+  };
+
   const toggleRequireApproval = async () => {
     if (!game || !user) return;
     setApprovalSaving(true);
