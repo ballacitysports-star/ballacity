@@ -756,6 +756,56 @@ export type Database = {
           },
         ]
       }
+      payment_verification_events: {
+        Row: {
+          action: string
+          actor_id: string | null
+          created_at: string
+          from_status: string | null
+          game_id: string
+          host_id: string
+          id: string
+          notes: string | null
+          player_id: string
+          submission_id: string
+          to_status: string | null
+        }
+        Insert: {
+          action: string
+          actor_id?: string | null
+          created_at?: string
+          from_status?: string | null
+          game_id: string
+          host_id: string
+          id?: string
+          notes?: string | null
+          player_id: string
+          submission_id: string
+          to_status?: string | null
+        }
+        Update: {
+          action?: string
+          actor_id?: string | null
+          created_at?: string
+          from_status?: string | null
+          game_id?: string
+          host_id?: string
+          id?: string
+          notes?: string | null
+          player_id?: string
+          submission_id?: string
+          to_status?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payment_verification_events_submission_id_fkey"
+            columns: ["submission_id"]
+            isOneToOne: false
+            referencedRelation: "payment_submissions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       player_availabilities: {
         Row: {
           city: string | null
