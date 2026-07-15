@@ -284,28 +284,6 @@ function GameDetail() {
     return () => setHostRequests(snapshot);
   };
 
-  const toggleRequireApproval = async () => {
-    if (!game || !user) return;
-    setApprovalSaving(true);
-    try {
-      await upsertGamePaymentSettings({
-        game_id: game.id,
-        entry_fee: Number(settings?.entry_fee ?? game.price ?? 0),
-        accepted_method_ids: settings?.accepted_method_ids ?? [],
-        payment_deadline: settings?.payment_deadline ?? null,
-        refund_policy: settings?.refund_policy ?? null,
-        payment_instructions: settings?.payment_instructions ?? null,
-        requires_approval: !settings?.requires_approval,
-      });
-      toast.success(settings?.requires_approval ? "Approval disabled" : "Approval enabled");
-      await refreshStatus();
-      await refreshHostRequests();
-    } catch (e: any) {
-      toast.error(e.message ?? "Could not update.");
-    } finally {
-      setApprovalSaving(false);
-    }
-  };
 
   useEffect(() => {
     if (GAMES.some((g) => g.id === gameId) || hosted.some((g) => g.id === gameId)) {
