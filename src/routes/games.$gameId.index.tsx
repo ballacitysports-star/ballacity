@@ -630,18 +630,26 @@ function GameDetail() {
       };
       setMyReq(optimistic);
       try {
+        const wasRejected = prevReq?.status === "rejected";
         const created = await createJoinRequest({ game_id: game.id, host_id: settings.host_id });
         // Swap synthetic row for the authoritative one.
         setMyReq(created);
+        const isResubmit = wasRejected || (created.attempt_count ?? 1) > 1;
         // Fire notification off the critical path — failure must not stall the UI.
         void createNotification({
           user_id: settings.host_id,
-          type: "join_request",
-          title: `New request to join ${game.title}`,
-          body: "Tap to review.",
+          type: isResubmit ? "join_resubmitted" : "join_request",
+          title: isResubmit
+            ? `Resubmitted request: ${game.title}`
+            : `New request to join ${game.title}`,
+          body: isResubmit
+            ? "A player resubmitted their request — pending your review."
+            : "Tap to review.",
           link: `/games/${game.id}`,
         }).catch(() => {});
-        toast.success("Request sent. The host will review it.");
+        toast.success(
+          isResubmit ? "Request resubmitted. The host will review it." : "Request sent. The host will review it.",
+        );
       } catch (e: any) {
         setMyReq(prevReq);
         toast.error(e.message ?? "Could not send request.");
