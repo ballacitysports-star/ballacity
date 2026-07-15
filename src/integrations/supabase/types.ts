@@ -470,11 +470,13 @@ export type Database = {
       }
       join_requests: {
         Row: {
+          attempt_count: number
           created_at: string
           game_id: string
           host_id: string
           id: string
           idempotency_key: string
+          last_rejected_at: string | null
           message: string | null
           player_id: string
           reviewed_at: string | null
@@ -482,11 +484,13 @@ export type Database = {
           status: string
         }
         Insert: {
+          attempt_count?: number
           created_at?: string
           game_id: string
           host_id: string
           id?: string
           idempotency_key: string
+          last_rejected_at?: string | null
           message?: string | null
           player_id: string
           reviewed_at?: string | null
@@ -494,11 +498,13 @@ export type Database = {
           status?: string
         }
         Update: {
+          attempt_count?: number
           created_at?: string
           game_id?: string
           host_id?: string
           id?: string
           idempotency_key?: string
+          last_rejected_at?: string | null
           message?: string | null
           player_id?: string
           reviewed_at?: string | null
