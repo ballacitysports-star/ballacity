@@ -331,8 +331,10 @@ function GameDetail() {
     // eslint-disable-next-line
   }, [game?.id, user?.id]);
 
-  // Fallback: poll + refetch on tab focus / visibility so approval, roster,
-  // and payment status update even when the realtime socket is stalled.
+  // Event-driven fallback: refetch when the tab regains focus or becomes
+  // visible (covers the case where the realtime socket was suspended while
+  // the tab was backgrounded). No polling interval — updates are driven by
+  // realtime events plus these lifecycle events.
   useEffect(() => {
     if (!game?.id) return;
     const refreshAll = () => {
@@ -340,9 +342,6 @@ function GameDetail() {
       refreshHostRequests();
       void refetchRoster();
     };
-    const interval = window.setInterval(() => {
-      if (document.visibilityState === "visible") refreshAll();
-    }, 15000);
     const onFocus = () => refreshAll();
     const onVisibility = () => {
       if (document.visibilityState === "visible") refreshAll();
@@ -350,7 +349,6 @@ function GameDetail() {
     window.addEventListener("focus", onFocus);
     document.addEventListener("visibilitychange", onVisibility);
     return () => {
-      window.clearInterval(interval);
       window.removeEventListener("focus", onFocus);
       document.removeEventListener("visibilitychange", onVisibility);
     };
