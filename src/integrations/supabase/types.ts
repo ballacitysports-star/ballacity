@@ -1066,10 +1066,6 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      can_access_game_payment: {
-        Args: { _game_id: string; _host_id: string; _user_id: string }
-        Returns: boolean
-      }
       can_notify: {
         Args: { _caller: string; _target: string }
         Returns: boolean
@@ -1096,42 +1092,20 @@ export type Database = {
           username: string
         }[]
       }
-      get_game_payment_options: {
-        Args: { _game_id: string }
+      get_host_payment_methods: {
+        Args: { _host_id: string }
         Returns: {
-          methods: Json
-          settings: Json
+          contact_info: string
+          host_id: string
+          id: string
+          instructions: string
+          is_enabled: boolean
+          label: string
+          payment_type: string
+          payment_url: string
+          username: string
         }[]
       }
-      get_host_payment_methods:
-        | {
-            Args: { _host_id: string }
-            Returns: {
-              contact_info: string
-              host_id: string
-              id: string
-              instructions: string
-              is_enabled: boolean
-              label: string
-              payment_type: string
-              payment_url: string
-              username: string
-            }[]
-          }
-        | {
-            Args: { _game_id: string; _host_id: string }
-            Returns: {
-              contact_info: string
-              host_id: string
-              id: string
-              instructions: string
-              is_enabled: boolean
-              label: string
-              payment_type: string
-              payment_url: string
-              username: string
-            }[]
-          }
       has_active_subscription: {
         Args: { check_env?: string; user_uuid: string }
         Returns: boolean
