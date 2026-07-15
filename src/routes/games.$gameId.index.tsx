@@ -1661,6 +1661,10 @@ function GameDetail() {
                             gameTitle={game.title}
                             feeRequired={isPaid}
                             onOptimistic={applyOptimisticReview}
+                            onRemoved={(playerId) => {
+                              removeRosterLocal(playerId);
+                              void refetchRoster();
+                            }}
                           />
 
                         ))}
@@ -2577,11 +2581,13 @@ function RosterPlayerRow({
   gameTitle,
   feeRequired,
   onOptimistic,
+  onRemoved,
 }: {
   req: JoinRequest;
   gameTitle: string;
   feeRequired: boolean;
   onOptimistic: (reqId: string, status: "approved" | "rejected") => () => void;
+  onRemoved?: (playerId: string) => void;
 }) {
   const [busy, setBusy] = useState(false);
   const [name, setName] = useState<string>("Player");
@@ -2719,6 +2725,9 @@ function RosterPlayerRow({
       toast.success(
         next === "verified" ? "Payment verified." : next === "rejected" ? "Payment rejected." : "Marked unpaid.",
       );
+      if (next === "rejected" && res.changed) {
+        onRemoved?.(req.player_id);
+      }
     } catch (e: any) {
       setLatestSub(prev);
       toast.error(e.message ?? "Could not update payment.");
