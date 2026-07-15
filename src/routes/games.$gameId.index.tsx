@@ -75,7 +75,7 @@ import { shouldTriggerLeaveBranch } from "@/lib/leave-branch";
 import { useHostedGames, fetchHostedGame, updateHostedGame, deleteHostedGame } from "@/lib/hosted-games-store";
 import type { Game } from "@/lib/sample-data";
 import { PositionsPicker, positionsCleanup } from "@/components/PositionsPicker";
-import { LegalNotice } from "@/components/LegalNotice";
+
 import { useAuth } from "@/hooks/use-auth";
 import { useMyProfile } from "@/lib/user-prefs-store";
 import { getOrCreateDirectConversation } from "@/lib/messages";
