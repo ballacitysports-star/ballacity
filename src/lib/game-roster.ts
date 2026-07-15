@@ -100,6 +100,7 @@ export function useLiveParticipants(gameId: string | undefined): {
       setParticipants(rows.map((r) => toParticipant(r, profiles.get(r.user_id))));
       setLoading(false);
     };
+    reloadRef.current = load;
     void load();
 
     const channel = supabase
@@ -148,5 +149,9 @@ export function useLiveParticipants(gameId: string | undefined): {
     };
   }, [gameId]);
 
-  return { participants, loading };
+  const refetch = useCallback(async () => {
+    await reloadRef.current();
+  }, []);
+
+  return { participants, loading, refetch };
 }
