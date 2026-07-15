@@ -2837,7 +2837,7 @@ function HostRequestRow({
               onClick={async () => {
                 if (!confirm(`Block ${name}? They won't be able to join your future games.`))
                   return;
-                await act("rejected");
+                await act("rejected", "Blocked by host");
                 blockUser(req.host_id, req.player_id);
                 toast.success(`${name} blocked.`);
               }}
@@ -2848,11 +2848,16 @@ function HostRequestRow({
             </button>
             <button
               disabled={busy}
-              onClick={() => act("rejected")}
+              onClick={() => {
+                const reason = promptRejection();
+                if (reason === null) return;
+                void act("rejected", reason || null);
+              }}
               className="grid h-9 w-9 place-items-center rounded-xl border border-coral/40 text-coral disabled:opacity-50"
             >
               <XIcon className="h-4 w-4" />
             </button>
+
             <button
               disabled={busy}
               onClick={() => act("approved")}
