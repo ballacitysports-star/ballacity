@@ -59,6 +59,9 @@ import {
   upsertGamePaymentSettings,
   listMyPaymentMethods,
   paymentTypeMeta,
+  joinResubmitCooldownRemainingMs,
+  joinResubmitCapReached,
+  JOIN_RESUBMIT_MAX_ATTEMPTS,
   type PaymentMethod,
   type GamePaymentSettings,
   type PaymentSubmission,
@@ -156,6 +159,15 @@ export const Route = createFileRoute("/games/$gameId/")({
   component: GameDetail,
 });
 
+function formatCooldownLabel(ms: number): string {
+  const secs = Math.max(1, Math.ceil(ms / 1000));
+  if (secs < 60) return `${secs}s`;
+  const m = Math.floor(secs / 60);
+  const s = secs % 60;
+  return s ? `${m}m ${s}s` : `${m}m`;
+}
+
+
 function GameDetail() {
   const { gameId } = Route.useLoaderData();
   const { invite: isInvite, from: inviteFrom, exp: inviteExp, expInvalid } = Route.useSearch();
@@ -184,6 +196,17 @@ function GameDetail() {
   const [requesting, setRequesting] = useState(false);
   const [processing, setProcessing] = useState(false);
   const [positionRosterOpen, setPositionRosterOpen] = useState(false);
+
+  // Ticking clock (1s) that re-renders while the resubmit cooldown counts down.
+  // Only starts when there's an active cooldown to avoid unnecessary re-renders.
+  const cooldownMs = joinResubmitCooldownRemainingMs(myReq);
+  const capReached = joinResubmitCapReached(myReq);
+  const [, setNowTick] = useState(0);
+  useEffect(() => {
+    if (cooldownMs <= 0) return;
+    const t = setInterval(() => setNowTick((n) => n + 1), 1000);
+    return () => clearInterval(t);
+  }, [cooldownMs > 0]);
 
   // effectiveJoined is computed below, after settings/myReq/isHost resolve.
   // Placeholder removed — see definition near line 161.
@@ -609,6 +632,20 @@ function GameDetail() {
         toast.error("This invite link is invalid or has been tampered with.");
         return;
       }
+      // Client-side gate on resubmit: mirror the DB trigger so the user gets
+      // an instant, human-readable message before the network round-trip.
+      if (myReq?.status === "rejected") {
+        if (capReached) {
+          toast.error(
+            `You've reached the ${JOIN_RESUBMIT_MAX_ATTEMPTS}-attempt limit for this game. Message the host instead.`,
+          );
+          return;
+        }
+        if (cooldownMs > 0) {
+          toast.error(`Please wait ${formatCooldownLabel(cooldownMs)} before resubmitting.`);
+          return;
+        }
+      }
       setRequesting(true);
       // Optimistic: flip CTA to "Request pending" immediately using a
       // synthetic row. Realtime `join_requests:me:*` reconciles with the
@@ -627,18 +664,26 @@ function GameDetail() {
       };
       setMyReq(optimistic);
       try {
+        const wasRejected = prevReq?.status === "rejected";
         const created = await createJoinRequest({ game_id: game.id, host_id: settings.host_id });
         // Swap synthetic row for the authoritative one.
         setMyReq(created);
+        const isResubmit = wasRejected || (created.attempt_count ?? 1) > 1;
         // Fire notification off the critical path — failure must not stall the UI.
         void createNotification({
           user_id: settings.host_id,
-          type: "join_request",
-          title: `New request to join ${game.title}`,
-          body: "Tap to review.",
+          type: isResubmit ? "join_resubmitted" : "join_request",
+          title: isResubmit
+            ? `Resubmitted request: ${game.title}`
+            : `New request to join ${game.title}`,
+          body: isResubmit
+            ? "A player resubmitted their request — pending your review."
+            : "Tap to review.",
           link: `/games/${game.id}`,
         }).catch(() => {});
-        toast.success("Request sent. The host will review it.");
+        toast.success(
+          isResubmit ? "Request resubmitted. The host will review it." : "Request sent. The host will review it.",
+        );
       } catch (e: any) {
         setMyReq(prevReq);
         toast.error(e.message ?? "Could not send request.");
@@ -872,7 +917,11 @@ function GameDetail() {
                   ? "Your spot isn't held until the host approves. You'll get a notification when they respond."
                   : myReq.status === "approved"
                     ? "The host approved your request. You're on the roster."
-                    : `${myReq.reviewer_notes ? `${myReq.reviewer_notes} · ` : ""}You can send another request or message the host.`}
+                    : capReached
+                      ? `${myReq.reviewer_notes ? `${myReq.reviewer_notes} · ` : ""}You've reached the ${JOIN_RESUBMIT_MAX_ATTEMPTS}-attempt limit for this game. Message the host instead.`
+                      : cooldownMs > 0
+                        ? `${myReq.reviewer_notes ? `${myReq.reviewer_notes} · ` : ""}You can resubmit in ${formatCooldownLabel(cooldownMs)}.`
+                        : `${myReq.reviewer_notes ? `${myReq.reviewer_notes} · ` : ""}You can send another request or message the host.`}
 
               </p>
             </div>

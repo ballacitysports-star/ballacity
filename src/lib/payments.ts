@@ -44,7 +44,28 @@ export type JoinRequest = {
   reviewer_notes: string | null;
   created_at: string;
   reviewed_at: string | null;
+  attempt_count?: number;
+  last_rejected_at?: string | null;
 };
+
+export const JOIN_RESUBMIT_COOLDOWN_MS = 15 * 60 * 1000;
+export const JOIN_RESUBMIT_MAX_ATTEMPTS = 3;
+
+/**
+ * Milliseconds remaining before the caller may resubmit after a rejection.
+ * 0 means no active cooldown. Client-side gate that mirrors the DB trigger
+ * so the UI can disable the CTA and show a countdown before the network round-trip.
+ */
+export function joinResubmitCooldownRemainingMs(req: JoinRequest | null): number {
+  if (!req || req.status !== "rejected" || !req.last_rejected_at) return 0;
+  const until = new Date(req.last_rejected_at).getTime() + JOIN_RESUBMIT_COOLDOWN_MS;
+  return Math.max(0, until - Date.now());
+}
+
+export function joinResubmitCapReached(req: JoinRequest | null): boolean {
+  if (!req || req.status !== "rejected") return false;
+  return (req.attempt_count ?? 1) >= JOIN_RESUBMIT_MAX_ATTEMPTS;
+}
 
 export type PaymentSubmission = {
   id: string;
@@ -329,7 +350,9 @@ export async function createJoinRequest(input: {
 
   // 23505 = unique_violation. Either (player_id, idempotency_key) or the
   // (game_id, player_id) constraint fired. If the existing row is 'rejected',
-  // the host previously declined — clear it so the player can resubmit.
+  // the host previously declined — flip it back to pending (UPDATE) so the
+  // resubmit trigger can enforce the 15-minute cooldown and 3-attempt cap
+  // against the prior row's `attempt_count` / `last_rejected_at`.
   // Otherwise (pending/approved) return the existing row so callers see a
   // successful idempotent result.
   if (error && (error as { code?: string }).code === "23505") {
@@ -343,23 +366,51 @@ export async function createJoinRequest(input: {
       .maybeSingle();
     if (readErr) throw readErr;
     if (existing) {
-      if ((existing as JoinRequest).status === "rejected") {
-        // Delete the declined row (RLS allows player to delete own rejected
-        // rows) and retry the insert as a fresh pending request.
-        const { error: delErr } = await supabase
+      const prev = existing as JoinRequest;
+      if (prev.status === "rejected") {
+        // Pre-check on client so we can raise a friendly message before the
+        // DB trigger fires. The trigger is still the source of truth.
+        if (joinResubmitCapReached(prev)) {
+          throw new Error(
+            `You've reached the maximum of ${JOIN_RESUBMIT_MAX_ATTEMPTS} resubmit attempts for this game. Message the host instead.`,
+          );
+        }
+        const cooldownMs = joinResubmitCooldownRemainingMs(prev);
+        if (cooldownMs > 0) {
+          const secs = Math.ceil(cooldownMs / 1000);
+          throw new Error(
+            `Please wait ${formatCooldown(secs)} before resubmitting this request.`,
+          );
+        }
+        const { data: retryData, error: retryErr } = await supabase
           .from("join_requests")
-          .delete()
-          .eq("id", (existing as JoinRequest).id);
-        if (delErr) throw delErr;
-        const retry = await attemptInsert();
-        if (!retry.error && retry.data) return retry.data as JoinRequest;
-        throw retry.error;
+          .update({
+            status: "pending",
+            message: input.message ?? null,
+            // reviewer_notes / reviewed_at are cleared by the trigger.
+          } as never)
+          .eq("id", prev.id)
+          .eq("status", "rejected")
+          .select("*")
+          .single();
+        if (retryErr) {
+          // Trigger raises P0001 with a human-readable message for cap/cooldown.
+          throw new Error(retryErr.message);
+        }
+        return retryData as JoinRequest;
       }
-      return existing as JoinRequest;
+      return prev;
     }
   }
 
   throw error;
+}
+
+function formatCooldown(secs: number): string {
+  if (secs < 60) return `${secs}s`;
+  const m = Math.floor(secs / 60);
+  const s = secs % 60;
+  return s ? `${m}m ${s}s` : `${m}m`;
 }
 
 
