@@ -5,5 +5,6 @@ export default defineConfig({
   plugins: [tsconfigPaths()],
   test: {
     exclude: ["e2e/**", "node_modules/**", "dist/**", ".lovable/**"],
+    environmentMatchGlobs: [["**/*.test.tsx", "jsdom"]],
   },
 });
