@@ -39,12 +39,11 @@ async function resolveOrCreateCustomer(
 }
 
 export const createCheckoutSession = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
   .inputValidator(
     (data: {
       priceId: string;
       quantity?: number;
-      customerEmail?: string;
-      userId?: string;
       returnUrl: string;
       environment: StripeEnv;
       collectShipping?: boolean;
@@ -53,8 +52,13 @@ export const createCheckoutSession = createServerFn({ method: "POST" })
       return data;
     },
   )
-  .handler(async ({ data }): Promise<CheckoutSessionResult> => {
+  .handler(async ({ data, context }): Promise<CheckoutSessionResult> => {
     try {
+      // Always derive identity from the verified session — never trust the client.
+      const userId = context.userId;
+      const customerEmail =
+        typeof context.claims?.email === "string" ? (context.claims.email as string) : undefined;
+
       const stripe = createStripeClient(data.environment);
 
       const prices = await stripe.prices.list({ lookup_keys: [data.priceId] });
@@ -62,13 +66,10 @@ export const createCheckoutSession = createServerFn({ method: "POST" })
       const stripePrice = prices.data[0];
       const isRecurring = stripePrice.type === "recurring";
 
-      const customerId =
-        data.customerEmail || data.userId
-          ? await resolveOrCreateCustomer(stripe, {
-              email: data.customerEmail,
-              userId: data.userId,
-            })
-          : undefined;
+      const customerId = await resolveOrCreateCustomer(stripe, {
+        email: customerEmail,
+        userId,
+      });
 
       let productDescription: string | undefined;
       if (!isRecurring) {
@@ -78,8 +79,6 @@ export const createCheckoutSession = createServerFn({ method: "POST" })
         productDescription = product.name;
       }
 
-      // Physical goods (merch) need shipping_address_collection, which
-      // conflicts with managed_payments. Use automatic_tax for those instead.
       const isPhysical = !!data.collectShipping;
 
       const session = await stripe.checkout.sessions.create({
@@ -87,12 +86,10 @@ export const createCheckoutSession = createServerFn({ method: "POST" })
         mode: isRecurring ? "subscription" : "payment",
         ui_mode: "embedded_page",
         return_url: data.returnUrl,
-        ...(customerId && { customer: customerId }),
+        customer: customerId,
         ...(!isRecurring && { payment_intent_data: { description: productDescription } }),
-        ...(data.userId && {
-          metadata: { userId: data.userId, priceId: data.priceId },
-          ...(isRecurring && { subscription_data: { metadata: { userId: data.userId } } }),
-        }),
+        metadata: { userId, priceId: data.priceId },
+        ...(isRecurring && { subscription_data: { metadata: { userId } } }),
         ...(isPhysical
           ? {
               automatic_tax: { enabled: true },
@@ -106,6 +103,7 @@ export const createCheckoutSession = createServerFn({ method: "POST" })
       return { error: getStripeErrorMessage(error) };
     }
   });
+
 
 export const createPortalSession = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])

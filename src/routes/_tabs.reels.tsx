@@ -169,8 +169,6 @@ function ReelsPage() {
     }
     openCheckout({
       priceId: "ai_highlight_reel_monthly",
-      customerEmail: user.email,
-      userId: user.id,
       returnUrl: `${window.location.origin}/checkout/return?session_id={CHECKOUT_SESSION_ID}`,
     });
   }

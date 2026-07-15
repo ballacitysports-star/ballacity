@@ -159,7 +159,30 @@ async function processReel(reel: Reel, supabaseAdmin: any, apiKey: string) {
 export const Route = createFileRoute("/api/public/reels/process")({
   server: {
     handlers: {
-      POST: async () => {
+      POST: async ({ request }) => {
+        // Restrict this expensive endpoint to callers that present the shared
+        // worker secret. Prevents anonymous internet visitors from burning
+        // Lovable AI credits by hammering the URL.
+        const workerSecret = process.env.REELS_WORKER_SECRET;
+        if (workerSecret) {
+          const provided =
+            request.headers.get("x-worker-secret") ??
+            request.headers.get("authorization")?.replace(/^Bearer\s+/i, "") ??
+            "";
+          if (provided !== workerSecret) {
+            return new Response(JSON.stringify({ error: "Unauthorized" }), {
+              status: 401,
+              headers: { "Content-Type": "application/json" },
+            });
+          }
+        } else {
+          // Fail closed when the secret hasn't been configured yet.
+          return new Response(
+            JSON.stringify({ error: "REELS_WORKER_SECRET not configured" }),
+            { status: 503, headers: { "Content-Type": "application/json" } },
+          );
+        }
+
         const apiKey = process.env.LOVABLE_API_KEY;
         if (!apiKey) {
           return new Response(JSON.stringify({ error: "Missing LOVABLE_API_KEY" }), {
@@ -167,6 +190,7 @@ export const Route = createFileRoute("/api/public/reels/process")({
             headers: { "Content-Type": "application/json" },
           });
         }
+
 
         const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
         const stuckBefore = new Date(Date.now() - STUCK_AFTER_MS).toISOString();

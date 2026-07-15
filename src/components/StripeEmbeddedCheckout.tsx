@@ -5,8 +5,6 @@ import { createCheckoutSession } from "@/utils/payments.functions";
 interface StripeEmbeddedCheckoutProps {
   priceId: string;
   quantity?: number;
-  customerEmail?: string;
-  userId?: string;
   returnUrl?: string;
   collectShipping?: boolean;
 }
@@ -14,8 +12,6 @@ interface StripeEmbeddedCheckoutProps {
 export function StripeEmbeddedCheckout({
   priceId,
   quantity,
-  customerEmail,
-  userId,
   returnUrl,
   collectShipping,
 }: StripeEmbeddedCheckoutProps) {
@@ -24,8 +20,6 @@ export function StripeEmbeddedCheckout({
       data: {
         priceId,
         quantity,
-        customerEmail,
-        userId,
         collectShipping,
         returnUrl: returnUrl || window.location.href,
         environment: getStripeEnvironment(),
@@ -35,6 +29,7 @@ export function StripeEmbeddedCheckout({
     if (!result.clientSecret) throw new Error("Stripe did not return a client secret");
     return result.clientSecret;
   };
+
 
   return (
     <div id="checkout">

@@ -1,8 +1,11 @@
 import { createServerFn } from "@tanstack/react-start";
+import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+
 
 const GATEWAY_URL = "https://connector-gateway.lovable.dev/google_maps";
 
 export const reverseGeocode = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
   .inputValidator((data: { lat: number; lng: number }) => {
     if (typeof data?.lat !== "number" || typeof data?.lng !== "number") {
       throw new Error("lat and lng required");
@@ -46,6 +49,7 @@ export const reverseGeocode = createServerFn({ method: "POST" })
   });
 
 export const geocodeAddress = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
   .inputValidator((data: { address: string }) => {
     const address = String(data?.address ?? "").trim();
     if (address.length < 2) throw new Error("address required");

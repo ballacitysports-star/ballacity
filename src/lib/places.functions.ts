@@ -1,4 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
+import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+
 
 const GATEWAY_URL = "https://connector-gateway.lovable.dev/google_maps";
 
@@ -9,6 +11,7 @@ export type PlaceSuggestion = {
 };
 
 export const autocompletePlaces = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
   .inputValidator(
     (data: { input: string; lat?: number | null; lng?: number | null; sessionToken?: string }) => {
       const input = String(data?.input ?? "").trim();

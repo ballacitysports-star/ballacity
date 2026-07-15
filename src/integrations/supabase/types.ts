@@ -1066,6 +1066,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      can_notify: {
+        Args: { _caller: string; _target: string }
+        Returns: boolean
+      }
       create_direct_conversation: {
         Args: { _game_id?: string; _other_user: string }
         Returns: string

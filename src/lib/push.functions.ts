@@ -34,7 +34,17 @@ function validate(input: unknown): PushInput {
 export const sendPushToUser = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator(validate)
-  .handler(async ({ data }) => {
+  .handler(async ({ data, context }) => {
+    if (data.userId !== context.userId) {
+      const { data: allowed, error: relErr } = await context.supabase.rpc("can_notify" as any, {
+        _caller: context.userId,
+        _target: data.userId,
+      });
+      if (relErr || !allowed) {
+        return { ok: false as const, reason: "not_authorized" };
+      }
+    }
+
     const log = async (
       status: "sent" | "failed" | "skipped",
       extra: { error?: string | null; detail?: unknown } = {},
