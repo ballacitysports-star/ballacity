@@ -59,6 +59,8 @@ import {
   upsertGamePaymentSettings,
   listMyPaymentMethods,
   paymentTypeMeta,
+  reviewSubmission,
+  getSignedProofUrl,
   joinResubmitCooldownRemainingMs,
   joinResubmitCapReached,
   JOIN_RESUBMIT_MAX_ATTEMPTS,
@@ -2642,9 +2644,12 @@ function RosterPlayerRow({
   const [busy, setBusy] = useState(false);
   const [name, setName] = useState<string>("Player");
   const [initials, setInitials] = useState<string>("P");
-  const [paymentStatus, setPaymentStatus] = useState<"verified" | "pending" | "rejected" | "none">(
-    "none",
-  );
+  const [latestSub, setLatestSub] = useState<{
+    id: string;
+    status: "verified" | "pending" | "rejected";
+    screenshot_path: string | null;
+  } | null>(null);
+  const paymentStatus: "verified" | "pending" | "rejected" | "none" = latestSub?.status ?? "none";
   const reviews = useReviewsFor(req.player_id);
   const rep = useMemo(() => computeReputation(reviews, "player"), [reviews]);
   const reliability = rep.criteriaAverages.find((c) => c.key === "reliability")?.avg ?? 0;
@@ -2655,15 +2660,19 @@ function RosterPlayerRow({
     const loadPayment = async () => {
       const { data } = await supabase
         .from("payment_submissions")
-        .select("status")
+        .select("id, status, screenshot_path")
         .eq("game_id", req.game_id)
         .eq("player_id", req.player_id)
         .order("submitted_at", { ascending: false })
         .limit(1)
         .maybeSingle();
       if (cancel) return;
-      const s = (data as any)?.status;
-      setPaymentStatus(s === "verified" || s === "pending" || s === "rejected" ? s : "none");
+      const d = data as { id: string; status: string; screenshot_path: string | null } | null;
+      if (d && (d.status === "verified" || d.status === "pending" || d.status === "rejected")) {
+        setLatestSub({ id: d.id, status: d.status, screenshot_path: d.screenshot_path });
+      } else {
+        setLatestSub(null);
+      }
     };
     (async () => {
       const profRes = await supabase
@@ -2706,6 +2715,88 @@ function RosterPlayerRow({
       supabase.removeChannel(channel);
     };
   }, [req.player_id, req.game_id]);
+
+  const setPaymentStatusAction = async (
+    next: "verified" | "rejected" | "pending",
+    notifyType?: "payment_verified" | "payment_rejected",
+  ) => {
+    if (!latestSub || busy) return;
+    setBusy(true);
+    const prev = latestSub;
+    setLatestSub({ ...latestSub, status: next });
+    try {
+      await reviewSubmission(latestSub.id, next);
+      if (notifyType) {
+        await createNotification({
+          user_id: req.player_id,
+          type: notifyType,
+          title:
+            next === "verified"
+              ? `Payment verified for ${gameTitle}`
+              : `Payment rejected for ${gameTitle}`,
+          body:
+            next === "verified"
+              ? "The host confirmed your payment. You're all set."
+              : "The host couldn't verify your payment. Please resubmit.",
+          link: `/games/${req.game_id}`,
+        });
+      }
+      toast.success(
+        next === "verified" ? "Payment verified." : next === "rejected" ? "Payment rejected." : "Marked unpaid.",
+      );
+    } catch (e: any) {
+      setLatestSub(prev);
+      toast.error(e.message ?? "Could not update payment.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const markPaidNoSubmission = async () => {
+    if (busy) return;
+    setBusy(true);
+    try {
+      const { data, error } = await supabase
+        .from("payment_submissions")
+        .insert({
+          player_id: req.player_id,
+          game_id: req.game_id,
+          host_id: req.host_id,
+          payment_method_id: null,
+          payment_type: null,
+          screenshot_path: null,
+          notes: "Marked paid by host",
+          paid_at: new Date().toISOString(),
+          status: "verified",
+          reviewed_at: new Date().toISOString(),
+        } as never)
+        .select("id, status, screenshot_path")
+        .single();
+      if (error) throw error;
+      const d = data as { id: string; status: string; screenshot_path: string | null };
+      setLatestSub({ id: d.id, status: "verified", screenshot_path: d.screenshot_path });
+      await createNotification({
+        user_id: req.player_id,
+        type: "payment_verified",
+        title: `Payment recorded for ${gameTitle}`,
+        body: "The host marked your payment as received.",
+        link: `/games/${req.game_id}`,
+      });
+      toast.success("Marked as paid.");
+    } catch (e: any) {
+      toast.error(e.message ?? "Could not mark as paid.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const viewProof = async () => {
+    if (!latestSub?.screenshot_path) return;
+    const url = await getSignedProofUrl(latestSub.screenshot_path);
+    if (url) window.open(url, "_blank", "noopener,noreferrer");
+    else toast.error("Could not load proof.");
+  };
+
 
   const remove = async () => {
     if (!confirm(`Remove ${name} from ${gameTitle}?`)) return;
@@ -2822,6 +2913,70 @@ function RosterPlayerRow({
           </span>
         )}
       </div>
+      {feeRequired && (
+        <div className="mt-2 flex flex-wrap items-center gap-1.5">
+          {latestSub?.screenshot_path && (
+            <button
+              type="button"
+              onClick={viewProof}
+              className="inline-flex items-center gap-1 rounded-full border border-border bg-background px-2.5 py-1 text-[11px] font-semibold hover:bg-secondary"
+            >
+              View proof
+            </button>
+          )}
+          {paymentStatus === "pending" && (
+            <>
+              <button
+                type="button"
+                onClick={() => setPaymentStatusAction("verified", "payment_verified")}
+                disabled={busy}
+                className="inline-flex items-center gap-1 rounded-full border border-lime/50 bg-lime/15 px-2.5 py-1 text-[11px] font-bold text-lime disabled:opacity-50"
+              >
+                <Check className="h-3 w-3" /> Verify payment
+              </button>
+              <button
+                type="button"
+                onClick={() => setPaymentStatusAction("rejected", "payment_rejected")}
+                disabled={busy}
+                className="inline-flex items-center gap-1 rounded-full border border-coral/50 bg-coral/15 px-2.5 py-1 text-[11px] font-bold text-coral disabled:opacity-50"
+              >
+                <XIcon className="h-3 w-3" /> Reject
+              </button>
+            </>
+          )}
+          {paymentStatus === "rejected" && (
+            <button
+              type="button"
+              onClick={() => setPaymentStatusAction("verified", "payment_verified")}
+              disabled={busy}
+              className="inline-flex items-center gap-1 rounded-full border border-lime/50 bg-lime/15 px-2.5 py-1 text-[11px] font-bold text-lime disabled:opacity-50"
+            >
+              <Check className="h-3 w-3" /> Verify anyway
+            </button>
+          )}
+          {paymentStatus === "verified" && (
+            <button
+              type="button"
+              onClick={() => setPaymentStatusAction("pending")}
+              disabled={busy}
+              className="inline-flex items-center gap-1 rounded-full border border-border bg-background px-2.5 py-1 text-[11px] font-semibold hover:bg-secondary disabled:opacity-50"
+            >
+              Mark unpaid
+            </button>
+          )}
+          {paymentStatus === "none" && (
+            <button
+              type="button"
+              onClick={markPaidNoSubmission}
+              disabled={busy}
+              className="inline-flex items-center gap-1 rounded-full border border-lime/50 bg-lime/15 px-2.5 py-1 text-[11px] font-bold text-lime disabled:opacity-50"
+            >
+              <Check className="h-3 w-3" /> Mark as paid
+            </button>
+          )}
+        </div>
+      )}
+
     </div>
   );
 }
