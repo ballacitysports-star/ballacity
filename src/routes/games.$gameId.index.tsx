@@ -80,6 +80,16 @@ import {
   isUserBlocked,
   useBlockedUsers,
 } from "@/lib/blocked-users-store";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 const emojiBySport: Record<string, string> = Object.fromEntries(
   SPORTS.map((s) => [s.name, s.emoji]),
@@ -409,6 +419,8 @@ function GameDetail() {
   const viewerDelta = viewerCountsAsJoined && liveParticipantCount === undefined ? 1 : 0;
   const effectiveJoined = baseJoined + viewerDelta;
   const spotsLeft = Math.max(0, game.maxPlayers - effectiveJoined);
+
+  const [confirmAction, setConfirmAction] = useState<"join" | "leave" | null>(null);
 
   const handleJoin = async (preselectedPosition?: string) => {
     // Expired invite → block all join actions and steer to discovery.
@@ -1661,7 +1673,25 @@ function GameDetail() {
             return (
               <motion.button
                 whileTap={{ scale: 0.97 }}
-                onClick={() => handleJoin()}
+                onClick={() => {
+                  const wantsLeave = isConfirmed || (joined && !isPaid);
+                  const wantsFreeJoin =
+                    !isConfirmed &&
+                    !joined &&
+                    !isPending &&
+                    spotsLeft > 0 &&
+                    !(requiresApproval && !isApproved) &&
+                    !isPaid;
+                  if (wantsLeave) {
+                    setConfirmAction("leave");
+                    return;
+                  }
+                  if (wantsFreeJoin) {
+                    setConfirmAction("join");
+                    return;
+                  }
+                  void handleJoin();
+                }}
                 disabled={buttonDisabled}
                 aria-live="polite"
                 aria-disabled={buttonDisabled}
@@ -1725,6 +1755,44 @@ function GameDetail() {
           onSettingsSaved={(s) => setSettings(s)}
         />
       )}
+
+      <AlertDialog
+        open={confirmAction !== null}
+        onOpenChange={(open) => {
+          if (!open) setConfirmAction(null);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {confirmAction === "leave" ? "Leave this game?" : "Join this game?"}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {confirmAction === "leave"
+                ? "Your spot will open up for someone else. You can rejoin if there's still space."
+                : "You'll be added to the roster. You can leave later if plans change."}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => {
+                e.preventDefault();
+                const action = confirmAction;
+                setConfirmAction(null);
+                if (action) void handleJoin();
+              }}
+              className={
+                confirmAction === "leave"
+                  ? "bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                  : undefined
+              }
+            >
+              {confirmAction === "leave" ? "Leave game" : "Join game"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

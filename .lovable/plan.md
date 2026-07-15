@@ -1,33 +1,27 @@
-## Bug: "Tap to leave" doesn't update the roster
+## Add confirmation prompts to join / leave actions
 
-### What's happening
+Wrap the join and leave button interactions on the game detail page with an AlertDialog so the user must confirm before the action fires.
 
-On the game detail page, when a **confirmed** player (paid-verified or approved on an approval-gated game) taps the "You're in · Tap to leave" (or "Confirmed · Tap to leave") button:
+### Files to change
 
-- Local join set clears optimistically, so the button label may briefly flip, but…
-- `leaveGame(id)` in `src/lib/games-store.ts` early-returns and **never issues the DELETE** on `game_participants` when the id isn't in the local `joined` Set. Confirmed players got onto the roster server-side (via payment verification / approval auto-join), not through `joinGame`, so their id was never in that Set.
-- `cancelMyJoinRequest` only deletes `join_requests` rows whose status is `pending`, so an **approved** request stays approved.
-- `deleteMyPendingSubmission` only helps for pending submissions, so a **verified** payment row stays.
-
-Net effect: the `game_participants` row survives → the live roster list and "Roster (X/Y)" counter don't change, and after the next `refreshStatus` the button flips right back to "Confirmed · Tap to leave" (because approval/payment still read as cleared).
-
-### Fix (presentation + thin data layer only, no schema changes)
-
-1. **`src/lib/games-store.ts` — `leaveGame`**
-   - Always attempt the `game_participants` DELETE for the current user, regardless of whether the id is in the local `joined` Set. Keep the optimistic local-set clear as-is.
-   - On DB error, restore the local set (existing rollback pattern in `joinGame`).
-
-2. **`src/lib/payments.ts` — join-request cancel**
-   - Add `withdrawMyApprovedJoinRequest(gameId)` (or extend `cancelMyJoinRequest` to also match `status = 'approved'`) that deletes the caller's own approved row. RLS already scopes deletes to `player_id = auth.uid()`, so this is safe.
-
-3. **`src/routes/games.$gameId.index.tsx` — leave branch of `handleJoin` (~L443–468)**
-   - After `leaveGame`, also cancel/withdraw an **approved** join request (not just pending) so the approval gate resets.
-   - Keep the existing "delete pending submission" call; do not touch verified submission rows (payment history stays intact — only the roster seat is released).
-   - Continue to call `refreshStatus()` at the end; the live roster subscription already picks up the DELETE from `game_participants`.
-
-4. **No UI copy or E2E-testid changes.** `e2e/join-cross-device-roster.spec.ts`'s "reverse: leave from B" step already exercises the free-game path and should continue to pass; the confirmed-leave path gets fixed as a side effect.
+1. **`src/routes/games.$gameId.index.tsx`**
+   - Import `AlertDialog` primitives from `@/components/ui/alert-dialog` (already used elsewhere in the app, e.g. `RequestStatusPanel`).
+   - Add local state `confirmAction: "join" | "leave" | null`.
+   - Change the sticky CTA button's `onClick` from directly calling `handleJoin` to opening the dialog with the appropriate intent based on current status:
+     - If currently joined/confirmed → open leave confirmation.
+     - If not joined and the CTA would trigger a free join → open join confirmation.
+     - Paid / approval-gated flows that navigate to `/pay` or submit an approval request stay as-is (they already have their own screens/confirmations). Only the direct join and direct leave paths get a prompt.
+   - Render a single `<AlertDialog>` whose title/description/action label change based on `confirmAction`:
+     - **Join**: "Join this game?" · "You'll be added to the roster. You can leave later if plans change." · confirm label "Join game".
+     - **Leave**: "Leave this game?" · "Your spot will open up for someone else. You can rejoin if there's still space." · confirm label "Leave game", destructive styling.
+   - On confirm, run the existing `handleJoin` logic (unchanged) and close the dialog. On cancel, just close.
 
 ### Out of scope
 
-- No changes to payment records, refunds, notifications wording, RLS, or the pay screen.
-- No changes to `joinGame`, waitlist, or host-side flows.
+- No changes to `joinGame` / `leaveGame` in `src/lib/games-store.ts`.
+- No changes to the pay flow, approval-request flow, waitlist, or host-side actions.
+- No copy or testid changes to buttons that E2E specs match on — the button label stays "Join free" / "You're in · Tap to leave"; the dialog is an added layer. E2E specs that click the CTA once expect immediate action, so they'll need a follow-up click on the dialog's confirm button.
+
+### E2E impact
+
+Specs that exercise join/leave via the sticky CTA (e.g. `join-realtime-cross-views.spec.ts`, `join-cross-device-roster.spec.ts`) will need a follow-up click on the AlertDialog's "Join game" / "Leave game" confirm button after clicking the CTA. Plan updates those specs to click the confirm button in the dialog immediately after the CTA click. No assertions change.
