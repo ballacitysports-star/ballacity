@@ -5,11 +5,11 @@
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {
-  --font-display: "Space Grotesk", ui-sans-serif, system-ui, sans-serif;
-  --font-sans: "DM Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Sora", ui-sans-serif, system-ui, sans-serif;
+  --font-sans: "Manrope", ui-sans-serif, system-ui, sans-serif;
 
-  --radius-sm: calc(var(--radius) - 4px);
-  --radius-md: calc(var(--radius) - 2px);
+  --radius-sm: calc(var(--radius) - 8px);
+  --radius-md: calc(var(--radius) - 4px);
   --radius-lg: var(--radius);
   --radius-xl: calc(var(--radius) + 4px);
   --radius-2xl: calc(var(--radius) + 8px);
@@ -47,125 +47,94 @@
 }
 
 :root {
-  --radius: 0.875rem;
+  --radius: 1.25rem; /* 20px card radius — PS-app rounded shells */
 
-  /* Midnight Court — premium dark */
-  --background: oklch(0.13 0.015 250);
-  --foreground: oklch(0.97 0.005 90);
-  --surface: oklch(0.17 0.018 250);
-  --surface-2: oklch(0.21 0.02 250);
+  /* PS Blue on Ink — near-black layered surfaces + electric PlayStation blue */
+  --background: oklch(0.14 0.02 260);           /* #0a0e17 ink */
+  --foreground: oklch(0.98 0.005 250);
+  --surface: oklch(0.19 0.025 260);             /* #141b29 card */
+  --surface-2: oklch(0.26 0.04 260);            /* #1f2b44 elevated */
 
-  --card: oklch(0.17 0.018 250);
-  --card-foreground: oklch(0.97 0.005 90);
-  --popover: oklch(0.17 0.018 250);
-  --popover-foreground: oklch(0.97 0.005 90);
+  --card: oklch(0.19 0.025 260);
+  --card-foreground: oklch(0.98 0.005 250);
+  --popover: oklch(0.19 0.025 260);
+  --popover-foreground: oklch(0.98 0.005 250);
 
-  --primary: oklch(0.78 0.14 195);              /* Aurora Teal */
-  --primary-foreground: oklch(0.15 0.02 250);
-  --secondary: oklch(0.24 0.03 250);
-  --secondary-foreground: oklch(0.97 0.005 90);
+  --primary: oklch(0.62 0.22 258);              /* #0070f3 PS Blue */
+  --primary-foreground: oklch(0.99 0.005 250);
+  --primary-glow: oklch(0.74 0.16 245);         /* #4aa8ff */
+  --secondary: oklch(0.26 0.04 260);
+  --secondary-foreground: oklch(0.98 0.005 250);
 
-  --muted: oklch(0.23 0.025 250);
-  --muted-foreground: oklch(0.68 0.015 250);
+  --muted: oklch(0.24 0.03 260);
+  --muted-foreground: oklch(0.70 0.02 255);
 
-  --accent: oklch(0.82 0.12 75);                /* Champagne Amber */
-  --accent-foreground: oklch(0.15 0.02 250);
+  --accent: oklch(0.74 0.16 245);               /* PS Blue glow accent */
+  --accent-foreground: oklch(0.14 0.02 260);
 
-  --destructive: oklch(0.65 0.22 22);           /* Garnet */
-  --destructive-foreground: oklch(0.98 0.005 90);
+  --destructive: oklch(0.66 0.22 22);
+  --destructive-foreground: oklch(0.99 0.005 250);
 
-  --success: oklch(0.76 0.15 155);              /* Emerald */
-  --success-foreground: oklch(0.15 0.02 250);
-  --warning: oklch(0.82 0.14 82);               /* Amber */
-  --warning-foreground: oklch(0.15 0.02 250);
-  --info: oklch(0.75 0.12 230);                 /* Sky */
-  --info-foreground: oklch(0.15 0.02 250);
+  --success: oklch(0.72 0.17 155);
+  --success-foreground: oklch(0.14 0.02 260);
+  --warning: oklch(0.82 0.14 82);
+  --warning-foreground: oklch(0.14 0.02 260);
+  --info: oklch(0.74 0.16 245);
+  --info-foreground: oklch(0.14 0.02 260);
 
-  --border: oklch(1 0 0 / 7%);
+  --border: oklch(1 0 0 / 8%);
   --input: oklch(1 0 0 / 10%);
-  --ring: oklch(0.78 0.14 195);
+  --ring: oklch(0.62 0.22 258);
 
-  /* Back-compat aliases — repoint legacy tokens to the new palette */
-  --lime: oklch(0.78 0.14 195);
-  --coral: oklch(0.82 0.12 75);
-
-  --gradient-hero: radial-gradient(120% 80% at 80% 0%, oklch(0.82 0.12 75 / 0.28), transparent 60%),
-                   radial-gradient(100% 80% at 0% 100%, oklch(0.78 0.14 195 / 0.22), transparent 55%),
-                   linear-gradient(180deg, oklch(0.13 0.015 250), oklch(0.10 0.012 250));
-  --gradient-primary: linear-gradient(135deg, oklch(0.78 0.14 195), oklch(0.68 0.13 210));
-  --gradient-secondary: linear-gradient(135deg, oklch(0.82 0.12 75), oklch(0.72 0.14 45));
-  --gradient-lime: var(--gradient-primary);
-  --gradient-coral: var(--gradient-secondary);
-  --shadow-glow-primary: 0 10px 40px -10px oklch(0.78 0.14 195 / 0.55);
-  --shadow-glow-secondary: 0 10px 40px -10px oklch(0.82 0.12 75 / 0.5);
-  --shadow-glow-lime: var(--shadow-glow-primary);
-  --shadow-glow-coral: var(--shadow-glow-secondary);
-}
-
-/* Light theme — "Daylight Court": warm paper base, teal primary, amber accent */
-html.light {
-  --background: oklch(0.985 0.006 90);          /* warm paper */
-  --foreground: oklch(0.20 0.02 250);           /* near-ink */
-  --surface: oklch(0.965 0.008 90);
-  --surface-2: oklch(0.935 0.01 85);
-
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.20 0.02 250);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.20 0.02 250);
-
-  --primary: oklch(0.58 0.13 200);              /* deeper Aurora Teal for AA on white */
-  --primary-foreground: oklch(0.99 0.005 90);
-  --secondary: oklch(0.94 0.008 250);
-  --secondary-foreground: oklch(0.22 0.02 250);
-
-  --muted: oklch(0.955 0.006 90);
-  --muted-foreground: oklch(0.46 0.018 250);
-
-  --accent: oklch(0.68 0.14 60);                /* deeper Champagne Amber */
-  --accent-foreground: oklch(0.15 0.02 250);
-
-  --destructive: oklch(0.58 0.22 22);
-  --destructive-foreground: oklch(0.99 0.005 90);
-
-  --success: oklch(0.58 0.15 155);
-  --success-foreground: oklch(0.99 0.005 90);
-  --warning: oklch(0.68 0.14 78);
-  --warning-foreground: oklch(0.18 0.02 250);
-  --info: oklch(0.56 0.14 230);
-  --info-foreground: oklch(0.99 0.005 90);
-
-  --border: oklch(0.20 0.02 250 / 10%);
-  --input: oklch(0.20 0.02 250 / 12%);
-  --ring: oklch(0.58 0.13 200);
-
-  --lime: oklch(0.58 0.13 200);
-  --coral: oklch(0.68 0.14 60);
+  /* Back-compat aliases — repoint legacy `lime`/`coral` to the PS palette so
+     every existing `bg-lime`, `text-coral`, `.bg-lime-gradient` re-skins. */
+  --lime: oklch(0.62 0.22 258);
+  --coral: oklch(0.74 0.16 245);
 
   --gradient-hero:
-    radial-gradient(120% 80% at 80% 0%, oklch(0.68 0.14 60 / 0.16), transparent 60%),
-    radial-gradient(100% 80% at 0% 100%, oklch(0.58 0.13 200 / 0.14), transparent 55%),
-    linear-gradient(180deg, oklch(0.99 0.006 90), oklch(0.96 0.008 85));
-  --gradient-primary: linear-gradient(135deg, oklch(0.58 0.13 200), oklch(0.5 0.13 215));
-  --gradient-secondary: linear-gradient(135deg, oklch(0.72 0.14 60), oklch(0.62 0.16 40));
+    radial-gradient(120% 80% at 80% 0%, oklch(0.62 0.22 258 / 0.28), transparent 60%),
+    radial-gradient(100% 80% at 0% 100%, oklch(0.74 0.16 245 / 0.18), transparent 55%),
+    linear-gradient(180deg, oklch(0.14 0.02 260), oklch(0.10 0.015 260));
+  --gradient-primary: linear-gradient(135deg, oklch(0.62 0.22 258), oklch(0.74 0.16 245));
+  --gradient-secondary: linear-gradient(135deg, oklch(0.74 0.16 245), oklch(0.62 0.22 258));
   --gradient-lime: var(--gradient-primary);
   --gradient-coral: var(--gradient-secondary);
 
-  --shadow-glow-primary: 0 10px 30px -12px oklch(0.58 0.13 200 / 0.35);
-  --shadow-glow-secondary: 0 10px 30px -12px oklch(0.68 0.14 60 / 0.3);
+  --shadow-glow-primary: 0 12px 40px -12px oklch(0.62 0.22 258 / 0.65);
+  --shadow-glow-secondary: 0 12px 40px -12px oklch(0.74 0.16 245 / 0.55);
   --shadow-glow-lime: var(--shadow-glow-primary);
   --shadow-glow-coral: var(--shadow-glow-secondary);
+
+  --shadow-card:
+    0 1px 0 0 oklch(1 0 0 / 0.06) inset,
+    0 12px 30px -18px oklch(0 0 0 / 0.7);
 }
-html.light body {
-  background:
-    radial-gradient(60% 40% at 50% -10%, oklch(0.68 0.14 60 / 0.10), transparent 60%),
-    radial-gradient(50% 40% at 100% 100%, oklch(0.58 0.13 200 / 0.08), transparent 60%),
-    var(--background);
-}
-html.light .grid-noise {
-  background-image:
-    linear-gradient(to right, oklch(0.20 0.02 250 / 0.05) 1px, transparent 1px),
-    linear-gradient(to bottom, oklch(0.20 0.02 250 / 0.05) 1px, transparent 1px);
+
+/* Light theme intentionally shadowed to keep the PS aesthetic dark-only in
+   this pass. `html.light` inherits `:root` so any user with an old `light`
+   pref still sees the dark PS-blue palette. */
+html.light {
+  --background: oklch(0.14 0.02 260);
+  --foreground: oklch(0.98 0.005 250);
+  --surface: oklch(0.19 0.025 260);
+  --surface-2: oklch(0.26 0.04 260);
+  --card: oklch(0.19 0.025 260);
+  --card-foreground: oklch(0.98 0.005 250);
+  --popover: oklch(0.19 0.025 260);
+  --popover-foreground: oklch(0.98 0.005 250);
+  --primary: oklch(0.62 0.22 258);
+  --primary-foreground: oklch(0.99 0.005 250);
+  --secondary: oklch(0.26 0.04 260);
+  --secondary-foreground: oklch(0.98 0.005 250);
+  --muted: oklch(0.24 0.03 260);
+  --muted-foreground: oklch(0.70 0.02 255);
+  --accent: oklch(0.74 0.16 245);
+  --accent-foreground: oklch(0.14 0.02 260);
+  --border: oklch(1 0 0 / 8%);
+  --input: oklch(1 0 0 / 10%);
+  --ring: oklch(0.62 0.22 258);
+  --lime: oklch(0.62 0.22 258);
+  --coral: oklch(0.74 0.16 245);
 }
 
 
@@ -176,12 +145,16 @@ html.light .grid-noise {
     font-family: var(--font-sans);
     -webkit-font-smoothing: antialiased;
     background:
-      radial-gradient(60% 40% at 50% -10%, oklch(0.82 0.12 75 / 0.14), transparent 60%),
-      radial-gradient(50% 40% at 100% 100%, oklch(0.78 0.14 195 / 0.10), transparent 60%),
+      radial-gradient(65% 45% at 50% -10%, oklch(0.62 0.22 258 / 0.22), transparent 60%),
+      radial-gradient(55% 45% at 100% 110%, oklch(0.74 0.16 245 / 0.14), transparent 60%),
       var(--background);
     min-height: 100dvh;
   }
-  h1, h2, h3, h4, .font-display { font-family: var(--font-display); letter-spacing: -0.02em; }
+  h1, h2, h3, h4, .font-display {
+    font-family: var(--font-display);
+    letter-spacing: -0.02em;
+    font-weight: 700;
+  }
 }
 
 @layer utilities {
@@ -197,6 +170,13 @@ html.light .grid-noise {
   .text-lime { color: var(--lime); }
   .text-coral { color: var(--coral); }
   .ring-lime { --tw-ring-color: var(--lime); }
+  .shadow-card { box-shadow: var(--shadow-card); }
+  .ps-card {
+    background-color: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow-card);
+  }
   .grid-noise {
     background-image:
       linear-gradient(to right, oklch(1 0 0 / 0.04) 1px, transparent 1px),
@@ -207,8 +187,7 @@ html.light .grid-noise {
   .scrollbar-hide { scrollbar-width: none; }
 }
 
-/* Debug mode — highlight SSR vs client render boundaries.
- * Toggle via the bug button (bottom-right) or localStorage `openrun:debug-mode`. */
+/* Debug mode — highlight SSR vs client render boundaries. */
 html[data-debug="1"] [data-render="client-only"] {
   outline: 2px dashed oklch(0.78 0.18 145);
   outline-offset: 2px;
