@@ -302,6 +302,55 @@ function GameDetail() {
     // eslint-disable-next-line
   }, [game?.id, hostsThisGame]);
 
+  // Realtime: live approval updates for my own join_request on this game.
+  useEffect(() => {
+    if (!game?.id || !user?.id) return;
+    const channel = supabase
+      .channel(`join_requests:me:${game.id}:${user.id}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "join_requests",
+          filter: `player_id=eq.${user.id}`,
+        },
+        (payload) => {
+          const row = (payload.new ?? payload.old) as { game_id?: string } | null;
+          if (row?.game_id === game.id) refreshStatus();
+        },
+      )
+      .subscribe();
+    return () => {
+      supabase.removeChannel(channel);
+    };
+    // eslint-disable-next-line
+  }, [game?.id, user?.id]);
+
+  // Realtime: live changes to the game's payment settings (fee, approval toggle, accepted methods).
+  useEffect(() => {
+    if (!game?.id) return;
+    const channel = supabase
+      .channel(`game_payment_settings:${game.id}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "game_payment_settings",
+          filter: `game_id=eq.${game.id}`,
+        },
+        () => {
+          refreshStatus();
+        },
+      )
+      .subscribe();
+    return () => {
+      supabase.removeChannel(channel);
+    };
+    // eslint-disable-next-line
+  }, [game?.id]);
+
   // Realtime: when the host verifies/updates my payment submission for this
   // game, re-run refreshStatus so the auto-join effect can add me to the
   // roster (game_participants) as soon as the fee is verified.
