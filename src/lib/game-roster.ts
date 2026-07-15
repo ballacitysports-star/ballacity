@@ -154,5 +154,10 @@ export function useLiveParticipants(gameId: string | undefined): {
     await reloadRef.current();
   }, []);
 
-  return { participants, loading, refetch };
+  const removeLocal = useCallback((userId: string) => {
+    setParticipants((prev) => prev.filter((p) => p.userId !== userId));
+  }, []);
+
+  return { participants, loading, refetch, removeLocal };
 }
+
