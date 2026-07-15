@@ -1082,6 +1082,20 @@ export type Database = {
         Args: { check_env?: string; user_uuid: string }
         Returns: number
       }
+      get_game_host_payment_methods: {
+        Args: { _game_id: string; _host_id: string }
+        Returns: {
+          contact_info: string
+          host_id: string
+          id: string
+          instructions: string
+          is_enabled: boolean
+          label: string
+          payment_type: string
+          payment_url: string
+          username: string
+        }[]
+      }
       get_game_payment_options: {
         Args: { _game_id: string }
         Returns: {
