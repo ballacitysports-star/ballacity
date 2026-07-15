@@ -181,6 +181,7 @@ function GameDetail() {
   const [messaging, setMessaging] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
   const [requesting, setRequesting] = useState(false);
+  const [processing, setProcessing] = useState(false);
   const [positionRosterOpen, setPositionRosterOpen] = useState(false);
 
   // effectiveJoined is computed below, after settings/myReq/isHost resolve.
