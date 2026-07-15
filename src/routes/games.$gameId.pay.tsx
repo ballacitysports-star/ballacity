@@ -1231,19 +1231,19 @@ function PaymentInstructionsAndProof({
             </p>
           )}
         </div>
-        <button
+        <PrimaryCTA
           type="button"
           onClick={() => void submitProof()}
           disabled={uploadState === "uploading"}
-          className="w-full rounded-xl bg-lime-gradient py-3 text-sm font-bold text-primary-foreground inline-flex items-center justify-center gap-2 disabled:opacity-50"
+          loading={submitting || uploadState === "uploading"}
+          icon={<ShieldCheck className="h-4 w-4" />}
         >
-          <ShieldCheck className="h-4 w-4" />{" "}
           {submitting
             ? "Submitting…"
             : uploadState === "uploading"
               ? "Uploading proof…"
               : "I have paid"}
-        </button>
+        </PrimaryCTA>
       </form>
     </div>
   );
