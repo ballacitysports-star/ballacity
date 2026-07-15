@@ -3053,12 +3053,78 @@ function RosterPlayerRow({
               <Check className="h-3 w-3" /> Mark as paid
             </button>
           )}
+          <button
+            type="button"
+            onClick={toggleHistory}
+            className="inline-flex items-center gap-1 rounded-full border border-border bg-background px-2.5 py-1 text-[11px] font-semibold hover:bg-secondary"
+            aria-expanded={historyOpen}
+          >
+            <History className="h-3 w-3" /> {historyOpen ? "Hide history" : "History"}
+          </button>
         </div>
       )}
-
+      {feeRequired && historyOpen && (
+        <div className="mt-2 rounded-xl border border-border bg-background/60 p-2.5">
+          <div className="mb-1.5 text-[11px] font-bold uppercase tracking-wide text-muted-foreground">
+            Verification history
+          </div>
+          {historyLoading ? (
+            <div className="text-[11px] text-muted-foreground">Loading…</div>
+          ) : history.length === 0 ? (
+            <div className="text-[11px] text-muted-foreground">No activity yet.</div>
+          ) : (
+            <ul className="space-y-1.5">
+              {history.map((ev) => {
+                const when = new Date(ev.created_at).toLocaleString("en-US", {
+                  month: "short",
+                  day: "numeric",
+                  hour: "numeric",
+                  minute: "2-digit",
+                });
+                const change =
+                  ev.from_status && ev.to_status
+                    ? `${ev.from_status} → ${ev.to_status}`
+                    : ev.to_status ?? ev.action;
+                const label =
+                  ev.action === "submitted"
+                    ? "Player submitted payment"
+                    : ev.action === "created_verified"
+                      ? "Host marked as paid"
+                      : ev.action === "created_rejected"
+                        ? "Marked rejected"
+                        : ev.action === "verified"
+                          ? "Payment verified"
+                          : ev.action === "rejected"
+                            ? "Payment rejected"
+                            : ev.action === "reopened"
+                              ? "Marked unpaid"
+                              : "Updated";
+                return (
+                  <li
+                    key={ev.id}
+                    className="rounded-lg border border-border/60 bg-surface px-2 py-1.5 text-[11px]"
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="font-semibold">{label}</span>
+                      <span className="text-muted-foreground">{when}</span>
+                    </div>
+                    <div className="text-muted-foreground">
+                      by {ev.actor_name} · {change}
+                    </div>
+                    {ev.notes && (
+                      <div className="mt-0.5 italic text-muted-foreground">“{ev.notes}”</div>
+                    )}
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </div>
+      )}
     </div>
   );
 }
+
 
 function HostRequestRow({
   req,
