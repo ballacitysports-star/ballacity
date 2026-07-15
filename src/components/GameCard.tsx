@@ -2,6 +2,7 @@ import { Link, useNavigate } from "@tanstack/react-router";
 import { motion } from "framer-motion";
 import { MapPin, Users, Clock, Zap, Lock, Flame, MessageCircle, Check, CreditCard } from "lucide-react";
 import { UserAvatar } from "@/components/UserAvatar";
+import { SpotsPill } from "@/components/SpotsPill";
 import type { Game } from "@/lib/sample-data";
 import { formatWhen } from "@/lib/format";
 import { joinGame, useIsJoined } from "@/lib/games-store";
@@ -249,8 +250,8 @@ export function GameCard({ game, index = 0 }: { game: Game; index?: number }) {
                 <span className="text-foreground">
                   {joinedCount}/{game.maxPlayers}
                 </span>
-                {spotsLeft > 0 && spotsLeft <= 3 && (
-                  <span className="text-coral">· {spotsLeft} left</span>
+                {spotsLeft < game.maxPlayers && spotsLeft <= Math.max(3, Math.ceil(game.maxPlayers * 0.2)) && (
+                  <SpotsPill spotsLeft={spotsLeft} maxPlayers={game.maxPlayers} />
                 )}
               </div>
             </div>
