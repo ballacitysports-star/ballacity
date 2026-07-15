@@ -169,7 +169,7 @@ function GameDetail() {
   );
   const joined = useIsJoined(gameId);
   const liveParticipantCount = useLiveParticipantCount(gameId);
-  const { participants: liveRoster, refetch: refetchRoster } = useLiveParticipants(gameId);
+  const { participants: liveRoster, refetch: refetchRoster, removeLocal: removeRosterLocal } = useLiveParticipants(gameId);
   const { entries: waitlistEntries } = useGameWaitlist(gameId);
   const nav = useNavigate();
   const { user } = useAuth();
@@ -226,6 +226,26 @@ function GameDetail() {
       const all = await listHostJoinRequests();
       setHostRequests(all.filter((r) => r.game_id === game.id));
     } catch {}
+  };
+
+  // Optimistically flip a host-side join_request row's status. Returns an
+  // undo function the caller runs on server error so the UI reverts to the
+  // pre-tap state. Realtime `join_requests:host:*` events reconcile with
+  // authoritative rows on success; we don't need a manual refetch.
+  const applyOptimisticReview = (
+    reqId: string,
+    status: "approved" | "rejected",
+  ): (() => void) => {
+    let snapshot: JoinRequest[] = [];
+    setHostRequests((prev) => {
+      snapshot = prev;
+      return prev.map((r) =>
+        r.id === reqId
+          ? { ...r, status, reviewed_at: new Date().toISOString() }
+          : r,
+      );
+    });
+    return () => setHostRequests(snapshot);
   };
 
   const toggleRequireApproval = async () => {
@@ -596,16 +616,28 @@ function GameDetail() {
     }
     // Confirmed → leave / withdraw
     if (isConfirmed || joined) {
+      // Snapshot for rollback on server error.
+      const prevReq = myReq;
+      const prevSubs = mySubs;
+      const wasJoined = joined;
+      // Optimistic: flip UI immediately.
+      setMyReq(null);
+      setMySubs((subs) =>
+        subs.filter(
+          (s) => !(s.status !== "verified" && s.status !== "rejected"),
+        ),
+      );
+      leaveGame(game.id);
+      if (user) removeRosterLocal(user.id);
       try {
         if (latestSub && latestSub.status !== "rejected" && latestSub.status !== "verified") {
           await deleteMyPendingSubmission(latestSub.id).catch(() => {});
         }
-        if (myReq?.status === "pending") {
+        if (prevReq?.status === "pending") {
           await cancelMyJoinRequest(game.id).catch(() => {});
-        } else if (myReq?.status === "approved") {
+        } else if (prevReq?.status === "approved") {
           await withdrawMyApprovedJoinRequest(game.id).catch(() => {});
         }
-        leaveGame(game.id);
         toast("You left the game.");
         // Notify host in real time that a player left.
         if (gameHostId && user && gameHostId !== user.id) {
@@ -618,20 +650,30 @@ function GameDetail() {
             link: `/games/${game.id}`,
           }).catch(() => {});
         }
-        refreshStatus();
       } catch (e: any) {
+        // Rollback optimistic state.
+        setMyReq(prevReq);
+        setMySubs(prevSubs);
+        if (wasJoined) joinGame(game.id);
+        void refetchRoster();
         toast.error(e.message ?? "Could not leave.");
       }
       return;
     }
     // Pending → cancel request / withdraw submission
     if (isPending) {
+      const prevReq = myReq;
+      const prevSubs = mySubs;
+      // Optimistic clear.
+      if (myReq?.status === "pending") setMyReq(null);
+      setMySubs((subs) => subs.filter((s) => s.status !== "pending"));
       try {
         if (latestSub?.status === "pending") await deleteMyPendingSubmission(latestSub.id);
-        if (myReq?.status === "pending") await cancelMyJoinRequest(game.id);
+        if (prevReq?.status === "pending") await cancelMyJoinRequest(game.id);
         toast("Request canceled.");
-        refreshStatus();
       } catch (e: any) {
+        setMyReq(prevReq);
+        setMySubs(prevSubs);
         toast.error(e.message ?? "Could not cancel.");
       }
       return;
@@ -667,9 +709,25 @@ function GameDetail() {
         return;
       }
       setRequesting(true);
+      // Optimistic: flip CTA to "Request pending" immediately using a
+      // synthetic row. Realtime `join_requests:me:*` reconciles with the
+      // authoritative row on success; on server error we roll back.
+      const prevReq = myReq;
+      const optimistic: JoinRequest = {
+        id: `optimistic:${crypto.randomUUID()}`,
+        game_id: game.id,
+        player_id: user?.id ?? "",
+        host_id: settings.host_id,
+        status: "pending",
+        message: null,
+        reviewer_notes: null,
+        created_at: new Date().toISOString(),
+        reviewed_at: null,
+      };
+      setMyReq(optimistic);
       try {
         const created = await createJoinRequest({ game_id: game.id, host_id: settings.host_id });
-        // Optimistic: flip CTA to "Request pending" immediately.
+        // Swap synthetic row for the authoritative one.
         setMyReq(created);
         // Fire notification off the critical path — failure must not stall the UI.
         void createNotification({
@@ -680,8 +738,8 @@ function GameDetail() {
           link: `/games/${game.id}`,
         }).catch(() => {});
         toast.success("Request sent. The host will review it.");
-        await refreshStatus();
       } catch (e: any) {
+        setMyReq(prevReq);
         toast.error(e.message ?? "Could not send request.");
       } finally {
         setRequesting(false);
@@ -1402,12 +1460,10 @@ function GameDetail() {
                     key={`pending-${p.req.id}`}
                     req={p.req}
                     gameTitle={game.title}
-                    onChange={() => {
-                      refreshHostRequests();
-                      refreshStatus();
-                    }}
+                    onOptimistic={applyOptimisticReview}
                     index={i}
                   />
+
                 );
               }
               const isRealPlayer =
@@ -1620,8 +1676,9 @@ function GameDetail() {
                     key={r.id}
                     req={r}
                     gameTitle={game.title}
-                    onChange={refreshHostRequests}
+                    onOptimistic={applyOptimisticReview}
                   />
+
                 ))}
               </div>
             </div>
@@ -1662,8 +1719,9 @@ function GameDetail() {
                             req={r}
                             gameTitle={game.title}
                             feeRequired={isPaid}
-                            onChange={refreshHostRequests}
+                            onOptimistic={applyOptimisticReview}
                           />
+
                         ))}
                         {rosterFromLive.map((p) => (
                           <Link
@@ -2592,12 +2650,12 @@ function RosterPlayerRow({
   req,
   gameTitle,
   feeRequired,
-  onChange,
+  onOptimistic,
 }: {
   req: JoinRequest;
   gameTitle: string;
   feeRequired: boolean;
-  onChange: () => void;
+  onOptimistic: (reqId: string, status: "approved" | "rejected") => () => void;
 }) {
   const [busy, setBusy] = useState(false);
   const [name, setName] = useState<string>("Player");
@@ -2670,6 +2728,7 @@ function RosterPlayerRow({
   const remove = async () => {
     if (!confirm(`Remove ${name} from ${gameTitle}?`)) return;
     setBusy(true);
+    const rollback = onOptimistic(req.id, "rejected");
     try {
       await reviewJoinRequest(req.id, "rejected", "Removed by host");
       await createNotification({
@@ -2680,8 +2739,8 @@ function RosterPlayerRow({
         link: `/games/${req.game_id}`,
       });
       toast.success(`${name} removed.`);
-      onChange();
     } catch (e: any) {
+      rollback();
       toast.error(e.message ?? "Could not remove.");
     } finally {
       setBusy(false);
@@ -2691,6 +2750,7 @@ function RosterPlayerRow({
   const removeAndBlock = async () => {
     if (!confirm(`Block ${name}? They won't be able to join your future games.`)) return;
     setBusy(true);
+    const rollback = onOptimistic(req.id, "rejected");
     try {
       await reviewJoinRequest(req.id, "rejected", "Blocked by host");
       blockUser(req.host_id, req.player_id);
@@ -2702,13 +2762,14 @@ function RosterPlayerRow({
         link: `/games/${req.game_id}`,
       });
       toast.success(`${name} blocked.`);
-      onChange();
     } catch (e: any) {
+      rollback();
       toast.error(e.message ?? "Could not block.");
     } finally {
       setBusy(false);
     }
   };
+
 
   const fmt = (n: number) => (n > 0 ? n.toFixed(1) : "—");
   const paymentChip = !feeRequired
@@ -2786,11 +2847,11 @@ function RosterPlayerRow({
 function HostRequestRow({
   req,
   gameTitle,
-  onChange,
+  onOptimistic,
 }: {
   req: JoinRequest;
   gameTitle: string;
-  onChange: () => void;
+  onOptimistic: (reqId: string, status: "approved" | "rejected") => () => void;
 }) {
   const [busy, setBusy] = useState(false);
   const [name, setName] = useState<string>("Player");
@@ -2807,6 +2868,7 @@ function HostRequestRow({
 
   const act = async (status: "approved" | "rejected") => {
     setBusy(true);
+    const rollback = onOptimistic(req.id, status);
     try {
       await reviewJoinRequest(req.id, status);
       await createNotification({
@@ -2820,13 +2882,14 @@ function HostRequestRow({
         link: `/games/${req.game_id}`,
       });
       toast.success(status === "approved" ? "Approved" : "Declined");
-      onChange();
     } catch (e: any) {
+      rollback();
       toast.error(e.message);
     } finally {
       setBusy(false);
     }
   };
+
 
   return (
     <div
@@ -2895,12 +2958,12 @@ function HostRequestRow({
 function HostPendingChip({
   req,
   gameTitle,
-  onChange,
+  onOptimistic,
   index,
 }: {
   req: JoinRequest;
   gameTitle: string;
-  onChange: () => void;
+  onOptimistic: (reqId: string, status: "approved" | "rejected") => () => void;
   index: number;
 }) {
   const [open, setOpen] = useState(false);
@@ -2924,6 +2987,8 @@ function HostPendingChip({
 
   const act = async (status: "approved" | "rejected") => {
     setBusy(true);
+    const rollback = onOptimistic(req.id, status);
+    setOpen(false);
     try {
       await reviewJoinRequest(req.id, status);
       await createNotification({
@@ -2937,14 +3002,14 @@ function HostPendingChip({
         link: `/games/${req.game_id}`,
       });
       toast.success(status === "approved" ? `Approved ${name}` : `Declined ${name}`);
-      setOpen(false);
-      onChange();
     } catch (e: any) {
+      rollback();
       toast.error(e.message);
     } finally {
       setBusy(false);
     }
   };
+
 
   return (
     <div className="relative">
