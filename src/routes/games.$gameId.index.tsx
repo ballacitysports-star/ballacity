@@ -159,6 +159,15 @@ export const Route = createFileRoute("/games/$gameId/")({
   component: GameDetail,
 });
 
+function formatCooldownLabel(ms: number): string {
+  const secs = Math.max(1, Math.ceil(ms / 1000));
+  if (secs < 60) return `${secs}s`;
+  const m = Math.floor(secs / 60);
+  const s = secs % 60;
+  return s ? `${m}m ${s}s` : `${m}m`;
+}
+
+
 function GameDetail() {
   const { gameId } = Route.useLoaderData();
   const { invite: isInvite, from: inviteFrom, exp: inviteExp, expInvalid } = Route.useSearch();
