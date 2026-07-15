@@ -69,6 +69,7 @@ export function useLiveParticipants(gameId: string | undefined): {
   participants: LiveParticipant[];
   loading: boolean;
   refetch: () => Promise<void>;
+  removeLocal: (userId: string) => void;
 } {
   const reloadRef = useRef<() => Promise<void>>(async () => {});
   const [participants, setParticipants] = useState<LiveParticipant[]>([]);
