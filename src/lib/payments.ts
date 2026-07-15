@@ -311,23 +311,27 @@ export async function createJoinRequest(input: {
 
   const idempotency_key = input.idempotency_key ?? `join:${input.game_id}`;
 
-  const { data, error } = await supabase
-    .from("join_requests")
-    .insert({
-      game_id: input.game_id,
-      host_id: input.host_id,
-      player_id: u.user.id,
-      message: input.message ?? null,
-      idempotency_key,
-    })
-    .select("*")
-    .single();
+  const attemptInsert = async () =>
+    supabase
+      .from("join_requests")
+      .insert({
+        game_id: input.game_id,
+        host_id: input.host_id,
+        player_id: u.user!.id,
+        message: input.message ?? null,
+        idempotency_key,
+      })
+      .select("*")
+      .single();
 
+  const { data, error } = await attemptInsert();
   if (!error && data) return data as JoinRequest;
 
   // 23505 = unique_violation. Either (player_id, idempotency_key) or the
-  // (game_id, player_id) constraint fired — both mean "already submitted".
-  // Return the existing row so callers see a successful idempotent result.
+  // (game_id, player_id) constraint fired. If the existing row is 'rejected',
+  // the host previously declined — clear it so the player can resubmit.
+  // Otherwise (pending/approved) return the existing row so callers see a
+  // successful idempotent result.
   if (error && (error as { code?: string }).code === "23505") {
     const { data: existing, error: readErr } = await supabase
       .from("join_requests")
@@ -338,11 +342,26 @@ export async function createJoinRequest(input: {
       .limit(1)
       .maybeSingle();
     if (readErr) throw readErr;
-    if (existing) return existing as JoinRequest;
+    if (existing) {
+      if ((existing as JoinRequest).status === "rejected") {
+        // Delete the declined row (RLS allows player to delete own rejected
+        // rows) and retry the insert as a fresh pending request.
+        const { error: delErr } = await supabase
+          .from("join_requests")
+          .delete()
+          .eq("id", (existing as JoinRequest).id);
+        if (delErr) throw delErr;
+        const retry = await attemptInsert();
+        if (!retry.error && retry.data) return retry.data as JoinRequest;
+        throw retry.error;
+      }
+      return existing as JoinRequest;
+    }
   }
 
   throw error;
 }
+
 
 export async function cancelMyJoinRequest(gameId: string) {
   const { data: u } = await supabase.auth.getUser();

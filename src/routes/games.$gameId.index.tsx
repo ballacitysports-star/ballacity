@@ -872,8 +872,8 @@ function GameDetail() {
                   ? "Your spot isn't held until the host approves. You'll get a notification when they respond."
                   : myReq.status === "approved"
                     ? "The host approved your request. You're on the roster."
-                    : myReq.reviewer_notes ||
-                      "The host declined this request. You can message them or find another run."}
+                    : `${myReq.reviewer_notes ? `${myReq.reviewer_notes} · ` : ""}You can send another request or message the host.`}
+
               </p>
             </div>
           </div>
