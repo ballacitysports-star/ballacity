@@ -1631,7 +1631,7 @@ function GameDetail() {
           </button>
           {!isHost && (() => {
             const canJoinAction = joined || isPending || isConfirmed || spotsLeft > 0;
-            const buttonDisabled = requesting || !canJoinAction;
+            const buttonDisabled = requesting || processing || !canJoinAction;
             const hasPaymentAttempt = latestSub?.status === "pending" || latestSub?.status === "rejected";
             const canEnterPaymentFlow = spotsLeft > 0 || joined || hasPaymentAttempt || isApproved;
             const paymentAction = isPaid && !paymentCleared && approvalCleared && canEnterPaymentFlow;
