@@ -224,14 +224,22 @@ function GameDetail() {
   const hostRep = useMemo(() => computeReputation(hostReviews, "host"), [hostReviews]);
   const canReviewHost = useCanReview(hostIdFor(game?.host.username ?? ""));
 
+  // Guards refreshStatus while a leave flow is tearing down local + server
+  // state. Realtime DELETE events for join_requests / payment_submissions
+  // fire during the teardown and would otherwise refetch the (still-
+  // committing) rows and re-hydrate the "Payment verified" strip.
+  const leavingRef = useRef(false);
+
   const refreshStatus = async () => {
     if (!game) return;
+    if (leavingRef.current) return;
     try {
       const [s, subs, req] = await Promise.all([
         getGamePaymentSettings(game.id),
         listMySubmissionsForGame(game.id),
         getMyJoinRequest(game.id),
       ]);
+      if (leavingRef.current) return;
       setSettings(s);
       setMySubs(subs);
       setMyReq(req);
@@ -548,14 +556,15 @@ function GameDetail() {
       // request/submission state — including verified subs — so the sticky
       // CTA immediately collapses `isConfirmed` back to false and re-enables
       // "Request to join" / "Pay to join" without waiting for a refetch.
+      leavingRef.current = true;
       setMyReq(null);
       setMySubs([]);
       leaveGame(game.id);
       if (user) removeRosterLocal(user.id);
       try {
         // Delete every open/verified submission the viewer had for this game
-        // so the host's "pending approval" list clears and the viewer can
-        // resubmit a fresh payment on re-join.
+        // FIRST so the host's "pending approval" list clears and any realtime
+        // refetch that lands after this step no longer sees a verified row.
         const clearableSubs = prevSubs.filter((s) => s.status !== "rejected");
         await Promise.all(
           clearableSubs.map((s) => deleteMyPendingSubmission(s.id).catch(() => {})),
@@ -564,6 +573,16 @@ function GameDetail() {
           await cancelMyJoinRequest(game.id).catch(() => {});
         } else if (prevReq?.status === "approved") {
           await withdrawMyApprovedJoinRequest(game.id).catch(() => {});
+        }
+        // Also ensure the participant row is gone server-side before we drop
+        // the guard, so the reconcile refetch sees a fully torn-down state.
+        if (user) {
+          await supabase
+            .from("game_participants")
+            .delete()
+            .eq("game_id", game.id)
+            .eq("user_id", user.id)
+            .then(() => undefined, () => undefined);
         }
         toast("You left the game.");
         // Notify host in real time that a player left.
@@ -582,8 +601,12 @@ function GameDetail() {
         setMyReq(prevReq);
         setMySubs(prevSubs);
         if (wasJoined) joinGame(game.id);
-        void refetchRoster();
         toast.error(e.message ?? "Could not leave.");
+      } finally {
+        leavingRef.current = false;
+        // Single reconcile pass now that all deletes have committed.
+        void refreshStatus();
+        void refetchRoster();
       }
       return;
     }

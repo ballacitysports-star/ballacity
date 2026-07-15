@@ -1,37 +1,28 @@
-## Goal
-Prevent spam/accidental rapid resubmits of join requests after a host rejection, and notify the host when a player resubmits.
+## Problem
 
-## Rules
-- **Cooldown**: 15 minutes after the most recent rejection on a given `(player_id, game_id)`.
-- **Attempt cap**: max 3 total submissions per `(player_id, game_id)` (initial + up to 2 resubmits).
-- **Host notification**: on a successful resubmit, notify the host with a minimal "player resubmitted, pending review" message.
+After a viewer taps "Leave" on a game they've already paid for, the "Your status · Payment verified — you're on the roster" strip briefly disappears and then reappears without a refresh.
 
-## Database (migration)
-Add to `join_requests`:
-- `attempt_count INT NOT NULL DEFAULT 1` — total submissions for this player+game.
-- `last_rejected_at TIMESTAMPTZ` — set by trigger whenever a row transitions to `status = 'rejected'`.
+Root cause: the leave handler does the right thing optimistically (`setMySubs([])`, then deletes each submission + the join request in a `Promise.all`), but the realtime channels wired up in `useGameRealtimeChannels` fire during the delete sequence:
 
-Trigger: `BEFORE UPDATE` on `join_requests` — when `OLD.status <> 'rejected' AND NEW.status = 'rejected'`, set `NEW.last_rejected_at = now()`.
+- `join_requests` DELETE → `onMyJoinRequestChange` → `refreshStatus()`
+- `payment_submissions` DELETE → `onMyPaymentChange` → `refreshStatus()`
 
-RLS: keep existing DELETE policy (`pending`/`rejected` by owner). No new policies needed — attempt cap & cooldown are enforced server-side via a validation trigger to prevent client bypass.
+`refreshStatus()` re-reads `listMySubmissionsForGame` from the DB. If a `join_requests` DELETE lands before every `payment_submissions` DELETE has committed, the refetch returns the still-verified submission, overwrites the optimistic `setMySubs([])`, and the "Payment verified — you're on the roster" strip re-renders.
 
-Trigger: `BEFORE INSERT` on `join_requests` — when a prior row exists for the same `(player_id, game_id)` that will be superseded:
-- If prior `attempt_count >= 3` → `RAISE EXCEPTION 'Maximum resubmission attempts reached for this game.'`.
-- If prior `status = 'rejected'` AND `last_rejected_at > now() - interval '15 minutes'` → `RAISE EXCEPTION 'Please wait before resubmitting.' USING ERRCODE = 'P0001'` and include remaining seconds in the message.
-- Set `NEW.attempt_count = prior.attempt_count + 1`.
+## Fix
 
-## Client (`src/lib/payments.ts`)
-Update `createJoinRequest` resubmit path:
-1. Before deleting the prior rejected row, check `last_rejected_at` and `attempt_count`; if cooldown active or cap hit, return a typed result `{ blocked: true, reason: 'cooldown' | 'cap', retryAfterSeconds?: number }` instead of retrying.
-2. On successful resubmit insert, call a new server function `notifyHostOfResubmit({ gameId, hostId, playerId })` that inserts a notification for the host via `createNotification` with body `"A player resubmitted a join request — pending your review."` and a link back to the game.
+Serialize refetches out of the leave flow so nothing rehydrates `mySubs` / `myReq` until every server-side clear has committed.
 
-## UI (`src/routes/games.$gameId.index.tsx`)
-- Declined banner: show remaining cooldown ("You can resubmit in Xm Ys") and disable the resubmit CTA until it elapses; when `attempt_count >= 3`, replace CTA with "You've reached the resubmit limit for this game — message the host."
-- Toast on cooldown/cap errors returned from `createJoinRequest`.
+1. In `src/routes/games.$gameId.index.tsx`, add a `leavingRef = useRef(false)` and guard `refreshStatus()` (early-return while `leavingRef.current` is true). Do the same for the realtime handler paths that call `refreshStatus` (`onMyJoinRequestChange`, `onMyPaymentChange`).
+2. In the leave branch of `executeJoinAction`:
+   - Set `leavingRef.current = true` before any delete.
+   - Await the payment-submission deletes FIRST, then the join-request cancel/withdraw, then the `leaveGame` DB write (turn the current fire-and-forget `leaveGame` into an awaited variant — either `await`-friendly helper or inline the delete).
+   - In a `finally`, clear `leavingRef.current = false` and call `refreshStatus()` + `refetchRoster()` once to reconcile.
+3. On error rollback, still restore `myReq` / `mySubs` and re-run `refreshStatus()` after clearing the guard.
 
-## Test updates
-- `src/lib/game-realtime.test.tsx` unaffected.
-- Update existing join-request tests / add unit tests for `createJoinRequest` covering: cooldown block, cap block, successful resubmit increments attempt count, host notification fires on resubmit.
+No schema changes — the RLS delete policy added earlier is already in place and working.
 
-## Notes
-The backend has no standard rate-limiting primitive, so this is an ad-hoc limit enforced by DB triggers + client checks (per your confirmation). No new tables needed.
+## Verification
+
+- Manual: on a game requiring approval + payment, join → pay → get verified → Leave. The status strip should disappear and stay gone, and the sticky CTA should immediately flip back to "Request to join" / "Pay to join".
+- Existing e2e (`join-realtime-cross-views.spec.ts`, `pay-*` specs) should still pass.
