@@ -420,6 +420,8 @@ function GameDetail() {
   const effectiveJoined = baseJoined + viewerDelta;
   const spotsLeft = Math.max(0, game.maxPlayers - effectiveJoined);
 
+  const [confirmAction, setConfirmAction] = useState<"join" | "leave" | null>(null);
+
   const handleJoin = async (preselectedPosition?: string) => {
     // Expired invite → block all join actions and steer to discovery.
     if (inviteExpired && !isHost && !viewerCountsAsJoined && !viewerPending) {
