@@ -1089,20 +1089,35 @@ export type Database = {
           settings: Json
         }[]
       }
-      get_host_payment_methods: {
-        Args: { _host_id: string }
-        Returns: {
-          contact_info: string
-          host_id: string
-          id: string
-          instructions: string
-          is_enabled: boolean
-          label: string
-          payment_type: string
-          payment_url: string
-          username: string
-        }[]
-      }
+      get_host_payment_methods:
+        | {
+            Args: { _host_id: string }
+            Returns: {
+              contact_info: string
+              host_id: string
+              id: string
+              instructions: string
+              is_enabled: boolean
+              label: string
+              payment_type: string
+              payment_url: string
+              username: string
+            }[]
+          }
+        | {
+            Args: { _game_id: string; _host_id: string }
+            Returns: {
+              contact_info: string
+              host_id: string
+              id: string
+              instructions: string
+              is_enabled: boolean
+              label: string
+              payment_type: string
+              payment_url: string
+              username: string
+            }[]
+          }
       has_active_subscription: {
         Args: { check_env?: string; user_uuid: string }
         Returns: boolean
