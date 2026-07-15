@@ -164,19 +164,31 @@ export function joinGame(id: string, position?: string) {
 
 export function leaveGame(id: string) {
   loadJoinedGames();
-  if (!joined.has(id)) return;
-  joined.delete(id);
-  saveJoinedGames();
-  emit();
+  // Clear local optimistic state (may be a no-op for confirmed players who
+  // got onto the roster server-side via approval/payment auto-join).
+  const wasJoined = joined.has(id);
+  if (wasJoined) {
+    joined.delete(id);
+    saveJoinedGames();
+    emit();
+  }
+  // Always attempt the DB delete — confirmed players are on the roster
+  // even when the local set never tracked them.
   void (async () => {
     const { data } = await supabase.auth.getUser();
     const uid = data.user?.id;
     if (!uid) return;
-    await supabase
+    const { error } = await supabase
       .from("game_participants")
       .delete()
       .eq("game_id", id)
       .eq("user_id", uid);
+    if (error && wasJoined) {
+      // Roll back optimistic local removal on real failure.
+      joined.add(id);
+      saveJoinedGames();
+      emit();
+    }
   })();
 }
 

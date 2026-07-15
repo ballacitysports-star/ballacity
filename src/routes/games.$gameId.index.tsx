@@ -52,6 +52,7 @@ import {
   getMyJoinRequest,
   createJoinRequest,
   cancelMyJoinRequest,
+  withdrawMyApprovedJoinRequest,
   listHostJoinRequests,
   reviewJoinRequest,
   upsertGamePaymentSettings,
@@ -442,11 +443,13 @@ function GameDetail() {
     // Confirmed → leave / withdraw
     if (isConfirmed || joined) {
       try {
-        if (latestSub && latestSub.status !== "rejected") {
+        if (latestSub && latestSub.status !== "rejected" && latestSub.status !== "verified") {
           await deleteMyPendingSubmission(latestSub.id).catch(() => {});
         }
-        if (myReq && myReq.status === "pending") {
+        if (myReq?.status === "pending") {
           await cancelMyJoinRequest(game.id).catch(() => {});
+        } else if (myReq?.status === "approved") {
+          await withdrawMyApprovedJoinRequest(game.id).catch(() => {});
         }
         leaveGame(game.id);
         toast("You left the game.");
