@@ -2985,11 +2985,16 @@ function HostPendingChip({
             <div className="flex gap-1.5">
               <button
                 disabled={busy}
-                onClick={() => act("rejected")}
+                onClick={() => {
+                  const reason = promptRejection();
+                  if (reason === null) return;
+                  void act("rejected", reason || null);
+                }}
                 className="flex-1 inline-flex items-center justify-center gap-1 rounded-xl border border-coral/40 text-coral py-1.5 text-xs font-semibold disabled:opacity-50"
               >
                 <XIcon className="h-3.5 w-3.5" /> Decline
               </button>
+
               <button
                 disabled={busy}
                 onClick={() => act("approved")}
