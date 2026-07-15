@@ -426,83 +426,75 @@ function PayPage() {
   const isApproved = myReq?.status === "approved";
   const approvalGateActive = requiresApproval && !isApproved;
 
+  const hasSubmission = mySubs.length > 0;
+  const currentStep: "pay" | "confirm" = picked ? "confirm" : "pay";
+  const showStepper =
+    !hasSubmission &&
+    !approvalGateActive &&
+    !fetching &&
+    !fetchTimedOut &&
+    !!settings &&
+    methods.length > 0;
+
   return (
-    <div className="mx-auto max-w-md px-4 pt-6 pb-32">
-      <div className="flex items-center gap-3 mb-4">
+    <div className="mx-auto max-w-md px-4 pt-6 pb-32 space-y-4">
+      {/* Header */}
+      <div className="flex items-center gap-3">
         <Link
           to="/games/$gameId"
           params={{ gameId: game.id }}
           className="grid h-10 w-10 place-items-center rounded-full border border-border bg-surface"
+          aria-label="Back to game"
         >
           <ArrowLeft className="h-5 w-5" />
         </Link>
-        <div>
-          <h1 className="font-display text-xl font-bold leading-tight">{game.title}</h1>
-          <div className="text-xs text-muted-foreground">{game.location}</div>
+        <div className="min-w-0">
+          <h1 className="font-display text-xl font-bold leading-tight truncate">{game.title}</h1>
+          <div className="text-xs text-muted-foreground truncate">{game.location}</div>
         </div>
       </div>
 
-      <div className="rounded-3xl border border-lime/30 bg-lime/5 p-5 mb-4">
-        <div className="text-xs uppercase tracking-wider text-muted-foreground">Game fee</div>
-        <div className="font-display text-4xl font-bold text-lime mt-1">
-          ${Number(fee).toFixed(2)}
+      {/* Hero amount — always the loudest thing on screen */}
+      <div className="rounded-3xl border border-lime/30 bg-lime/5 p-5">
+        <div className="flex items-baseline justify-between gap-3">
+          <div>
+            <div className="text-xs uppercase tracking-wider text-muted-foreground">Entry fee</div>
+            <div className="font-display text-4xl font-bold text-lime mt-1">
+              ${Number(fee).toFixed(2)}
+            </div>
+          </div>
+          {liveCount !== undefined && maxPlayers > 0 && (
+            <div className="text-right" data-testid="pay-live-roster">
+              <div className="text-[11px] uppercase tracking-wider text-muted-foreground font-bold">
+                {effectiveJoined}/{maxPlayers} in
+              </div>
+              <div className="mt-1">
+                <SpotsPill spotsLeft={spotsLeft} maxPlayers={maxPlayers} />
+              </div>
+            </div>
+          )}
         </div>
         {settings?.payment_deadline && (
-          <div className="mt-2 inline-flex items-center gap-1 text-xs text-coral">
+          <div className="mt-3 inline-flex items-center gap-1 text-xs text-coral">
             <Clock className="h-3 w-3" /> Pay by{" "}
             {new Date(settings.payment_deadline).toLocaleString()}
           </div>
         )}
+        {justFilledDuringPay && (
+          <p
+            role="status"
+            aria-live="assertive"
+            className="mt-3 text-[11px] font-semibold text-coral"
+          >
+            This game just filled up — message the host before submitting.
+          </p>
+        )}
       </div>
 
-      {/* Live roster strip — see spots tick down and who else is in while
-          the viewer completes payment. Uses game_participants realtime;
-          hidden until we have live data so sample games (no live rows)
-          don't render a stale zero. */}
-      {liveCount !== undefined && maxPlayers > 0 && (
-        <div
-          className="mb-4 rounded-2xl border border-border bg-surface px-4 py-3"
-          data-testid="pay-live-roster"
-        >
-          <div className="flex items-center justify-between gap-3">
-            <div className="text-xs uppercase tracking-wider text-muted-foreground font-bold">
-              Roster · {effectiveJoined}/{maxPlayers}
-            </div>
-            <SpotsPill spotsLeft={spotsLeft} maxPlayers={maxPlayers} />
-          </div>
-          {liveRoster.length > 0 && (
-            <div className="mt-2 flex items-center gap-1.5">
-              {liveRoster.slice(0, 6).map((p) => (
-                <UserAvatar
-                  key={p.userId}
-                  initials={p.avatarInitials}
-                  name={p.displayName}
-                  avatarUrl={p.avatarUrl}
-                  size="xs"
-                />
-              ))}
-              {liveRoster.length > 6 && (
-                <span className="ml-1 text-[11px] font-semibold text-muted-foreground">
-                  +{liveRoster.length - 6}
-                </span>
-              )}
-            </div>
-          )}
-          {justFilledDuringPay && (
-            <p
-              role="status"
-              aria-live="assertive"
-              className="mt-2 text-[11px] font-semibold text-coral"
-            >
-              This game just filled up while you were paying — your spot isn't
-              guaranteed. Message the host before submitting.
-            </p>
-          )}
-        </div>
-      )}
+      {/* Status card replaces the stepper once a submission exists */}
+      {hasSubmission && <PaymentStatusTimeline latest={mySubs[0]} history={mySubs.slice(1)} />}
 
-      {mySubs.length > 0 && <PaymentStatusTimeline latest={mySubs[0]} history={mySubs.slice(1)} />}
-
+      {/* Approval badge — kept for tests and clarity */}
       {requiresApproval && (myReq?.status === "pending" || myReq?.status === "approved") && (
         <div
           data-testid="approval-status-indicator"
@@ -510,7 +502,7 @@ function PayPage() {
           role="status"
           aria-live="polite"
           aria-atomic="true"
-          className={`mb-3 inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-bold transition-colors ${
+          className={`inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-bold ${
             myReq.status === "approved"
               ? "border-lime/40 bg-lime/10 text-lime"
               : "border-coral/40 bg-coral/10 text-coral"
@@ -524,12 +516,28 @@ function PayPage() {
           ) : (
             <>
               <Clock className="h-3.5 w-3.5 animate-pulse" aria-hidden="true" />
-              <span>Approval pending — waiting on host</span>
+              <span>Waiting for host to approve you</span>
             </>
           )}
         </div>
       )}
 
+      {/* Two-step progress (Pay → Confirm) */}
+      {showStepper && (
+        <div aria-label="Payment progress" className="flex items-center gap-2 text-xs">
+          <StepDot active={currentStep === "pay"} done={currentStep === "confirm"} n={1} />
+          <span className={currentStep === "pay" ? "font-bold text-foreground" : "text-muted-foreground"}>
+            Pay the host
+          </span>
+          <span className="flex-1 h-px bg-border" />
+          <StepDot active={currentStep === "confirm"} done={false} n={2} />
+          <span className={currentStep === "confirm" ? "font-bold text-foreground" : "text-muted-foreground"}>
+            Confirm
+          </span>
+        </div>
+      )}
+
+      {/* Single active step body */}
       {approvalGateActive ? (
         <div
           className="rounded-2xl border border-coral/40 bg-coral/10 p-5"
@@ -574,16 +582,14 @@ function PayPage() {
         </div>
       ) : !settings || methods.length === 0 ? (
         <div className="rounded-2xl border border-dashed border-border bg-surface/40 p-5 text-center">
-          <div className="font-semibold text-sm">Host hasn't configured payment yet</div>
+          <div className="font-semibold text-sm">Host hasn't set up payment yet</div>
           <p className="text-xs text-muted-foreground mt-1">
-            Reach out to the host directly to arrange payment.
+            Message the host directly to arrange payment.
           </p>
         </div>
       ) : !picked ? (
-        <>
-          <h2 className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2">
-            Pay host using
-          </h2>
+        <div>
+          <h2 className="text-sm font-semibold mb-2">How do you want to pay?</h2>
           <div className="space-y-2">
             {methods.map((m) => {
               const meta = paymentTypeMeta(m.payment_type);
@@ -618,12 +624,12 @@ function PayPage() {
                       title={`Open ${meta.name} in a new tab`}
                       aria-label={`Open ${meta.name} in a new tab to pay`}
                     >
-                      <ExternalLink className="h-3.5 w-3.5" /> Open {meta.name}
+                      <ExternalLink className="h-3.5 w-3.5" /> Open
                     </button>
                   ) : (
                     <button
                       onClick={() => setPicked(m)}
-                      className="text-lime text-sm"
+                      className="text-lime text-sm px-2"
                       aria-label="Select payment method"
                     >
                       →
@@ -633,7 +639,10 @@ function PayPage() {
               );
             })}
           </div>
-        </>
+          <p className="mt-3 text-[11px] text-muted-foreground text-center">
+            Pay outside the app, then come back to send proof.
+          </p>
+        </div>
       ) : (
         <PaymentInstructionsAndProof
           game_id={game.id}
@@ -652,17 +661,33 @@ function PayPage() {
         />
       )}
 
+      {/* Footer: refund policy is collapsed by default; legal always shows */}
       {settings?.refund_policy && (
-        <div className="mt-4 rounded-2xl border border-border bg-surface p-3 text-xs">
-          <div className="font-semibold mb-1">Refund policy</div>
-          <p className="text-muted-foreground">{settings.refund_policy}</p>
-        </div>
+        <details className="rounded-2xl border border-border bg-surface p-3 text-xs">
+          <summary className="cursor-pointer font-semibold">Refund policy</summary>
+          <p className="mt-2 text-muted-foreground">{settings.refund_policy}</p>
+        </details>
       )}
 
-      <div className="mt-5">
-        <LegalNotice />
-      </div>
+      <LegalNotice />
     </div>
+  );
+}
+
+function StepDot({ active, done, n }: { active: boolean; done: boolean; n: number }) {
+  return (
+    <span
+      aria-hidden="true"
+      className={`grid h-6 w-6 place-items-center rounded-full border text-[11px] font-bold ${
+        done
+          ? "border-lime/50 bg-lime/15 text-lime"
+          : active
+            ? "border-lime bg-lime text-primary-foreground"
+            : "border-border bg-background text-muted-foreground"
+      }`}
+    >
+      {done ? <Check className="h-3.5 w-3.5" /> : n}
+    </span>
   );
 }
 
