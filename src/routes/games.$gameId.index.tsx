@@ -2767,11 +2767,11 @@ function HostRequestRow({
     })();
   }, [req.player_id]);
 
-  const act = async (status: "approved" | "rejected") => {
+  const act = async (status: "approved" | "rejected", reason?: string | null) => {
     setBusy(true);
     const rollback = onOptimistic(req.id, status);
     try {
-      await reviewJoinRequest(req.id, status);
+      await reviewJoinRequest(req.id, status, reason ?? undefined);
       await createNotification({
         user_id: req.player_id,
         type: status === "approved" ? "join_approved" : "join_declined",
@@ -2779,7 +2779,9 @@ function HostRequestRow({
         body:
           status === "approved"
             ? "The host approved your request."
-            : "The host declined your request.",
+            : reason
+              ? `The host declined your request: ${reason}`
+              : "The host declined your request.",
         link: `/games/${req.game_id}`,
       });
       toast.success(status === "approved" ? "Approved" : "Declined");
@@ -2790,6 +2792,17 @@ function HostRequestRow({
       setBusy(false);
     }
   };
+
+  const promptRejection = (defaultReason?: string): string | null => {
+    const raw = window.prompt(
+      "Add a short reason for the player (optional). Leave blank to decline without a note.",
+      defaultReason ?? "",
+    );
+    // `null` = user cancelled the prompt → abort. Empty string = decline with no reason.
+    if (raw === null) return null;
+    return raw.trim().slice(0, 500);
+  };
+
 
 
   return (
@@ -2824,7 +2837,7 @@ function HostRequestRow({
               onClick={async () => {
                 if (!confirm(`Block ${name}? They won't be able to join your future games.`))
                   return;
-                await act("rejected");
+                await act("rejected", "Blocked by host");
                 blockUser(req.host_id, req.player_id);
                 toast.success(`${name} blocked.`);
               }}
@@ -2835,11 +2848,16 @@ function HostRequestRow({
             </button>
             <button
               disabled={busy}
-              onClick={() => act("rejected")}
+              onClick={() => {
+                const reason = promptRejection();
+                if (reason === null) return;
+                void act("rejected", reason || null);
+              }}
               className="grid h-9 w-9 place-items-center rounded-xl border border-coral/40 text-coral disabled:opacity-50"
             >
               <XIcon className="h-4 w-4" />
             </button>
+
             <button
               disabled={busy}
               onClick={() => act("approved")}
@@ -2886,12 +2904,12 @@ function HostPendingChip({
     })();
   }, [req.player_id]);
 
-  const act = async (status: "approved" | "rejected") => {
+  const act = async (status: "approved" | "rejected", reason?: string | null) => {
     setBusy(true);
     const rollback = onOptimistic(req.id, status);
     setOpen(false);
     try {
-      await reviewJoinRequest(req.id, status);
+      await reviewJoinRequest(req.id, status, reason ?? undefined);
       await createNotification({
         user_id: req.player_id,
         type: status === "approved" ? "join_approved" : "join_declined",
@@ -2899,7 +2917,9 @@ function HostPendingChip({
         body:
           status === "approved"
             ? "The host approved your request."
-            : "The host declined your request.",
+            : reason
+              ? `The host declined your request: ${reason}`
+              : "The host declined your request.",
         link: `/games/${req.game_id}`,
       });
       toast.success(status === "approved" ? `Approved ${name}` : `Declined ${name}`);
@@ -2910,6 +2930,16 @@ function HostPendingChip({
       setBusy(false);
     }
   };
+
+  const promptRejection = (): string | null => {
+    const raw = window.prompt(
+      "Add a short reason for the player (optional). Leave blank to decline without a note.",
+      "",
+    );
+    if (raw === null) return null;
+    return raw.trim().slice(0, 500);
+  };
+
 
 
   return (
@@ -2955,11 +2985,16 @@ function HostPendingChip({
             <div className="flex gap-1.5">
               <button
                 disabled={busy}
-                onClick={() => act("rejected")}
+                onClick={() => {
+                  const reason = promptRejection();
+                  if (reason === null) return;
+                  void act("rejected", reason || null);
+                }}
                 className="flex-1 inline-flex items-center justify-center gap-1 rounded-xl border border-coral/40 text-coral py-1.5 text-xs font-semibold disabled:opacity-50"
               >
                 <XIcon className="h-3.5 w-3.5" /> Decline
               </button>
+
               <button
                 disabled={busy}
                 onClick={() => act("approved")}
@@ -2973,7 +3008,7 @@ function HostPendingChip({
               onClick={async () => {
                 if (!confirm(`Block ${name}? They won't be able to join your future games.`))
                   return;
-                await act("rejected");
+                await act("rejected", "Blocked by host");
                 blockUser(req.host_id, req.player_id);
                 toast.success(`${name} blocked.`);
               }}
