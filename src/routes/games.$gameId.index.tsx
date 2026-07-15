@@ -544,19 +544,22 @@ function GameDetail() {
       const prevReq = myReq;
       const prevSubs = mySubs;
       const wasJoined = joined;
-      // Optimistic: flip UI immediately.
+      // Optimistic: flip UI immediately. Clear ALL of the viewer's local
+      // request/submission state — including verified subs — so the sticky
+      // CTA immediately collapses `isConfirmed` back to false and re-enables
+      // "Request to join" / "Pay to join" without waiting for a refetch.
       setMyReq(null);
-      setMySubs((subs) =>
-        subs.filter(
-          (s) => !(s.status !== "verified" && s.status !== "rejected"),
-        ),
-      );
+      setMySubs([]);
       leaveGame(game.id);
       if (user) removeRosterLocal(user.id);
       try {
-        if (latestSub && latestSub.status !== "rejected" && latestSub.status !== "verified") {
-          await deleteMyPendingSubmission(latestSub.id).catch(() => {});
-        }
+        // Delete every open/verified submission the viewer had for this game
+        // so the host's "pending approval" list clears and the viewer can
+        // resubmit a fresh payment on re-join.
+        const clearableSubs = prevSubs.filter((s) => s.status !== "rejected");
+        await Promise.all(
+          clearableSubs.map((s) => deleteMyPendingSubmission(s.id).catch(() => {})),
+        );
         if (prevReq?.status === "pending") {
           await cancelMyJoinRequest(game.id).catch(() => {});
         } else if (prevReq?.status === "approved") {
