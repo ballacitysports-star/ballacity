@@ -709,9 +709,25 @@ function GameDetail() {
         return;
       }
       setRequesting(true);
+      // Optimistic: flip CTA to "Request pending" immediately using a
+      // synthetic row. Realtime `join_requests:me:*` reconciles with the
+      // authoritative row on success; on server error we roll back.
+      const prevReq = myReq;
+      const optimistic: JoinRequest = {
+        id: `optimistic:${crypto.randomUUID()}`,
+        game_id: game.id,
+        player_id: user?.id ?? "",
+        host_id: settings.host_id,
+        status: "pending",
+        message: null,
+        reviewer_notes: null,
+        created_at: new Date().toISOString(),
+        reviewed_at: null,
+      };
+      setMyReq(optimistic);
       try {
         const created = await createJoinRequest({ game_id: game.id, host_id: settings.host_id });
-        // Optimistic: flip CTA to "Request pending" immediately.
+        // Swap synthetic row for the authoritative one.
         setMyReq(created);
         // Fire notification off the critical path — failure must not stall the UI.
         void createNotification({
@@ -722,8 +738,8 @@ function GameDetail() {
           link: `/games/${game.id}`,
         }).catch(() => {});
         toast.success("Request sent. The host will review it.");
-        await refreshStatus();
       } catch (e: any) {
+        setMyReq(prevReq);
         toast.error(e.message ?? "Could not send request.");
       } finally {
         setRequesting(false);
