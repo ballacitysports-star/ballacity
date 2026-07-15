@@ -1755,6 +1755,44 @@ function GameDetail() {
           onSettingsSaved={(s) => setSettings(s)}
         />
       )}
+
+      <AlertDialog
+        open={confirmAction !== null}
+        onOpenChange={(open) => {
+          if (!open) setConfirmAction(null);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {confirmAction === "leave" ? "Leave this game?" : "Join this game?"}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {confirmAction === "leave"
+                ? "Your spot will open up for someone else. You can rejoin if there's still space."
+                : "You'll be added to the roster. You can leave later if plans change."}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => {
+                e.preventDefault();
+                const action = confirmAction;
+                setConfirmAction(null);
+                if (action) void handleJoin();
+              }}
+              className={
+                confirmAction === "leave"
+                  ? "bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                  : undefined
+              }
+            >
+              {confirmAction === "leave" ? "Leave game" : "Join game"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
