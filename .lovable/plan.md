@@ -1,38 +1,39 @@
-## Symptom
+## Goal
+Let the host verify or reject a player's payment directly from the roster row in game details, without leaving the page.
 
-On `/games/g7` (a sample game the viewer has joined locally), tapping "You're in · Tap to leave" → "Leave game" leaves the CTA unchanged; localStorage still lists `g7` in `openrun.joinedGameIds.v1` and the roster/counter don't update.
+## Where
+`RosterPlayerRow` in `src/routes/games.$gameId.index.tsx` (~lines 2631–2827). Only shown to the host on paid games (already gated by `feeRequired`).
 
-## Suspected root cause
+## Changes
 
-The `AlertDialog` action calls `void handleJoin()` immediately after `setConfirmAction(null)`. The `handleJoin` closure reads `joined`, `isConfirmed`, `myReq`, `mySubs`, and `settings` from the render at the time the button was clicked — not from a fresh render — so the leave branch appears to run, but then the `try` block calls `refreshStatus()` in `finally` which re-fetches sample-game state that never existed and, more importantly, `leavingRef.current` is toggled back to false before the realtime channel emits.
+### 1. Track the latest submission, not just its status
+In the existing `loadPayment` effect, also capture `id` and `screenshot_path`:
+- Replace local `paymentStatus` state with `latestSub: { id, status, screenshot_path } | null`.
+- Derive `paymentStatus` from `latestSub?.status ?? "none"` so the existing chip logic is unchanged.
+- Realtime channel already refetches on change — keeps action buttons in sync when the player submits/resubmits.
 
-The likelier concrete cause (needs one confirmation via a temporary `console.log`): the leave branch IS being taken, `leaveGame("g7")` runs, but the try-block `supabase.from("game_participants").delete()...` returns a `{ error }` that we ignore, THEN `refreshStatus()` in `finally` re-hydrates and something re-adds `g7` — OR the leave branch is not entered at all because one of the earlier guards (block check, paid redirect) short-circuits.
+### 2. Add inline action buttons next to the payment chip
+Below (or beside) the chip row, render host actions based on current status:
+- `pending` → **Verify** (primary/lime) and **Reject** (coral) buttons.
+- `rejected` → **Verify** button (allow override).
+- `verified` → **Mark unpaid** button (revert to `pending`) — useful if verified by mistake.
+- `none` (no submission yet) → **Mark as paid** button (creates a host-recorded submission with `status: "verified"`, `payment_type: null`, `notes: "Marked paid by host"`).
 
-## Diagnostic step (build-mode)
+Buttons are compact pill style consistent with existing Remove/Block buttons.
 
-Add one-shot `console.log` at these four points in `src/routes/games.$gameId.index.tsx` and reproduce the click:
-1. Top of `executeJoinAction` — log `{ isConfirmed, joined, requiresApproval, isPaid, isPending, gameId: game.id }`.
-2. Right before each early-return guard (invite expired, blocked, approved-but-unpaid) — log which guard fired.
-3. Inside the `if (shouldTriggerLeaveBranch(...))` block — log "entered leave branch".
-4. In the `catch` — log the error object.
+### 3. Wire actions
+- Verify / Reject / Mark unpaid → call existing `reviewSubmission(latestSub.id, status, notes?)` from `@/lib/payments`.
+- Mark as paid (no submission exists) → insert into `payment_submissions` via a new small helper in the same file (or inline supabase call) with `player_id: req.player_id`, `game_id: req.game_id`, `host_id: req.host_id`, `status: "verified"`, `notes: "Marked paid by host"`, `paid_at: now`.
+- After success: optimistic `setLatestSub` update, toast, and send a notification to the player (`createNotification`) — `payment_verified` / `payment_rejected` (reuse existing notification types if present, otherwise `join_approved`-style generic).
+- Wrap each action in a `busy` guard reusing the existing `busy` state.
 
-Run leave → read console logs → identify which branch fires or which error re-adds the id.
-
-## Fix (contingent on diagnosis)
-
-Most likely one of:
-
-- **Leave branch not entered**: correct the guard (e.g. a stale `settings` from a previous game caused `paymentCleared` to be false).
-- **`joinGame` rollback in catch**: replace the broad `catch` with a narrower one that only rolls back on the specific delete failure, not on downstream notification/refresh failures.
-- **`refreshStatus`/realtime re-adds the id**: gate `hydrateFromDb` / realtime merge in `src/lib/games-store.ts` so it skips ids the user has just removed locally (small "recently-left" tombstone Set with a short TTL, cleared once server confirms).
-
-Remove all diagnostic `console.log`s before finishing.
-
-## Verification
-
-- Reproduce with Playwright on `/games/g7`: tap leave → CTA flips to the free-join style, roster shows 7/10, `localStorage.getItem('openrun.joinedGameIds.v1')` no longer contains `"g7"`, and reload keeps it out.
-- Repeat on a hosted DB game the viewer joined: leave still tears down `game_participants` + `join_requests` + `payment_submissions` as before (existing behavior preserved).
+### 4. Optional: "View proof" link
+If `latestSub?.screenshot_path`, show a small "View proof" link that calls `getSignedProofUrl` and opens the URL in a new tab.
 
 ## Out of scope
+- No DB/schema changes (RLS already permits host to update `payment_submissions` — that's how the existing host review screen works).
+- No changes to the player-facing pay flow.
+- No changes to the payments list route.
 
-- No UI/design changes; no schema changes; no changes to the leave-branch predicate itself unless step 1 shows it's the culprit.
+## Files touched
+- `src/routes/games.$gameId.index.tsx` (RosterPlayerRow only)
