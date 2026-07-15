@@ -1661,6 +1661,10 @@ function GameDetail() {
                             gameTitle={game.title}
                             feeRequired={isPaid}
                             onOptimistic={applyOptimisticReview}
+                            onRemoved={(playerId) => {
+                              removeRosterLocal(playerId);
+                              void refetchRoster();
+                            }}
                           />
 
                         ))}
