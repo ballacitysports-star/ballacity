@@ -1676,8 +1676,9 @@ function GameDetail() {
                     key={r.id}
                     req={r}
                     gameTitle={game.title}
-                    onChange={refreshHostRequests}
+                    onOptimistic={applyOptimisticReview}
                   />
+
                 ))}
               </div>
             </div>
