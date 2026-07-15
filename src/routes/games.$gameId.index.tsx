@@ -23,6 +23,7 @@ import {
   DollarSign,
   Home,
   ShieldCheck,
+  History,
 } from "lucide-react";
 import { GAMES, SPORTS, imageFor } from "@/lib/sample-data";
 import { formatWhen } from "@/lib/format";
