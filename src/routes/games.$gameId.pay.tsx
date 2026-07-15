@@ -455,6 +455,52 @@ function PayPage() {
         )}
       </div>
 
+      {/* Live roster strip — see spots tick down and who else is in while
+          the viewer completes payment. Uses game_participants realtime;
+          hidden until we have live data so sample games (no live rows)
+          don't render a stale zero. */}
+      {liveCount !== undefined && maxPlayers > 0 && (
+        <div
+          className="mb-4 rounded-2xl border border-border bg-surface px-4 py-3"
+          data-testid="pay-live-roster"
+        >
+          <div className="flex items-center justify-between gap-3">
+            <div className="text-xs uppercase tracking-wider text-muted-foreground font-bold">
+              Roster · {effectiveJoined}/{maxPlayers}
+            </div>
+            <SpotsPill spotsLeft={spotsLeft} maxPlayers={maxPlayers} />
+          </div>
+          {liveRoster.length > 0 && (
+            <div className="mt-2 flex items-center gap-1.5">
+              {liveRoster.slice(0, 6).map((p) => (
+                <UserAvatar
+                  key={p.userId}
+                  initials={p.avatarInitials}
+                  name={p.displayName}
+                  avatarUrl={p.avatarUrl}
+                  size="xs"
+                />
+              ))}
+              {liveRoster.length > 6 && (
+                <span className="ml-1 text-[11px] font-semibold text-muted-foreground">
+                  +{liveRoster.length - 6}
+                </span>
+              )}
+            </div>
+          )}
+          {justFilledDuringPay && (
+            <p
+              role="status"
+              aria-live="assertive"
+              className="mt-2 text-[11px] font-semibold text-coral"
+            >
+              This game just filled up while you were paying — your spot isn't
+              guaranteed. Message the host before submitting.
+            </p>
+          )}
+        </div>
+      )}
+
       {mySubs.length > 0 && <PaymentStatusTimeline latest={mySubs[0]} history={mySubs.slice(1)} />}
 
       {requiresApproval && (myReq?.status === "pending" || myReq?.status === "approved") && (
