@@ -13,7 +13,19 @@ const inputSchema = z.object({
 export const createNotificationForUser = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: unknown) => inputSchema.parse(d))
-  .handler(async ({ data }) => {
+  .handler(async ({ data, context }) => {
+    const callerId = context.userId;
+    if (data.user_id !== callerId) {
+      // Verify the caller has a legitimate relationship with the target user
+      // before sending them an in-app notification.
+      const { data: allowed, error: relErr } = await context.supabase.rpc("can_notify" as any, {
+        _caller: callerId,
+        _target: data.user_id,
+      });
+      if (relErr) throw new Error(relErr.message);
+      if (!allowed) throw new Error("Not authorized to notify this user");
+    }
+
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { error } = await supabaseAdmin.from("notifications").insert({
       user_id: data.user_id,
