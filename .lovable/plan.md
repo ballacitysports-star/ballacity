@@ -1,67 +1,88 @@
+## UX Audit — top problems
 
-## Goal
+**1. Bottom nav is overloaded (6 tabs).**
+Pickup / Players / Teams / Host / Map / Profile. "Host" (a primary action) sits between browse and destination tabs. Players + Teams overlap. Map (`/discover`) duplicates Feed (`/feed`). Six equal-weight icons at 402px wide crowd labels and hurt thumb reach.
 
-Make roster status feel alive at every step of the join flow. Users should see spots ticking down in real time on browse surfaces, on the details header, while they're paying, and immediately after they join — with an escalating urgency signal when the game is nearly full.
+**2. Discover / Feed / Map — three surfaces for "find a game".**
+`/feed` = list + filters. `/discover` = map. `/pickup` also exists. New users can't tell them apart; internal state (filters, sport chip) doesn't survive switching.
 
-## What changes
+**3. Game detail file is 2,799 lines.**
+One route holds view, edit, roster, waitlist, payment settings, host approvals, join, share, delete. CTA hierarchy is diluted; the primary "Join / Pay" action competes with 6+ secondary controls.
 
-### 1. Shared urgency helper — `src/lib/spots-urgency.ts` (new)
-Small pure helper `getSpotsUrgency(spotsLeft, maxPlayers)` returning `"full" | "critical" | "low" | "normal"`:
-- `full` — 0 left
-- `critical` — 1–3 left
-- `low` — ≤20% of capacity (and >3)
-- `normal` — otherwise
+**4. Host form asks too much upfront.**
+Sport, title, when, location, skill, size, price, indoor/private toggles, description, approval toggle, cover image, per-position needs — all required on one screen before publishing. Most fields have obvious defaults.
 
-Unit tests in `src/lib/spots-urgency.test.ts`.
+**5. Settings / Profile / Account sprawl.**
+`/settings`, `/account/notifications`, `/account/security`, `/profile/edit`, `/reset-password`, `/plans`, `/admin`, `/payments` — all reachable from different entry points, inconsistent headers, "My card" links back into a tab.
 
-### 2. Upgrade `SpotsPill` — `src/components/SpotsPill.tsx`
-- Accept optional `maxPlayers` prop.
-- Coral background + soft `animate-pulse` ring at `critical`.
-- Amber tint at `low`.
-- Keep existing lime for `normal`, destructive for `full`.
-- Preserve existing `role="status"` / `aria-live` politeness rules; escalate to `assertive` at `critical` as well as `full` (label reads e.g. "Only 2 spots left — filling fast").
-- Existing consumer (Discover bottom card) keeps working; new callers can pass `maxPlayers`.
+**6. Onboarding is thin.**
+`/auth` → straight to `/profile`. No sport preference, no location prompt, no first-game nudge. Empty states in Feed just show "no games" without a next step.
 
-### 3. Discover + Feed card counters — `src/components/GameCard.tsx`
-- Already renders a static `joined/max` badge; wire it to `useLiveParticipantCount(game.id)` with fallback to `game.joined`.
-- Swap the plain badge for `SpotsPill` (compact variant) so urgency styling is consistent with the details header.
-- No layout change beyond color/pulse.
+**7. Design system inconsistency.**
+Some pages use `PrimaryCTA`, others hand-roll buttons; card radii, header patterns, and back-arrow placement vary route-to-route.
 
-### 4. Game details header — `src/routes/games.$gameId.index.tsx`
-- The "Roster (X/Y)" header already reads live count. Add a `SpotsPill` next to the header showing `spotsLeft` with urgency styling, so users see the same signal above the roster list they see on the cards.
-- Compact live avatar strip (first 5 participants + "+N") already exists via `useLiveParticipants`; unchanged.
+---
 
-### 5. Pay screen live roster — `src/routes/games.$gameId.pay.tsx`
-- Add a compact live roster strip at the top of the pay screen:
-  - `SpotsPill` with urgency (from `useLiveParticipantCount` + game max).
-  - Avatar row of current joiners (from `useLiveParticipants`, capped at 6 + overflow count).
-  - If spots hit 0 while the user is on this screen, show an inline warning banner: "This game just filled up while you were paying — your spot is not guaranteed. Contact the host before submitting." (Does NOT disable the submit button; host still resolves manually.)
-- Placement: directly above the payment method picker, below the existing header.
+## Structural changes to implement (prioritized)
 
-### 6. Post-join confirmation feedback — details page
-- After a successful join on `games.$gameId.index.tsx`, briefly surface a lime toast-style strip: "You're in — spot X of Y locked" using the freshly incremented live count. Reuse the existing "Your status" strip slot for paid games; for free games render a transient (5s) confirmation strip.
-- No new toast lib; use a local dismissible element with `role="status"` `aria-live="polite"`.
+### P0 — Navigation reshape
+- Collapse bottom nav from **6 → 5 tabs**: `Play` (merged Feed+Map with a list/map toggle) · `Players` · **Host (center FAB, elevated)** · `Messages` · `Profile`.
+- Fold `Teams` under `Players` as a top segmented control (People / Teams).
+- Delete `/pickup` as a nav entry (keep route as redirect → `/play`).
+- Center Host FAB uses primary gradient so the main create action is unmistakable.
 
-### 7. Sample-data path (`g1` etc.)
-`useLiveParticipantCount` only counts real Supabase `game_participants` rows; sample games have none, so `liveCount` stays `undefined` and static `game.joined` is used — matching current behavior. No change needed.
+### P0 — Merge Discover + Feed → `/play`
+- Single route with a sticky **List ⇄ Map** toggle at the top.
+- Shared filter/sport state persists across the toggle.
+- Redirect `/feed` and `/discover` → `/play`.
+- Preserve all filter, search, and realtime roster behavior.
 
-## Technical details
+### P1 — Game detail slimdown
+- Extract host-only panels (edit meta, payment settings, approvals, delete) into `/games/$gameId/manage` route.
+- Player view keeps: hero, when/where, roster + SpotsPill, description, single sticky primary CTA (Join / Pay / Full / Requested).
+- Move Share/Bookmark into an overflow menu; keep only CTA + back in the sticky bar.
 
-- No schema changes. `game_participants` is already in the realtime publication (existing `useLiveParticipantCount` / `useLiveParticipants` subscriptions work).
-- Urgency helper is pure, tree-shakeable, and unit tested; no runtime deps.
-- `SpotsPill` change is backward compatible (`maxPlayers` optional). All existing selectors used by e2e specs (`text=/\d+\/\d+/`, "Full", "N spots") remain intact — we only add classes and refine the aria-label.
-- Reduced-motion: pulse ring wrapped in a `motion-safe:` variant so users with `prefers-reduced-motion` see the color change without animation.
-- No changes to join/leave RPCs, RLS, or business logic — presentation layer only.
+### P1 — Host form: progressive disclosure
+- Step 1 (required): Sport, When, Where. Publish enabled after these three.
+- Step 2 (optional, collapsed "More options"): title (auto-generated default: "{Sport} at {Neighborhood}"), size (default 10), price (default Free), skill (default All Levels), indoor, private, approval, cover, positions.
+- Smart defaults: location prefilled from GPS/profile; when defaults to next Saturday 10am.
 
-## Files touched
+### P1 — Settings hub consolidation
+- `/settings` becomes the single account root. Move `/profile/edit`, `/account/notifications`, `/account/security`, `/plans`, `/payments` under it with a consistent header component.
+- Remove "My card" link (redundant with Profile tab).
+- Add a `SettingsHeader` component used by every sub-page (back arrow, title, optional action).
 
-- new `src/lib/spots-urgency.ts`
-- new `src/lib/spots-urgency.test.ts`
-- edit `src/components/SpotsPill.tsx`
-- edit `src/components/GameCard.tsx`
-- edit `src/routes/games.$gameId.index.tsx`
-- edit `src/routes/games.$gameId.pay.tsx`
+### P2 — Onboarding polish
+- Post-signup: 2-step sheet — pick sports (chips), confirm city (autocomplete + "Use current location"). Skippable.
+- Feed empty state: illustration + "Host the first game" primary + "Widen your search" secondary.
+- First-time Play visit: brief coach-mark on the List/Map toggle.
 
-## Out of scope
+### P2 — Design system pass
+- Replace ad-hoc buttons on join/pay/host/settings pages with `PrimaryCTA`.
+- Extract `PageHeader` (sticky, back arrow, title, optional trailing action) and adopt on all sub-pages.
+- Standardize card: `rounded-2xl border bg-card` — audit and normalize.
+- Mobile-first: verify all tap targets ≥44px, safe-area padding on all sticky bars.
 
-- Waitlist auto-promotion, push notifications on fill, or map-marker recoloring by fill state (can follow in a separate pass).
+---
+
+## Technical notes
+
+- New routes: `src/routes/_tabs.play.tsx` (merged), `src/routes/games.$gameId.manage.tsx` (host tools).
+- New components: `src/components/PageHeader.tsx`, `src/components/BottomNav.tsx` refactor for center FAB, `src/components/HostFormMore.tsx` (collapsible advanced section), `src/components/OnboardingSheet.tsx`.
+- Redirects: `/feed`, `/discover`, `/pickup` → `/play` via `beforeLoad: () => redirect(...)`.
+- `BottomNav` `PUBLIC_PATHS` unchanged; add safe-area on the new FAB.
+- No DB/RLS changes. No changes to realtime, payments, invite, or messaging logic — presentation only, except route splits which move JSX between files.
+- Preserve all e2e selectors: keep button labels ("Join", "Pay", "Request to join", "Cancel request", "Leave") verbatim. Run the invite/pay/join e2e suite after each P0/P1 chunk.
+
+---
+
+## Execution order
+
+1. Bottom nav + `/play` merge + redirects (single PR-sized chunk).
+2. Host form progressive disclosure.
+3. Game detail → extract `/manage`.
+4. Settings hub consolidation + `PageHeader`.
+5. Onboarding sheet + empty-state polish.
+6. Design system sweep (`PrimaryCTA` adoption, card normalization).
+
+Each chunk ships independently; e2e runs between chunks.

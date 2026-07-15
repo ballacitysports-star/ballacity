@@ -2,7 +2,8 @@ import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Loader2, RefreshCw } from "lucide-react";
-import { Search, SlidersHorizontal, Bell, MessageCircle, X, MapPin } from "lucide-react";
+import { Search, SlidersHorizontal, Bell, MessageCircle, X, MapPin, List, Map as MapIcon } from "lucide-react";
+import { PlayMapView } from "@/components/PlayMapView";
 import { useUnreadNotificationCount } from "@/lib/notifications";
 import { Logo } from "@/components/Logo";
 import { MyAvatar } from "@/components/UserAvatar";
@@ -23,6 +24,14 @@ export const Route = createFileRoute("/_tabs/feed")({
 function Feed() {
   const [q, setQ] = useState("");
   const [filtersOpen, setFiltersOpen] = useState(false);
+  const [viewMode, setViewMode] = useState<"list" | "map">(() => {
+    if (typeof window === "undefined") return "list";
+    return (localStorage.getItem("openrun:play-view") as "list" | "map") ?? "list";
+  });
+  const switchView = (m: "list" | "map") => {
+    setViewMode(m);
+    try { localStorage.setItem("openrun:play-view", m); } catch { /* ignore */ }
+  };
   const [positionFilter, setPositionFilter] = useState<string | null>(null);
   const hosted = useHostedGames();
   const joinedIds = useJoinedGameIds();
@@ -293,6 +302,34 @@ function Feed() {
         </p>
       </motion.div>
 
+      {/* List / Map segmented toggle — persists across visits via localStorage */}
+      <div className="mb-4 inline-flex items-center gap-1 rounded-full border border-border bg-surface p-1" role="tablist" aria-label="View mode">
+        {([
+          { id: "list", label: "List", Icon: List },
+          { id: "map", label: "Map", Icon: MapIcon },
+        ] as const).map(({ id, label, Icon }) => {
+          const active = viewMode === id;
+          return (
+            <button
+              key={id}
+              role="tab"
+              aria-selected={active}
+              onClick={() => switchView(id)}
+              className={`inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-xs font-bold transition-colors ${
+                active ? "bg-lime text-primary-foreground" : "text-muted-foreground"
+              }`}
+            >
+              <Icon className="h-3.5 w-3.5" />
+              {label}
+            </button>
+          );
+        })}
+      </div>
+
+      {viewMode === "map" ? (
+        <PlayMapView />
+      ) : (
+      <>
       <div className="flex gap-2 mb-4 relative">
         <div className="flex-1 flex items-center gap-2 rounded-full border border-border bg-surface px-4 py-2.5">
           <Search className="h-4 w-4 text-muted-foreground" />
@@ -430,6 +467,9 @@ function Feed() {
           )}
         </>
       )}
+      </>
+      )}
+
 
       {typeof document !== "undefined" &&
         createPortal(
