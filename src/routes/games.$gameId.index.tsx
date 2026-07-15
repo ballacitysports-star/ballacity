@@ -188,6 +188,17 @@ function GameDetail() {
   const [processing, setProcessing] = useState(false);
   const [positionRosterOpen, setPositionRosterOpen] = useState(false);
 
+  // Ticking clock (1s) that re-renders while the resubmit cooldown counts down.
+  // Only starts when there's an active cooldown to avoid unnecessary re-renders.
+  const cooldownMs = joinResubmitCooldownRemainingMs(myReq);
+  const capReached = joinResubmitCapReached(myReq);
+  const [, setNowTick] = useState(0);
+  useEffect(() => {
+    if (cooldownMs <= 0) return;
+    const t = setInterval(() => setNowTick((n) => n + 1), 1000);
+    return () => clearInterval(t);
+  }, [cooldownMs > 0]);
+
   // effectiveJoined is computed below, after settings/myReq/isHost resolve.
   // Placeholder removed — see definition near line 161.
   // Ownership is locked to the original host's auth user id.
