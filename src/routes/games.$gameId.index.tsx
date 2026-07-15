@@ -1763,23 +1763,8 @@ function GameDetail() {
         </div>
       )}
 
-      {/* Host-only payment setup link */}
-      <div className="mx-auto w-full max-w-md sm:max-w-2xl lg:max-w-4xl px-4 mt-4">
-        {isHost && (
-          <Link
-            to="/games/$gameId/payment-setup"
-            params={{ gameId: game.id }}
-            className="flex items-center gap-2 rounded-2xl border border-dashed border-border bg-surface/40 p-3 text-xs text-muted-foreground hover:border-lime/40"
-          >
-            <SettingsIcon className="h-4 w-4 text-lime" />
-            <span className="flex-1">Configure payment methods & fee.</span>
-            <span className="text-lime">→</span>
-          </Link>
-        )}
-        <div className="mt-3">
-          <LegalNotice compact />
-        </div>
-      </div>
+
+
 
       {/* Sticky CTA */}
       <div className="fixed bottom-[calc(env(safe-area-inset-bottom)+6rem)] left-0 right-0 z-30 px-4 pb-[max(env(safe-area-inset-bottom),0.75rem)] pt-3 backdrop-blur-xl bg-background/80 border-t border-border">
@@ -2498,6 +2483,20 @@ function EditGameModal({
           </Field>
         </div>
         <BlockedUsersSection hostId={hostId} />
+        <div className="mt-4">
+          <Link
+            to="/games/$gameId/payment-setup"
+            params={{ gameId: game.id }}
+            className="flex items-center gap-2 rounded-2xl border border-dashed border-border bg-surface/40 p-3 text-xs text-muted-foreground hover:border-lime/40"
+          >
+            <SettingsIcon className="h-4 w-4 text-lime" />
+            <span className="flex-1">Configure payment methods & fee.</span>
+            <span className="text-lime">→</span>
+          </Link>
+          <div className="mt-3">
+            <LegalNotice compact />
+          </div>
+        </div>
         <div className="mt-4 flex items-center gap-2">
           <button
             onClick={onClose}
