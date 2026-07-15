@@ -12,7 +12,7 @@ import {
   Star,
   Check,
   CreditCard,
-  Settings as SettingsIcon,
+  
   X as XIcon,
   Pencil,
   Play,
@@ -75,7 +75,7 @@ import { shouldTriggerLeaveBranch } from "@/lib/leave-branch";
 import { useHostedGames, fetchHostedGame, updateHostedGame, deleteHostedGame } from "@/lib/hosted-games-store";
 import type { Game } from "@/lib/sample-data";
 import { PositionsPicker, positionsCleanup } from "@/components/PositionsPicker";
-import { LegalNotice } from "@/components/LegalNotice";
+
 import { useAuth } from "@/hooks/use-auth";
 import { useMyProfile } from "@/lib/user-prefs-store";
 import { getOrCreateDirectConversation } from "@/lib/messages";
@@ -2483,20 +2483,6 @@ function EditGameModal({
           </Field>
         </div>
         <BlockedUsersSection hostId={hostId} />
-        <div className="mt-4">
-          <Link
-            to="/games/$gameId/payment-setup"
-            params={{ gameId: game.id }}
-            className="flex items-center gap-2 rounded-2xl border border-dashed border-border bg-surface/40 p-3 text-xs text-muted-foreground hover:border-lime/40"
-          >
-            <SettingsIcon className="h-4 w-4 text-lime" />
-            <span className="flex-1">Configure payment methods & fee.</span>
-            <span className="text-lime">→</span>
-          </Link>
-          <div className="mt-3">
-            <LegalNotice compact />
-          </div>
-        </div>
         <div className="mt-4 flex items-center gap-2">
           <button
             onClick={onClose}
