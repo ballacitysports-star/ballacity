@@ -2767,11 +2767,11 @@ function HostRequestRow({
     })();
   }, [req.player_id]);
 
-  const act = async (status: "approved" | "rejected") => {
+  const act = async (status: "approved" | "rejected", reason?: string | null) => {
     setBusy(true);
     const rollback = onOptimistic(req.id, status);
     try {
-      await reviewJoinRequest(req.id, status);
+      await reviewJoinRequest(req.id, status, reason ?? undefined);
       await createNotification({
         user_id: req.player_id,
         type: status === "approved" ? "join_approved" : "join_declined",
@@ -2779,7 +2779,9 @@ function HostRequestRow({
         body:
           status === "approved"
             ? "The host approved your request."
-            : "The host declined your request.",
+            : reason
+              ? `The host declined your request: ${reason}`
+              : "The host declined your request.",
         link: `/games/${req.game_id}`,
       });
       toast.success(status === "approved" ? "Approved" : "Declined");
@@ -2790,6 +2792,17 @@ function HostRequestRow({
       setBusy(false);
     }
   };
+
+  const promptRejection = (defaultReason?: string): string | null => {
+    const raw = window.prompt(
+      "Add a short reason for the player (optional). Leave blank to decline without a note.",
+      defaultReason ?? "",
+    );
+    // `null` = user cancelled the prompt → abort. Empty string = decline with no reason.
+    if (raw === null) return null;
+    return raw.trim().slice(0, 500);
+  };
+
 
 
   return (
