@@ -616,16 +616,28 @@ function GameDetail() {
     }
     // Confirmed → leave / withdraw
     if (isConfirmed || joined) {
+      // Snapshot for rollback on server error.
+      const prevReq = myReq;
+      const prevSubs = mySubs;
+      const wasJoined = joined;
+      // Optimistic: flip UI immediately.
+      setMyReq(null);
+      setMySubs((subs) =>
+        subs.filter(
+          (s) => !(s.status !== "verified" && s.status !== "rejected"),
+        ),
+      );
+      leaveGame(game.id);
+      if (user) removeRosterLocal(user.id);
       try {
         if (latestSub && latestSub.status !== "rejected" && latestSub.status !== "verified") {
           await deleteMyPendingSubmission(latestSub.id).catch(() => {});
         }
-        if (myReq?.status === "pending") {
+        if (prevReq?.status === "pending") {
           await cancelMyJoinRequest(game.id).catch(() => {});
-        } else if (myReq?.status === "approved") {
+        } else if (prevReq?.status === "approved") {
           await withdrawMyApprovedJoinRequest(game.id).catch(() => {});
         }
-        leaveGame(game.id);
         toast("You left the game.");
         // Notify host in real time that a player left.
         if (gameHostId && user && gameHostId !== user.id) {
@@ -638,20 +650,30 @@ function GameDetail() {
             link: `/games/${game.id}`,
           }).catch(() => {});
         }
-        refreshStatus();
       } catch (e: any) {
+        // Rollback optimistic state.
+        setMyReq(prevReq);
+        setMySubs(prevSubs);
+        if (wasJoined) joinGame(game.id);
+        void refetchRoster();
         toast.error(e.message ?? "Could not leave.");
       }
       return;
     }
     // Pending → cancel request / withdraw submission
     if (isPending) {
+      const prevReq = myReq;
+      const prevSubs = mySubs;
+      // Optimistic clear.
+      if (myReq?.status === "pending") setMyReq(null);
+      setMySubs((subs) => subs.filter((s) => s.status !== "pending"));
       try {
         if (latestSub?.status === "pending") await deleteMyPendingSubmission(latestSub.id);
-        if (myReq?.status === "pending") await cancelMyJoinRequest(game.id);
+        if (prevReq?.status === "pending") await cancelMyJoinRequest(game.id);
         toast("Request canceled.");
-        refreshStatus();
       } catch (e: any) {
+        setMyReq(prevReq);
+        setMySubs(prevSubs);
         toast.error(e.message ?? "Could not cancel.");
       }
       return;
