@@ -1673,7 +1673,25 @@ function GameDetail() {
             return (
               <motion.button
                 whileTap={{ scale: 0.97 }}
-                onClick={() => handleJoin()}
+                onClick={() => {
+                  const wantsLeave = isConfirmed || (joined && !isPaid);
+                  const wantsFreeJoin =
+                    !isConfirmed &&
+                    !joined &&
+                    !isPending &&
+                    spotsLeft > 0 &&
+                    !(requiresApproval && !isApproved) &&
+                    !isPaid;
+                  if (wantsLeave) {
+                    setConfirmAction("leave");
+                    return;
+                  }
+                  if (wantsFreeJoin) {
+                    setConfirmAction("join");
+                    return;
+                  }
+                  void handleJoin();
+                }}
                 disabled={buttonDisabled}
                 aria-live="polite"
                 aria-disabled={buttonDisabled}
