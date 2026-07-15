@@ -356,6 +356,24 @@ export async function cancelMyJoinRequest(gameId: string) {
   if (error) throw error;
 }
 
+/**
+ * Release the caller's approved join request for a game. Used when a
+ * confirmed player taps "Leave" — without this the approval gate stays
+ * cleared and the roster refetch flips them right back to Confirmed.
+ * RLS scopes deletes to `player_id = auth.uid()`.
+ */
+export async function withdrawMyApprovedJoinRequest(gameId: string) {
+  const { data: u } = await supabase.auth.getUser();
+  if (!u.user) return;
+  const { error } = await supabase
+    .from("join_requests")
+    .delete()
+    .eq("game_id", gameId)
+    .eq("player_id", u.user.id)
+    .eq("status", "approved");
+  if (error) throw error;
+}
+
 export async function getMyJoinRequest(gameId: string): Promise<JoinRequest | null> {
   const { data: u } = await supabase.auth.getUser();
   if (!u.user) return null;
