@@ -1,31 +1,64 @@
-## Problem
+## Goal
 
-Realtime subscriptions for `join_requests`, `game_payment_settings`, and `payment_submissions` are wired on the game details page, tables are in the `supabase_realtime` publication, and RLS allows the viewer to read their own rows — yet status still only updates on refresh. This is the same class of flakiness the pay page already handles with a belt-and-suspenders fallback (see `e2e/pay-approval-polling-fallback.spec.ts`). We need the same safety net on the game details page so approval, roster, and payment status always update live.
+Make join, approval, and payment actions feel instant. Flip local state the moment the user taps, then let existing realtime handlers reconcile with server truth (and roll back on error).
 
-## Fix (all in `src/routes/games.$gameId.index.tsx`)
+All changes are in `src/routes/games.$gameId.index.tsx` plus tiny helpers in `src/lib/game-roster.ts`. No backend, RLS, or query-shape changes.
 
-1. **Log + surface subscription status** on the three viewer-scoped channels (`join_requests:me:*`, `game_payment_settings:*`, `payment_submissions:me:*`) so we can see `CHANNEL_ERROR` / `TIMED_OUT` in the console instead of silent failure.
+## Pattern
 
-2. **Re-auth realtime on session changes.** After `supabase.auth.getSession()` / `onAuthStateChange`, call `supabase.realtime.setAuth(access_token)` once at mount so the WebSocket carries the user JWT. Without it, RLS-scoped subscriptions can be rejected silently right after sign-in.
+For each action:
+1. Snapshot current local state.
+2. Apply optimistic mutation to state (and show toast).
+3. Await server call.
+4. On success: leave state as-is — realtime `postgres_changes` handler (already wired) will overwrite with authoritative row shortly. Drop the trailing `refreshStatus()`/`refreshHostRequests()` so we don't clobber the optimistic value before realtime arrives.
+5. On failure: restore snapshot, show error toast.
 
-3. **Add a fallback refresh loop** (mirrors the pay page):
-   - `setInterval(refreshStatus, 15000)` while the tab is visible.
-   - `window.addEventListener('focus', refreshStatus)`.
-   - `document.addEventListener('visibilitychange', ...)` → `refreshStatus()` when the tab becomes visible.
-   - Same fallback triggers `refreshHostRequests()` when the viewer is the host.
+Add a small helper `applyOptimistic<T>(setter, next, serverCall)` co-located in the route file to keep call sites tidy.
 
-4. **Also refresh roster on tab focus.** The live roster hook (`useLiveParticipants`) already subscribes, but if its socket dropped the count/list can stall. Add a focus/visibility re-hydrate by bumping a local `rosterNonce` state that the hook keys on (or call a small `refetch` we expose). Minimal change: force `useLiveParticipants` to re-run by keying it on `${game.id}:${rosterNonce}` and incrementing `rosterNonce` on focus.
+## Player-side actions
 
-5. **Keep existing realtime channels** — the fallback is additive, not a replacement.
+Handler around lines 570–700 (`handlePrimary`):
 
-## Non-goals
+- **Send join request** (line 669–688): already sets `setMyReq(created)` after the call. Move the optimistic set to *before* `createJoinRequest` using a synthetic pending row `{ id: 'optimistic', status: 'pending', game_id, player_id: user.id, host_id, created_at: now, … }`. Replace with returned row on success. Roll back to previous `myReq` on error. Remove the trailing `await refreshStatus()`.
+- **Cancel pending request** (line 628–637): snapshot `myReq` + `mySubs`, set `myReq` to null and filter pending sub out of `mySubs` immediately, then call `deleteMyPendingSubmission` / `cancelMyJoinRequest`. Roll back on error. Drop `refreshStatus()`.
+- **Leave / withdraw approved** (line 597–626): snapshot `myReq`, `mySubs`, and `joined`. Optimistically set `myReq` to null (for approved case), remove pending sub, and call `leaveGame` (already local). Await server deletes; roll back on error. Drop `refreshStatus()`.
 
-- No schema changes (publication + RLS already correct).
-- No changes to the pay page (already has this fallback).
-- No changes to shared stores beyond what's needed to expose a refetch.
+Payment submission on the pay page is out of scope for this task per prior turns; only status reflection here matters. On this page, when `payment_submissions` realtime event arrives we already refetch — nothing else needed.
+
+## Host-side actions
+
+`HostRequestRow.act` (~line 2808) and `HostPendingChip.act` (~line 2925):
+
+- Snapshot `hostRequests` from parent via a new prop `applyOptimisticStatus(reqId, status)` OR lift to a shared callback. Simplest: add optional prop `onOptimistic?: (reqId, status) => void` and `onRollback?: () => void`. Parent passes handlers that mutate `hostRequests` state.
+- On approve/reject tap: call `onOptimistic(req.id, status)` → parent updates that row's `status` in place immediately (approved chip disappears from Pending list, moves to reviewed section).
+- Await `reviewJoinRequest`. On error → `onRollback()` restores prior array.
+- Keep the notification call. Remove the `onChange()` (which triggers `refreshHostRequests`) — realtime `join_requests:host:*` handler already updates the list.
+
+## Roster optimistic add on approve (viewer = approved player)
+
+When realtime approval flips the CTA to "Pay", the roster count is authoritative via `useLiveParticipants` and doesn't need an optimistic bump on the player side (they aren't in `game_participants` yet — that happens after payment/join).
+
+For the "Leave" case, add an optimistic remove: extend `useLiveParticipants` (in `src/lib/game-roster.ts`) with a `removeLocal(userId)` helper alongside `refetch`. Call it from the leave handler; the realtime DELETE event then reconciles (idempotent — filter is a no-op if already gone).
+
+## Rollback safety
+
+- Guard every rollback with a `didError` flag so late realtime events don't get overwritten.
+- Optimistic rows use a sentinel `id: 'optimistic:<uuid>'`; realtime INSERT handler already keys by real id so both can coexist briefly, then optimistic is replaced when the real row arrives (in the `setMyReq` case we replace directly on server-call resolution, so no dedupe needed).
+
+## Files touched
+
+- `src/routes/games.$gameId.index.tsx` — refactor `handlePrimary` branches, wire `onOptimistic`/`onRollback` into `HostRequestRow` and `HostPendingChip`, remove the now-redundant post-action `refreshStatus`/`refreshHostRequests` calls.
+- `src/lib/game-roster.ts` — export `removeLocal(userId)` from `useLiveParticipants`.
 
 ## Verification
 
-- Manual: sign in as player on tab A, host on tab B. Host approves join request → tab A flips to "Pay" state within 15s even if the socket is down; within ~1s when realtime works.
-- Console: subscribe status logs show `SUBSCRIBED` on the three channels.
-- Existing e2e (`pay-approval-realtime-only.spec.ts`, `pay-approval-polling-fallback.spec.ts`) still pass.
+- Tap "Request to join" with network throttled to Slow 3G → CTA flips to "Request pending" within one frame; server response arrives later and row id is swapped in silently.
+- Host taps Approve → row leaves Pending list instantly; realtime event arrives ~1s later and doesn't cause a flicker.
+- Force an error (offline) → optimistic state rolls back and error toast shows.
+- Existing e2e specs (`pay-approval-realtime-only`, `invite-request-*`, `pay-approval-gate-flips`) still pass; behavior change is timing-only.
+
+## Non-goals
+
+- No changes to `src/routes/games.$gameId.pay.tsx`.
+- No new realtime channels, migrations, or RPCs.
+- No changes to notification delivery.
