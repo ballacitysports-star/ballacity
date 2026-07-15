@@ -2904,12 +2904,12 @@ function HostPendingChip({
     })();
   }, [req.player_id]);
 
-  const act = async (status: "approved" | "rejected") => {
+  const act = async (status: "approved" | "rejected", reason?: string | null) => {
     setBusy(true);
     const rollback = onOptimistic(req.id, status);
     setOpen(false);
     try {
-      await reviewJoinRequest(req.id, status);
+      await reviewJoinRequest(req.id, status, reason ?? undefined);
       await createNotification({
         user_id: req.player_id,
         type: status === "approved" ? "join_approved" : "join_declined",
@@ -2917,7 +2917,9 @@ function HostPendingChip({
         body:
           status === "approved"
             ? "The host approved your request."
-            : "The host declined your request.",
+            : reason
+              ? `The host declined your request: ${reason}`
+              : "The host declined your request.",
         link: `/games/${req.game_id}`,
       });
       toast.success(status === "approved" ? `Approved ${name}` : `Declined ${name}`);
@@ -2928,6 +2930,16 @@ function HostPendingChip({
       setBusy(false);
     }
   };
+
+  const promptRejection = (): string | null => {
+    const raw = window.prompt(
+      "Add a short reason for the player (optional). Leave blank to decline without a note.",
+      "",
+    );
+    if (raw === null) return null;
+    return raw.trim().slice(0, 500);
+  };
+
 
 
   return (
