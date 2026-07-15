@@ -76,9 +76,9 @@ test("payment verified by host updates pay screen to confirmed state", async ({ 
   );
 
   await page.route(
-    (url) => tableUrl(url, "host_payment_methods"),
+    (url) => tableUrl(url, "host_payment_methods") || String(url).includes("/rest/v1/rpc/get_game_host_payment_methods"),
     async (route) => {
-      if (route.request().method() !== "GET") return route.fallback();
+      if (!["GET","POST"].includes(route.request().method())) return route.fallback();
       await route.fulfill({
         status: 200,
         contentType: "application/json",
