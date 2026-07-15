@@ -1,62 +1,74 @@
-## Goal
+## Direction
 
-Lock in the "leave after verified payment" flow with automated tests so future changes can't regress:
-- CTA on the game detail page collapses from "Confirmed · Tap to leave" back to "Request to join" / "Pay to join"
-- The "Payment verified — you're on the roster" status strip disappears and stays gone
-- The viewer is removed from the roster ("YOU" chip gone, count decremented)
-- Host's pending-approval list no longer shows the former player
-- Tapping "Request to join" after leaving actually creates a new request instead of re-firing the leave branch
+Reskin the entire app to feel like the PlayStation mobile app: near-black layered surfaces, a single electric PS-blue accent, generous rounded corners, subtle inner highlights, and a bold icon-first tab bar. This is a **visual/token pass only** — no changes to routes, data, RLS, server functions, or business logic.
 
-## Tests to add
+### Design tokens (locked)
 
-### 1. Unit: leave-branch condition (fast, no DB)
+Palette — **PS Blue on Ink**
+- `--background` `#0a0e17` (ink)
+- `--surface` `#141b29` (card)
+- `--surface-2` `#1f2b44` (elevated / hover)
+- `--primary` `#0070f3` (PS blue)
+- `--primary-glow` `#4aa8ff`
+- `--foreground` near-white, `--muted-foreground` cool gray
+- `--border` low-contrast cool tint of surface-2
 
-`src/routes/games.$gameId.leave-branch.test.ts` — pure logic test around the predicate used at the leave branch entry. Extract the tiny helper `shouldTriggerLeaveBranch({ isConfirmed, joined, requiresApproval, isPaid })` from `games.$gameId.index.tsx` into `src/lib/leave-branch.ts` and unit-test it with a matrix:
-- confirmed → true
-- stale joined + requiresApproval → false (regression guard for the bug just fixed)
-- stale joined + paid → false
-- joined on free/no-approval → true
-- nothing set → false
+Typography — **Sora + Manrope**
+- Display / headings: **Sora** (600–800), tight tracking on large sizes
+- Body / UI: **Manrope** (400–600)
+- Loaded via `<link>` in `src/routes/__root.tsx`, referenced in `@theme` — never `@import`ed from a URL
 
-Keeps the regression cheap to catch even if the route file changes.
+Shape, depth, motion
+- Radii: `--radius: 20px` for cards, `28px` for hero tiles, `999px` for pills/tab bar
+- Elevation: soft outer shadow + 1px inner top highlight (`inset 0 1px 0 rgba(255,255,255,0.06)`)
+- Gradients: `linear-gradient(135deg, var(--primary), var(--primary-glow))` on primary CTAs and active tab indicator
+- Motion: 180–220ms ease-out on hover/press; scale 0.98 on tap for cards and tab items
 
-### 2. E2E: leave-with-verified-payment (Playwright)
+### Scope — what changes
 
-`e2e/leave-verified-payment-consistency.spec.ts` — end-to-end against localhost:8080 using the injected Supabase session.
+Tokens & base
+- Rewrite `src/styles.css` `:root` / `@theme inline` block with the palette above
+- Register `--font-display: "Sora"` and `--font-sans: "Manrope"` in `@theme`, add Google Fonts `<link>`s in `__root.tsx`
+- Default `body` to `--font-sans`, headings to `--font-display`
 
-Setup (SQL fixture inserted via a tiny server function or direct supabase-js calls in the spec `test.beforeAll`):
-- Create a hosted game owned by a second seeded host account (reuse `docs/e2e-test-accounts.md` fixtures)
-- Create `game_payment_settings` with `requires_approval=true` and `entry_fee>0`
-- Insert an approved `join_requests` row for the signed-in viewer
-- Insert a `verified` `payment_submissions` row for the viewer
-- Insert the viewer into `game_participants`
+Global chrome
+- `BottomNav`: floating pill/tab bar, dark surface, active item filled with PS-blue gradient + white icon, inactive icons muted; safe-area padding preserved
+- Top page headers: display-weight title, condensed meta row, no drop shadow
 
-Assertions on the viewer device (single context):
-1. Navigate to `/games/<id>`. Assert the "Your status · Payment verified — you're on the roster" strip is visible, the sticky CTA reads "Confirmed · Tap to leave", the roster shows a "YOU" chip, and the roster header count includes the viewer.
-2. Tap the CTA, confirm the leave dialog. Assert (within 10s):
-   - strip disappears and does NOT reappear after a further 3s wait (guards the realtime-rehydrate regression)
-   - CTA flips to "Request to join · N spots left"
-   - "YOU" chip gone from roster; header count decremented
-3. Tap "Request to join". Assert a toast that is NOT "You left the game", and that the CTA transitions to "Request pending · Tap to cancel" and a pending `join_requests` row exists for the viewer (poll via supabase-js).
+Cards & lists (shared)
+- `GameCard`, `PostCard`, `OrgCard`, `RosterPlayerRow`, `HostRequestRow`, `MessageAttachment`, `ReputationCard`: unified card shell (surface, radius 20, inner highlight, 16–20px padding), sport chip → small pill in PS blue, price/spots → right-aligned mono numerals
 
-Then open a second BrowserContext signed in as the host account:
-4. Navigate to the host's pending list surface (game detail as host, or `/notifications` / host approval panel — whichever surface renders `hostRequests`). Assert that the former player is NOT listed after leave, and IS listed once step 3 creates the new pending request.
+Primary surfaces
+- Discover (`_tabs.discover`): PS-app "Explore" feel — hero rail on top (large tile with cover image + gradient scrim), horizontal category rails below (Basketball / Soccer / …), then a card grid
+- Feed, Notifications, Players, Teams, Reels, Create tabs: same header + card language
+- Profile (`_tabs.profile`): dark avatar block with subtle blue glow, stat pills, reputation card restyled
+- Game detail (`games.$gameId.index`): cover image with gradient overlay → sticky glass header on scroll → sectioned dark cards for roster, pickup requests, host info, payment; sticky CTA becomes a full-width PS-blue gradient pill with white text
+- Pay / payment-setup screens: same card shell, primary CTA gradient
+- Auth, Settings, Account.*, Admin, Messages, Reviews, Plans, Shop, Available Players, Reset Password: reuse the shared shells so no page looks like the old theme
 
-Cleanup in `test.afterAll` deletes the fixture rows so re-runs are idempotent.
+Components
+- Buttons: default → PS-blue gradient pill; secondary → surface-2 pill with 1px cool border; ghost → transparent + hover surface-2
+- Inputs, Selects, Textareas, Dialogs, Sheets, Tabs, Toasts (shadcn): retheme via CSS tokens only, no structural changes
+- `SpotsPill`, `ReputationBadge`, `PrimaryCTA`, `SportChips`: adopt new pill/gradient styles
 
-Auto-skips when `LOVABLE_BROWSER_SUPABASE_*` env vars are missing (same guard used by existing specs like `join-realtime-cross-views.spec.ts`).
+### Out of scope
 
-### 3. Integration: DB-level clear
+- No route additions/removals, no schema or RLS changes, no server-function changes
+- No copy changes beyond header/CTA labels where the new layout demands it
+- No swap of icon library
+- No changes to test files, migrations, or edge functions
+- Light mode is not delivered in this pass (app becomes dark-only for now)
 
-`src/lib/leave-verified-payment.integration.test.ts` — vitest against the live Supabase publishable client, guarded by the same env-var check as other `*.integration.test.ts` files in this repo. Exercises just the server side of the leave flow:
-- seed approved request + verified submission + participant row for the viewer
-- call `deleteMyPendingSubmission` (for the verified row), `withdrawMyApprovedJoinRequest`, and the `game_participants` delete
-- assert all three rows are gone
-- assert a subsequent `getMyJoinRequest` returns `null` and `listMySubmissionsForGame` returns `[]`
+### Technical notes
 
-Locks in the RLS policies that were added earlier (`Players withdraw own submissions`, `Players withdraw own join requests`) so a future policy edit that re-narrows either DELETE would fail this test loudly.
+- Tailwind v4: all tokens go in `src/styles.css` under `@theme` / `@theme inline`; no `tailwind.config.js`
+- Colors defined as `oklch()` in `:root`, mapped through `@theme inline` so `bg-primary`, `text-foreground`, `border-border`, etc. keep working across every shadcn component
+- Fonts: `<link rel="preconnect">` + Google Fonts `<link rel="stylesheet">` for Sora (400,600,700,800) and Manrope (400,500,600,700) added to `head()` in `src/routes/__root.tsx`
+- Never hardcode hex/`text-white`/`bg-black` in components — every color reads from tokens so the whole app flips in one place
+- shadcn components restyled via variants (`cva`) where a new look is needed (buttons, badges), not by editing component internals
 
-## Out of scope
+### Verification
 
-- No UI changes.
-- No new production code beyond extracting the tiny `shouldTriggerLeaveBranch` helper (needed for unit test) and wiring it back into the route file.
+- `bun run build` succeeds
+- Visual sweep via Playwright screenshots of: `/`, `/_tabs/discover`, `/_tabs/profile`, `/games/host-mrl2wvvn-313q`, `/auth`, `/settings`, `/messages` — confirm consistent tokens, tab bar, card shell, and CTA style
+- Existing unit / e2e tests still pass (no logic touched)
