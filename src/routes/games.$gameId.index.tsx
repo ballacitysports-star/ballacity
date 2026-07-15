@@ -1719,8 +1719,9 @@ function GameDetail() {
                             req={r}
                             gameTitle={game.title}
                             feeRequired={isPaid}
-                            onChange={refreshHostRequests}
+                            onOptimistic={applyOptimisticReview}
                           />
+
                         ))}
                         {rosterFromLive.map((p) => (
                           <Link
