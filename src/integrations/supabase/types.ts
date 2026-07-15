@@ -1066,6 +1066,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      can_access_game_payment: {
+        Args: { _game_id: string; _host_id: string; _user_id: string }
+        Returns: boolean
+      }
       can_notify: {
         Args: { _caller: string; _target: string }
         Returns: boolean
@@ -1077,6 +1081,13 @@ export type Database = {
       free_reels_used: {
         Args: { check_env?: string; user_uuid: string }
         Returns: number
+      }
+      get_game_payment_options: {
+        Args: { _game_id: string }
+        Returns: {
+          methods: Json
+          settings: Json
+        }[]
       }
       get_host_payment_methods: {
         Args: { _host_id: string }
