@@ -1604,28 +1604,6 @@ function GameDetail() {
             </button>
           </div>
 
-          <button
-            type="button"
-            onClick={toggleRequireApproval}
-            disabled={approvalSaving}
-            className={`w-full flex items-center justify-between gap-3 rounded-2xl border p-4 text-left disabled:opacity-60 ${
-              settings?.requires_approval ? "border-lime bg-lime/5" : "border-border bg-surface"
-            }`}
-          >
-            <div className="min-w-0">
-              <div className="font-semibold text-sm">Require my approval to join</div>
-              <p className="text-xs text-muted-foreground mt-0.5">
-                Players send a pickup request and you approve or decline each one.
-              </p>
-            </div>
-            <div
-              className={`shrink-0 grid h-7 w-12 items-center rounded-full p-0.5 transition-colors ${settings?.requires_approval ? "bg-lime" : "bg-secondary"}`}
-            >
-              <div
-                className={`h-6 w-6 rounded-full bg-background shadow transition-transform ${settings?.requires_approval ? "translate-x-5" : ""}`}
-              />
-            </div>
-          </button>
 
           {hostRequests.length > 0 ? (
             <div>
