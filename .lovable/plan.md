@@ -1,39 +1,32 @@
-## Goal
-Let the host verify or reject a player's payment directly from the roster row in game details, without leaving the page.
+## Problem
 
-## Where
-`RosterPlayerRow` in `src/routes/games.$gameId.index.tsx` (~lines 2631–2827). Only shown to the host on paid games (already gated by `feeRequired`).
+When the host rejects a player's payment from the roster panel, `reviewPaymentAction` only updates `payment_submissions.status` to `rejected`. The player's `game_participants` row (and approved `join_requests` row) are left intact, so the player still appears on the confirmed roster and still counts toward the `joined` total.
 
-## Changes
+## Fix
 
-### 1. Track the latest submission, not just its status
-In the existing `loadPayment` effect, also capture `id` and `screenshot_path`:
-- Replace local `paymentStatus` state with `latestSub: { id, status, screenshot_path } | null`.
-- Derive `paymentStatus` from `latestSub?.status ?? "none"` so the existing chip logic is unchanged.
-- Realtime channel already refetches on change — keeps action buttons in sync when the player submits/resubmits.
+Extend the reject path so a rejection also removes the player from the game.
 
-### 2. Add inline action buttons next to the payment chip
-Below (or beside) the chip row, render host actions based on current status:
-- `pending` → **Verify** (primary/lime) and **Reject** (coral) buttons.
-- `rejected` → **Verify** button (allow override).
-- `verified` → **Mark unpaid** button (revert to `pending`) — useful if verified by mistake.
-- `none` (no submission yet) → **Mark as paid** button (creates a host-recorded submission with `status: "verified"`, `payment_type: null`, `notes: "Marked paid by host"`).
+### Server (`src/lib/payments.functions.ts`)
 
-Buttons are compact pill style consistent with existing Remove/Block buttons.
+In `reviewPaymentAction`, when `next === "rejected"` and the update succeeds (`changed: true`):
 
-### 3. Wire actions
-- Verify / Reject / Mark unpaid → call existing `reviewSubmission(latestSub.id, status, notes?)` from `@/lib/payments`.
-- Mark as paid (no submission exists) → insert into `payment_submissions` via a new small helper in the same file (or inline supabase call) with `player_id: req.player_id`, `game_id: req.game_id`, `host_id: req.host_id`, `status: "verified"`, `notes: "Marked paid by host"`, `paid_at: now`.
-- After success: optimistic `setLatestSub` update, toast, and send a notification to the player (`createNotification`) — `payment_verified` / `payment_rejected` (reuse existing notification types if present, otherwise `join_approved`-style generic).
-- Wrap each action in a `busy` guard reusing the existing `busy` state.
+1. Delete the player's row from `game_participants` for this `game_id` (trigger `sync_hosted_game_joined_count` will recompute `hosted_games.joined`).
+2. If an `approved` `join_requests` row exists for `(game_id, player_id)`, flip it back to `rejected` with `reviewer_notes = "Payment rejected"` so the player has to re-request + re-pay (matches existing "resubmit after rejection" flow already handled by `enforce_join_request_resubmit_rules`).
+3. Do nothing extra when the transition is a no-op (`changed: false`) so repeated clicks stay idempotent.
 
-### 4. Optional: "View proof" link
-If `latestSub?.screenshot_path`, show a small "View proof" link that calls `getSignedProofUrl` and opens the URL in a new tab.
+Return the same `ReviewPaymentResult` shape — no client type changes needed.
 
-## Out of scope
-- No DB/schema changes (RLS already permits host to update `payment_submissions` — that's how the existing host review screen works).
-- No changes to the player-facing pay flow.
-- No changes to the payments list route.
+### Client (`src/routes/games.$gameId.index.tsx`)
 
-## Files touched
-- `src/routes/games.$gameId.index.tsx` (RosterPlayerRow only)
+After a successful reject in `setPaymentStatusAction`:
+
+- Call the existing `refetchRoster()` / roster invalidation already used elsewhere so the removed player disappears immediately (the realtime subscription on `game_participants` should also fire, but an explicit refetch avoids a visible lag).
+- Keep the existing "Payment rejected" notification to the player.
+
+No UI/copy changes; the reject button and history panel behave the same, the player just also drops off the roster.
+
+### Out of scope
+
+- No schema migration (uses existing tables/triggers).
+- No changes to the verify / mark-paid / mark-unpaid paths.
+- No changes to the player-initiated leave flow.
