@@ -23,6 +23,7 @@ import {
   DollarSign,
   Home,
   ShieldCheck,
+  History,
 } from "lucide-react";
 import { GAMES, SPORTS, imageFor } from "@/lib/sample-data";
 import { formatWhen } from "@/lib/format";
@@ -2649,6 +2650,20 @@ function RosterPlayerRow({
     status: "verified" | "pending" | "rejected";
     screenshot_path: string | null;
   } | null>(null);
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const [history, setHistory] = useState<
+    Array<{
+      id: string;
+      action: string;
+      from_status: string | null;
+      to_status: string | null;
+      notes: string | null;
+      actor_id: string | null;
+      actor_name: string;
+      created_at: string;
+    }>
+  >([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
   const paymentStatus: "verified" | "pending" | "rejected" | "none" = latestSub?.status ?? "none";
   const reviews = useReviewsFor(req.player_id);
   const rep = useMemo(() => computeReputation(reviews, "player"), [reviews]);
@@ -2796,6 +2811,70 @@ function RosterPlayerRow({
     if (url) window.open(url, "_blank", "noopener,noreferrer");
     else toast.error("Could not load proof.");
   };
+
+  const loadHistory = async () => {
+    setHistoryLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from("payment_verification_events" as never)
+        .select("id, action, from_status, to_status, notes, actor_id, created_at")
+        .eq("game_id", req.game_id)
+        .eq("player_id", req.player_id)
+        .order("created_at", { ascending: false });
+      if (error) throw error;
+      const rows = (data ?? []) as Array<{
+        id: string;
+        action: string;
+        from_status: string | null;
+        to_status: string | null;
+        notes: string | null;
+        actor_id: string | null;
+        created_at: string;
+      }>;
+      const actorIds = Array.from(
+        new Set(rows.map((r) => r.actor_id).filter((v): v is string => !!v)),
+      );
+      const nameMap: Record<string, string> = {};
+      if (actorIds.length) {
+        const { data: profs } = await supabase
+          .from("profiles")
+          .select("id, display_name")
+          .in("id", actorIds);
+        for (const p of (profs ?? []) as Array<{ id: string; display_name: string | null }>) {
+          nameMap[p.id] = p.display_name ?? "Someone";
+        }
+      }
+      setHistory(
+        rows.map((r) => {
+          const isHostActor = r.actor_id === req.host_id;
+          const isPlayerActor = r.actor_id === req.player_id;
+          const label = isHostActor
+            ? "Host"
+            : isPlayerActor
+              ? "Player"
+              : (r.actor_id && nameMap[r.actor_id]) || "System";
+          return { ...r, actor_name: label };
+        }),
+      );
+    } catch (e: any) {
+      toast.error(e.message ?? "Could not load history.");
+    } finally {
+      setHistoryLoading(false);
+    }
+  };
+
+  const toggleHistory = () => {
+    const next = !historyOpen;
+    setHistoryOpen(next);
+    if (next && history.length === 0) void loadHistory();
+  };
+
+  // Refresh history after any local action changes the submission.
+  useEffect(() => {
+    if (historyOpen) void loadHistory();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [latestSub?.id, latestSub?.status]);
+
 
 
   const remove = async () => {
@@ -2974,12 +3053,78 @@ function RosterPlayerRow({
               <Check className="h-3 w-3" /> Mark as paid
             </button>
           )}
+          <button
+            type="button"
+            onClick={toggleHistory}
+            className="inline-flex items-center gap-1 rounded-full border border-border bg-background px-2.5 py-1 text-[11px] font-semibold hover:bg-secondary"
+            aria-expanded={historyOpen}
+          >
+            <History className="h-3 w-3" /> {historyOpen ? "Hide history" : "History"}
+          </button>
         </div>
       )}
-
+      {feeRequired && historyOpen && (
+        <div className="mt-2 rounded-xl border border-border bg-background/60 p-2.5">
+          <div className="mb-1.5 text-[11px] font-bold uppercase tracking-wide text-muted-foreground">
+            Verification history
+          </div>
+          {historyLoading ? (
+            <div className="text-[11px] text-muted-foreground">Loading…</div>
+          ) : history.length === 0 ? (
+            <div className="text-[11px] text-muted-foreground">No activity yet.</div>
+          ) : (
+            <ul className="space-y-1.5">
+              {history.map((ev) => {
+                const when = new Date(ev.created_at).toLocaleString("en-US", {
+                  month: "short",
+                  day: "numeric",
+                  hour: "numeric",
+                  minute: "2-digit",
+                });
+                const change =
+                  ev.from_status && ev.to_status
+                    ? `${ev.from_status} → ${ev.to_status}`
+                    : ev.to_status ?? ev.action;
+                const label =
+                  ev.action === "submitted"
+                    ? "Player submitted payment"
+                    : ev.action === "created_verified"
+                      ? "Host marked as paid"
+                      : ev.action === "created_rejected"
+                        ? "Marked rejected"
+                        : ev.action === "verified"
+                          ? "Payment verified"
+                          : ev.action === "rejected"
+                            ? "Payment rejected"
+                            : ev.action === "reopened"
+                              ? "Marked unpaid"
+                              : "Updated";
+                return (
+                  <li
+                    key={ev.id}
+                    className="rounded-lg border border-border/60 bg-surface px-2 py-1.5 text-[11px]"
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="font-semibold">{label}</span>
+                      <span className="text-muted-foreground">{when}</span>
+                    </div>
+                    <div className="text-muted-foreground">
+                      by {ev.actor_name} · {change}
+                    </div>
+                    {ev.notes && (
+                      <div className="mt-0.5 italic text-muted-foreground">“{ev.notes}”</div>
+                    )}
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </div>
+      )}
     </div>
   );
 }
+
 
 function HostRequestRow({
   req,
