@@ -894,7 +894,11 @@ function GameDetail() {
                   ? "Your spot isn't held until the host approves. You'll get a notification when they respond."
                   : myReq.status === "approved"
                     ? "The host approved your request. You're on the roster."
-                    : `${myReq.reviewer_notes ? `${myReq.reviewer_notes} · ` : ""}You can send another request or message the host.`}
+                    : capReached
+                      ? `${myReq.reviewer_notes ? `${myReq.reviewer_notes} · ` : ""}You've reached the ${JOIN_RESUBMIT_MAX_ATTEMPTS}-attempt limit for this game. Message the host instead.`
+                      : cooldownMs > 0
+                        ? `${myReq.reviewer_notes ? `${myReq.reviewer_notes} · ` : ""}You can resubmit in ${formatCooldownLabel(cooldownMs)}.`
+                        : `${myReq.reviewer_notes ? `${myReq.reviewer_notes} · ` : ""}You can send another request or message the host.`}
 
               </p>
             </div>
