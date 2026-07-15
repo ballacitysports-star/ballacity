@@ -222,7 +222,7 @@ function GameDetail() {
   const ownsViaGame = !!(user && game?.hostUserId && user.id === game.hostUserId);
   const hostsThisGame = ownsViaDb || ownsViaGame;
   const isHost = hostsThisGame;
-  const [approvalSaving, setApprovalSaving] = useState(false);
+  
 
   const hostReviews = useReviewsFor(hostIdFor(game?.host.username ?? ""));
   const hostRep = useMemo(() => computeReputation(hostReviews, "host"), [hostReviews]);
@@ -284,28 +284,6 @@ function GameDetail() {
     return () => setHostRequests(snapshot);
   };
 
-  const toggleRequireApproval = async () => {
-    if (!game || !user) return;
-    setApprovalSaving(true);
-    try {
-      await upsertGamePaymentSettings({
-        game_id: game.id,
-        entry_fee: Number(settings?.entry_fee ?? game.price ?? 0),
-        accepted_method_ids: settings?.accepted_method_ids ?? [],
-        payment_deadline: settings?.payment_deadline ?? null,
-        refund_policy: settings?.refund_policy ?? null,
-        payment_instructions: settings?.payment_instructions ?? null,
-        requires_approval: !settings?.requires_approval,
-      });
-      toast.success(settings?.requires_approval ? "Approval disabled" : "Approval enabled");
-      await refreshStatus();
-      await refreshHostRequests();
-    } catch (e: any) {
-      toast.error(e.message ?? "Could not update.");
-    } finally {
-      setApprovalSaving(false);
-    }
-  };
 
   useEffect(() => {
     if (GAMES.some((g) => g.id === gameId) || hosted.some((g) => g.id === gameId)) {
@@ -1626,28 +1604,6 @@ function GameDetail() {
             </button>
           </div>
 
-          <button
-            type="button"
-            onClick={toggleRequireApproval}
-            disabled={approvalSaving}
-            className={`w-full flex items-center justify-between gap-3 rounded-2xl border p-4 text-left disabled:opacity-60 ${
-              settings?.requires_approval ? "border-lime bg-lime/5" : "border-border bg-surface"
-            }`}
-          >
-            <div className="min-w-0">
-              <div className="font-semibold text-sm">Require my approval to join</div>
-              <p className="text-xs text-muted-foreground mt-0.5">
-                Players send a pickup request and you approve or decline each one.
-              </p>
-            </div>
-            <div
-              className={`shrink-0 grid h-7 w-12 items-center rounded-full p-0.5 transition-colors ${settings?.requires_approval ? "bg-lime" : "bg-secondary"}`}
-            >
-              <div
-                className={`h-6 w-6 rounded-full bg-background shadow transition-transform ${settings?.requires_approval ? "translate-x-5" : ""}`}
-              />
-            </div>
-          </button>
 
           {hostRequests.length > 0 ? (
             <div>
