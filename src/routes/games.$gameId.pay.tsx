@@ -240,7 +240,7 @@ function PayPage() {
         setSettings(s);
         if (s) {
           const all = await withTimeout(
-            listPaymentMethodsForHost(s.host_id),
+            listPaymentMethodsForHost(s.host_id, gameId),
             "listPaymentMethodsForHost",
           );
           if (cancelled) return;

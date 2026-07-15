@@ -117,8 +117,13 @@ export async function listMyPaymentMethods(): Promise<PaymentMethod[]> {
   return (data ?? []) as PaymentMethod[];
 }
 
-export async function listPaymentMethodsForHost(hostId: string): Promise<PaymentMethod[]> {
-  const { data, error } = await supabase.rpc("get_host_payment_methods", { _host_id: hostId });
+export async function listPaymentMethodsForHost(
+  hostId: string,
+  gameId?: string,
+): Promise<PaymentMethod[]> {
+  const { data, error } = gameId
+    ? await supabase.rpc("get_game_host_payment_methods", { _host_id: hostId, _game_id: gameId })
+    : await supabase.rpc("get_host_payment_methods", { _host_id: hostId });
   if (error) throw error;
   return (data ?? []) as PaymentMethod[];
 }

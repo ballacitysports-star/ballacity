@@ -2,8 +2,8 @@ import { test, expect, type Page } from "@playwright/test";
 
 /**
  * E2E: tapping the paid CTA on a game detail page must, within a bounded
- * time, either reach the pay screen's success/ready state (h1 title
- * rendered, no "Game not found") OR surface the retry/error affordance
+ * time, either reach the pay screen's success/ready state (loading gone,
+ * no "Game not found") OR surface the retry/error affordance
  * ("Couldn't reach the payment service" + Retry button).
  *
  * Covers both branches:
@@ -94,15 +94,15 @@ async function mockPaidSettingsHang(page: Page) {
 }
 
 /**
- * Wait for the pay screen to resolve to EITHER the ready state (h1 visible,
+ * Wait for the pay screen to resolve to EITHER the ready state (loading gone,
  * no "Game not found") OR the retry/error state (Retry button visible).
  * Returns which outcome occurred so the caller can assert on it.
  */
 async function waitForPayOutcome(page: Page): Promise<"ready" | "retry"> {
   const ready = page
-    .locator("h1")
+    .getByText(/loading payment options/i)
     .first()
-    .waitFor({ state: "visible", timeout: OUTCOME_TIMEOUT_MS })
+    .waitFor({ state: "hidden", timeout: OUTCOME_TIMEOUT_MS })
     .then(() => "ready" as const);
   const retry = page
     .getByRole("button", { name: /^retry$/i })

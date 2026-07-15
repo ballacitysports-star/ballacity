@@ -7,12 +7,12 @@ import { test, expect, type Page, type Route } from "@playwright/test";
  * Guards against the previous RLS leak where `host_payment_methods`
  * SELECT allowed any authenticated user to read every enabled host's
  * payment methods. After the fix, players fetch only a specific host's
- * enabled methods via the `get_host_payment_methods` RPC, and direct
+ * enabled methods via the `get_game_host_payment_methods` RPC, and direct
  * table reads for another host must return zero rows.
  *
  * The test:
  *   1. Mocks game_payment_settings to point at HOST_A.
- *   2. Intercepts the get_host_payment_methods RPC — returns HOST_A's
+ *   2. Intercepts the get_game_host_payment_methods RPC — returns HOST_A's
  *      method when asked for HOST_A, and rejects (fails the test) if
  *      the client ever asks for HOST_B.
  *   3. Fulfills a direct table read for HOST_B with an empty list to
@@ -97,20 +97,21 @@ test("Pay screen for HOST_A never renders or requests HOST_B's payment methods",
   const rpcCalls: string[] = [];
   const leakedHostBRequests: string[] = [];
 
-  // Intercept the security-definer RPC. Only HOST_A is a legitimate arg;
+  // Intercept the security-definer RPC. Only HOST_A for GAME_ID is legitimate;
   // any HOST_B call is a leak and is recorded to fail the test below.
   await page.route(
-    (url) => urlIncludes(url, "/rest/v1/rpc/get_host_payment_methods"),
+    (url) => urlIncludes(url, "/rest/v1/rpc/get_game_host_payment_methods"),
     async (route) => {
       const req = route.request();
       if (req.method() !== "POST") return route.fallback();
-      let body: { _host_id?: string } = {};
+      let body: { _host_id?: string; _game_id?: string } = {};
       try {
         body = JSON.parse(req.postData() || "{}");
       } catch {
         /* keep body empty */
       }
       rpcCalls.push(body._host_id ?? "");
+      expect(body._game_id).toBe(GAME_ID);
       if (body._host_id === HOST_A) {
         await route.fulfill({
           status: 200,

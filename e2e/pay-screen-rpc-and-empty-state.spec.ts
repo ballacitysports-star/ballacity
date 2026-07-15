@@ -2,7 +2,7 @@ import { test, expect, type Page, type Route } from "@playwright/test";
 
 /**
  * E2E: the pay screen must fetch host payment options exclusively via
- * the `get_host_payment_methods` RPC (host-scoped, security definer),
+ * the `get_game_host_payment_methods` RPC (game + host scoped, security definer),
  * never via a direct `host_payment_methods` table SELECT. When the RPC
  * returns no rows, the screen must render the empty state.
  *
@@ -85,17 +85,18 @@ test("Pay screen uses host-scoped RPC and renders empty state when no methods", 
 
   // The correct path: RPC returns empty list.
   await page.route(
-    (url) => urlIncludes(url, "/rest/v1/rpc/get_host_payment_methods"),
+    (url) => urlIncludes(url, "/rest/v1/rpc/get_game_host_payment_methods"),
     async (route) => {
       const req = route.request();
       if (req.method() !== "POST") return route.fallback();
-      let body: { _host_id?: string } = {};
+      let body: { _host_id?: string; _game_id?: string } = {};
       try {
         body = JSON.parse(req.postData() || "{}");
       } catch {
         /* ignore */
       }
       rpcCalls.push(body._host_id ?? "");
+      expect(body._game_id).toBe(GAME_ID);
       await route.fulfill({
         status: 200,
         contentType: "application/json",
