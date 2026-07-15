@@ -60,7 +60,6 @@ import {
   upsertGamePaymentSettings,
   listMyPaymentMethods,
   paymentTypeMeta,
-  reviewSubmission,
   getSignedProofUrl,
   joinResubmitCooldownRemainingMs,
   joinResubmitCapReached,
@@ -70,6 +69,7 @@ import {
   type PaymentSubmission,
   type JoinRequest,
 } from "@/lib/payments";
+import { reviewPaymentAction } from "@/lib/payments.functions";
 import { shouldTriggerLeaveBranch } from "@/lib/leave-branch";
 
 import { useHostedGames, fetchHostedGame, updateHostedGame, deleteHostedGame } from "@/lib/hosted-games-store";
@@ -2738,9 +2738,28 @@ function RosterPlayerRow({
     if (!latestSub || busy) return;
     setBusy(true);
     const prev = latestSub;
+    // Optimistic UI. `expectedFrom` gives server-side optimistic concurrency
+    // so a second concurrent click cannot double-apply the transition.
     setLatestSub({ ...latestSub, status: next });
     try {
-      await reviewSubmission(latestSub.id, next);
+      const res = await reviewPaymentAction({
+        data: {
+          gameId: req.game_id,
+          playerId: req.player_id,
+          next,
+          expectedFrom: prev.status,
+        },
+      });
+      setLatestSub({
+        id: res.submission.id,
+        status: res.submission.status,
+        screenshot_path: res.submission.screenshot_path,
+      });
+      if (!res.changed) {
+        // Idempotent no-op — already in this state (duplicate click / stale tab).
+        toast.info("Already up to date.");
+        return;
+      }
       if (notifyType) {
         await createNotification({
           user_id: req.player_id,
@@ -2771,25 +2790,23 @@ function RosterPlayerRow({
     if (busy) return;
     setBusy(true);
     try {
-      const { data, error } = await supabase
-        .from("payment_submissions")
-        .insert({
-          player_id: req.player_id,
-          game_id: req.game_id,
-          host_id: req.host_id,
-          payment_method_id: null,
-          payment_type: null,
-          screenshot_path: null,
-          notes: "Marked paid by host",
-          paid_at: new Date().toISOString(),
-          status: "verified",
-          reviewed_at: new Date().toISOString(),
-        } as never)
-        .select("id, status, screenshot_path")
-        .single();
-      if (error) throw error;
-      const d = data as { id: string; status: string; screenshot_path: string | null };
-      setLatestSub({ id: d.id, status: "verified", screenshot_path: d.screenshot_path });
+      const res = await reviewPaymentAction({
+        data: {
+          gameId: req.game_id,
+          playerId: req.player_id,
+          next: "verified",
+          expectedFrom: "none",
+        },
+      });
+      setLatestSub({
+        id: res.submission.id,
+        status: res.submission.status,
+        screenshot_path: res.submission.screenshot_path,
+      });
+      if (!res.changed) {
+        toast.info("Already marked as paid.");
+        return;
+      }
       await createNotification({
         user_id: req.player_id,
         type: "payment_verified",
@@ -2804,6 +2821,8 @@ function RosterPlayerRow({
       setBusy(false);
     }
   };
+
+
 
   const viewProof = async () => {
     if (!latestSub?.screenshot_path) return;
