@@ -140,7 +140,6 @@ function ensureRealtime() {
 
 export function joinGame(id: string, position?: string) {
   loadJoinedGames();
-  console.log("[leave-dbg] joinGame call", id, new Error().stack?.split("\n").slice(1,5).join(" | "));
   if (joined.has(id)) return;
   joined.add(id);
   saveJoinedGames();
