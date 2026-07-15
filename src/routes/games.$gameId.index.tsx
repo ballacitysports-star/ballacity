@@ -569,6 +569,15 @@ function GameDetail() {
     }
   };
 
+  const handleJoin = async (preselectedPosition?: string) => {
+    setProcessing(true);
+    try {
+      await executeJoinAction(preselectedPosition);
+    } finally {
+      setProcessing(false);
+    }
+  };
+
   const viewerPending =
     !isHost && requiresApproval && myReq?.status === "pending" && !viewerCountsAsJoined;
   const hostPendingReqs = isHost ? hostRequests.filter((r) => r.status === "pending") : [];
