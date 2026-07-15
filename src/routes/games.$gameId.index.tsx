@@ -34,6 +34,7 @@ import { ReputationBadge } from "@/components/ReputationBadge";
 import { joinGame, leaveGame, useIsJoined } from "@/lib/games-store";
 import { useLiveParticipantCount } from "@/lib/game-participants-store";
 import { useLiveParticipants } from "@/lib/game-roster";
+import { useGameRealtimeChannels } from "@/lib/game-realtime";
 import { useGameWaitlist, joinWaitlist, leaveWaitlist } from "@/lib/waitlist-store";
 import {
   Sheet,
@@ -309,64 +310,31 @@ function GameDetail() {
     refreshHostRequests();
   }, [game?.id, user?.id, settings?.host_id, hostsThisGame]);
 
-  // Realtime: refresh roster/requests when any join_request for this game changes.
-  // Channel key + deps include game.id AND user.id so we automatically tear
-  // down and re-subscribe when the viewer switches games or accounts.
-  useEffect(() => {
-    if (!game?.id || !user?.id || !hostsThisGame) return;
-    const channel = supabase
-      .channel(`join_requests:host:${game.id}:${user.id}`)
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "join_requests", filter: `game_id=eq.${game.id}` },
-        (payload) => {
-          const row = (payload.new ?? payload.old) as { game_id?: string } | null;
-          if (row?.game_id !== game.id) return;
-          refreshHostRequests();
-        },
-      )
-      .subscribe((status) => {
-        if (status !== "SUBSCRIBED") {
-          console.warn(`[realtime] join_requests:host channel status: ${status}`);
-        }
-      });
-    return () => {
-      supabase.removeChannel(channel);
-    };
-    // eslint-disable-next-line
-  }, [game?.id, user?.id, hostsThisGame]);
+  // Realtime channels for approval, roster, and payment status. Channel keys
+  // include gameId AND userId (where user-scoped) so switching games or
+  // accounts always tears down old channels and re-subscribes with fresh ids.
+  // Contract pinned by src/lib/game-realtime.test.tsx.
+  useGameRealtimeChannels({
+    gameId: game?.id,
+    userId: user?.id,
+    hostsThisGame,
+    onHostJoinRequestChange: () => {
+      refreshHostRequests();
+    },
+    onMyJoinRequestChange: () => {
+      refreshStatus();
+      void refetchRoster();
+    },
+    onSettingsChange: () => {
+      refreshStatus();
+      if (hostsThisGame) refreshHostRequests();
+    },
+    onMyPaymentChange: () => {
+      refreshStatus();
+      void refetchRoster();
+    },
+  });
 
-  // Realtime: live approval updates for my own join_request on this game.
-  useEffect(() => {
-    if (!game?.id || !user?.id) return;
-    const channel = supabase
-      .channel(`join_requests:me:${game.id}:${user.id}`)
-      .on(
-        "postgres_changes",
-        {
-          event: "*",
-          schema: "public",
-          table: "join_requests",
-          filter: `player_id=eq.${user.id}`,
-        },
-        (payload) => {
-          const row = (payload.new ?? payload.old) as { game_id?: string } | null;
-          if (row?.game_id === game.id) {
-            refreshStatus();
-            void refetchRoster();
-          }
-        },
-      )
-      .subscribe((status) => {
-        if (status !== "SUBSCRIBED") {
-          console.warn(`[realtime] join_requests:me channel status: ${status}`);
-        }
-      });
-    return () => {
-      supabase.removeChannel(channel);
-    };
-    // eslint-disable-next-line
-  }, [game?.id, user?.id]);
 
   // Event-driven fallback: refetch when the tab regains focus or becomes
   // visible (covers the case where the realtime socket was suspended while
@@ -424,73 +392,6 @@ function GameDetail() {
     };
   }, []);
 
-  // Realtime: live changes to the game's payment settings (fee, approval toggle, accepted methods).
-  useEffect(() => {
-    if (!game?.id) return;
-    const channel = supabase
-      .channel(`game_payment_settings:${game.id}`)
-      .on(
-        "postgres_changes",
-        {
-          event: "*",
-          schema: "public",
-          table: "game_payment_settings",
-          filter: `game_id=eq.${game.id}`,
-        },
-        (payload) => {
-          const row = (payload.new ?? payload.old) as { game_id?: string } | null;
-          if (row?.game_id !== game.id) return;
-          refreshStatus();
-          if (hostsThisGame) refreshHostRequests();
-        },
-      )
-      .subscribe((status) => {
-        if (status !== "SUBSCRIBED") {
-          console.warn(`[realtime] game_payment_settings channel status: ${status}`);
-        }
-      });
-    return () => {
-      supabase.removeChannel(channel);
-    };
-    // eslint-disable-next-line
-  }, [game?.id]);
-
-  // Realtime: when the host verifies/updates my payment submission for this
-  // game, re-run refreshStatus so the auto-join effect can add me to the
-  // roster (game_participants) as soon as the fee is verified.
-  useEffect(() => {
-    if (!game?.id || !user?.id) return;
-    const channel = supabase
-      .channel(`payment_submissions:me:${game.id}:${user.id}`)
-      .on(
-        "postgres_changes",
-        {
-          event: "*",
-          schema: "public",
-          table: "payment_submissions",
-          filter: `game_id=eq.${game.id}`,
-        },
-        (payload) => {
-          const row = (payload.new ?? payload.old) as {
-            player_id?: string;
-            game_id?: string;
-          } | null;
-          if (row?.game_id !== game.id) return;
-          if (row?.player_id !== user.id) return;
-          refreshStatus();
-          void refetchRoster();
-        },
-      )
-      .subscribe((status) => {
-        if (status !== "SUBSCRIBED") {
-          console.warn(`[realtime] payment_submissions:me channel status: ${status}`);
-        }
-      });
-    return () => {
-      supabase.removeChannel(channel);
-    };
-    // eslint-disable-next-line
-  }, [game?.id, user?.id]);
 
   // Realtime: surface in-app toasts as other players join or leave.
   // Compares snapshots of the live roster and skips the viewer's own
