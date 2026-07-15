@@ -44,7 +44,28 @@ export type JoinRequest = {
   reviewer_notes: string | null;
   created_at: string;
   reviewed_at: string | null;
+  attempt_count?: number;
+  last_rejected_at?: string | null;
 };
+
+export const JOIN_RESUBMIT_COOLDOWN_MS = 15 * 60 * 1000;
+export const JOIN_RESUBMIT_MAX_ATTEMPTS = 3;
+
+/**
+ * Milliseconds remaining before the caller may resubmit after a rejection.
+ * 0 means no active cooldown. Client-side gate that mirrors the DB trigger
+ * so the UI can disable the CTA and show a countdown before the network round-trip.
+ */
+export function joinResubmitCooldownRemainingMs(req: JoinRequest | null): number {
+  if (!req || req.status !== "rejected" || !req.last_rejected_at) return 0;
+  const until = new Date(req.last_rejected_at).getTime() + JOIN_RESUBMIT_COOLDOWN_MS;
+  return Math.max(0, until - Date.now());
+}
+
+export function joinResubmitCapReached(req: JoinRequest | null): boolean {
+  if (!req || req.status !== "rejected") return false;
+  return (req.attempt_count ?? 1) >= JOIN_RESUBMIT_MAX_ATTEMPTS;
+}
 
 export type PaymentSubmission = {
   id: string;
