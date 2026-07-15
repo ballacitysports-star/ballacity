@@ -753,6 +753,36 @@ function GameDetail() {
           </div>
         )}
 
+        {/* Compact "Your status" strip for paid games — surfaces payment state
+            at the top so the viewer sees where they are without scrolling to
+            the sticky CTA. Only rendered when the viewer has actually
+            submitted (or had rejected) proof; otherwise the sticky CTA is
+            the single source of truth. */}
+        {!isHost && isPaid && latestSub && (
+          <div
+            className={`flex items-center gap-3 rounded-2xl border px-4 py-2.5 text-xs ${
+              latestSub.status === "verified"
+                ? "border-lime/40 bg-lime/10 text-lime"
+                : latestSub.status === "pending"
+                  ? "border-coral/40 bg-coral/10 text-coral"
+                  : "border-border bg-surface text-muted-foreground"
+            }`}
+            role="status"
+            aria-live="polite"
+            data-testid="your-status-strip"
+          >
+            <span className="font-bold uppercase tracking-wider">Your status</span>
+            <span className="text-foreground/80">·</span>
+            <span className="font-semibold">
+              {latestSub.status === "verified"
+                ? "Payment verified — you're on the roster"
+                : latestSub.status === "pending"
+                  ? "Payment pending host review"
+                  : "Payment rejected — resubmit below"}
+            </span>
+          </div>
+        )}
+
         {/* Meta */}
         <div className="grid grid-cols-2 gap-2">
           <Meta
