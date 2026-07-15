@@ -2812,6 +2812,70 @@ function RosterPlayerRow({
     else toast.error("Could not load proof.");
   };
 
+  const loadHistory = async () => {
+    setHistoryLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from("payment_verification_events" as never)
+        .select("id, action, from_status, to_status, notes, actor_id, created_at")
+        .eq("game_id", req.game_id)
+        .eq("player_id", req.player_id)
+        .order("created_at", { ascending: false });
+      if (error) throw error;
+      const rows = (data ?? []) as Array<{
+        id: string;
+        action: string;
+        from_status: string | null;
+        to_status: string | null;
+        notes: string | null;
+        actor_id: string | null;
+        created_at: string;
+      }>;
+      const actorIds = Array.from(
+        new Set(rows.map((r) => r.actor_id).filter((v): v is string => !!v)),
+      );
+      const nameMap: Record<string, string> = {};
+      if (actorIds.length) {
+        const { data: profs } = await supabase
+          .from("profiles")
+          .select("id, display_name")
+          .in("id", actorIds);
+        for (const p of (profs ?? []) as Array<{ id: string; display_name: string | null }>) {
+          nameMap[p.id] = p.display_name ?? "Someone";
+        }
+      }
+      setHistory(
+        rows.map((r) => {
+          const isHostActor = r.actor_id === req.host_id;
+          const isPlayerActor = r.actor_id === req.player_id;
+          const label = isHostActor
+            ? "Host"
+            : isPlayerActor
+              ? "Player"
+              : (r.actor_id && nameMap[r.actor_id]) || "System";
+          return { ...r, actor_name: label };
+        }),
+      );
+    } catch (e: any) {
+      toast.error(e.message ?? "Could not load history.");
+    } finally {
+      setHistoryLoading(false);
+    }
+  };
+
+  const toggleHistory = () => {
+    const next = !historyOpen;
+    setHistoryOpen(next);
+    if (next && history.length === 0) void loadHistory();
+  };
+
+  // Refresh history after any local action changes the submission.
+  useEffect(() => {
+    if (historyOpen) void loadHistory();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [latestSub?.id, latestSub?.status]);
+
+
 
   const remove = async () => {
     if (!confirm(`Remove ${name} from ${gameTitle}?`)) return;
