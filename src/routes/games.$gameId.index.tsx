@@ -169,7 +169,7 @@ function GameDetail() {
   );
   const joined = useIsJoined(gameId);
   const liveParticipantCount = useLiveParticipantCount(gameId);
-  const { participants: liveRoster, refetch: refetchRoster } = useLiveParticipants(gameId);
+  const { participants: liveRoster, refetch: refetchRoster, removeLocal: removeRosterLocal } = useLiveParticipants(gameId);
   const { entries: waitlistEntries } = useGameWaitlist(gameId);
   const nav = useNavigate();
   const { user } = useAuth();
