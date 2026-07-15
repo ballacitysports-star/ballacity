@@ -67,6 +67,7 @@ import {
   type PaymentSubmission,
   type JoinRequest,
 } from "@/lib/payments";
+import { shouldTriggerLeaveBranch } from "@/lib/leave-branch";
 
 import { useHostedGames, fetchHostedGame, updateHostedGame, deleteHostedGame } from "@/lib/hosted-games-store";
 import type { Game } from "@/lib/sample-data";
@@ -550,7 +551,8 @@ function GameDetail() {
     // actually on the roster — a stale local `joined` flag on an approval-
     // or payment-gated game (e.g. right after leaving, before refetch) must
     // NOT re-trigger the leave branch when the user taps "Request to join".
-    if (isConfirmed || (joined && !requiresApproval && !isPaid)) {
+    // Predicate extracted for unit-test coverage (see src/lib/leave-branch.ts).
+    if (shouldTriggerLeaveBranch({ isConfirmed, joined, requiresApproval, isPaid })) {
       // Snapshot for rollback on server error.
       const prevReq = myReq;
       const prevSubs = mySubs;
