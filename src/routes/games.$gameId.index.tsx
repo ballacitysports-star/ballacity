@@ -60,7 +60,7 @@ import {
   upsertGamePaymentSettings,
   listMyPaymentMethods,
   paymentTypeMeta,
-  reviewSubmission,
+  reviewJoinRequest,
   getSignedProofUrl,
   joinResubmitCooldownRemainingMs,
   joinResubmitCapReached,
