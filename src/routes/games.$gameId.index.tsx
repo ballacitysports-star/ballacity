@@ -169,7 +169,7 @@ function GameDetail() {
   );
   const joined = useIsJoined(gameId);
   const liveParticipantCount = useLiveParticipantCount(gameId);
-  const { participants: liveRoster } = useLiveParticipants(gameId);
+  const { participants: liveRoster, refetch: refetchRoster } = useLiveParticipants(gameId);
   const { entries: waitlistEntries } = useGameWaitlist(gameId);
   const nav = useNavigate();
   const { user } = useAuth();
@@ -320,12 +320,74 @@ function GameDetail() {
           if (row?.game_id === game.id) refreshStatus();
         },
       )
-      .subscribe();
+      .subscribe((status) => {
+        if (status !== "SUBSCRIBED") {
+          console.warn(`[realtime] join_requests:me channel status: ${status}`);
+        }
+      });
     return () => {
       supabase.removeChannel(channel);
     };
     // eslint-disable-next-line
   }, [game?.id, user?.id]);
+
+  // Fallback: poll + refetch on tab focus / visibility so approval, roster,
+  // and payment status update even when the realtime socket is stalled.
+  useEffect(() => {
+    if (!game?.id) return;
+    const refreshAll = () => {
+      refreshStatus();
+      refreshHostRequests();
+      void refetchRoster();
+    };
+    const interval = window.setInterval(() => {
+      if (document.visibilityState === "visible") refreshAll();
+    }, 15000);
+    const onFocus = () => refreshAll();
+    const onVisibility = () => {
+      if (document.visibilityState === "visible") refreshAll();
+    };
+    window.addEventListener("focus", onFocus);
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => {
+      window.clearInterval(interval);
+      window.removeEventListener("focus", onFocus);
+      document.removeEventListener("visibilitychange", onVisibility);
+    };
+    // eslint-disable-next-line
+  }, [game?.id, user?.id, hostsThisGame]);
+
+  // Ensure the realtime socket carries the current user's JWT so RLS-scoped
+  // subscriptions aren't silently rejected right after sign-in / refresh.
+  useEffect(() => {
+    let cancelled = false;
+    const applyAuth = async () => {
+      const { data } = await supabase.auth.getSession();
+      const token = data.session?.access_token;
+      if (!cancelled && token) {
+        try {
+          supabase.realtime.setAuth(token);
+        } catch {
+          /* ignore */
+        }
+      }
+    };
+    void applyAuth();
+    const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
+      const token = session?.access_token;
+      if (token) {
+        try {
+          supabase.realtime.setAuth(token);
+        } catch {
+          /* ignore */
+        }
+      }
+    });
+    return () => {
+      cancelled = true;
+      sub.subscription.unsubscribe();
+    };
+  }, []);
 
   // Realtime: live changes to the game's payment settings (fee, approval toggle, accepted methods).
   useEffect(() => {
