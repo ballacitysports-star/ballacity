@@ -327,7 +327,8 @@ function GameDetail() {
     return () => {
       cancelled = true;
     };
-  }, [gameId, hosted]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [gameId]);
 
   // Re-run status/roster fetches whenever the viewed game OR the signed-in
   // user changes so switching games or accounts always yields fresh data
