@@ -181,6 +181,7 @@ function GameDetail() {
   const [messaging, setMessaging] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
   const [requesting, setRequesting] = useState(false);
+  const [processing, setProcessing] = useState(false);
   const [positionRosterOpen, setPositionRosterOpen] = useState(false);
 
   // effectiveJoined is computed below, after settings/myReq/isHost resolve.
@@ -422,7 +423,7 @@ function GameDetail() {
 
   const [confirmAction, setConfirmAction] = useState<"join" | "leave" | null>(null);
 
-  const handleJoin = async (preselectedPosition?: string) => {
+  const executeJoinAction = async (preselectedPosition?: string) => {
     // Expired invite → block all join actions and steer to discovery.
     if (inviteExpired && !isHost && !viewerCountsAsJoined && !viewerPending) {
       toast.error("This invite has expired. Browse open games instead.");
@@ -565,6 +566,15 @@ function GameDetail() {
         body: `${effectiveJoined + 1}/${game.maxPlayers} players confirmed.`,
         link: `/games/${game.id}`,
       }).catch(() => {});
+    }
+  };
+
+  const handleJoin = async (preselectedPosition?: string) => {
+    setProcessing(true);
+    try {
+      await executeJoinAction(preselectedPosition);
+    } finally {
+      setProcessing(false);
     }
   };
 
@@ -1075,12 +1085,13 @@ function GameDetail() {
                     {canJoinAs && (
                       <button
                         type="button"
+                        disabled={processing}
                         onClick={() => {
                           void leaveWaitlist(game.id, name).catch(() => {});
                           handleJoin(name);
                         }}
                         aria-label={`Join as ${name}`}
-                        className="rounded-full border border-lime bg-lime px-2.5 py-1 text-[11px] font-bold text-background hover:opacity-90 active:scale-95 transition"
+                        className="rounded-full border border-lime bg-lime px-2.5 py-1 text-[11px] font-bold text-background hover:opacity-90 active:scale-95 transition disabled:opacity-60 disabled:cursor-not-allowed"
                       >
                         Join as {name}
                       </button>
@@ -1621,7 +1632,7 @@ function GameDetail() {
           </button>
           {!isHost && (() => {
             const canJoinAction = joined || isPending || isConfirmed || spotsLeft > 0;
-            const buttonDisabled = requesting || !canJoinAction;
+            const buttonDisabled = requesting || processing || !canJoinAction;
             const hasPaymentAttempt = latestSub?.status === "pending" || latestSub?.status === "rejected";
             const canEnterPaymentFlow = spotsLeft > 0 || joined || hasPaymentAttempt || isApproved;
             const paymentAction = isPaid && !paymentCleared && approvalCleared && canEnterPaymentFlow;
@@ -1776,6 +1787,7 @@ function GameDetail() {
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction
+              disabled={processing}
               onClick={(e) => {
                 e.preventDefault();
                 const action = confirmAction;
