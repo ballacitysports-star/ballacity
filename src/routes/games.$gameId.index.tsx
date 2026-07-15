@@ -2958,12 +2958,12 @@ function HostRequestRow({
 function HostPendingChip({
   req,
   gameTitle,
-  onChange,
+  onOptimistic,
   index,
 }: {
   req: JoinRequest;
   gameTitle: string;
-  onChange: () => void;
+  onOptimistic: (reqId: string, status: "approved" | "rejected") => () => void;
   index: number;
 }) {
   const [open, setOpen] = useState(false);
@@ -2987,6 +2987,8 @@ function HostPendingChip({
 
   const act = async (status: "approved" | "rejected") => {
     setBusy(true);
+    const rollback = onOptimistic(req.id, status);
+    setOpen(false);
     try {
       await reviewJoinRequest(req.id, status);
       await createNotification({
@@ -3000,14 +3002,14 @@ function HostPendingChip({
         link: `/games/${req.game_id}`,
       });
       toast.success(status === "approved" ? `Approved ${name}` : `Declined ${name}`);
-      setOpen(false);
-      onChange();
     } catch (e: any) {
+      rollback();
       toast.error(e.message);
     } finally {
       setBusy(false);
     }
   };
+
 
   return (
     <div className="relative">
