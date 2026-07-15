@@ -276,9 +276,15 @@ function GameDetail() {
     };
   }, [gameId, hosted]);
 
+  // Re-run status/roster fetches whenever the viewed game OR the signed-in
+  // user changes so switching games or accounts always yields fresh data
+  // matched to the current view (subscriptions below re-key on the same
+  // ids and auto-resubscribe).
   useEffect(() => {
-    refreshStatus(); /* eslint-disable-next-line */
-  }, [game?.id]);
+    refreshStatus();
+    void refetchRoster();
+    /* eslint-disable-next-line */
+  }, [game?.id, user?.id]);
   useEffect(() => {
     refreshHostRequests();
   }, [game?.id, user?.id, settings?.host_id, hostsThisGame]);
