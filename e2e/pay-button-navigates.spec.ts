@@ -108,7 +108,7 @@ async function mockPaymentBackend(
   );
 
   await page.route(
-    (url) => String(url).includes("/rest/v1/rpc/get_host_payment_methods"),
+    (url) => String(url).includes("/rest/v1/rpc/get_game_host_payment_methods"),
     async (route) => {
       if (route.request().method() !== "POST") return route.fallback();
       await route.fulfill({ status: 200, contentType: "application/json", body: "[]" });
@@ -209,7 +209,7 @@ test("Pay host still renders when optional status lookups hang", async ({ browse
     },
   );
   await page.route(
-    (url) => String(url).includes("/rest/v1/rpc/get_host_payment_methods"),
+    (url) => String(url).includes("/rest/v1/rpc/get_game_host_payment_methods"),
     async (route) => {
       if (route.request().method() !== "POST") return route.fallback();
       await route.fulfill({ status: 200, contentType: "application/json", body: "[]" });

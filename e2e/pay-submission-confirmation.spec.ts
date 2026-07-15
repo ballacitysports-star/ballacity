@@ -77,9 +77,9 @@ test("submitting mocked payment shows the post-payment confirmation UI", async (
   // Host has one enabled Venmo method (no payment_url so no external launch
   // is triggered — clicking the row picks it and shows the proof form).
   await page.route(
-    (url) => tableUrl(url, "host_payment_methods"),
+    (url) => tableUrl(url, "host_payment_methods") || String(url).includes("/rest/v1/rpc/get_game_host_payment_methods"),
     async (route) => {
-      if (route.request().method() !== "GET") return route.fallback();
+      if (!["GET","POST"].includes(route.request().method())) return route.fallback();
       await route.fulfill({
         status: 200,
         contentType: "application/json",

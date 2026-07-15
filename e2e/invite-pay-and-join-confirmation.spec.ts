@@ -84,9 +84,9 @@ test("invite → Pay & join → confirmation with invite params preserved", asyn
 
   // One enabled payment method for the host.
   await page.route(
-    (u) => isTable(u, "host_payment_methods"),
+    (u) => isTable(String(u), "host_payment_methods") || String(u).includes("/rest/v1/rpc/get_game_host_payment_methods"),
     async (route: Route) => {
-      if (route.request().method() !== "GET") return route.fallback();
+      if (!["GET","POST"].includes(route.request().method())) return route.fallback();
       await route.fulfill({
         status: 200,
         contentType: "application/json",

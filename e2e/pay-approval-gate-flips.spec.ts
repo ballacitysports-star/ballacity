@@ -79,9 +79,9 @@ test("pay page auto-flips from approval gate to payment picker on approval", asy
 
   // One enabled Venmo method for the host so the picker has a row to show.
   await page.route(
-    (u) => isTable(u, "host_payment_methods"),
+    (u) => isTable(String(u), "host_payment_methods") || String(u).includes("/rest/v1/rpc/get_game_host_payment_methods"),
     async (route: PWRoute) => {
-      if (route.request().method() !== "GET") return route.fallback();
+      if (!["GET","POST"].includes(route.request().method())) return route.fallback();
       await route.fulfill({
         status: 200,
         contentType: "application/json",
