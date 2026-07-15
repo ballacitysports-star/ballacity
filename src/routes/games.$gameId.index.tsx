@@ -12,7 +12,7 @@ import {
   Star,
   Check,
   CreditCard,
-  Settings as SettingsIcon,
+  
   X as XIcon,
   Pencil,
   Play,
