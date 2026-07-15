@@ -247,7 +247,7 @@ export function GameCard({ game, index = 0 }: { game: Game; index?: number }) {
               )}
               <div className="flex items-center gap-1.5 text-xs font-semibold">
                 <Users className="h-4 w-4 text-lime" />
-                <span className="text-foreground">
+                <span key={joinedCount} className="text-foreground inline-block motion-safe:animate-scale-in">
                   {joinedCount}/{game.maxPlayers}
                 </span>
                 {spotsLeft < game.maxPlayers && spotsLeft <= Math.max(3, Math.ceil(game.maxPlayers * 0.2)) && (

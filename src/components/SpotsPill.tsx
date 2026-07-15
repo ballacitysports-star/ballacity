@@ -60,7 +60,15 @@ export function SpotsPill({
       aria-label={label}
       className={cls}
     >
-      {visible}
+      {/* key={spotsLeft} remounts the inner span on every count change so
+          the scale-in keyframe replays — a subtle bump that draws the eye
+          to availability updates without being distracting. */}
+      <span
+        key={spotsLeft}
+        className="inline-block motion-safe:animate-scale-in"
+      >
+        {visible}
+      </span>
     </span>
   );
 }

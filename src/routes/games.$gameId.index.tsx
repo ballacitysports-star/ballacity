@@ -1216,7 +1216,7 @@ function GameDetail() {
         <div>
           <div className="flex items-center justify-between mb-2 gap-2">
             <h2 className="font-display text-sm font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-2 flex-wrap">
-              <span>Roster ({effectiveJoined}/{game.maxPlayers})</span>
+              <span>Roster (<span key={effectiveJoined} className="inline-block motion-safe:animate-scale-in tabular-nums">{effectiveJoined}</span>/{game.maxPlayers})</span>
               <SpotsPill spotsLeft={spotsLeft} maxPlayers={game.maxPlayers} />
               {(viewerPending || pendingCount > 0) && (
                 <span className="inline-flex items-center gap-1 rounded-full border border-coral/40 bg-coral/10 px-2 py-0.5 text-[10px] font-bold text-coral normal-case tracking-normal">
