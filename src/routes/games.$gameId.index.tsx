@@ -406,7 +406,11 @@ function GameDetail() {
           refreshStatus();
         },
       )
-      .subscribe();
+      .subscribe((status) => {
+        if (status !== "SUBSCRIBED") {
+          console.warn(`[realtime] game_payment_settings channel status: ${status}`);
+        }
+      });
     return () => {
       supabase.removeChannel(channel);
     };
@@ -435,7 +439,11 @@ function GameDetail() {
           }
         },
       )
-      .subscribe();
+      .subscribe((status) => {
+        if (status !== "SUBSCRIBED") {
+          console.warn(`[realtime] payment_submissions:me channel status: ${status}`);
+        }
+      });
     return () => {
       supabase.removeChannel(channel);
     };
