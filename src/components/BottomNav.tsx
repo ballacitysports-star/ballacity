@@ -51,20 +51,33 @@ export function BottomNav() {
       <li key={it.to} className="min-w-0">
         <Link
           to={it.to}
-          className="relative flex flex-col items-center gap-1 px-1 py-3 text-[10px] sm:text-[11px] font-medium"
+          className="relative flex flex-col items-center gap-1 px-1 py-2.5 text-[10px] sm:text-[11px] font-medium transition-transform active:scale-95"
         >
-          <span className="relative">
+          <span
+            className={`relative grid h-9 w-14 place-items-center rounded-2xl transition-colors ${
+              active
+                ? "bg-primary-gradient text-primary-foreground shadow-[0_6px_18px_-8px_var(--primary)]"
+                : "text-muted-foreground"
+            }`}
+          >
             {it.render
               ? it.render(active)
               : Icon
-                ? <Icon className={`h-5 w-5 ${active ? "text-lime" : "text-muted-foreground"}`} />
+                ? <Icon className="h-5 w-5" strokeWidth={active ? 2.5 : 2} />
                 : null}
           </span>
-          <span className={`truncate max-w-full ${active ? "text-foreground" : "text-muted-foreground"}`}>
+          <span
+            className={`truncate max-w-full tracking-wide ${
+              active ? "text-foreground" : "text-muted-foreground"
+            }`}
+          >
             {it.label}
           </span>
           {active && (
-            <motion.span layoutId="nav-dot" className="absolute -bottom-1 h-1 w-1 rounded-full bg-lime" />
+            <motion.span
+              layoutId="nav-dot"
+              className="absolute -bottom-0.5 h-[3px] w-6 rounded-full bg-primary-gradient"
+            />
           )}
         </Link>
       </li>
@@ -79,12 +92,12 @@ export function BottomNav() {
         <ul className="relative grid grid-cols-5 items-end">
           {leftItems.map(renderTab)}
 
-          {/* Center elevated Host FAB — the primary create action */}
+          {/* Center elevated Host FAB — PS-blue gradient primary action */}
           <li className="min-w-0 flex justify-center">
             <Link
               to="/create"
               aria-label="Host a game"
-              className="relative -mt-6 grid h-14 w-14 place-items-center rounded-full bg-lime-gradient text-primary-foreground shadow-xl glow-lime ring-4 ring-background transition-transform active:scale-95"
+              className="relative -mt-7 grid h-14 w-14 place-items-center rounded-full bg-primary-gradient text-primary-foreground shadow-xl glow-primary ring-4 ring-background transition-transform active:scale-95"
             >
               <Plus className={`h-6 w-6 ${hostActive ? "rotate-45" : ""} transition-transform`} strokeWidth={3} />
             </Link>
