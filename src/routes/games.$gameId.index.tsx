@@ -555,6 +555,7 @@ function GameDetail() {
     // NOT re-trigger the leave branch when the user taps "Request to join".
     // Predicate extracted for unit-test coverage (see src/lib/leave-branch.ts).
     if (shouldTriggerLeaveBranch({ isConfirmed, joined, requiresApproval, isPaid })) {
+      console.log("[leave-dbg] entered leave branch");
       // Snapshot for rollback on server error.
       const prevReq = myReq;
       const prevSubs = mySubs;
