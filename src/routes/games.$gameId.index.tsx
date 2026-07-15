@@ -224,14 +224,22 @@ function GameDetail() {
   const hostRep = useMemo(() => computeReputation(hostReviews, "host"), [hostReviews]);
   const canReviewHost = useCanReview(hostIdFor(game?.host.username ?? ""));
 
+  // Guards refreshStatus while a leave flow is tearing down local + server
+  // state. Realtime DELETE events for join_requests / payment_submissions
+  // fire during the teardown and would otherwise refetch the (still-
+  // committing) rows and re-hydrate the "Payment verified" strip.
+  const leavingRef = useRef(false);
+
   const refreshStatus = async () => {
     if (!game) return;
+    if (leavingRef.current) return;
     try {
       const [s, subs, req] = await Promise.all([
         getGamePaymentSettings(game.id),
         listMySubmissionsForGame(game.id),
         getMyJoinRequest(game.id),
       ]);
+      if (leavingRef.current) return;
       setSettings(s);
       setMySubs(subs);
       setMyReq(req);
