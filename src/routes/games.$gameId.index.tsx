@@ -287,15 +287,21 @@ function GameDetail() {
   useEffect(() => {
     if (!game?.id || !hostsThisGame) return;
     const channel = supabase
-      .channel(`join_requests:${game.id}`)
+      .channel(`join_requests:host:${game.id}`)
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "join_requests", filter: `game_id=eq.${game.id}` },
-        () => {
+        (payload) => {
+          const row = (payload.new ?? payload.old) as { game_id?: string } | null;
+          if (row?.game_id !== game.id) return;
           refreshHostRequests();
         },
       )
-      .subscribe();
+      .subscribe((status) => {
+        if (status !== "SUBSCRIBED") {
+          console.warn(`[realtime] join_requests:host channel status: ${status}`);
+        }
+      });
     return () => {
       supabase.removeChannel(channel);
     };
@@ -403,7 +409,9 @@ function GameDetail() {
           table: "game_payment_settings",
           filter: `game_id=eq.${game.id}`,
         },
-        () => {
+        (payload) => {
+          const row = (payload.new ?? payload.old) as { game_id?: string } | null;
+          if (row?.game_id !== game.id) return;
           refreshStatus();
           if (hostsThisGame) refreshHostRequests();
         },
@@ -435,11 +443,14 @@ function GameDetail() {
           filter: `game_id=eq.${game.id}`,
         },
         (payload) => {
-          const row = (payload.new ?? payload.old) as { player_id?: string } | null;
-          if (row?.player_id && row.player_id === user.id) {
-            refreshStatus();
-            void refetchRoster();
-          }
+          const row = (payload.new ?? payload.old) as {
+            player_id?: string;
+            game_id?: string;
+          } | null;
+          if (row?.game_id !== game.id) return;
+          if (row?.player_id !== user.id) return;
+          refreshStatus();
+          void refetchRoster();
         },
       )
       .subscribe((status) => {
