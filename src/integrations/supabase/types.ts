@@ -1127,6 +1127,10 @@ export type Database = {
         Args: { _conv: string; _user: string }
         Returns: boolean
       }
+      is_game_participant: {
+        Args: { _game_id: string; _user_id: string }
+        Returns: boolean
+      }
     }
     Enums: {
       app_role: "admin" | "moderator"
