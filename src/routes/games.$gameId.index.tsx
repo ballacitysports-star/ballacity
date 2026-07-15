@@ -2650,6 +2650,20 @@ function RosterPlayerRow({
     status: "verified" | "pending" | "rejected";
     screenshot_path: string | null;
   } | null>(null);
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const [history, setHistory] = useState<
+    Array<{
+      id: string;
+      action: string;
+      from_status: string | null;
+      to_status: string | null;
+      notes: string | null;
+      actor_id: string | null;
+      actor_name: string;
+      created_at: string;
+    }>
+  >([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
   const paymentStatus: "verified" | "pending" | "rejected" | "none" = latestSub?.status ?? "none";
   const reviews = useReviewsFor(req.player_id);
   const rep = useMemo(() => computeReputation(reviews, "player"), [reviews]);
