@@ -9,6 +9,7 @@ export type PlaceSuggestion = {
 };
 
 export const autocompletePlaces = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
   .inputValidator(
     (data: { input: string; lat?: number | null; lng?: number | null; sessionToken?: string }) => {
       const input = String(data?.input ?? "").trim();
