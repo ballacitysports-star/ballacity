@@ -222,7 +222,7 @@ function GameDetail() {
   const ownsViaGame = !!(user && game?.hostUserId && user.id === game.hostUserId);
   const hostsThisGame = ownsViaDb || ownsViaGame;
   const isHost = hostsThisGame;
-  const [approvalSaving, setApprovalSaving] = useState(false);
+  
 
   const hostReviews = useReviewsFor(hostIdFor(game?.host.username ?? ""));
   const hostRep = useMemo(() => computeReputation(hostReviews, "host"), [hostReviews]);
