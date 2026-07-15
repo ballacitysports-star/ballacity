@@ -302,6 +302,30 @@ function Feed() {
         </p>
       </motion.div>
 
+      {/* List / Map segmented toggle — persists across visits via localStorage */}
+      <div className="mb-4 inline-flex items-center gap-1 rounded-full border border-border bg-surface p-1" role="tablist" aria-label="View mode">
+        {([
+          { id: "list", label: "List", Icon: List },
+          { id: "map", label: "Map", Icon: MapIcon },
+        ] as const).map(({ id, label, Icon }) => {
+          const active = viewMode === id;
+          return (
+            <button
+              key={id}
+              role="tab"
+              aria-selected={active}
+              onClick={() => switchView(id)}
+              className={`inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-xs font-bold transition-colors ${
+                active ? "bg-lime text-primary-foreground" : "text-muted-foreground"
+              }`}
+            >
+              <Icon className="h-3.5 w-3.5" />
+              {label}
+            </button>
+          );
+        })}
+      </div>
+
       <div className="flex gap-2 mb-4 relative">
         <div className="flex-1 flex items-center gap-2 rounded-full border border-border bg-surface px-4 py-2.5">
           <Search className="h-4 w-4 text-muted-foreground" />
