@@ -30,8 +30,8 @@ const METHOD_ID = "mock-method-venmo";
 const JOIN_REQ_ID = "mock-join-req-id";
 const SUBMISSION_ID = "mock-submission-id";
 
-function tableUrl(url: string, table: string) {
-  return url.includes(`/rest/v1/${table}`);
+function tableUrl(url: string | URL, table: string) {
+  return String(url).includes(`/rest/v1/${table}`);
 }
 
 async function restoreSession(page: Page) {
