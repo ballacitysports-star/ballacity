@@ -2725,6 +2725,9 @@ function RosterPlayerRow({
       toast.success(
         next === "verified" ? "Payment verified." : next === "rejected" ? "Payment rejected." : "Marked unpaid.",
       );
+      if (next === "rejected" && res.changed) {
+        onRemoved?.(req.player_id);
+      }
     } catch (e: any) {
       setLatestSub(prev);
       toast.error(e.message ?? "Could not update payment.");
