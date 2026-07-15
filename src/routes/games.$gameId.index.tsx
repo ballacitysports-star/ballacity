@@ -1786,6 +1786,7 @@ function GameDetail() {
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction
+              disabled={processing}
               onClick={(e) => {
                 e.preventDefault();
                 const action = confirmAction;
