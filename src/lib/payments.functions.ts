@@ -171,30 +171,6 @@ export const reviewPaymentAction = createServerFn({ method: "POST" })
       };
     }
 
-    // When the host rejects payment, also remove the player from the roster
-    // so a rejected player doesn't remain confirmed. Revert an approved join
-    // request back to `rejected` so the player must re-request and re-pay.
-    if (next === "rejected") {
-      await supabase
-        .from("game_participants")
-        .delete()
-        .eq("game_id", gameId)
-        .eq("user_id", playerId)
-        .then(() => undefined, () => undefined);
-
-      await supabase
-        .from("join_requests")
-        .update({
-          status: "rejected",
-          reviewer_notes: "Payment rejected",
-          reviewed_at: new Date().toISOString(),
-        })
-        .eq("game_id", gameId)
-        .eq("player_id", playerId)
-        .eq("status", "approved")
-        .then(() => undefined, () => undefined);
-    }
-
     return {
       ok: true,
       changed: true,
