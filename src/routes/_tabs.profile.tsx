@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { ME, GAMES } from "@/lib/sample-data";
 import { GameCard } from "@/components/GameCard";
+import { RequestGameCard } from "@/components/RequestGameCard";
 import { ReviewsSection } from "@/components/ReviewsSection";
 import { HERO_IMAGE } from "@/lib/sample-data";
 import { computeReputation, useReviewsFor } from "@/lib/reviews";
@@ -102,9 +103,9 @@ function Profile() {
   }, [profileUser?.id]);
 
   const gameLookup = useMemo(() => {
-    const m = new Map<string, { title: string; date: string; location: string }>();
+    const m = new Map<string, Game>();
     [...hosted, ...GAMES].forEach((g) => {
-      if (!m.has(g.id)) m.set(g.id, { title: g.title, date: g.date, location: g.location });
+      if (!m.has(g.id)) m.set(g.id, g);
     });
     return m;
   }, [hosted]);
