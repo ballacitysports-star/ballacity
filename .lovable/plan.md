@@ -1,49 +1,74 @@
 ## Goal
-Rework the public player profile follow surface to match Instagram's pattern: inline count row, prominent Follow/Message action row, and a tabbed Followers/Following sheet with search and per-row follow-back.
 
-## UI changes — `src/routes/players.$userId.tsx`
+Turn the current DMs (basic 1:1 threads with text + one attachment + read receipts) into an Instagram-style experience: live delivery with typing/presence, reactions, quote replies, sender unsend, and a Requests inbox for strangers. Ship in two phases so you can review before media/voice lands.
 
-1. **Remove the 4-tile stats grid** (Games, Reliable, Followers, Following).
-2. **Add an inline count row** under the name/handle block:
-   `Games · Followers · Following` rendered as three tappable inline stats (bold number over lowercase label, IG-style). Followers and Following open the sheet on the matching tab; Games is a static number.
-3. **Replace the stacked buttons** next to the avatar with an IG-style **action row below the bio**:
-   - Row 1 (full width, 2 buttons side-by-side): `Follow` / `Following` (primary lime, flips to outline when following) + `Message`.
-   - When following, tapping the button opens a small confirm popover: "Unfollow @name?" → Unfollow / Cancel. Prevents accidental unfollows (IG behavior).
-4. **Move the small "Verified" chip** to sit beside the display name (unchanged), but drop the age " · N" text into the handle line to reduce header noise.
+## Phase 1 — Realtime chat, reactions, reply, unsend, Requests inbox
 
-## New component — `src/components/FollowSheet.tsx`
-Replaces `FollowListDialog`.
+### 1. Schema & backend (single migration)
 
-- Radix Dialog with mobile-first sheet look (rounded top, full-height on mobile, max-w-md on desktop).
-- Header: sticky title with close button; below it a **Tabs** row (Followers | Following) using the existing shadcn `Tabs`.
-- **Search input** (sticky under the tabs) filters the current tab's list by `display_name` / `username` client-side across already-loaded pages; still fetches next pages via infinite scroll so search widens as more loads.
-- Each row (`FollowRow`):
-  - Avatar + display name (bold) + `@username` (muted) — the whole row links to `/players/$userId` and closes the sheet.
-  - Right-aligned small button:
-    - If the row user is the viewer → hidden.
-    - If viewer already follows them → `Following` (outline).
-    - Else → `Follow` (lime).
-    - Tapping toggles follow for that row without closing the sheet, using the same `useFollow`-style mutation but per-row.
-- Reuses existing keyset infinite scroll from `follows.ts` (30/page). Adds a small "No matches" empty state when search returns nothing.
+New / changed columns on `public.messages`:
+- `reply_to_id uuid null` — quoted parent message (self-FK, `on delete set null`)
+- `deleted_at timestamptz null` — sender unsend timestamp (soft delete; row kept so reply chains and read cursors stay valid)
+- `is_request boolean not null default false` — set when the recipient hasn't accepted the thread yet
 
-## Data layer — `src/lib/follows.ts`
-- `listFollows` already returns `{ users, nextCursor }` — keep.
-- **Extend** `FollowUser` to include the viewer's follow state for that row: after loading a page, do one extra query
-  `select follower_id from follows where follower_id = <viewer> and followee_id in (<page ids>)`
-  and mark each user `viewerFollows: boolean` (skip when signed out). Merge into the returned page so the per-row Follow buttons render correct state without N queries.
-- New `followUserById(id)` / `unfollowUserById(id)` (thin wrappers; the existing `followUser`/`unfollowUser` already take an id, so reuse those).
-- Update the `useFollow` invalidation to also invalidate `["follow-list", *, userId]` so counts and row buttons stay in sync when the header button toggles.
+New `public.message_reactions` table (one row per user per emoji per message):
+- `message_id`, `user_id`, `emoji text` (constrained to a small allowlist ❤️😂😮😢🔥👍), PK `(message_id, user_id, emoji)`
+- GRANTs to `authenticated`/`service_role`, RLS: participant of the parent message's conversation can `select`; user can `insert`/`delete` their own row
 
-## Notification
-No change — the DB trigger already writes an in-app notification on insert; it fires for row-level follows too.
+New `public.conversations` columns:
+- `accepted_by uuid[] not null default '{}'` — user ids who accepted the thread (auto-populated for the creator; recipient added on Accept)
 
-## Out of scope
-- Follow requests / private profiles.
-- Followed-by-mutuals hint ("Followed by X, Y +3").
-- Real-time follower stream updates.
-- Suggestions section inside the sheet.
-- Any change to routing structure (still a modal, not a dedicated `/players/$userId/followers` route).
+RPCs / triggers:
+- `accept_conversation(_conv uuid)` — appends `auth.uid()` to `accepted_by` and flips `is_request=false` on that user's incoming messages
+- `decline_conversation(_conv uuid)` — deletes the participant row for the caller so the thread disappears from their inbox
+- `unsend_message(_id uuid)` — sets `deleted_at=now()` when `sender_id = auth.uid()`; blanks `body`/`attachment_*`
+- Update the existing DM-notification path to skip inserting notifications when `is_request=true` (prevents Requests from spamming alerts)
 
-## Verification
-- `bunx tsgo --noEmit` clean.
-- Manual: signed-in viewer opens someone's profile → sees inline `Games · Followers · Following`, Follow + Message row. Tap Followers → sheet opens on Followers tab, can switch to Following, can search, can Follow/Unfollow rows inline, can scroll to load more. Header button and row buttons for the same user stay in sync. Confirm popover appears on Unfollow.
+Bucket / RLS: reuse `message-attachments` unchanged.
+
+### 2. Realtime, typing, presence
+
+- Extend the existing thread channel to also carry Postgres change events for `UPDATE` on `messages` (reactions/unsend echo) and `INSERT`/`DELETE` on `message_reactions`.
+- Add a Supabase Realtime **presence** track per conversation channel: `{ user_id, typing: boolean, last_active }`. Typing state is set true on keystroke and cleared after 3s of idle; UI shows an animated "typing…" bubble.
+- Inbox list subscribes to a per-user channel and updates last message/unread live.
+
+### 3. UI — thread (`messages.$conversationId.tsx`)
+
+Redesigned to mirror Instagram:
+- Header: avatar, name, small "Active now" / "Active 5m ago" dot from presence.
+- Message row: swipe-left (touch) or hover "Reply" button reveals; quoted parent renders as a compact card above the bubble with a subtle left border and the parent's snippet; tapping it scrolls to the original.
+- Double-tap / long-press bubble opens a small floating reaction bar (❤️😂😮😢🔥👍). Reactions render as a chip under the bubble with count; tapping your own chip removes it.
+- Sender-only bubble menu (long-press / three-dot on hover): **Unsend**, **Copy**, **Reply**. Unsend replaces the bubble with a muted "You unsent a message." tombstone for both sides (driven by `deleted_at`).
+- Typing indicator: three-dot animated bubble on the left when the other user is typing.
+- Read receipts: keep existing `read_at` behavior; render "Seen" under the last message you sent once the other user reads it.
+
+### 4. UI — inbox (`messages.index.tsx`)
+
+- Add tabs: **Messages** (default) and **Requests** (with a small count badge).
+- A conversation goes to Requests for me when the other user sent the first message and I haven't accepted (checked via `accepted_by`).
+- Requests row shows **Accept** / **Decline** buttons inline; Accept calls `accept_conversation` and moves the row into Messages.
+- Rows show the presence dot on the avatar when the other user is online.
+
+### 5. Client library (`src/lib/messages.ts`)
+
+New helpers: `addReaction`, `removeReaction`, `unsendMessage`, `sendMessage(..., { replyToId })`, `acceptConversation`, `declineConversation`, `listRequests()`. Update `listMyConversations` to segment by `is_request`/`accepted_by`.
+
+### 6. Verification
+
+- `bun x tsgo --noEmit`
+- Manual: sign in as two users in two windows on `/messages/<id>`; confirm live delivery, typing bubble, reactions, quote-reply, unsend tombstone, and Requests Accept/Decline flow.
+
+## Phase 2 — Media & voice, inbox polish (kicks off after Phase 1 lands)
+
+Sketch only, so you can steer scope later:
+
+- **Media**: multi-image/video attachments per message, full-screen swipeable viewer with pinch-zoom, in-line video player, thumbnails in the composer preview strip.
+- **Voice notes**: hold-to-record button (MediaRecorder → webm/opus), waveform preview, playhead scrubber, stored in `message-attachments/<conv>/<user>/voice-*.webm` with a new `attachment_kind='voice'` marker.
+- **Inbox polish**: thread search across your DMs, per-thread mute + pin, sharing a game/host into a DM as a rich card, unread badge on the bottom-nav Messages tab.
+
+## Technical notes
+
+- Presence is scoped to each conversation channel and torn down in the effect cleanup so we don't leak subscriptions (Cloud Realtime billing rule).
+- All new tables/columns follow the "CREATE → GRANT → ENABLE RLS → CREATE POLICY" order; reactions use participant checks via the existing `is_conversation_participant` helper to avoid recursion.
+- Unsend keeps the message row so `reply_to_id` and last-message pointers remain stable; the client renders the tombstone when `deleted_at is not null`.
+- No design system changes — reuses existing `bg-lime-gradient`, `bg-surface`, `border-border`, and shadcn primitives already in the app.
