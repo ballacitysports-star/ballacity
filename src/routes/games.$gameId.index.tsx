@@ -2164,6 +2164,39 @@ function GameDetail() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <AlertDialog
+        open={removeTarget !== null}
+        onOpenChange={(open) => {
+          if (!open && !removingId) setRemoveTarget(null);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              Remove {removeTarget?.name ?? "player"} from this game?
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              They'll be notified and their spot will open up. They can request to join again later.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={!!removingId}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={!!removingId}
+              onClick={(e) => {
+                e.preventDefault();
+                if (removeTarget) {
+                  void handleRemoveParticipant(removeTarget.userId, removeTarget.name);
+                }
+              }}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Remove player
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
