@@ -320,28 +320,56 @@ function Feed() {
       </motion.div>
 
       {/* List / Map segmented toggle — persists across visits via localStorage */}
-      <div className="mb-4 inline-flex items-center gap-1 rounded-full border border-border bg-surface p-1" role="tablist" aria-label="View mode">
-        {([
-          { id: "list", label: "List", Icon: List },
-          { id: "map", label: "Map", Icon: MapIcon },
-        ] as const).map(({ id, label, Icon }) => {
-          const active = viewMode === id;
-          return (
-            <button
-              key={id}
-              role="tab"
-              aria-selected={active}
-              onClick={() => switchView(id)}
-              className={`inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-xs font-bold transition-colors ${
-                active ? "bg-lime text-primary-foreground" : "text-muted-foreground"
-              }`}
-            >
-              <Icon className="h-3.5 w-3.5" />
-              {label}
-            </button>
-          );
-        })}
+      <div className="mb-4 flex items-center gap-2">
+        <div className="inline-flex items-center gap-1 rounded-full border border-border bg-surface p-1" role="tablist" aria-label="View mode">
+          {([
+            { id: "list", label: "List", Icon: List },
+            { id: "map", label: "Map", Icon: MapIcon },
+          ] as const).map(({ id, label, Icon }) => {
+            const active = viewMode === id;
+            return (
+              <button
+                key={id}
+                role="tab"
+                aria-selected={active}
+                onClick={() => switchView(id)}
+                className={`inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-xs font-bold transition-colors ${
+                  active ? "bg-lime text-primary-foreground" : "text-muted-foreground"
+                }`}
+              >
+                <Icon className="h-3.5 w-3.5" />
+                {label}
+              </button>
+            );
+          })}
+        </div>
+        {viewMode === "list" && (
+          <div className="inline-flex items-center gap-1 rounded-full border border-border bg-surface p-1" role="tablist" aria-label="Card density">
+            {([
+              { id: "grid", label: "Grid", Icon: LayoutGrid },
+              { id: "list", label: "Compact", Icon: Rows3 },
+            ] as const).map(({ id, label, Icon }) => {
+              const active = density === id;
+              return (
+                <button
+                  key={id}
+                  role="tab"
+                  aria-selected={active}
+                  aria-label={`${label} view`}
+                  onClick={() => switchDensity(id)}
+                  className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-bold transition-colors ${
+                    active ? "bg-lime text-primary-foreground" : "text-muted-foreground"
+                  }`}
+                >
+                  <Icon className="h-3.5 w-3.5" />
+                  {label}
+                </button>
+              );
+            })}
+          </div>
+        )}
       </div>
+
 
       {viewMode === "map" ? (
         <PlayMapView />
