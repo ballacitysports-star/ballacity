@@ -8,6 +8,7 @@ import {
   LogIn,
   LogOut,
   Clock,
+  Star,
 } from "lucide-react";
 import { ME, GAMES, type Game } from "@/lib/sample-data";
 import { GameCard } from "@/components/GameCard";
@@ -26,6 +27,12 @@ import { readOverrides, useMyProfile } from "@/lib/user-prefs-store";
 import { ProfileLinksList } from "@/components/ProfileLinks";
 import { listMyJoinRequests, cancelMyJoinRequest, type JoinRequest } from "@/lib/payments";
 import { supabase } from "@/integrations/supabase/client";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 export const Route = createFileRoute("/_tabs/profile")({
   head: () => ({ meta: [{ title: "Profile — OpenRun" }] }),
