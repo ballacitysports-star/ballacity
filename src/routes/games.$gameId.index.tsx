@@ -297,6 +297,46 @@ function GameDetail() {
     return () => setHostRequests(snapshot);
   };
 
+  // Host "Remove player" flow. `removeTarget` drives the confirmation
+  // dialog; `removingId` disables the row while the delete is in flight so
+  // a double-tap can't fire two requests.
+  const [removeTarget, setRemoveTarget] = useState<{ userId: string; name: string } | null>(null);
+  const [removingId, setRemovingId] = useState<string | null>(null);
+
+  const handleRemoveParticipant = async (playerId: string, displayName: string) => {
+    if (!game || !isHost) return;
+    setRemovingId(playerId);
+    // Optimistic UI: drop from both roster sources immediately.
+    const prevHostReqs = hostRequests;
+    removeRosterLocal(playerId);
+    setHostRequests((prev) => prev.filter((r) => r.player_id !== playerId));
+    try {
+      await hostRemoveParticipant({ gameId: game.id, playerId });
+      // Notify the removed player (best-effort).
+      if (user && playerId !== user.id) {
+        void createNotification({
+          user_id: playerId,
+          type: "participant_removed",
+          title: `Removed from ${game.title}`,
+          body: "The host removed you from the roster.",
+          link: `/games/${game.id}`,
+        }).catch(() => {});
+      }
+      toast.success(`Removed ${displayName} from the roster.`);
+    } catch (e: any) {
+      // Rollback.
+      setHostRequests(prevHostReqs);
+      void refetchRoster();
+      toast.error(e?.message ?? "Could not remove player.");
+    } finally {
+      setRemovingId(null);
+      setRemoveTarget(null);
+      void refetchRoster();
+      refreshHostRequests();
+    }
+  };
+
+
 
   useEffect(() => {
     if (GAMES.some((g) => g.id === gameId) || hosted.some((g) => g.id === gameId)) {
