@@ -1112,6 +1112,7 @@ function GameDetail() {
           revieweeId={hostIdFor(game.host.username)}
           revieweeKind="host"
           revieweeName={game.host.name}
+          isOwner={ownsViaGame}
         />
 
         {/* About */}
