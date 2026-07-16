@@ -19,7 +19,8 @@ test.skip(
   "Requires a signed-in Supabase session (LOVABLE_BROWSER_SUPABASE_* env vars).",
 );
 
-const PROTECTED_ROUTES = ["/feed", "/discover", "/profile", "/notifications"] as const;
+// Only routes that render themselves (no app-level redirect) belong here.
+const PROTECTED_ROUTES = ["/feed", "/profile", "/notifications"] as const;
 
 const MOBILE_DEVICES = [
   { label: "iOS Safari (iPhone 13)", descriptor: devices["iPhone 13"] },
