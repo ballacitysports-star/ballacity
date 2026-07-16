@@ -540,13 +540,23 @@ function PayPage() {
                 ? "The host declined your request. You can't submit payment for this game."
                 : "This host reviews every player before payment. Send a request to join first."}
           </p>
-          <Link
-            to="/games/$gameId"
-            params={{ gameId: game.id }}
-            className="mt-3 inline-flex items-center rounded-full bg-lime-gradient px-4 py-1.5 text-xs font-bold text-primary-foreground"
-          >
-            {myReq ? "Back to game" : "Request to join"}
-          </Link>
+          <div className="mt-3 flex items-center gap-3 flex-wrap">
+            <Link
+              to="/games/$gameId"
+              params={{ gameId: game.id }}
+              className="inline-flex items-center rounded-full bg-lime-gradient px-4 py-1.5 text-xs font-bold text-primary-foreground"
+            >
+              {myReq ? "Back to game" : "Request to join"}
+            </Link>
+            {myReq?.status === "pending" && (
+              <LeaveFlowButton
+                gameId={game.id}
+                gameTitle={game.title}
+                variant="link"
+                navigateTo={`/games/${game.id}`}
+              />
+            )}
+          </div>
         </div>
       ) : fetching ? (
         <div className="rounded-2xl border border-dashed border-border bg-surface/40 p-5 text-center text-sm text-muted-foreground">
