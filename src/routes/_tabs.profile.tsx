@@ -537,54 +537,79 @@ function Profile() {
           </div>
         </section>
 
-        {/* Upcoming — split into games you host vs games you're playing in */}
-        <div className="mt-6">
-          <h2 className="font-display text-sm font-bold uppercase tracking-wider text-muted-foreground mb-2 flex items-center gap-1.5">
-            <Calendar className="h-4 w-4" /> Upcoming games
-          </h2>
-          {upcomingGroups.total > 0 ? (
-            <div className="space-y-5">
-              {upcomingGroups.hosting.length > 0 && (
-                <div>
-                  <h3 className="font-display text-xs font-bold uppercase tracking-wider text-muted-foreground/80 mb-2 flex items-center gap-1.5">
-                    <Shield className="h-3.5 w-3.5" /> Hosting
-                    <span className="text-muted-foreground/60 font-normal normal-case tracking-normal">
-                      ({upcomingGroups.hosting.length})
-                    </span>
-                  </h3>
-                  <div className="space-y-3">
-                    {upcomingGroups.hosting.map((g, i) => (
-                      <GameCard key={g.id} game={g} index={i} />
-                    ))}
-                  </div>
-                </div>
-              )}
-              {upcomingGroups.playing.length > 0 && (
-                <div>
-                  <h3 className="font-display text-xs font-bold uppercase tracking-wider text-muted-foreground/80 mb-2 flex items-center gap-1.5">
-                    <Trophy className="h-3.5 w-3.5" /> Playing
-                    <span className="text-muted-foreground/60 font-normal normal-case tracking-normal">
-                      ({upcomingGroups.playing.length})
-                    </span>
-                  </h3>
-                  <div className="space-y-3">
-                    {upcomingGroups.playing.map((g, i) => (
-                      <GameCard key={g.id} game={g} index={i} />
-                    ))}
-                  </div>
-                </div>
-              )}
+        {/* Hosting */}
+        <section className="mt-8 rounded-3xl border border-border bg-surface p-4 shadow-card">
+          <div className="mb-3 flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2">
+              <span className="grid h-8 w-8 place-items-center rounded-2xl border border-lime/30 bg-lime/10 text-lime">
+                <Crown className="h-4 w-4" />
+              </span>
+              <div>
+                <h2 className="font-display text-sm font-bold uppercase tracking-wider text-foreground">
+                  Hosting
+                </h2>
+                <p className="text-[10px] text-muted-foreground">Games you're running</p>
+              </div>
+            </div>
+            {upcomingGroups.hosting.length > 0 && (
+              <span className="rounded-full bg-lime/15 px-2.5 py-1 text-[10px] font-bold text-lime">
+                {upcomingGroups.hosting.length}
+              </span>
+            )}
+          </div>
+          {upcomingGroups.hosting.length > 0 ? (
+            <div className="space-y-3">
+              {upcomingGroups.hosting.map((g, i) => (
+                <GameCard key={g.id} game={g} index={i} />
+              ))}
+            </div>
+          ) : (
+            <Link
+              to="/create"
+              className="block rounded-2xl border border-dashed border-border bg-surface/40 p-5 text-center transition-colors hover:border-lime/40"
+            >
+              <div className="font-display text-base font-bold">No hosted games</div>
+              <p className="text-xs text-muted-foreground mt-1">Create a game to start hosting.</p>
+            </Link>
+          )}
+        </section>
+
+        {/* Pickup / Playing */}
+        <section className="mt-8 rounded-3xl border border-border bg-surface p-4 shadow-card">
+          <div className="mb-3 flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2">
+              <span className="grid h-8 w-8 place-items-center rounded-2xl border border-lime/30 bg-lime/10 text-lime">
+                <Users className="h-4 w-4" />
+              </span>
+              <div>
+                <h2 className="font-display text-sm font-bold uppercase tracking-wider text-foreground">
+                  Pickup
+                </h2>
+                <p className="text-[10px] text-muted-foreground">Games you're joining</p>
+              </div>
+            </div>
+            {upcomingGroups.playing.length > 0 && (
+              <span className="rounded-full bg-lime/15 px-2.5 py-1 text-[10px] font-bold text-lime">
+                {upcomingGroups.playing.length}
+              </span>
+            )}
+          </div>
+          {upcomingGroups.playing.length > 0 ? (
+            <div className="space-y-3">
+              {upcomingGroups.playing.map((g, i) => (
+                <GameCard key={g.id} game={g} index={i} />
+              ))}
             </div>
           ) : (
             <Link
               to="/feed"
-              className="block rounded-3xl border border-dashed border-border bg-surface/40 p-5 text-center hover:border-lime/40"
+              className="block rounded-2xl border border-dashed border-border bg-surface/40 p-5 text-center transition-colors hover:border-lime/40"
             >
-              <div className="font-display text-base font-bold">No games joined yet</div>
+              <div className="font-display text-base font-bold">No pickup games</div>
               <p className="text-xs text-muted-foreground mt-1">Join a run to see it here.</p>
             </Link>
           )}
-        </div>
+        </section>
 
 
         {/* Sports & skill */}
