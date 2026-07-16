@@ -462,8 +462,11 @@ function Feed() {
             {filtered.length} result{filtered.length === 1 ? "" : "s"} for "{q}"
           </h2>
           <div className={listContainerClass}>
-            {visible.map((g, i) => renderGame(g, i))}
-            {filtered.length === 0 && (
+            {refreshing && filtered.length === 0
+              ? renderSkeletons(density === "list" ? 6 : 3)
+              : visible.map((g, i) => renderGame(g, i))}
+            {hasMore && !refreshing && renderSkeletons(density === "list" ? 4 : 3)}
+            {!refreshing && filtered.length === 0 && (
               <div className={`${emptyColSpan} rounded-2xl border border-border bg-surface p-8 text-center text-muted-foreground`}>
                 No games match "{q}".
               </div>
