@@ -41,6 +41,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 export const Route = createFileRoute("/_tabs/profile")({
   head: () => ({ meta: [{ title: "Profile — OpenRun" }] }),
@@ -83,6 +84,7 @@ function Profile() {
   const [myRequests, setMyRequests] = useState<JoinRequest[]>([]);
   const [hostRequests, setHostRequests] = useState<JoinRequest[]>([]);
   const [requestsLoading, setRequestsLoading] = useState(true);
+  const [requestFilter, setRequestFilter] = useState<"all" | "host" | "player">("all");
   const refreshRequests = async () => {
     if (!profileUser) {
       setMyRequests([]);
@@ -146,8 +148,13 @@ function Profile() {
   }, [hosted]);
 
   const allRequests = useMemo(() => [...myRequests, ...hostRequests], [myRequests, hostRequests]);
-  const pendingRequests = allRequests.filter((r) => r.status === "pending");
-  const recentlyReviewed = allRequests.filter((r) => r.status !== "pending").slice(0, 3);
+  const filteredRequests = useMemo(() => {
+    if (requestFilter === "all") return allRequests;
+    if (requestFilter === "host") return hostRequests;
+    return myRequests;
+  }, [requestFilter, allRequests, hostRequests, myRequests]);
+  const pendingRequests = filteredRequests.filter((r) => r.status === "pending");
+  const recentlyReviewed = filteredRequests.filter((r) => r.status !== "pending").slice(0, 3);
   const pendingWithGame = pendingRequests.filter((r) => gameLookup.has(r.game_id));
   const reviewedWithGame = recentlyReviewed.filter((r) => gameLookup.has(r.game_id));
 
@@ -369,80 +376,108 @@ function Profile() {
         {/* Join request status (pending approvals + recent decisions) */}
         <div className="mt-6">
           <h2 className="font-display text-sm font-bold uppercase tracking-wider text-muted-foreground mb-2 flex items-center gap-1.5">
-              <Clock className="h-4 w-4" /> Pending approvals
-              {pendingWithGame.length > 0 && !requestsLoading && (
-                <span className="ml-1 rounded-full bg-coral/15 px-2 py-0.5 text-[10px] font-bold text-coral">
-                  {pendingWithGame.length}
-                </span>
-              )}
-            </h2>
-            <div className="space-y-3">
-              {requestsLoading ? (
-                <>
-                  <RequestGameCardSkeleton />
-                  <RequestGameCardSkeleton />
-                </>
-              ) : pendingWithGame.length > 0 || reviewedWithGame.length > 0 ? (
-                <>
-              {pendingWithGame.map((r, i) => {
-                const g = gameLookup.get(r.game_id)!;
-                const isHost = r.host_id === profileUser?.id;
-                return (
-                  <RequestGameCard
-                    key={r.id}
-                    game={g}
-                    request={r}
-                    index={i}
-                    isHost={isHost}
-                    onCancel={isHost ? undefined : async () => {
-                      try {
-                        await cancelMyJoinRequest(r.game_id);
-                        toast("Request canceled.");
-                        refreshRequests();
-                      } catch (e: any) {
-                        toast.error(e.message ?? "Could not cancel.");
-                      }
-                    }}
-                    onApprove={isHost ? async () => {
-                      try {
-                        await reviewJoinRequest(r.id, "approved");
-                        toast("Player approved.");
-                        refreshRequests();
-                      } catch (e: any) {
-                        toast.error(e.message ?? "Could not approve.");
-                      }
-                    } : undefined}
-                    onDecline={isHost ? async () => {
-                      try {
-                        await reviewJoinRequest(r.id, "rejected");
-                        toast("Player declined.");
-                        refreshRequests();
-                      } catch (e: any) {
-                        toast.error(e.message ?? "Could not decline.");
-                      }
-                    } : undefined}
-                  />
-                );
-              })}
-              {reviewedWithGame.map((r, i) => {
-                const g = gameLookup.get(r.game_id)!;
-                const isHost = r.host_id === profileUser?.id;
-                return (
-                  <RequestGameCard
-                    key={r.id}
-                    game={g}
-                    request={r}
-                    index={pendingWithGame.length + i}
-                    isHost={isHost}
-                  />
-                );
-              })}
-            </>
-          ) : (
-            <EmptyRequestsState />
+            <Clock className="h-4 w-4" /> Pending approvals
+            {pendingWithGame.length > 0 && !requestsLoading && (
+              <span className="ml-1 rounded-full bg-coral/15 px-2 py-0.5 text-[10px] font-bold text-coral">
+                {pendingWithGame.length}
+              </span>
+            )}
+          </h2>
+          {!requestsLoading && (
+            <Tabs
+              value={requestFilter}
+              onValueChange={(v) => setRequestFilter(v as "all" | "host" | "player")}
+              className="mb-3"
+            >
+              <TabsList className="h-8 w-full rounded-full bg-surface p-1 border border-border">
+                <TabsTrigger
+                  value="all"
+                  className="flex-1 rounded-full text-xs data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
+                >
+                  All
+                </TabsTrigger>
+                <TabsTrigger
+                  value="host"
+                  className="flex-1 rounded-full text-xs data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
+                >
+                  Host actions
+                </TabsTrigger>
+                <TabsTrigger
+                  value="player"
+                  className="flex-1 rounded-full text-xs data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
+                >
+                  My sent requests
+                </TabsTrigger>
+              </TabsList>
+            </Tabs>
           )}
-            </div>
+          <div className="space-y-3">
+            {requestsLoading ? (
+              <>
+                <RequestGameCardSkeleton />
+                <RequestGameCardSkeleton />
+              </>
+            ) : pendingWithGame.length > 0 || reviewedWithGame.length > 0 ? (
+              <>
+                {pendingWithGame.map((r, i) => {
+                  const g = gameLookup.get(r.game_id)!;
+                  const isHost = r.host_id === profileUser?.id;
+                  return (
+                    <RequestGameCard
+                      key={r.id}
+                      game={g}
+                      request={r}
+                      index={i}
+                      isHost={isHost}
+                      onCancel={isHost ? undefined : async () => {
+                        try {
+                          await cancelMyJoinRequest(r.game_id);
+                          toast("Request canceled.");
+                          refreshRequests();
+                        } catch (e: any) {
+                          toast.error(e.message ?? "Could not cancel.");
+                        }
+                      }}
+                      onApprove={isHost ? async () => {
+                        try {
+                          await reviewJoinRequest(r.id, "approved");
+                          toast("Player approved.");
+                          refreshRequests();
+                        } catch (e: any) {
+                          toast.error(e.message ?? "Could not approve.");
+                        }
+                      } : undefined}
+                      onDecline={isHost ? async () => {
+                        try {
+                          await reviewJoinRequest(r.id, "rejected");
+                          toast("Player declined.");
+                          refreshRequests();
+                        } catch (e: any) {
+                          toast.error(e.message ?? "Could not decline.");
+                        }
+                      } : undefined}
+                    />
+                  );
+                })}
+                {reviewedWithGame.map((r, i) => {
+                  const g = gameLookup.get(r.game_id)!;
+                  const isHost = r.host_id === profileUser?.id;
+                  return (
+                    <RequestGameCard
+                      key={r.id}
+                      game={g}
+                      request={r}
+                      index={pendingWithGame.length + i}
+                      isHost={isHost}
+                    />
+                  );
+                })}
+              </>
+            ) : (
+              <EmptyRequestsState filter={requestFilter} />
+            )}
           </div>
+        </div>
 
         {/* Upcoming — split into games you host vs games you're playing in */}
         <div className="mt-6">
