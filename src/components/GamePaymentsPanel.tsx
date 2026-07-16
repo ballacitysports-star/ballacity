@@ -594,7 +594,9 @@ export function PlayerPaymentsPanel({
 
   return (
     <div className="space-y-4">
+      <PaymentPoliciesCard gameId={gameId} settings={settings} isHost={false} />
       {/* Status card */}
+
       <div className="rounded-2xl border border-border bg-surface p-4">
         <div className="text-xs uppercase tracking-wider font-bold text-muted-foreground">
           Your payment status
