@@ -384,41 +384,63 @@ function Profile() {
                 </>
               ) : pendingWithGame.length > 0 || reviewedWithGame.length > 0 ? (
                 <>
-                  {pendingWithGame.map((r, i) => {
-                    const g = gameLookup.get(r.game_id)!;
-                    return (
-                      <RequestGameCard
-                        key={r.id}
-                        game={g}
-                        request={r}
-                        index={i}
-                        onCancel={async () => {
-                          try {
-                            await cancelMyJoinRequest(r.game_id);
-                            toast("Request canceled.");
-                            refreshRequests();
-                          } catch (e: any) {
-                            toast.error(e.message ?? "Could not cancel.");
-                          }
-                        }}
-                      />
-                    );
-                  })}
-                  {reviewedWithGame.map((r, i) => {
-                    const g = gameLookup.get(r.game_id)!;
-                    return (
-                      <RequestGameCard
-                        key={r.id}
-                        game={g}
-                        request={r}
-                        index={pendingWithGame.length + i}
-                      />
-                    );
-                  })}
-                </>
-              ) : (
-                <EmptyRequestsState />
-              )}
+              {pendingWithGame.map((r, i) => {
+                const g = gameLookup.get(r.game_id)!;
+                const isHost = r.host_id === profileUser?.id;
+                return (
+                  <RequestGameCard
+                    key={r.id}
+                    game={g}
+                    request={r}
+                    index={i}
+                    isHost={isHost}
+                    onCancel={isHost ? undefined : async () => {
+                      try {
+                        await cancelMyJoinRequest(r.game_id);
+                        toast("Request canceled.");
+                        refreshRequests();
+                      } catch (e: any) {
+                        toast.error(e.message ?? "Could not cancel.");
+                      }
+                    }}
+                    onApprove={isHost ? async () => {
+                      try {
+                        await reviewJoinRequest(r.id, "approved");
+                        toast("Player approved.");
+                        refreshRequests();
+                      } catch (e: any) {
+                        toast.error(e.message ?? "Could not approve.");
+                      }
+                    } : undefined}
+                    onDecline={isHost ? async () => {
+                      try {
+                        await reviewJoinRequest(r.id, "rejected");
+                        toast("Player declined.");
+                        refreshRequests();
+                      } catch (e: any) {
+                        toast.error(e.message ?? "Could not decline.");
+                      }
+                    } : undefined}
+                  />
+                );
+              })}
+              {reviewedWithGame.map((r, i) => {
+                const g = gameLookup.get(r.game_id)!;
+                const isHost = r.host_id === profileUser?.id;
+                return (
+                  <RequestGameCard
+                    key={r.id}
+                    game={g}
+                    request={r}
+                    index={pendingWithGame.length + i}
+                    isHost={isHost}
+                  />
+                );
+              })}
+            </>
+          ) : (
+            <EmptyRequestsState />
+          )}
             </div>
           </div>
 
