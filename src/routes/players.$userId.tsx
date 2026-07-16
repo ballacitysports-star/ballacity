@@ -1,7 +1,8 @@
 import { createFileRoute, Link, useNavigate, Navigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
-import { ArrowLeft, MessageCircle, Loader2, Calendar, MapPin, Shield, Trophy } from "lucide-react";
+import { ArrowLeft, MessageCircle, Loader2, Calendar, MapPin, Shield, Trophy, UserPlus, UserCheck } from "lucide-react";
+import { useFollow } from "@/lib/follows";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
@@ -56,6 +57,7 @@ function PlayerProfilePage() {
   const overrides = useProfileOverrides(userId);
   const reviews = useReviewsFor(userId);
   const rep = useMemo(() => computeReputation(reviews, "player"), [reviews]);
+  const follow = useFollow(userId);
 
   useEffect(() => {
     let cancelled = false;
@@ -220,19 +222,45 @@ function PlayerProfilePage() {
               </div>
             )}
           </div>
-          <Button
-            onClick={handleMessage}
-            disabled={opening}
-            className="shrink-0 rounded-full bg-lime-gradient text-primary-foreground"
-            size="sm"
-          >
-            {opening ? (
-              <Loader2 className="h-4 w-4 mr-1 animate-spin" />
-            ) : (
-              <MessageCircle className="h-4 w-4 mr-1" />
-            )}
-            Message
-          </Button>
+          <div className="shrink-0 flex flex-col gap-2">
+            <Button
+              onClick={handleMessage}
+              disabled={opening}
+              className="rounded-full bg-lime-gradient text-primary-foreground"
+              size="sm"
+            >
+              {opening ? (
+                <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+              ) : (
+                <MessageCircle className="h-4 w-4 mr-1" />
+              )}
+              Message
+            </Button>
+            <Button
+              onClick={() => {
+                if (!user) {
+                  toast.error("Sign in to follow this player.");
+                  return;
+                }
+                follow.toggle();
+              }}
+              disabled={follow.pending}
+              variant={follow.isFollowing ? "outline" : "default"}
+              className={
+                follow.isFollowing
+                  ? "rounded-full border-lime/40 bg-lime/10 text-lime hover:bg-coral/10 hover:text-coral hover:border-coral/40"
+                  : "rounded-full bg-lime-gradient text-primary-foreground"
+              }
+              size="sm"
+            >
+              {follow.isFollowing ? (
+                <UserCheck className="h-4 w-4 mr-1" />
+              ) : (
+                <UserPlus className="h-4 w-4 mr-1" />
+              )}
+              {follow.isFollowing ? "Following" : "Follow"}
+            </Button>
+          </div>
         </div>
 
         {bio && <p className="mt-3 text-sm text-foreground/90 whitespace-pre-wrap">{bio}</p>}
@@ -249,8 +277,8 @@ function PlayerProfilePage() {
           {[
             { k: stats.played, v: "Games" },
             { k: stats.reliability + "%", v: "Reliable" },
-            { k: stats.sportsmanship, v: "Sport" },
-            { k: stats.friends, v: "Crew" },
+            { k: follow.followers, v: "Followers" },
+            { k: follow.following, v: "Following" },
           ].map((s) => (
             <div key={s.v} className="rounded-2xl border border-border bg-surface p-3 text-center">
               <div className="font-display text-lg font-bold">{s.k}</div>
