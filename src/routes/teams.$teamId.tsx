@@ -223,7 +223,11 @@ function TeamPage() {
         {/* Reputation badge (opens reviews popup) */}
         {orgRep.count > 0 && (
           <div className="mt-4">
-            <ReputationBadge rep={orgRep} onClick={() => setReviewsOpen(true)} />
+            <ReputationBadge
+              rep={orgRep}
+              onClick={() => setReviewsOpen(true)}
+              ariaLabel={`Open reviews for ${org.name}. Trust score ${orgRep.trustScore}, ${orgRep.avg.toFixed(1)} out of 5 from ${orgRep.count} review${orgRep.count === 1 ? "" : "s"}.`}
+            />
           </div>
         )}
 
