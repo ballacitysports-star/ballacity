@@ -1871,12 +1871,6 @@ function GameDetail() {
                             gameTitle={game.title}
                             feeRequired={isPaid}
                             onOptimistic={applyOptimisticReview}
-                            onRequestRemove={
-                              isHost && user && r.player_id !== user.id
-                                ? (name) => setRemoveTarget({ userId: r.player_id, name })
-                                : undefined
-                            }
-                            removing={removingId === r.player_id}
                           />
 
                         ))}
