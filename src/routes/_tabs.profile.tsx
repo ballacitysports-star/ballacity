@@ -334,7 +334,7 @@ function Profile() {
 
         {/* Reputation badge (above the fold) */}
         <div className="mt-4">
-          <ReputationBadge rep={myRep} />
+          <ReputationBadge rep={myRep} onClick={() => setReviewsOpen(true)} />
         </div>
 
         {/* Join request status (pending approvals + recent decisions) */}
