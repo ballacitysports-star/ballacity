@@ -10,6 +10,7 @@ import { MyAvatar } from "@/components/UserAvatar";
 import { SportChips } from "@/components/SportChips";
 import { GameCard } from "@/components/GameCard";
 import { GameListRow } from "@/components/GameListRow";
+import { GameCardSkeleton, GameListRowSkeleton } from "@/components/GameCardSkeleton";
 import { GAMES, SPORTS, POSITIONS_BY_SPORT, type Sport } from "@/lib/sample-data";
 import { useHostedGames } from "@/lib/hosted-games-store";
 import { useJoinedGameIds } from "@/lib/games-store";
