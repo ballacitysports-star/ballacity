@@ -206,6 +206,7 @@ function GameDetail() {
   const [requesting, setRequesting] = useState(false);
   const [processing, setProcessing] = useState(false);
   const [positionRosterOpen, setPositionRosterOpen] = useState(false);
+  const [reviewsOpen, setReviewsOpen] = useState(false);
 
   // Ticking clock (1s) that re-renders while the resubmit cooldown counts down.
   // Only starts when there's an active cooldown to avoid unnecessary re-renders.
