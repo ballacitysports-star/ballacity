@@ -395,9 +395,16 @@ function TeamPage() {
 
         {/* Reviews popup */}
         <Dialog open={reviewsOpen} onOpenChange={setReviewsOpen}>
-          <DialogContent className="max-h-[90dvh] overflow-y-auto p-0 sm:max-w-xl">
+          <DialogContent
+            className="max-h-[90dvh] overflow-y-auto p-0 sm:max-w-xl"
+            aria-labelledby="team-reviews-title"
+            aria-describedby="team-reviews-desc"
+          >
             <DialogHeader className="sr-only">
-              <DialogTitle>Reviews</DialogTitle>
+              <DialogTitle id="team-reviews-title">Reviews for {org.name}</DialogTitle>
+              <DialogDescription id="team-reviews-desc">
+                Browse, filter, and sort reviews left for this {org.kind === "coach" ? "trainer" : "team"}. Press Escape to close.
+              </DialogDescription>
             </DialogHeader>
             <div className="p-4">
               <ReviewsSection
