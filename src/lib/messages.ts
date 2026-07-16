@@ -53,7 +53,10 @@ export type ConversationWithMeta = Conversation & {
   other_avatar_url: string | null;
   last_message: string | null;
   unread: number;
+  is_request: boolean;
+  accepted_by: string[];
 };
+
 
 
 // Find or create a 1:1 conversation between current user and otherUserId
