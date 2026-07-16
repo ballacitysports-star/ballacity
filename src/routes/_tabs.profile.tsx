@@ -44,6 +44,7 @@ function Profile() {
   const myRep = useMemo(() => computeReputation(myReviews, "player"), [myReviews]);
   const { user, loading } = useAuth();
   const [confirmedUser, setConfirmedUser] = useState<User | null>(null);
+  const [reviewsOpen, setReviewsOpen] = useState(false);
   const profileUser = user ?? confirmedUser;
   const me = useMyProfile(profileUser);
   const joinedGameIds = useJoinedGameIds();
