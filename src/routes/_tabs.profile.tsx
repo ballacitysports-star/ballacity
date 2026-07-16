@@ -73,17 +73,24 @@ function Profile() {
   }, [joinedGameIds, hosted, profileUser]);
 
 
-  // Pending / recently-reviewed join requests for player view
+  // Pending / recently-reviewed join requests for player and host views
   const [myRequests, setMyRequests] = useState<JoinRequest[]>([]);
+  const [hostRequests, setHostRequests] = useState<JoinRequest[]>([]);
   const [requestsLoading, setRequestsLoading] = useState(true);
   const refreshRequests = async () => {
     if (!profileUser) {
       setMyRequests([]);
+      setHostRequests([]);
       return;
     }
     setRequestsLoading(true);
     try {
-      setMyRequests(await listMyJoinRequests());
+      const [mine, hosted] = await Promise.all([
+        listMyJoinRequests(),
+        listHostJoinRequests(),
+      ]);
+      setMyRequests(mine);
+      setHostRequests(hosted);
     } catch {
       /* ignore */
     } finally {
