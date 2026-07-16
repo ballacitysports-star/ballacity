@@ -26,6 +26,8 @@ import { useLiveParticipantCount } from "@/lib/game-participants-store";
 
 // joinGame no longer called here — player is added to roster only after host verifies payment.
 import { fetchHostedGame, useHostedGames } from "@/lib/hosted-games-store";
+import { useMyFlowStatus, FLOW_STEPS, FLOW_META } from "@/lib/game-flow-status";
+import { PlayerFlowPill } from "@/components/PlayerFlowPill";
 import { z } from "zod";
 
 // Local YYYY-MM-DD for a Date, avoiding UTC shift from toISOString().
@@ -448,11 +450,14 @@ function PayPage() {
         >
           <ArrowLeft className="h-5 w-5" />
         </Link>
-        <div className="min-w-0">
+        <div className="min-w-0 flex-1">
           <h1 className="font-display text-xl font-bold leading-tight truncate">{game.title}</h1>
           <div className="text-xs text-muted-foreground truncate">{game.location}</div>
         </div>
+        <PayFlowPillHeader gameId={gameId} />
       </div>
+
+      <PayFlowStepper gameId={gameId} />
 
       {/* Hero amount — always the loudest thing on screen */}
       <div className="rounded-3xl border border-lime/30 bg-lime/5 p-5">
