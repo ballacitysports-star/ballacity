@@ -192,9 +192,24 @@ function Create() {
           }
           setPublishing(true);
           try {
-            const date = when
-              ? new Date(when).toISOString()
-              : new Date(Date.now() + 3600_000).toISOString();
+            // Compute one or many ISO datetimes.
+            let dates: string[];
+            if (repeatRange) {
+              if (rangeDates.length === 0) {
+                toast.error("Pick a valid start and end date.");
+                setPublishing(false);
+                return;
+              }
+              const time = when.includes("T") ? when.split("T")[1] : when;
+              const t = time && /^\d{2}:\d{2}/.test(time) ? time : "18:00";
+              dates = rangeDates.map((d) => new Date(`${d}T${t}`).toISOString());
+            } else {
+              dates = [
+                when
+                  ? new Date(when).toISOString()
+                  : new Date(Date.now() + 3600_000).toISOString(),
+              ];
+            }
 
             // Build the host snapshot from the freshest profile available so
             // it never falls back to an email-prefix default when the
@@ -222,25 +237,28 @@ function Create() {
               },
             });
 
-            const game = await addHostedGame({
-              sport,
-              title,
-              date,
-              location,
-              skill,
-              maxPlayers: size,
-              price,
-              indoor,
-              isPrivate: priv,
-              description,
-              hostUserId: user?.id,
-              host: hostSnap,
-              image: coverUrl ?? undefined,
-              positionsNeeded: positionsCleanup(positionsNeeded),
-            });
+            const cleanPositions = positionsCleanup(positionsNeeded);
+            let firstGameId: string | null = null;
+            for (const date of dates) {
+              const game = await addHostedGame({
+                sport,
+                title,
+                date,
+                location,
+                skill,
+                maxPlayers: size,
+                price,
+                indoor,
+                isPrivate: priv,
+                description,
+                hostUserId: user?.id,
+                host: hostSnap,
+                image: coverUrl ?? undefined,
+                positionsNeeded: cleanPositions,
+              });
+              if (!firstGameId) firstGameId = game.id;
 
-            // Persist host ownership + approval/fee preferences so the host & players see them on the detail page
-            if (user) {
+              // Persist host ownership + approval/fee preferences so the host & players see them on the detail page
               try {
                 await upsertGamePaymentSettings({
                   game_id: game.id,
@@ -255,8 +273,13 @@ function Create() {
 
             // Note: do NOT auto-join the host. Hosting ≠ playing; the host
             // sees their published games in the profile's hosted section.
-            toast.success("Game published");
-            nav({ to: "/games/$gameId", params: { gameId: game.id } });
+            if (dates.length > 1) {
+              toast.success(`Created ${dates.length} games`);
+              nav({ to: "/feed" });
+            } else {
+              toast.success("Game published");
+              nav({ to: "/games/$gameId", params: { gameId: firstGameId! } });
+            }
           } finally {
             setPublishing(false);
           }
