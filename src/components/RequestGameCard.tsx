@@ -74,11 +74,11 @@ function RequestTimeline({ request }: { request: JoinRequest }) {
     events.push({ key: "upd", label: "Updated", ts: updated, tone: "muted" });
   }
   return (
-    <ol className="mt-1.5 space-y-1">
+    <ol className="mt-1 space-y-0.5">
       {events.map((e) => (
-        <li key={e.key} className="flex items-center gap-2 text-[10px] text-muted-foreground">
+        <li key={e.key} className="flex items-center gap-1.5 text-[9px] text-muted-foreground">
           <span
-            className={`h-1.5 w-1.5 rounded-full ${
+            className={`h-1 w-1 rounded-full ${
               e.tone === "lime" ? "bg-lime" : e.tone === "coral" ? "bg-coral" : "bg-muted-foreground/50"
             }`}
           />
