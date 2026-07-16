@@ -57,6 +57,7 @@ function PlayerProfilePage() {
   const overrides = useProfileOverrides(userId);
   const reviews = useReviewsFor(userId);
   const rep = useMemo(() => computeReputation(reviews, "player"), [reviews]);
+  const follow = useFollow(userId);
 
   useEffect(() => {
     let cancelled = false;
