@@ -334,7 +334,7 @@ function PlayerProfilePage() {
             revieweeId={userId}
             revieweeKind="player"
             revieweeName={displayName}
-            isOwner={false}
+            isOwner={user?.id === userId}
           />
         </div>
       </div>
