@@ -42,11 +42,11 @@ function Profile() {
   const me = useMyProfile(profileUser);
   const joinedGameIds = useJoinedGameIds();
   const hosted = useHostedGames();
-  const upcomingGames = useMemo(() => {
+  const upcomingGroups = useMemo(() => {
     const ids = new Set(joinedGameIds);
     const pool = [...hosted, ...GAMES];
     const seen = new Set<string>();
-    return pool
+    const relevant = pool
       .filter(
         (game) =>
           ids.has(game.id) ||
@@ -54,7 +54,15 @@ function Profile() {
       )
       .filter((g) => (seen.has(g.id) ? false : (seen.add(g.id), true)))
       .sort((a, b) => +new Date(a.date) - +new Date(b.date));
+    const hosting = relevant.filter(
+      (g) => profileUser && (g as { hostUserId?: string }).hostUserId === profileUser.id,
+    );
+    const playing = relevant.filter(
+      (g) => !(profileUser && (g as { hostUserId?: string }).hostUserId === profileUser.id),
+    );
+    return { hosting, playing, total: relevant.length };
   }, [joinedGameIds, hosted, profileUser]);
+
 
   // Pending / recently-reviewed join requests for player view
   const [myRequests, setMyRequests] = useState<JoinRequest[]>([]);
