@@ -65,7 +65,175 @@ async function openProof(path: string | null) {
   else toast.error("Could not load proof.");
 }
 
+/* --------------------------- Payment policies --------------------------- */
+
+function fmtDeadline(iso: string): string {
+  try {
+    const d = new Date(iso);
+    return d.toLocaleString(undefined, {
+      weekday: "short",
+      month: "short",
+      day: "numeric",
+      hour: "numeric",
+      minute: "2-digit",
+    });
+  } catch {
+    return iso;
+  }
+}
+
+export function PaymentPoliciesCard({
+  gameId,
+  settings,
+  isHost,
+}: {
+  gameId: string;
+  settings: GamePaymentSettings | null;
+  isHost: boolean;
+}) {
+  const [methods, setMethods] = useState<PaymentMethod[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      if (!settings?.host_id) {
+        setLoading(false);
+        return;
+      }
+      try {
+        const list = await listPaymentMethodsForHost(settings.host_id, gameId);
+        if (cancelled) return;
+        const accepted = new Set(settings.accepted_method_ids ?? []);
+        const filtered = accepted.size
+          ? list.filter((m) => accepted.has(m.id) && m.is_enabled)
+          : list.filter((m) => m.is_enabled);
+        setMethods(filtered);
+      } catch {
+        // silent; card still renders policies
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [gameId, settings?.host_id, settings?.accepted_method_ids?.join(",")]);
+
+  const deadline = settings?.payment_deadline ?? null;
+  const isPastDue = !!deadline && new Date(deadline).getTime() < Date.now();
+  const hasAny =
+    !!deadline ||
+    !!settings?.refund_policy ||
+    !!settings?.payment_instructions ||
+    methods.length > 0;
+
+  return (
+    <div className="rounded-2xl border border-border bg-surface p-4">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <div className="font-display text-base font-bold flex items-center gap-2">
+            <Info className="h-4 w-4 text-lime" /> Payment details
+          </div>
+          <p className="text-xs text-muted-foreground mt-0.5">
+            {isHost
+              ? "What players see on this game."
+              : "Policies and accepted methods from the host."}
+          </p>
+        </div>
+        {isHost && (
+          <Link
+            to="/games/$gameId/payment-setup"
+            params={{ gameId }}
+            className="inline-flex items-center gap-1 rounded-full border border-border bg-background px-2.5 py-1 text-[11px] font-semibold hover:bg-secondary"
+          >
+            <Pencil className="h-3 w-3" /> Edit
+          </Link>
+        )}
+      </div>
+
+      {!hasAny ? (
+        <div className="mt-3 rounded-xl border border-dashed border-border p-3 text-xs text-muted-foreground">
+          {isHost
+            ? "No payment settings yet. Add a deadline, refund policy, or accepted methods."
+            : "Host hasn't configured payment details yet."}
+        </div>
+      ) : (
+        <div className="mt-3 space-y-3">
+          {deadline && (
+            <div className="flex items-start gap-2 rounded-xl border border-border bg-background p-3">
+              <CalendarClock
+                className={`h-4 w-4 mt-0.5 shrink-0 ${isPastDue ? "text-coral" : "text-lime"}`}
+              />
+              <div className="min-w-0 flex-1">
+                <div className="text-[11px] uppercase tracking-wider font-bold text-muted-foreground">
+                  Payment deadline
+                </div>
+                <div className="text-sm font-semibold">{fmtDeadline(deadline)}</div>
+                {isPastDue && (
+                  <div className="mt-0.5 inline-flex items-center gap-1 text-[11px] font-semibold text-coral">
+                    <AlertTriangle className="h-3 w-3" /> Past due
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {methods.length > 0 && (
+            <div className="rounded-xl border border-border bg-background p-3">
+              <div className="flex items-center gap-2 text-[11px] uppercase tracking-wider font-bold text-muted-foreground">
+                <Wallet className="h-3.5 w-3.5" /> Accepted methods
+              </div>
+              <ul className="mt-2 flex flex-wrap gap-2">
+                {methods.map((m) => {
+                  const meta = paymentTypeMeta(m.payment_type);
+                  return (
+                    <li
+                      key={m.id}
+                      className="inline-flex items-center gap-1.5 rounded-full border border-border bg-surface px-2.5 py-1 text-xs"
+                    >
+                      <span className="font-semibold">{meta.label}</span>
+                      {m.username && (
+                        <span className="text-muted-foreground">· {m.username}</span>
+                      )}
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
+          )}
+
+          {settings?.payment_instructions && (
+            <div className="rounded-xl border border-border bg-background p-3">
+              <div className="flex items-center gap-2 text-[11px] uppercase tracking-wider font-bold text-muted-foreground">
+                <FileText className="h-3.5 w-3.5" /> Instructions
+              </div>
+              <p className="mt-1 text-sm whitespace-pre-wrap">
+                {settings.payment_instructions}
+              </p>
+            </div>
+          )}
+
+          {settings?.refund_policy && (
+            <div className="rounded-xl border border-border bg-background p-3">
+              <div className="flex items-center gap-2 text-[11px] uppercase tracking-wider font-bold text-muted-foreground">
+                <ShieldCheck className="h-3.5 w-3.5" /> Refund policy
+              </div>
+              <p className="mt-1 text-sm whitespace-pre-wrap">{settings.refund_policy}</p>
+            </div>
+          )}
+
+          {loading && methods.length === 0 && (
+            <div className="text-[11px] text-muted-foreground">Loading accepted methods…</div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 /* --------------------------------- Host --------------------------------- */
+
 
 type HostRow = PaymentSubmission & {
   playerName: string;
