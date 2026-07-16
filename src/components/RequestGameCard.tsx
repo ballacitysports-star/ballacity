@@ -49,6 +49,71 @@ export function RequestGameCard({
   onApprove?: () => void;
   onDecline?: () => void;
 }) {
+  return <RequestGameCardInner game={game} request={request} index={index} isHost={isHost} onCancel={onCancel} onApprove={onApprove} onDecline={onDecline} />;
+}
+
+function formatTs(ts: string) {
+  const d = new Date(ts);
+  return d.toLocaleString(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
+}
+
+function RequestTimeline({ request }: { request: JoinRequest }) {
+  const events: { key: string; label: string; ts: string; tone: "muted" | "lime" | "coral" }[] = [];
+  events.push({ key: "req", label: "Requested", ts: request.created_at, tone: "muted" });
+  if (request.status === "approved" && request.reviewed_at) {
+    events.push({ key: "app", label: "Approved", ts: request.reviewed_at, tone: "lime" });
+  }
+  if (request.status === "rejected") {
+    const ts = request.last_rejected_at || request.reviewed_at;
+    if (ts) events.push({ key: "dec", label: "Declined", ts, tone: "coral" });
+  }
+  const updated = request.reviewed_at || request.last_rejected_at;
+  if (updated && updated !== request.created_at) {
+    events.push({ key: "upd", label: "Updated", ts: updated, tone: "muted" });
+  }
+  return (
+    <ol className="mt-1.5 space-y-1">
+      {events.map((e) => (
+        <li key={e.key} className="flex items-center gap-2 text-[10px] text-muted-foreground">
+          <span
+            className={`h-1.5 w-1.5 rounded-full ${
+              e.tone === "lime" ? "bg-lime" : e.tone === "coral" ? "bg-coral" : "bg-muted-foreground/50"
+            }`}
+          />
+          <span className="font-semibold text-foreground/80">{e.label}</span>
+          <span suppressHydrationWarning>· {formatTs(e.ts)}</span>
+        </li>
+      ))}
+    </ol>
+  );
+}
+
+function RequestGameCardInner({
+  game,
+  request,
+  index = 0,
+  isHost,
+  onCancel,
+  onApprove,
+  onDecline,
+}: {
+  game: Game;
+  request: JoinRequest;
+  index?: number;
+  isHost?: boolean;
+  onCancel?: () => void;
+  onApprove?: () => void;
+  onDecline?: () => void;
+}) {
+  const isPending = request.status === "pending";
+  const isApproved = request.status === "approved";
+  const liveCount = useLiveParticipantCount(game.id);
+  const joinedCount = liveCount ?? game.joined;
+  const spotsLeft = Math.max(0, game.maxPlayers - joinedCount);
+  const fillPct = Math.round((joinedCount / game.maxPlayers) * 100);
+  const [confirm, setConfirm] = useState<null | "approve" | "decline">(null);
+  const playerName = (request as any).player_name || (request as any).player?.display_name || "this player";
+
   const isPending = request.status === "pending";
   const isApproved = request.status === "approved";
   const liveCount = useLiveParticipantCount(game.id);
