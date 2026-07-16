@@ -57,6 +57,24 @@ function Create() {
   const [coverUploading, setCoverUploading] = useState(false);
   const coverInputRef = useRef<HTMLInputElement>(null);
   const [positionsNeeded, setPositionsNeeded] = useState<PositionsNeeded>({});
+  const [repeatRange, setRepeatRange] = useState(false);
+  const [rangeStart, setRangeStart] = useState("");
+  const [rangeEnd, setRangeEnd] = useState("");
+
+  const rangeDates: string[] = (() => {
+    if (!repeatRange || !rangeStart || !rangeEnd) return [];
+    const start = new Date(rangeStart + "T00:00:00");
+    const end = new Date(rangeEnd + "T00:00:00");
+    if (isNaN(start.getTime()) || isNaN(end.getTime()) || end < start) return [];
+    const out: string[] = [];
+    for (let d = new Date(start); d <= end && out.length < 60; d.setDate(d.getDate() + 1)) {
+      const y = d.getFullYear();
+      const m = String(d.getMonth() + 1).padStart(2, "0");
+      const day = String(d.getDate()).padStart(2, "0");
+      out.push(`${y}-${m}-${day}`);
+    }
+    return out;
+  })();
 
 
 
@@ -174,9 +192,24 @@ function Create() {
           }
           setPublishing(true);
           try {
-            const date = when
-              ? new Date(when).toISOString()
-              : new Date(Date.now() + 3600_000).toISOString();
+            // Compute one or many ISO datetimes.
+            let dates: string[];
+            if (repeatRange) {
+              if (rangeDates.length === 0) {
+                toast.error("Pick a valid start and end date.");
+                setPublishing(false);
+                return;
+              }
+              const time = when.includes("T") ? when.split("T")[1] : when;
+              const t = time && /^\d{2}:\d{2}/.test(time) ? time : "18:00";
+              dates = rangeDates.map((d) => new Date(`${d}T${t}`).toISOString());
+            } else {
+              dates = [
+                when
+                  ? new Date(when).toISOString()
+                  : new Date(Date.now() + 3600_000).toISOString(),
+              ];
+            }
 
             // Build the host snapshot from the freshest profile available so
             // it never falls back to an email-prefix default when the
@@ -204,25 +237,28 @@ function Create() {
               },
             });
 
-            const game = await addHostedGame({
-              sport,
-              title,
-              date,
-              location,
-              skill,
-              maxPlayers: size,
-              price,
-              indoor,
-              isPrivate: priv,
-              description,
-              hostUserId: user?.id,
-              host: hostSnap,
-              image: coverUrl ?? undefined,
-              positionsNeeded: positionsCleanup(positionsNeeded),
-            });
+            const cleanPositions = positionsCleanup(positionsNeeded);
+            let firstGameId: string | null = null;
+            for (const date of dates) {
+              const game = await addHostedGame({
+                sport,
+                title,
+                date,
+                location,
+                skill,
+                maxPlayers: size,
+                price,
+                indoor,
+                isPrivate: priv,
+                description,
+                hostUserId: user?.id,
+                host: hostSnap,
+                image: coverUrl ?? undefined,
+                positionsNeeded: cleanPositions,
+              });
+              if (!firstGameId) firstGameId = game.id;
 
-            // Persist host ownership + approval/fee preferences so the host & players see them on the detail page
-            if (user) {
+              // Persist host ownership + approval/fee preferences so the host & players see them on the detail page
               try {
                 await upsertGamePaymentSettings({
                   game_id: game.id,
@@ -237,8 +273,13 @@ function Create() {
 
             // Note: do NOT auto-join the host. Hosting ≠ playing; the host
             // sees their published games in the profile's hosted section.
-            toast.success("Game published");
-            nav({ to: "/games/$gameId", params: { gameId: game.id } });
+            if (dates.length > 1) {
+              toast.success(`Created ${dates.length} games`);
+              nav({ to: "/feed" });
+            } else {
+              toast.success("Game published");
+              nav({ to: "/games/$gameId", params: { gameId: firstGameId! } });
+            }
           } finally {
             setPublishing(false);
           }
@@ -355,13 +396,70 @@ function Create() {
         </Section>
 
         {/* Date */}
-        <Section title="When" icon={<Calendar className="h-4 w-4" />}>
-          <input
-            type="datetime-local"
-            value={when}
-            onChange={(e) => setWhen(e.target.value)}
-            className="w-full rounded-2xl border border-border bg-surface px-4 py-3 text-sm outline-none focus:border-lime [color-scheme:dark]"
-          />
+        <Section title={repeatRange ? "Time" : "When"} icon={<Calendar className="h-4 w-4" />}>
+          {repeatRange ? (
+            <input
+              type="time"
+              value={when.includes("T") ? when.split("T")[1] : when}
+              onChange={(e) => setWhen(e.target.value)}
+              className="w-full rounded-2xl border border-border bg-surface px-4 py-3 text-sm outline-none focus:border-lime [color-scheme:dark]"
+            />
+          ) : (
+            <input
+              type="datetime-local"
+              value={when}
+              onChange={(e) => setWhen(e.target.value)}
+              className="w-full rounded-2xl border border-border bg-surface px-4 py-3 text-sm outline-none focus:border-lime [color-scheme:dark]"
+            />
+          )}
+          <div className="rounded-2xl border border-border bg-surface px-4 py-3">
+            <div className="flex items-center justify-between">
+              <span className="text-sm font-medium">Repeat on multiple days</span>
+              <button
+                type="button"
+                onClick={() => setRepeatRange((v) => !v)}
+                className={`relative h-6 w-10 rounded-full transition-colors ${repeatRange ? "bg-lime" : "bg-secondary"}`}
+                aria-label="Toggle date range"
+              >
+                <motion.span
+                  layout
+                  transition={{ type: "spring", stiffness: 500, damping: 30 }}
+                  className="absolute top-0.5 h-5 w-5 rounded-full bg-background shadow"
+                  style={{ left: repeatRange ? "calc(100% - 1.375rem)" : "0.125rem" }}
+                />
+              </button>
+            </div>
+            {repeatRange && (
+              <div className="mt-3 space-y-2">
+                <div className="grid grid-cols-2 gap-2">
+                  <label className="text-xs text-muted-foreground">
+                    Start date
+                    <input
+                      type="date"
+                      value={rangeStart}
+                      onChange={(e) => setRangeStart(e.target.value)}
+                      className="mt-1 w-full rounded-xl border border-border bg-background px-3 py-2 text-sm outline-none focus:border-lime [color-scheme:dark]"
+                    />
+                  </label>
+                  <label className="text-xs text-muted-foreground">
+                    End date
+                    <input
+                      type="date"
+                      value={rangeEnd}
+                      min={rangeStart || undefined}
+                      onChange={(e) => setRangeEnd(e.target.value)}
+                      className="mt-1 w-full rounded-xl border border-border bg-background px-3 py-2 text-sm outline-none focus:border-lime [color-scheme:dark]"
+                    />
+                  </label>
+                </div>
+                <p className="text-[11px] text-muted-foreground">
+                  {rangeDates.length > 0
+                    ? `Will create ${rangeDates.length} game${rangeDates.length === 1 ? "" : "s"}, one per day at the time above.`
+                    : "Pick start and end dates (max 60 days)."}
+                </p>
+              </div>
+            )}
+          </div>
         </Section>
 
         {/* Venue address */}
