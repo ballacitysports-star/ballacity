@@ -415,12 +415,12 @@ function PlayerProfilePage() {
           </DialogContent>
         </Dialog>
 
-        <FollowListDialog
+        <FollowSheet
           open={followList !== null}
-          onOpenChange={(v) => !v && setFollowList(null)}
+          onOpenChange={(v: boolean) => !v && setFollowList(null)}
           userId={userId}
           displayName={displayName}
-          kind={followList ?? "followers"}
+          initialTab={followList ?? "followers"}
         />
       </div>
     </div>
