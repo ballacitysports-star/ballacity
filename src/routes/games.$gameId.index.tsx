@@ -1771,7 +1771,7 @@ function GameDetail() {
 
       {/* Host controls */}
       {isHost && (
-        <div className="mx-auto w-full max-w-md sm:max-w-2xl lg:max-w-4xl px-4 mt-4 space-y-3">
+        <div className={`mx-auto w-full max-w-md sm:max-w-2xl lg:max-w-4xl px-4 mt-4 space-y-3 ${isPaid && activeTab !== "overview" ? "hidden" : ""}`}>
           {/* Manage game: edit, start, close joining */}
           <div className="rounded-2xl border border-border bg-surface p-3">
             <div className="flex items-center justify-between gap-2">
