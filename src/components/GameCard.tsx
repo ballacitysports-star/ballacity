@@ -113,7 +113,7 @@ export function GameCard({ game, index = 0 }: { game: Game; index?: number }) {
         params={{ gameId: game.id }}
         className="group block overflow-hidden rounded-3xl border border-border bg-surface transition-all hover:border-lime/40 hover:-translate-y-0.5"
       >
-        <div className="relative h-44 overflow-hidden">
+        <div className="relative h-28 overflow-hidden">
           <img
             src={game.image}
             alt={game.title}
