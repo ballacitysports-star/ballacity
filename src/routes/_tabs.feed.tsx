@@ -571,17 +571,9 @@ const InfiniteSentinel = ({
 }) => {
   if (total === 0) return null;
   return (
-    <div ref={ref} className="mt-4 flex items-center justify-center py-6">
+    <div ref={ref} className="mt-2 flex items-center justify-center py-4" aria-live="polite">
       {hasMore ? (
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          className="inline-flex items-center gap-2 rounded-full border border-border bg-surface px-4 py-2 text-xs font-semibold text-muted-foreground"
-          aria-live="polite"
-        >
-          <Loader2 className="h-3.5 w-3.5 animate-spin text-lime" />
-          Loading more games…
-        </motion.div>
+        <span className="sr-only">Loading more games…</span>
       ) : (
         <span className="text-xs text-muted-foreground">You're all caught up · {total} games</span>
       )}
