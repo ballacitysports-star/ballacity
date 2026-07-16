@@ -96,6 +96,7 @@ function RequestGameCardInner({
   index = 0,
   isHost,
   onCancel,
+  onWithdraw,
   onApprove,
   onDecline,
 }: {
@@ -104,6 +105,7 @@ function RequestGameCardInner({
   index?: number;
   isHost?: boolean;
   onCancel?: () => void;
+  onWithdraw?: () => void;
   onApprove?: () => void;
   onDecline?: () => void;
 }) {
