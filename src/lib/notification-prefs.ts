@@ -1,7 +1,7 @@
 import { useEffect, useSyncExternalStore } from "react";
 import { supabase } from "@/integrations/supabase/client";
 
-export type NotifCategory = "approvals" | "messages" | "joinRequests" | "general";
+export type NotifCategory = "approvals" | "messages" | "joinRequests" | "follows" | "general";
 export type NotifChannel = "inApp" | "push";
 
 export type NotifPrefs = Record<NotifCategory, Record<NotifChannel, boolean>>;
@@ -10,6 +10,7 @@ export const DEFAULT_NOTIF_PREFS: NotifPrefs = {
   approvals: { inApp: true, push: true },
   messages: { inApp: true, push: true },
   joinRequests: { inApp: true, push: true },
+  follows: { inApp: true, push: false },
   general: { inApp: true, push: false },
 };
 
@@ -20,6 +21,10 @@ export const CATEGORY_META: Record<NotifCategory, { label: string; description: 
     label: "Join requests",
     description: "When a player requests to join a game you host.",
   },
+  follows: {
+    label: "Followers",
+    description: "When someone follows or unfollows you.",
+  },
   general: { label: "General updates", description: "Payments, reminders, and other activity." },
 };
 
@@ -29,6 +34,7 @@ export function categoryFor(type: string): NotifCategory {
   if (type === "join_request" || type === "game_invite") return "joinRequests";
   if (type === "join_approved" || type === "join_declined") return "approvals";
   if (type === "message") return "messages";
+  if (type === "follow" || type === "unfollow") return "follows";
   return "general";
 }
 
