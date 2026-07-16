@@ -121,51 +121,51 @@ export function GameCard({ game, index = 0 }: { game: Game; index?: number }) {
             className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-105"
           />
           <div className="absolute inset-0 bg-gradient-to-t from-surface via-surface/30 to-transparent" />
-          <div className="absolute top-3 left-3 flex flex-wrap gap-1.5">
-            <span className="inline-flex items-center gap-1 rounded-full bg-background/70 backdrop-blur px-2.5 py-1 text-xs font-semibold">
+          <div className="absolute top-2 left-2 flex flex-wrap gap-1">
+            <span className="inline-flex items-center gap-1 rounded-full bg-background/70 backdrop-blur px-2 py-0.5 text-[11px] font-semibold">
               <span>{sportEmoji[game.sport]}</span>
               {game.sport}
             </span>
             {game.urgent && (
-              <span className="inline-flex items-center gap-1 rounded-full bg-coral-gradient px-2.5 py-1 text-xs font-bold text-white">
+              <span className="inline-flex items-center gap-1 rounded-full bg-coral-gradient px-2 py-0.5 text-[11px] font-bold text-white">
                 <Zap className="h-3 w-3" /> Needs players
               </span>
             )}
             {flowStatus !== "none" ? (
               <PlayerFlowPill status={flowStatus} short />
             ) : joinedByMe ? (
-              <span className="inline-flex items-center gap-1 rounded-full bg-lime px-2.5 py-1 text-xs font-bold text-primary-foreground">
+              <span className="inline-flex items-center gap-1 rounded-full bg-lime px-2 py-0.5 text-[11px] font-bold text-primary-foreground">
                 Joined
               </span>
             ) : null}
             {game.trending && !game.urgent && liveStatus === "scheduled" && (
-              <span className="inline-flex items-center gap-1 rounded-full bg-background/70 backdrop-blur px-2.5 py-1 text-xs font-semibold text-coral">
+              <span className="inline-flex items-center gap-1 rounded-full bg-background/70 backdrop-blur px-2 py-0.5 text-[11px] font-semibold text-coral">
                 <Flame className="h-3 w-3" /> Trending
               </span>
             )}
             {liveStatus === "in_progress" && (
-              <span className="inline-flex items-center gap-1 rounded-full bg-coral px-2.5 py-1 text-xs font-bold text-white">
+              <span className="inline-flex items-center gap-1 rounded-full bg-coral px-2 py-0.5 text-[11px] font-bold text-white">
                 <span className="h-1.5 w-1.5 rounded-full bg-white animate-pulse" /> Live
               </span>
             )}
             {liveStatus === "completed" && (
-              <span className="inline-flex items-center gap-1 rounded-full bg-background/70 backdrop-blur px-2.5 py-1 text-xs font-semibold text-muted-foreground">
+              <span className="inline-flex items-center gap-1 rounded-full bg-background/70 backdrop-blur px-2 py-0.5 text-[11px] font-semibold text-muted-foreground">
                 Completed
               </span>
             )}
             {game.joinsClosed && liveStatus === "scheduled" && (
-              <span className="inline-flex items-center gap-1 rounded-full bg-background/70 backdrop-blur px-2.5 py-1 text-xs font-semibold">
+              <span className="inline-flex items-center gap-1 rounded-full bg-background/70 backdrop-blur px-2 py-0.5 text-[11px] font-semibold">
                 <Lock className="h-3 w-3" /> Closed
               </span>
             )}
           </div>
-          <div className="absolute top-3 right-3">
+          <div className="absolute top-2 right-2">
             {game.price === 0 ? (
-              <span className="rounded-full bg-lime px-2.5 py-1 text-xs font-bold text-primary-foreground">
+              <span className="rounded-full bg-lime px-2 py-0.5 text-[11px] font-bold text-primary-foreground">
                 FREE
               </span>
             ) : (
-              <span className="rounded-full bg-background/70 backdrop-blur px-2.5 py-1 text-xs font-bold">
+              <span className="rounded-full bg-background/70 backdrop-blur px-2 py-0.5 text-[11px] font-bold">
                 ${game.price}
               </span>
             )}
