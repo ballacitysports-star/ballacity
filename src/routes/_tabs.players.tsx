@@ -208,8 +208,18 @@ function PlayersPage() {
     return age;
   }
 
+  const [density, setDensity] = useState<"grid" | "list">(() => {
+    if (typeof window === "undefined") return "list";
+    return (localStorage.getItem("openrun:players-density") as "grid" | "list") ?? "list";
+  });
+  const switchDensity = (d: "grid" | "list") => {
+    setDensity(d);
+    try { localStorage.setItem("openrun:players-density", d); } catch { /* ignore */ }
+  };
+
   return (
     <div className="mx-auto w-full max-w-md sm:max-w-2xl lg:max-w-4xl px-4 pt-6">
+
       <div className="flex items-center justify-between mb-5">
         <Logo />
         <div className="flex items-center gap-2">
