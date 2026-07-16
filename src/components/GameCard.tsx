@@ -206,13 +206,13 @@ export function GameCard({ game, index = 0 }: { game: Game; index?: number }) {
               )}
             </div>
           )}
-          <div className="flex items-center justify-between gap-3">
-            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground">
               {hostUserId ? (
                 <button
                   type="button"
                   onClick={goToHost}
-                  className="rounded-full hover:ring-2 hover:ring-lime"
+                  className="shrink-0 rounded-full hover:ring-2 hover:ring-lime"
                   aria-label={`View ${game.host.name}'s profile`}
                 >
                   <UserAvatar
@@ -229,29 +229,29 @@ export function GameCard({ game, index = 0 }: { game: Game; index?: number }) {
                 <button
                   type="button"
                   onClick={goToHost}
-                  className="font-semibold text-foreground hover:text-lime hover:underline"
+                  className="truncate font-semibold text-foreground hover:text-lime hover:underline"
                 >
                   {game.host.name}
                 </button>
               ) : (
-                <span>{game.host.name}</span>
+                <span className="truncate">{game.host.name}</span>
               )}
-              <span className="text-foreground">· {game.skill}</span>
+              <span className="shrink-0 text-foreground">· {game.skill}</span>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex shrink-0 items-center gap-1.5">
               {hostUserId && (
                 <button
                   type="button"
                   onClick={messageHost}
                   disabled={opening}
                   aria-label={`Message ${game.host.name}`}
-                  className="grid h-8 w-8 place-items-center rounded-full border border-border bg-surface text-muted-foreground hover:border-lime/40 hover:text-lime disabled:opacity-50"
+                  className="grid h-7 w-7 place-items-center rounded-full border border-border bg-surface text-muted-foreground hover:border-lime/40 hover:text-lime disabled:opacity-50"
                 >
-                  <MessageCircle className="h-4 w-4" />
+                  <MessageCircle className="h-3.5 w-3.5" />
                 </button>
               )}
-              <div className="flex items-center gap-1.5 text-xs font-semibold">
-                <Users className="h-4 w-4 text-lime" />
+              <div className="flex items-center gap-1 text-[11px] font-semibold">
+                <Users className="h-3.5 w-3.5 text-lime" />
                 <span key={joinedCount} className="text-foreground inline-block motion-safe:animate-scale-in">
                   {joinedCount}/{game.maxPlayers}
                 </span>
