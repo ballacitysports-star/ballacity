@@ -192,7 +192,7 @@ export function PaymentPoliciesCard({
                       key={m.id}
                       className="inline-flex items-center gap-1.5 rounded-full border border-border bg-surface px-2.5 py-1 text-xs"
                     >
-                      <span className="font-semibold">{meta.label}</span>
+                      <span className="font-semibold">{meta.emoji} {meta.name}</span>
                       {m.username && (
                         <span className="text-muted-foreground">· {m.username}</span>
                       )}
