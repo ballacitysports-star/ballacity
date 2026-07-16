@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useInfiniteQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
-import { Loader2, Search, X } from "lucide-react";
+import { Loader2, MoreHorizontal, Search, ShieldOff, Flag, X } from "lucide-react";
 import { toast } from "sonner";
 import {
   Dialog,
@@ -13,8 +13,26 @@ import {
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { UserAvatar } from "@/components/UserAvatar";
+import { ReportUserDialog } from "@/components/ReportUserDialog";
 import { useAuth } from "@/hooks/use-auth";
+import { useBlock } from "@/lib/moderation";
 import {
   listFollows,
   followUser,
