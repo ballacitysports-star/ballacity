@@ -343,9 +343,8 @@ function Profile() {
         </div>
 
         {/* Join request status (pending approvals + recent decisions) */}
-        {(requestsLoading || myRequests.length > 0) && (
-          <div className="mt-6">
-            <h2 className="font-display text-sm font-bold uppercase tracking-wider text-muted-foreground mb-2 flex items-center gap-1.5">
+        <div className="mt-6">
+          <h2 className="font-display text-sm font-bold uppercase tracking-wider text-muted-foreground mb-2 flex items-center gap-1.5">
               <Clock className="h-4 w-4" /> Pending approvals
               {pendingWithGame.length > 0 && !requestsLoading && (
                 <span className="ml-1 rounded-full bg-coral/15 px-2 py-0.5 text-[10px] font-bold text-coral">
