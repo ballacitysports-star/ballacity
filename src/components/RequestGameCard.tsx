@@ -284,6 +284,19 @@ function RequestGameCardInner({
               )}
             </div>
           )}
+          {isApproved && !isHost && onWithdraw && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                onWithdraw();
+              }}
+              className="rounded-full border border-coral/40 bg-coral/10 px-3 py-1 text-xs font-semibold text-coral hover:bg-coral/20"
+            >
+              Withdraw
+            </button>
+          )}
         </div>
       </div>
 
