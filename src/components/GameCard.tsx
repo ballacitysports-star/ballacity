@@ -131,11 +131,13 @@ export function GameCard({ game, index = 0 }: { game: Game; index?: number }) {
                 <Zap className="h-3 w-3" /> Needs players
               </span>
             )}
-            {joinedByMe && (
+            {flowStatus !== "none" ? (
+              <PlayerFlowPill status={flowStatus} short />
+            ) : joinedByMe ? (
               <span className="inline-flex items-center gap-1 rounded-full bg-lime px-2.5 py-1 text-xs font-bold text-primary-foreground">
                 Joined
               </span>
-            )}
+            ) : null}
             {game.trending && !game.urgent && liveStatus === "scheduled" && (
               <span className="inline-flex items-center gap-1 rounded-full bg-background/70 backdrop-blur px-2.5 py-1 text-xs font-semibold text-coral">
                 <Flame className="h-3 w-3" /> Trending
