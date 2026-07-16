@@ -127,8 +127,11 @@ function AvailablePlayersPage() {
 
 
   useEffect(() => {
+    setList(null);
+  }, [sport, city]);
+
+  useEffect(() => {
     let cancelled = false;
-    if (refreshKey === 0) setList(null);
     listOpenAvailabilities({ sport: sport || undefined, city: city.trim() || undefined })
       .then((rows) => {
         if (!cancelled) setList(rows);
