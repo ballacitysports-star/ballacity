@@ -503,6 +503,18 @@ function Profile() {
                       request={r}
                       index={pendingWithGame.length + i}
                       isHost={isHost}
+                      onWithdraw={isHost || r.status !== "approved" ? undefined : async () => {
+                        const prev = myRequests;
+                        setMyRequests((rs) => rs.filter((x) => x.id !== r.id));
+                        try {
+                          await withdrawMyApprovedJoinRequest(r.game_id);
+                          leaveGame(r.game_id);
+                          toast("You withdrew from the game.");
+                        } catch (e: any) {
+                          setMyRequests(prev);
+                          toast.error(e.message ?? "Could not withdraw.");
+                        }
+                      }}
                     />
                   );
                 })}
