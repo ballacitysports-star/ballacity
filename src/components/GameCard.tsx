@@ -261,7 +261,7 @@ export function GameCard({ game, index = 0 }: { game: Game; index?: number }) {
               </div>
             </div>
           </div>
-          <div className="h-1.5 overflow-hidden rounded-full bg-secondary">
+          <div className="h-1 overflow-hidden rounded-full bg-secondary">
             <motion.div
               initial={{ width: 0 }}
               animate={{ width: `${fillPct}%` }}
@@ -273,13 +273,13 @@ export function GameCard({ game, index = 0 }: { game: Game; index?: number }) {
             <button
               type="button"
               onClick={quickJoin}
-              className="mt-1 w-full rounded-2xl bg-lime-gradient py-2.5 text-sm font-bold text-primary-foreground glow-lime inline-flex items-center justify-center gap-1.5"
+              className="mt-1 w-full rounded-2xl bg-lime-gradient py-2 text-xs font-bold text-primary-foreground glow-lime inline-flex items-center justify-center gap-1"
             >
               {ctaLabel}
             </button>
           ) : (
             <div
-              className={`mt-1 w-full rounded-2xl py-2.5 text-sm font-bold inline-flex items-center justify-center gap-1.5 ${
+              className={`mt-1 w-full rounded-2xl py-2 text-xs font-bold inline-flex items-center justify-center gap-1 ${
                 joinedByMe
                   ? "bg-lime/15 border border-lime/40 text-lime"
                   : spotsLeft <= 0 || liveStatus === "completed"
@@ -291,9 +291,9 @@ export function GameCard({ game, index = 0 }: { game: Game; index?: number }) {
                         : "border border-border bg-surface text-foreground"
               }`}
             >
-              {joinedByMe && <Check className="h-4 w-4" />}
+              {joinedByMe && <Check className="h-3.5 w-3.5" />}
               {!joinedByMe && game.price > 0 && spotsLeft > 0 && liveStatus === "scheduled" && (
-                <CreditCard className="h-4 w-4" />
+                <CreditCard className="h-3.5 w-3.5" />
               )}
               {ctaLabel}
             </div>
