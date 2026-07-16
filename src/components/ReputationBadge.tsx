@@ -61,15 +61,18 @@ export function ReputationBadge({ rep, compact = false, onClick }: { rep: Reputa
           )}
         </div>
         <TrendIcon className={`h-3.5 w-3.5 shrink-0 ${trendColor}`} />
-      </motion.div>
+      </Component>
     );
   }
 
+  const Component = onClick ? motion.button : motion.div;
   return (
-    <motion.div
+    <Component
+      type={onClick ? "button" : undefined}
+      onClick={onClick}
       initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
-      className="rounded-2xl border border-border bg-surface p-4"
+      className={`rounded-2xl border border-border bg-surface p-4 text-left transition-all hover:border-lime/40 ${onClick ? "cursor-pointer" : ""}`}
     >
       <div className="flex items-center justify-between gap-3">
         <div className="flex items-center gap-3">
