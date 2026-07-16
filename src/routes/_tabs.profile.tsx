@@ -75,7 +75,7 @@ function Profile() {
 
   // Pending / recently-reviewed join requests for player view
   const [myRequests, setMyRequests] = useState<JoinRequest[]>([]);
-  const [requestsLoading, setRequestsLoading] = useState(false);
+  const [requestsLoading, setRequestsLoading] = useState(true);
   const refreshRequests = async () => {
     if (!profileUser) {
       setMyRequests([]);
