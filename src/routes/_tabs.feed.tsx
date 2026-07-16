@@ -2,13 +2,14 @@ import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Loader2, RefreshCw } from "lucide-react";
-import { Search, SlidersHorizontal, Bell, MessageCircle, X, MapPin, List, Map as MapIcon } from "lucide-react";
+import { Search, SlidersHorizontal, Bell, MessageCircle, X, MapPin, List, Map as MapIcon, LayoutGrid, Rows3 } from "lucide-react";
 import { PlayMapView } from "@/components/PlayMapView";
 import { useUnreadNotificationCount } from "@/lib/notifications";
 import { Logo } from "@/components/Logo";
 import { MyAvatar } from "@/components/UserAvatar";
 import { SportChips } from "@/components/SportChips";
 import { GameCard } from "@/components/GameCard";
+import { GameListRow } from "@/components/GameListRow";
 import { GAMES, SPORTS, POSITIONS_BY_SPORT, type Sport } from "@/lib/sample-data";
 import { useHostedGames } from "@/lib/hosted-games-store";
 import { useJoinedGameIds } from "@/lib/games-store";
@@ -32,6 +33,22 @@ function Feed() {
     setViewMode(m);
     try { localStorage.setItem("openrun:play-view", m); } catch { /* ignore */ }
   };
+  const [density, setDensity] = useState<"grid" | "list">(() => {
+    if (typeof window === "undefined") return "grid";
+    return (localStorage.getItem("openrun:feed-density") as "grid" | "list") ?? "grid";
+  });
+  const switchDensity = (d: "grid" | "list") => {
+    setDensity(d);
+    try { localStorage.setItem("openrun:feed-density", d); } catch { /* ignore */ }
+  };
+  const listContainerClass = density === "list"
+    ? "flex flex-col gap-2"
+    : "grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3";
+  const emptyColSpan = density === "list" ? "" : "sm:col-span-2 lg:col-span-3";
+  const renderGame = (g: typeof GAMES[number], i: number) =>
+    density === "list"
+      ? <GameListRow key={g.id} game={g} index={i} />
+      : <GameCard key={g.id} game={g} index={i} />;
   const [positionFilter, setPositionFilter] = useState<string | null>(null);
   const hosted = useHostedGames();
   const joinedIds = useJoinedGameIds();
@@ -303,28 +320,56 @@ function Feed() {
       </motion.div>
 
       {/* List / Map segmented toggle — persists across visits via localStorage */}
-      <div className="mb-4 inline-flex items-center gap-1 rounded-full border border-border bg-surface p-1" role="tablist" aria-label="View mode">
-        {([
-          { id: "list", label: "List", Icon: List },
-          { id: "map", label: "Map", Icon: MapIcon },
-        ] as const).map(({ id, label, Icon }) => {
-          const active = viewMode === id;
-          return (
-            <button
-              key={id}
-              role="tab"
-              aria-selected={active}
-              onClick={() => switchView(id)}
-              className={`inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-xs font-bold transition-colors ${
-                active ? "bg-lime text-primary-foreground" : "text-muted-foreground"
-              }`}
-            >
-              <Icon className="h-3.5 w-3.5" />
-              {label}
-            </button>
-          );
-        })}
+      <div className="mb-4 flex items-center gap-2">
+        <div className="inline-flex items-center gap-1 rounded-full border border-border bg-surface p-1" role="tablist" aria-label="View mode">
+          {([
+            { id: "list", label: "List", Icon: List },
+            { id: "map", label: "Map", Icon: MapIcon },
+          ] as const).map(({ id, label, Icon }) => {
+            const active = viewMode === id;
+            return (
+              <button
+                key={id}
+                role="tab"
+                aria-selected={active}
+                onClick={() => switchView(id)}
+                className={`inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-xs font-bold transition-colors ${
+                  active ? "bg-lime text-primary-foreground" : "text-muted-foreground"
+                }`}
+              >
+                <Icon className="h-3.5 w-3.5" />
+                {label}
+              </button>
+            );
+          })}
+        </div>
+        {viewMode === "list" && (
+          <div className="inline-flex items-center gap-1 rounded-full border border-border bg-surface p-1" role="tablist" aria-label="Card density">
+            {([
+              { id: "grid", label: "Grid", Icon: LayoutGrid },
+              { id: "list", label: "Compact", Icon: Rows3 },
+            ] as const).map(({ id, label, Icon }) => {
+              const active = density === id;
+              return (
+                <button
+                  key={id}
+                  role="tab"
+                  aria-selected={active}
+                  aria-label={`${label} view`}
+                  onClick={() => switchDensity(id)}
+                  className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-bold transition-colors ${
+                    active ? "bg-lime text-primary-foreground" : "text-muted-foreground"
+                  }`}
+                >
+                  <Icon className="h-3.5 w-3.5" />
+                  {label}
+                </button>
+              );
+            })}
+          </div>
+        )}
       </div>
+
 
       {viewMode === "map" ? (
         <PlayMapView />
@@ -411,12 +456,10 @@ function Feed() {
           <h2 className="font-display text-sm font-bold uppercase tracking-wider text-muted-foreground mb-2">
             {filtered.length} result{filtered.length === 1 ? "" : "s"} for "{q}"
           </h2>
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {visible.map((g, i) => (
-              <GameCard key={g.id} game={g} index={i} />
-            ))}
+          <div className={listContainerClass}>
+            {visible.map((g, i) => renderGame(g, i))}
             {filtered.length === 0 && (
-              <div className="sm:col-span-2 lg:col-span-3 rounded-2xl border border-border bg-surface p-8 text-center text-muted-foreground">
+              <div className={`${emptyColSpan} rounded-2xl border border-border bg-surface p-8 text-center text-muted-foreground`}>
                 No games match "{q}".
               </div>
             )}
@@ -433,10 +476,8 @@ function Feed() {
                 </h2>
                 <span className="text-xs text-muted-foreground">{urgent.length} games</span>
               </div>
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                {urgent.map((g, i) => (
-                  <GameCard key={g.id} game={g} index={i} />
-                ))}
+              <div className={listContainerClass}>
+                {urgent.map((g, i) => renderGame(g, i))}
               </div>
             </div>
           )}
@@ -446,12 +487,10 @@ function Feed() {
               <h2 className="font-display text-sm font-bold uppercase tracking-wider text-muted-foreground mb-2">
                 For you
               </h2>
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                {visible.map((g, i) => (
-                  <GameCard key={g.id} game={g} index={i} />
-                ))}
+              <div className={listContainerClass}>
+                {visible.map((g, i) => renderGame(g, i))}
                 {filtered.length === 0 && (
-                  <div className="sm:col-span-2 lg:col-span-3 rounded-2xl border border-border bg-surface p-8 text-center text-muted-foreground space-y-3">
+                  <div className={`${emptyColSpan} rounded-2xl border border-border bg-surface p-8 text-center text-muted-foreground space-y-3`}>
                     <div>No games match your filters.</div>
                     <button
                       onClick={() => setFeedPrefs(DEFAULT_PREFS)}

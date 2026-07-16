@@ -13,6 +13,8 @@ import {
   Loader2,
   SlidersHorizontal,
   Ticket,
+  LayoutGrid,
+  Rows3,
 } from "lucide-react";
 import { AnimatePresence } from "framer-motion";
 import { motion } from "framer-motion";
@@ -206,8 +208,18 @@ function PlayersPage() {
     return age;
   }
 
+  const [density, setDensity] = useState<"grid" | "list">(() => {
+    if (typeof window === "undefined") return "list";
+    return (localStorage.getItem("openrun:players-density") as "grid" | "list") ?? "list";
+  });
+  const switchDensity = (d: "grid" | "list") => {
+    setDensity(d);
+    try { localStorage.setItem("openrun:players-density", d); } catch { /* ignore */ }
+  };
+
   return (
     <div className="mx-auto w-full max-w-md sm:max-w-2xl lg:max-w-4xl px-4 pt-6">
+
       <div className="flex items-center justify-between mb-5">
         <Logo />
         <div className="flex items-center gap-2">
@@ -319,10 +331,41 @@ function PlayersPage() {
         />
       ) : (
         <>
-          <h2 className="font-display text-sm font-bold uppercase tracking-wider text-muted-foreground mb-2">
-            {filtered.length} player{filtered.length === 1 ? "" : "s"} available
-          </h2>
-          <ul className="space-y-3 pb-6">
+          <div className="mb-2 flex items-center justify-between gap-2">
+            <h2 className="font-display text-sm font-bold uppercase tracking-wider text-muted-foreground">
+              {filtered.length} player{filtered.length === 1 ? "" : "s"} available
+            </h2>
+            <div className="inline-flex items-center gap-1 rounded-full border border-border bg-surface p-1" role="tablist" aria-label="Layout">
+              {([
+                { id: "list", label: "List", Icon: Rows3 },
+                { id: "grid", label: "Grid", Icon: LayoutGrid },
+              ] as const).map(({ id, label, Icon }) => {
+                const active = density === id;
+                return (
+                  <button
+                    key={id}
+                    role="tab"
+                    aria-selected={active}
+                    aria-label={`${label} view`}
+                    onClick={() => switchDensity(id)}
+                    className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-bold transition-colors ${
+                      active ? "bg-lime text-primary-foreground" : "text-muted-foreground"
+                    }`}
+                  >
+                    <Icon className="h-3.5 w-3.5" />
+                    {label}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+          <ul
+            className={
+              density === "grid"
+                ? "grid grid-cols-1 sm:grid-cols-2 gap-3 pb-6"
+                : "space-y-3 pb-6"
+            }
+          >
             {filtered.map((a) => (
               <AvailabilityCard
                 key={a.id}
