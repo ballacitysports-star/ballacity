@@ -138,7 +138,7 @@ function RequestGameCardInner({
           params={{ gameId: game.id }}
           className="group block"
         >
-          <div className="relative h-44 overflow-hidden">
+          <div className="relative h-28 overflow-hidden">
             <img
               src={game.image}
               alt={game.title}
