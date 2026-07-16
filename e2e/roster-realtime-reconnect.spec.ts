@@ -174,11 +174,8 @@ test("roster stays consistent across INSERT, DELETE, and reconnect", async ({ br
 
     // Verify A truly lost its websocket by making B change state; A must NOT
     // see the update while offline.
-    const afterOfflineJoin = bDetail.getByRole("button", { name: /join free/i }).first();
-    await afterOfflineJoin.click();
-    await expect(
-      bDetail.getByRole("button", { name: /you're in · tap to leave/i }).first(),
-    ).toBeVisible({ timeout: 10_000 });
+    await performJoin(bDetail);
+
 
     // Give the realtime event time to arrive (or not) on A.
     await aDetail.waitForTimeout(2_500);
