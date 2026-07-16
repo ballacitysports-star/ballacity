@@ -147,11 +147,17 @@ export function RequestGameCard({
           )}
           <div className="min-w-0 flex-1">
             <p className="text-xs font-semibold">
-              {isPending
-                ? "Waiting for host approval"
-                : isApproved
-                  ? "Approved — you're on the roster."
-                  : "Declined by host."}
+              {isHost
+                ? isPending
+                  ? "A player wants to join"
+                  : isApproved
+                    ? "You approved this player."
+                    : "You declined this player."
+                : isPending
+                  ? "Waiting for host approval"
+                  : isApproved
+                    ? "Approved — you're on the roster."
+                    : "Declined by host."}
             </p>
             {isPending && (
               <p className="text-[10px] text-muted-foreground mt-0.5">
@@ -159,18 +165,48 @@ export function RequestGameCard({
               </p>
             )}
           </div>
-          {isPending && onCancel && (
-            <button
-              type="button"
-              onClick={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                onCancel();
-              }}
-              className="rounded-full border border-border bg-background px-3 py-1 text-xs font-semibold hover:border-coral/40"
-            >
-              Cancel
-            </button>
+          {isPending && (
+            <div className="flex items-center gap-2">
+              {isHost && onDecline && (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    onDecline();
+                  }}
+                  className="rounded-full border border-border bg-background px-3 py-1 text-xs font-semibold hover:border-coral/40"
+                >
+                  Decline
+                </button>
+              )}
+              {isHost && onApprove && (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    onApprove();
+                  }}
+                  className="rounded-full bg-lime-gradient px-3 py-1 text-xs font-semibold text-primary-foreground"
+                >
+                  Approve
+                </button>
+              )}
+              {!isHost && onCancel && (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    onCancel();
+                  }}
+                  className="rounded-full border border-border bg-background px-3 py-1 text-xs font-semibold hover:border-coral/40"
+                >
+                  Cancel
+                </button>
+              )}
+            </div>
           )}
         </div>
       </div>
