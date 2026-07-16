@@ -307,19 +307,28 @@ function Profile() {
         )}
 
         {/* Stats */}
-        <div className="mt-5 grid grid-cols-4 gap-2">
+        <div className="mt-5 grid grid-cols-5 gap-2">
           {[
             { k: me.stats.played, v: "Games" },
             { k: me.stats.reliability + "%", v: "Reliable" },
             { k: me.stats.sportsmanship, v: "Sport" },
             { k: me.stats.friends, v: "Crew" },
-          ].map((s) => (
-            <div key={s.v} className="rounded-2xl border border-border bg-surface p-3 text-center">
+            { k: myRep.count, v: "Reviews" },
+          ].map((s, i) => (
+            <button
+              key={s.v}
+              type="button"
+              onClick={s.v === "Reviews" ? () => setReviewsOpen(true) : undefined}
+              className={`rounded-2xl border border-border bg-surface p-3 text-center transition-all hover:border-lime/40 ${
+                s.v === "Reviews" ? "cursor-pointer" : ""
+              }`}
+            >
               <div className="font-display text-lg font-bold">{s.k}</div>
-              <div className="text-[10px] uppercase tracking-wider text-muted-foreground">
+              <div className="text-[10px] uppercase tracking-wider text-muted-foreground flex items-center justify-center gap-1">
+                {s.v === "Reviews" && <Star className="h-3 w-3" />}
                 {s.v}
               </div>
-            </div>
+            </button>
           ))}
         </div>
 
