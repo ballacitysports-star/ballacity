@@ -1,27 +1,47 @@
-## Bug
-
-On paid games with `requires_approval`, once the host approves the join request the ad-hoc "Approval status banner" in `src/routes/games.$gameId.index.tsx` (lines 936–978) renders:
-
-> ✅ You're approved — see you there!
-> The host approved your request. You're on the roster.
-
-This is wrong for paid games — being approved to *request* a spot is not the same as the host confirming payment. `PlayerFlowPill` + `PaymentRequiredBanner` already reflect the correct `payment_pending` state right above it, so the stale "approved" copy directly contradicts them and misleads the player into thinking they're locked in.
-
 ## Fix
 
-Scope: presentation only, `src/routes/games.$gameId.index.tsx`.
+Make every "approval banner" — the ad-hoc panels that today say variations of "You're approved" / "Approved — you can pay now" — render **"Payment due"** for paid games until the host verifies the payment. Presentation only, no store/DB changes.
 
-1. In the "Approval status banner" block, skip the `approved` branch when the game is paid AND the viewer's latest submission is not `verified` (i.e. `isPaid && latestSub?.status !== "verified"`). The `PaymentRequiredBanner` + `PlayerFlowPill` above already communicate the true state ("Payment due" / "Awaiting review" / "Payment declined").
-2. Keep the `approved` branch for free games (still valid: "You're on the roster").
-3. Keep the `pending` and `rejected` branches unchanged for all games.
-4. Tighten the approved copy's second line so it never claims roster confirmation on a paid game path — e.g. render nothing on the approved branch for paid games, and leave the free-game copy as-is.
+### Rule (one source of truth)
 
-No changes to `game-flow-status.ts`, `PlayerFlowPill`, `PaymentRequiredBanner`, or business logic. No DB or store changes.
+For a viewer on a paid game (`entry_fee > 0`), the approval banner's copy is chosen from `useMyFlowStatus(gameId).status`, not from `join_request.status`:
+
+| Flow status         | Approval banner copy                                              |
+| ------------------- | ----------------------------------------------------------------- |
+| `requested`         | "Waiting for host approval" (unchanged)                           |
+| `rejected`          | "Request declined" (unchanged)                                    |
+| `payment_pending`   | **"Payment due — submit payment to lock your spot"** + Pay CTA    |
+| `payment_submitted` | **"Payment sent — waiting on host to confirm"**                   |
+| `payment_rejected`  | **"Payment declined — resubmit to keep your spot"** + Pay CTA     |
+| `payment_verified`  | "Payment confirmed — you're on the roster"                        |
+| `confirmed` (free)  | "You're approved — see you there!" (unchanged, free games only)   |
+
+Never show "Approved — you can pay now" or "You're on the roster" for a paid game whose latest submission is not `verified`.
+
+### Files
+
+1. **`src/routes/games.$gameId.index.tsx`** — Approval status banner (~line 936–990):
+   - Replace the current `myReq.status`-driven copy with a switch on `myFlowStatus` (already computed in this file via `useMyFlowStatus`).
+   - Free game path (no `entry_fee`) keeps today's approved copy.
+   - Paid game: render "Payment due" (or the matching row above) whenever `payment_verified` hasn't been reached.
+   - Keep the existing icon tokens (Clock / Check / X) but pick them from the flow status too.
+
+2. **`src/routes/games.$gameId.pay.tsx`** — `approval-status-indicator` (~line 502–528):
+   - Same switch. When paid and `status !== "payment_verified"`, render "Payment due" instead of "Approved — you can pay now". Keep the `data-testid="approval-status-indicator"` and `data-status` attributes so existing e2e specs still match, but set `data-status` from the flow status (`payment_pending` / `payment_submitted` / `payment_verified` / `payment_rejected` / `requested` / `rejected`).
+
+3. **`src/routes/games.$gameId.index.tsx`** — "Compact your-status strip for paid games" (~line 992–1020):
+   - Same switch, so this strip and the approval banner never disagree. Drive copy off `myFlowStatus`; keep the strip visible whenever `myFlowStatus` is any paid-flow state, not just when `latestSub` exists (so an approved-but-unpaid player also sees "Payment due" here).
+
+### Out of scope
+
+- No changes to `game-flow-status.ts`, `PlayerFlowPill`, `PaymentRequiredBanner`, `PaymentStatusTimeline`, or business logic.
+- The false "Try again" on the pay page is a separate issue — not touched here.
 
 ## Verification
 
-- Paid + `requires_approval` game, host approves but no payment submitted: only `PaymentRequiredBanner` ("Payment required — Pay $X now") and `PlayerFlowPill` ("Payment due") render. The "You're approved — on the roster" banner is gone.
-- Paid game, submission `pending`: pill shows "Awaiting review"; approved banner still suppressed.
-- Paid game, submission `verified`: pill shows "Paid"; approved banner may render (or stays suppressed — either is fine since pill already says Paid).
-- Free + `requires_approval` game, host approves: existing "You're approved — see you there!" banner still renders.
-- `pending` and `rejected` join-request states unchanged in all cases.
+- Paid game, host approves → both surfaces show "Payment due" (never "You're approved").
+- Player submits proof → both surfaces flip to "Payment sent — waiting on host".
+- Host verifies → both flip to "Payment confirmed".
+- Host rejects payment → both show "Payment declined — resubmit".
+- Free game, host approves → unchanged "You're approved — see you there!".
+- Existing pay-page e2e specs continue to find `data-testid="approval-status-indicator"` with a valid `data-status`.
