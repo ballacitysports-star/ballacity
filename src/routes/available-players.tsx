@@ -33,6 +33,7 @@ import {
   updateAvailability,
   type PlayerAvailability,
 } from "@/lib/availability";
+import { supabase } from "@/integrations/supabase/client";
 import { getOrCreateDirectConversation } from "@/lib/messages";
 import {
   Dialog,
