@@ -12,6 +12,7 @@ import { SPORTS, HERO_IMAGE } from "@/lib/sample-data";
 import { kmToMi } from "@/lib/distance";
 import type { PlayerAvailability } from "@/lib/availability";
 import { ReviewsSection } from "@/components/ReviewsSection";
+import { FollowListDialog } from "@/components/FollowListDialog";
 import { ReputationBadge } from "@/components/ReputationBadge";
 import { computeReputation, useReviewsFor } from "@/lib/reviews";
 import { useProfileOverrides } from "@/lib/user-prefs-store";
@@ -410,6 +411,14 @@ function PlayerProfilePage() {
             </div>
           </DialogContent>
         </Dialog>
+
+        <FollowListDialog
+          open={followList !== null}
+          onOpenChange={(v) => !v && setFollowList(null)}
+          userId={userId}
+          displayName={displayName}
+          kind={followList ?? "followers"}
+        />
       </div>
     </div>
   );
