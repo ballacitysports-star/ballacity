@@ -311,6 +311,8 @@ function PlayerProfilePage() {
             )}
             Message
           </Button>
+          </div>
+          <UserSafetyMenu userId={userId} displayName={displayName} align="end" />
         </div>
 
         {/* Reputation badge (opens reviews popup) */}
