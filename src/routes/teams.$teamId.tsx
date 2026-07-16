@@ -393,6 +393,7 @@ function TeamPage() {
             revieweeId={org.id}
             revieweeKind={org.kind === "coach" ? "trainer" : "team"}
             revieweeName={org.name}
+            isOwner={canEdit}
           />
         )}
       </div>
