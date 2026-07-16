@@ -136,17 +136,23 @@ async function fetchFlowInputs(gameId: string, userId: string) {
     getGamePaymentSettings(gameId).catch(() => null),
     getMyJoinRequest(gameId).catch(() => null),
     listMySubmissionsForGame(gameId).catch(() => [] as PaymentSubmission[]),
-    supabase
-      .from("game_participants")
-      .select("user_id")
-      .eq("game_id", gameId)
-      .eq("user_id", userId)
-      .maybeSingle()
-      .then((res) => !!res.data)
-      .catch(() => false),
+    (async () => {
+      try {
+        const res = await supabase
+          .from("game_participants")
+          .select("user_id")
+          .eq("game_id", gameId)
+          .eq("user_id", userId)
+          .maybeSingle();
+        return !!res.data;
+      } catch {
+        return false;
+      }
+    })(),
   ]);
   return { settings, joinRequest, submissions, isJoined };
 }
+
 
 
 /**
