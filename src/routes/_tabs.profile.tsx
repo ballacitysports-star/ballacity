@@ -27,7 +27,13 @@ import { useJoinedGameIds } from "@/lib/games-store";
 import { useHostedGames } from "@/lib/hosted-games-store";
 import { readOverrides, useMyProfile } from "@/lib/user-prefs-store";
 import { ProfileLinksList } from "@/components/ProfileLinks";
-import { listMyJoinRequests, cancelMyJoinRequest, type JoinRequest } from "@/lib/payments";
+import {
+  listMyJoinRequests,
+  listHostJoinRequests,
+  cancelMyJoinRequest,
+  reviewJoinRequest,
+  type JoinRequest,
+} from "@/lib/payments";
 import { supabase } from "@/integrations/supabase/client";
 import {
   Dialog,
