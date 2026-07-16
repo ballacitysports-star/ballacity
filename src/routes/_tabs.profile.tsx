@@ -399,16 +399,43 @@ function Profile() {
           </div>
         )}
 
-        {/* Upcoming */}
+        {/* Upcoming — split into games you host vs games you're playing in */}
         <div className="mt-6">
           <h2 className="font-display text-sm font-bold uppercase tracking-wider text-muted-foreground mb-2 flex items-center gap-1.5">
             <Calendar className="h-4 w-4" /> Upcoming games
           </h2>
-          {upcomingGames.length > 0 ? (
-            <div className="space-y-3">
-              {upcomingGames.map((g, i) => (
-                <GameCard key={g.id} game={g} index={i} />
-              ))}
+          {upcomingGroups.total > 0 ? (
+            <div className="space-y-5">
+              {upcomingGroups.hosting.length > 0 && (
+                <div>
+                  <h3 className="font-display text-xs font-bold uppercase tracking-wider text-muted-foreground/80 mb-2 flex items-center gap-1.5">
+                    <Shield className="h-3.5 w-3.5" /> Hosting
+                    <span className="text-muted-foreground/60 font-normal normal-case tracking-normal">
+                      ({upcomingGroups.hosting.length})
+                    </span>
+                  </h3>
+                  <div className="space-y-3">
+                    {upcomingGroups.hosting.map((g, i) => (
+                      <GameCard key={g.id} game={g} index={i} />
+                    ))}
+                  </div>
+                </div>
+              )}
+              {upcomingGroups.playing.length > 0 && (
+                <div>
+                  <h3 className="font-display text-xs font-bold uppercase tracking-wider text-muted-foreground/80 mb-2 flex items-center gap-1.5">
+                    <Trophy className="h-3.5 w-3.5" /> Playing
+                    <span className="text-muted-foreground/60 font-normal normal-case tracking-normal">
+                      ({upcomingGroups.playing.length})
+                    </span>
+                  </h3>
+                  <div className="space-y-3">
+                    {upcomingGroups.playing.map((g, i) => (
+                      <GameCard key={g.id} game={g} index={i} />
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           ) : (
             <Link
@@ -420,6 +447,7 @@ function Profile() {
             </Link>
           )}
         </div>
+
 
         {/* Sports & skill */}
         <div className="mt-6">
