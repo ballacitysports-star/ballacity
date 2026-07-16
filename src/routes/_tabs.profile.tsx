@@ -649,7 +649,7 @@ function Profile() {
         </div>
 
         {/* Badges */}
-        <div className="mt-6">
+        <div className="mt-8">
           <h2 className="font-display text-sm font-bold uppercase tracking-wider text-muted-foreground mb-2 flex items-center gap-1.5">
             <Trophy className="h-4 w-4" /> Badges
           </h2>
