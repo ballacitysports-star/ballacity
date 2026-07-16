@@ -23,6 +23,13 @@ import {
 import { ReputationCard } from "@/components/ReputationCard";
 import { useCanReview } from "@/lib/transactions";
 import { toast } from "sonner";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 type Sort = "recent" | "top" | "lowest" | "helpful";
 
@@ -35,9 +42,9 @@ const FILTERS: { key: ReviewerKind | "all"; label: string }[] = [
 ];
 
 const SORTS: { key: Sort; label: string }[] = [
-  { key: "recent", label: "Recent" },
-  { key: "top", label: "Highest" },
-  { key: "lowest", label: "Lowest" },
+  { key: "recent", label: "Newest" },
+  { key: "top", label: "Highest rating" },
+  { key: "lowest", label: "Lowest rating" },
   { key: "helpful", label: "Most helpful" },
 ];
 
@@ -219,22 +226,36 @@ export function ReviewsSection({
         <h2 className="font-display text-sm font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
           <Star className="h-4 w-4" /> Reviews
         </h2>
-        {eligible ? (
-          <Link
-            to="/review/new"
-            search={{ revieweeId, revieweeKind, revieweeName, kind: "player" } as any}
-            className="inline-flex items-center gap-1 text-xs font-bold text-lime"
-          >
-            <MessageSquarePlus className="h-3.5 w-3.5" /> Write
-          </Link>
-        ) : (
-          <span
-            className="inline-flex items-center gap-1 text-xs font-semibold text-muted-foreground"
-            title="Only available after a completed game, training, or event together"
-          >
-            <Lock className="h-3.5 w-3.5" /> Verified only
-          </span>
-        )}
+        <div className="flex items-center gap-2">
+          <Select value={sort} onValueChange={(v) => setSort(v as Sort)}>
+            <SelectTrigger className="h-8 w-[140px] rounded-full border-border bg-surface text-xs focus:ring-0 focus:ring-offset-0">
+              <SelectValue placeholder="Sort" />
+            </SelectTrigger>
+            <SelectContent>
+              {SORTS.map((s) => (
+                <SelectItem key={s.key} value={s.key}>
+                  {s.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          {eligible ? (
+            <Link
+              to="/review/new"
+              search={{ revieweeId, revieweeKind, revieweeName, kind: "player" } as any}
+              className="inline-flex items-center gap-1 text-xs font-bold text-lime"
+            >
+              <MessageSquarePlus className="h-3.5 w-3.5" /> Write
+            </Link>
+          ) : (
+            <span
+              className="inline-flex items-center gap-1 text-xs font-semibold text-muted-foreground"
+              title="Only available after a completed game, training, or event together"
+            >
+              <Lock className="h-3.5 w-3.5" /> Verified only
+            </span>
+          )}
+        </div>
       </div>
 
       <ReputationCard rep={rep} />
