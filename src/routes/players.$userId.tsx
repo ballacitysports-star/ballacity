@@ -12,7 +12,7 @@ import { SPORTS, HERO_IMAGE } from "@/lib/sample-data";
 import { kmToMi } from "@/lib/distance";
 import type { PlayerAvailability } from "@/lib/availability";
 import { ReviewsSection } from "@/components/ReviewsSection";
-import { FollowSheet } from "@/components/FollowSheet";
+import { FollowSheet, UserSafetyMenu } from "@/components/FollowSheet";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { ReputationBadge } from "@/components/ReputationBadge";
 import { computeReputation, useReviewsFor } from "@/lib/reviews";
@@ -245,7 +245,8 @@ function PlayerProfilePage() {
         )}
 
         {/* Action row — IG-style Follow / Message */}
-        <div className="mt-4 grid grid-cols-2 gap-2">
+        <div className="mt-4 flex items-center gap-2">
+          <div className="grid flex-1 grid-cols-2 gap-2">
           {follow.isFollowing ? (
             <Popover open={unfollowOpen} onOpenChange={setUnfollowOpen}>
               <PopoverTrigger asChild>
@@ -310,6 +311,8 @@ function PlayerProfilePage() {
             )}
             Message
           </Button>
+          </div>
+          <UserSafetyMenu userId={userId} displayName={displayName} align="end" />
         </div>
 
         {/* Reputation badge (opens reviews popup) */}
