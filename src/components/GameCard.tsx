@@ -113,7 +113,7 @@ export function GameCard({ game, index = 0 }: { game: Game; index?: number }) {
         params={{ gameId: game.id }}
         className="group block overflow-hidden rounded-3xl border border-border bg-surface transition-all hover:border-lime/40 hover:-translate-y-0.5"
       >
-        <div className="relative h-44 overflow-hidden">
+        <div className="relative h-28 overflow-hidden">
           <img
             src={game.image}
             alt={game.title}
@@ -121,98 +121,98 @@ export function GameCard({ game, index = 0 }: { game: Game; index?: number }) {
             className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-105"
           />
           <div className="absolute inset-0 bg-gradient-to-t from-surface via-surface/30 to-transparent" />
-          <div className="absolute top-3 left-3 flex flex-wrap gap-1.5">
-            <span className="inline-flex items-center gap-1 rounded-full bg-background/70 backdrop-blur px-2.5 py-1 text-xs font-semibold">
+          <div className="absolute top-2 left-2 flex flex-wrap gap-1">
+            <span className="inline-flex items-center gap-1 rounded-full bg-background/70 backdrop-blur px-2 py-0.5 text-[11px] font-semibold">
               <span>{sportEmoji[game.sport]}</span>
               {game.sport}
             </span>
             {game.urgent && (
-              <span className="inline-flex items-center gap-1 rounded-full bg-coral-gradient px-2.5 py-1 text-xs font-bold text-white">
+              <span className="inline-flex items-center gap-1 rounded-full bg-coral-gradient px-2 py-0.5 text-[11px] font-bold text-white">
                 <Zap className="h-3 w-3" /> Needs players
               </span>
             )}
             {flowStatus !== "none" ? (
               <PlayerFlowPill status={flowStatus} short />
             ) : joinedByMe ? (
-              <span className="inline-flex items-center gap-1 rounded-full bg-lime px-2.5 py-1 text-xs font-bold text-primary-foreground">
+              <span className="inline-flex items-center gap-1 rounded-full bg-lime px-2 py-0.5 text-[11px] font-bold text-primary-foreground">
                 Joined
               </span>
             ) : null}
             {game.trending && !game.urgent && liveStatus === "scheduled" && (
-              <span className="inline-flex items-center gap-1 rounded-full bg-background/70 backdrop-blur px-2.5 py-1 text-xs font-semibold text-coral">
+              <span className="inline-flex items-center gap-1 rounded-full bg-background/70 backdrop-blur px-2 py-0.5 text-[11px] font-semibold text-coral">
                 <Flame className="h-3 w-3" /> Trending
               </span>
             )}
             {liveStatus === "in_progress" && (
-              <span className="inline-flex items-center gap-1 rounded-full bg-coral px-2.5 py-1 text-xs font-bold text-white">
+              <span className="inline-flex items-center gap-1 rounded-full bg-coral px-2 py-0.5 text-[11px] font-bold text-white">
                 <span className="h-1.5 w-1.5 rounded-full bg-white animate-pulse" /> Live
               </span>
             )}
             {liveStatus === "completed" && (
-              <span className="inline-flex items-center gap-1 rounded-full bg-background/70 backdrop-blur px-2.5 py-1 text-xs font-semibold text-muted-foreground">
+              <span className="inline-flex items-center gap-1 rounded-full bg-background/70 backdrop-blur px-2 py-0.5 text-[11px] font-semibold text-muted-foreground">
                 Completed
               </span>
             )}
             {game.joinsClosed && liveStatus === "scheduled" && (
-              <span className="inline-flex items-center gap-1 rounded-full bg-background/70 backdrop-blur px-2.5 py-1 text-xs font-semibold">
+              <span className="inline-flex items-center gap-1 rounded-full bg-background/70 backdrop-blur px-2 py-0.5 text-[11px] font-semibold">
                 <Lock className="h-3 w-3" /> Closed
               </span>
             )}
           </div>
-          <div className="absolute top-3 right-3">
+          <div className="absolute top-2 right-2">
             {game.price === 0 ? (
-              <span className="rounded-full bg-lime px-2.5 py-1 text-xs font-bold text-primary-foreground">
+              <span className="rounded-full bg-lime px-2 py-0.5 text-[11px] font-bold text-primary-foreground">
                 FREE
               </span>
             ) : (
-              <span className="rounded-full bg-background/70 backdrop-blur px-2.5 py-1 text-xs font-bold">
+              <span className="rounded-full bg-background/70 backdrop-blur px-2 py-0.5 text-[11px] font-bold">
                 ${game.price}
               </span>
             )}
           </div>
-          <div className="absolute bottom-3 left-3 right-3">
-            <h3 className="font-display text-xl font-bold text-foreground drop-shadow-lg">
+          <div className="absolute bottom-2 left-3 right-3">
+            <h3 className="font-display text-lg font-bold text-foreground drop-shadow-lg">
               {game.title}
             </h3>
           </div>
         </div>
 
-        <div className="p-4 space-y-3">
-          <div className="flex items-center gap-3 text-sm text-muted-foreground">
+        <div className="p-3 space-y-2">
+          <div className="flex items-center gap-3 text-xs text-muted-foreground">
             <span className="inline-flex items-center gap-1.5" suppressHydrationWarning>
-              <Clock className="h-4 w-4 text-lime" />
+              <Clock className="h-3.5 w-3.5 text-lime" />
               {formatWhen(game.date)}
             </span>
             <span className="inline-flex items-center gap-1.5">
-              <MapPin className="h-4 w-4 text-coral" />
+              <MapPin className="h-3.5 w-3.5 text-coral" />
               {game.distanceMi} mi
             </span>
-            {game.isPrivate && <Lock className="h-4 w-4" />}
+            {game.isPrivate && <Lock className="h-3.5 w-3.5" />}
           </div>
           {game.positionsNeeded && Object.keys(game.positionsNeeded).length > 0 && (
             <div className="flex flex-wrap gap-1">
               {Object.entries(game.positionsNeeded).slice(0, 3).map(([name, count]) => (
                 <span
                   key={name}
-                  className="inline-flex items-center gap-1 rounded-full border border-lime/40 bg-lime/10 px-2 py-0.5 text-[10px] font-semibold text-lime"
+                  className="inline-flex items-center gap-1 rounded-full border border-lime/40 bg-lime/10 px-1.5 py-0.5 text-[9px] font-semibold text-lime"
                 >
                   {name} <span className="tabular-nums opacity-80">×{count}</span>
                 </span>
               ))}
               {Object.keys(game.positionsNeeded).length > 3 && (
-                <span className="text-[10px] font-semibold text-muted-foreground">
+                <span className="text-[9px] font-semibold text-muted-foreground">
                   +{Object.keys(game.positionsNeeded).length - 3} more
                 </span>
               )}
             </div>
           )}
-          <div className="flex items-center justify-between gap-3">
-            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground">
               {hostUserId ? (
                 <button
                   type="button"
                   onClick={goToHost}
-                  className="rounded-full hover:ring-2 hover:ring-lime"
+                  className="shrink-0 rounded-full hover:ring-2 hover:ring-lime"
                   aria-label={`View ${game.host.name}'s profile`}
                 >
                   <UserAvatar
@@ -229,29 +229,29 @@ export function GameCard({ game, index = 0 }: { game: Game; index?: number }) {
                 <button
                   type="button"
                   onClick={goToHost}
-                  className="font-semibold text-foreground hover:text-lime hover:underline"
+                  className="truncate font-semibold text-foreground hover:text-lime hover:underline"
                 >
                   {game.host.name}
                 </button>
               ) : (
-                <span>{game.host.name}</span>
+                <span className="truncate">{game.host.name}</span>
               )}
-              <span className="text-foreground">· {game.skill}</span>
+              <span className="shrink-0 text-foreground">· {game.skill}</span>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex shrink-0 items-center gap-1.5">
               {hostUserId && (
                 <button
                   type="button"
                   onClick={messageHost}
                   disabled={opening}
                   aria-label={`Message ${game.host.name}`}
-                  className="grid h-8 w-8 place-items-center rounded-full border border-border bg-surface text-muted-foreground hover:border-lime/40 hover:text-lime disabled:opacity-50"
+                  className="grid h-7 w-7 place-items-center rounded-full border border-border bg-surface text-muted-foreground hover:border-lime/40 hover:text-lime disabled:opacity-50"
                 >
-                  <MessageCircle className="h-4 w-4" />
+                  <MessageCircle className="h-3.5 w-3.5" />
                 </button>
               )}
-              <div className="flex items-center gap-1.5 text-xs font-semibold">
-                <Users className="h-4 w-4 text-lime" />
+              <div className="flex items-center gap-1 text-[11px] font-semibold">
+                <Users className="h-3.5 w-3.5 text-lime" />
                 <span key={joinedCount} className="text-foreground inline-block motion-safe:animate-scale-in">
                   {joinedCount}/{game.maxPlayers}
                 </span>
@@ -261,7 +261,7 @@ export function GameCard({ game, index = 0 }: { game: Game; index?: number }) {
               </div>
             </div>
           </div>
-          <div className="h-1.5 overflow-hidden rounded-full bg-secondary">
+          <div className="h-1 overflow-hidden rounded-full bg-secondary">
             <motion.div
               initial={{ width: 0 }}
               animate={{ width: `${fillPct}%` }}
@@ -273,13 +273,13 @@ export function GameCard({ game, index = 0 }: { game: Game; index?: number }) {
             <button
               type="button"
               onClick={quickJoin}
-              className="mt-1 w-full rounded-2xl bg-lime-gradient py-2.5 text-sm font-bold text-primary-foreground glow-lime inline-flex items-center justify-center gap-1.5"
+              className="mt-1 w-full rounded-2xl bg-lime-gradient py-2 text-xs font-bold text-primary-foreground glow-lime inline-flex items-center justify-center gap-1"
             >
               {ctaLabel}
             </button>
           ) : (
             <div
-              className={`mt-1 w-full rounded-2xl py-2.5 text-sm font-bold inline-flex items-center justify-center gap-1.5 ${
+              className={`mt-1 w-full rounded-2xl py-2 text-xs font-bold inline-flex items-center justify-center gap-1 ${
                 joinedByMe
                   ? "bg-lime/15 border border-lime/40 text-lime"
                   : spotsLeft <= 0 || liveStatus === "completed"
@@ -291,9 +291,9 @@ export function GameCard({ game, index = 0 }: { game: Game; index?: number }) {
                         : "border border-border bg-surface text-foreground"
               }`}
             >
-              {joinedByMe && <Check className="h-4 w-4" />}
+              {joinedByMe && <Check className="h-3.5 w-3.5" />}
               {!joinedByMe && game.price > 0 && spotsLeft > 0 && liveStatus === "scheduled" && (
-                <CreditCard className="h-4 w-4" />
+                <CreditCard className="h-3.5 w-3.5" />
               )}
               {ctaLabel}
             </div>

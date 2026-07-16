@@ -74,11 +74,11 @@ function RequestTimeline({ request }: { request: JoinRequest }) {
     events.push({ key: "upd", label: "Updated", ts: updated, tone: "muted" });
   }
   return (
-    <ol className="mt-1.5 space-y-1">
+    <ol className="mt-1 space-y-0.5">
       {events.map((e) => (
-        <li key={e.key} className="flex items-center gap-2 text-[10px] text-muted-foreground">
+        <li key={e.key} className="flex items-center gap-1.5 text-[9px] text-muted-foreground">
           <span
-            className={`h-1.5 w-1.5 rounded-full ${
+            className={`h-1 w-1 rounded-full ${
               e.tone === "lime" ? "bg-lime" : e.tone === "coral" ? "bg-coral" : "bg-muted-foreground/50"
             }`}
           />
@@ -138,7 +138,7 @@ function RequestGameCardInner({
           params={{ gameId: game.id }}
           className="group block"
         >
-          <div className="relative h-44 overflow-hidden">
+          <div className="relative h-28 overflow-hidden">
             <img
               src={game.image}
               alt={game.title}
@@ -146,48 +146,48 @@ function RequestGameCardInner({
               className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-105"
             />
             <div className="absolute inset-0 bg-gradient-to-t from-surface via-surface/30 to-transparent" />
-            <div className="absolute top-3 left-3 flex flex-wrap gap-1.5">
-              <span className="inline-flex items-center gap-1 rounded-full bg-background/70 backdrop-blur px-2.5 py-1 text-xs font-semibold">
-                <span>{sportEmoji[game.sport]}</span>
-                {game.sport}
+          <div className="absolute top-2 left-2 flex flex-wrap gap-1">
+            <span className="inline-flex items-center gap-1 rounded-full bg-background/70 backdrop-blur px-2 py-0.5 text-[11px] font-semibold">
+              <span>{sportEmoji[game.sport]}</span>
+              {game.sport}
+            </span>
+          </div>
+          <div className="absolute top-2 right-2">
+            {game.price === 0 ? (
+              <span className="rounded-full bg-lime px-2 py-0.5 text-[11px] font-bold text-primary-foreground">
+                FREE
               </span>
-            </div>
-            <div className="absolute top-3 right-3">
-              {game.price === 0 ? (
-                <span className="rounded-full bg-lime px-2.5 py-1 text-xs font-bold text-primary-foreground">
-                  FREE
-                </span>
-              ) : (
-                <span className="rounded-full bg-background/70 backdrop-blur px-2.5 py-1 text-xs font-bold">
-                  ${game.price}
-                </span>
-              )}
-            </div>
-            <div className="absolute bottom-3 left-3 right-3">
-              <h3 className="font-display text-xl font-bold text-foreground drop-shadow-lg">
-                {game.title}
-              </h3>
-            </div>
+            ) : (
+              <span className="rounded-full bg-background/70 backdrop-blur px-2 py-0.5 text-[11px] font-bold">
+                ${game.price}
+              </span>
+            )}
+          </div>
+          <div className="absolute bottom-2 left-3 right-3">
+            <h3 className="font-display text-lg font-bold text-foreground drop-shadow-lg">
+              {game.title}
+            </h3>
+          </div>
           </div>
 
-          <div className="p-4 space-y-3">
-            <div className="flex items-center gap-3 text-sm text-muted-foreground">
+          <div className="p-3 space-y-2">
+            <div className="flex items-center gap-3 text-xs text-muted-foreground">
               <span className="inline-flex items-center gap-1.5" suppressHydrationWarning>
-                <Clock className="h-4 w-4 text-lime" />
+                <Clock className="h-3.5 w-3.5 text-lime" />
                 {formatWhen(game.date)}
               </span>
               <span className="inline-flex items-center gap-1.5">
-                <MapPin className="h-4 w-4 text-coral" />
+                <MapPin className="h-3.5 w-3.5 text-coral" />
                 {game.distanceMi} mi
               </span>
             </div>
-            <div className="flex items-center justify-between gap-3">
-              <div className="flex items-center gap-2 text-xs text-muted-foreground">
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground">
                 <UserAvatar initials={game.host.avatar} name={game.host.name} size="xs" />
-                <span>{game.host.name}</span>
-                <span className="text-foreground">· {game.skill}</span>
+                <span className="truncate">{game.host.name}</span>
+                <span className="shrink-0 text-foreground">· {game.skill}</span>
               </div>
-              <div className="flex items-center gap-1.5 text-xs font-semibold">
+              <div className="flex shrink-0 items-center gap-1 text-[11px] font-semibold">
                 <span className="text-foreground">
                   {joinedCount}/{game.maxPlayers}
                 </span>
@@ -196,7 +196,7 @@ function RequestGameCardInner({
                 )}
               </div>
             </div>
-            <div className="h-1.5 overflow-hidden rounded-full bg-secondary">
+            <div className="h-1 overflow-hidden rounded-full bg-secondary">
               <motion.div
                 initial={{ width: 0 }}
                 animate={{ width: `${fillPct}%` }}
@@ -208,7 +208,7 @@ function RequestGameCardInner({
         </Link>
 
         <div
-          className={`mx-4 mb-4 rounded-2xl border p-3 flex items-start gap-3 ${
+          className={`mx-3 mb-3 rounded-2xl border p-2.5 flex items-start gap-2.5 ${
             isPending
               ? "border-coral/40 bg-coral/10"
               : isApproved
@@ -217,14 +217,14 @@ function RequestGameCardInner({
           }`}
         >
           {isPending ? (
-            <ClockIcon className="h-4 w-4 text-coral shrink-0 mt-0.5" />
+            <ClockIcon className="h-3.5 w-3.5 text-coral shrink-0 mt-0.5" />
           ) : isApproved ? (
-            <Check className="h-4 w-4 text-lime shrink-0 mt-0.5" />
+            <Check className="h-3.5 w-3.5 text-lime shrink-0 mt-0.5" />
           ) : (
-            <XIcon className="h-4 w-4 text-muted-foreground shrink-0 mt-0.5" />
+            <XIcon className="h-3.5 w-3.5 text-muted-foreground shrink-0 mt-0.5" />
           )}
           <div className="min-w-0 flex-1">
-            <p className="text-xs font-semibold">
+            <p className="text-[11px] font-semibold">
               {isHost
                 ? isPending
                   ? "A player wants to join"
@@ -241,7 +241,7 @@ function RequestGameCardInner({
 
           </div>
           {isPending && (
-            <div className="flex items-center gap-2">
+            <div className="flex shrink-0 items-center gap-1.5">
               {isHost && onDecline && (
                 <button
                   type="button"
@@ -250,7 +250,7 @@ function RequestGameCardInner({
                     e.stopPropagation();
                     setConfirm("decline");
                   }}
-                  className="rounded-full border border-border bg-background px-3 py-1 text-xs font-semibold hover:border-coral/40"
+                  className="rounded-full border border-border bg-background px-2 py-0.5 text-[10px] font-semibold hover:border-coral/40"
                 >
                   Decline
                 </button>
@@ -263,7 +263,7 @@ function RequestGameCardInner({
                     e.stopPropagation();
                     setConfirm("approve");
                   }}
-                  className="rounded-full bg-lime-gradient px-3 py-1 text-xs font-semibold text-primary-foreground"
+                  className="rounded-full bg-lime-gradient px-2 py-0.5 text-[10px] font-semibold text-primary-foreground"
                 >
                   Approve
                 </button>
@@ -277,7 +277,7 @@ function RequestGameCardInner({
                     e.stopPropagation();
                     onCancel();
                   }}
-                  className="rounded-full border border-border bg-background px-3 py-1 text-xs font-semibold hover:border-coral/40"
+                  className="rounded-full border border-border bg-background px-2 py-0.5 text-[10px] font-semibold hover:border-coral/40"
                 >
                   Cancel
                 </button>
@@ -292,7 +292,7 @@ function RequestGameCardInner({
                 e.stopPropagation();
                 onWithdraw();
               }}
-              className="rounded-full border border-coral/40 bg-coral/10 px-3 py-1 text-xs font-semibold text-coral hover:bg-coral/20"
+              className="shrink-0 rounded-full border border-coral/40 bg-coral/10 px-2 py-0.5 text-[10px] font-semibold text-coral hover:bg-coral/20"
             >
               Withdraw
             </button>
