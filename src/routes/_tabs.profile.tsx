@@ -85,13 +85,13 @@ function Profile() {
   const [hostRequests, setHostRequests] = useState<JoinRequest[]>([]);
   const [requestsLoading, setRequestsLoading] = useState(true);
   const [requestFilter, setRequestFilter] = useState<"all" | "host" | "player">("all");
-  const refreshRequests = async () => {
+  const refreshRequests = async (opts: { silent?: boolean } = {}) => {
     if (!profileUser) {
       setMyRequests([]);
       setHostRequests([]);
       return;
     }
-    setRequestsLoading(true);
+    if (!opts.silent) setRequestsLoading(true);
     try {
       const [mine, hosted] = await Promise.all([
         listMyJoinRequests(),
@@ -102,7 +102,7 @@ function Profile() {
     } catch {
       /* ignore */
     } finally {
-      setRequestsLoading(false);
+      if (!opts.silent) setRequestsLoading(false);
     }
   };
   useEffect(() => {
@@ -110,6 +110,24 @@ function Profile() {
   }, [profileUser?.id]);
   useEffect(() => {
     if (!profileUser) return;
+    const applyPayload = (
+      payload: { eventType: string; new: any; old: any },
+      bucket: "mine" | "host",
+    ) => {
+      const setter = bucket === "mine" ? setMyRequests : setHostRequests;
+      setter((prev) => {
+        if (payload.eventType === "DELETE") {
+          return prev.filter((r) => r.id !== payload.old?.id);
+        }
+        const row = payload.new as JoinRequest;
+        if (!row) return prev;
+        const idx = prev.findIndex((r) => r.id === row.id);
+        if (idx === -1) return [row, ...prev];
+        const next = prev.slice();
+        next[idx] = { ...next[idx], ...row };
+        return next;
+      });
+    };
     const ch = supabase
       .channel(`profile-join-requests-${profileUser.id}`)
       .on(
@@ -120,7 +138,10 @@ function Profile() {
           table: "join_requests",
           filter: `player_id=eq.${profileUser.id}`,
         },
-        () => refreshRequests(),
+        (payload) => {
+          applyPayload(payload as any, "mine");
+          refreshRequests({ silent: true });
+        },
       )
       .on(
         "postgres_changes",
@@ -130,7 +151,10 @@ function Profile() {
           table: "join_requests",
           filter: `host_id=eq.${profileUser.id}`,
         },
-        () => refreshRequests(),
+        (payload) => {
+          applyPayload(payload as any, "host");
+          refreshRequests({ silent: true });
+        },
       )
       .subscribe();
     return () => {
@@ -138,6 +162,7 @@ function Profile() {
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [profileUser?.id]);
+
 
   const gameLookup = useMemo(() => {
     const m = new Map<string, Game>();
@@ -430,32 +455,39 @@ function Profile() {
                       index={i}
                       isHost={isHost}
                       onCancel={isHost ? undefined : async () => {
+                        const prev = myRequests;
+                        setMyRequests((rs) => rs.filter((x) => x.id !== r.id));
                         try {
                           await cancelMyJoinRequest(r.game_id);
                           toast("Request canceled.");
-                          refreshRequests();
                         } catch (e: any) {
+                          setMyRequests(prev);
                           toast.error(e.message ?? "Could not cancel.");
                         }
                       }}
                       onApprove={isHost ? async () => {
+                        const prev = hostRequests;
+                        setHostRequests((rs) => rs.map((x) => x.id === r.id ? { ...x, status: "approved" } : x));
                         try {
                           await reviewJoinRequest(r.id, "approved");
                           toast("Player approved.");
-                          refreshRequests();
                         } catch (e: any) {
+                          setHostRequests(prev);
                           toast.error(e.message ?? "Could not approve.");
                         }
                       } : undefined}
                       onDecline={isHost ? async () => {
+                        const prev = hostRequests;
+                        setHostRequests((rs) => rs.map((x) => x.id === r.id ? { ...x, status: "rejected" } : x));
                         try {
                           await reviewJoinRequest(r.id, "rejected");
                           toast("Player declined.");
-                          refreshRequests();
                         } catch (e: any) {
+                          setHostRequests(prev);
                           toast.error(e.message ?? "Could not decline.");
                         }
                       } : undefined}
+
                     />
                   );
                 })}
