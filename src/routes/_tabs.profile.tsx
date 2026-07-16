@@ -126,7 +126,6 @@ function Profile() {
   const recentlyReviewed = myRequests.filter((r) => r.status !== "pending").slice(0, 3);
   const pendingWithGame = pendingRequests.filter((r) => gameLookup.has(r.game_id));
   const reviewedWithGame = recentlyReviewed.filter((r) => gameLookup.has(r.game_id));
-  const showRequests = pendingWithGame.length > 0 || reviewedWithGame.length > 0;
 
   useEffect(() => {
     if (user) setConfirmedUser(user);
