@@ -15,6 +15,12 @@ import { ReputationBadge } from "@/components/ReputationBadge";
 import { computeReputation, useReviewsFor } from "@/lib/reviews";
 import { useProfileOverrides } from "@/lib/user-prefs-store";
 import { ProfileLinksList } from "@/components/ProfileLinks";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 export const Route = createFileRoute("/players/$userId")({
   head: () => ({ meta: [{ title: "Player profile — OpenRun" }] }),
