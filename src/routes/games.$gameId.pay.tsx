@@ -21,6 +21,7 @@ import {
 import { LegalNotice } from "@/components/LegalNotice";
 import { PrimaryCTA } from "@/components/PrimaryCTA";
 import { SpotsPill } from "@/components/SpotsPill";
+import { LeaveFlowButton } from "@/components/LeaveFlowButton";
 
 import { useLiveParticipantCount } from "@/lib/game-participants-store";
 
