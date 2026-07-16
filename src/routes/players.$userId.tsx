@@ -18,6 +18,7 @@ import { ProfileLinksList } from "@/components/ProfileLinks";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
