@@ -153,9 +153,12 @@ export async function listMyConversations(): Promise<ConversationWithMeta[]> {
       other_avatar_url: prof?.avatar_url ?? null,
       last_message: lastByConv[c.id]?.body ?? null,
       unread: unreadByConv[c.id] ?? 0,
+      accepted_by: (c.accepted_by ?? []) as string[],
+      is_request: !((c.accepted_by ?? []) as string[]).includes(me),
     } as ConversationWithMeta;
   });
 }
+
 
 
 export async function getConversation(convId: string) {
