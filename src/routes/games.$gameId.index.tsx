@@ -55,6 +55,7 @@ import {
   createJoinRequest,
   cancelMyJoinRequest,
   withdrawMyApprovedJoinRequest,
+  hostRemoveParticipant,
   listHostJoinRequests,
   reviewJoinRequest,
   upsertGamePaymentSettings,
