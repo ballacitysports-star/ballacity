@@ -488,8 +488,22 @@ function Profile() {
           </div>
         </div>
 
-        {/* Reviews */}
-        <ReviewsSection revieweeId="me" revieweeKind="player" revieweeName={me.name} isOwner />
+        {/* Reviews popup */}
+        <Dialog open={reviewsOpen} onOpenChange={setReviewsOpen}>
+          <DialogContent className="max-h-[90dvh] overflow-y-auto p-0 sm:max-w-xl">
+            <DialogHeader className="sr-only">
+              <DialogTitle>Reviews</DialogTitle>
+            </DialogHeader>
+            <div className="p-4">
+              <ReviewsSection
+                revieweeId="me"
+                revieweeKind="player"
+                revieweeName={me.name}
+                isOwner
+              />
+            </div>
+          </DialogContent>
+        </Dialog>
       </div>
     </div>
   );
