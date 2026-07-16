@@ -1330,6 +1330,14 @@ function PaymentInstructionsAndProof({
               : "I have paid"}
         </PrimaryCTA>
       </form>
+      <div className="flex justify-center pt-1">
+        <LeaveFlowButton
+          gameId={game_id}
+          gameTitle={game_title}
+          variant="link"
+          navigateTo={`/games/${game_id}`}
+        />
+      </div>
     </div>
   );
 }
