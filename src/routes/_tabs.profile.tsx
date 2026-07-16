@@ -9,6 +9,8 @@ import {
   LogOut,
   Clock,
   Star,
+  Crown,
+  Users,
 } from "lucide-react";
 import { ME, GAMES, type Game } from "@/lib/sample-data";
 import { GameCard } from "@/components/GameCard";
