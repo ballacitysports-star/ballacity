@@ -98,12 +98,19 @@ export function useLiveParticipants(gameId: string | undefined): {
       const rows = (data ?? []) as Row[];
       const profiles = await fetchProfiles(rows.map((r) => r.user_id));
       if (cancelled) return;
+      // Replace wholesale — this is the authoritative snapshot. Any realtime
+      // deltas that arrived during the fetch will be reapplied on the next
+      // event; the SUBSCRIBED-triggered reload guarantees we can't miss one.
       setParticipants(rows.map((r) => toParticipant(r, profiles.get(r.user_id))));
       setLoading(false);
     };
     reloadRef.current = load;
-    void load();
 
+    // Subscribe FIRST, then fetch the snapshot on the SUBSCRIBED ack (initial
+    // connect AND every reconnect after a network flap). This closes the race
+    // where an INSERT/DELETE fires between the SELECT and the subscribe ack,
+    // and it re-syncs after transient disconnects that would otherwise drop
+    // events silently.
     const channel = supabase
       .channel(`game_participants:roster:${gameId}`)
       .on(
@@ -127,6 +134,25 @@ export function useLiveParticipants(gameId: string | undefined): {
       .on(
         "postgres_changes",
         {
+          event: "UPDATE",
+          schema: "public",
+          table: "game_participants",
+          filter: `game_id=eq.${gameId}`,
+        },
+        async (payload) => {
+          const row = payload.new as Row;
+          const profiles = await fetchProfiles([row.user_id]);
+          if (cancelled) return;
+          setParticipants((prev) =>
+            prev.map((p) =>
+              p.userId === row.user_id ? toParticipant(row, profiles.get(row.user_id)) : p,
+            ),
+          );
+        },
+      )
+      .on(
+        "postgres_changes",
+        {
           event: "DELETE",
           schema: "public",
           table: "game_participants",
@@ -134,11 +160,22 @@ export function useLiveParticipants(gameId: string | undefined): {
         },
         (payload) => {
           const old = payload.old as Partial<Row>;
-          if (!old.user_id) return;
+          if (!old.user_id) {
+            // Replica identity may not include user_id — fall back to a full
+            // resync so the row disappears everywhere.
+            void reloadRef.current();
+            return;
+          }
           setParticipants((prev) => prev.filter((p) => p.userId !== old.user_id));
         },
       )
-      .subscribe();
+      .subscribe((status) => {
+        if (cancelled) return;
+        if (status === "SUBSCRIBED") {
+          // Initial connect + every reconnect: reload the authoritative list.
+          void reloadRef.current();
+        }
+      });
 
     return () => {
       cancelled = true;
@@ -149,6 +186,7 @@ export function useLiveParticipants(gameId: string | undefined): {
       }
     };
   }, [gameId]);
+
 
   const refetch = useCallback(async () => {
     await reloadRef.current();

@@ -24,7 +24,7 @@ function emit(gameId: string) {
 }
 
 async function hydrate(gameId: string) {
-  if (hydrated.has(gameId) || inFlight.has(gameId)) return;
+  if (inFlight.has(gameId)) return;
   inFlight.add(gameId);
   try {
     const { count, error } = await supabase
@@ -71,9 +71,18 @@ function attachChannel(gameId: string) {
         emit(gameId);
       },
     )
-    .subscribe();
+    .subscribe((status) => {
+      if (status === "SUBSCRIBED") {
+        // Re-hydrate on initial connect AND every reconnect. Optimistic +/- 1
+        // deltas can drift if events are missed during a network flap; an
+        // authoritative HEAD count on every SUBSCRIBED transition keeps
+        // "spots left" badges consistent across devices.
+        void hydrate(gameId);
+      }
+    });
   channels.set(gameId, channel);
 }
+
 
 function detachIfIdle(gameId: string) {
   const set = listeners.get(gameId);
