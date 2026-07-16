@@ -170,8 +170,8 @@ export function GameCard({ game, index = 0 }: { game: Game; index?: number }) {
               </span>
             )}
           </div>
-          <div className="absolute bottom-3 left-3 right-3">
-            <h3 className="font-display text-xl font-bold text-foreground drop-shadow-lg">
+          <div className="absolute bottom-2 left-3 right-3">
+            <h3 className="font-display text-lg font-bold text-foreground drop-shadow-lg">
               {game.title}
             </h3>
           </div>
