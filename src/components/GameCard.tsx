@@ -12,7 +12,7 @@ import { getOrCreateDirectConversation } from "@/lib/messages";
 import { useAuth } from "@/hooks/use-auth";
 import { useState } from "react";
 import { toast } from "sonner";
-import { useMyFlowStatus } from "@/lib/game-flow-status";
+import { useMyFlowStatus, isUuid } from "@/lib/game-flow-status";
 import { PlayerFlowPill } from "@/components/PlayerFlowPill";
 
 const sportEmoji: Record<string, string> = {
