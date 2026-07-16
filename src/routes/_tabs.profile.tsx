@@ -13,6 +13,8 @@ import {
 import { ME, GAMES, type Game } from "@/lib/sample-data";
 import { GameCard } from "@/components/GameCard";
 import { RequestGameCard } from "@/components/RequestGameCard";
+import { RequestGameCardSkeleton } from "@/components/RequestGameCardSkeleton";
+import { EmptyRequestsState } from "@/components/EmptyRequestsState";
 import { ReviewsSection } from "@/components/ReviewsSection";
 import { HERO_IMAGE } from "@/lib/sample-data";
 import { computeReputation, useReviewsFor } from "@/lib/reviews";
