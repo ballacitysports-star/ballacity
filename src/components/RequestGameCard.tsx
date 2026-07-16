@@ -188,7 +188,7 @@ export function RequestGameCard({
                   onClick={(e) => {
                     e.preventDefault();
                     e.stopPropagation();
-                    onDecline();
+                    setConfirm("decline");
                   }}
                   className="rounded-full border border-border bg-background px-3 py-1 text-xs font-semibold hover:border-coral/40"
                 >
@@ -201,13 +201,14 @@ export function RequestGameCard({
                   onClick={(e) => {
                     e.preventDefault();
                     e.stopPropagation();
-                    onApprove();
+                    setConfirm("approve");
                   }}
                   className="rounded-full bg-lime-gradient px-3 py-1 text-xs font-semibold text-primary-foreground"
                 >
                   Approve
                 </button>
               )}
+
               {!isHost && onCancel && (
                 <button
                   type="button"
