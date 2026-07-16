@@ -1527,3 +1527,47 @@ function Field({ label, value }: { label: string; value: string }) {
     </div>
   );
 }
+
+function PayFlowPillHeader({ gameId }: { gameId: string }) {
+  const { status } = useMyFlowStatus(gameId);
+  if (status === "none") return null;
+  return <PlayerFlowPill status={status} />;
+}
+
+function PayFlowStepper({ gameId }: { gameId: string }) {
+  const { status } = useMyFlowStatus(gameId);
+  if (status === "none" || status === "rejected") return null;
+  const currentIdx = FLOW_STEPS.indexOf(
+    status === "confirmed" ? "payment_verified" : status === "payment_rejected" ? "payment_pending" : status,
+  );
+  return (
+    <ol
+      className="flex items-center gap-1 rounded-2xl border border-border bg-surface px-2 py-2 text-[10px] font-semibold overflow-x-auto"
+      aria-label="Join flow progress"
+      data-testid="pay-flow-stepper"
+    >
+      {FLOW_STEPS.map((step, i) => {
+        const done = i < currentIdx;
+        const active = i === currentIdx;
+        const tone = done
+          ? "border-lime/40 bg-lime/15 text-lime"
+          : active
+            ? "border-coral/50 bg-coral/10 text-coral"
+            : "border-border bg-transparent text-muted-foreground";
+        return (
+          <li key={step} className="flex items-center gap-1 shrink-0">
+            <span
+              className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 ${tone}`}
+              aria-current={active ? "step" : undefined}
+            >
+              {FLOW_META[step].short}
+            </span>
+            {i < FLOW_STEPS.length - 1 && (
+              <span className={`h-px w-3 ${done ? "bg-lime/40" : "bg-border"}`} aria-hidden />
+            )}
+          </li>
+        );
+      })}
+    </ol>
+  );
+}
