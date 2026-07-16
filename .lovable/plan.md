@@ -1,39 +1,66 @@
-## Fix roster not updating + add host "Remove player" action
+## Goals
 
-### Problem 1 — roster shows removed players
-The host roster on the game details page is composed from two sources:
-- `approvedReqs` = `join_requests` rows with `status='approved'` (rendered via `RosterPlayerRow`)
-- `liveRoster` = live `game_participants` rows (rendered as plain `Link` rows), minus overlap
+1. **Roster not updating after removal** — the game details page keeps showing "ghost" avatars for removed players because the roster falls back to placeholders derived from the static `game.joined` count whenever the live list is empty.
+2. **AuthGate redirect `/feed → /auth`** — on a fresh visit or slow hydration, `AuthGate` runs its second-chance check once and redirects even when a stored Supabase session exists but hasn't parsed yet.
+3. **Light cleanup** — drop dead imports/vars discovered in the files we touch (no broader refactor, no `any`/prettier sweeps).
 
-Today, when a player is removed from `game_participants` (host action, admin cleanup, or a partial self-leave) the corresponding `join_requests` row can be left behind with `status='approved'`. That row is not cleaned up by any realtime handler, so `approvedReqs` keeps rendering the player forever even though `liveRoster` no longer contains them.
+## 1. Fix ghost roster placeholders
 
-There is also no "remove" affordance for the host — RLS already permits `DELETE` on `game_participants` for hosts, but the UI never exposes it.
+`src/routes/games.$gameId.index.tsx` around line 829:
 
-### Problem 2 — no host "remove player" UI
-Add a small "Remove" control on each roster row visible only to the host, with a confirmation dialog. Removing a player must clear both `game_participants` AND any leftover `join_requests` row for that player+game so the roster updates immediately across all viewers.
+```ts
+const usePlaceholderRoster = liveRoster.length === 0 && (game.joined ?? 0) > 0;
+```
 
-### Changes
+This is true even after `useLiveParticipants` has hydrated with 0 rows (which is exactly the state right after the last participant is removed). It then renders `game.joined` fake avatars from a hard-coded initials list.
 
-1. `src/lib/payments.ts`
-   - Add `hostRemoveParticipant({ gameId, playerId })`:
-     - `DELETE FROM game_participants WHERE game_id=? AND user_id=?`
-     - `DELETE FROM join_requests WHERE game_id=? AND player_id=?` (all statuses — cleans the "ghost approved" row that causes the stale render). RLS already permits both for the host.
-     - Best-effort: delete pending `payment_submissions` for that player+game so payment chips don't linger.
+**Fix:** only render placeholders while the roster hasn't hydrated yet. Use the already-available live count as the authoritative signal:
 
-2. `src/routes/games.$gameId.index.tsx` — host roster section (lines ~1792-1875)
-   - Filter `approvedReqs` so it only renders rows whose `player_id` is present in `liveRoster` once `liveRoster` has hydrated. This is the actual fix for the stale-display bug — any join_request whose participant row is gone is dropped from the UI immediately, without waiting on any cleanup.
-   - When `isHost`, render a small trash/"Remove" icon-button on both branches (`RosterPlayerRow` and the live-roster `Link` rows). Clicking opens an `AlertDialog`:
-     - Confirm copy: "Remove {name} from this game? They'll be notified and their spot will open up."
-     - On confirm: optimistically call `removeRosterLocal(playerId)` + drop from `hostRequests`, then `await hostRemoveParticipant(...)`, then `void refetchRoster()` + refresh host requests. Rollback on error.
-     - Fire `createNotification({ user_id: playerId, type: 'participant_removed', title: 'Removed from {game.title}', body: 'The host removed you from the roster.', link: '/games/{id}' })`.
-   - The live-roster row is currently a whole-row `<Link>`; wrap children so the remove button uses `e.preventDefault(); e.stopPropagation()` to avoid navigating to the player profile when clicking Remove.
+```ts
+const rosterHydrated = liveParticipantCount !== undefined;
+const usePlaceholderRoster =
+  !rosterHydrated && liveRoster.length === 0 && (game.joined ?? 0) > 0;
+const placeholderCount = rosterHydrated
+  ? 0
+  : Math.max(0, (liveParticipantCount ?? game.joined ?? 0) - liveRoster.length);
+```
 
-3. Realtime: no schema changes needed. `useLiveParticipants` already handles DELETE + resubscribe reload, so both the host's device and every other viewer will see the row disappear. The join_requests deletion is picked up by the existing `join_requests:host:<gameId>` channel which triggers `loadHostRequests()`.
+Cap `placeholderOthers` at `placeholderCount` so the visible roster size can never exceed the authoritative live count.
 
-### Out of scope
-- No database migration; existing RLS policies already allow the host to delete from both tables.
-- No changes to the self-leave flow.
+Also verify the two other roster surfaces (positions list ~line 1390 / 1530 / 1576 and the "approved+live" merge at 1841) already read from `liveRoster`; no change needed there.
 
-### Technical notes
-- `hostRemoveParticipant` runs client-side (RLS-scoped) — matches the pattern used by `withdrawMyApprovedJoinRequest`.
-- Notification best-effort with `.catch(() => {})` so a notify failure doesn't roll back the remove.
+## 2. Harden AuthGate late-hydration redirect
+
+`src/routes/__root.tsx` `AuthGate` (lines 242–350) currently:
+- waits for `useAuth` `loading=false`,
+- calls `supabase.auth.getSession()` once, and
+- if that returns no session, navigates to `/auth`.
+
+On mobile Safari the persisted session can parse a tick after the first `getSession()` resolves. Add a bounded retry that only kicks in when there is a stored session in `localStorage` (we already compute this in `authgate-log.ts`).
+
+Changes:
+- Extract `readStoredSupabaseSession()` (or reuse the logic from `envSnapshot`) into `src/lib/authgate-log.ts` and export it.
+- In the verify effect, if `getSession()` returns `null` **and** `readStoredSupabaseSession()` is truthy and not expired, wait ~250ms and re-check `getSession()` once more before redirecting. Log a new `verify-hydrated-retry` decision for observability.
+- If still empty (or no stored session), redirect as today.
+
+Result: signed-out visitors still redirect immediately; signed-in visitors whose session hasn't parsed avoid the false redirect.
+
+## 3. Light cleanup (unused imports/vars only)
+
+Only in files above:
+- `src/components/RequestGameCard.tsx` — drop unused `User` icon import.
+- `src/routes/games.$gameId.index.tsx` — remove any imports that become unused after the roster change (verify with `bunx tsgo --noEmit` scoped to the file).
+
+No `any→unknown` conversions, no prettier reformats, no larger refactors.
+
+## Verification
+
+- `bunx tsgo --noEmit` — no new errors (preexisting `available-players.tsx` TS2322s stay).
+- Manual: host removes the last participant → placeholder avatars disappear immediately.
+- Manual: hard-refresh `/feed` while signed in on mobile viewport → no `[AuthGate] redirect` warning; hard-refresh while signed out → still redirects.
+
+## Out of scope
+
+- Fixing every `no-explicit-any` / prettier lint warning.
+- Reworking RLS or the Realtime subscription filters.
+- The Vite HMR websocket warning (preview-only).

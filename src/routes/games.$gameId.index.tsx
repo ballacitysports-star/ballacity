@@ -826,15 +826,20 @@ function GameDetail() {
       displayName: p.displayName,
       avatarUrl: p.avatarUrl,
     }));
-  const usePlaceholderRoster = liveRoster.length === 0 && (game.joined ?? 0) > 0;
-  const placeholderOthers: RosterEntry[] = usePlaceholderRoster
-    ? Array.from({ length: game.joined }, (_, i) => ({
-        kind: "player" as const,
-        initials: ["MC", "AG", "JK", "RC", "TB", "SO", "PN", "DP", "EL", "VM"][i % 10],
-        isMe: false,
-        pending: false as const,
-      }))
-    : [];
+  // Only show placeholder avatars while the live roster hasn't hydrated yet.
+  // Once `liveParticipantCount` is defined we trust it as the authoritative
+  // count, so a host removal that drops the roster to 0 doesn't leave ghost
+  // avatars behind derived from the stale `game.joined` value.
+  const rosterHydrated = liveParticipantCount !== undefined;
+  const placeholderCount = rosterHydrated
+    ? 0
+    : Math.max(0, (game.joined ?? 0) - liveRoster.length);
+  const placeholderOthers: RosterEntry[] = Array.from({ length: placeholderCount }, (_, i) => ({
+    kind: "player" as const,
+    initials: ["MC", "AG", "JK", "RC", "TB", "SO", "PN", "DP", "EL", "VM"][i % 10],
+    isMe: false,
+    pending: false as const,
+  }));
   const players: RosterEntry[] = [
     ...(viewerCountsAsJoined
       ? [

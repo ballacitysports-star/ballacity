@@ -19,7 +19,7 @@ import { runLegacyHostMigration } from "@/lib/legacy-host-migration";
 import { useAuth } from "@/hooks/use-auth";
 import { useNotificationPush } from "@/lib/notifications";
 import { useOneSignal } from "@/lib/onesignal";
-import { logAuthGateDecision } from "@/lib/authgate-log";
+import { logAuthGateDecision, readStoredSupabaseSession } from "@/lib/authgate-log";
 
 function NotFoundComponent() {
   return (
@@ -283,27 +283,60 @@ function AuthGate({ children }: { children: React.ReactNode }) {
       extra: { phase: "second-chance-getSession" },
     });
     const t0 = performance.now();
-    supabase.auth.getSession().then(({ data, error }) => {
+    const attemptRedirect = async () => {
+      const first = await supabase.auth.getSession();
       if (cancelled) return;
-      const durationMs = Math.round(performance.now() - t0);
-      if (data.session?.user) {
+      if (first.data.session?.user) {
         logAuthGateDecision("verify-hydrated-late", {
           pathname,
           loading,
           hasUser: true,
-          extra: { durationMs, userId: data.session.user.id },
+          extra: { durationMs: Math.round(performance.now() - t0), userId: first.data.session.user.id },
         });
         setVerifying(false);
         return;
       }
+
+      // Mobile Safari/Chrome sometimes parses the persisted session one tick
+      // after `getSession()` first resolves. If localStorage still holds a
+      // non-expired session, wait briefly and re-check once before giving up.
+      const stored = readStoredSupabaseSession();
+      if (stored) {
+        logAuthGateDecision("verify-hydrated-retry", {
+          pathname,
+          loading,
+          hasUser: false,
+          extra: { storedExpiresAt: stored.expiresAt },
+        });
+        await new Promise((r) => setTimeout(r, 250));
+        if (cancelled) return;
+        const second = await supabase.auth.getSession();
+        if (cancelled) return;
+        if (second.data.session?.user) {
+          logAuthGateDecision("verify-hydrated-late", {
+            pathname,
+            loading,
+            hasUser: true,
+            extra: {
+              durationMs: Math.round(performance.now() - t0),
+              userId: second.data.session.user.id,
+              retried: true,
+            },
+          });
+          setVerifying(false);
+          return;
+        }
+      }
+
+      const durationMs = Math.round(performance.now() - t0);
       logAuthGateDecision("verify-no-session", {
         pathname,
         loading,
         hasUser: false,
         extra: {
           durationMs,
-          errorName: error?.name ?? null,
-          errorMessage: error?.message ?? null,
+          errorName: first.error?.name ?? null,
+          errorMessage: first.error?.message ?? null,
         },
       });
       const href = router.state.location.href;
@@ -320,7 +353,8 @@ function AuthGate({ children }: { children: React.ReactNode }) {
         replace: true,
       });
       setVerifying(false);
-    });
+    };
+    void attemptRedirect();
     return () => {
       cancelled = true;
     };

@@ -53,7 +53,34 @@ export type AuthGateDecision =
   | "verify-start"
   | "verify-hydrated-late"
   | "verify-no-session"
+  | "verify-hydrated-retry"
   | "redirect";
+
+/**
+ * Reads the persisted Supabase session from localStorage without touching the
+ * network. Returns `null` when there is no stored session, the payload is
+ * unparseable, or the access token has already expired. Used by AuthGate to
+ * decide whether a `getSession()` miss deserves a short retry (persisted
+ * session may not have parsed yet on slow mobile webviews) vs. an immediate
+ * redirect to /auth.
+ */
+export function readStoredSupabaseSession(): { expiresAt: number | null } | null {
+  try {
+    if (typeof window === "undefined") return null;
+    const projectRef = (import.meta.env.VITE_SUPABASE_PROJECT_ID ?? "") as string;
+    if (!projectRef) return null;
+    const raw = window.localStorage.getItem(`sb-${projectRef}-auth-token`);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    const expiresAt: number | undefined = parsed?.expires_at;
+    if (typeof expiresAt === "number" && expiresAt <= Math.floor(Date.now() / 1000)) {
+      return null;
+    }
+    return { expiresAt: typeof expiresAt === "number" ? expiresAt : null };
+  } catch {
+    return null;
+  }
+}
 
 interface DecisionContext {
   pathname: string;
