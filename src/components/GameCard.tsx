@@ -194,13 +194,13 @@ export function GameCard({ game, index = 0 }: { game: Game; index?: number }) {
               {Object.entries(game.positionsNeeded).slice(0, 3).map(([name, count]) => (
                 <span
                   key={name}
-                  className="inline-flex items-center gap-1 rounded-full border border-lime/40 bg-lime/10 px-2 py-0.5 text-[10px] font-semibold text-lime"
+                  className="inline-flex items-center gap-1 rounded-full border border-lime/40 bg-lime/10 px-1.5 py-0.5 text-[9px] font-semibold text-lime"
                 >
                   {name} <span className="tabular-nums opacity-80">×{count}</span>
                 </span>
               ))}
               {Object.keys(game.positionsNeeded).length > 3 && (
-                <span className="text-[10px] font-semibold text-muted-foreground">
+                <span className="text-[9px] font-semibold text-muted-foreground">
                   +{Object.keys(game.positionsNeeded).length - 3} more
                 </span>
               )}
