@@ -255,9 +255,17 @@ function RootComponent() {
       if (data.user) runLegacyHostMigration(data.user.id);
     });
     const { data: sub } = supabase.auth.onAuthStateChange((event, session) => {
-      queryClient.invalidateQueries();
+      // Only react to identity transitions. TOKEN_REFRESHED / INITIAL_SESSION
+      // fire on every mount and every ~hour of tab focus — invalidating on
+      // those thrashes the router and can 401-storm protected queries.
+      if (event !== "SIGNED_IN" && event !== "SIGNED_OUT" && event !== "USER_UPDATED") {
+        return;
+      }
       router.invalidate();
-      if ((event === "SIGNED_IN" || event === "INITIAL_SESSION") && session?.user) {
+      if (event !== "SIGNED_OUT") {
+        queryClient.invalidateQueries();
+      }
+      if ((event === "SIGNED_IN" || event === "USER_UPDATED") && session?.user) {
         runLegacyHostMigration(session.user.id);
       }
     });
