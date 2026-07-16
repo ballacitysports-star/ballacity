@@ -31,9 +31,11 @@ import {
   listMyJoinRequests,
   listHostJoinRequests,
   cancelMyJoinRequest,
+  withdrawMyApprovedJoinRequest,
   reviewJoinRequest,
   type JoinRequest,
 } from "@/lib/payments";
+import { leaveGame } from "@/lib/games-store";
 import { supabase } from "@/integrations/supabase/client";
 import {
   Dialog,
