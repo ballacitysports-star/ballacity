@@ -1,32 +1,47 @@
-## Bug
+## Goal
+Add Follow / Unfollow to the public player profile (`/players/$userId`), including follower/following counts and a notification to the followed user.
 
-On a hard refresh of a protected page (e.g. `/feed`, `/games/:id`), `AuthGate` sometimes redirects to `/auth` (the sign-in landing) before the persisted Supabase session finishes parsing. The 250ms retry we added helps most cases but still loses the race on slow mobile webviews and cold TanStack SSR shells, so the user sees the landing/sign-in page instead of the page they refreshed.
+## Database
+New migration:
 
-## Fix — never redirect while a stored session exists
+- `public.follows` table
+  - `follower_id uuid` → `auth.users.id`
+  - `followee_id uuid` → `auth.users.id`
+  - `created_at timestamptz default now()`
+  - PK `(follower_id, followee_id)`, `CHECK (follower_id <> followee_id)`
+  - Indexes on `follower_id` and `followee_id`
+- GRANTs: `SELECT` to `anon` + `authenticated` (public counts); `INSERT, DELETE` to `authenticated`.
+- RLS:
+  - SELECT: `true` (counts and follow-lists are public).
+  - INSERT: `auth.uid() = follower_id`.
+  - DELETE: `auth.uid() = follower_id`.
+- Trigger `after_insert_follow` → inserts a row in `public.notifications` for the followee (`type = 'follow'`, actor = follower, payload with follower id/name). Uses `SECURITY DEFINER` and respects `notification_preferences` if the existing pattern does (will mirror what other notification triggers do — read first before writing).
 
-Change the AuthGate policy in `src/routes/__root.tsx`:
+## Frontend
 
-1. On mount / verify, first call `readStoredSupabaseSession()` (already exported from `src/lib/authgate-log.ts`).
-2. If a **non-expired** stored session exists, do **not** redirect — keep rendering the `AuthLoadingFallback` and wait. The root's `onAuthStateChange` listener (already present) will fire `INITIAL_SESSION` / `SIGNED_IN` and `useAuth` will flip `user` to non-null; `AuthGate` re-renders and shows the page.
-3. Add a soft safety net: if `user` hasn't hydrated after ~4s despite a stored session, call `supabase.auth.getSession()` one more time. Only redirect if that final check returns no session AND the stored token is gone/expired.
-4. If there is no stored session from the start, redirect to `/auth?next=…` immediately (today's behavior — keeps signed-out visits fast).
+### `src/lib/follows.ts` (new)
+Helpers:
+- `getFollowState(followeeId)` → `{ isFollowing, followers, following }` via 3 parallel `supabase` reads (`select count`).
+- `followUser(followeeId)` / `unfollowUser(followeeId)`.
+- `useFollow(followeeId)` React hook using TanStack Query: `queryKey: ["follow", followeeId, viewerId]`, exposes counts + `toggle()` with optimistic update + `invalidateQueries`.
 
-Also log a new `verify-waiting-hydration` decision so we can see the "waiting for stored session" branch in existing logs.
+### `src/routes/players.$userId.tsx`
+- Import `useFollow`.
+- In the header actions row (next to Message), render a new `Follow` / `Following` button:
+  - Signed-out: button prompts `toast.error("Sign in to follow")`.
+  - Own profile: hidden (already redirected).
+  - Uses lime-gradient when not following, outline/secondary when following; hover on following swaps to "Unfollow".
+- Add two new small stat pills under the name row (or extend the existing 4-stat grid): show `followers` and `following` counts. Chosen approach: **replace the "Crew" tile with "Followers" and add "Following" next to it, keeping the 4-tile grid** (Games, Reliable, Followers, Following). Tiles are tappable → future list; for now no-op.
 
-## Files
-
-- `src/routes/__root.tsx` — rewrite the verify effect in `AuthGate` (lines ~258–327) per the policy above. Keep `sanitizeNextPath` and the existing redirect payload; only the decision logic changes.
-- `src/lib/authgate-log.ts` — add `"verify-waiting-hydration"` to `AuthGateDecision`.
-
-No changes to `/auth`, `useAuth`, or any route.
-
-## Verification
-
-- Hard-refresh `/feed` and `/games/:id` while signed in → stays on the page, no `[AuthGate] redirect` warning; brief loader is acceptable.
-- Hard-refresh `/feed` while signed out (localStorage empty) → still redirects to `/auth?next=/feed` immediately.
-- `bunx tsgo --noEmit` — no new errors.
+### Notification rendering
+- `src/lib/notifications.ts` (and any notification list UI): add handling for `type === 'follow'` → "X started following you" linking to `/players/{followerId}`. Only touch presentation strings; no schema changes beyond the new type value.
 
 ## Out of scope
+- Followers/Following list pages.
+- Mutual-follow / friend semantics.
+- Push notification wording changes beyond adding the new type.
+- Any change to Message flow, roster, or auth.
 
-- Restructuring routes as public/`_authenticated`.
-- Changes to `auth.tsx` post-sign-in navigation.
+## Verification
+- `bunx tsgo --noEmit` clean.
+- Manual: sign in as user A, visit user B's profile → tap Follow → count increments, button flips to "Following", user B sees a new in-app notification. Tap again → unfollow, count decrements. Refresh persists state. Signed-out tap shows toast.
