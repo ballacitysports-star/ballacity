@@ -12,28 +12,42 @@ export type FollowUser = {
 
 export type FollowListKind = "followers" | "following";
 
+export const FOLLOW_PAGE_SIZE = 30;
+
+export type FollowPage = {
+  users: FollowUser[];
+  nextCursor: string | null;
+};
+
 export async function listFollows(
   userId: string,
   kind: FollowListKind,
-): Promise<FollowUser[]> {
+  cursor?: string | null,
+  pageSize: number = FOLLOW_PAGE_SIZE,
+): Promise<FollowPage> {
   const col = kind === "followers" ? "followee_id" : "follower_id";
   const otherCol = kind === "followers" ? "follower_id" : "followee_id";
-  const { data, error } = await supabase
+  let q = supabase
     .from("follows" as any)
     .select(otherCol + ", created_at")
     .eq(col, userId)
     .order("created_at", { ascending: false })
-    .limit(200);
+    .limit(pageSize);
+  if (cursor) q = q.lt("created_at", cursor);
+  const { data, error } = await q;
   if (error) throw error;
-  const ids = ((data ?? []) as any[]).map((r) => r[otherCol]).filter(Boolean);
-  if (ids.length === 0) return [];
+  const rows = (data ?? []) as any[];
+  const ids = rows.map((r) => r[otherCol]).filter(Boolean);
+  const nextCursor =
+    rows.length === pageSize ? (rows[rows.length - 1].created_at as string) : null;
+  if (ids.length === 0) return { users: [], nextCursor };
   const { data: profs, error: pErr } = await supabase
     .from("profiles")
     .select("id, display_name, username, avatar_url, avatar_initials")
     .in("id", ids);
   if (pErr) throw pErr;
   const byId = new Map(((profs ?? []) as any[]).map((p) => [p.id, p]));
-  return ids
+  const users = ids
     .map((id) => byId.get(id))
     .filter(Boolean)
     .map((p: any) => ({
@@ -43,6 +57,7 @@ export async function listFollows(
       avatar_url: p.avatar_url,
       avatar_initials: p.avatar_initials,
     }));
+  return { users, nextCursor };
 }
 
 
