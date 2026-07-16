@@ -11,7 +11,7 @@ import {
   Check,
   X as XIcon,
 } from "lucide-react";
-import { ME, GAMES } from "@/lib/sample-data";
+import { ME, GAMES, type Game } from "@/lib/sample-data";
 import { GameCard } from "@/components/GameCard";
 import { RequestGameCard } from "@/components/RequestGameCard";
 import { ReviewsSection } from "@/components/ReviewsSection";
