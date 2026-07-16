@@ -71,9 +71,6 @@ import {
 } from "@/lib/payments";
 import { reviewPaymentAction } from "@/lib/payments.functions";
 import { shouldTriggerLeaveBranch } from "@/lib/leave-branch";
-import { useMyFlowStatus } from "@/lib/game-flow-status";
-import { PlayerFlowPill } from "@/components/PlayerFlowPill";
-import { PaymentRequiredBanner } from "@/components/PaymentRequiredBanner";
 
 import { useHostedGames, fetchHostedGame, updateHostedGame, deleteHostedGame } from "@/lib/hosted-games-store";
 import type { Game } from "@/lib/sample-data";
@@ -211,7 +208,6 @@ function GameDetail() {
   const [processing, setProcessing] = useState(false);
   const [positionRosterOpen, setPositionRosterOpen] = useState(false);
   const [reviewsOpen, setReviewsOpen] = useState(false);
-  const { status: myFlowStatus, settings: flowSettings } = useMyFlowStatus(gameId);
 
   // Ticking clock (1s) that re-renders while the resubmit cooldown counts down.
   // Only starts when there's an active cooldown to avoid unnecessary re-renders.
@@ -721,11 +717,6 @@ function GameDetail() {
       const search: { invite?: true; from?: string } = {};
       if (isInvite) search.invite = true;
       if (inviteFrom) search.from = inviteFrom;
-      const feeLabel = `$${Number(settings?.entry_fee ?? game.price ?? 0).toFixed(2).replace(/\.00$/, "")}`;
-      toast.info(`Payment required to secure your spot`, {
-        description: `Send ${feeLabel} to the host — your spot locks in once they verify.`,
-        duration: 6000,
-      });
       nav({ to: "/games/$gameId/pay", params: { gameId: game.id }, search });
       return;
     }
@@ -913,25 +904,6 @@ function GameDetail() {
               </div>
             </div>
           ))}
-
-        {/* Payment-required banner (shows when approved-but-unpaid or payment rejected) */}
-        {!isHost && (
-          <PaymentRequiredBanner
-            gameId={gameId}
-            settings={flowSettings ?? settings}
-            status={myFlowStatus}
-          />
-        )}
-
-        {/* Compact flow status pill for the viewer */}
-        {!isHost && myFlowStatus !== "none" && (
-          <div className="flex items-center gap-2 text-xs">
-            <span className="font-bold uppercase tracking-wider text-muted-foreground">
-              Your status
-            </span>
-            <PlayerFlowPill status={myFlowStatus} />
-          </div>
-        )}
 
         {/* Approval status banner (player view) */}
         {!isHost && requiresApproval && myReq && (
