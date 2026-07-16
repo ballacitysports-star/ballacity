@@ -1,43 +1,39 @@
-## Goal
-Make the event cards on the profile page more compact so more of them are visible at once without scrolling.
+## Fix roster not updating + add host "Remove player" action
 
-## Scope
-This targets the two card types rendered in the profile activity sections:
-- `GameCard` — used in Hosting and Pickup sections.
-- `RequestGameCard` — used in Pending Approvals section.
+### Problem 1 — roster shows removed players
+The host roster on the game details page is composed from two sources:
+- `approvedReqs` = `join_requests` rows with `status='approved'` (rendered via `RosterPlayerRow`)
+- `liveRoster` = live `game_participants` rows (rendered as plain `Link` rows), minus overlap
 
-## Proposed Changes
+Today, when a player is removed from `game_participants` (host action, admin cleanup, or a partial self-leave) the corresponding `join_requests` row can be left behind with `status='approved'`. That row is not cleaned up by any realtime handler, so `approvedReqs` keeps rendering the player forever even though `liveRoster` no longer contains them.
 
-### 1. Shrink card image height
-Reduce the card hero image from `h-44` to `h-28` (or `h-32` if content feels cramped). This is the biggest single vertical win.
+There is also no "remove" affordance for the host — RLS already permits `DELETE` on `game_participants` for hosts, but the UI never exposes it.
 
-### 2. Tighten internal padding
-Reduce card body padding from `p-4` to `p-3` and internal spacing from `space-y-3` to `space-y-2`.
+### Problem 2 — no host "remove player" UI
+Add a small "Remove" control on each roster row visible only to the host, with a confirmation dialog. Removing a player must clear both `game_participants` AND any leftover `join_requests` row for that player+game so the roster updates immediately across all viewers.
 
-### 3. Compact metadata rows
-- Reduce text size on date/location lines from `text-sm` to `text-xs`.
-- Shrink icon size from `h-4 w-4` to `h-3.5 w-3.5`.
-- Reduce host/avatar row size and spacing.
+### Changes
 
-### 4. Slim progress bar
-Keep the progress bar but reduce height from `h-1.5` to `h-1`.
+1. `src/lib/payments.ts`
+   - Add `hostRemoveParticipant({ gameId, playerId })`:
+     - `DELETE FROM game_participants WHERE game_id=? AND user_id=?`
+     - `DELETE FROM join_requests WHERE game_id=? AND player_id=?` (all statuses — cleans the "ghost approved" row that causes the stale render). RLS already permits both for the host.
+     - Best-effort: delete pending `payment_submissions` for that player+game so payment chips don't linger.
 
-### 5. Compact request status box
-For `RequestGameCard`, reduce the request status box padding from `p-3` to `p-2.5`, shrink timeline dot size, and make the action buttons smaller (`text-[10px]` / `px-2 py-0.5`).
+2. `src/routes/games.$gameId.index.tsx` — host roster section (lines ~1792-1875)
+   - Filter `approvedReqs` so it only renders rows whose `player_id` is present in `liveRoster` once `liveRoster` has hydrated. This is the actual fix for the stale-display bug — any join_request whose participant row is gone is dropped from the UI immediately, without waiting on any cleanup.
+   - When `isHost`, render a small trash/"Remove" icon-button on both branches (`RosterPlayerRow` and the live-roster `Link` rows). Clicking opens an `AlertDialog`:
+     - Confirm copy: "Remove {name} from this game? They'll be notified and their spot will open up."
+     - On confirm: optimistically call `removeRosterLocal(playerId)` + drop from `hostRequests`, then `await hostRemoveParticipant(...)`, then `void refetchRoster()` + refresh host requests. Rollback on error.
+     - Fire `createNotification({ user_id: playerId, type: 'participant_removed', title: 'Removed from {game.title}', body: 'The host removed you from the roster.', link: '/games/{id}' })`.
+   - The live-roster row is currently a whole-row `<Link>`; wrap children so the remove button uses `e.preventDefault(); e.stopPropagation()` to avoid navigating to the player profile when clicking Remove.
 
-### 6. Compact CTA bar
-Reduce the bottom CTA/quick-join bar from `py-2.5` to `py-2` and font from `text-sm` to `text-xs`.
+3. Realtime: no schema changes needed. `useLiveParticipants` already handles DELETE + resubscribe reload, so both the host's device and every other viewer will see the row disappear. The join_requests deletion is picked up by the existing `join_requests:host:<gameId>` channel which triggers `loadHostRequests()`.
 
-### 7. Preserve readability
-- Keep the title at `text-lg` font-bold (or drop to `text-base` only if necessary).
-- Keep sport/price badges at a readable size.
-- Keep hover/tap affordances intact.
+### Out of scope
+- No database migration; existing RLS policies already allow the host to delete from both tables.
+- No changes to the self-leave flow.
 
-## Files to edit
-- `src/components/GameCard.tsx`
-- `src/components/RequestGameCard.tsx`
-
-## Verification
-- Open `/profile` on mobile and desktop widths.
-- Confirm at least 2–3 cards are visible without scrolling on a typical phone viewport.
-- Confirm cards remain readable and tappable.
+### Technical notes
+- `hostRemoveParticipant` runs client-side (RLS-scoped) — matches the pattern used by `withdrawMyApprovedJoinRequest`.
+- Notification best-effort with `.catch(() => {})` so a notify failure doesn't roll back the remove.
