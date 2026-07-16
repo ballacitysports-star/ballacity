@@ -33,6 +33,7 @@ import {
   updateAvailability,
   type PlayerAvailability,
 } from "@/lib/availability";
+import { supabase } from "@/integrations/supabase/client";
 import { getOrCreateDirectConversation } from "@/lib/messages";
 import {
   Dialog,
@@ -126,8 +127,11 @@ function AvailablePlayersPage() {
 
 
   useEffect(() => {
-    let cancelled = false;
     setList(null);
+  }, [sport, city]);
+
+  useEffect(() => {
+    let cancelled = false;
     listOpenAvailabilities({ sport: sport || undefined, city: city.trim() || undefined })
       .then((rows) => {
         if (!cancelled) setList(rows);
@@ -142,6 +146,21 @@ function AvailablePlayersPage() {
       cancelled = true;
     };
   }, [sport, city, refreshKey]);
+
+  // Realtime: refresh list whenever any availability row changes.
+  useEffect(() => {
+    const channel = supabase
+      .channel("player-availabilities-feed")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "player_availabilities" },
+        () => setRefreshKey((k) => k + 1),
+      )
+      .subscribe();
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, []);
 
   return (
     <div className="mx-auto max-w-md px-4 pt-6 pb-32">
