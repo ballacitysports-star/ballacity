@@ -177,8 +177,8 @@ export function GameCard({ game, index = 0 }: { game: Game; index?: number }) {
           </div>
         </div>
 
-        <div className="p-4 space-y-3">
-          <div className="flex items-center gap-3 text-sm text-muted-foreground">
+        <div className="p-3 space-y-2">
+          <div className="flex items-center gap-3 text-xs text-muted-foreground">
             <span className="inline-flex items-center gap-1.5" suppressHydrationWarning>
               <Clock className="h-4 w-4 text-lime" />
               {formatWhen(game.date)}
