@@ -226,11 +226,7 @@ function AuthGate({ children }: { children: React.ReactNode }) {
 
   if (isPublic) return <>{children}</>;
   if (loading || !user) {
-    return (
-      <div className="grid min-h-dvh place-items-center bg-background">
-        <div className="h-8 w-8 animate-spin rounded-full border-2 border-muted border-t-foreground" />
-      </div>
-    );
+    return <AuthLoadingFallback pending={loading} />;
   }
   return (
     <>
