@@ -8,8 +8,6 @@ import {
   LogIn,
   LogOut,
   Clock,
-  Check,
-  X as XIcon,
 } from "lucide-react";
 import { ME, GAMES, type Game } from "@/lib/sample-data";
 import { GameCard } from "@/components/GameCard";
