@@ -321,20 +321,19 @@ function Profile() {
         </div>
 
         {/* Join request status (pending approvals + recent decisions) */}
-        {(pendingRequests.length > 0 || recentlyReviewed.length > 0) && (
+        {showRequests && (
           <div className="mt-6">
             <h2 className="font-display text-sm font-bold uppercase tracking-wider text-muted-foreground mb-2 flex items-center gap-1.5">
               <Clock className="h-4 w-4" /> Pending approvals
-              {pendingRequests.length > 0 && (
+              {pendingWithGame.length > 0 && (
                 <span className="ml-1 rounded-full bg-coral/15 px-2 py-0.5 text-[10px] font-bold text-coral">
-                  {pendingRequests.length}
+                  {pendingWithGame.length}
                 </span>
               )}
             </h2>
             <div className="space-y-3">
-              {pendingRequests.map((r, i) => {
-                const g = gameLookup.get(r.game_id);
-                if (!g) return null;
+              {pendingWithGame.map((r, i) => {
+                const g = gameLookup.get(r.game_id)!;
                 return (
                   <RequestGameCard
                     key={r.id}
@@ -353,15 +352,14 @@ function Profile() {
                   />
                 );
               })}
-              {recentlyReviewed.map((r, i) => {
-                const g = gameLookup.get(r.game_id);
-                if (!g) return null;
+              {reviewedWithGame.map((r, i) => {
+                const g = gameLookup.get(r.game_id)!;
                 return (
                   <RequestGameCard
                     key={r.id}
                     game={g}
                     request={r}
-                    index={pendingRequests.length + i}
+                    index={pendingWithGame.length + i}
                   />
                 );
               })}
