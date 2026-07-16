@@ -392,15 +392,22 @@ function TeamPage() {
           </div>
         )}
 
-        {/* Reviews tab */}
-        {tab === "reviews" && (
-          <ReviewsSection
-            revieweeId={org.id}
-            revieweeKind={org.kind === "coach" ? "trainer" : "team"}
-            revieweeName={org.name}
-            isOwner={canEdit}
-          />
-        )}
+        {/* Reviews popup */}
+        <Dialog open={reviewsOpen} onOpenChange={setReviewsOpen}>
+          <DialogContent className="max-h-[90dvh] overflow-y-auto p-0 sm:max-w-xl">
+            <DialogHeader className="sr-only">
+              <DialogTitle>Reviews</DialogTitle>
+            </DialogHeader>
+            <div className="p-4">
+              <ReviewsSection
+                revieweeId={org.id}
+                revieweeKind={org.kind === "coach" ? "trainer" : "team"}
+                revieweeName={org.name}
+                isOwner={canEdit}
+              />
+            </div>
+          </DialogContent>
+        </Dialog>
       </div>
     </div>
   );
