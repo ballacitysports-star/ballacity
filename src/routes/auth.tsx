@@ -27,7 +27,24 @@ function AuthPage() {
   const [busy, setBusy] = useState(false);
 
   const goPostAuth = () => {
-    const dest = sanitizeNextPath(next) ?? "/profile";
+    let dest = sanitizeNextPath(next);
+    if (!dest) {
+      // Some mobile in-app browsers strip the `next` query on redirects;
+      // fall back to a same-origin referrer, then to the in-app default
+      // surface (/feed) so users never get bounced back to marketing.
+      try {
+        const ref = document.referrer;
+        if (ref) {
+          const u = new URL(ref);
+          if (u.origin === window.location.origin) {
+            dest = sanitizeNextPath(`${u.pathname}${u.search}${u.hash}`);
+          }
+        }
+      } catch {
+        /* ignore */
+      }
+    }
+    if (!dest) dest = "/feed";
     // Hard reload keeps mobile webviews / OAuth popups in sync with the
     // freshly-hydrated session; a client-side navigate can race with the
     // AuthGate's own loading flip.
