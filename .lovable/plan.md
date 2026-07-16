@@ -1,47 +1,67 @@
 ## Goal
-Add a clearly visible "Leave" / "Cancel request" control on every screen of the join flow, so a player can back out at any stage (pending request, approved-awaiting-payment, payment submitted, verified) without hunting for the sticky bar on the game details page.
 
-Today, the only place that exposes cancel/withdraw is the sticky CTA on `/games/$gameId`. Once a player advances to `/games/$gameId/pay` (or is deep-linked there from an invite/notification), there is no exit — they must navigate back and find the sticky bar. This plan fixes that.
+On mobile Safari and Chrome, refreshing any protected page (e.g. `/feed`, `/games/:id`, `/messages/:id`) currently drops the user onto the landing page at `/`. It works correctly on desktop. Fix it so refresh always keeps the user on the same URL.
 
-## Scope
+## Root-cause hypothesis
 
-Frontend / presentation only. No schema or business-logic changes — reuses existing `cancelMyJoinRequest` and `withdrawMyApprovedJoinRequest` in `src/lib/payments.ts`.
+The app never explicitly navigates a signed-in user to `/`. Two mobile-only conditions can strand them there today:
 
-## Changes
+1. **OneSignal service worker intercepts navigation requests.** `public/OneSignalSDKWorker.js` only bypasses `/~oauth/*`. On mobile browsers the SW is registered and OneSignal's imported worker installs a broad `fetch` handler; on refresh under flaky mobile networks it can serve a cached shell that resolves to the landing route.
+2. **Supabase session hydration races on mobile.** `useAuth` reads `getSession()` from localStorage. On mobile Safari (ITP) and Chrome Android, storage can be evicted or arrive after first paint, so `AuthGate` sees `user = null` briefly. Today that redirects to `/auth`, but combined with `window.location.replace` in `auth.tsx` and lost `next` params on some in-app browsers, the fallback resolves to a public route. The user then perceives it as "sent home".
 
-### 1. New shared control: `LeaveFlowButton`
-`src/components/LeaveFlowButton.tsx` — small button + `AlertDialog` confirmation that:
-- Reads `useMyFlowStatus(gameId)` to pick the correct action and copy:
-  - `requested` (pending) → "Cancel request" → `cancelMyJoinRequest`
-  - `approved` / `payment_*` (approved, not yet verified) → "Withdraw from game" → `withdrawMyApprovedJoinRequest` (+ best-effort delete of the latest pending `payment_submissions` row so the pay screen resets)
-  - `confirmed` (verified / on roster) → "Leave game" → `withdrawMyApprovedJoinRequest` + `leaveGame(gameId)`
-  - `none` / `rejected` → render nothing
-- Shows a toast on success/error, then navigates back to `/games/$gameId` (configurable via prop).
-- Variants: `"link"` (compact text link for headers/footers) and `"danger"` (full-width `PrimaryCTA` for sticky footers).
+## What to change
 
-### 2. Pay screen (`src/routes/games.$gameId.pay.tsx`)
-- Add a compact `LeaveFlowButton variant="link"` in the header row next to `PayFlowPillHeader`, so it's always reachable regardless of stage (waiting for approval, picking method, submitting proof, awaiting verification).
-- In the approval-gate card (`approvalGateActive` branch, ~line 524), add a secondary "Cancel request" link under the "Back to game" button when `myReq.status === "pending"`.
-- In `PaymentInstructionsAndProof` footer (near the existing `onCancel` "back" link, ~line 1117), keep the current "Back to methods" cancel and add a separate "Withdraw from game" link that triggers the shared button's flow.
+### 1. Stop the OneSignal SW from touching page navigations
 
-### 3. Game details sticky bar (`src/routes/games.$gameId.index.tsx`)
-- No behavior change to the existing sticky CTA. Add a small `LeaveFlowButton variant="link"` under the "Payment pending · Tap to withdraw" / "Request pending · Tap to cancel" hint so the leave path is discoverable as its own affordance (some users don't realize tapping the primary CTA cancels).
+`public/OneSignalSDKWorker.js`
 
-### 4. Requests list card (`src/components/RequestGameCard.tsx`)
-Already exposes Cancel for pending requests. Extend the player-side (`!isHost`) branch to also render a "Withdraw" button when `request.status === "approved"` (currently only pending shows an action). Wire it to a new `onWithdraw` prop; the parent page (requests list in `_tabs.profile.tsx` / wherever this is used) passes `withdrawMyApprovedJoinRequest`.
+- Register a `fetch` listener BEFORE `importScripts` that short-circuits every `request.mode === "navigate"` request straight to the network (`event.respondWith(fetch(event.request))`). Keep the existing `/~oauth/*` bypass.
+- This guarantees the SW cannot serve a cached shell for `/feed`, `/games/:id`, etc.
 
-### 5. Copy & confirmation
-Confirmation dialog copy varies by stage:
-- Cancel request: "Cancel your request to join {title}? You can request again later."
-- Withdraw before payment verified: "Withdraw from {title}? Your spot will be released and any pending payment submission will be cleared."
-- Leave confirmed: existing "Leave this game?" copy reused.
+### 2. Make `AuthGate` refresh-safe on mobile
 
-## Non-goals
-- No refund logic — the withdraw dialog explicitly says "contact the host about refunds" when a verified payment exists (matches current behavior).
-- No changes to host-side approve/decline.
-- No schema, RLS, or server-function changes.
+`src/routes/__root.tsx`
+
+- In `AuthGate`, do not redirect to `/auth` on the very first `loading → false` transition when `user` is `null`. Instead:
+  - Track a `verifying` state and re-check `supabase.auth.getSession()` once more (mobile hydration can lag one tick behind the store's `loading` flip).
+  - Only after that second check still returns no session do we navigate to `/auth`.
+- When we do navigate, keep the current behavior of preserving `next` via `sanitizeNextPath`, and use `router.navigate({ replace: true })` (already there).
+- Keep `AuthLoadingFallback` unchanged — the retry UI already handles the long-tail case.
+
+### 3. Make post-auth redirect resilient on mobile
+
+`src/routes/auth.tsx`
+
+- In `goPostAuth`, if `next` is missing, fall back to `document.referrer` when it is same-origin and passes `sanitizeNextPath`, then finally `/feed` (not `/profile`). `/feed` is the in-app default surface and matches what desktop lands on.
+- Keep `window.location.replace` for the hard reload behavior mobile needs.
+
+### 4. Never bounce a signed-in visitor off `/`
+
+`src/routes/index.tsx`
+
+- Landing is public and shows a marketing page. Leave it public, but if the user is already signed in (from `useAuth`), render a small "Continue to app" affordance pointing to `/feed` so a mobile user who somehow lands here has a one-tap way back. Do NOT auto-redirect — that would break the marketing page for signed-in users who intentionally visited `/`.
+
+### 5. Lightweight telemetry to confirm the fix
+
+`src/routes/__root.tsx`
+
+- When `AuthGate` decides to redirect to `/auth`, log a single `console.warn` including `pathname`, `document.visibilityState`, and whether `localStorage` contained the Supabase session key. This gives us a signal in the browser console if the bug recurs on a specific device.
+
+## Files touched
+
+- `public/OneSignalSDKWorker.js` — add navigation bypass.
+- `src/routes/__root.tsx` — second-chance session check in `AuthGate`, warn on forced redirect.
+- `src/routes/auth.tsx` — smarter `next` fallback (`document.referrer` → `/feed`).
+- `src/routes/index.tsx` — session-aware "Continue to app" affordance.
+
+## Out of scope
+
+- Adding a PWA manifest or reworking service worker strategy beyond the navigation bypass.
+- Changing auth providers or the Supabase storage adapter.
+- Any backend/RLS changes.
 
 ## Verification
-- Typecheck (`bunx tsgo --noEmit`).
-- Manual: pending → cancel from pay screen; approved+unpaid → withdraw from pay screen; verified → leave from pay screen; pending → withdraw from requests list card.
-- Existing e2e specs (`leave-*`, `pay-*`, `invite-request-*`) should still pass — no changes to selectors or primary CTAs.
+
+- Desktop: hard refresh on `/feed`, `/games/:id`, `/messages/:id`, `/profile` — stays on the same URL (regression check).
+- Mobile Safari and Chrome Android: same refresh matrix — stays on the same URL; if signed out, lands on `/auth` and after sign-in returns to the original URL, never `/`.
+- Signed-in user manually visits `/` on mobile — sees landing with a "Continue to app" button, no forced redirect.
