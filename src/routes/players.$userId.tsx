@@ -260,9 +260,9 @@ function PlayerProfilePage() {
           ))}
         </div>
 
-        {/* Reputation badge */}
+        {/* Reputation badge (opens reviews popup) */}
         <div className="mt-4">
-          <ReputationBadge rep={rep} />
+          <ReputationBadge rep={rep} onClick={() => setReviewsOpen(true)} />
         </div>
 
         {/* Open availability */}
