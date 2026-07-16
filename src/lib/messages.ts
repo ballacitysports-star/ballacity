@@ -25,7 +25,19 @@ export type Message = {
   attachment_type?: string | null;
   attachment_name?: string | null;
   attachment_size?: number | null;
+  reply_to_id?: string | null;
+  deleted_at?: string | null;
+  is_request?: boolean;
 };
+
+export type MessageReaction = {
+  message_id: string;
+  user_id: string;
+  emoji: string;
+};
+
+export const REACTION_EMOJIS = ["❤️", "😂", "😮", "😢", "🔥", "👍"] as const;
+
 
 export type Attachment = {
   path: string;
