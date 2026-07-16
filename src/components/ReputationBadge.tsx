@@ -16,7 +16,7 @@ function Stars({ value, size = 12 }: { value: number; size?: number }) {
   );
 }
 
-export function ReputationBadge({ rep, compact = false }: { rep: Reputation; compact?: boolean }) {
+export function ReputationBadge({ rep, compact = false, onClick }: { rep: Reputation; compact?: boolean; onClick?: () => void }) {
   const TrendIcon =
     rep.recentTrend === "up" ? TrendingUp : rep.recentTrend === "down" ? TrendingDown : Minus;
   const trendColor =
@@ -27,11 +27,14 @@ export function ReputationBadge({ rep, compact = false }: { rep: Reputation; com
         : "text-muted-foreground";
 
   if (compact) {
+    const Component = onClick ? motion.button : motion.div;
     return (
-      <motion.div
+      <Component
+        type={onClick ? "button" : undefined}
+        onClick={onClick}
         initial={{ opacity: 0, y: 6 }}
         animate={{ opacity: 1, y: 0 }}
-        className="flex items-center gap-3 rounded-2xl border border-border bg-surface p-3"
+        className={`flex items-center gap-3 rounded-2xl border border-border bg-surface p-3 text-left transition-all hover:border-lime/40 ${onClick ? "cursor-pointer" : ""}`}
       >
         <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-lime/15 font-display text-sm font-bold text-lime">
           {rep.trustScore}
@@ -58,15 +61,18 @@ export function ReputationBadge({ rep, compact = false }: { rep: Reputation; com
           )}
         </div>
         <TrendIcon className={`h-3.5 w-3.5 shrink-0 ${trendColor}`} />
-      </motion.div>
+      </Component>
     );
   }
 
+  const Component = onClick ? motion.button : motion.div;
   return (
-    <motion.div
+    <Component
+      type={onClick ? "button" : undefined}
+      onClick={onClick}
       initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
-      className="rounded-2xl border border-border bg-surface p-4"
+      className={`rounded-2xl border border-border bg-surface p-4 text-left transition-all hover:border-lime/40 ${onClick ? "cursor-pointer" : ""}`}
     >
       <div className="flex items-center justify-between gap-3">
         <div className="flex items-center gap-3">
@@ -118,6 +124,6 @@ export function ReputationBadge({ rep, compact = false }: { rep: Reputation; com
       {rep.count > 0 && (
         <p className="mt-2 text-xs text-foreground/80 leading-snug">{rep.aiSummary}</p>
       )}
-    </motion.div>
+    </Component>
   );
 }

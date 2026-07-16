@@ -8,6 +8,7 @@ import {
   LogIn,
   LogOut,
   Clock,
+  Star,
 } from "lucide-react";
 import { ME, GAMES, type Game } from "@/lib/sample-data";
 import { GameCard } from "@/components/GameCard";
@@ -26,6 +27,12 @@ import { readOverrides, useMyProfile } from "@/lib/user-prefs-store";
 import { ProfileLinksList } from "@/components/ProfileLinks";
 import { listMyJoinRequests, cancelMyJoinRequest, type JoinRequest } from "@/lib/payments";
 import { supabase } from "@/integrations/supabase/client";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 export const Route = createFileRoute("/_tabs/profile")({
   head: () => ({ meta: [{ title: "Profile — OpenRun" }] }),
@@ -37,6 +44,7 @@ function Profile() {
   const myRep = useMemo(() => computeReputation(myReviews, "player"), [myReviews]);
   const { user, loading } = useAuth();
   const [confirmedUser, setConfirmedUser] = useState<User | null>(null);
+  const [reviewsOpen, setReviewsOpen] = useState(false);
   const profileUser = user ?? confirmedUser;
   const me = useMyProfile(profileUser);
   const joinedGameIds = useJoinedGameIds();
@@ -299,25 +307,34 @@ function Profile() {
         )}
 
         {/* Stats */}
-        <div className="mt-5 grid grid-cols-4 gap-2">
+        <div className="mt-5 grid grid-cols-5 gap-2">
           {[
             { k: me.stats.played, v: "Games" },
             { k: me.stats.reliability + "%", v: "Reliable" },
             { k: me.stats.sportsmanship, v: "Sport" },
             { k: me.stats.friends, v: "Crew" },
-          ].map((s) => (
-            <div key={s.v} className="rounded-2xl border border-border bg-surface p-3 text-center">
+            { k: myRep.count, v: "Reviews" },
+          ].map((s, i) => (
+            <button
+              key={s.v}
+              type="button"
+              onClick={s.v === "Reviews" ? () => setReviewsOpen(true) : undefined}
+              className={`rounded-2xl border border-border bg-surface p-3 text-center transition-all hover:border-lime/40 ${
+                s.v === "Reviews" ? "cursor-pointer" : ""
+              }`}
+            >
               <div className="font-display text-lg font-bold">{s.k}</div>
-              <div className="text-[10px] uppercase tracking-wider text-muted-foreground">
+              <div className="text-[10px] uppercase tracking-wider text-muted-foreground flex items-center justify-center gap-1">
+                {s.v === "Reviews" && <Star className="h-3 w-3" />}
                 {s.v}
               </div>
-            </div>
+            </button>
           ))}
         </div>
 
         {/* Reputation badge (above the fold) */}
         <div className="mt-4">
-          <ReputationBadge rep={myRep} />
+          <ReputationBadge rep={myRep} onClick={() => setReviewsOpen(true)} />
         </div>
 
         {/* Join request status (pending approvals + recent decisions) */}
@@ -471,8 +488,22 @@ function Profile() {
           </div>
         </div>
 
-        {/* Reviews */}
-        <ReviewsSection revieweeId="me" revieweeKind="player" revieweeName={me.name} isOwner />
+        {/* Reviews popup */}
+        <Dialog open={reviewsOpen} onOpenChange={setReviewsOpen}>
+          <DialogContent className="max-h-[90dvh] overflow-y-auto p-0 sm:max-w-xl">
+            <DialogHeader className="sr-only">
+              <DialogTitle>Reviews</DialogTitle>
+            </DialogHeader>
+            <div className="p-4">
+              <ReviewsSection
+                revieweeId="me"
+                revieweeKind="player"
+                revieweeName={me.name}
+                isOwner
+              />
+            </div>
+          </DialogContent>
+        </Dialog>
       </div>
     </div>
   );
