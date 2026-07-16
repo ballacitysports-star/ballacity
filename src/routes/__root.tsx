@@ -246,24 +246,59 @@ function AuthGate({ children }: { children: React.ReactNode }) {
     pathname === "/" ||
     PUBLIC_ROUTES.some((p) => p !== "/" && (pathname === p || pathname.startsWith(`${p}/`)));
   const isTab = TAB_PATHS.includes(pathname);
+  // Second-chance verification: on mobile Safari/Chrome the Supabase session
+  // can hydrate one tick after `loading` flips to false. Redirecting to
+  // /auth on that first tick would strand refreshed protected pages. We
+  // re-check `getSession()` once before giving up.
+  const [verifying, setVerifying] = useState(false);
   useNotificationPush();
   useOneSignal();
 
   useEffect(() => {
     if (loading) return;
-    if (user) return;
+    if (user) {
+      if (verifying) setVerifying(false);
+      return;
+    }
     if (isPublic) return;
-    // Guard against re-entry: don't queue another redirect while already
-    // navigating to /auth, and never point `next` back at the auth flow.
     if (pathname === "/auth") return;
-    const href = router.state.location.href;
-    const safeNext = sanitizeNextPath(href);
-    router.navigate({
-      to: "/auth",
-      search: safeNext ? { next: safeNext } : {},
-      replace: true,
+
+    let cancelled = false;
+    setVerifying(true);
+    supabase.auth.getSession().then(({ data }) => {
+      if (cancelled) return;
+      if (data.session?.user) {
+        // Session hydrated late — useAuth's listener will pick it up.
+        setVerifying(false);
+        return;
+      }
+      // Telemetry: help diagnose recurrences on specific devices.
+      try {
+        const projectRef = (import.meta.env.VITE_SUPABASE_PROJECT_ID ?? "") as string;
+        const storageKey = projectRef ? `sb-${projectRef}-auth-token` : "";
+        const hasStored = storageKey ? !!window.localStorage.getItem(storageKey) : "unknown";
+        // eslint-disable-next-line no-console
+        console.warn("[AuthGate] redirecting to /auth", {
+          pathname,
+          visibility: document.visibilityState,
+          hasStoredSession: hasStored,
+        });
+      } catch {
+        /* ignore */
+      }
+      const href = router.state.location.href;
+      const safeNext = sanitizeNextPath(href);
+      router.navigate({
+        to: "/auth",
+        search: safeNext ? { next: safeNext } : {},
+        replace: true,
+      });
+      setVerifying(false);
     });
-  }, [loading, user, isPublic, router, pathname]);
+    return () => {
+      cancelled = true;
+    };
+  }, [loading, user, isPublic, router, pathname, verifying]);
 
   useEffect(() => {
     if (user && !isPublic && !isTab) {
@@ -277,8 +312,8 @@ function AuthGate({ children }: { children: React.ReactNode }) {
   }, [user, isPublic, isTab]);
 
   if (isPublic) return <>{children}</>;
-  if (loading || !user) {
-    return <AuthLoadingFallback pending={loading} />;
+  if (loading || verifying || !user) {
+    return <AuthLoadingFallback pending={loading || verifying} />;
   }
   return (
     <>
