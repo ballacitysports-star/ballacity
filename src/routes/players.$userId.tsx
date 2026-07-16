@@ -50,6 +50,7 @@ function PlayerProfilePage() {
   const [availability, setAvailability] = useState<PlayerAvailability | null>(null);
   const [loading, setLoading] = useState(true);
   const [opening, setOpening] = useState(false);
+  const [reviewsOpen, setReviewsOpen] = useState(false);
 
   const overrides = useProfileOverrides(userId);
   const reviews = useReviewsFor(userId);
