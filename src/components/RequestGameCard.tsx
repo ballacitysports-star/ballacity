@@ -38,6 +38,7 @@ export function RequestGameCard({
   index = 0,
   isHost,
   onCancel,
+  onWithdraw,
   onApprove,
   onDecline,
 }: {
@@ -46,10 +47,11 @@ export function RequestGameCard({
   index?: number;
   isHost?: boolean;
   onCancel?: () => void;
+  onWithdraw?: () => void;
   onApprove?: () => void;
   onDecline?: () => void;
 }) {
-  return <RequestGameCardInner game={game} request={request} index={index} isHost={isHost} onCancel={onCancel} onApprove={onApprove} onDecline={onDecline} />;
+  return <RequestGameCardInner game={game} request={request} index={index} isHost={isHost} onCancel={onCancel} onWithdraw={onWithdraw} onApprove={onApprove} onDecline={onDecline} />;
 }
 
 function formatTs(ts: string) {
@@ -94,6 +96,7 @@ function RequestGameCardInner({
   index = 0,
   isHost,
   onCancel,
+  onWithdraw,
   onApprove,
   onDecline,
 }: {
@@ -102,6 +105,7 @@ function RequestGameCardInner({
   index?: number;
   isHost?: boolean;
   onCancel?: () => void;
+  onWithdraw?: () => void;
   onApprove?: () => void;
   onDecline?: () => void;
 }) {
@@ -279,6 +283,19 @@ function RequestGameCardInner({
                 </button>
               )}
             </div>
+          )}
+          {isApproved && !isHost && onWithdraw && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                onWithdraw();
+              }}
+              className="rounded-full border border-coral/40 bg-coral/10 px-3 py-1 text-xs font-semibold text-coral hover:bg-coral/20"
+            >
+              Withdraw
+            </button>
           )}
         </div>
       </div>

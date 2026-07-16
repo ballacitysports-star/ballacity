@@ -21,6 +21,7 @@ import {
 import { LegalNotice } from "@/components/LegalNotice";
 import { PrimaryCTA } from "@/components/PrimaryCTA";
 import { SpotsPill } from "@/components/SpotsPill";
+import { LeaveFlowButton } from "@/components/LeaveFlowButton";
 
 import { useLiveParticipantCount } from "@/lib/game-participants-store";
 
@@ -455,6 +456,7 @@ function PayPage() {
           <div className="text-xs text-muted-foreground truncate">{game.location}</div>
         </div>
         <PayFlowPillHeader gameId={gameId} />
+        <LeaveFlowButton gameId={gameId} gameTitle={game.title} variant="link" navigateTo={`/games/${game.id}`} />
       </div>
 
       <PayFlowStepper gameId={gameId} />
@@ -538,13 +540,23 @@ function PayPage() {
                 ? "The host declined your request. You can't submit payment for this game."
                 : "This host reviews every player before payment. Send a request to join first."}
           </p>
-          <Link
-            to="/games/$gameId"
-            params={{ gameId: game.id }}
-            className="mt-3 inline-flex items-center rounded-full bg-lime-gradient px-4 py-1.5 text-xs font-bold text-primary-foreground"
-          >
-            {myReq ? "Back to game" : "Request to join"}
-          </Link>
+          <div className="mt-3 flex items-center gap-3 flex-wrap">
+            <Link
+              to="/games/$gameId"
+              params={{ gameId: game.id }}
+              className="inline-flex items-center rounded-full bg-lime-gradient px-4 py-1.5 text-xs font-bold text-primary-foreground"
+            >
+              {myReq ? "Back to game" : "Request to join"}
+            </Link>
+            {myReq?.status === "pending" && (
+              <LeaveFlowButton
+                gameId={game.id}
+                gameTitle={game.title}
+                variant="link"
+                navigateTo={`/games/${game.id}`}
+              />
+            )}
+          </div>
         </div>
       ) : fetching ? (
         <div className="rounded-2xl border border-dashed border-border bg-surface/40 p-5 text-center text-sm text-muted-foreground">
@@ -629,6 +641,7 @@ function PayPage() {
       ) : (
         <PaymentInstructionsAndProof
           game_id={game.id}
+          game_title={game.title}
           host_id={settings.host_id}
           method={picked}
           extraInstructions={settings.payment_instructions}
@@ -850,6 +863,7 @@ function PaymentStatusTimeline({
 
 function PaymentInstructionsAndProof({
   game_id,
+  game_title,
   host_id,
   method,
   extraInstructions,
@@ -857,6 +871,7 @@ function PaymentInstructionsAndProof({
   onSubmitted,
 }: {
   game_id: string;
+  game_title: string;
   host_id: string;
   method: PaymentMethod;
   extraInstructions: string | null;
@@ -1315,6 +1330,14 @@ function PaymentInstructionsAndProof({
               : "I have paid"}
         </PrimaryCTA>
       </form>
+      <div className="flex justify-center pt-1">
+        <LeaveFlowButton
+          gameId={game_id}
+          gameTitle={game_title}
+          variant="link"
+          navigateTo={`/games/${game_id}`}
+        />
+      </div>
     </div>
   );
 }
