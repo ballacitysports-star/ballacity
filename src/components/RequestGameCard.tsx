@@ -146,28 +146,28 @@ function RequestGameCardInner({
               className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-105"
             />
             <div className="absolute inset-0 bg-gradient-to-t from-surface via-surface/30 to-transparent" />
-            <div className="absolute top-3 left-3 flex flex-wrap gap-1.5">
-              <span className="inline-flex items-center gap-1 rounded-full bg-background/70 backdrop-blur px-2.5 py-1 text-xs font-semibold">
-                <span>{sportEmoji[game.sport]}</span>
-                {game.sport}
+          <div className="absolute top-2 left-2 flex flex-wrap gap-1">
+            <span className="inline-flex items-center gap-1 rounded-full bg-background/70 backdrop-blur px-2 py-0.5 text-[11px] font-semibold">
+              <span>{sportEmoji[game.sport]}</span>
+              {game.sport}
+            </span>
+          </div>
+          <div className="absolute top-2 right-2">
+            {game.price === 0 ? (
+              <span className="rounded-full bg-lime px-2 py-0.5 text-[11px] font-bold text-primary-foreground">
+                FREE
               </span>
-            </div>
-            <div className="absolute top-3 right-3">
-              {game.price === 0 ? (
-                <span className="rounded-full bg-lime px-2.5 py-1 text-xs font-bold text-primary-foreground">
-                  FREE
-                </span>
-              ) : (
-                <span className="rounded-full bg-background/70 backdrop-blur px-2.5 py-1 text-xs font-bold">
-                  ${game.price}
-                </span>
-              )}
-            </div>
-            <div className="absolute bottom-3 left-3 right-3">
-              <h3 className="font-display text-xl font-bold text-foreground drop-shadow-lg">
-                {game.title}
-              </h3>
-            </div>
+            ) : (
+              <span className="rounded-full bg-background/70 backdrop-blur px-2 py-0.5 text-[11px] font-bold">
+                ${game.price}
+              </span>
+            )}
+          </div>
+          <div className="absolute bottom-2 left-3 right-3">
+            <h3 className="font-display text-lg font-bold text-foreground drop-shadow-lg">
+              {game.title}
+            </h3>
+          </div>
           </div>
 
           <div className="p-4 space-y-3">
