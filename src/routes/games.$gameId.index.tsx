@@ -933,8 +933,20 @@ function GameDetail() {
           </div>
         )}
 
-        {/* Approval status banner (player view) */}
-        {!isHost && requiresApproval && myReq && (
+        {/* Approval status banner (player view).
+            For paid games, once the host approves the join request the
+            player still owes payment — PaymentRequiredBanner + PlayerFlowPill
+            above already communicate the true state (Payment due / Awaiting
+            review / Declined), so suppress the "approved — on the roster"
+            copy here to avoid contradicting them. */}
+        {!isHost &&
+          requiresApproval &&
+          myReq &&
+          !(
+            myReq.status === "approved" &&
+            isPaid &&
+            latestSub?.status !== "verified"
+          ) && (
           <div
             className={`rounded-2xl border p-4 flex items-start gap-3 ${
               myReq.status === "pending"

@@ -1,79 +1,27 @@
-## Goal
+## Bug
 
-After a player joins a game, notify them if payment is required and reflect the full join → payment flow inline everywhere player-facing.
+On paid games with `requires_approval`, once the host approves the join request the ad-hoc "Approval status banner" in `src/routes/games.$gameId.index.tsx` (lines 936–978) renders:
 
-## Flow states (single source of truth)
+> ✅ You're approved — see you there!
+> The host approved your request. You're on the roster.
 
-Compute a `PlayerFlowStatus` per (game, user) from existing data — no schema changes:
+This is wrong for paid games — being approved to *request* a spot is not the same as the host confirming payment. `PlayerFlowPill` + `PaymentRequiredBanner` already reflect the correct `payment_pending` state right above it, so the stale "approved" copy directly contradicts them and misleads the player into thinking they're locked in.
 
-```text
-none → requested → approved → payment_pending → payment_submitted → payment_verified → confirmed
-                 ↘ rejected                    ↘ payment_rejected
-```
+## Fix
 
-- `requested` = pending `join_requests` row
-- `approved` = approved `join_requests` row, game requires payment, no submission yet → `payment_pending`
-- `approved` + no fee → `confirmed`
-- `payment_submitted` = latest `payment_submissions.status = 'pending'`
-- `payment_verified` = latest submission verified → `confirmed`
-- `payment_rejected` = latest submission rejected → back to `payment_pending`
-- `rejected` = join_request rejected
+Scope: presentation only, `src/routes/games.$gameId.index.tsx`.
 
-Add `src/lib/game-flow-status.ts` with:
-- `type PlayerFlowStatus` and `FlowStep` metadata (label, tone, icon)
-- `computePlayerFlowStatus({ joinRequest, submissions, settings, isJoined })`
-- `useMyFlowStatus(gameId)` hook that subscribes to join_requests + payment_submissions realtime and returns the derived status
+1. In the "Approval status banner" block, skip the `approved` branch when the game is paid AND the viewer's latest submission is not `verified` (i.e. `isPaid && latestSub?.status !== "verified"`). The `PaymentRequiredBanner` + `PlayerFlowPill` above already communicate the true state ("Payment due" / "Awaiting review" / "Payment declined").
+2. Keep the `approved` branch for free games (still valid: "You're on the roster").
+3. Keep the `pending` and `rejected` branches unchanged for all games.
+4. Tighten the approved copy's second line so it never claims roster confirmation on a paid game path — e.g. render nothing on the approved branch for paid games, and leave the free-game copy as-is.
 
-## Post-join payment notification
+No changes to `game-flow-status.ts`, `PlayerFlowPill`, `PaymentRequiredBanner`, or business logic. No DB or store changes.
 
-In `src/lib/games-store.ts` `joinGame` (or its call sites in `games.$gameId.index.tsx` and the invite deep-link handler), after successful join:
+## Verification
 
-1. Read `getGamePaymentSettings(gameId)`.
-2. If `entry_fee > 0` and no verified submission:
-   - `toast.success("You're in — payment required", { description: "$X due by <deadline>", action: { label: "Pay now", onClick: () => navigate({ to: "/games/$gameId/pay", params: { gameId } }) }, duration: 10000 })`
-3. Render a persistent inline banner (new `src/components/PaymentRequiredBanner.tsx`) at the top of the roster/status card whenever `status === "payment_pending" | "payment_rejected"`. Banner shows amount, deadline countdown, "Pay now" primary CTA, and dismiss-per-session.
-
-## Inline roster status pills
-
-New `src/components/PlayerFlowPill.tsx` — small pill with icon + label + tone:
-
-| Status              | Label            | Tone     |
-| ------------------- | ---------------- | -------- |
-| requested           | Requested        | muted    |
-| approved            | Approved         | info     |
-| payment_pending     | Payment due      | warning  |
-| payment_submitted   | Awaiting review  | info     |
-| payment_verified    | Paid             | success  |
-| confirmed           | Confirmed        | success  |
-| payment_rejected    | Payment declined | destruct |
-| rejected            | Not approved     | destruct |
-
-Wire it into every player-facing surface:
-
-- **`src/routes/games.$gameId.index.tsx`** roster list — pill next to each participant. Host sees every player's full status (host-scoped fetch); non-host players see their own real status inline and other players show as `Confirmed`. Also show the pill in the current user's own "your status" card, replacing the ad-hoc badges already there.
-- **`src/components/GameCard.tsx`** — status chip in the corner using `useMyFlowStatus(game.id)` when signed in and the user has any relationship to the game (join request or participant).
-- **`src/routes/games.$gameId.pay.tsx`** — header pill + step indicator (Requested → Approved → Pay → Verified) using the same status. Replace the current bespoke "Awaiting host approval" / "Submitted" copy with the shared component.
-- **`src/routes/_tabs.notifications.tsx`** / host join-request review list — show the same pill for consistency.
-
-## Realtime
-
-`useMyFlowStatus` subscribes to:
-- `join_requests` filtered by `player_id=eq.<uid>` and `game_id=eq.<gid>`
-- `payment_submissions` filtered by `player_id=eq.<uid>` and `game_id=eq.<gid>`
-
-so every surface using the hook auto-updates when the host approves, or when a submission is verified/rejected, without a reload.
-
-## Files
-
-Create:
-- `src/lib/game-flow-status.ts`
-- `src/components/PlayerFlowPill.tsx`
-- `src/components/PaymentRequiredBanner.tsx`
-
-Edit:
-- `src/routes/games.$gameId.index.tsx` (post-join toast, banner, roster pills, replace own-status badges)
-- `src/routes/games.$gameId.pay.tsx` (header pill + step indicator)
-- `src/components/GameCard.tsx` (status chip)
-- `src/lib/games-store.ts` (surface payment-required signal from `joinGame`, or leave to caller — decide during impl based on existing return type)
-
-No DB migrations. No changes to business logic — only presentation and post-join notification.
+- Paid + `requires_approval` game, host approves but no payment submitted: only `PaymentRequiredBanner` ("Payment required — Pay $X now") and `PlayerFlowPill` ("Payment due") render. The "You're approved — on the roster" banner is gone.
+- Paid game, submission `pending`: pill shows "Awaiting review"; approved banner still suppressed.
+- Paid game, submission `verified`: pill shows "Paid"; approved banner may render (or stays suppressed — either is fine since pill already says Paid).
+- Free + `requires_approval` game, host approves: existing "You're approved — see you there!" banner still renders.
+- `pending` and `rejected` join-request states unchanged in all cases.
