@@ -277,8 +277,8 @@ function PlayerProfilePage() {
           {[
             { k: stats.played, v: "Games" },
             { k: stats.reliability + "%", v: "Reliable" },
-            { k: stats.sportsmanship, v: "Sport" },
-            { k: stats.friends, v: "Crew" },
+            { k: follow.followers, v: "Followers" },
+            { k: follow.following, v: "Following" },
           ].map((s) => (
             <div key={s.v} className="rounded-2xl border border-border bg-surface p-3 text-center">
               <div className="font-display text-lg font-bold">{s.k}</div>
