@@ -41,6 +41,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 export const Route = createFileRoute("/_tabs/profile")({
   head: () => ({ meta: [{ title: "Profile — OpenRun" }] }),
@@ -83,6 +84,7 @@ function Profile() {
   const [myRequests, setMyRequests] = useState<JoinRequest[]>([]);
   const [hostRequests, setHostRequests] = useState<JoinRequest[]>([]);
   const [requestsLoading, setRequestsLoading] = useState(true);
+  const [requestFilter, setRequestFilter] = useState<"all" | "host" | "player">("all");
   const refreshRequests = async () => {
     if (!profileUser) {
       setMyRequests([]);
@@ -146,8 +148,13 @@ function Profile() {
   }, [hosted]);
 
   const allRequests = useMemo(() => [...myRequests, ...hostRequests], [myRequests, hostRequests]);
-  const pendingRequests = allRequests.filter((r) => r.status === "pending");
-  const recentlyReviewed = allRequests.filter((r) => r.status !== "pending").slice(0, 3);
+  const filteredRequests = useMemo(() => {
+    if (requestFilter === "all") return allRequests;
+    if (requestFilter === "host") return hostRequests;
+    return myRequests;
+  }, [requestFilter, allRequests, hostRequests, myRequests]);
+  const pendingRequests = filteredRequests.filter((r) => r.status === "pending");
+  const recentlyReviewed = filteredRequests.filter((r) => r.status !== "pending").slice(0, 3);
   const pendingWithGame = pendingRequests.filter((r) => gameLookup.has(r.game_id));
   const reviewedWithGame = recentlyReviewed.filter((r) => gameLookup.has(r.game_id));
 
