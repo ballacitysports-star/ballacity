@@ -862,6 +862,7 @@ function PaymentStatusTimeline({
 
 function PaymentInstructionsAndProof({
   game_id,
+  game_title,
   host_id,
   method,
   extraInstructions,
@@ -869,6 +870,7 @@ function PaymentInstructionsAndProof({
   onSubmitted,
 }: {
   game_id: string;
+  game_title: string;
   host_id: string;
   method: PaymentMethod;
   extraInstructions: string | null;
