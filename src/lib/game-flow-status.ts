@@ -126,8 +126,13 @@ export function computePlayerFlowStatus(input: {
   return isJoined ? "confirmed" : "none";
 }
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+export function isUuid(id: string | null | undefined): id is string {
+  return typeof id === "string" && UUID_RE.test(id);
+}
+
 async function fetchFlowInputs(gameId: string, userId: string) {
-  const [settings, joinRequest, submissions, participantRes] = await Promise.all([
+  const [settings, joinRequest, submissions, isJoined] = await Promise.all([
     getGamePaymentSettings(gameId).catch(() => null),
     getMyJoinRequest(gameId).catch(() => null),
     listMySubmissionsForGame(gameId).catch(() => [] as PaymentSubmission[]),
@@ -136,15 +141,13 @@ async function fetchFlowInputs(gameId: string, userId: string) {
       .select("user_id")
       .eq("game_id", gameId)
       .eq("user_id", userId)
-      .maybeSingle(),
+      .maybeSingle()
+      .then((res) => !!res.data)
+      .catch(() => false),
   ]);
-  return {
-    settings,
-    joinRequest,
-    submissions,
-    isJoined: !!participantRes.data,
-  };
+  return { settings, joinRequest, submissions, isJoined };
 }
+
 
 /**
  * Live-derived join → payment flow status for the signed-in viewer.
