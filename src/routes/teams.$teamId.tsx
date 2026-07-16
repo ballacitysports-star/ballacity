@@ -65,9 +65,10 @@ const FILTERS: { key: PostKind | "all"; label: string }[] = [
 function TeamPage() {
   const org = Route.useLoaderData() as Org;
   const [filter, setFilter] = useState<PostKind | "all">("all");
-  const [tab, setTab] = useState<"posts" | "about" | "games" | "reviews">("posts");
+  const [tab, setTab] = useState<"posts" | "about" | "games">("posts");
   const [following, setFollowing] = useState(false);
   const [mounted, setMounted] = useState(false);
+  const [reviewsOpen, setReviewsOpen] = useState(false);
   useEffect(() => setMounted(true), []);
   const canEdit = mounted && isMyOrg(org.id);
 
