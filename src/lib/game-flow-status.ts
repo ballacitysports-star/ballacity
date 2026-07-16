@@ -127,7 +127,7 @@ export function computePlayerFlowStatus(input: {
 }
 
 async function fetchFlowInputs(gameId: string, userId: string) {
-  const [settings, joinRequest, submissions, participantRow] = await Promise.all([
+  const [settings, joinRequest, submissions, participantRes] = await Promise.all([
     getGamePaymentSettings(gameId).catch(() => null),
     getMyJoinRequest(gameId).catch(() => null),
     listMySubmissionsForGame(gameId).catch(() => [] as PaymentSubmission[]),
@@ -136,11 +136,14 @@ async function fetchFlowInputs(gameId: string, userId: string) {
       .select("user_id")
       .eq("game_id", gameId)
       .eq("user_id", userId)
-      .maybeSingle()
-      .then(({ data }) => data)
-      .catch(() => null),
+      .maybeSingle(),
   ]);
-  return { settings, joinRequest, submissions, isJoined: !!participantRow };
+  return {
+    settings,
+    joinRequest,
+    submissions,
+    isJoined: !!participantRes.data,
+  };
 }
 
 /**
