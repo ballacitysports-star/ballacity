@@ -57,6 +57,24 @@ function Create() {
   const [coverUploading, setCoverUploading] = useState(false);
   const coverInputRef = useRef<HTMLInputElement>(null);
   const [positionsNeeded, setPositionsNeeded] = useState<PositionsNeeded>({});
+  const [repeatRange, setRepeatRange] = useState(false);
+  const [rangeStart, setRangeStart] = useState("");
+  const [rangeEnd, setRangeEnd] = useState("");
+
+  const rangeDates: string[] = (() => {
+    if (!repeatRange || !rangeStart || !rangeEnd) return [];
+    const start = new Date(rangeStart + "T00:00:00");
+    const end = new Date(rangeEnd + "T00:00:00");
+    if (isNaN(start.getTime()) || isNaN(end.getTime()) || end < start) return [];
+    const out: string[] = [];
+    for (let d = new Date(start); d <= end && out.length < 60; d.setDate(d.getDate() + 1)) {
+      const y = d.getFullYear();
+      const m = String(d.getMonth() + 1).padStart(2, "0");
+      const day = String(d.getDate()).padStart(2, "0");
+      out.push(`${y}-${m}-${day}`);
+    }
+    return out;
+  })();
 
 
 
