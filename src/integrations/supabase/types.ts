@@ -152,6 +152,7 @@ export type Database = {
       }
       conversations: {
         Row: {
+          accepted_by: string[]
           created_at: string
           created_by: string
           game_id: string | null
@@ -159,6 +160,7 @@ export type Database = {
           last_message_at: string
         }
         Insert: {
+          accepted_by?: string[]
           created_at?: string
           created_by: string
           game_id?: string | null
@@ -166,6 +168,7 @@ export type Database = {
           last_message_at?: string
         }
         Update: {
+          accepted_by?: string[]
           created_at?: string
           created_by?: string
           game_id?: string | null
@@ -567,6 +570,35 @@ export type Database = {
         }
         Relationships: []
       }
+      message_reactions: {
+        Row: {
+          created_at: string
+          emoji: string
+          message_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          emoji: string
+          message_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          emoji?: string
+          message_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "message_reactions_message_id_fkey"
+            columns: ["message_id"]
+            isOneToOne: false
+            referencedRelation: "messages"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       messages: {
         Row: {
           attachment_name: string | null
@@ -576,8 +608,11 @@ export type Database = {
           body: string | null
           conversation_id: string
           created_at: string
+          deleted_at: string | null
           id: string
+          is_request: boolean
           read_at: string | null
+          reply_to_id: string | null
           sender_id: string
         }
         Insert: {
@@ -588,8 +623,11 @@ export type Database = {
           body?: string | null
           conversation_id: string
           created_at?: string
+          deleted_at?: string | null
           id?: string
+          is_request?: boolean
           read_at?: string | null
+          reply_to_id?: string | null
           sender_id: string
         }
         Update: {
@@ -600,8 +638,11 @@ export type Database = {
           body?: string | null
           conversation_id?: string
           created_at?: string
+          deleted_at?: string | null
           id?: string
+          is_request?: boolean
           read_at?: string | null
+          reply_to_id?: string | null
           sender_id?: string
         }
         Relationships: [
@@ -610,6 +651,13 @@ export type Database = {
             columns: ["conversation_id"]
             isOneToOne: false
             referencedRelation: "conversations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "messages_reply_to_id_fkey"
+            columns: ["reply_to_id"]
+            isOneToOne: false
+            referencedRelation: "messages"
             referencedColumns: ["id"]
           },
         ]
@@ -1191,6 +1239,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      accept_conversation: { Args: { _conv: string }; Returns: undefined }
       can_notify: {
         Args: { _caller: string; _target: string }
         Returns: boolean
@@ -1199,6 +1248,7 @@ export type Database = {
         Args: { _game_id?: string; _other_user: string }
         Returns: string
       }
+      decline_conversation: { Args: { _conv: string }; Returns: undefined }
       free_reels_used: {
         Args: { check_env?: string; user_uuid: string }
         Returns: number
@@ -1250,6 +1300,7 @@ export type Database = {
         Args: { _game_id: string; _user_id: string }
         Returns: boolean
       }
+      unsend_message: { Args: { _id: string }; Returns: undefined }
     }
     Enums: {
       app_role: "admin" | "moderator"
