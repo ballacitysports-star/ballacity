@@ -54,6 +54,7 @@ export type AuthGateDecision =
   | "verify-hydrated-late"
   | "verify-no-session"
   | "verify-hydrated-retry"
+  | "verify-waiting-hydration"
   | "redirect";
 
 /**

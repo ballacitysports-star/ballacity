@@ -297,33 +297,52 @@ function AuthGate({ children }: { children: React.ReactNode }) {
         return;
       }
 
-      // Mobile Safari/Chrome sometimes parses the persisted session one tick
-      // after `getSession()` first resolves. If localStorage still holds a
-      // non-expired session, wait briefly and re-check once before giving up.
+      // If localStorage still holds a non-expired Supabase session, the
+      // client just hasn't finished parsing it yet (common on hard refresh
+      // in mobile webviews and cold SSR shells). NEVER redirect in that
+      // window — sit on the loading fallback and let the root's
+      // onAuthStateChange listener flip `useAuth` to signed-in. A stray
+      // redirect here bounces refreshed protected pages to /auth for no
+      // reason. As a safety net, re-check `getSession()` once more after
+      // ~4s in case onAuthStateChange never fires.
       const stored = readStoredSupabaseSession();
       if (stored) {
-        logAuthGateDecision("verify-hydrated-retry", {
+        logAuthGateDecision("verify-waiting-hydration", {
           pathname,
           loading,
           hasUser: false,
           extra: { storedExpiresAt: stored.expiresAt },
         });
-        await new Promise((r) => setTimeout(r, 250));
+        await new Promise((r) => setTimeout(r, 4000));
         if (cancelled) return;
-        const second = await supabase.auth.getSession();
+        const final = await supabase.auth.getSession();
         if (cancelled) return;
-        if (second.data.session?.user) {
+        if (final.data.session?.user) {
           logAuthGateDecision("verify-hydrated-late", {
             pathname,
             loading,
             hasUser: true,
             extra: {
               durationMs: Math.round(performance.now() - t0),
-              userId: second.data.session.user.id,
+              userId: final.data.session.user.id,
               retried: true,
             },
           });
           setVerifying(false);
+          return;
+        }
+        // Still no session and the stored token is either gone or expired:
+        // fall through to the redirect below.
+        if (readStoredSupabaseSession()) {
+          // Token is still present and valid — keep waiting rather than
+          // redirecting. `verifying` stays true so the loader keeps
+          // showing until onAuthStateChange fires (or the user reloads).
+          logAuthGateDecision("verify-waiting-hydration", {
+            pathname,
+            loading,
+            hasUser: false,
+            extra: { phase: "still-waiting-after-timeout" },
+          });
           return;
         }
       }

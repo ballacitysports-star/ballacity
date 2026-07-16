@@ -1,66 +1,32 @@
-## Goals
+## Bug
 
-1. **Roster not updating after removal** — the game details page keeps showing "ghost" avatars for removed players because the roster falls back to placeholders derived from the static `game.joined` count whenever the live list is empty.
-2. **AuthGate redirect `/feed → /auth`** — on a fresh visit or slow hydration, `AuthGate` runs its second-chance check once and redirects even when a stored Supabase session exists but hasn't parsed yet.
-3. **Light cleanup** — drop dead imports/vars discovered in the files we touch (no broader refactor, no `any`/prettier sweeps).
+On a hard refresh of a protected page (e.g. `/feed`, `/games/:id`), `AuthGate` sometimes redirects to `/auth` (the sign-in landing) before the persisted Supabase session finishes parsing. The 250ms retry we added helps most cases but still loses the race on slow mobile webviews and cold TanStack SSR shells, so the user sees the landing/sign-in page instead of the page they refreshed.
 
-## 1. Fix ghost roster placeholders
+## Fix — never redirect while a stored session exists
 
-`src/routes/games.$gameId.index.tsx` around line 829:
+Change the AuthGate policy in `src/routes/__root.tsx`:
 
-```ts
-const usePlaceholderRoster = liveRoster.length === 0 && (game.joined ?? 0) > 0;
-```
+1. On mount / verify, first call `readStoredSupabaseSession()` (already exported from `src/lib/authgate-log.ts`).
+2. If a **non-expired** stored session exists, do **not** redirect — keep rendering the `AuthLoadingFallback` and wait. The root's `onAuthStateChange` listener (already present) will fire `INITIAL_SESSION` / `SIGNED_IN` and `useAuth` will flip `user` to non-null; `AuthGate` re-renders and shows the page.
+3. Add a soft safety net: if `user` hasn't hydrated after ~4s despite a stored session, call `supabase.auth.getSession()` one more time. Only redirect if that final check returns no session AND the stored token is gone/expired.
+4. If there is no stored session from the start, redirect to `/auth?next=…` immediately (today's behavior — keeps signed-out visits fast).
 
-This is true even after `useLiveParticipants` has hydrated with 0 rows (which is exactly the state right after the last participant is removed). It then renders `game.joined` fake avatars from a hard-coded initials list.
+Also log a new `verify-waiting-hydration` decision so we can see the "waiting for stored session" branch in existing logs.
 
-**Fix:** only render placeholders while the roster hasn't hydrated yet. Use the already-available live count as the authoritative signal:
+## Files
 
-```ts
-const rosterHydrated = liveParticipantCount !== undefined;
-const usePlaceholderRoster =
-  !rosterHydrated && liveRoster.length === 0 && (game.joined ?? 0) > 0;
-const placeholderCount = rosterHydrated
-  ? 0
-  : Math.max(0, (liveParticipantCount ?? game.joined ?? 0) - liveRoster.length);
-```
+- `src/routes/__root.tsx` — rewrite the verify effect in `AuthGate` (lines ~258–327) per the policy above. Keep `sanitizeNextPath` and the existing redirect payload; only the decision logic changes.
+- `src/lib/authgate-log.ts` — add `"verify-waiting-hydration"` to `AuthGateDecision`.
 
-Cap `placeholderOthers` at `placeholderCount` so the visible roster size can never exceed the authoritative live count.
-
-Also verify the two other roster surfaces (positions list ~line 1390 / 1530 / 1576 and the "approved+live" merge at 1841) already read from `liveRoster`; no change needed there.
-
-## 2. Harden AuthGate late-hydration redirect
-
-`src/routes/__root.tsx` `AuthGate` (lines 242–350) currently:
-- waits for `useAuth` `loading=false`,
-- calls `supabase.auth.getSession()` once, and
-- if that returns no session, navigates to `/auth`.
-
-On mobile Safari the persisted session can parse a tick after the first `getSession()` resolves. Add a bounded retry that only kicks in when there is a stored session in `localStorage` (we already compute this in `authgate-log.ts`).
-
-Changes:
-- Extract `readStoredSupabaseSession()` (or reuse the logic from `envSnapshot`) into `src/lib/authgate-log.ts` and export it.
-- In the verify effect, if `getSession()` returns `null` **and** `readStoredSupabaseSession()` is truthy and not expired, wait ~250ms and re-check `getSession()` once more before redirecting. Log a new `verify-hydrated-retry` decision for observability.
-- If still empty (or no stored session), redirect as today.
-
-Result: signed-out visitors still redirect immediately; signed-in visitors whose session hasn't parsed avoid the false redirect.
-
-## 3. Light cleanup (unused imports/vars only)
-
-Only in files above:
-- `src/components/RequestGameCard.tsx` — drop unused `User` icon import.
-- `src/routes/games.$gameId.index.tsx` — remove any imports that become unused after the roster change (verify with `bunx tsgo --noEmit` scoped to the file).
-
-No `any→unknown` conversions, no prettier reformats, no larger refactors.
+No changes to `/auth`, `useAuth`, or any route.
 
 ## Verification
 
-- `bunx tsgo --noEmit` — no new errors (preexisting `available-players.tsx` TS2322s stay).
-- Manual: host removes the last participant → placeholder avatars disappear immediately.
-- Manual: hard-refresh `/feed` while signed in on mobile viewport → no `[AuthGate] redirect` warning; hard-refresh while signed out → still redirects.
+- Hard-refresh `/feed` and `/games/:id` while signed in → stays on the page, no `[AuthGate] redirect` warning; brief loader is acceptable.
+- Hard-refresh `/feed` while signed out (localStorage empty) → still redirects to `/auth?next=/feed` immediately.
+- `bunx tsgo --noEmit` — no new errors.
 
 ## Out of scope
 
-- Fixing every `no-explicit-any` / prettier lint warning.
-- Reworking RLS or the Realtime subscription filters.
-- The Vite HMR websocket warning (preview-only).
+- Restructuring routes as public/`_authenticated`.
+- Changes to `auth.tsx` post-sign-in navigation.
