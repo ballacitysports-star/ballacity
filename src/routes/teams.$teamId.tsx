@@ -23,6 +23,12 @@ import { ReviewsSection } from "@/components/ReviewsSection";
 import { computeReputation, useReviewsFor } from "@/lib/reviews";
 import { ReputationBadge } from "@/components/ReputationBadge";
 import { useCanReview } from "@/lib/transactions";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 export const Route = createFileRoute("/teams/$teamId")({
   head: ({ params }) => {
