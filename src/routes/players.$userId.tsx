@@ -245,7 +245,8 @@ function PlayerProfilePage() {
         )}
 
         {/* Action row — IG-style Follow / Message */}
-        <div className="mt-4 grid grid-cols-2 gap-2">
+        <div className="mt-4 flex items-center gap-2">
+          <div className="grid flex-1 grid-cols-2 gap-2">
           {follow.isFollowing ? (
             <Popover open={unfollowOpen} onOpenChange={setUnfollowOpen}>
               <PopoverTrigger asChild>
