@@ -499,33 +499,11 @@ function PayPage() {
       {/* Status card replaces the stepper once a submission exists */}
       {hasSubmission && <PaymentStatusTimeline latest={mySubs[0]} history={mySubs.slice(1)} />}
 
-      {/* Approval badge — kept for tests and clarity */}
-      {requiresApproval && (myReq?.status === "pending" || myReq?.status === "approved") && (
-        <div
-          data-testid="approval-status-indicator"
-          data-status={myReq.status}
-          role="status"
-          aria-live="polite"
-          aria-atomic="true"
-          className={`inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-bold ${
-            myReq.status === "approved"
-              ? "border-lime/40 bg-lime/10 text-lime"
-              : "border-coral/40 bg-coral/10 text-coral"
-          }`}
-        >
-          {myReq.status === "approved" ? (
-            <>
-              <ShieldCheck className="h-3.5 w-3.5" aria-hidden="true" />
-              <span>Approved — you can pay now</span>
-            </>
-          ) : (
-            <>
-              <Clock className="h-3.5 w-3.5 animate-pulse" aria-hidden="true" />
-              <span>Waiting for host to approve you</span>
-            </>
-          )}
-        </div>
-      )}
+      {/* Approval / payment stage badge — driven by shared flow status so
+          paid games show "Payment due" (etc.) rather than "Approved — you
+          can pay now" until the host actually verifies the payment. */}
+      <PayApprovalIndicator gameId={gameId} isPaid={Number(fee) > 0} requiresApproval={requiresApproval} />
+
 
       {/* Two-step progress (Pay → Confirm) */}
       {showStepper && (
@@ -1571,3 +1549,63 @@ function PayFlowStepper({ gameId }: { gameId: string }) {
     </ol>
   );
 }
+
+function PayApprovalIndicator({
+  gameId,
+  isPaid,
+  requiresApproval,
+}: {
+  gameId: string;
+  isPaid: boolean;
+  requiresApproval: boolean;
+}) {
+  const { status } = useMyFlowStatus(gameId);
+  if (!requiresApproval) return null;
+  // Nothing to show before the viewer has any relationship to the game.
+  if (status === "none") return null;
+
+  const paid: Partial<Record<typeof status, { label: string; tone: "warn" | "info" | "ok" | "bad"; icon: "clock" | "shield" | "x" }>> = {
+    requested: { label: "Waiting for host to approve you", tone: "warn", icon: "clock" },
+    payment_pending: { label: "Payment due", tone: "warn", icon: "clock" },
+    payment_submitted: { label: "Payment sent — waiting on host", tone: "info", icon: "clock" },
+    payment_rejected: { label: "Payment declined — resubmit", tone: "bad", icon: "x" },
+    payment_verified: { label: "Payment confirmed — you're on the roster", tone: "ok", icon: "shield" },
+    confirmed: { label: "Payment confirmed — you're on the roster", tone: "ok", icon: "shield" },
+    rejected: { label: "Request declined", tone: "bad", icon: "x" },
+  };
+
+  const free: Partial<Record<typeof status, { label: string; tone: "warn" | "ok" | "bad"; icon: "clock" | "shield" | "x" }>> = {
+    requested: { label: "Waiting for host to approve you", tone: "warn", icon: "clock" },
+    confirmed: { label: "Approved — see you at the game", tone: "ok", icon: "shield" },
+    rejected: { label: "Request declined", tone: "bad", icon: "x" },
+  };
+
+  const entry = (isPaid ? paid : free)[status];
+  if (!entry) return null;
+
+  const toneClass =
+    entry.tone === "ok"
+      ? "border-lime/40 bg-lime/10 text-lime"
+      : entry.tone === "warn"
+        ? "border-coral/40 bg-coral/10 text-coral"
+        : entry.tone === "info"
+          ? "border-lime/30 bg-lime/5 text-lime"
+          : "border-destructive/50 bg-destructive/10 text-destructive";
+
+  const Icon = entry.icon === "shield" ? ShieldCheck : entry.icon === "x" ? X : Clock;
+
+  return (
+    <div
+      data-testid="approval-status-indicator"
+      data-status={status}
+      role="status"
+      aria-live="polite"
+      aria-atomic="true"
+      className={`inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-bold ${toneClass}`}
+    >
+      <Icon className={`h-3.5 w-3.5 ${entry.icon === "clock" && entry.tone === "warn" ? "animate-pulse" : ""}`} aria-hidden="true" />
+      <span>{entry.label}</span>
+    </div>
+  );
+}
+
