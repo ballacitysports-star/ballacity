@@ -16,7 +16,7 @@ function Stars({ value, size = 12 }: { value: number; size?: number }) {
   );
 }
 
-export function ReputationBadge({ rep, compact = false }: { rep: Reputation; compact?: boolean }) {
+export function ReputationBadge({ rep, compact = false, onClick }: { rep: Reputation; compact?: boolean; onClick?: () => void }) {
   const TrendIcon =
     rep.recentTrend === "up" ? TrendingUp : rep.recentTrend === "down" ? TrendingDown : Minus;
   const trendColor =
