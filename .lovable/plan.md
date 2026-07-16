@@ -1,47 +1,43 @@
-## Fix
+## Bug: /feed and any list rendering sample games crashes the render tree
 
-Make every "approval banner" — the ad-hoc panels that today say variations of "You're approved" / "Approved — you can pay now" — render **"Payment due"** for paid games until the host verifies the payment. Presentation only, no store/DB changes.
+After the "unify status" work, `GameCard` calls `useMyFlowStatus(game.id)` for every card in the feed. That hook runs a Supabase query and opens a realtime channel per game id. On `/feed`, most cards render **sample games** whose IDs (`"game-1"`, `"game-2"`, …) are plain strings, not UUIDs. Two things happen inside `useMyFlowStatus` for each sample card:
 
-### Rule (one source of truth)
+1. `fetchFlowInputs()` calls `supabase.from("game_participants").eq("game_id", "game-1").maybeSingle()`. Postgres rejects with *invalid input syntax for type uuid*. That branch has **no `.catch()`** (unlike the other three parallel fetches), so `Promise.all` rejects and the whole `reload()` throws — surfaced as an unhandled rejection in the effect.
+2. `supabase.channel("flow-status:game-1:<uid>").on("postgres_changes", …)` is opened for every card. Ten+ sample cards × three `.on()` subscriptions each pushes the client past its realtime channel budget and the internal `on()` throws (`on@supabase-js.js:8189`, propagated to `game-flow-status.ts:139` in the source map).
 
-For a viewer on a paid game (`entry_fee > 0`), the approval banner's copy is chosen from `useMyFlowStatus(gameId).status`, not from `join_request.status`:
+The thrown error escapes the effect and bubbles into the root `ErrorComponent`, producing the "This page didn't load" screen the user sees right after login (post-login redirect lands on `/feed` / `/profile` list surfaces).
 
-| Flow status         | Approval banner copy                                              |
-| ------------------- | ----------------------------------------------------------------- |
-| `requested`         | "Waiting for host approval" (unchanged)                           |
-| `rejected`          | "Request declined" (unchanged)                                    |
-| `payment_pending`   | **"Payment due — submit payment to lock your spot"** + Pay CTA    |
-| `payment_submitted` | **"Payment sent — waiting on host to confirm"**                   |
-| `payment_rejected`  | **"Payment declined — resubmit to keep your spot"** + Pay CTA     |
-| `payment_verified`  | "Payment confirmed — you're on the roster"                        |
-| `confirmed` (free)  | "You're approved — see you there!" (unchanged, free games only)   |
+Users signed out don't hit the bug because `GameCard` already skips the hook with `useMyFlowStatus(user ? game.id : undefined)`.
 
-Never show "Approved — you can pay now" or "You're on the roster" for a paid game whose latest submission is not `verified`.
+## Fix (presentation-safe, no schema changes)
 
-### Files
+### A. Add a UUID guard to `useMyFlowStatus`
 
-1. **`src/routes/games.$gameId.index.tsx`** — Approval status banner (~line 936–990):
-   - Replace the current `myReq.status`-driven copy with a switch on `myFlowStatus` (already computed in this file via `useMyFlowStatus`).
-   - Free game path (no `entry_fee`) keeps today's approved copy.
-   - Paid game: render "Payment due" (or the matching row above) whenever `payment_verified` hasn't been reached.
-   - Keep the existing icon tokens (Clock / Check / X) but pick them from the flow status too.
+`src/lib/game-flow-status.ts`:
 
-2. **`src/routes/games.$gameId.pay.tsx`** — `approval-status-indicator` (~line 502–528):
-   - Same switch. When paid and `status !== "payment_verified"`, render "Payment due" instead of "Approved — you can pay now". Keep the `data-testid="approval-status-indicator"` and `data-status` attributes so existing e2e specs still match, but set `data-status` from the flow status (`payment_pending` / `payment_submitted` / `payment_verified` / `payment_rejected` / `requested` / `rejected`).
+- Treat any `gameId` that isn't a valid UUID as "no live status" — set `status = "none"`, don't fetch, don't open a realtime channel. Add a small `isUuid(id)` regex helper.
+- In the `useEffect` that owns the fetch + subscription: bail early when `!isUuid(gameId)` the same way it already bails when `!userId`.
+- Harden `fetchFlowInputs`: wrap the `game_participants` `.maybeSingle()` in its own `try/catch` (like the other three) so a single failed sub-query can never reject the whole `Promise.all` again, regardless of ID shape.
 
-3. **`src/routes/games.$gameId.index.tsx`** — "Compact your-status strip for paid games" (~line 992–1020):
-   - Same switch, so this strip and the approval banner never disagree. Drive copy off `myFlowStatus`; keep the strip visible whenever `myFlowStatus` is any paid-flow state, not just when `latestSub` exists (so an approved-but-unpaid player also sees "Payment due" here).
+### B. Gate `useMyFlowStatus` at the `GameCard` call site
 
-### Out of scope
+`src/components/GameCard.tsx`:
 
-- No changes to `game-flow-status.ts`, `PlayerFlowPill`, `PaymentRequiredBanner`, `PaymentStatusTimeline`, or business logic.
-- The false "Try again" on the pay page is a separate issue — not touched here.
+- Only pass `game.id` when both `user` is signed in **and** `isUuid(game.id)`; otherwise pass `undefined`. This stops the hook from doing any work (fetch or channel open) for sample games, keeps the "Joined" static badge path intact for those cards, and avoids the per-card realtime cost on feed pages that render dozens of cards.
+- Export the `isUuid` helper from `game-flow-status.ts` and import it here — one source of truth.
+
+### C. Same guard in the pay page's `PayApprovalIndicator` and the game-detail banners
+
+`src/routes/games.$gameId.pay.tsx` and `src/routes/games.$gameId.index.tsx` currently call `useMyFlowStatus(gameId)` unconditionally. Sample-game deep links (`/games/game-1`) hit the same UUID error. The hook's internal guard from step A already returns `status: "none"`, but the outer JSX should also treat `status === "none"` on a sample game as "no live status" and fall back to the existing static banners/pills so nothing tries to render an empty pill.
+
+### D. No changes to
+
+`PlayerFlowPill`, `PaymentRequiredBanner`, `PaymentStatusTimeline`, business logic, RLS, or realtime schema.
 
 ## Verification
 
-- Paid game, host approves → both surfaces show "Payment due" (never "You're approved").
-- Player submits proof → both surfaces flip to "Payment sent — waiting on host".
-- Host verifies → both flip to "Payment confirmed".
-- Host rejects payment → both show "Payment declined — resubmit".
-- Free game, host approves → unchanged "You're approved — see you there!".
-- Existing pay-page e2e specs continue to find `data-testid="approval-status-indicator"` with a valid `data-status`.
+- `/feed` (signed in): loads normally. Real hosted games still show live pills; sample cards keep the static "Joined" badge (or nothing).
+- `/games/game-1` (sample game): renders game detail, no runtime error, no "This page didn't load".
+- `/games/<real uuid>`: pill + banners still update in realtime as before.
+- After login, redirected to `/profile` and `/feed` — both load without the error screen.
+- No new console errors mentioning `game-flow-status.ts` or `supabase-js.js on@`.

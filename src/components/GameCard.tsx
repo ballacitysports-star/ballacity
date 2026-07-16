@@ -12,7 +12,7 @@ import { getOrCreateDirectConversation } from "@/lib/messages";
 import { useAuth } from "@/hooks/use-auth";
 import { useState } from "react";
 import { toast } from "sonner";
-import { useMyFlowStatus } from "@/lib/game-flow-status";
+import { useMyFlowStatus, isUuid } from "@/lib/game-flow-status";
 import { PlayerFlowPill } from "@/components/PlayerFlowPill";
 
 const sportEmoji: Record<string, string> = {
@@ -39,7 +39,7 @@ export function GameCard({ game, index = 0 }: { game: Game; index?: number }) {
   const [opening, setOpening] = useState(false);
   const hostUserId = (game as { hostUserId?: string }).hostUserId;
   const liveStatus = useLiveStatus(game);
-  const { status: flowStatus } = useMyFlowStatus(user ? game.id : undefined);
+  const { status: flowStatus } = useMyFlowStatus(user && isUuid(game.id) ? game.id : undefined);
   const goToHost = (e: React.MouseEvent) => {
     if (!hostUserId) return;
     e.preventDefault();
