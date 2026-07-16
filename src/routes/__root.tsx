@@ -255,39 +255,64 @@ function AuthGate({ children }: { children: React.ReactNode }) {
   useOneSignal();
 
   useEffect(() => {
-    if (loading) return;
+    if (loading) {
+      logAuthGateDecision("verify-start", { pathname, loading, hasUser: !!user, extra: { phase: "waiting-for-useAuth" } });
+      return;
+    }
     if (user) {
+      logAuthGateDecision("user-present", { pathname, loading, hasUser: true });
       if (verifying) setVerifying(false);
       return;
     }
-    if (isPublic) return;
-    if (pathname === "/auth") return;
+    if (isPublic) {
+      logAuthGateDecision("public-skip", { pathname, loading, hasUser: false });
+      return;
+    }
+    if (pathname === "/auth") {
+      logAuthGateDecision("auth-route-skip", { pathname, loading, hasUser: false });
+      return;
+    }
 
     let cancelled = false;
     setVerifying(true);
-    supabase.auth.getSession().then(({ data }) => {
+    logAuthGateDecision("verify-start", {
+      pathname,
+      loading,
+      hasUser: false,
+      extra: { phase: "second-chance-getSession" },
+    });
+    const t0 = performance.now();
+    supabase.auth.getSession().then(({ data, error }) => {
       if (cancelled) return;
+      const durationMs = Math.round(performance.now() - t0);
       if (data.session?.user) {
-        // Session hydrated late — useAuth's listener will pick it up.
+        logAuthGateDecision("verify-hydrated-late", {
+          pathname,
+          loading,
+          hasUser: true,
+          extra: { durationMs, userId: data.session.user.id },
+        });
         setVerifying(false);
         return;
       }
-      // Telemetry: help diagnose recurrences on specific devices.
-      try {
-        const projectRef = (import.meta.env.VITE_SUPABASE_PROJECT_ID ?? "") as string;
-        const storageKey = projectRef ? `sb-${projectRef}-auth-token` : "";
-        const hasStored = storageKey ? !!window.localStorage.getItem(storageKey) : "unknown";
-        // eslint-disable-next-line no-console
-        console.warn("[AuthGate] redirecting to /auth", {
-          pathname,
-          visibility: document.visibilityState,
-          hasStoredSession: hasStored,
-        });
-      } catch {
-        /* ignore */
-      }
+      logAuthGateDecision("verify-no-session", {
+        pathname,
+        loading,
+        hasUser: false,
+        extra: {
+          durationMs,
+          errorName: error?.name ?? null,
+          errorMessage: error?.message ?? null,
+        },
+      });
       const href = router.state.location.href;
       const safeNext = sanitizeNextPath(href);
+      logAuthGateDecision("redirect", {
+        pathname,
+        loading,
+        hasUser: false,
+        extra: { to: "/auth", next: safeNext ?? null, durationMs },
+      });
       router.navigate({
         to: "/auth",
         search: safeNext ? { next: safeNext } : {},
