@@ -144,12 +144,7 @@ test("roster stays consistent across INSERT, DELETE, and reconnect", async ({ br
     await ensureLeft(bDetail);
 
     // ============ Step 1: INSERT propagates A ←— B ============
-    const joinCta = bDetail.getByRole("button", { name: /join free/i }).first();
-    await expect(joinCta).toBeVisible({ timeout: 15_000 });
-    await joinCta.click();
-    await expect(
-      bDetail.getByRole("button", { name: /you're in · tap to leave/i }).first(),
-    ).toBeVisible({ timeout: 10_000 });
+    await performJoin(bDetail);
 
     await expect
       .poll(async () => joinedFromHeader(await readRosterHeader(aDetail)), {
@@ -159,13 +154,8 @@ test("roster stays consistent across INSERT, DELETE, and reconnect", async ({ br
       .toBe((baseline ?? 0) + 1);
 
     // ============ Step 2: DELETE propagates A ←— B (both online) ============
-    await bDetail
-      .getByRole("button", { name: /you're in · tap to leave/i })
-      .first()
-      .click();
-    await expect(
-      bDetail.getByRole("button", { name: /join free/i }).first(),
-    ).toBeVisible({ timeout: 10_000 });
+    await performLeave(bDetail);
+
 
     await expect
       .poll(async () => joinedFromHeader(await readRosterHeader(aDetail)), {
