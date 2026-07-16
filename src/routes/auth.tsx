@@ -1,4 +1,4 @@
-import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { ArrowLeft } from "lucide-react";
 import { toast } from "sonner";
@@ -6,17 +6,18 @@ import { supabase } from "@/integrations/supabase/client";
 import { lovable } from "@/integrations/lovable";
 import { useAuth } from "@/hooks/use-auth";
 import { trackSigninEvent } from "@/lib/auth-signin-telemetry";
+import { sanitizeNextPath } from "@/routes/__root";
 
 export const Route = createFileRoute("/auth")({
   head: () => ({ meta: [{ title: "Sign in — OpenRun" }] }),
   validateSearch: (s: Record<string, unknown>) => ({
-    next: typeof s.next === "string" && s.next.startsWith("/") && !s.next.startsWith("//") ? s.next : undefined,
+    next: sanitizeNextPath(s.next),
   }),
   component: AuthPage,
 });
 
 function AuthPage() {
-  const nav = useNavigate();
+  
   const { next } = Route.useSearch();
   const { user, loading } = useAuth();
   const [mode, setMode] = useState<"signin" | "signup">("signin");
@@ -26,11 +27,11 @@ function AuthPage() {
   const [busy, setBusy] = useState(false);
 
   const goPostAuth = () => {
-    if (next) {
-      window.location.replace(next);
-    } else {
-      nav({ to: "/profile", replace: true });
-    }
+    const dest = sanitizeNextPath(next) ?? "/profile";
+    // Hard reload keeps mobile webviews / OAuth popups in sync with the
+    // freshly-hydrated session; a client-side navigate can race with the
+    // AuthGate's own loading flip.
+    window.location.replace(dest);
   };
 
   useEffect(() => {

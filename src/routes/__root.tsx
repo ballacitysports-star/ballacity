@@ -171,6 +171,21 @@ const TAB_PATHS = [
   "/reels",
 ];
 
+/**
+ * Same-origin, safe next-path filter used by both the auth redirect
+ * (to preserve the user's destination) and the /auth page (to bounce
+ * back after sign-in). Rejects anything that could loop back through
+ * the sign-in flow itself.
+ */
+export function sanitizeNextPath(raw: unknown): string | undefined {
+  if (typeof raw !== "string" || raw.length === 0) return undefined;
+  if (!raw.startsWith("/") || raw.startsWith("//")) return undefined;
+  const pathOnly = raw.split(/[?#]/)[0] ?? "";
+  if (pathOnly === "/auth" || pathOnly.startsWith("/auth/")) return undefined;
+  if (pathOnly === "/reset-password" || pathOnly.startsWith("/reset-password/")) return undefined;
+  return raw;
+}
+
 function AuthGate({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const pathname = router.state.location.pathname;
@@ -184,14 +199,18 @@ function AuthGate({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     if (loading) return;
-    if (!user && !isPublic) {
-      const href = router.state.location.href;
-      router.navigate({
-        to: "/auth",
-        search: { next: href && href !== "/" ? href : undefined },
-        replace: true,
-      });
-    }
+    if (user) return;
+    if (isPublic) return;
+    // Guard against re-entry: don't queue another redirect while already
+    // navigating to /auth, and never point `next` back at the auth flow.
+    if (pathname === "/auth") return;
+    const href = router.state.location.href;
+    const safeNext = sanitizeNextPath(href);
+    router.navigate({
+      to: "/auth",
+      search: safeNext ? { next: safeNext } : {},
+      replace: true,
+    });
   }, [loading, user, isPublic, router, pathname]);
 
   useEffect(() => {
@@ -236,9 +255,17 @@ function RootComponent() {
       if (data.user) runLegacyHostMigration(data.user.id);
     });
     const { data: sub } = supabase.auth.onAuthStateChange((event, session) => {
-      queryClient.invalidateQueries();
+      // Only react to identity transitions. TOKEN_REFRESHED / INITIAL_SESSION
+      // fire on every mount and every ~hour of tab focus — invalidating on
+      // those thrashes the router and can 401-storm protected queries.
+      if (event !== "SIGNED_IN" && event !== "SIGNED_OUT" && event !== "USER_UPDATED") {
+        return;
+      }
       router.invalidate();
-      if ((event === "SIGNED_IN" || event === "INITIAL_SESSION") && session?.user) {
+      if (event !== "SIGNED_OUT") {
+        queryClient.invalidateQueries();
+      }
+      if ((event === "SIGNED_IN" || event === "USER_UPDATED") && session?.user) {
         runLegacyHostMigration(session.user.id);
       }
     });
