@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Link } from "@tanstack/react-router";
 import { motion } from "framer-motion";
 import { MapPin, Clock, Check, X as XIcon, Clock as ClockIcon, User } from "lucide-react";
@@ -7,6 +8,17 @@ import type { Game } from "@/lib/sample-data";
 import { formatWhen } from "@/lib/format";
 import { useLiveParticipantCount } from "@/lib/game-participants-store";
 import type { JoinRequest } from "@/lib/payments";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+
 
 const sportEmoji: Record<string, string> = {
   Basketball: "🏀",
@@ -43,6 +55,9 @@ export function RequestGameCard({
   const joinedCount = liveCount ?? game.joined;
   const spotsLeft = Math.max(0, game.maxPlayers - joinedCount);
   const fillPct = Math.round((joinedCount / game.maxPlayers) * 100);
+  const [confirm, setConfirm] = useState<null | "approve" | "decline">(null);
+  const playerName = (request as any).player_name || (request as any).player?.display_name || "this player";
+
 
   return (
     <motion.div
@@ -173,7 +188,7 @@ export function RequestGameCard({
                   onClick={(e) => {
                     e.preventDefault();
                     e.stopPropagation();
-                    onDecline();
+                    setConfirm("decline");
                   }}
                   className="rounded-full border border-border bg-background px-3 py-1 text-xs font-semibold hover:border-coral/40"
                 >
@@ -186,13 +201,14 @@ export function RequestGameCard({
                   onClick={(e) => {
                     e.preventDefault();
                     e.stopPropagation();
-                    onApprove();
+                    setConfirm("approve");
                   }}
                   className="rounded-full bg-lime-gradient px-3 py-1 text-xs font-semibold text-primary-foreground"
                 >
                   Approve
                 </button>
               )}
+
               {!isHost && onCancel && (
                 <button
                   type="button"
@@ -210,6 +226,36 @@ export function RequestGameCard({
           )}
         </div>
       </div>
+
+      <AlertDialog open={confirm !== null} onOpenChange={(o) => !o && setConfirm(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {confirm === "approve" ? "Approve this request?" : "Decline this request?"}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {confirm === "approve"
+                ? `${playerName} will be added to ${game.title}.`
+                : `${playerName} won't join ${game.title}. They can request again later.`}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className={confirm === "decline" ? "bg-coral text-primary-foreground hover:bg-coral/90" : undefined}
+              onClick={() => {
+                const action = confirm;
+                setConfirm(null);
+                if (action === "approve") onApprove?.();
+                else if (action === "decline") onDecline?.();
+              }}
+            >
+              {confirm === "approve" ? "Approve" : "Decline"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </motion.div>
   );
+
 }
