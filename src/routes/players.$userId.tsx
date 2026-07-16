@@ -338,9 +338,16 @@ function PlayerProfilePage() {
 
         {/* Reviews popup */}
         <Dialog open={reviewsOpen} onOpenChange={setReviewsOpen}>
-          <DialogContent className="max-h-[90dvh] overflow-y-auto p-0 sm:max-w-xl">
+          <DialogContent
+            className="max-h-[90dvh] overflow-y-auto p-0 sm:max-w-xl"
+            aria-labelledby="player-reviews-title"
+            aria-describedby="player-reviews-desc"
+          >
             <DialogHeader className="sr-only">
-              <DialogTitle>Reviews</DialogTitle>
+              <DialogTitle id="player-reviews-title">Reviews for {displayName}</DialogTitle>
+              <DialogDescription id="player-reviews-desc">
+                Browse, filter, and sort reviews left for this player. Press Escape to close.
+              </DialogDescription>
             </DialogHeader>
             <div className="p-4">
               <ReviewsSection
