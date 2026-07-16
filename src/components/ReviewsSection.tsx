@@ -23,6 +23,13 @@ import {
 import { ReputationCard } from "@/components/ReputationCard";
 import { useCanReview } from "@/lib/transactions";
 import { toast } from "sonner";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 type Sort = "recent" | "top" | "lowest" | "helpful";
 
