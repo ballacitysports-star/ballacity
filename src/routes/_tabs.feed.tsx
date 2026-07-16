@@ -10,6 +10,7 @@ import { MyAvatar } from "@/components/UserAvatar";
 import { SportChips } from "@/components/SportChips";
 import { GameCard } from "@/components/GameCard";
 import { GameListRow } from "@/components/GameListRow";
+import { GameCardSkeleton, GameListRowSkeleton } from "@/components/GameCardSkeleton";
 import { GAMES, SPORTS, POSITIONS_BY_SPORT, type Sport } from "@/lib/sample-data";
 import { useHostedGames } from "@/lib/hosted-games-store";
 import { useJoinedGameIds } from "@/lib/games-store";
@@ -49,6 +50,10 @@ function Feed() {
     density === "list"
       ? <GameListRow key={g.id} game={g} index={i} />
       : <GameCard key={g.id} game={g} index={i} />;
+  const renderSkeletons = (count: number) => {
+    const Skel = density === "list" ? GameListRowSkeleton : GameCardSkeleton;
+    return Array.from({ length: count }, (_, i) => <Skel key={`sk-${i}`} />);
+  };
   const [positionFilter, setPositionFilter] = useState<string | null>(null);
   const hosted = useHostedGames();
   const joinedIds = useJoinedGameIds();
@@ -457,8 +462,11 @@ function Feed() {
             {filtered.length} result{filtered.length === 1 ? "" : "s"} for "{q}"
           </h2>
           <div className={listContainerClass}>
-            {visible.map((g, i) => renderGame(g, i))}
-            {filtered.length === 0 && (
+            {refreshing && filtered.length === 0
+              ? renderSkeletons(density === "list" ? 6 : 3)
+              : visible.map((g, i) => renderGame(g, i))}
+            {hasMore && !refreshing && renderSkeletons(density === "list" ? 4 : 3)}
+            {!refreshing && filtered.length === 0 && (
               <div className={`${emptyColSpan} rounded-2xl border border-border bg-surface p-8 text-center text-muted-foreground`}>
                 No games match "{q}".
               </div>
@@ -488,8 +496,11 @@ function Feed() {
                 For you
               </h2>
               <div className={listContainerClass}>
-                {visible.map((g, i) => renderGame(g, i))}
-                {filtered.length === 0 && (
+                {refreshing && filtered.length === 0
+                  ? renderSkeletons(density === "list" ? 6 : 3)
+                  : visible.map((g, i) => renderGame(g, i))}
+                {hasMore && !refreshing && renderSkeletons(density === "list" ? 4 : 3)}
+                {!refreshing && filtered.length === 0 && (
                   <div className={`${emptyColSpan} rounded-2xl border border-border bg-surface p-8 text-center text-muted-foreground space-y-3`}>
                     <div>No games match your filters.</div>
                     <button
@@ -560,17 +571,9 @@ const InfiniteSentinel = ({
 }) => {
   if (total === 0) return null;
   return (
-    <div ref={ref} className="mt-4 flex items-center justify-center py-6">
+    <div ref={ref} className="mt-2 flex items-center justify-center py-4" aria-live="polite">
       {hasMore ? (
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          className="inline-flex items-center gap-2 rounded-full border border-border bg-surface px-4 py-2 text-xs font-semibold text-muted-foreground"
-          aria-live="polite"
-        >
-          <Loader2 className="h-3.5 w-3.5 animate-spin text-lime" />
-          Loading more games…
-        </motion.div>
+        <span className="sr-only">Loading more games…</span>
       ) : (
         <span className="text-xs text-muted-foreground">You're all caught up · {total} games</span>
       )}
