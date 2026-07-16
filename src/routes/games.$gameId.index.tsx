@@ -914,6 +914,25 @@ function GameDetail() {
             </div>
           ))}
 
+        {/* Payment-required banner (shows when approved-but-unpaid or payment rejected) */}
+        {!isHost && (
+          <PaymentRequiredBanner
+            gameId={gameId}
+            settings={flowSettings ?? settings}
+            status={myFlowStatus}
+          />
+        )}
+
+        {/* Compact flow status pill for the viewer */}
+        {!isHost && myFlowStatus !== "none" && (
+          <div className="flex items-center gap-2 text-xs">
+            <span className="font-bold uppercase tracking-wider text-muted-foreground">
+              Your status
+            </span>
+            <PlayerFlowPill status={myFlowStatus} />
+          </div>
+        )}
+
         {/* Approval status banner (player view) */}
         {!isHost && requiresApproval && myReq && (
           <div
