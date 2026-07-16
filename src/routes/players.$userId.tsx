@@ -222,19 +222,45 @@ function PlayerProfilePage() {
               </div>
             )}
           </div>
-          <Button
-            onClick={handleMessage}
-            disabled={opening}
-            className="shrink-0 rounded-full bg-lime-gradient text-primary-foreground"
-            size="sm"
-          >
-            {opening ? (
-              <Loader2 className="h-4 w-4 mr-1 animate-spin" />
-            ) : (
-              <MessageCircle className="h-4 w-4 mr-1" />
-            )}
-            Message
-          </Button>
+          <div className="shrink-0 flex flex-col gap-2">
+            <Button
+              onClick={handleMessage}
+              disabled={opening}
+              className="rounded-full bg-lime-gradient text-primary-foreground"
+              size="sm"
+            >
+              {opening ? (
+                <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+              ) : (
+                <MessageCircle className="h-4 w-4 mr-1" />
+              )}
+              Message
+            </Button>
+            <Button
+              onClick={() => {
+                if (!user) {
+                  toast.error("Sign in to follow this player.");
+                  return;
+                }
+                follow.toggle();
+              }}
+              disabled={follow.pending}
+              variant={follow.isFollowing ? "outline" : "default"}
+              className={
+                follow.isFollowing
+                  ? "rounded-full border-lime/40 bg-lime/10 text-lime hover:bg-coral/10 hover:text-coral hover:border-coral/40"
+                  : "rounded-full bg-lime-gradient text-primary-foreground"
+              }
+              size="sm"
+            >
+              {follow.isFollowing ? (
+                <UserCheck className="h-4 w-4 mr-1" />
+              ) : (
+                <UserPlus className="h-4 w-4 mr-1" />
+              )}
+              {follow.isFollowing ? "Following" : "Follow"}
+            </Button>
+          </div>
         </div>
 
         {bio && <p className="mt-3 text-sm text-foreground/90 whitespace-pre-wrap">{bio}</p>}
