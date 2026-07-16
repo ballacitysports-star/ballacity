@@ -10,9 +10,10 @@ import { sanitizeNextPath } from "@/routes/__root";
 
 export const Route = createFileRoute("/auth")({
   head: () => ({ meta: [{ title: "Sign in — OpenRun" }] }),
-  validateSearch: (s: Record<string, unknown>) => ({
-    next: sanitizeNextPath(s.next),
-  }),
+  validateSearch: (s: Record<string, unknown>) => {
+    const next = sanitizeNextPath(s.next);
+    return next ? { next } : {};
+  },
   component: AuthPage,
 });
 
