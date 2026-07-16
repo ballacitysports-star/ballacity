@@ -16,7 +16,7 @@ function Stars({ value, size = 12 }: { value: number; size?: number }) {
   );
 }
 
-export function ReputationBadge({ rep, compact = false, onClick }: { rep: Reputation; compact?: boolean; onClick?: () => void }) {
+export function ReputationBadge({ rep, compact = false, onClick, ariaLabel }: { rep: Reputation; compact?: boolean; onClick?: () => void; ariaLabel?: string }) {
   const TrendIcon =
     rep.recentTrend === "up" ? TrendingUp : rep.recentTrend === "down" ? TrendingDown : Minus;
   const trendColor =
@@ -32,6 +32,8 @@ export function ReputationBadge({ rep, compact = false, onClick }: { rep: Reputa
       <Component
         type={onClick ? "button" : undefined}
         onClick={onClick}
+        aria-label={onClick ? (ariaLabel ?? `Open reviews. Trust score ${rep.trustScore}, ${rep.avg.toFixed(1)} out of 5 from ${rep.count} review${rep.count === 1 ? "" : "s"}.`) : undefined}
+        aria-haspopup={onClick ? "dialog" : undefined}
         initial={{ opacity: 0, y: 6 }}
         animate={{ opacity: 1, y: 0 }}
         className={`flex items-center gap-3 rounded-2xl border border-border bg-surface p-3 text-left transition-all hover:border-lime/40 ${onClick ? "cursor-pointer" : ""}`}
@@ -70,6 +72,8 @@ export function ReputationBadge({ rep, compact = false, onClick }: { rep: Reputa
     <Component
       type={onClick ? "button" : undefined}
       onClick={onClick}
+      aria-label={onClick ? (ariaLabel ?? `Open reviews. Trust score ${rep.trustScore}, ${rep.avg.toFixed(1)} out of 5 from ${rep.count} review${rep.count === 1 ? "" : "s"}.`) : undefined}
+      aria-haspopup={onClick ? "dialog" : undefined}
       initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
       className={`rounded-2xl border border-border bg-surface p-4 text-left transition-all hover:border-lime/40 ${onClick ? "cursor-pointer" : ""}`}

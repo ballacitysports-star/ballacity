@@ -101,6 +101,7 @@ import {
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
@@ -1110,15 +1111,26 @@ function GameDetail() {
         {/* Host reputation (opens reviews popup) */}
         {hostRep.count > 0 && (
           <div className="mt-3">
-            <ReputationBadge rep={hostRep} onClick={() => setReviewsOpen(true)} />
+            <ReputationBadge
+              rep={hostRep}
+              onClick={() => setReviewsOpen(true)}
+              ariaLabel={`Open host reviews for ${game.host.name}. Trust score ${hostRep.trustScore}, ${hostRep.avg.toFixed(1)} out of 5 from ${hostRep.count} review${hostRep.count === 1 ? "" : "s"}.`}
+            />
           </div>
         )}
 
         {/* Host reviews popup */}
         <Dialog open={reviewsOpen} onOpenChange={setReviewsOpen}>
-          <DialogContent className="max-h-[90dvh] overflow-y-auto p-0 sm:max-w-xl">
+          <DialogContent
+            className="max-h-[90dvh] overflow-y-auto p-0 sm:max-w-xl"
+            aria-labelledby="host-reviews-title"
+            aria-describedby="host-reviews-desc"
+          >
             <DialogHeader className="sr-only">
-              <DialogTitle>Host reviews</DialogTitle>
+              <DialogTitle id="host-reviews-title">Reviews for host {game.host.name}</DialogTitle>
+              <DialogDescription id="host-reviews-desc">
+                Browse, filter, and sort reviews left for this host. Press Escape to close.
+              </DialogDescription>
             </DialogHeader>
             <div className="p-4">
               <ReviewsSection

@@ -26,6 +26,7 @@ import { useCanReview } from "@/lib/transactions";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
@@ -222,7 +223,11 @@ function TeamPage() {
         {/* Reputation badge (opens reviews popup) */}
         {orgRep.count > 0 && (
           <div className="mt-4">
-            <ReputationBadge rep={orgRep} onClick={() => setReviewsOpen(true)} />
+            <ReputationBadge
+              rep={orgRep}
+              onClick={() => setReviewsOpen(true)}
+              ariaLabel={`Open reviews for ${org.name}. Trust score ${orgRep.trustScore}, ${orgRep.avg.toFixed(1)} out of 5 from ${orgRep.count} review${orgRep.count === 1 ? "" : "s"}.`}
+            />
           </div>
         )}
 
@@ -394,9 +399,16 @@ function TeamPage() {
 
         {/* Reviews popup */}
         <Dialog open={reviewsOpen} onOpenChange={setReviewsOpen}>
-          <DialogContent className="max-h-[90dvh] overflow-y-auto p-0 sm:max-w-xl">
+          <DialogContent
+            className="max-h-[90dvh] overflow-y-auto p-0 sm:max-w-xl"
+            aria-labelledby="team-reviews-title"
+            aria-describedby="team-reviews-desc"
+          >
             <DialogHeader className="sr-only">
-              <DialogTitle>Reviews</DialogTitle>
+              <DialogTitle id="team-reviews-title">Reviews for {org.name}</DialogTitle>
+              <DialogDescription id="team-reviews-desc">
+                Browse, filter, and sort reviews left for this {org.kind === "coach" ? "trainer" : "team"}. Press Escape to close.
+              </DialogDescription>
             </DialogHeader>
             <div className="p-4">
               <ReviewsSection
