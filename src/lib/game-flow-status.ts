@@ -186,7 +186,7 @@ export function useMyFlowStatus(gameId: string | undefined): {
   }, []);
 
   useEffect(() => {
-    if (!gameId || !userId) {
+    if (!gameId || !userId || !isUuid(gameId)) {
       setStatus("none");
       setSettings(null);
       setLoading(false);
