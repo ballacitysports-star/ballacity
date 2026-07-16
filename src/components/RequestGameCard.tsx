@@ -105,7 +105,7 @@ export function RequestGameCard({
               </div>
               <div className="flex items-center gap-1.5 text-xs font-semibold">
                 <span className="text-foreground">
-                  {game.joined}/{game.maxPlayers}
+                  {joinedCount}/{game.maxPlayers}
                 </span>
                 {spotsLeft < game.maxPlayers && spotsLeft <= Math.max(3, Math.ceil(game.maxPlayers * 0.2)) && (
                   <SpotsPill spotsLeft={spotsLeft} maxPlayers={game.maxPlayers} />
