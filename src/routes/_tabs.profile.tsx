@@ -120,6 +120,16 @@ function Profile() {
         },
         () => refreshRequests(),
       )
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "join_requests",
+          filter: `host_id=eq.${profileUser.id}`,
+        },
+        () => refreshRequests(),
+      )
       .subscribe();
     return () => {
       supabase.removeChannel(ch);
