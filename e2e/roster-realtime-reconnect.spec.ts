@@ -197,15 +197,13 @@ test("roster stays consistent across INSERT, DELETE, and reconnect", async ({ br
       .toBe((baseline ?? 0) + 1);
 
     // Cleanup: leave from B while both online, and confirm A tracks it too.
-    await bDetail
-      .getByRole("button", { name: /you're in · tap to leave/i })
-      .first()
-      .click();
+    await performLeave(bDetail);
     await expect
       .poll(async () => joinedFromHeader(await readRosterHeader(aDetail)), {
         timeout: 20_000,
       })
       .toBe(baseline!);
+
   } finally {
     await deviceA.close();
     await deviceB.close();
