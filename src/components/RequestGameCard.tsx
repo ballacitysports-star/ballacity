@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Link } from "@tanstack/react-router";
 import { motion } from "framer-motion";
 import { MapPin, Clock, Check, X as XIcon, Clock as ClockIcon, User } from "lucide-react";
@@ -7,6 +8,17 @@ import type { Game } from "@/lib/sample-data";
 import { formatWhen } from "@/lib/format";
 import { useLiveParticipantCount } from "@/lib/game-participants-store";
 import type { JoinRequest } from "@/lib/payments";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+
 
 const sportEmoji: Record<string, string> = {
   Basketball: "🏀",
