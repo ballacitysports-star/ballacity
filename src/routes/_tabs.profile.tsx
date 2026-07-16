@@ -402,23 +402,33 @@ function Profile() {
           <ReputationBadge rep={myRep} onClick={() => setReviewsOpen(true)} />
         </div>
 
-        {/* Join request status (pending approvals + recent decisions) */}
-        <div className="mt-6">
-          <h2 className="font-display text-sm font-bold uppercase tracking-wider text-muted-foreground mb-2 flex items-center gap-1.5">
-            <Clock className="h-4 w-4" /> Pending approvals
+        {/* Pending approvals */}
+        <section className="mt-8 rounded-3xl border border-border bg-surface p-4 shadow-card">
+          <div className="mb-3 flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2">
+              <span className="grid h-8 w-8 place-items-center rounded-2xl border border-coral/30 bg-coral/10 text-coral">
+                <Clock className="h-4 w-4" />
+              </span>
+              <div>
+                <h2 className="font-display text-sm font-bold uppercase tracking-wider text-foreground">
+                  Pending approvals
+                </h2>
+                <p className="text-[10px] text-muted-foreground">Join requests needing action</p>
+              </div>
+            </div>
             {pendingWithGame.length > 0 && !requestsLoading && (
-              <span className="ml-1 rounded-full bg-coral/15 px-2 py-0.5 text-[10px] font-bold text-coral">
+              <span className="rounded-full bg-coral/15 px-2.5 py-1 text-[10px] font-bold text-coral">
                 {pendingWithGame.length}
               </span>
             )}
-          </h2>
+          </div>
           {!requestsLoading && (
             <Tabs
               value={requestFilter}
               onValueChange={(v) => setRequestFilter(v as "all" | "host" | "player")}
               className="mb-3"
             >
-              <TabsList className="h-8 w-full rounded-full bg-surface p-1 border border-border">
+              <TabsList className="h-8 w-full rounded-full bg-surface-2 p-1 border border-border">
                 <TabsTrigger
                   value="all"
                   className="flex-1 rounded-full text-xs data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
@@ -525,7 +535,7 @@ function Profile() {
               <EmptyRequestsState filter={requestFilter} />
             )}
           </div>
-        </div>
+        </section>
 
         {/* Upcoming — split into games you host vs games you're playing in */}
         <div className="mt-6">
