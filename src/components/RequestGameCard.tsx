@@ -208,7 +208,7 @@ function RequestGameCardInner({
         </Link>
 
         <div
-          className={`mx-4 mb-4 rounded-2xl border p-3 flex items-start gap-3 ${
+          className={`mx-3 mb-3 rounded-2xl border p-2.5 flex items-start gap-2.5 ${
             isPending
               ? "border-coral/40 bg-coral/10"
               : isApproved
@@ -217,14 +217,14 @@ function RequestGameCardInner({
           }`}
         >
           {isPending ? (
-            <ClockIcon className="h-4 w-4 text-coral shrink-0 mt-0.5" />
+            <ClockIcon className="h-3.5 w-3.5 text-coral shrink-0 mt-0.5" />
           ) : isApproved ? (
-            <Check className="h-4 w-4 text-lime shrink-0 mt-0.5" />
+            <Check className="h-3.5 w-3.5 text-lime shrink-0 mt-0.5" />
           ) : (
-            <XIcon className="h-4 w-4 text-muted-foreground shrink-0 mt-0.5" />
+            <XIcon className="h-3.5 w-3.5 text-muted-foreground shrink-0 mt-0.5" />
           )}
           <div className="min-w-0 flex-1">
-            <p className="text-xs font-semibold">
+            <p className="text-[11px] font-semibold">
               {isHost
                 ? isPending
                   ? "A player wants to join"
