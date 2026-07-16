@@ -71,6 +71,9 @@ import {
 } from "@/lib/payments";
 import { reviewPaymentAction } from "@/lib/payments.functions";
 import { shouldTriggerLeaveBranch } from "@/lib/leave-branch";
+import { useMyFlowStatus } from "@/lib/game-flow-status";
+import { PlayerFlowPill } from "@/components/PlayerFlowPill";
+import { PaymentRequiredBanner } from "@/components/PaymentRequiredBanner";
 
 import { useHostedGames, fetchHostedGame, updateHostedGame, deleteHostedGame } from "@/lib/hosted-games-store";
 import type { Game } from "@/lib/sample-data";
@@ -208,6 +211,7 @@ function GameDetail() {
   const [processing, setProcessing] = useState(false);
   const [positionRosterOpen, setPositionRosterOpen] = useState(false);
   const [reviewsOpen, setReviewsOpen] = useState(false);
+  const { status: myFlowStatus, settings: flowSettings } = useMyFlowStatus(gameId);
 
   // Ticking clock (1s) that re-renders while the resubmit cooldown counts down.
   // Only starts when there's an active cooldown to avoid unnecessary re-renders.
