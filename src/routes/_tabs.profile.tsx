@@ -27,7 +27,13 @@ import { useJoinedGameIds } from "@/lib/games-store";
 import { useHostedGames } from "@/lib/hosted-games-store";
 import { readOverrides, useMyProfile } from "@/lib/user-prefs-store";
 import { ProfileLinksList } from "@/components/ProfileLinks";
-import { listMyJoinRequests, cancelMyJoinRequest, type JoinRequest } from "@/lib/payments";
+import {
+  listMyJoinRequests,
+  listHostJoinRequests,
+  cancelMyJoinRequest,
+  reviewJoinRequest,
+  type JoinRequest,
+} from "@/lib/payments";
 import { supabase } from "@/integrations/supabase/client";
 import {
   Dialog,
@@ -73,17 +79,24 @@ function Profile() {
   }, [joinedGameIds, hosted, profileUser]);
 
 
-  // Pending / recently-reviewed join requests for player view
+  // Pending / recently-reviewed join requests for player and host views
   const [myRequests, setMyRequests] = useState<JoinRequest[]>([]);
+  const [hostRequests, setHostRequests] = useState<JoinRequest[]>([]);
   const [requestsLoading, setRequestsLoading] = useState(true);
   const refreshRequests = async () => {
     if (!profileUser) {
       setMyRequests([]);
+      setHostRequests([]);
       return;
     }
     setRequestsLoading(true);
     try {
-      setMyRequests(await listMyJoinRequests());
+      const [mine, hosted] = await Promise.all([
+        listMyJoinRequests(),
+        listHostJoinRequests(),
+      ]);
+      setMyRequests(mine);
+      setHostRequests(hosted);
     } catch {
       /* ignore */
     } finally {
@@ -107,6 +120,16 @@ function Profile() {
         },
         () => refreshRequests(),
       )
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "join_requests",
+          filter: `host_id=eq.${profileUser.id}`,
+        },
+        () => refreshRequests(),
+      )
       .subscribe();
     return () => {
       supabase.removeChannel(ch);
@@ -122,8 +145,9 @@ function Profile() {
     return m;
   }, [hosted]);
 
-  const pendingRequests = myRequests.filter((r) => r.status === "pending");
-  const recentlyReviewed = myRequests.filter((r) => r.status !== "pending").slice(0, 3);
+  const allRequests = useMemo(() => [...myRequests, ...hostRequests], [myRequests, hostRequests]);
+  const pendingRequests = allRequests.filter((r) => r.status === "pending");
+  const recentlyReviewed = allRequests.filter((r) => r.status !== "pending").slice(0, 3);
   const pendingWithGame = pendingRequests.filter((r) => gameLookup.has(r.game_id));
   const reviewedWithGame = recentlyReviewed.filter((r) => gameLookup.has(r.game_id));
 
@@ -360,41 +384,63 @@ function Profile() {
                 </>
               ) : pendingWithGame.length > 0 || reviewedWithGame.length > 0 ? (
                 <>
-                  {pendingWithGame.map((r, i) => {
-                    const g = gameLookup.get(r.game_id)!;
-                    return (
-                      <RequestGameCard
-                        key={r.id}
-                        game={g}
-                        request={r}
-                        index={i}
-                        onCancel={async () => {
-                          try {
-                            await cancelMyJoinRequest(r.game_id);
-                            toast("Request canceled.");
-                            refreshRequests();
-                          } catch (e: any) {
-                            toast.error(e.message ?? "Could not cancel.");
-                          }
-                        }}
-                      />
-                    );
-                  })}
-                  {reviewedWithGame.map((r, i) => {
-                    const g = gameLookup.get(r.game_id)!;
-                    return (
-                      <RequestGameCard
-                        key={r.id}
-                        game={g}
-                        request={r}
-                        index={pendingWithGame.length + i}
-                      />
-                    );
-                  })}
-                </>
-              ) : (
-                <EmptyRequestsState />
-              )}
+              {pendingWithGame.map((r, i) => {
+                const g = gameLookup.get(r.game_id)!;
+                const isHost = r.host_id === profileUser?.id;
+                return (
+                  <RequestGameCard
+                    key={r.id}
+                    game={g}
+                    request={r}
+                    index={i}
+                    isHost={isHost}
+                    onCancel={isHost ? undefined : async () => {
+                      try {
+                        await cancelMyJoinRequest(r.game_id);
+                        toast("Request canceled.");
+                        refreshRequests();
+                      } catch (e: any) {
+                        toast.error(e.message ?? "Could not cancel.");
+                      }
+                    }}
+                    onApprove={isHost ? async () => {
+                      try {
+                        await reviewJoinRequest(r.id, "approved");
+                        toast("Player approved.");
+                        refreshRequests();
+                      } catch (e: any) {
+                        toast.error(e.message ?? "Could not approve.");
+                      }
+                    } : undefined}
+                    onDecline={isHost ? async () => {
+                      try {
+                        await reviewJoinRequest(r.id, "rejected");
+                        toast("Player declined.");
+                        refreshRequests();
+                      } catch (e: any) {
+                        toast.error(e.message ?? "Could not decline.");
+                      }
+                    } : undefined}
+                  />
+                );
+              })}
+              {reviewedWithGame.map((r, i) => {
+                const g = gameLookup.get(r.game_id)!;
+                const isHost = r.host_id === profileUser?.id;
+                return (
+                  <RequestGameCard
+                    key={r.id}
+                    game={g}
+                    request={r}
+                    index={pendingWithGame.length + i}
+                    isHost={isHost}
+                  />
+                );
+              })}
+            </>
+          ) : (
+            <EmptyRequestsState />
+          )}
             </div>
           </div>
 
