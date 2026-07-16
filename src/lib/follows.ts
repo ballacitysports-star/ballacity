@@ -8,6 +8,7 @@ export type FollowUser = {
   username: string | null;
   avatar_url: string | null;
   avatar_initials: string | null;
+  viewerFollows: boolean;
 };
 
 export type FollowListKind = "followers" | "following";
@@ -24,6 +25,7 @@ export async function listFollows(
   kind: FollowListKind,
   cursor?: string | null,
   pageSize: number = FOLLOW_PAGE_SIZE,
+  viewerId?: string | null,
 ): Promise<FollowPage> {
   const col = kind === "followers" ? "followee_id" : "follower_id";
   const otherCol = kind === "followers" ? "follower_id" : "followee_id";
@@ -41,13 +43,25 @@ export async function listFollows(
   const nextCursor =
     rows.length === pageSize ? (rows[rows.length - 1].created_at as string) : null;
   if (ids.length === 0) return { users: [], nextCursor };
-  const { data: profs, error: pErr } = await supabase
-    .from("profiles")
-    .select("id, display_name, username, avatar_url, avatar_initials")
-    .in("id", ids);
-  if (pErr) throw pErr;
-  const byId = new Map(((profs ?? []) as any[]).map((p) => [p.id, p]));
-  const users = ids
+  const [profsRes, mineRes] = await Promise.all([
+    supabase
+      .from("profiles")
+      .select("id, display_name, username, avatar_url, avatar_initials")
+      .in("id", ids),
+    viewerId
+      ? supabase
+          .from("follows" as any)
+          .select("followee_id")
+          .eq("follower_id", viewerId)
+          .in("followee_id", ids)
+      : Promise.resolve({ data: [], error: null } as any),
+  ]);
+  if (profsRes.error) throw profsRes.error;
+  const byId = new Map(((profsRes.data ?? []) as any[]).map((p) => [p.id, p]));
+  const mineSet = new Set(
+    ((mineRes as any).data ?? []).map((r: any) => r.followee_id as string),
+  );
+  const users: FollowUser[] = ids
     .map((id) => byId.get(id))
     .filter(Boolean)
     .map((p: any) => ({
@@ -56,6 +70,7 @@ export async function listFollows(
       username: p.username,
       avatar_url: p.avatar_url,
       avatar_initials: p.avatar_initials,
+      viewerFollows: mineSet.has(p.id),
     }));
   return { users, nextCursor };
 }
