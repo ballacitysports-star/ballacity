@@ -219,16 +219,16 @@ function TeamPage() {
           )}
         </div>
 
-        {/* Reputation badge (visible on all tabs) */}
+        {/* Reputation badge (opens reviews popup) */}
         {orgRep.count > 0 && (
           <div className="mt-4">
-            <ReputationBadge rep={orgRep} />
+            <ReputationBadge rep={orgRep} onClick={() => setReviewsOpen(true)} />
           </div>
         )}
 
         {/* Tabs */}
         <div className="mt-6 flex gap-1 rounded-full border border-border bg-surface p-1">
-          {(["posts", "about", "games", "reviews"] as const).map((t) => (
+          {(["posts", "about", "games"] as const).map((t) => (
             <button
               key={t}
               onClick={() => setTab(t)}
@@ -240,9 +240,7 @@ function TeamPage() {
                 ? `Games · ${upcomingGames.length}`
                 : t === "posts"
                   ? `Posts · ${org.posts.length}`
-                  : t === "reviews"
-                    ? "Reviews"
-                    : "About"}
+                  : "About"}
             </button>
           ))}
         </div>
