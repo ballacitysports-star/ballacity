@@ -42,9 +42,9 @@ const FILTERS: { key: ReviewerKind | "all"; label: string }[] = [
 ];
 
 const SORTS: { key: Sort; label: string }[] = [
-  { key: "recent", label: "Recent" },
-  { key: "top", label: "Highest" },
-  { key: "lowest", label: "Lowest" },
+  { key: "recent", label: "Newest" },
+  { key: "top", label: "Highest rating" },
+  { key: "lowest", label: "Lowest rating" },
   { key: "helpful", label: "Most helpful" },
 ];
 
