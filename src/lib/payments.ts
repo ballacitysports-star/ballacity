@@ -444,6 +444,41 @@ export async function withdrawMyApprovedJoinRequest(gameId: string) {
   if (error) throw error;
 }
 
+/**
+ * Host-side removal of a player from a game. Deletes the participant row,
+ * any lingering join_request row (which is what causes the roster to keep
+ * rendering a "ghost" approved player when only game_participants is
+ * cleaned up), and any pending/verified payment submission for that player
+ * on this game so payment chips don't linger. RLS restricts each delete
+ * to the game's host.
+ */
+export async function hostRemoveParticipant(params: {
+  gameId: string;
+  playerId: string;
+}): Promise<void> {
+  const { gameId, playerId } = params;
+  const { error: partErr } = await supabase
+    .from("game_participants")
+    .delete()
+    .eq("game_id", gameId)
+    .eq("user_id", playerId);
+  if (partErr) throw partErr;
+  // Best-effort: strip request + payment residue so the row disappears
+  // everywhere. Failures here shouldn't roll back the removal.
+  await supabase
+    .from("join_requests")
+    .delete()
+    .eq("game_id", gameId)
+    .eq("player_id", playerId)
+    .then(() => undefined, () => undefined);
+  await supabase
+    .from("payment_submissions")
+    .delete()
+    .eq("game_id", gameId)
+    .eq("player_id", playerId)
+    .then(() => undefined, () => undefined);
+}
+
 export async function getMyJoinRequest(gameId: string): Promise<JoinRequest | null> {
   const { data: u } = await supabase.auth.getUser();
   if (!u.user) return null;

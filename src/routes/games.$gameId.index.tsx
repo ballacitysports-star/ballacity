@@ -55,6 +55,7 @@ import {
   createJoinRequest,
   cancelMyJoinRequest,
   withdrawMyApprovedJoinRequest,
+  hostRemoveParticipant,
   listHostJoinRequests,
   reviewJoinRequest,
   upsertGamePaymentSettings,
@@ -295,6 +296,46 @@ function GameDetail() {
     });
     return () => setHostRequests(snapshot);
   };
+
+  // Host "Remove player" flow. `removeTarget` drives the confirmation
+  // dialog; `removingId` disables the row while the delete is in flight so
+  // a double-tap can't fire two requests.
+  const [removeTarget, setRemoveTarget] = useState<{ userId: string; name: string } | null>(null);
+  const [removingId, setRemovingId] = useState<string | null>(null);
+
+  const handleRemoveParticipant = async (playerId: string, displayName: string) => {
+    if (!game || !isHost) return;
+    setRemovingId(playerId);
+    // Optimistic UI: drop from both roster sources immediately.
+    const prevHostReqs = hostRequests;
+    removeRosterLocal(playerId);
+    setHostRequests((prev) => prev.filter((r) => r.player_id !== playerId));
+    try {
+      await hostRemoveParticipant({ gameId: game.id, playerId });
+      // Notify the removed player (best-effort).
+      if (user && playerId !== user.id) {
+        void createNotification({
+          user_id: playerId,
+          type: "participant_removed",
+          title: `Removed from ${game.title}`,
+          body: "The host removed you from the roster.",
+          link: `/games/${game.id}`,
+        }).catch(() => {});
+      }
+      toast.success(`Removed ${displayName} from the roster.`);
+    } catch (e: any) {
+      // Rollback.
+      setHostRequests(prevHostReqs);
+      void refetchRoster();
+      toast.error(e?.message ?? "Could not remove player.");
+    } finally {
+      setRemovingId(null);
+      setRemoveTarget(null);
+      void refetchRoster();
+      refreshHostRequests();
+    }
+  };
+
 
 
   useEffect(() => {
@@ -1792,7 +1833,16 @@ function GameDetail() {
           {/* Roster (host view) */}
           <div>
             {(() => {
-              const approvedReqs = hostRequests.filter((r) => r.status === "approved");
+              // Only surface approved join_requests whose player is still on
+              // the live roster. Once liveRoster hydrates, any join_request
+              // whose participant row was removed (host action, cleanup)
+              // stops rendering immediately — this was the "roster still
+              // shows removed player" bug.
+              const liveIds = new Set(liveRoster.map((p) => p.userId));
+              const rosterHydrated = liveRoster.length > 0 || (liveParticipantCount ?? 0) === 0;
+              const approvedReqs = hostRequests
+                .filter((r) => r.status === "approved")
+                .filter((r) => (rosterHydrated ? liveIds.has(r.player_id) : true));
               const approvedIds = new Set(approvedReqs.map((r) => r.player_id));
               // Realtime participants that aren't already surfaced via an
               // approved join request. Falls back to placeholder rows only
@@ -1824,35 +1874,59 @@ function GameDetail() {
                           />
 
                         ))}
-                        {rosterFromLive.map((p) => (
-                          <Link
-                            key={`live-${p.userId}`}
-                            to="/players/$userId"
-                            params={{ userId: p.userId }}
-                            className="flex items-center gap-3 rounded-2xl border border-border bg-surface p-3 hover:border-lime/40"
-                          >
-                            <div className="grid h-10 w-10 place-items-center overflow-hidden rounded-full bg-secondary text-xs font-bold">
-                              {p.avatarUrl ? (
-                                <img
-                                  src={p.avatarUrl}
-                                  alt={p.displayName}
-                                  className="h-full w-full object-cover"
-                                  loading="lazy"
-                                />
-                              ) : (
-                                p.avatarInitials
-                              )}
+                        {rosterFromLive.map((p) => {
+                          const canRemove = isHost && user && p.userId !== user.id;
+                          const isRemoving = removingId === p.userId;
+                          return (
+                            <div
+                              key={`live-${p.userId}`}
+                              className="flex items-center gap-3 rounded-2xl border border-border bg-surface p-3"
+                            >
+                              <Link
+                                to="/players/$userId"
+                                params={{ userId: p.userId }}
+                                className="flex flex-1 items-center gap-3 min-w-0 hover:opacity-90"
+                              >
+                                <div className="grid h-10 w-10 place-items-center overflow-hidden rounded-full bg-secondary text-xs font-bold">
+                                  {p.avatarUrl ? (
+                                    <img
+                                      src={p.avatarUrl}
+                                      alt={p.displayName}
+                                      className="h-full w-full object-cover"
+                                      loading="lazy"
+                                    />
+                                  ) : (
+                                    p.avatarInitials
+                                  )}
+                                </div>
+                                <div className="min-w-0 flex-1">
+                                  <div className="text-sm font-semibold truncate">
+                                    {p.displayName}
+                                  </div>
+                                  <div className="text-[11px] text-muted-foreground">
+                                    Joined {new Date(p.joinedAt).toLocaleString()}
+                                  </div>
+                                </div>
+                              </Link>
+                              {canRemove ? (
+                                <button
+                                  type="button"
+                                  aria-label={`Remove ${p.displayName} from roster`}
+                                  disabled={isRemoving}
+                                  onClick={(e) => {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                    setRemoveTarget({ userId: p.userId, name: p.displayName });
+                                  }}
+                                  className="grid h-8 w-8 place-items-center rounded-full border border-border text-muted-foreground hover:border-coral/60 hover:text-coral disabled:opacity-50"
+                                >
+                                  <Trash2 className="h-3.5 w-3.5" />
+                                </button>
+                              ) : null}
                             </div>
-                            <div className="min-w-0 flex-1">
-                              <div className="text-sm font-semibold truncate">
-                                {p.displayName}
-                              </div>
-                              <div className="text-[11px] text-muted-foreground">
-                                Joined {new Date(p.joinedAt).toLocaleString()}
-                              </div>
-                            </div>
-                          </Link>
-                        ))}
+                          );
+                        })}
+
                         {Array.from({ length: fallbackPlaceholderCount }).map((_, i) => (
                           <div
                             key={`ph-${i}`}
@@ -2086,6 +2160,39 @@ function GameDetail() {
               }
             >
               {confirmAction === "leave" ? "Leave game" : "Join game"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog
+        open={removeTarget !== null}
+        onOpenChange={(open) => {
+          if (!open && !removingId) setRemoveTarget(null);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              Remove {removeTarget?.name ?? "player"} from this game?
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              They'll be notified and their spot will open up. They can request to join again later.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={!!removingId}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={!!removingId}
+              onClick={(e) => {
+                e.preventDefault();
+                if (removeTarget) {
+                  void handleRemoveParticipant(removeTarget.userId, removeTarget.name);
+                }
+              }}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Remove player
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
