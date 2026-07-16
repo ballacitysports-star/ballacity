@@ -17,6 +17,7 @@ import {
   Mail,
   MailOpen,
   Settings,
+  UserPlus,
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/hooks/use-auth";
