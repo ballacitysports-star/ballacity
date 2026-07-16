@@ -3,7 +3,6 @@ import { motion } from "framer-motion";
 import {
   Settings,
   Trophy,
-  Calendar,
   Shield,
   LogIn,
   LogOut,
