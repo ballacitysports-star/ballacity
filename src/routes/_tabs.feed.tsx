@@ -476,10 +476,8 @@ function Feed() {
                 </h2>
                 <span className="text-xs text-muted-foreground">{urgent.length} games</span>
               </div>
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                {urgent.map((g, i) => (
-                  <GameCard key={g.id} game={g} index={i} />
-                ))}
+              <div className={listContainerClass}>
+                {urgent.map((g, i) => renderGame(g, i))}
               </div>
             </div>
           )}
