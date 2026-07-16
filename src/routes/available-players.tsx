@@ -244,13 +244,68 @@ function AvailablePlayersPage() {
                 ))}
               </div>
             </div>
+            <div className="-mx-4 overflow-x-auto px-4">
+              <div className="flex gap-2 pb-1">
+                {SKILLS.map((s) => (
+                  <Chip key={s} active={skill === s} onClick={() => setSkill(s)}>
+                    {s}
+                  </Chip>
+                ))}
+              </div>
+            </div>
+            <div className="-mx-4 overflow-x-auto px-4">
+              <div className="flex gap-2 pb-1">
+                {(
+                  [
+                    ["any", "Any time"],
+                    ["week", "Next 7 days"],
+                    ["month", "Next 30 days"],
+                    ["custom", "Custom…"],
+                  ] as const
+                ).map(([v, label]) => (
+                  <Chip key={v} active={window === v} onClick={() => setWindow(v)}>
+                    {label}
+                  </Chip>
+                ))}
+              </div>
+            </div>
+            {window === "custom" && (
+              <div className="flex gap-2">
+                <Input
+                  type="date"
+                  value={customFrom}
+                  onChange={(e) => setCustomFrom(e.target.value)}
+                  className="h-10"
+                  aria-label="From date"
+                />
+                <Input
+                  type="date"
+                  value={customTo}
+                  onChange={(e) => setCustomTo(e.target.value)}
+                  className="h-10"
+                  aria-label="To date"
+                />
+              </div>
+            )}
             <Input
               value={city}
               onChange={(e) => setCity(e.target.value)}
               placeholder="Filter by city"
               className="h-10"
             />
+            {city.trim() && (
+              <label className="flex items-center gap-2 text-xs text-muted-foreground">
+                <input
+                  type="checkbox"
+                  checked={includeAnywhere}
+                  onChange={(e) => setIncludeAnywhere(e.target.checked)}
+                  className="h-4 w-4 rounded border-border"
+                />
+                Include players open to anywhere
+              </label>
+            )}
           </div>
+
 
           {list === null ? (
             <LoadingRows />
