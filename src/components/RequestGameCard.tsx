@@ -38,6 +38,7 @@ export function RequestGameCard({
   index = 0,
   isHost,
   onCancel,
+  onWithdraw,
   onApprove,
   onDecline,
 }: {
@@ -46,10 +47,11 @@ export function RequestGameCard({
   index?: number;
   isHost?: boolean;
   onCancel?: () => void;
+  onWithdraw?: () => void;
   onApprove?: () => void;
   onDecline?: () => void;
 }) {
-  return <RequestGameCardInner game={game} request={request} index={index} isHost={isHost} onCancel={onCancel} onApprove={onApprove} onDecline={onDecline} />;
+  return <RequestGameCardInner game={game} request={request} index={index} isHost={isHost} onCancel={onCancel} onWithdraw={onWithdraw} onApprove={onApprove} onDecline={onDecline} />;
 }
 
 function formatTs(ts: string) {
