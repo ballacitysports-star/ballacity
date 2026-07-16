@@ -280,20 +280,118 @@ function FollowRow({
         </div>
       </Link>
       {!isSelf && viewerId && (
-        <Button
-          size="sm"
-          variant={isFollowing ? "outline" : "default"}
-          disabled={mutation.isPending}
-          onClick={() => mutation.mutate()}
-          className={
-            isFollowing
-              ? "h-8 rounded-full border-border bg-surface px-4 text-xs font-semibold"
-              : "h-8 rounded-full bg-lime-gradient px-4 text-xs font-semibold text-primary-foreground"
-          }
-        >
-          {isFollowing ? "Following" : "Follow"}
-        </Button>
+        <>
+          <Button
+            size="sm"
+            variant={isFollowing ? "outline" : "default"}
+            disabled={mutation.isPending}
+            onClick={() => mutation.mutate()}
+            className={
+              isFollowing
+                ? "h-8 rounded-full border-border bg-surface px-4 text-xs font-semibold"
+                : "h-8 rounded-full bg-lime-gradient px-4 text-xs font-semibold text-primary-foreground"
+            }
+          >
+            {isFollowing ? "Following" : "Follow"}
+          </Button>
+          <UserSafetyMenu userId={user.id} displayName={user.display_name} />
+        </>
       )}
     </li>
+  );
+}
+
+export function UserSafetyMenu({
+  userId,
+  displayName,
+  align = "end",
+}: {
+  userId: string;
+  displayName: string;
+  align?: "start" | "center" | "end";
+}) {
+  const block = useBlock(userId);
+  const [confirmBlock, setConfirmBlock] = useState(false);
+  const [reportOpen, setReportOpen] = useState(false);
+
+  async function handleBlockConfirmed() {
+    try {
+      await block.toggle();
+      toast.success(block.blocked ? `${displayName} unblocked` : `${displayName} blocked`);
+    } catch (e: any) {
+      toast.error(e?.message ?? "Couldn't update block");
+    } finally {
+      setConfirmBlock(false);
+    }
+  }
+
+  return (
+    <>
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8 shrink-0 rounded-full text-muted-foreground"
+            aria-label={`More options for ${displayName}`}
+          >
+            <MoreHorizontal className="h-4 w-4" />
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align={align} className="w-48">
+          <DropdownMenuItem
+            onSelect={(e) => {
+              e.preventDefault();
+              if (block.blocked) {
+                void handleBlockConfirmed();
+              } else {
+                setConfirmBlock(true);
+              }
+            }}
+            disabled={block.pending}
+            className="text-destructive focus:text-destructive"
+          >
+            <ShieldOff className="mr-2 h-4 w-4" />
+            {block.blocked ? "Unblock" : "Block"}
+          </DropdownMenuItem>
+          <DropdownMenuItem onSelect={() => setReportOpen(true)}>
+            <Flag className="mr-2 h-4 w-4" />
+            Report
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+
+      <AlertDialog open={confirmBlock} onOpenChange={setConfirmBlock}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Block {displayName}?</AlertDialogTitle>
+            <AlertDialogDescription>
+              They won't be able to follow you or interact with your profile. Any existing
+              follow relationships between you will be removed. You can unblock them anytime.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={block.pending}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={block.pending}
+              onClick={(e) => {
+                e.preventDefault();
+                void handleBlockConfirmed();
+              }}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Block
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <ReportUserDialog
+        open={reportOpen}
+        onOpenChange={setReportOpen}
+        userId={userId}
+        displayName={displayName}
+      />
+    </>
   );
 }
