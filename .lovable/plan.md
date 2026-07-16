@@ -1,25 +1,33 @@
-## Add payment policies section to the Payments tab
+## Add date range option to Host a Game
 
-Surface the same payment configuration that hosts set in `/games/$gameId/payment-setup` at the top of the Payments tab on `/games/$gameId`, visible to both host and player views.
+Let hosts optionally schedule the same game on multiple days at the same time. When a range is chosen, publishing creates one game instance per day in the range.
 
-### What to display
+### UI changes (`src/routes/_tabs.create.tsx`)
 
-Pulled from `game_payment_settings` for the game:
-- **Payment deadline** — formatted date/time, with a "past due" indicator when in the past.
-- **Refund policy** — free text, rendered with line breaks.
-- **Payment instructions** — free text, rendered with line breaks.
-- **Accepted payment methods** — list of the host's enabled methods (label + handle/identifier), same shape as the setup screen.
+- Under the existing "When" datetime input, add a toggle: **"Repeat on multiple days"** (off by default).
+- When on:
+  - The existing "When" input becomes the **time** used for every day in the range (label switches to "Time").
+  - Add two date pickers: **Start date** and **End date** (end date must be ≥ start date).
+  - Show a small helper line: "Will create N games, one per day."
+- When off: behavior is unchanged (single game at the chosen datetime).
 
-Fields render only when set; if none are configured, show a subtle empty state ("Host hasn't configured payment details yet"). For the host view, include a small "Edit payment settings" link to `/games/$gameId/payment-setup`.
+### Publish logic
 
-### Implementation
+- Off: unchanged — one `addHostedGame` call.
+- On:
+  - Build the list of dates from start→end (inclusive, cap at 60 to prevent runaway).
+  - For each date, combine with the chosen time to build an ISO datetime, then call `addHostedGame` with the same title/sport/location/size/price/etc.
+  - If `game_payment_settings` are used, call `upsertGamePaymentSettings` for each created game (same values).
+  - Show a single toast: "Created N games" and navigate to `/feed` (or the first game) as today.
+- All-or-nothing failure: if any insert fails, surface the error toast and stop; already-created games remain (no rollback — matches current single-create behavior).
 
-- New presentational component `PaymentPoliciesCard` in `src/routes/games.$gameId.index.tsx` (or co-located file) that takes the settings + accepted methods as props.
-- Extend the existing Payments-tab query (or add a sibling query) to also fetch `game_payment_settings` for the game and the host's `host_payment_methods` rows referenced by it, reusing helpers from `src/lib/payments.ts`.
-- Render `PaymentPoliciesCard` at the top of the Payments tab, above both the host approval queue and the player status card.
-- No schema changes, no mutation logic — read-only display.
+### Out of scope
+
+- No schema changes (no "series" grouping table).
+- No RRULE/weekday-selection recurrence — strictly one-per-day across a contiguous range.
+- No edit-all-in-series; each game is independent after creation.
 
 ### Verification
 
 - `bunx tsgo --noEmit`.
-- Manually confirm: with policies set, both host and player see the card; with none set, empty state renders; deadline past shows the past-due badge.
+- Manually: toggle off → single game as before; toggle on with a 3-day range → 3 games appear on the feed, each at the chosen time.
