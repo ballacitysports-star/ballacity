@@ -19,7 +19,7 @@ export const Route = createFileRoute("/account/notifications")({
   component: NotificationSettingsPage,
 });
 
-const ORDER: NotifCategory[] = ["messages", "approvals", "joinRequests", "general"];
+const ORDER: NotifCategory[] = ["messages", "approvals", "joinRequests", "follows", "general"];
 
 function NotificationSettingsPage() {
   const [userId, setUserId] = useState<string | null>(null);
