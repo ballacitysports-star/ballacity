@@ -499,33 +499,11 @@ function PayPage() {
       {/* Status card replaces the stepper once a submission exists */}
       {hasSubmission && <PaymentStatusTimeline latest={mySubs[0]} history={mySubs.slice(1)} />}
 
-      {/* Approval badge — kept for tests and clarity */}
-      {requiresApproval && (myReq?.status === "pending" || myReq?.status === "approved") && (
-        <div
-          data-testid="approval-status-indicator"
-          data-status={myReq.status}
-          role="status"
-          aria-live="polite"
-          aria-atomic="true"
-          className={`inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-bold ${
-            myReq.status === "approved"
-              ? "border-lime/40 bg-lime/10 text-lime"
-              : "border-coral/40 bg-coral/10 text-coral"
-          }`}
-        >
-          {myReq.status === "approved" ? (
-            <>
-              <ShieldCheck className="h-3.5 w-3.5" aria-hidden="true" />
-              <span>Approved — you can pay now</span>
-            </>
-          ) : (
-            <>
-              <Clock className="h-3.5 w-3.5 animate-pulse" aria-hidden="true" />
-              <span>Waiting for host to approve you</span>
-            </>
-          )}
-        </div>
-      )}
+      {/* Approval / payment stage badge — driven by shared flow status so
+          paid games show "Payment due" (etc.) rather than "Approved — you
+          can pay now" until the host actually verifies the payment. */}
+      <PayApprovalIndicator gameId={gameId} isPaid={Number(fee) > 0} requiresApproval={requiresApproval} />
+
 
       {/* Two-step progress (Pay → Confirm) */}
       {showStepper && (
