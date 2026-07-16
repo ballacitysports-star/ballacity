@@ -612,7 +612,7 @@ function Profile() {
 
 
         {/* Sports & skill */}
-        <div className="mt-6">
+        <div className="mt-8">
           <h2 className="font-display text-sm font-bold uppercase tracking-wider text-muted-foreground mb-2">
             Sports
           </h2>
