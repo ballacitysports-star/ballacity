@@ -1,17 +1,21 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "@tanstack/react-router";
 import { toast } from "sonner";
-import { Check, X as XIcon, ExternalLink, RefreshCw, Clock, ShieldCheck, ImageIcon } from "lucide-react";
+import { Check, X as XIcon, ExternalLink, RefreshCw, Clock, ShieldCheck, ImageIcon, CalendarClock, FileText, Info, Wallet, Pencil, AlertTriangle } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import {
   listMySubmissionsForGame,
   getSignedProofUrl,
+  listPaymentMethodsForHost,
+  paymentTypeMeta,
+  type PaymentMethod,
   type PaymentSubmission,
   type GamePaymentSettings,
 } from "@/lib/payments";
 import { reviewPaymentAction } from "@/lib/payments.functions";
 import { createNotification } from "@/lib/notifications";
 import { UserAvatar } from "@/components/UserAvatar";
+
 
 type Filter = "all" | "pending" | "verified" | "rejected";
 
