@@ -456,6 +456,7 @@ function PayPage() {
           <div className="text-xs text-muted-foreground truncate">{game.location}</div>
         </div>
         <PayFlowPillHeader gameId={gameId} />
+        <LeaveFlowButton gameId={gameId} gameTitle={game.title} variant="link" navigateTo={`/games/${game.id}`} />
       </div>
 
       <PayFlowStepper gameId={gameId} />
