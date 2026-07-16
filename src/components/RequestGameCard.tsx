@@ -33,8 +33,10 @@ export function RequestGameCard({
 }) {
   const isPending = request.status === "pending";
   const isApproved = request.status === "approved";
-  const spotsLeft = Math.max(0, game.maxPlayers - game.joined);
-  const fillPct = Math.round((game.joined / game.maxPlayers) * 100);
+  const liveCount = useLiveParticipantCount(game.id);
+  const joinedCount = liveCount ?? game.joined;
+  const spotsLeft = Math.max(0, game.maxPlayers - joinedCount);
+  const fillPct = Math.round((joinedCount / game.maxPlayers) * 100);
 
   return (
     <motion.div
