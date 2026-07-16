@@ -270,7 +270,12 @@ export async function getAttachmentUrl(path: string): Promise<string | null> {
   return data?.signedUrl ?? null;
 }
 
-export async function sendMessage(convId: string, body: string, attachment?: Attachment | null) {
+export async function sendMessage(
+  convId: string,
+  body: string,
+  attachment?: Attachment | null,
+  opts?: { replyToId?: string | null },
+) {
   const { data: u } = await supabase.auth.getUser();
   if (!u.user) throw new Error("Sign in to send messages.");
   const me = u.user.id;
@@ -284,10 +289,18 @@ export async function sendMessage(convId: string, body: string, attachment?: Att
     attachment_type: attachment?.type ?? null,
     attachment_name: attachment?.name ?? null,
     attachment_size: attachment?.size ?? null,
+    reply_to_id: opts?.replyToId ?? null,
   } as any);
   if (error) throw error;
 
-  // Notify other participants
+  // Skip notification if this thread is still a request for the recipient
+  const { data: convRow } = await supabase
+    .from("conversations" as any)
+    .select("accepted_by")
+    .eq("id", convId)
+    .maybeSingle();
+  const accepted: string[] = ((convRow as any)?.accepted_by ?? []) as string[];
+
   const { data: parts } = await supabase
     .from("conversation_participants" as any)
     .select("user_id")
@@ -301,15 +314,17 @@ export async function sendMessage(convId: string, body: string, attachment?: Att
   const name = (meProf as any)?.display_name ?? "Someone";
   const preview = trimmed ? trimmed.slice(0, 140) : `📎 ${attachment?.name ?? "Attachment"}`;
   await Promise.all(
-    others.map((uid) =>
-      createNotification({
-        user_id: uid,
-        type: "message",
-        title: `New message from ${name}`,
-        body: preview,
-        link: `/messages/${convId}`,
-      }),
-    ),
+    others
+      .filter((uid) => accepted.includes(uid))
+      .map((uid) =>
+        createNotification({
+          user_id: uid,
+          type: "message",
+          title: `New message from ${name}`,
+          body: preview,
+          link: `/messages/${convId}`,
+        }),
+      ),
   );
 }
 
@@ -323,3 +338,48 @@ export async function markConversationRead(convId: string) {
     .neq("sender_id", u.user.id)
     .is("read_at", null);
 }
+
+export async function unsendMessage(messageId: string) {
+  const { error } = await supabase.rpc("unsend_message" as any, { _id: messageId });
+  if (error) throw error;
+}
+
+export async function acceptConversation(convId: string) {
+  const { error } = await supabase.rpc("accept_conversation" as any, { _conv: convId });
+  if (error) throw error;
+}
+
+export async function declineConversation(convId: string) {
+  const { error } = await supabase.rpc("decline_conversation" as any, { _conv: convId });
+  if (error) throw error;
+}
+
+export async function addReaction(messageId: string, emoji: string) {
+  const { data: u } = await supabase.auth.getUser();
+  if (!u.user) throw new Error("Sign in first.");
+  const { error } = await supabase
+    .from("message_reactions" as any)
+    .insert({ message_id: messageId, user_id: u.user.id, emoji } as any);
+  if (error && !String(error.message).toLowerCase().includes("duplicate")) throw error;
+}
+
+export async function removeReaction(messageId: string, emoji: string) {
+  const { data: u } = await supabase.auth.getUser();
+  if (!u.user) return;
+  await supabase
+    .from("message_reactions" as any)
+    .delete()
+    .eq("message_id", messageId)
+    .eq("user_id", u.user.id)
+    .eq("emoji", emoji);
+}
+
+export async function listReactionsFor(messageIds: string[]): Promise<MessageReaction[]> {
+  if (messageIds.length === 0) return [];
+  const { data } = await supabase
+    .from("message_reactions" as any)
+    .select("message_id, user_id, emoji")
+    .in("message_id", messageIds);
+  return ((data ?? []) as unknown) as MessageReaction[];
+}
+
