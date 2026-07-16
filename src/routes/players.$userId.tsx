@@ -427,6 +427,35 @@ function PlayerProfilePage() {
   );
 }
 
+function StatCell({
+  k,
+  v,
+  onClick,
+}: {
+  k: number | string;
+  v: string;
+  onClick?: () => void;
+}) {
+  const inner = (
+    <>
+      <div className="font-display text-base font-bold leading-tight">{k}</div>
+      <div className="text-[11px] text-muted-foreground">{v}</div>
+    </>
+  );
+  if (onClick) {
+    return (
+      <button
+        type="button"
+        onClick={onClick}
+        className="min-w-[56px] rounded-lg px-1 transition-colors hover:bg-surface"
+      >
+        {inner}
+      </button>
+    );
+  }
+  return <div className="min-w-[56px] px-1">{inner}</div>;
+}
+
 function PlayerCard({ a }: { a: PlayerAvailability }) {
   const window = formatWindow(a);
   return (
