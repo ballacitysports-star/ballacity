@@ -170,24 +170,24 @@ function RequestGameCardInner({
           </div>
           </div>
 
-          <div className="p-4 space-y-3">
-            <div className="flex items-center gap-3 text-sm text-muted-foreground">
+          <div className="p-3 space-y-2">
+            <div className="flex items-center gap-3 text-xs text-muted-foreground">
               <span className="inline-flex items-center gap-1.5" suppressHydrationWarning>
-                <Clock className="h-4 w-4 text-lime" />
+                <Clock className="h-3.5 w-3.5 text-lime" />
                 {formatWhen(game.date)}
               </span>
               <span className="inline-flex items-center gap-1.5">
-                <MapPin className="h-4 w-4 text-coral" />
+                <MapPin className="h-3.5 w-3.5 text-coral" />
                 {game.distanceMi} mi
               </span>
             </div>
-            <div className="flex items-center justify-between gap-3">
-              <div className="flex items-center gap-2 text-xs text-muted-foreground">
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground">
                 <UserAvatar initials={game.host.avatar} name={game.host.name} size="xs" />
-                <span>{game.host.name}</span>
-                <span className="text-foreground">· {game.skill}</span>
+                <span className="truncate">{game.host.name}</span>
+                <span className="shrink-0 text-foreground">· {game.skill}</span>
               </div>
-              <div className="flex items-center gap-1.5 text-xs font-semibold">
+              <div className="flex shrink-0 items-center gap-1 text-[11px] font-semibold">
                 <span className="text-foreground">
                   {joinedCount}/{game.maxPlayers}
                 </span>
@@ -196,7 +196,7 @@ function RequestGameCardInner({
                 )}
               </div>
             </div>
-            <div className="h-1.5 overflow-hidden rounded-full bg-secondary">
+            <div className="h-1 overflow-hidden rounded-full bg-secondary">
               <motion.div
                 initial={{ width: 0 }}
                 animate={{ width: `${fillPct}%` }}
