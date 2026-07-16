@@ -55,6 +55,9 @@ export function RequestGameCard({
   const joinedCount = liveCount ?? game.joined;
   const spotsLeft = Math.max(0, game.maxPlayers - joinedCount);
   const fillPct = Math.round((joinedCount / game.maxPlayers) * 100);
+  const [confirm, setConfirm] = useState<null | "approve" | "decline">(null);
+  const playerName = (request as any).player_name || (request as any).player?.display_name || "this player";
+
 
   return (
     <motion.div
