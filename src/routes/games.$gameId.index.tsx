@@ -934,90 +934,181 @@ function GameDetail() {
         )}
 
         {/* Approval status banner (player view).
-            For paid games, once the host approves the join request the
-            player still owes payment — PaymentRequiredBanner + PlayerFlowPill
-            above already communicate the true state (Payment due / Awaiting
-            review / Declined), so suppress the "approved — on the roster"
-            copy here to avoid contradicting them. */}
-        {!isHost &&
-          requiresApproval &&
-          myReq &&
-          !(
-            myReq.status === "approved" &&
-            isPaid &&
-            latestSub?.status !== "verified"
-          ) && (
-          <div
-            className={`rounded-2xl border p-4 flex items-start gap-3 ${
-              myReq.status === "pending"
+            Driven by the shared useMyFlowStatus so paid games always show
+            "Payment due" (or the matching payment stage) until the host
+            verifies the payment — never "You're approved / on the roster". */}
+        {!isHost && requiresApproval && myReq && (() => {
+          // Paid games: pick copy from the shared flow status so this banner
+          // can't disagree with the pill / PaymentRequiredBanner / pay page.
+          if (isPaid) {
+            const paidCopy: Record<string, { title: string; body: string; tone: "warn" | "info" | "ok" | "bad" | "muted" }> = {
+              requested: {
+                title: "Waiting for host approval",
+                body: "Your spot isn't held until the host approves. You'll get a notification when they respond.",
+                tone: "warn",
+              },
+              payment_pending: {
+                title: "Payment due",
+                body: "Submit payment to lock your spot on the roster.",
+                tone: "warn",
+              },
+              payment_submitted: {
+                title: "Payment sent — waiting on host to confirm",
+                body: "The host is reviewing your proof. You'll be confirmed once they verify.",
+                tone: "info",
+              },
+              payment_rejected: {
+                title: "Payment declined — resubmit to keep your spot",
+                body: myReq.reviewer_notes || "The host couldn't verify your last payment. Send new proof to lock your spot.",
+                tone: "bad",
+              },
+              payment_verified: {
+                title: "Payment confirmed — you're on the roster",
+                body: "You're all set. See you at the game!",
+                tone: "ok",
+              },
+              confirmed: {
+                title: "Payment confirmed — you're on the roster",
+                body: "You're all set. See you at the game!",
+                tone: "ok",
+              },
+              rejected: {
+                title: "Request declined",
+                body: capReached
+                  ? `${myReq.reviewer_notes ? `${myReq.reviewer_notes} · ` : ""}You've reached the ${JOIN_RESUBMIT_MAX_ATTEMPTS}-attempt limit for this game. Message the host instead.`
+                  : cooldownMs > 0
+                    ? `${myReq.reviewer_notes ? `${myReq.reviewer_notes} · ` : ""}You can resubmit in ${formatCooldownLabel(cooldownMs)}.`
+                    : `${myReq.reviewer_notes ? `${myReq.reviewer_notes} · ` : ""}You can send another request or message the host.`,
+                tone: "muted",
+              },
+            };
+            const entry = paidCopy[myFlowStatus];
+            if (!entry) return null;
+            const toneClass =
+              entry.tone === "warn"
                 ? "border-coral/40 bg-coral/10"
-                : myReq.status === "approved"
-                  ? "border-lime/40 bg-lime/10"
-                  : "border-border bg-surface"
-            }`}
-            role="status"
-            aria-live="polite"
-          >
-            {myReq.status === "pending" ? (
-              <Clock className="h-5 w-5 text-coral shrink-0 mt-0.5" />
-            ) : myReq.status === "approved" ? (
-              <Check className="h-5 w-5 text-lime shrink-0 mt-0.5" />
-            ) : (
-              <XIcon className="h-5 w-5 text-muted-foreground shrink-0 mt-0.5" />
-            )}
-            <div className="min-w-0">
-              <div className="font-display text-sm font-bold">
-                {myReq.status === "pending"
-                  ? "Waiting for host approval"
-                  : myReq.status === "approved"
-                    ? "You're approved — see you there!"
-                    : "Request declined"}
+                : entry.tone === "bad"
+                  ? "border-destructive/50 bg-destructive/10"
+                  : entry.tone === "ok"
+                    ? "border-lime/40 bg-lime/10"
+                    : entry.tone === "info"
+                      ? "border-lime/40 bg-lime/5"
+                      : "border-border bg-surface";
+            const Icon =
+              entry.tone === "warn" || entry.tone === "info"
+                ? Clock
+                : entry.tone === "ok"
+                  ? Check
+                  : entry.tone === "bad"
+                    ? XIcon
+                    : XIcon;
+            const iconColor =
+              entry.tone === "warn"
+                ? "text-coral"
+                : entry.tone === "ok"
+                  ? "text-lime"
+                  : entry.tone === "bad"
+                    ? "text-destructive"
+                    : entry.tone === "info"
+                      ? "text-lime"
+                      : "text-muted-foreground";
+            return (
+              <div
+                className={`rounded-2xl border p-4 flex items-start gap-3 ${toneClass}`}
+                role="status"
+                aria-live="polite"
+              >
+                <Icon className={`h-5 w-5 shrink-0 mt-0.5 ${iconColor}`} />
+                <div className="min-w-0">
+                  <div className="font-display text-sm font-bold">{entry.title}</div>
+                  <p className="text-xs text-muted-foreground mt-0.5">{entry.body}</p>
+                </div>
               </div>
-              <p className="text-xs text-muted-foreground mt-0.5">
-                {myReq.status === "pending"
-                  ? "Your spot isn't held until the host approves. You'll get a notification when they respond."
+            );
+          }
+
+          // Free games: original approval-only copy (no payment stage exists).
+          return (
+            <div
+              className={`rounded-2xl border p-4 flex items-start gap-3 ${
+                myReq.status === "pending"
+                  ? "border-coral/40 bg-coral/10"
                   : myReq.status === "approved"
-                    ? "The host approved your request. You're on the roster."
-                    : capReached
-                      ? `${myReq.reviewer_notes ? `${myReq.reviewer_notes} · ` : ""}You've reached the ${JOIN_RESUBMIT_MAX_ATTEMPTS}-attempt limit for this game. Message the host instead.`
-                      : cooldownMs > 0
-                        ? `${myReq.reviewer_notes ? `${myReq.reviewer_notes} · ` : ""}You can resubmit in ${formatCooldownLabel(cooldownMs)}.`
-                        : `${myReq.reviewer_notes ? `${myReq.reviewer_notes} · ` : ""}You can send another request or message the host.`}
-
-              </p>
+                    ? "border-lime/40 bg-lime/10"
+                    : "border-border bg-surface"
+              }`}
+              role="status"
+              aria-live="polite"
+            >
+              {myReq.status === "pending" ? (
+                <Clock className="h-5 w-5 text-coral shrink-0 mt-0.5" />
+              ) : myReq.status === "approved" ? (
+                <Check className="h-5 w-5 text-lime shrink-0 mt-0.5" />
+              ) : (
+                <XIcon className="h-5 w-5 text-muted-foreground shrink-0 mt-0.5" />
+              )}
+              <div className="min-w-0">
+                <div className="font-display text-sm font-bold">
+                  {myReq.status === "pending"
+                    ? "Waiting for host approval"
+                    : myReq.status === "approved"
+                      ? "You're approved — see you there!"
+                      : "Request declined"}
+                </div>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  {myReq.status === "pending"
+                    ? "Your spot isn't held until the host approves. You'll get a notification when they respond."
+                    : myReq.status === "approved"
+                      ? "The host approved your request. You're on the roster."
+                      : capReached
+                        ? `${myReq.reviewer_notes ? `${myReq.reviewer_notes} · ` : ""}You've reached the ${JOIN_RESUBMIT_MAX_ATTEMPTS}-attempt limit for this game. Message the host instead.`
+                        : cooldownMs > 0
+                          ? `${myReq.reviewer_notes ? `${myReq.reviewer_notes} · ` : ""}You can resubmit in ${formatCooldownLabel(cooldownMs)}.`
+                          : `${myReq.reviewer_notes ? `${myReq.reviewer_notes} · ` : ""}You can send another request or message the host.`}
+                </p>
+              </div>
             </div>
-          </div>
-        )}
+          );
+        })()}
 
-        {/* Compact "Your status" strip for paid games — surfaces payment state
-            at the top so the viewer sees where they are without scrolling to
-            the sticky CTA. Only rendered when the viewer has actually
-            submitted (or had rejected) proof; otherwise the sticky CTA is
-            the single source of truth. */}
-        {!isHost && isPaid && latestSub && (
-          <div
-            className={`flex items-center gap-3 rounded-2xl border px-4 py-2.5 text-xs ${
-              latestSub.status === "verified"
-                ? "border-lime/40 bg-lime/10 text-lime"
-                : latestSub.status === "pending"
-                  ? "border-coral/40 bg-coral/10 text-coral"
-                  : "border-border bg-surface text-muted-foreground"
-            }`}
-            role="status"
-            aria-live="polite"
-            data-testid="your-status-strip"
-          >
-            <span className="font-bold uppercase tracking-wider">Your status</span>
-            <span className="text-foreground/80">·</span>
-            <span className="font-semibold">
-              {latestSub.status === "verified"
-                ? "Payment verified — you're on the roster"
-                : latestSub.status === "pending"
-                  ? "Payment pending host review"
-                  : "Payment rejected — resubmit below"}
-            </span>
-          </div>
-        )}
+        {/* Compact "Your status" strip for paid games — driven by shared flow
+            status so it never disagrees with the banner above. Shown for any
+            paid-flow state so an approved-but-unpaid player sees "Payment due"
+            here too, not just after they've submitted proof. */}
+        {!isHost && isPaid && (() => {
+          const stripCopy: Partial<Record<string, { text: string; tone: "warn" | "info" | "ok" | "bad" }>> = {
+            payment_pending: { text: "Payment due — submit payment to lock your spot", tone: "warn" },
+            payment_submitted: { text: "Payment sent — waiting on host to confirm", tone: "info" },
+            payment_rejected: { text: "Payment declined — resubmit below", tone: "bad" },
+            payment_verified: { text: "Payment verified — you're on the roster", tone: "ok" },
+            confirmed: { text: "Payment verified — you're on the roster", tone: "ok" },
+          };
+          const entry = stripCopy[myFlowStatus];
+          if (!entry) return null;
+          const toneClass =
+            entry.tone === "ok"
+              ? "border-lime/40 bg-lime/10 text-lime"
+              : entry.tone === "warn"
+                ? "border-coral/40 bg-coral/10 text-coral"
+                : entry.tone === "info"
+                  ? "border-lime/30 bg-lime/5 text-lime"
+                  : "border-destructive/50 bg-destructive/10 text-destructive";
+          return (
+            <div
+              className={`flex items-center gap-3 rounded-2xl border px-4 py-2.5 text-xs ${toneClass}`}
+              role="status"
+              aria-live="polite"
+              data-testid="your-status-strip"
+              data-status={myFlowStatus}
+            >
+              <span className="font-bold uppercase tracking-wider">Your status</span>
+              <span className="text-foreground/80">·</span>
+              <span className="font-semibold">{entry.text}</span>
+            </div>
+          );
+        })()}
+
+
 
         {/* Meta */}
         <div className="grid grid-cols-2 gap-2">
