@@ -124,6 +124,6 @@ export function ReputationBadge({ rep, compact = false, onClick }: { rep: Reputa
       {rep.count > 0 && (
         <p className="mt-2 text-xs text-foreground/80 leading-snug">{rep.aiSummary}</p>
       )}
-    </motion.div>
+    </Component>
   );
 }
