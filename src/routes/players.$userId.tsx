@@ -15,6 +15,12 @@ import { ReputationBadge } from "@/components/ReputationBadge";
 import { computeReputation, useReviewsFor } from "@/lib/reviews";
 import { useProfileOverrides } from "@/lib/user-prefs-store";
 import { ProfileLinksList } from "@/components/ProfileLinks";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 export const Route = createFileRoute("/players/$userId")({
   head: () => ({ meta: [{ title: "Player profile — OpenRun" }] }),
@@ -44,6 +50,7 @@ function PlayerProfilePage() {
   const [availability, setAvailability] = useState<PlayerAvailability | null>(null);
   const [loading, setLoading] = useState(true);
   const [opening, setOpening] = useState(false);
+  const [reviewsOpen, setReviewsOpen] = useState(false);
 
   const overrides = useProfileOverrides(userId);
   const reviews = useReviewsFor(userId);
@@ -253,9 +260,9 @@ function PlayerProfilePage() {
           ))}
         </div>
 
-        {/* Reputation badge */}
+        {/* Reputation badge (opens reviews popup) */}
         <div className="mt-4">
-          <ReputationBadge rep={rep} />
+          <ReputationBadge rep={rep} onClick={() => setReviewsOpen(true)} />
         </div>
 
         {/* Open availability */}
@@ -328,15 +335,22 @@ function PlayerProfilePage() {
           </div>
         )}
 
-        {/* Reviews */}
-        <div className="mt-6">
-          <ReviewsSection
-            revieweeId={userId}
-            revieweeKind="player"
-            revieweeName={displayName}
-            isOwner={user?.id === userId}
-          />
-        </div>
+        {/* Reviews popup */}
+        <Dialog open={reviewsOpen} onOpenChange={setReviewsOpen}>
+          <DialogContent className="max-h-[90dvh] overflow-y-auto p-0 sm:max-w-xl">
+            <DialogHeader className="sr-only">
+              <DialogTitle>Reviews</DialogTitle>
+            </DialogHeader>
+            <div className="p-4">
+              <ReviewsSection
+                revieweeId={userId}
+                revieweeKind="player"
+                revieweeName={displayName}
+                isOwner={user?.id === userId}
+              />
+            </div>
+          </DialogContent>
+        </Dialog>
       </div>
     </div>
   );

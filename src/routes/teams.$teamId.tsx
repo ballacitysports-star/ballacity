@@ -23,6 +23,12 @@ import { ReviewsSection } from "@/components/ReviewsSection";
 import { computeReputation, useReviewsFor } from "@/lib/reviews";
 import { ReputationBadge } from "@/components/ReputationBadge";
 import { useCanReview } from "@/lib/transactions";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 export const Route = createFileRoute("/teams/$teamId")({
   head: ({ params }) => {
@@ -59,9 +65,10 @@ const FILTERS: { key: PostKind | "all"; label: string }[] = [
 function TeamPage() {
   const org = Route.useLoaderData() as Org;
   const [filter, setFilter] = useState<PostKind | "all">("all");
-  const [tab, setTab] = useState<"posts" | "about" | "games" | "reviews">("posts");
+  const [tab, setTab] = useState<"posts" | "about" | "games">("posts");
   const [following, setFollowing] = useState(false);
   const [mounted, setMounted] = useState(false);
+  const [reviewsOpen, setReviewsOpen] = useState(false);
   useEffect(() => setMounted(true), []);
   const canEdit = mounted && isMyOrg(org.id);
 
@@ -212,16 +219,16 @@ function TeamPage() {
           )}
         </div>
 
-        {/* Reputation badge (visible on all tabs) */}
+        {/* Reputation badge (opens reviews popup) */}
         {orgRep.count > 0 && (
           <div className="mt-4">
-            <ReputationBadge rep={orgRep} />
+            <ReputationBadge rep={orgRep} onClick={() => setReviewsOpen(true)} />
           </div>
         )}
 
         {/* Tabs */}
         <div className="mt-6 flex gap-1 rounded-full border border-border bg-surface p-1">
-          {(["posts", "about", "games", "reviews"] as const).map((t) => (
+          {(["posts", "about", "games"] as const).map((t) => (
             <button
               key={t}
               onClick={() => setTab(t)}
@@ -233,9 +240,7 @@ function TeamPage() {
                 ? `Games · ${upcomingGames.length}`
                 : t === "posts"
                   ? `Posts · ${org.posts.length}`
-                  : t === "reviews"
-                    ? "Reviews"
-                    : "About"}
+                  : "About"}
             </button>
           ))}
         </div>
@@ -387,15 +392,22 @@ function TeamPage() {
           </div>
         )}
 
-        {/* Reviews tab */}
-        {tab === "reviews" && (
-          <ReviewsSection
-            revieweeId={org.id}
-            revieweeKind={org.kind === "coach" ? "trainer" : "team"}
-            revieweeName={org.name}
-            isOwner={canEdit}
-          />
-        )}
+        {/* Reviews popup */}
+        <Dialog open={reviewsOpen} onOpenChange={setReviewsOpen}>
+          <DialogContent className="max-h-[90dvh] overflow-y-auto p-0 sm:max-w-xl">
+            <DialogHeader className="sr-only">
+              <DialogTitle>Reviews</DialogTitle>
+            </DialogHeader>
+            <div className="p-4">
+              <ReviewsSection
+                revieweeId={org.id}
+                revieweeKind={org.kind === "coach" ? "trainer" : "team"}
+                revieweeName={org.name}
+                isOwner={canEdit}
+              />
+            </div>
+          </DialogContent>
+        </Dialog>
       </div>
     </div>
   );

@@ -98,6 +98,12 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 const emojiBySport: Record<string, string> = Object.fromEntries(
   SPORTS.map((s) => [s.name, s.emoji]),
@@ -200,6 +206,7 @@ function GameDetail() {
   const [requesting, setRequesting] = useState(false);
   const [processing, setProcessing] = useState(false);
   const [positionRosterOpen, setPositionRosterOpen] = useState(false);
+  const [reviewsOpen, setReviewsOpen] = useState(false);
 
   // Ticking clock (1s) that re-renders while the resubmit cooldown counts down.
   // Only starts when there's an active cooldown to avoid unnecessary re-renders.
@@ -1100,20 +1107,29 @@ function GameDetail() {
           ) : null}
         </div>
 
-        {/* Host reputation (above the fold) */}
+        {/* Host reputation (opens reviews popup) */}
         {hostRep.count > 0 && (
           <div className="mt-3">
-            <ReputationBadge rep={hostRep} />
+            <ReputationBadge rep={hostRep} onClick={() => setReviewsOpen(true)} />
           </div>
         )}
 
-        {/* Host reviews */}
-        <ReviewsSection
-          revieweeId={hostIdFor(game.host.username)}
-          revieweeKind="host"
-          revieweeName={game.host.name}
-          isOwner={ownsViaGame}
-        />
+        {/* Host reviews popup */}
+        <Dialog open={reviewsOpen} onOpenChange={setReviewsOpen}>
+          <DialogContent className="max-h-[90dvh] overflow-y-auto p-0 sm:max-w-xl">
+            <DialogHeader className="sr-only">
+              <DialogTitle>Host reviews</DialogTitle>
+            </DialogHeader>
+            <div className="p-4">
+              <ReviewsSection
+                revieweeId={hostIdFor(game.host.username)}
+                revieweeKind="host"
+                revieweeName={game.host.name}
+                isOwner={ownsViaGame}
+              />
+            </div>
+          </DialogContent>
+        </Dialog>
 
         {/* About */}
         <div>
