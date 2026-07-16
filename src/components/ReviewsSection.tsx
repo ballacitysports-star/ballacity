@@ -260,6 +260,51 @@ export function ReviewsSection({
 
       <ReputationCard rep={rep} />
 
+      {/* Prominent write-a-review CTA */}
+      <div className="mt-3">
+        {eligible ? (
+          <Link
+            to="/review/new"
+            search={{ revieweeId, revieweeKind, revieweeName, kind: "player" } as any}
+            className="flex items-center justify-between gap-3 rounded-2xl border border-lime bg-lime/15 px-4 py-3 text-left transition-colors hover:bg-lime/25"
+            aria-label={`Write a review${revieweeName ? ` for ${revieweeName}` : ""}`}
+          >
+            <div className="flex items-center gap-3">
+              <div className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-lime/25 text-lime">
+                <MessageSquarePlus className="h-4 w-4" />
+              </div>
+              <div className="min-w-0">
+                <div className="font-display text-sm font-bold text-lime">
+                  Write a review{revieweeName ? ` for ${revieweeName}` : ""}
+                </div>
+                <div className="text-[11px] text-muted-foreground">
+                  Rate your experience and help others in the community.
+                </div>
+              </div>
+            </div>
+            <span className="shrink-0 rounded-full bg-lime px-3 py-1 text-[11px] font-bold text-background">
+              Start
+            </span>
+          </Link>
+        ) : (
+          <div
+            className="flex items-center gap-3 rounded-2xl border border-dashed border-border bg-surface/60 px-4 py-3"
+            role="note"
+          >
+            <div className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-secondary text-muted-foreground">
+              <Lock className="h-4 w-4" />
+            </div>
+            <div className="min-w-0">
+              <div className="font-display text-sm font-bold">Reviews are verified only</div>
+              <div className="text-[11px] text-muted-foreground">
+                You can write a review after a completed game, training, or event together.
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+
+
       {/* Reviewer-kind filter chips */}
       <div className="mt-3 flex gap-2 overflow-x-auto pb-1 -mx-1 px-1">
         {FILTERS.map((f) => (
