@@ -226,6 +226,36 @@ export function RequestGameCard({
           )}
         </div>
       </div>
+
+      <AlertDialog open={confirm !== null} onOpenChange={(o) => !o && setConfirm(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {confirm === "approve" ? "Approve this request?" : "Decline this request?"}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {confirm === "approve"
+                ? `${playerName} will be added to ${game.title}.`
+                : `${playerName} won't join ${game.title}. They can request again later.`}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className={confirm === "decline" ? "bg-coral text-primary-foreground hover:bg-coral/90" : undefined}
+              onClick={() => {
+                const action = confirm;
+                setConfirm(null);
+                if (action === "approve") onApprove?.();
+                else if (action === "decline") onDecline?.();
+              }}
+            >
+              {confirm === "approve" ? "Approve" : "Decline"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </motion.div>
   );
+
 }
