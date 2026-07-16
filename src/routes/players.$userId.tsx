@@ -197,72 +197,40 @@ function PlayerProfilePage() {
           <div className="min-w-0">
             <h1 className="font-display text-2xl font-bold flex items-center gap-2">
               <span className="truncate">{displayName}</span>
-              {profile.birthday &&
-                (() => {
-                  const a = ageFrom(profile.birthday);
-                  return a != null ? (
-                    <span className="text-sm font-normal text-muted-foreground shrink-0">
-                      · {a}
-                    </span>
-                  ) : null;
-                })()}
               <span className="inline-flex items-center gap-1 rounded-full bg-lime/15 px-2 py-0.5 text-xs font-bold text-lime shrink-0">
                 <Shield className="h-3 w-3" /> Verified
               </span>
             </h1>
             <div className="text-sm text-muted-foreground truncate">
-              {[username, city].filter(Boolean).join(" · ")}
+              {[
+                username,
+                city,
+                profile.birthday && ageFrom(profile.birthday) != null
+                  ? `${ageFrom(profile.birthday)}`
+                  : "",
+              ]
+                .filter(Boolean)
+                .join(" · ")}
             </div>
-            {(profile.birthday || profile.graduating_class) && (
-              <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-muted-foreground">
-                {profile.birthday && (
-                  <span>
-                    🎂 {formatBirthday(profile.birthday)}
-                    {ageFrom(profile.birthday) != null ? ` · ${ageFrom(profile.birthday)} yrs` : ""}
-                  </span>
-                )}
-                {profile.graduating_class && <span>🎓 Class of {profile.graduating_class}</span>}
+            {profile.graduating_class && (
+              <div className="mt-1 text-xs text-muted-foreground">
+                🎓 Class of {profile.graduating_class}
               </div>
             )}
           </div>
-          <div className="shrink-0 flex flex-col gap-2">
-            <Button
-              onClick={handleMessage}
-              disabled={opening}
-              className="rounded-full bg-lime-gradient text-primary-foreground"
-              size="sm"
-            >
-              {opening ? (
-                <Loader2 className="h-4 w-4 mr-1 animate-spin" />
-              ) : (
-                <MessageCircle className="h-4 w-4 mr-1" />
-              )}
-              Message
-            </Button>
-            <Button
-              onClick={() => {
-                if (!user) {
-                  toast.error("Sign in to follow this player.");
-                  return;
-                }
-                follow.toggle();
-              }}
-              disabled={follow.pending}
-              variant={follow.isFollowing ? "outline" : "default"}
-              className={
-                follow.isFollowing
-                  ? "rounded-full border-lime/40 bg-lime/10 text-lime hover:bg-coral/10 hover:text-coral hover:border-coral/40"
-                  : "rounded-full bg-lime-gradient text-primary-foreground"
-              }
-              size="sm"
-            >
-              {follow.isFollowing ? (
-                <UserCheck className="h-4 w-4 mr-1" />
-              ) : (
-                <UserPlus className="h-4 w-4 mr-1" />
-              )}
-              {follow.isFollowing ? "Following" : "Follow"}
-            </Button>
+          {/* IG-style inline stats */}
+          <div className="shrink-0 flex items-center gap-4 text-center">
+            <StatCell k={stats.played} v="games" />
+            <StatCell
+              k={follow.followers}
+              v="followers"
+              onClick={() => setFollowList("followers")}
+            />
+            <StatCell
+              k={follow.following}
+              v="following"
+              onClick={() => setFollowList("following")}
+            />
           </div>
         </div>
 
@@ -275,39 +243,73 @@ function PlayerProfilePage() {
           </div>
         )}
 
-        {/* Stats */}
-        <div className="mt-5 grid grid-cols-4 gap-2">
-          {[
-            { k: stats.played, v: "Games", onClick: undefined as (() => void) | undefined },
-            { k: stats.reliability + "%", v: "Reliable", onClick: undefined },
-            { k: follow.followers, v: "Followers", onClick: () => setFollowList("followers") },
-            { k: follow.following, v: "Following", onClick: () => setFollowList("following") },
-          ].map((s) => {
-            const cls =
-              "rounded-2xl border border-border bg-surface p-3 text-center transition-colors";
-            const content = (
-              <>
-                <div className="font-display text-lg font-bold">{s.k}</div>
-                <div className="text-[10px] uppercase tracking-wider text-muted-foreground">
-                  {s.v}
+        {/* Action row — IG-style Follow / Message */}
+        <div className="mt-4 grid grid-cols-2 gap-2">
+          {follow.isFollowing ? (
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button
+                  disabled={follow.pending || !user}
+                  variant="outline"
+                  size="sm"
+                  className="rounded-lg border-border bg-surface font-semibold"
+                >
+                  <UserCheck className="h-4 w-4 mr-1.5" /> Following
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent align="start" className="w-64 p-3">
+                <p className="text-sm">
+                  Unfollow <span className="font-semibold">{displayName}</span>?
+                </p>
+                <div className="mt-3 flex justify-end gap-2">
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={(e) => (e.currentTarget.closest("[data-radix-popper-content-wrapper]") as HTMLElement | null)?.querySelector<HTMLElement>("[data-state=open]")?.blur()}
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="destructive"
+                    disabled={follow.pending}
+                    onClick={() => follow.toggle()}
+                  >
+                    Unfollow
+                  </Button>
                 </div>
-              </>
-            );
-            return s.onClick ? (
-              <button
-                key={s.v}
-                type="button"
-                onClick={s.onClick}
-                className={cls + " hover:border-lime/40 hover:bg-lime/5"}
-              >
-                {content}
-              </button>
+              </PopoverContent>
+            </Popover>
+          ) : (
+            <Button
+              onClick={() => {
+                if (!user) {
+                  toast.error("Sign in to follow this player.");
+                  return;
+                }
+                follow.toggle();
+              }}
+              disabled={follow.pending}
+              size="sm"
+              className="rounded-lg bg-lime-gradient font-semibold text-primary-foreground"
+            >
+              <UserPlus className="h-4 w-4 mr-1.5" /> Follow
+            </Button>
+          )}
+          <Button
+            onClick={handleMessage}
+            disabled={opening}
+            variant="outline"
+            size="sm"
+            className="rounded-lg border-border bg-surface font-semibold"
+          >
+            {opening ? (
+              <Loader2 className="h-4 w-4 mr-1.5 animate-spin" />
             ) : (
-              <div key={s.v} className={cls}>
-                {content}
-              </div>
-            );
-          })}
+              <MessageCircle className="h-4 w-4 mr-1.5" />
+            )}
+            Message
+          </Button>
         </div>
 
         {/* Reputation badge (opens reviews popup) */}
