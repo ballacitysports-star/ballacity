@@ -5,6 +5,7 @@ import { UserAvatar } from "@/components/UserAvatar";
 import { SpotsPill } from "@/components/SpotsPill";
 import type { Game } from "@/lib/sample-data";
 import { formatWhen } from "@/lib/format";
+import { useLiveParticipantCount } from "@/lib/game-participants-store";
 import type { JoinRequest } from "@/lib/payments";
 
 const sportEmoji: Record<string, string> = {
