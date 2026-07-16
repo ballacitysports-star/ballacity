@@ -243,7 +243,17 @@ function FollowRow({
           size="md"
         />
         <div className="min-w-0 flex-1">
-          <div className="truncate text-sm font-semibold">{user.display_name}</div>
+          <div className="flex items-center gap-1.5">
+            <span className="truncate text-sm font-semibold">{user.display_name}</span>
+            {!isSelf && viewerId && user.viewerFollows && (
+              <span
+                className="shrink-0 rounded-full border border-border bg-surface px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground"
+                title="You also follow this user"
+              >
+                Mutual
+              </span>
+            )}
+          </div>
           {user.username && (
             <div className="truncate text-xs text-muted-foreground">
               @{user.username.replace(/^@/, "")}
