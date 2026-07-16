@@ -297,15 +297,67 @@ export function ReviewsSection({
         ))}
       </div>
 
-      <div className="mt-3 space-y-3">
-        {list.length === 0 ? (
-          <div className="rounded-2xl border border-dashed border-border bg-surface/40 p-6 text-center text-sm text-muted-foreground">
-            No reviews in this view yet.
-          </div>
-        ) : (
-          list.map((r, i) => <ReviewCard key={r.id} r={r} index={i} isOwner={isOwner} />)
-        )}
+      <PaginatedList list={list} isOwner={isOwner} />
+    </div>
+  );
+}
+
+const PAGE_SIZE = 8;
+
+function PaginatedList({ list, isOwner }: { list: Review[]; isOwner: boolean }) {
+  const [visible, setVisible] = useState(PAGE_SIZE);
+  const sentinelRef = useRef<HTMLDivElement | null>(null);
+
+  // Reset when the underlying list changes (filter/sort/data).
+  useEffect(() => {
+    setVisible(PAGE_SIZE);
+  }, [list]);
+
+  useEffect(() => {
+    if (visible >= list.length) return;
+    const el = sentinelRef.current;
+    if (!el) return;
+    const io = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((e) => e.isIntersecting)) {
+          setVisible((v) => Math.min(v + PAGE_SIZE, list.length));
+        }
+      },
+      { rootMargin: "200px" },
+    );
+    io.observe(el);
+    return () => io.disconnect();
+  }, [visible, list.length]);
+
+  if (list.length === 0) {
+    return (
+      <div className="mt-3 rounded-2xl border border-dashed border-border bg-surface/40 p-6 text-center text-sm text-muted-foreground">
+        No reviews in this view yet.
       </div>
+    );
+  }
+
+  const shown = list.slice(0, visible);
+  const remaining = list.length - visible;
+
+  return (
+    <div className="mt-3 space-y-3">
+      {shown.map((r, i) => (
+        <ReviewCard key={r.id} r={r} index={i} isOwner={isOwner} />
+      ))}
+      {remaining > 0 && (
+        <div ref={sentinelRef} className="flex flex-col items-center gap-2 pt-2">
+          <button
+            onClick={() => setVisible((v) => Math.min(v + PAGE_SIZE, list.length))}
+            className="rounded-full border border-border bg-surface px-4 py-1.5 text-xs font-semibold text-muted-foreground hover:text-lime hover:border-lime"
+          >
+            Load {Math.min(PAGE_SIZE, remaining)} more
+          </button>
+          <span className="text-[10px] uppercase tracking-wider text-muted-foreground">
+            Showing {visible} of {list.length}
+          </span>
+        </div>
+      )}
     </div>
   );
 }
