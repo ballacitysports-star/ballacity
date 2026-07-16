@@ -478,8 +478,6 @@ function Profile() {
             )}
           </div>
         </div>
-            </div>
-          </div>
 
         {/* Upcoming — split into games you host vs games you're playing in */}
         <div className="mt-6">
