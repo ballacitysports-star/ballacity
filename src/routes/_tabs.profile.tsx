@@ -73,15 +73,19 @@ function Profile() {
 
   // Pending / recently-reviewed join requests for player view
   const [myRequests, setMyRequests] = useState<JoinRequest[]>([]);
+  const [requestsLoading, setRequestsLoading] = useState(false);
   const refreshRequests = async () => {
     if (!profileUser) {
       setMyRequests([]);
       return;
     }
+    setRequestsLoading(true);
     try {
       setMyRequests(await listMyJoinRequests());
     } catch {
       /* ignore */
+    } finally {
+      setRequestsLoading(false);
     }
   };
   useEffect(() => {
