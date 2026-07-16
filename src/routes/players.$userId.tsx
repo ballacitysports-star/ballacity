@@ -12,6 +12,7 @@ import { SPORTS, HERO_IMAGE } from "@/lib/sample-data";
 import { kmToMi } from "@/lib/distance";
 import type { PlayerAvailability } from "@/lib/availability";
 import { ReviewsSection } from "@/components/ReviewsSection";
+import { FollowListDialog } from "@/components/FollowListDialog";
 import { ReputationBadge } from "@/components/ReputationBadge";
 import { computeReputation, useReviewsFor } from "@/lib/reviews";
 import { useProfileOverrides } from "@/lib/user-prefs-store";
@@ -53,6 +54,7 @@ function PlayerProfilePage() {
   const [loading, setLoading] = useState(true);
   const [opening, setOpening] = useState(false);
   const [reviewsOpen, setReviewsOpen] = useState(false);
+  const [followList, setFollowList] = useState<null | "followers" | "following">(null);
 
   const overrides = useProfileOverrides(userId);
   const reviews = useReviewsFor(userId);
@@ -275,18 +277,36 @@ function PlayerProfilePage() {
         {/* Stats */}
         <div className="mt-5 grid grid-cols-4 gap-2">
           {[
-            { k: stats.played, v: "Games" },
-            { k: stats.reliability + "%", v: "Reliable" },
-            { k: follow.followers, v: "Followers" },
-            { k: follow.following, v: "Following" },
-          ].map((s) => (
-            <div key={s.v} className="rounded-2xl border border-border bg-surface p-3 text-center">
-              <div className="font-display text-lg font-bold">{s.k}</div>
-              <div className="text-[10px] uppercase tracking-wider text-muted-foreground">
-                {s.v}
+            { k: stats.played, v: "Games", onClick: undefined as (() => void) | undefined },
+            { k: stats.reliability + "%", v: "Reliable", onClick: undefined },
+            { k: follow.followers, v: "Followers", onClick: () => setFollowList("followers") },
+            { k: follow.following, v: "Following", onClick: () => setFollowList("following") },
+          ].map((s) => {
+            const cls =
+              "rounded-2xl border border-border bg-surface p-3 text-center transition-colors";
+            const content = (
+              <>
+                <div className="font-display text-lg font-bold">{s.k}</div>
+                <div className="text-[10px] uppercase tracking-wider text-muted-foreground">
+                  {s.v}
+                </div>
+              </>
+            );
+            return s.onClick ? (
+              <button
+                key={s.v}
+                type="button"
+                onClick={s.onClick}
+                className={cls + " hover:border-lime/40 hover:bg-lime/5"}
+              >
+                {content}
+              </button>
+            ) : (
+              <div key={s.v} className={cls}>
+                {content}
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
 
         {/* Reputation badge (opens reviews popup) */}
@@ -391,6 +411,14 @@ function PlayerProfilePage() {
             </div>
           </DialogContent>
         </Dialog>
+
+        <FollowListDialog
+          open={followList !== null}
+          onOpenChange={(v) => !v && setFollowList(null)}
+          userId={userId}
+          displayName={displayName}
+          kind={followList ?? "followers"}
+        />
       </div>
     </div>
   );
