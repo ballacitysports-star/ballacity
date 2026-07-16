@@ -2843,6 +2843,12 @@ function RosterPlayerRow({
     const rollback = onOptimistic(req.id, "rejected");
     try {
       await reviewJoinRequest(req.id, "rejected", "Removed by host");
+      const { error: delErr } = await supabase
+        .from("game_participants")
+        .delete()
+        .eq("game_id", req.game_id)
+        .eq("user_id", req.player_id);
+      if (delErr) throw delErr;
       await createNotification({
         user_id: req.player_id,
         type: "join_declined",
@@ -2865,6 +2871,12 @@ function RosterPlayerRow({
     const rollback = onOptimistic(req.id, "rejected");
     try {
       await reviewJoinRequest(req.id, "rejected", "Blocked by host");
+      const { error: delErr } = await supabase
+        .from("game_participants")
+        .delete()
+        .eq("game_id", req.game_id)
+        .eq("user_id", req.player_id);
+      if (delErr) throw delErr;
       blockUser(req.host_id, req.player_id);
       await createNotification({
         user_id: req.player_id,
@@ -2881,6 +2893,7 @@ function RosterPlayerRow({
       setBusy(false);
     }
   };
+
 
 
   const fmt = (n: number) => (n > 0 ? n.toFixed(1) : "—");
