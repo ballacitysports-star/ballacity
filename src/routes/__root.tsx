@@ -19,6 +19,7 @@ import { runLegacyHostMigration } from "@/lib/legacy-host-migration";
 import { useAuth } from "@/hooks/use-auth";
 import { useNotificationPush } from "@/lib/notifications";
 import { useOneSignal } from "@/lib/onesignal";
+import { logAuthGateDecision } from "@/lib/authgate-log";
 
 function NotFoundComponent() {
   return (
