@@ -13,6 +13,8 @@ import {
   Loader2,
   SlidersHorizontal,
   Ticket,
+  LayoutGrid,
+  Rows3,
 } from "lucide-react";
 import { AnimatePresence } from "framer-motion";
 import { motion } from "framer-motion";
