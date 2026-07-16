@@ -166,6 +166,7 @@ export function useFollow(followeeId: string) {
     },
     onSettled: () => {
       qc.invalidateQueries({ queryKey: ["follow", followeeId] });
+      qc.invalidateQueries({ queryKey: ["follow-list"] });
     },
   });
 
