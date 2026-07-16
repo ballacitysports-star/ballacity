@@ -174,11 +174,8 @@ export function RequestGameCard({
                     ? "Approved — you're on the roster."
                     : "Declined by host."}
             </p>
-            {isPending && (
-              <p className="text-[10px] text-muted-foreground mt-0.5">
-                Requested {new Date(request.created_at).toLocaleDateString()}
-              </p>
-            )}
+            <RequestTimeline request={request} />
+
           </div>
           {isPending && (
             <div className="flex items-center gap-2">
