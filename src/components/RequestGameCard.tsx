@@ -24,12 +24,18 @@ export function RequestGameCard({
   game,
   request,
   index = 0,
+  isHost,
   onCancel,
+  onApprove,
+  onDecline,
 }: {
   game: Game;
   request: JoinRequest;
   index?: number;
+  isHost?: boolean;
   onCancel?: () => void;
+  onApprove?: () => void;
+  onDecline?: () => void;
 }) {
   const isPending = request.status === "pending";
   const isApproved = request.status === "approved";
