@@ -285,7 +285,7 @@ export function HostPaymentsPanel({
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2">
                     <Link
-                      to="/user/$userId"
+                      to="/players/$userId"
                       params={{ userId: row.player_id }}
                       className="font-semibold truncate hover:underline"
                     >
