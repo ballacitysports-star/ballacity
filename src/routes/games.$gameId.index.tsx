@@ -717,6 +717,11 @@ function GameDetail() {
       const search: { invite?: true; from?: string } = {};
       if (isInvite) search.invite = true;
       if (inviteFrom) search.from = inviteFrom;
+      const feeLabel = `$${Number(settings?.entry_fee ?? game.price ?? 0).toFixed(2).replace(/\.00$/, "")}`;
+      toast.info(`Payment required to secure your spot`, {
+        description: `Send ${feeLabel} to the host — your spot locks in once they verify.`,
+        duration: 6000,
+      });
       nav({ to: "/games/$gameId/pay", params: { gameId: game.id }, search });
       return;
     }
