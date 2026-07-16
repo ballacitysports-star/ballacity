@@ -50,6 +50,10 @@ function Feed() {
     density === "list"
       ? <GameListRow key={g.id} game={g} index={i} />
       : <GameCard key={g.id} game={g} index={i} />;
+  const renderSkeletons = (count: number) => {
+    const Skel = density === "list" ? GameListRowSkeleton : GameCardSkeleton;
+    return Array.from({ length: count }, (_, i) => <Skel key={`sk-${i}`} />);
+  };
   const [positionFilter, setPositionFilter] = useState<string | null>(null);
   const hosted = useHostedGames();
   const joinedIds = useJoinedGameIds();
