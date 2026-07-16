@@ -213,6 +213,7 @@ function GameDetail() {
   const [processing, setProcessing] = useState(false);
   const [positionRosterOpen, setPositionRosterOpen] = useState(false);
   const [reviewsOpen, setReviewsOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState<"overview" | "payments">("overview");
   const { status: myFlowStatus, settings: flowSettings } = useMyFlowStatus(gameId);
 
   // Ticking clock (1s) that re-renders while the resubmit cooldown counts down.
