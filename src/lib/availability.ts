@@ -39,7 +39,15 @@ export type AvailabilityContactRequest = {
 };
 
 export async function listOpenAvailabilities(
-  opts: { sport?: string; city?: string } = {},
+  opts: {
+    sport?: string;
+    city?: string;
+    includeAnywhere?: boolean;
+    skill?: string;
+    /** ISO date (YYYY-MM-DD) — only posts whose window overlaps [from, to] */
+    from?: string;
+    to?: string;
+  } = {},
 ): Promise<AvailabilityWithAuthor[]> {
   let q = supabase
     .from("player_availabilities" as any)
@@ -48,7 +56,17 @@ export async function listOpenAvailabilities(
     .order("created_at", { ascending: false })
     .limit(100);
   if (opts.sport) q = q.contains("sports", [opts.sport]);
-  if (opts.city) q = q.ilike("city", `%${opts.city}%`);
+  if (opts.skill && opts.skill !== "All Levels") q = q.eq("skill_level", opts.skill);
+  if (opts.city) {
+    const pat = `%${opts.city.replace(/[%,()]/g, "")}%`;
+    q = opts.includeAnywhere
+      ? q.or(`city.ilike.${pat},city.is.null`)
+      : q.ilike("city", pat);
+  }
+  // Time-window overlap: post.starts_on <= to AND post.ends_on >= from,
+  // treating null bounds as "open-ended".
+  if (opts.to) q = q.or(`starts_on.is.null,starts_on.lte.${opts.to}`);
+  if (opts.from) q = q.or(`ends_on.is.null,ends_on.gte.${opts.from}`);
   const { data, error } = await q;
   if (error) throw error;
   const rows = (data ?? []) as unknown as PlayerAvailability[];

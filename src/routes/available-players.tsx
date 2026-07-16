@@ -82,6 +82,11 @@ function AvailablePlayersPage() {
   const [tab, setTab] = useState<Tab>("browse");
   const [sport, setSport] = useState<string>("");
   const [city, setCity] = useState("");
+  const [includeAnywhere, setIncludeAnywhere] = useState(true);
+  const [skill, setSkill] = useState<string>("All Levels");
+  const [window, setWindow] = useState<"any" | "week" | "month" | "custom">("any");
+  const [customFrom, setCustomFrom] = useState("");
+  const [customTo, setCustomTo] = useState("");
   const [list, setList] = useState<AvailabilityWithAuthor[] | null>(null);
   const [postOpen, setPostOpen] = useState(false);
   const [editingPost, setEditingPost] = useState<PlayerAvailability | null>(null);
@@ -100,6 +105,25 @@ function AvailablePlayersPage() {
         : [],
     [allHosted, user?.id],
   );
+
+  const { fromISO, toISO } = useMemo(() => {
+    const iso = (d: Date) => d.toISOString().slice(0, 10);
+    const now = new Date();
+    if (window === "week") {
+      const end = new Date(now);
+      end.setDate(end.getDate() + 7);
+      return { fromISO: iso(now), toISO: iso(end) };
+    }
+    if (window === "month") {
+      const end = new Date(now);
+      end.setDate(end.getDate() + 30);
+      return { fromISO: iso(now), toISO: iso(end) };
+    }
+    if (window === "custom") {
+      return { fromISO: customFrom || undefined, toISO: customTo || undefined };
+    }
+    return { fromISO: undefined, toISO: undefined };
+  }, [window, customFrom, customTo]);
 
   useEffect(() => {
     if (!postParam) {
@@ -128,11 +152,18 @@ function AvailablePlayersPage() {
 
   useEffect(() => {
     setList(null);
-  }, [sport, city]);
+  }, [sport, city, includeAnywhere, skill, fromISO, toISO]);
 
   useEffect(() => {
     let cancelled = false;
-    listOpenAvailabilities({ sport: sport || undefined, city: city.trim() || undefined })
+    listOpenAvailabilities({
+      sport: sport || undefined,
+      city: city.trim() || undefined,
+      includeAnywhere: city.trim() ? includeAnywhere : undefined,
+      skill: skill !== "All Levels" ? skill : undefined,
+      from: fromISO,
+      to: toISO,
+    })
       .then((rows) => {
         if (!cancelled) setList(rows);
       })
@@ -145,7 +176,7 @@ function AvailablePlayersPage() {
     return () => {
       cancelled = true;
     };
-  }, [sport, city, refreshKey]);
+  }, [sport, city, includeAnywhere, skill, fromISO, toISO, refreshKey]);
 
   // Realtime: refresh list whenever any availability row changes.
   useEffect(() => {
@@ -213,13 +244,68 @@ function AvailablePlayersPage() {
                 ))}
               </div>
             </div>
+            <div className="-mx-4 overflow-x-auto px-4">
+              <div className="flex gap-2 pb-1">
+                {SKILLS.map((s) => (
+                  <Chip key={s} active={skill === s} onClick={() => setSkill(s)}>
+                    {s}
+                  </Chip>
+                ))}
+              </div>
+            </div>
+            <div className="-mx-4 overflow-x-auto px-4">
+              <div className="flex gap-2 pb-1">
+                {(
+                  [
+                    ["any", "Any time"],
+                    ["week", "Next 7 days"],
+                    ["month", "Next 30 days"],
+                    ["custom", "Custom…"],
+                  ] as const
+                ).map(([v, label]) => (
+                  <Chip key={v} active={window === v} onClick={() => setWindow(v)}>
+                    {label}
+                  </Chip>
+                ))}
+              </div>
+            </div>
+            {window === "custom" && (
+              <div className="flex gap-2">
+                <Input
+                  type="date"
+                  value={customFrom}
+                  onChange={(e) => setCustomFrom(e.target.value)}
+                  className="h-10"
+                  aria-label="From date"
+                />
+                <Input
+                  type="date"
+                  value={customTo}
+                  onChange={(e) => setCustomTo(e.target.value)}
+                  className="h-10"
+                  aria-label="To date"
+                />
+              </div>
+            )}
             <Input
               value={city}
               onChange={(e) => setCity(e.target.value)}
               placeholder="Filter by city"
               className="h-10"
             />
+            {city.trim() && (
+              <label className="flex items-center gap-2 text-xs text-muted-foreground">
+                <input
+                  type="checkbox"
+                  checked={includeAnywhere}
+                  onChange={(e) => setIncludeAnywhere(e.target.checked)}
+                  className="h-4 w-4 rounded border-border"
+                />
+                Include players open to anywhere
+              </label>
+            )}
           </div>
+
 
           {list === null ? (
             <LoadingRows />
