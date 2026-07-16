@@ -145,8 +145,9 @@ function Profile() {
     return m;
   }, [hosted]);
 
-  const pendingRequests = myRequests.filter((r) => r.status === "pending");
-  const recentlyReviewed = myRequests.filter((r) => r.status !== "pending").slice(0, 3);
+  const allRequests = useMemo(() => [...myRequests, ...hostRequests], [myRequests, hostRequests]);
+  const pendingRequests = allRequests.filter((r) => r.status === "pending");
+  const recentlyReviewed = allRequests.filter((r) => r.status !== "pending").slice(0, 3);
   const pendingWithGame = pendingRequests.filter((r) => gameLookup.has(r.game_id));
   const reviewedWithGame = recentlyReviewed.filter((r) => gameLookup.has(r.game_id));
 
