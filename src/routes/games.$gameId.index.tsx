@@ -75,6 +75,7 @@ import { shouldTriggerLeaveBranch } from "@/lib/leave-branch";
 import { useMyFlowStatus } from "@/lib/game-flow-status";
 import { PlayerFlowPill } from "@/components/PlayerFlowPill";
 import { PaymentRequiredBanner } from "@/components/PaymentRequiredBanner";
+import { HostPaymentsPanel, PlayerPaymentsPanel } from "@/components/GamePaymentsPanel";
 
 import { useHostedGames, fetchHostedGame, updateHostedGame, deleteHostedGame } from "@/lib/hosted-games-store";
 import type { Game } from "@/lib/sample-data";
@@ -212,6 +213,7 @@ function GameDetail() {
   const [processing, setProcessing] = useState(false);
   const [positionRosterOpen, setPositionRosterOpen] = useState(false);
   const [reviewsOpen, setReviewsOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState<"overview" | "payments">("overview");
   const { status: myFlowStatus, settings: flowSettings } = useMyFlowStatus(gameId);
 
   // Ticking clock (1s) that re-renders while the resubmit cooldown counts down.
@@ -911,7 +913,64 @@ function GameDetail() {
         </div>
       </div>
 
-      <div className="mx-auto w-full max-w-md sm:max-w-2xl lg:max-w-4xl px-4 mt-5 space-y-5">
+      {/* Tabs: Overview / Payments */}
+      {isPaid && (
+        <div className="mx-auto w-full max-w-md sm:max-w-2xl lg:max-w-4xl px-4 mt-4">
+          <div className="flex gap-1 rounded-full border border-border bg-surface p-1 text-xs">
+            <button
+              type="button"
+              onClick={() => setActiveTab("overview")}
+              className={`flex-1 rounded-full px-3 py-2 font-semibold transition ${
+                activeTab === "overview"
+                  ? "bg-lime text-primary-foreground"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              Overview
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab("payments")}
+              className={`flex-1 rounded-full px-3 py-2 font-semibold transition inline-flex items-center justify-center gap-1.5 ${
+                activeTab === "payments"
+                  ? "bg-lime text-primary-foreground"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              Payments
+              {isHost && pendingCount > 0 && (
+                <span className="inline-flex items-center justify-center rounded-full bg-coral px-1.5 text-[10px] font-bold text-white min-w-[18px] h-[18px]">
+                  {pendingCount}
+                </span>
+              )}
+              {!isHost && latestSub && latestSub.status !== "verified" && (
+                <span
+                  className={`inline-block h-2 w-2 rounded-full ${
+                    latestSub.status === "rejected" ? "bg-coral" : "bg-amber-400"
+                  }`}
+                  aria-hidden
+                />
+              )}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {isPaid && activeTab === "payments" && (
+        <div className="mx-auto w-full max-w-md sm:max-w-2xl lg:max-w-4xl px-4 mt-4">
+          {isHost ? (
+            <HostPaymentsPanel
+              gameId={game.id}
+              gameTitle={game.title}
+              settings={settings}
+            />
+          ) : (
+            <PlayerPaymentsPanel gameId={game.id} settings={settings} />
+          )}
+        </div>
+      )}
+
+      <div className={`mx-auto w-full max-w-md sm:max-w-2xl lg:max-w-4xl px-4 mt-5 space-y-5 ${isPaid && activeTab !== "overview" ? "hidden" : ""}`}>
         {/* Invite deep-link banner */}
         {isInvite &&
           !isHost &&
@@ -1712,7 +1771,7 @@ function GameDetail() {
 
       {/* Host controls */}
       {isHost && (
-        <div className="mx-auto w-full max-w-md sm:max-w-2xl lg:max-w-4xl px-4 mt-4 space-y-3">
+        <div className={`mx-auto w-full max-w-md sm:max-w-2xl lg:max-w-4xl px-4 mt-4 space-y-3 ${isPaid && activeTab !== "overview" ? "hidden" : ""}`}>
           {/* Manage game: edit, start, close joining */}
           <div className="rounded-2xl border border-border bg-surface p-3">
             <div className="flex items-center justify-between gap-2">
