@@ -392,19 +392,19 @@ function Profile() {
               <TabsList className="h-8 w-full rounded-full bg-surface p-1 border border-border">
                 <TabsTrigger
                   value="all"
-                  className="flex-1 rounded-full text-xs data-[state=active]:bg-lime-gradient data-[state=active]:text-primary-foreground"
+                  className="flex-1 rounded-full text-xs data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
                 >
                   All
                 </TabsTrigger>
                 <TabsTrigger
                   value="host"
-                  className="flex-1 rounded-full text-xs data-[state=active]:bg-lime-gradient data-[state=active]:text-primary-foreground"
+                  className="flex-1 rounded-full text-xs data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
                 >
                   Host actions
                 </TabsTrigger>
                 <TabsTrigger
                   value="player"
-                  className="flex-1 rounded-full text-xs data-[state=active]:bg-lime-gradient data-[state=active]:text-primary-foreground"
+                  className="flex-1 rounded-full text-xs data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
                 >
                   My sent requests
                 </TabsTrigger>
