@@ -263,7 +263,11 @@ function PlayerProfilePage() {
 
         {/* Reputation badge (opens reviews popup) */}
         <div className="mt-4">
-          <ReputationBadge rep={rep} onClick={() => setReviewsOpen(true)} />
+          <ReputationBadge
+            rep={rep}
+            onClick={() => setReviewsOpen(true)}
+            ariaLabel={`Open reviews for ${displayName}. Trust score ${rep.trustScore}, ${rep.avg.toFixed(1)} out of 5 from ${rep.count} review${rep.count === 1 ? "" : "s"}.`}
+          />
         </div>
 
         {/* Open availability */}
