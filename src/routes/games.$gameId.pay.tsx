@@ -641,6 +641,7 @@ function PayPage() {
       ) : (
         <PaymentInstructionsAndProof
           game_id={game.id}
+          game_title={game.title}
           host_id={settings.host_id}
           method={picked}
           extraInstructions={settings.payment_instructions}
