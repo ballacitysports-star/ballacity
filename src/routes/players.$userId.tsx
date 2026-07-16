@@ -53,6 +53,7 @@ function PlayerProfilePage() {
   const [loading, setLoading] = useState(true);
   const [opening, setOpening] = useState(false);
   const [reviewsOpen, setReviewsOpen] = useState(false);
+  const [followList, setFollowList] = useState<null | "followers" | "following">(null);
 
   const overrides = useProfileOverrides(userId);
   const reviews = useReviewsFor(userId);
