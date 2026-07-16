@@ -7,7 +7,7 @@ import {
   HeadContent,
   Scripts,
 } from "@tanstack/react-router";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 
 import appCss from "../styles.css?url";
 import { DebugModeToggle } from "@/components/DebugModeToggle";
@@ -186,6 +186,58 @@ export function sanitizeNextPath(raw: unknown): string | undefined {
   return raw;
 }
 
+function AuthLoadingFallback({ pending }: { pending: boolean }) {
+  const [showRetry, setShowRetry] = useState(false);
+  const [reloading, setReloading] = useState(false);
+
+  useEffect(() => {
+    const t = window.setTimeout(() => setShowRetry(true), 6000);
+    return () => window.clearTimeout(t);
+  }, []);
+
+  return (
+    <div className="grid min-h-dvh place-items-center bg-background px-4">
+      <div className="flex max-w-sm flex-col items-center text-center">
+        <div className="h-8 w-8 animate-spin rounded-full border-2 border-muted border-t-foreground" />
+        <p className="mt-4 text-sm text-muted-foreground">
+          {pending ? "Signing you in…" : "Loading your account…"}
+        </p>
+        {showRetry ? (
+          <div className="mt-6 w-full">
+            <p className="text-sm text-muted-foreground">
+              This is taking longer than expected. Check your connection and try again.
+            </p>
+            <div className="mt-4 flex flex-wrap justify-center gap-2">
+              <button
+                onClick={() => {
+                  setReloading(true);
+                  window.location.reload();
+                }}
+                disabled={reloading}
+                className="inline-flex items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-60"
+              >
+                {reloading ? "Reloading…" : "Try again"}
+              </button>
+              <a
+                href="/auth"
+                className="inline-flex items-center justify-center rounded-md border border-input bg-background px-4 py-2 text-sm font-medium text-foreground transition-colors hover:bg-accent"
+              >
+                Sign in again
+              </a>
+              <a
+                href="/"
+                className="inline-flex items-center justify-center rounded-md border border-input bg-background px-4 py-2 text-sm font-medium text-foreground transition-colors hover:bg-accent"
+              >
+                Go home
+              </a>
+            </div>
+          </div>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
 function AuthGate({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const pathname = router.state.location.pathname;
@@ -226,11 +278,7 @@ function AuthGate({ children }: { children: React.ReactNode }) {
 
   if (isPublic) return <>{children}</>;
   if (loading || !user) {
-    return (
-      <div className="grid min-h-dvh place-items-center bg-background">
-        <div className="h-8 w-8 animate-spin rounded-full border-2 border-muted border-t-foreground" />
-      </div>
-    );
+    return <AuthLoadingFallback pending={loading} />;
   }
   return (
     <>
