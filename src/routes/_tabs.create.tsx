@@ -373,13 +373,70 @@ function Create() {
         </Section>
 
         {/* Date */}
-        <Section title="When" icon={<Calendar className="h-4 w-4" />}>
-          <input
-            type="datetime-local"
-            value={when}
-            onChange={(e) => setWhen(e.target.value)}
-            className="w-full rounded-2xl border border-border bg-surface px-4 py-3 text-sm outline-none focus:border-lime [color-scheme:dark]"
-          />
+        <Section title={repeatRange ? "Time" : "When"} icon={<Calendar className="h-4 w-4" />}>
+          {repeatRange ? (
+            <input
+              type="time"
+              value={when.includes("T") ? when.split("T")[1] : when}
+              onChange={(e) => setWhen(e.target.value)}
+              className="w-full rounded-2xl border border-border bg-surface px-4 py-3 text-sm outline-none focus:border-lime [color-scheme:dark]"
+            />
+          ) : (
+            <input
+              type="datetime-local"
+              value={when}
+              onChange={(e) => setWhen(e.target.value)}
+              className="w-full rounded-2xl border border-border bg-surface px-4 py-3 text-sm outline-none focus:border-lime [color-scheme:dark]"
+            />
+          )}
+          <div className="rounded-2xl border border-border bg-surface px-4 py-3">
+            <div className="flex items-center justify-between">
+              <span className="text-sm font-medium">Repeat on multiple days</span>
+              <button
+                type="button"
+                onClick={() => setRepeatRange((v) => !v)}
+                className={`relative h-6 w-10 rounded-full transition-colors ${repeatRange ? "bg-lime" : "bg-secondary"}`}
+                aria-label="Toggle date range"
+              >
+                <motion.span
+                  layout
+                  transition={{ type: "spring", stiffness: 500, damping: 30 }}
+                  className="absolute top-0.5 h-5 w-5 rounded-full bg-background shadow"
+                  style={{ left: repeatRange ? "calc(100% - 1.375rem)" : "0.125rem" }}
+                />
+              </button>
+            </div>
+            {repeatRange && (
+              <div className="mt-3 space-y-2">
+                <div className="grid grid-cols-2 gap-2">
+                  <label className="text-xs text-muted-foreground">
+                    Start date
+                    <input
+                      type="date"
+                      value={rangeStart}
+                      onChange={(e) => setRangeStart(e.target.value)}
+                      className="mt-1 w-full rounded-xl border border-border bg-background px-3 py-2 text-sm outline-none focus:border-lime [color-scheme:dark]"
+                    />
+                  </label>
+                  <label className="text-xs text-muted-foreground">
+                    End date
+                    <input
+                      type="date"
+                      value={rangeEnd}
+                      min={rangeStart || undefined}
+                      onChange={(e) => setRangeEnd(e.target.value)}
+                      className="mt-1 w-full rounded-xl border border-border bg-background px-3 py-2 text-sm outline-none focus:border-lime [color-scheme:dark]"
+                    />
+                  </label>
+                </div>
+                <p className="text-[11px] text-muted-foreground">
+                  {rangeDates.length > 0
+                    ? `Will create ${rangeDates.length} game${rangeDates.length === 1 ? "" : "s"}, one per day at the time above.`
+                    : "Pick start and end dates (max 60 days)."}
+                </p>
+              </div>
+            )}
+          </div>
         </Section>
 
         {/* Venue address */}
