@@ -1,32 +1,25 @@
-## Add a Payments tab to the game page
+## Add payment policies section to the Payments tab
 
-Add a dedicated **Payments** tab on `/games/$gameId` for both host and player views, keeping existing details/roster UI intact.
+Surface the same payment configuration that hosts set in `/games/$gameId/payment-setup` at the top of the Payments tab on `/games/$gameId`, visible to both host and player views.
 
-### Tab shell
-- In `src/routes/games.$gameId.index.tsx`, wrap the page body in a lightweight tab switcher: **Overview** (current content) and **Payments**. Tab state via `useState`, defaulting to Overview. Payments tab shows a badge with the pending count (host: pending submissions to review; player: my current status if not verified).
-- Only render the Payments tab when the game has payment settings enabled (paid game). For free games, hide it entirely.
+### What to display
 
-### Host view — Payments tab
-- Header: game fee, payment method summary, counts (Pending N · Verified N · Rejected N).
-- **Pending queue** (default section): list of `payment_submissions` with `status = 'pending'`, newest first. Each row shows player avatar/name, submitted amount, timestamp, note, and thumbnail/link to proof. Actions: **Approve** and **Decline** (with optional reason prompt). Reuses existing `setPaymentStatusAction` logic (extracted from the current per-player popover) — server-side call plus optimistic update and `payment_verified` / `payment_rejected` notifications.
-- **All submissions** section below: filterable (All / Verified / Rejected / Pending) table of every submission with same actions available on non-pending rows (re-verify, reject).
-- Realtime: subscribe once per game to `payment_submissions` changes (already present per-player; broaden to game scope) so approvals/new submissions update the list live.
-- Empty state: "No payment submissions yet — players will appear here once they send proof."
+Pulled from `game_payment_settings` for the game:
+- **Payment deadline** — formatted date/time, with a "past due" indicator when in the past.
+- **Refund policy** — free text, rendered with line breaks.
+- **Payment instructions** — free text, rendered with line breaks.
+- **Accepted payment methods** — list of the host's enabled methods (label + handle/identifier), same shape as the setup screen.
 
-### Player view — Payments tab
-- Status card at top with a clear state pill:
-  - **Not submitted** → CTA "Send payment proof" (links to `/games/$gameId/pay`).
-  - **Pending review** → "Your payment is being reviewed by the host." Show submitted amount, when, and proof thumbnail.
-  - **Verified** → "Payment verified — your spot is locked in." Timestamp + verified-by.
-  - **Declined** → Reviewer note (if any) + CTA "Resubmit payment proof".
-- **My history** section: list of my previous submissions for this game (status, amount, date, proof link).
-- Realtime: reuses existing per-player `payment_submissions` channel so status flips instantly on host action.
+Fields render only when set; if none are configured, show a subtle empty state ("Host hasn't configured payment details yet"). For the host view, include a small "Edit payment settings" link to `/games/$gameId/payment-setup`.
 
-### Shared bits
-- Extract two components into the same route file (keep the file self-contained, matching existing patterns): `HostPaymentsPanel` and `PlayerPaymentsPanel`.
-- Reuse existing helpers: `reviewJoinRequest`, `setPaymentStatusAction`, `payment_submissions` query shape from the current host popover code (~line 2856+).
-- No schema changes required — all needed columns (`status`, `amount`, `proof_url`, `note`, `reviewer_notes`, `verified_at`) exist on `payment_submissions`.
+### Implementation
+
+- New presentational component `PaymentPoliciesCard` in `src/routes/games.$gameId.index.tsx` (or co-located file) that takes the settings + accepted methods as props.
+- Extend the existing Payments-tab query (or add a sibling query) to also fetch `game_payment_settings` for the game and the host's `host_payment_methods` rows referenced by it, reusing helpers from `src/lib/payments.ts`.
+- Render `PaymentPoliciesCard` at the top of the Payments tab, above both the host approval queue and the player status card.
+- No schema changes, no mutation logic — read-only display.
 
 ### Verification
-- `bunx tsgo --noEmit`
-- Manual: as host on a paid game, submit a payment as a second account → Payments tab shows badge → Approve → player's tab flips to Verified live.
+
+- `bunx tsgo --noEmit`.
+- Manually confirm: with policies set, both host and player see the card; with none set, empty state renders; deadline past shows the past-due badge.
