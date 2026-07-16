@@ -241,7 +241,7 @@ function RequestGameCardInner({
 
           </div>
           {isPending && (
-            <div className="flex items-center gap-2">
+            <div className="flex shrink-0 items-center gap-1.5">
               {isHost && onDecline && (
                 <button
                   type="button"
@@ -250,7 +250,7 @@ function RequestGameCardInner({
                     e.stopPropagation();
                     setConfirm("decline");
                   }}
-                  className="rounded-full border border-border bg-background px-3 py-1 text-xs font-semibold hover:border-coral/40"
+                  className="rounded-full border border-border bg-background px-2 py-0.5 text-[10px] font-semibold hover:border-coral/40"
                 >
                   Decline
                 </button>
@@ -263,7 +263,7 @@ function RequestGameCardInner({
                     e.stopPropagation();
                     setConfirm("approve");
                   }}
-                  className="rounded-full bg-lime-gradient px-3 py-1 text-xs font-semibold text-primary-foreground"
+                  className="rounded-full bg-lime-gradient px-2 py-0.5 text-[10px] font-semibold text-primary-foreground"
                 >
                   Approve
                 </button>
@@ -277,7 +277,7 @@ function RequestGameCardInner({
                     e.stopPropagation();
                     onCancel();
                   }}
-                  className="rounded-full border border-border bg-background px-3 py-1 text-xs font-semibold hover:border-coral/40"
+                  className="rounded-full border border-border bg-background px-2 py-0.5 text-[10px] font-semibold hover:border-coral/40"
                 >
                   Cancel
                 </button>
@@ -292,7 +292,7 @@ function RequestGameCardInner({
                 e.stopPropagation();
                 onWithdraw();
               }}
-              className="rounded-full border border-coral/40 bg-coral/10 px-3 py-1 text-xs font-semibold text-coral hover:bg-coral/20"
+              className="shrink-0 rounded-full border border-coral/40 bg-coral/10 px-2 py-0.5 text-[10px] font-semibold text-coral hover:bg-coral/20"
             >
               Withdraw
             </button>
