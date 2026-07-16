@@ -33,6 +33,22 @@ function Feed() {
     setViewMode(m);
     try { localStorage.setItem("openrun:play-view", m); } catch { /* ignore */ }
   };
+  const [density, setDensity] = useState<"grid" | "list">(() => {
+    if (typeof window === "undefined") return "grid";
+    return (localStorage.getItem("openrun:feed-density") as "grid" | "list") ?? "grid";
+  });
+  const switchDensity = (d: "grid" | "list") => {
+    setDensity(d);
+    try { localStorage.setItem("openrun:feed-density", d); } catch { /* ignore */ }
+  };
+  const listContainerClass = density === "list"
+    ? "flex flex-col gap-2"
+    : "grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3";
+  const emptyColSpan = density === "list" ? "" : "sm:col-span-2 lg:col-span-3";
+  const renderGame = (g: typeof GAMES[number], i: number) =>
+    density === "list"
+      ? <GameListRow key={g.id} game={g} index={i} />
+      : <GameCard key={g.id} game={g} index={i} />;
   const [positionFilter, setPositionFilter] = useState<string | null>(null);
   const hosted = useHostedGames();
   const joinedIds = useJoinedGameIds();
