@@ -373,8 +373,10 @@ export function HostPaymentsPanel({
 
   return (
     <div className="space-y-4">
+      <PaymentPoliciesCard gameId={gameId} settings={settings} isHost />
       {/* Header */}
       <div className="rounded-2xl border border-border bg-surface p-4">
+
         <div className="flex items-center justify-between gap-3">
           <div>
             <div className="font-display text-base font-bold flex items-center gap-2">
