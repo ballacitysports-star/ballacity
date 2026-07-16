@@ -56,6 +56,7 @@ const iconFor = (type: string) => {
   if (type === "message") return MessageCircle;
   if (type === "join_request" || type === "join_approved" || type === "join_declined") return Users;
   if (type === "payment") return CreditCard;
+  if (type === "follow" || type === "unfollow") return UserPlus;
   return Zap;
 };
 
