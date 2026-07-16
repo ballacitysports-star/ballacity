@@ -455,32 +455,39 @@ function Profile() {
                       index={i}
                       isHost={isHost}
                       onCancel={isHost ? undefined : async () => {
+                        const prev = myRequests;
+                        setMyRequests((rs) => rs.filter((x) => x.id !== r.id));
                         try {
                           await cancelMyJoinRequest(r.game_id);
                           toast("Request canceled.");
-                          refreshRequests();
                         } catch (e: any) {
+                          setMyRequests(prev);
                           toast.error(e.message ?? "Could not cancel.");
                         }
                       }}
                       onApprove={isHost ? async () => {
+                        const prev = hostRequests;
+                        setHostRequests((rs) => rs.map((x) => x.id === r.id ? { ...x, status: "approved" } : x));
                         try {
                           await reviewJoinRequest(r.id, "approved");
                           toast("Player approved.");
-                          refreshRequests();
                         } catch (e: any) {
+                          setHostRequests(prev);
                           toast.error(e.message ?? "Could not approve.");
                         }
                       } : undefined}
                       onDecline={isHost ? async () => {
+                        const prev = hostRequests;
+                        setHostRequests((rs) => rs.map((x) => x.id === r.id ? { ...x, status: "rejected" } : x));
                         try {
                           await reviewJoinRequest(r.id, "rejected");
                           toast("Player declined.");
-                          refreshRequests();
                         } catch (e: any) {
+                          setHostRequests(prev);
                           toast.error(e.message ?? "Could not decline.");
                         }
                       } : undefined}
+
                     />
                   );
                 })}
