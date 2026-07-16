@@ -56,6 +56,7 @@ function PlayerProfilePage() {
   const [opening, setOpening] = useState(false);
   const [reviewsOpen, setReviewsOpen] = useState(false);
   const [followList, setFollowList] = useState<null | "followers" | "following">(null);
+  const [unfollowOpen, setUnfollowOpen] = useState(false);
 
   const overrides = useProfileOverrides(userId);
   const reviews = useReviewsFor(userId);
@@ -246,7 +247,7 @@ function PlayerProfilePage() {
         {/* Action row — IG-style Follow / Message */}
         <div className="mt-4 grid grid-cols-2 gap-2">
           {follow.isFollowing ? (
-            <Popover>
+            <Popover open={unfollowOpen} onOpenChange={setUnfollowOpen}>
               <PopoverTrigger asChild>
                 <Button
                   disabled={follow.pending || !user}
@@ -262,18 +263,17 @@ function PlayerProfilePage() {
                   Unfollow <span className="font-semibold">{displayName}</span>?
                 </p>
                 <div className="mt-3 flex justify-end gap-2">
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    onClick={(e) => (e.currentTarget.closest("[data-radix-popper-content-wrapper]") as HTMLElement | null)?.querySelector<HTMLElement>("[data-state=open]")?.blur()}
-                  >
+                  <Button size="sm" variant="ghost" onClick={() => setUnfollowOpen(false)}>
                     Cancel
                   </Button>
                   <Button
                     size="sm"
                     variant="destructive"
                     disabled={follow.pending}
-                    onClick={() => follow.toggle()}
+                    onClick={() => {
+                      follow.toggle();
+                      setUnfollowOpen(false);
+                    }}
                   >
                     Unfollow
                   </Button>
