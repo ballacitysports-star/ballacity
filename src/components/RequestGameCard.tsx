@@ -1,6 +1,6 @@
 import { Link } from "@tanstack/react-router";
 import { motion } from "framer-motion";
-import { MapPin, Clock, Check, X as XIcon, Clock as ClockIcon } from "lucide-react";
+import { MapPin, Clock, Check, X as XIcon, Clock as ClockIcon, User } from "lucide-react";
 import { UserAvatar } from "@/components/UserAvatar";
 import { SpotsPill } from "@/components/SpotsPill";
 import type { Game } from "@/lib/sample-data";
