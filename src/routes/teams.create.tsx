@@ -729,7 +729,7 @@ function CreateOrg() {
 
               {showTeamBlocks &&
                 sports
-                  .filter((s) => (SPORT_CONFIG[s]?.positions?.length ?? 0) > 0)
+                  .filter((s) => (POSITIONS_BY_SPORT[s]?.length ?? 0) > 0)
                   .map((s) => (
                     <Section key={`pos-${s}`} title={`${s} — positions needed`}>
                       <PositionsPicker
