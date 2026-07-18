@@ -93,11 +93,20 @@ const FILTERS: { key: PostKind | "all"; label: string }[] = [
 
 function TeamPage() {
   const org = Route.useLoaderData() as Org;
-  const [filter, setFilter] = useState<PostKind | "all">("all");
-  const [tab, setTab] = useState<"posts" | "about" | "games">("posts");
+  const search = Route.useSearch();
+  const navigate = useNavigate({ from: "/teams/$teamId" });
+  const tab: "posts" | "about" | "games" =
+    search.tab === "about" || search.tab === "games" ? search.tab : "posts";
+  const filter: PostKind | "all" = (search.filter || "all") as PostKind | "all";
+  const reviewsOpen = search.modal === "reviews";
+  const setTab = (v: "posts" | "about" | "games") =>
+    navigate({ search: (p) => ({ ...p, tab: v === "posts" ? "" : v }), replace: true });
+  const setFilter = (v: PostKind | "all") =>
+    navigate({ search: (p) => ({ ...p, filter: v === "all" ? "" : v }), replace: true });
+  const setReviewsOpen = (v: boolean) =>
+    navigate({ search: (p) => ({ ...p, modal: v ? "reviews" : "" }), replace: true });
   const [following, setFollowing] = useState(false);
   const [mounted, setMounted] = useState(false);
-  const [reviewsOpen, setReviewsOpen] = useState(false);
   useEffect(() => setMounted(true), []);
   const canEdit = mounted && isMyOrg(org.id);
 
