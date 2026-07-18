@@ -2,7 +2,8 @@ import { createFileRoute, Link, useNavigate, useRouter } from "@tanstack/react-r
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Loader2, RefreshCw } from "lucide-react";
-import { Search, SlidersHorizontal, Bell, MessageCircle, X, MapPin, List, Map as MapIcon, LayoutGrid, Rows3 } from "lucide-react";
+import { Search, SlidersHorizontal, Bell, MessageCircle, X, MapPin } from "lucide-react";
+import { ViewDensityToggle } from "@/components/ViewDensityToggle";
 import { PlayMapView } from "@/components/PlayMapView";
 import { useUnreadNotificationCount } from "@/lib/notifications";
 import { Logo } from "@/components/Logo";
