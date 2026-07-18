@@ -308,11 +308,46 @@ function TrainersPage() {
             <SportChips selected={sport} onSelect={(s) => setSport(s as Sport | null)} />
           </div>
 
+          {(() => {
+            const specialties = sport
+              ? SPORT_CONFIG[sport].formats
+              : SESSION_TYPES;
+            return (
+              <div className="-mx-4 overflow-x-auto px-4 mb-3">
+                <div className="flex gap-2 pb-1">
+                  <span className="self-center text-[10px] font-bold uppercase tracking-wider text-muted-foreground pr-1">
+                    Specialty
+                  </span>
+                  {specialties.map((s) => {
+                    const active = specialty === s;
+                    return (
+                      <button
+                        key={s}
+                        onClick={() => setSpecialty(s)}
+                        className={`whitespace-nowrap rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors ${
+                          active
+                            ? "border-lime bg-lime text-primary-foreground"
+                            : "border-border bg-surface text-muted-foreground"
+                        }`}
+                      >
+                        {s}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })()}
+
           <div className="-mx-4 overflow-x-auto px-4 mb-4">
             <div className="flex gap-2 pb-1">
+              <span className="self-center text-[10px] font-bold uppercase tracking-wider text-muted-foreground pr-1">
+                Available
+              </span>
               {([
-                { id: "any", label: "Any availability" },
+                { id: "any", label: "Any time" },
                 { id: "recruiting", label: "Booking now" },
+                { id: "soon", label: "This week" },
                 { id: "weekly", label: "Weekly+" },
                 { id: "casual", label: "Casual" },
               ] as const).map((a) => {
