@@ -237,10 +237,14 @@ function EditOrg() {
       return next;
     });
   }
-  function handleDelete() {
+  async function handleDelete() {
     if (!confirm(`Delete ${org.name}? This cannot be undone.`)) return;
-    deleteOrg(org.id);
-    nav({ to: "/teams" });
+    try {
+      await deleteOrg(org.id);
+      nav({ to: "/teams" });
+    } catch (e) {
+      alert(e instanceof Error ? e.message : "Failed to delete team.");
+    }
   }
 
   function toggleSport(s: Sport) {
