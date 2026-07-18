@@ -56,22 +56,30 @@ const KIND_META: Record<
 function TeamsPage() {
   const [kind, setKind] = useState<OrgKind>("team");
   const [q, setQ] = useState("");
+  const [sport, setSport] = useState<Sport | null>(null);
+  const [sortBy, setSortBy] = useState<SortBy>("nearest");
   const orgs = useAllOrgs();
   const meta = KIND_META[kind];
 
-  const list = useMemo(
-    () =>
-      orgs
-        .filter((o) => o.kind === kind)
-        .filter((o) =>
-          q
-            ? (o.name + o.handle + o.tagline + o.sports.join(" "))
-                .toLowerCase()
-                .includes(q.toLowerCase())
-            : true,
-        ),
-    [orgs, kind, q],
-  );
+  const list = useMemo(() => {
+    const filtered = orgs
+      .filter((o) => o.kind === kind)
+      .filter((o) => (sport ? o.sports.includes(sport) : true))
+      .filter((o) =>
+        q
+          ? (o.name + o.handle + o.tagline + o.city + o.sports.join(" "))
+              .toLowerCase()
+              .includes(q.toLowerCase())
+          : true,
+      );
+    const withDist = filtered.map((o) => ({ o, dist: pseudoDistance(o.id) }));
+    withDist.sort((a, b) => {
+      if (sortBy === "nearest") return a.dist - b.dist;
+      if (sortBy === "followers") return b.o.followers - a.o.followers;
+      return a.o.name.localeCompare(b.o.name);
+    });
+    return withDist;
+  }, [orgs, kind, sport, q, sortBy]);
 
   const featured =
     orgs.find((o) => o.verified && o.kind === kind) ?? orgs.find((o) => o.kind === kind);
