@@ -1,5 +1,5 @@
 import { Link } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
+import { type ReactNode, useMemo, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { MapPin, Navigation } from "lucide-react";
 import { GAMES, SPORTS } from "@/lib/sample-data";
@@ -16,34 +16,61 @@ const emojiBySport: Record<string, string> = Object.fromEntries(
   SPORTS.map((s) => [s.name, s.emoji]),
 );
 
+// Deterministic pseudo-coordinate 0-100 derived from an id, so pins for
+// entities without real lat/lng (players, teams) stay put across renders.
+function pseudoCoord(id: string, salt: number): number {
+  let h = salt;
+  for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) >>> 0;
+  return (h % 90) + 5; // 5-95 to keep pins inside the visible box
+}
+
+export type MapItemLike = { id: string };
+
 /**
- * Map surface used inside the merged /feed Play view. Extracted from the
- * former /discover route so both List and Map modes share the tab.
+ * Generic map surface. Feed uses it for games (default behavior when no
+ * props are supplied). Players and Teams pages pass their own pins + card.
  */
-export function PlayMapView() {
+export function PlayMapView<T extends MapItemLike>(props?: {
+  items?: T[];
+  pins?: MapPinItem[];
+  renderCard?: (item: T) => ReactNode;
+  noun?: string;
+  emptyLabel?: string;
+}) {
   const { user } = useAuth();
   const profile = useMyProfile(user);
   const hosted = useHostedGames();
-  const allGames = useMemo(() => [...hosted, ...GAMES], [hosted]);
-  const [active, setActive] = useState<string>(allGames[0]?.id ?? "");
-  const [visibleIds, setVisibleIds] = useState<string[] | null>(null);
-  const visibleGames = useMemo(
-    () => (visibleIds ? allGames.filter((g) => visibleIds.includes(g.id)) : allGames),
-    [visibleIds, allGames],
-  );
-  const activeGame = visibleGames.find((g) => g.id === active) ?? visibleGames[0] ?? null;
 
-  const pins: MapPinItem[] = useMemo(
-    () =>
-      allGames.map((g) => ({
-        id: g.id,
-        emoji: emojiBySport[g.sport] ?? "📍",
-        lat: g.lat,
-        lng: g.lng,
-        urgent: g.urgent,
-      })),
-    [allGames],
+  // Default (games) behavior when caller supplies nothing.
+  const defaultGames = useMemo(() => [...hosted, ...GAMES], [hosted]);
+  const items = (props?.items ?? (defaultGames as unknown as T[])) as T[];
+  const noun = props?.noun ?? "game";
+  const emptyLabel =
+    props?.emptyLabel ?? `No ${noun}s in this area. Pan the map or reset.`;
+
+  const pins: MapPinItem[] = useMemo(() => {
+    if (props?.pins) return props.pins;
+    return defaultGames.map((g) => ({
+      id: g.id,
+      emoji: emojiBySport[g.sport] ?? "📍",
+      lat: g.lat,
+      lng: g.lng,
+      urgent: g.urgent,
+    }));
+  }, [props?.pins, defaultGames]);
+
+  const [active, setActive] = useState<string>(items[0]?.id ?? "");
+  const [visibleIds, setVisibleIds] = useState<string[] | null>(null);
+  const visibleItems = useMemo(
+    () => (visibleIds ? items.filter((it) => visibleIds.includes(it.id)) : items),
+    [visibleIds, items],
   );
+  const activeItem =
+    visibleItems.find((it) => it.id === active) ?? visibleItems[0] ?? null;
+
+  const renderCard =
+    props?.renderCard ??
+    ((item: T) => <DefaultGameCard game={item as unknown as ActiveGame} />);
 
   return (
     <div className="relative h-[calc(100dvh-11rem)] overflow-hidden rounded-3xl border border-border">
@@ -64,7 +91,8 @@ export function PlayMapView() {
             <Navigation className="h-4 w-4 text-lime" />
             <span className="font-semibold">{visibleIds ? "This area" : "Live location"}</span>
             <span className="text-muted-foreground">
-              · {visibleGames.length} game{visibleGames.length === 1 ? "" : "s"}{" "}
+              · {visibleItems.length} {noun}
+              {visibleItems.length === 1 ? "" : "s"}{" "}
               {visibleIds ? "in view" : "nearby"}
             </span>
             {visibleIds && (
@@ -81,8 +109,16 @@ export function PlayMapView() {
 
       <div className="absolute bottom-3 left-3 right-3 z-20">
         <AnimatePresence mode="wait">
-          {activeGame ? (
-            <ActiveGameCard key={activeGame.id} game={activeGame} />
+          {activeItem ? (
+            <motion.div
+              key={activeItem.id}
+              initial={{ opacity: 0, y: 30 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 30 }}
+              transition={{ type: "spring", stiffness: 240, damping: 24 }}
+            >
+              {renderCard(activeItem)}
+            </motion.div>
           ) : (
             <motion.div
               key="empty"
@@ -91,11 +127,13 @@ export function PlayMapView() {
               exit={{ opacity: 0, y: 30 }}
               className="rounded-3xl border border-border bg-surface/90 backdrop-blur-xl p-4 text-center text-sm text-muted-foreground shadow-2xl"
             >
-              No games in this area. Pan the map or{" "}
-              <button onClick={() => setVisibleIds(null)} className="font-bold text-lime">
+              {emptyLabel}{" "}
+              <button
+                onClick={() => setVisibleIds(null)}
+                className="font-bold text-lime"
+              >
                 reset
               </button>
-              .
             </motion.div>
           )}
         </AnimatePresence>
@@ -116,44 +154,42 @@ type ActiveGame = {
   joined: number;
 };
 
-function ActiveGameCard({ game }: { game: ActiveGame }) {
+function DefaultGameCard({ game }: { game: ActiveGame }) {
   const liveCount = useLiveParticipantCount(game.id);
   const spotsLeft = computeSpotsLeft(game.maxPlayers, game.joined, liveCount);
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 30 }}
-      animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, y: 30 }}
-      transition={{ type: "spring", stiffness: 240, damping: 24 }}
+    <Link
+      to="/games/$gameId"
+      params={{ gameId: game.id }}
+      className="flex gap-3 rounded-3xl border border-border bg-surface/90 backdrop-blur-xl p-3 shadow-2xl"
     >
-      <Link
-        to="/games/$gameId"
-        params={{ gameId: game.id }}
-        className="flex gap-3 rounded-3xl border border-border bg-surface/90 backdrop-blur-xl p-3 shadow-2xl"
-      >
-        <img
-          src={game.image}
-          alt=""
-          loading="lazy"
-          className="h-20 w-20 rounded-2xl object-cover"
-        />
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 text-xs">
-            <span>{emojiBySport[game.sport]}</span>
-            <span className="font-semibold">{game.sport}</span>
-            <span className="text-muted-foreground">· {game.skill}</span>
-          </div>
-          <h3 className="font-display text-base font-bold truncate">{game.title}</h3>
-          <div className="flex items-center gap-2 text-xs text-muted-foreground mt-0.5">
-            <MapPin className="h-3.5 w-3.5" />
-            <span className="truncate">{game.location}</span>
-          </div>
-          <div className="flex items-center justify-between mt-1.5">
-            <span className="text-xs">{formatWhen(game.date)}</span>
-            <SpotsPill spotsLeft={spotsLeft} />
-          </div>
+      <img
+        src={game.image}
+        alt=""
+        loading="lazy"
+        className="h-20 w-20 rounded-2xl object-cover"
+      />
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-2 text-xs">
+          <span>{emojiBySport[game.sport]}</span>
+          <span className="font-semibold">{game.sport}</span>
+          <span className="text-muted-foreground">· {game.skill}</span>
         </div>
-      </Link>
-    </motion.div>
+        <h3 className="font-display text-base font-bold truncate">{game.title}</h3>
+        <div className="flex items-center gap-2 text-xs text-muted-foreground mt-0.5">
+          <MapPin className="h-3.5 w-3.5" />
+          <span className="truncate">{game.location}</span>
+        </div>
+        <div className="flex items-center justify-between mt-1.5">
+          <span className="text-xs">{formatWhen(game.date)}</span>
+          <SpotsPill spotsLeft={spotsLeft} />
+        </div>
+      </div>
+    </Link>
   );
+}
+
+// Exposed for other map views that want stable pseudo lat/lng from an id.
+export function pseudoLatLngFromId(id: string): { lat: number; lng: number } {
+  return { lat: pseudoCoord(id, 7), lng: pseudoCoord(id, 131) };
 }

@@ -9,7 +9,7 @@ import { useAllOrgs } from "@/lib/org-store";
 import { OrgCard } from "@/components/OrgCard";
 import { SportChips } from "@/components/SportChips";
 import { ViewDensityToggle, type ViewMode, type Density } from "@/components/ViewDensityToggle";
-import { PlayMapView } from "@/components/PlayMapView";
+import { TeamsMapView } from "@/components/TeamsMapView";
 import { useMyProfile } from "@/lib/user-prefs-store";
 import { useAuth } from "@/hooks/use-auth";
 
@@ -350,7 +350,7 @@ function TeamsPage() {
 
       {viewMode === "map" ? (
 
-        <PlayMapView />
+        <TeamsMapView orgs={list.map((x) => x.o)} kind={kind} />
       ) : (
         <div
           className={
