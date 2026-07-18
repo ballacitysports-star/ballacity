@@ -1,5 +1,5 @@
 import { Link, useLocation } from "@tanstack/react-router";
-import { Home, Map, Plus, UserCheck, Users, Dribbble, MessageCircle } from "lucide-react";
+import { Home, Map, Plus, UserCheck, Users, Dribbble, MessageCircle, GraduationCap } from "lucide-react";
 import { motion } from "framer-motion";
 import { MyAvatar } from "@/components/UserAvatar";
 
