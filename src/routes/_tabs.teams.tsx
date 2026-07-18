@@ -199,6 +199,13 @@ function TeamsPage() {
       )}
 
       {/* Search */}
+      <ViewDensityToggle
+        view={viewMode}
+        onViewChange={switchView}
+        density={density}
+        onDensityChange={switchDensity}
+      />
+
       <div className="flex gap-2 mb-4">
         <div className="flex-1 flex items-center gap-2 rounded-full border border-border bg-surface px-4 py-2.5">
           <Search className="h-4 w-4 text-muted-foreground" />
@@ -210,13 +217,7 @@ function TeamsPage() {
           />
         </div>
         <Link
-          to="/teams/create"
-          className="grid h-11 w-11 place-items-center rounded-full bg-lime-gradient text-primary-foreground glow-lime"
-          aria-label={kind === "team" ? "Create team" : "Create coach profile"}
-        >
-          <Plus className="h-5 w-5" strokeWidth={2.5} />
-        </Link>
-      </div>
+
 
       {/* Sport filter chips */}
       <div className="mb-3">
