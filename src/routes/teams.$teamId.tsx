@@ -1,4 +1,4 @@
-import { createFileRoute, Link, notFound, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, Link, notFound, redirect, useNavigate } from "@tanstack/react-router";
 import { motion } from "framer-motion";
 import { useEffect, useMemo, useState } from "react";
 import { zodValidator, fallback } from "@tanstack/zod-adapter";
@@ -74,6 +74,9 @@ export const Route = createFileRoute("/teams/$teamId")({
   loader: async ({ params }) => {
     const org = await ensureOrgById(params.teamId);
     if (!org) throw notFound();
+    if (org.kind === "coach") {
+      throw redirect({ to: "/trainers/$trainerId", params: { trainerId: org.id }, replace: true });
+    }
     return org;
   },
 });

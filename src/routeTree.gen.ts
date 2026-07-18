@@ -23,6 +23,7 @@ import { Route as AdminRouteImport } from './routes/admin'
 import { Route as TabsRouteImport } from './routes/_tabs'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as MessagesIndexRouteImport } from './routes/messages.index'
+import { Route as TrainersTrainerIdRouteImport } from './routes/trainers.$trainerId'
 import { Route as TeamsCreateRouteImport } from './routes/teams.create'
 import { Route as TeamsTeamIdRouteImport } from './routes/teams.$teamId'
 import { Route as ReviewNewRouteImport } from './routes/review.new'
@@ -121,6 +122,11 @@ const IndexRoute = IndexRouteImport.update({
 const MessagesIndexRoute = MessagesIndexRouteImport.update({
   id: '/messages/',
   path: '/messages/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const TrainersTrainerIdRoute = TrainersTrainerIdRouteImport.update({
+  id: '/trainers/$trainerId',
+  path: '/trainers/$trainerId',
   getParentRoute: () => rootRouteImport,
 } as any)
 const TeamsCreateRoute = TeamsCreateRouteImport.update({
@@ -313,6 +319,7 @@ export interface FileRoutesByFullPath {
   '/review/new': typeof ReviewNewRoute
   '/teams/$teamId': typeof TeamsTeamIdRouteWithChildren
   '/teams/create': typeof TeamsCreateRoute
+  '/trainers/$trainerId': typeof TrainersTrainerIdRoute
   '/messages/': typeof MessagesIndexRoute
   '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
   '/.mcp/invoke-tool/$tool': typeof Char91DotmcpChar93InvokeToolToolRoute
@@ -357,6 +364,7 @@ export interface FileRoutesByTo {
   '/review/new': typeof ReviewNewRoute
   '/teams/$teamId': typeof TeamsTeamIdRouteWithChildren
   '/teams/create': typeof TeamsCreateRoute
+  '/trainers/$trainerId': typeof TrainersTrainerIdRoute
   '/messages': typeof MessagesIndexRoute
   '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
   '/.mcp/invoke-tool/$tool': typeof Char91DotmcpChar93InvokeToolToolRoute
@@ -404,6 +412,7 @@ export interface FileRoutesById {
   '/review/new': typeof ReviewNewRoute
   '/teams/$teamId': typeof TeamsTeamIdRouteWithChildren
   '/teams/create': typeof TeamsCreateRoute
+  '/trainers/$trainerId': typeof TrainersTrainerIdRoute
   '/messages/': typeof MessagesIndexRoute
   '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
   '/.mcp/invoke-tool/$tool': typeof Char91DotmcpChar93InvokeToolToolRoute
@@ -451,6 +460,7 @@ export interface FileRouteTypes {
     | '/review/new'
     | '/teams/$teamId'
     | '/teams/create'
+    | '/trainers/$trainerId'
     | '/messages/'
     | '/.lovable/oauth/consent'
     | '/.mcp/invoke-tool/$tool'
@@ -495,6 +505,7 @@ export interface FileRouteTypes {
     | '/review/new'
     | '/teams/$teamId'
     | '/teams/create'
+    | '/trainers/$trainerId'
     | '/messages'
     | '/.lovable/oauth/consent'
     | '/.mcp/invoke-tool/$tool'
@@ -541,6 +552,7 @@ export interface FileRouteTypes {
     | '/review/new'
     | '/teams/$teamId'
     | '/teams/create'
+    | '/trainers/$trainerId'
     | '/messages/'
     | '/.lovable/oauth/consent'
     | '/.mcp/invoke-tool/$tool'
@@ -578,6 +590,7 @@ export interface RootRouteChildren {
   ReviewNewRoute: typeof ReviewNewRoute
   TeamsTeamIdRoute: typeof TeamsTeamIdRouteWithChildren
   TeamsCreateRoute: typeof TeamsCreateRoute
+  TrainersTrainerIdRoute: typeof TrainersTrainerIdRoute
   MessagesIndexRoute: typeof MessagesIndexRoute
   DotlovableOauthConsentRoute: typeof DotlovableOauthConsentRoute
   Char91DotmcpChar93InvokeToolToolRoute: typeof Char91DotmcpChar93InvokeToolToolRoute
@@ -683,6 +696,13 @@ declare module '@tanstack/react-router' {
       path: '/messages'
       fullPath: '/messages/'
       preLoaderRoute: typeof MessagesIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/trainers/$trainerId': {
+      id: '/trainers/$trainerId'
+      path: '/trainers/$trainerId'
+      fullPath: '/trainers/$trainerId'
+      preLoaderRoute: typeof TrainersTrainerIdRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/teams/create': {
@@ -989,6 +1009,7 @@ const rootRouteChildren: RootRouteChildren = {
   ReviewNewRoute: ReviewNewRoute,
   TeamsTeamIdRoute: TeamsTeamIdRouteWithChildren,
   TeamsCreateRoute: TeamsCreateRoute,
+  TrainersTrainerIdRoute: TrainersTrainerIdRoute,
   MessagesIndexRoute: MessagesIndexRoute,
   DotlovableOauthConsentRoute: DotlovableOauthConsentRoute,
   Char91DotmcpChar93InvokeToolToolRoute: Char91DotmcpChar93InvokeToolToolRoute,
