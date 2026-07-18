@@ -60,6 +60,7 @@ function TeamsPage() {
   const [q, setQ] = useState("");
   const [sport, setSport] = useState<Sport | null>(null);
   const [sortBy, setSortBy] = useState<SortBy>("nearest");
+  const [avail, setAvail] = useState<"any" | "recruiting" | "weekly" | "casual">("any");
   const [density, setDensity] = useState<Density>(() => {
     if (typeof window === "undefined") return "list";
     return (localStorage.getItem("openrun:teams-density") as Density) ?? "list";
@@ -80,9 +81,27 @@ function TeamsPage() {
   const meta = KIND_META[kind];
 
   const list = useMemo(() => {
+    const isRecruiting = (o: typeof orgs[number]) => {
+      const pn = o.positionsNeeded;
+      if (!pn) return false;
+      return Object.values(pn).some((byPos) =>
+        Object.values(byPos ?? {}).some((n) => Number(n) > 0),
+      );
+    };
+    const cadenceMatches = (o: typeof orgs[number], target: "weekly" | "casual") => {
+      const c = (o.cadence ?? "").toLowerCase();
+      if (!c) return false;
+      if (target === "weekly") return /week|multiple|daily/.test(c);
+      return /month|casual|occasion|pickup|drop/.test(c);
+    };
     const filtered = orgs
       .filter((o) => o.kind === kind)
       .filter((o) => (sport ? o.sports.includes(sport) : true))
+      .filter((o) => {
+        if (avail === "any") return true;
+        if (avail === "recruiting") return isRecruiting(o);
+        return cadenceMatches(o, avail);
+      })
       .filter((o) =>
         q
           ? (o.name + o.handle + o.tagline + o.city + o.sports.join(" "))
@@ -97,7 +116,7 @@ function TeamsPage() {
       return a.o.name.localeCompare(b.o.name);
     });
     return withDist;
-  }, [orgs, kind, sport, q, sortBy]);
+  }, [orgs, kind, sport, q, sortBy, avail]);
 
   const featured =
     orgs.find((o) => o.verified && o.kind === kind) ?? orgs.find((o) => o.kind === kind);
@@ -181,6 +200,35 @@ function TeamsPage() {
       <div className="mb-3">
         <SportChips selected={sport} onSelect={(s) => setSport(s as Sport | null)} />
       </div>
+
+      {/* Availability filter chips */}
+      <div className="-mx-4 overflow-x-auto px-4 mb-4">
+        <div className="flex gap-2 pb-1">
+          {([
+            { id: "any", label: "Any availability" },
+            { id: "recruiting", label: kind === "coach" ? "Booking now" : "Recruiting" },
+            { id: "weekly", label: "Weekly+" },
+            { id: "casual", label: "Casual" },
+          ] as const).map((a) => {
+            const active = avail === a.id;
+            return (
+              <button
+                key={a.id}
+                onClick={() => setAvail(a.id)}
+                className={`whitespace-nowrap rounded-full border px-3.5 py-1.5 text-xs font-semibold transition-colors ${
+                  active
+                    ? "border-lime bg-lime text-primary-foreground"
+                    : "border-border bg-surface text-muted-foreground"
+                }`}
+              >
+                {a.label}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+
 
       {/* Sort control + result count */}
       <div className="mb-4 flex items-center justify-between gap-2">
