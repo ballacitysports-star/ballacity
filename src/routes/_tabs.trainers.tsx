@@ -92,19 +92,27 @@ function TrainersPage() {
 
   const q = search.q;
   const sport: Sport | null = (search.sport || null) as Sport | null;
+  const specialty: string = search.specialty || "";
   const sortBy: SortBy =
-    search.sort === "followers" || search.sort === "name" ? search.sort : "nearest";
-  const avail: "any" | "recruiting" | "weekly" | "casual" =
-    search.avail === "recruiting" || search.avail === "weekly" || search.avail === "casual"
+    search.sort === "soonest" || search.sort === "followers" || search.sort === "name"
+      ? search.sort
+      : "nearest";
+  const avail: Avail =
+    search.avail === "soon" ||
+    search.avail === "recruiting" ||
+    search.avail === "weekly" ||
+    search.avail === "casual"
       ? search.avail
       : "any";
   const viewMode: ViewMode = search.view === "map" ? "map" : "list";
   const density: Density = search.density === "grid" ? "grid" : "list";
 
   const setQ = (v: string) => updateSearch({ q: v });
-  const setSport = (v: Sport | null) => updateSearch({ sport: v ?? "" });
+  const setSport = (v: Sport | null) => updateSearch({ sport: v ?? "", specialty: "" });
+  const setSpecialty = (v: string) =>
+    updateSearch({ specialty: specialty === v ? "" : v });
   const setSortBy = (v: SortBy) => updateSearch({ sort: v });
-  const setAvail = (v: "any" | "recruiting" | "weekly" | "casual") => updateSearch({ avail: v });
+  const setAvail = (v: Avail) => updateSearch({ avail: v });
   const [filtersOpen, setFiltersOpen] = useState(false);
   const switchView = (v: ViewMode) => updateSearch({ view: v });
   const switchDensity = (d: Density) => updateSearch({ density: d });
