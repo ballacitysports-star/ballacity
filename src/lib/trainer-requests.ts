@@ -1,0 +1,129 @@
+import { supabase } from "@/integrations/supabase/client";
+
+export type TrainerRequestStatus = "pending" | "accepted" | "declined" | "cancelled" | "completed";
+
+export type TrainerSessionRequest = {
+  id: string;
+  trainer_id: string;
+  from_user_id: string;
+  to_user_id: string;
+  session_type: string;
+  preferred_date: string | null;
+  duration_minutes: number;
+  message: string | null;
+  status: TrainerRequestStatus;
+  responder_note: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+const TABLE = "trainer_session_requests" as const;
+
+export async function createTrainerSessionRequest(input: {
+  trainerId: string;
+  toUserId: string;
+  sessionType: string;
+  preferredDate: string | null;
+  durationMinutes: number;
+  message: string | null;
+}): Promise<TrainerSessionRequest> {
+  const { data: u } = await supabase.auth.getUser();
+  if (!u.user) throw new Error("Please sign in to request a session.");
+  if (u.user.id === input.toUserId) throw new Error("You can't request a session from yourself.");
+
+  const { data, error } = await supabase
+    .from(TABLE as any)
+    .insert({
+      trainer_id: input.trainerId,
+      from_user_id: u.user.id,
+      to_user_id: input.toUserId,
+      session_type: input.sessionType,
+      preferred_date: input.preferredDate,
+      duration_minutes: input.durationMinutes,
+      message: input.message?.trim() || null,
+    } as any)
+    .select("*")
+    .single();
+
+  if (error) {
+    if ((error as any).code === "23505") {
+      throw new Error("You already have a pending request with this trainer.");
+    }
+    throw error;
+  }
+  return data as unknown as TrainerSessionRequest;
+}
+
+export async function getMyPendingRequestForTrainer(
+  trainerId: string,
+): Promise<TrainerSessionRequest | null> {
+  const { data: u } = await supabase.auth.getUser();
+  if (!u.user) return null;
+  const { data, error } = await supabase
+    .from(TABLE as any)
+    .select("*")
+    .eq("trainer_id", trainerId)
+    .eq("from_user_id", u.user.id)
+    .order("created_at", { ascending: false })
+    .limit(1);
+  if (error) throw error;
+  const row = (data ?? [])[0] as unknown as TrainerSessionRequest | undefined;
+  return row ?? null;
+}
+
+export async function listMyTrainerRequests(
+  box: "outbox" | "inbox",
+): Promise<TrainerSessionRequest[]> {
+  const { data: u } = await supabase.auth.getUser();
+  if (!u.user) return [];
+  const col = box === "inbox" ? "to_user_id" : "from_user_id";
+  const { data, error } = await supabase
+    .from(TABLE as any)
+    .select("*")
+    .eq(col, u.user.id)
+    .order("created_at", { ascending: false });
+  if (error) throw error;
+  return (data ?? []) as unknown as TrainerSessionRequest[];
+}
+
+export async function cancelTrainerSessionRequest(id: string) {
+  const { error } = await supabase
+    .from(TABLE as any)
+    .update({ status: "cancelled" } as any)
+    .eq("id", id);
+  if (error) throw error;
+}
+
+export async function respondToTrainerSessionRequest(
+  id: string,
+  status: "accepted" | "declined" | "completed",
+  responderNote?: string | null,
+) {
+  const { error } = await supabase
+    .from(TABLE as any)
+    .update({ status, responder_note: responderNote ?? null } as any)
+    .eq("id", id);
+  if (error) throw error;
+}
+
+export function subscribeToMyTrainerRequests(
+  userId: string,
+  onChange: () => void,
+) {
+  const channel = supabase
+    .channel(`trainer-requests-${userId}`)
+    .on(
+      "postgres_changes",
+      { event: "*", schema: "public", table: TABLE, filter: `from_user_id=eq.${userId}` },
+      () => onChange(),
+    )
+    .on(
+      "postgres_changes",
+      { event: "*", schema: "public", table: TABLE, filter: `to_user_id=eq.${userId}` },
+      () => onChange(),
+    )
+    .subscribe();
+  return () => {
+    supabase.removeChannel(channel);
+  };
+}
