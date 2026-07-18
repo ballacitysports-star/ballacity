@@ -906,19 +906,18 @@ function CreateOrg() {
       {/* Footer nav */}
       <div className="fixed bottom-[calc(env(safe-area-inset-bottom)+6rem)] left-0 right-0 z-30 px-4 pb-[max(env(safe-area-inset-bottom),0.75rem)] pt-3 bg-gradient-to-t from-background via-background/90 to-transparent">
         <div className="mx-auto max-w-md flex gap-2">
-          {step > 0 && !(initialKind && step === 1) && (
+          {step > 0 ? (
             <button
               type="button"
-              onClick={() => setStep((s) => Math.max(initialKind ? 1 : 0, s - 1))}
+              onClick={() => setStep((s) => Math.max(0, s - 1))}
               className="rounded-2xl border border-border bg-surface px-5 py-3.5 text-sm font-bold"
             >
               Back
             </button>
-          )}
-          {initialKind && step === 1 && (
+          ) : (
             <button
               type="button"
-              onClick={() => nav({ to: initialKind === "coach" ? "/trainers" : "/teams" })}
+              onClick={() => nav({ to: kind === "coach" ? "/trainers" : "/teams" })}
               className="rounded-2xl border border-border bg-surface px-5 py-3.5 text-sm font-bold"
             >
               Cancel
