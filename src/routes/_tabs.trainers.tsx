@@ -102,6 +102,23 @@ function TrainersPage() {
 
   const orgs = useAllOrgs();
 
+  // Real-time availability change indicator
+  const trainerSig = useMemo(
+    () =>
+      orgs
+        .filter((o) => o.kind === "coach")
+        .map((o) => `${o.id}:${o.cadence ?? ""}:${JSON.stringify(o.positionsNeeded ?? {})}`)
+        .join("|"),
+    [orgs],
+  );
+  const prevSigRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (prevSigRef.current !== null && prevSigRef.current !== trainerSig) {
+      toast("Trainer availability updated", { duration: 2000 });
+    }
+    prevSigRef.current = trainerSig;
+  }, [trainerSig]);
+
   const list = useMemo(() => {
     const isBooking = (o: typeof orgs[number]) => {
       const pn = o.positionsNeeded;
