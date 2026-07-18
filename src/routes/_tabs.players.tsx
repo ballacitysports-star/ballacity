@@ -208,13 +208,21 @@ function PlayersPage() {
     return age;
   }
 
-  const [density, setDensity] = useState<"grid" | "list">(() => {
+  const [density, setDensity] = useState<Density>(() => {
     if (typeof window === "undefined") return "list";
-    return (localStorage.getItem("openrun:players-density") as "grid" | "list") ?? "list";
+    return (localStorage.getItem("openrun:players-density") as Density) ?? "list";
   });
-  const switchDensity = (d: "grid" | "list") => {
+  const switchDensity = (d: Density) => {
     setDensity(d);
     try { localStorage.setItem("openrun:players-density", d); } catch { /* ignore */ }
+  };
+  const [viewMode, setViewMode] = useState<ViewMode>(() => {
+    if (typeof window === "undefined") return "list";
+    return (localStorage.getItem("openrun:players-view") as ViewMode) ?? "list";
+  });
+  const switchView = (v: ViewMode) => {
+    setViewMode(v);
+    try { localStorage.setItem("openrun:players-view", v); } catch { /* ignore */ }
   };
 
   return (
