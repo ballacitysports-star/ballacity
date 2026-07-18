@@ -137,7 +137,13 @@ function CreateOrg() {
 
 
 
-  function submit() {
+  const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
+
+  async function submit() {
+    if (submitting) return;
+    setSubmitError(null);
+    setSubmitting(true);
     const id = `${kind === "team" ? "t" : "c"}-${(name || "org").toLowerCase().replace(/[^a-z0-9]+/g, "-")}-${Date.now().toString(36).slice(-4)}`;
     const handleClean = (handle.startsWith("@") ? handle.slice(1) : handle)
       .replace(/[^a-zA-Z0-9_]/g, "")
@@ -147,8 +153,18 @@ function CreateOrg() {
       id,
       handle: `@${handleClean || "org"}`,
     };
-    addOrg(org);
-    nav({ to: "/teams/$teamId", params: { teamId: id } });
+    try {
+      const saved = await addOrg(org);
+      nav({ to: "/teams/$teamId", params: { teamId: saved.id } });
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Failed to create team.";
+      setSubmitError(
+        /unauthor/i.test(msg)
+          ? "Please sign in to create a team."
+          : msg,
+      );
+      setSubmitting(false);
+    }
   }
 
   function addAchievement() {
@@ -727,14 +743,21 @@ function CreateOrg() {
               Continue <ArrowRight className="h-4 w-4" />
             </motion.button>
           ) : (
-            <motion.button
-              whileTap={{ scale: 0.98 }}
-              type="button"
-              onClick={submit}
-              className="flex-1 inline-flex items-center justify-center gap-2 rounded-2xl bg-coral-gradient py-3.5 text-sm font-bold text-white glow-coral"
-            >
-              <Sparkles className="h-4 w-4" /> Publish profile
-            </motion.button>
+            <div className="flex-1 flex flex-col gap-1">
+              <motion.button
+                whileTap={{ scale: 0.98 }}
+                type="button"
+                onClick={submit}
+                disabled={submitting}
+                className="inline-flex items-center justify-center gap-2 rounded-2xl bg-coral-gradient py-3.5 text-sm font-bold text-white glow-coral disabled:opacity-60"
+              >
+                <Sparkles className="h-4 w-4" />
+                {submitting ? "Publishing…" : "Publish profile"}
+              </motion.button>
+              {submitError && (
+                <div className="text-[11px] text-coral text-center">{submitError}</div>
+              )}
+            </div>
           )}
         </div>
       </div>

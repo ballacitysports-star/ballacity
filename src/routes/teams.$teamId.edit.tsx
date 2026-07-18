@@ -155,31 +155,35 @@ function EditOrg() {
     staff: kind === "team" ? staff : undefined,
   };
 
-  function save() {
+  async function save() {
     const handleClean = (handle.startsWith("@") ? handle.slice(1) : handle)
       .replace(/[^a-zA-Z0-9_]/g, "")
       .toLowerCase();
-    updateOrg(org.id, {
-      name,
-      handle: `@${handleClean || org.handle.slice(1)}`,
-      tagline,
-      city,
-      founded,
-      sports,
-      cover,
-      avatar: computedAvatar,
-      accent,
-      bio,
-      achievements,
-      credentials: kind === "coach" ? credentials : undefined,
-      ratePerHour: kind === "coach" ? rate : undefined,
-      league: kind === "team" ? league : undefined,
-      record: kind === "team" ? { w: wins, l: losses } : undefined,
-      homeCourt: kind === "team" ? homeCourt : undefined,
-      staff: kind === "team" ? staff : undefined,
-      roster: kind === "team" ? staff.length : org.roster,
-    });
-    nav({ to: "/teams/$teamId", params: { teamId: org.id } });
+    try {
+      await updateOrg(org.id, {
+        name,
+        handle: `@${handleClean || org.handle.slice(1)}`,
+        tagline,
+        city,
+        founded,
+        sports,
+        cover,
+        avatar: computedAvatar,
+        accent,
+        bio,
+        achievements,
+        credentials: kind === "coach" ? credentials : undefined,
+        ratePerHour: kind === "coach" ? rate : undefined,
+        league: kind === "team" ? league : undefined,
+        record: kind === "team" ? { w: wins, l: losses } : undefined,
+        homeCourt: kind === "team" ? homeCourt : undefined,
+        staff: kind === "team" ? staff : undefined,
+        roster: kind === "team" ? staff.length : org.roster,
+      });
+      nav({ to: "/teams/$teamId", params: { teamId: org.id } });
+    } catch (e) {
+      alert(e instanceof Error ? e.message : "Failed to save changes.");
+    }
   }
 
   function addAchievement() {
@@ -233,10 +237,14 @@ function EditOrg() {
       return next;
     });
   }
-  function handleDelete() {
+  async function handleDelete() {
     if (!confirm(`Delete ${org.name}? This cannot be undone.`)) return;
-    deleteOrg(org.id);
-    nav({ to: "/teams" });
+    try {
+      await deleteOrg(org.id);
+      nav({ to: "/teams" });
+    } catch (e) {
+      alert(e instanceof Error ? e.message : "Failed to delete team.");
+    }
   }
 
   function toggleSport(s: Sport) {
