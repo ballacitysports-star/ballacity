@@ -1,9 +1,13 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
 import { motion } from "framer-motion";
 import { ArrowRight, MapPin, Sparkles, Trophy, Users, Video, Zap } from "lucide-react";
+import { useEffect } from "react";
 import { Logo } from "@/components/Logo";
 import { HERO_IMAGE, SPORTS, GAMES } from "@/lib/sample-data";
 import { GameCard } from "@/components/GameCard";
+import { useAuth } from "@/hooks/use-auth";
+import { readStoredSupabaseSession } from "@/lib/authgate-log";
+import { readLastVisited } from "@/lib/last-visited";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -25,6 +29,22 @@ export const Route = createFileRoute("/")({
 });
 
 function Landing() {
+  const router = useRouter();
+  const { user, loading } = useAuth();
+  const hasStoredSession =
+    typeof window !== "undefined" ? !!readStoredSupabaseSession() : false;
+
+  useEffect(() => {
+    if (loading || !user) return;
+    const dest = readLastVisited() ?? "/feed";
+    router.navigate({ href: dest, replace: true });
+  }, [loading, user, router]);
+
+  // Signed-in users (or those with a persisted session still hydrating)
+  // shouldn't flash the marketing hero before we redirect them back to
+  // their last page.
+  if (user || (loading && hasStoredSession)) return null;
+
   const trending = GAMES.filter((g) => g.trending).slice(0, 4);
 
   return (
