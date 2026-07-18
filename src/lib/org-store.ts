@@ -130,6 +130,15 @@ function orgToInsert(org: Org) {
     rate_per_hour: org.ratePerHour ?? null,
     skill_min: org.skillRange?.min ?? 1,
     skill_max: org.skillRange?.max ?? 5,
+    format: org.format ?? null,
+    venues: org.venues ?? [],
+    cadence: org.cadence ?? null,
+    positions_needed: org.positionsNeeded ?? {},
+    rating_system: org.ratingSystem ?? null,
+    rating_min: org.ratingMin ?? null,
+    rating_max: org.ratingMax ?? null,
+    distances: org.distances ?? [],
+    session_types: org.sessionTypes ?? [],
   };
 }
 
