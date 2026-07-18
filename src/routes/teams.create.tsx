@@ -43,6 +43,11 @@ import { PositionsPicker, positionsCleanup, type PositionsNeeded } from "@/compo
 
 
 export const Route = createFileRoute("/teams/create")({
+  validateSearch: zodValidator(
+    z.object({
+      kind: fallback(z.string(), "").default(""),
+    }),
+  ),
   head: () => ({ meta: [{ title: "Create a profile — OpenRun" }] }),
   component: CreateOrg,
 });
