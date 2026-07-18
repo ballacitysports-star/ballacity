@@ -17,7 +17,7 @@ import {
   Ticket,
 } from "lucide-react";
 import { ViewDensityToggle, type ViewMode, type Density } from "@/components/ViewDensityToggle";
-import { PlayMapView } from "@/components/PlayMapView";
+import { PlayersMapView } from "@/components/PlayersMapView";
 import { AnimatePresence } from "framer-motion";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
@@ -396,7 +396,7 @@ function PlayersPage() {
 
 
       {viewMode === "map" ? (
-        <PlayMapView />
+        <PlayersMapView players={filtered ?? []} />
       ) : filtered === null ? (
         <LoadingRows />
       ) : filtered.length === 0 ? (
