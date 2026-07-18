@@ -14,8 +14,41 @@ import { TrainerActions } from "@/components/TrainerActions";
 import { useMyProfile } from "@/lib/user-prefs-store";
 import { useAuth } from "@/hooks/use-auth";
 import { toast } from "sonner";
+import { SPORT_CONFIG, SESSION_TYPES } from "@/lib/sport-config";
 
-type SortBy = "nearest" | "followers" | "name";
+type SortBy = "nearest" | "soonest" | "followers" | "name";
+type Avail = "any" | "soon" | "recruiting" | "weekly" | "casual";
+
+// Lower = sooner. Used for the "Soonest available" sort.
+function availabilityScore(o: {
+  cadence?: string | null;
+  positionsNeeded?: Record<string, Record<string, number>> | null;
+}): number {
+  const pn = o.positionsNeeded;
+  const isBooking =
+    !!pn &&
+    Object.values(pn).some((byPos) =>
+      Object.values(byPos ?? {}).some((n) => Number(n) > 0),
+    );
+  const c = (o.cadence ?? "").toLowerCase();
+  if (isBooking) return 0;
+  if (/on.?demand/.test(c)) return 1;
+  if (/week/.test(c) && !/bi/.test(c)) return 2;
+  if (/bi.?week/.test(c)) return 3;
+  if (/month/.test(c)) return 4;
+  if (/season/.test(c)) return 5;
+  return 9;
+}
+
+function availabilityLabel(score: number): string {
+  if (score === 0) return "Booking now";
+  if (score === 1) return "On-demand";
+  if (score === 2) return "This week";
+  if (score === 3) return "Bi-weekly";
+  if (score === 4) return "Monthly";
+  if (score === 5) return "Seasonal";
+  return "Ask";
+}
 
 function pseudoDistance(id: string): number {
   let h = 0;
