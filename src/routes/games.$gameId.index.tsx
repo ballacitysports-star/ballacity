@@ -208,6 +208,8 @@ function GameDetail() {
     () => hosted.find((g) => g.id === gameId) ?? remoteGame ?? GAMES.find((g) => g.id === gameId),
     [hosted, remoteGame, gameId],
   );
+  const { invite: _iv, from: _fr, exp: _ex, expInvalid: _ei, tab: urlTab, modal: urlModal } = Route.useSearch();
+  void _iv; void _fr; void _ex; void _ei;
   const joined = useIsJoined(gameId);
   const liveParticipantCount = useLiveParticipantCount(gameId);
   const { participants: liveRoster, refetch: refetchRoster, removeLocal: removeRosterLocal } = useLiveParticipants(gameId);
@@ -220,13 +222,62 @@ function GameDetail() {
   const [myReq, setMyReq] = useState<JoinRequest | null>(null);
   const [hostRequests, setHostRequests] = useState<JoinRequest[]>([]);
   const [messaging, setMessaging] = useState(false);
-  const [editOpen, setEditOpen] = useState(false);
+  const [editOpen, _setEditOpen] = useState(urlModal === "edit");
   const [requesting, setRequesting] = useState(false);
   const [processing, setProcessing] = useState(false);
-  const [positionRosterOpen, setPositionRosterOpen] = useState(false);
-  const [reviewsOpen, setReviewsOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState<"overview" | "payments">("overview");
+  const [positionRosterOpen, _setPositionRosterOpen] = useState(urlModal === "positions");
+  const [reviewsOpen, _setReviewsOpen] = useState(urlModal === "reviews");
+  const [activeTab, _setActiveTab] = useState<"overview" | "payments">(urlTab ?? "overview");
   const { status: myFlowStatus, settings: flowSettings } = useMyFlowStatus(gameId);
+
+  // Deep-link writers: mirror UI state into the URL so refresh/share re-opens
+  // the same tab or modal. Only one modal can be encoded at a time.
+  const updateSearch = useCallback(
+    (patch: { tab?: "overview" | "payments" | null; modal?: "reviews" | "positions" | "edit" | null }) => {
+      nav({
+        to: "/games/$gameId",
+        params: { gameId },
+        search: (prev: any) => {
+          const next = { ...prev };
+          if ("tab" in patch) {
+            if (patch.tab && patch.tab !== "overview") next.tab = patch.tab;
+            else delete next.tab;
+          }
+          if ("modal" in patch) {
+            if (patch.modal) next.modal = patch.modal;
+            else delete next.modal;
+          }
+          return next;
+        },
+        replace: true,
+      });
+    },
+    [nav, gameId],
+  );
+  const setActiveTab = useCallback((t: "overview" | "payments") => {
+    _setActiveTab(t);
+    updateSearch({ tab: t });
+  }, [updateSearch]);
+  const setEditOpen = useCallback((v: boolean) => {
+    _setEditOpen(v);
+    updateSearch({ modal: v ? "edit" : null });
+  }, [updateSearch]);
+  const setReviewsOpen = useCallback((v: boolean) => {
+    _setReviewsOpen(v);
+    updateSearch({ modal: v ? "reviews" : null });
+  }, [updateSearch]);
+  const setPositionRosterOpen = useCallback((v: boolean) => {
+    _setPositionRosterOpen(v);
+    updateSearch({ modal: v ? "positions" : null });
+  }, [updateSearch]);
+
+  // Follow URL changes (back/forward, external link updates) into state.
+  useEffect(() => { _setActiveTab(urlTab ?? "overview"); }, [urlTab]);
+  useEffect(() => {
+    _setEditOpen(urlModal === "edit");
+    _setPositionRosterOpen(urlModal === "positions");
+    _setReviewsOpen(urlModal === "reviews");
+  }, [urlModal]);
 
   // Ticking clock (1s) that re-renders while the resubmit cooldown counts down.
   // Only starts when there's an active cooldown to avoid unnecessary re-renders.
@@ -238,6 +289,7 @@ function GameDetail() {
     const t = setInterval(() => setNowTick((n) => n + 1), 1000);
     return () => clearInterval(t);
   }, [cooldownMs > 0]);
+
 
   // effectiveJoined is computed below, after settings/myReq/isHost resolve.
   // Placeholder removed — see definition near line 161.
