@@ -166,6 +166,17 @@ function CreateOrg() {
     homeCourt: kind === "team" ? homeCourt : undefined,
     staff: kind === "team" ? staff : undefined,
     skillRange: { min: skillMin, max: skillMax },
+    format: format || undefined,
+    venues,
+    cadence: cadence || undefined,
+    positionsNeeded: Object.fromEntries(
+      Object.entries(positionsBySport).map(([k, v]) => [k, positionsCleanup(v)]),
+    ),
+    ratingSystem,
+    ratingMin: ratingMin || undefined,
+    ratingMax: ratingMax || undefined,
+    distances,
+    sessionTypes: kind === "coach" ? sessionTypes : undefined,
     upcoming: [],
     posts: [],
   };
