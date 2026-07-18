@@ -1162,6 +1162,96 @@ export type Database = {
         }
         Relationships: []
       }
+      teams: {
+        Row: {
+          accent: string
+          achievements: string[]
+          avatar: string
+          bio: string
+          city: string
+          cover: string
+          created_at: string
+          credentials: string[]
+          followers: number
+          founded: number | null
+          handle: string
+          home_court: string | null
+          id: string
+          kind: string
+          league: string | null
+          losses: number
+          name: string
+          owner_id: string
+          rate_per_hour: number | null
+          skill_max: number
+          skill_min: number
+          sports: string[]
+          staff: Json
+          tagline: string
+          updated_at: string
+          verified: boolean
+          wins: number
+        }
+        Insert: {
+          accent?: string
+          achievements?: string[]
+          avatar?: string
+          bio?: string
+          city?: string
+          cover?: string
+          created_at?: string
+          credentials?: string[]
+          followers?: number
+          founded?: number | null
+          handle: string
+          home_court?: string | null
+          id: string
+          kind: string
+          league?: string | null
+          losses?: number
+          name: string
+          owner_id: string
+          rate_per_hour?: number | null
+          skill_max?: number
+          skill_min?: number
+          sports?: string[]
+          staff?: Json
+          tagline?: string
+          updated_at?: string
+          verified?: boolean
+          wins?: number
+        }
+        Update: {
+          accent?: string
+          achievements?: string[]
+          avatar?: string
+          bio?: string
+          city?: string
+          cover?: string
+          created_at?: string
+          credentials?: string[]
+          followers?: number
+          founded?: number | null
+          handle?: string
+          home_court?: string | null
+          id?: string
+          kind?: string
+          league?: string | null
+          losses?: number
+          name?: string
+          owner_id?: string
+          rate_per_hour?: number | null
+          skill_max?: number
+          skill_min?: number
+          sports?: string[]
+          staff?: Json
+          tagline?: string
+          updated_at?: string
+          verified?: boolean
+          wins?: number
+        }
+        Relationships: []
+      }
       user_blocks: {
         Row: {
           blocked_id: string
