@@ -60,6 +60,22 @@ function TeamsPage() {
   const [q, setQ] = useState("");
   const [sport, setSport] = useState<Sport | null>(null);
   const [sortBy, setSortBy] = useState<SortBy>("nearest");
+  const [density, setDensity] = useState<Density>(() => {
+    if (typeof window === "undefined") return "list";
+    return (localStorage.getItem("openrun:teams-density") as Density) ?? "list";
+  });
+  const switchDensity = (d: Density) => {
+    setDensity(d);
+    try { localStorage.setItem("openrun:teams-density", d); } catch { /* ignore */ }
+  };
+  const [viewMode, setViewMode] = useState<ViewMode>(() => {
+    if (typeof window === "undefined") return "list";
+    return (localStorage.getItem("openrun:teams-view") as ViewMode) ?? "list";
+  });
+  const switchView = (v: ViewMode) => {
+    setViewMode(v);
+    try { localStorage.setItem("openrun:teams-view", v); } catch { /* ignore */ }
+  };
   const orgs = useAllOrgs();
   const meta = KIND_META[kind];
 
