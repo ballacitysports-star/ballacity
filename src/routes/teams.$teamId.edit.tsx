@@ -96,6 +96,12 @@ function EditOrg() {
   const [accent, setAccent] = useState(org.accent);
   const [avatar, setAvatar] = useState(org.avatar);
   const [cover, setCover] = useState<string>(org.cover);
+  const [customCover, setCustomCover] = useState<boolean>(() => {
+    const c = org.cover;
+    // Uploaded photos live at Supabase Storage URLs or as data URLs; presets are bundled asset URLs.
+    return /\/storage\/v1\//.test(c) || c.startsWith("data:") || c.startsWith("blob:");
+  });
+
 
   const canNext = useMemo(() => {
     if (step === 1)
