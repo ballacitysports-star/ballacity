@@ -74,6 +74,9 @@ export const Route = createFileRoute("/teams/$teamId")({
   loader: async ({ params }) => {
     const org = await ensureOrgById(params.teamId);
     if (!org) throw notFound();
+    if (org.kind === "coach") {
+      throw redirect({ to: "/trainers/$trainerId", params: { trainerId: org.id }, replace: true });
+    }
     return org;
   },
 });
