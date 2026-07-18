@@ -646,7 +646,16 @@ function SubmissionCard({ sub, onReviewed }: { sub: PaymentSubmission; onReviewe
 
 // =============================================================
 function RequestsPanel() {
-  const [filter, setFilter] = useState<"pending" | "approved" | "rejected">("pending");
+  const search = Route.useSearch();
+  const nav = useNavigate();
+  const filter: "pending" | "approved" | "rejected" =
+    search.requests === "approved" || search.requests === "rejected" ? search.requests : "pending";
+  const setFilter = (v: "pending" | "approved" | "rejected") =>
+    nav({
+      to: "/payments",
+      search: (p: any) => ({ ...p, requests: v === "pending" ? "" : v }),
+      replace: true,
+    });
   const [reqs, setReqs] = useState<JoinRequest[]>([]);
   const refresh = () =>
     listHostJoinRequests(filter)
