@@ -59,9 +59,12 @@ const KIND_META: Record<
 };
 
 function TeamsPage() {
+  const { user } = useAuth();
+  const profile = useMyProfile(user);
   const [kind, setKind] = useState<OrgKind>("team");
   const [q, setQ] = useState("");
   const [sport, setSport] = useState<Sport | null>(null);
+
   const [sortBy, setSortBy] = useState<SortBy>("nearest");
   const [avail, setAvail] = useState<"any" | "recruiting" | "weekly" | "casual">("any");
   const [density, setDensity] = useState<Density>(() => {
