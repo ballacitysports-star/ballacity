@@ -137,7 +137,13 @@ function CreateOrg() {
 
 
 
-  function submit() {
+  const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
+
+  async function submit() {
+    if (submitting) return;
+    setSubmitError(null);
+    setSubmitting(true);
     const id = `${kind === "team" ? "t" : "c"}-${(name || "org").toLowerCase().replace(/[^a-z0-9]+/g, "-")}-${Date.now().toString(36).slice(-4)}`;
     const handleClean = (handle.startsWith("@") ? handle.slice(1) : handle)
       .replace(/[^a-zA-Z0-9_]/g, "")
@@ -147,8 +153,18 @@ function CreateOrg() {
       id,
       handle: `@${handleClean || "org"}`,
     };
-    addOrg(org);
-    nav({ to: "/teams/$teamId", params: { teamId: id } });
+    try {
+      const saved = await addOrg(org);
+      nav({ to: "/teams/$teamId", params: { teamId: saved.id } });
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Failed to create team.";
+      setSubmitError(
+        /unauthor/i.test(msg)
+          ? "Please sign in to create a team."
+          : msg,
+      );
+      setSubmitting(false);
+    }
   }
 
   function addAchievement() {
