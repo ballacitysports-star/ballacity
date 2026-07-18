@@ -37,9 +37,6 @@ import {
 export const Route = createFileRoute("/teams/$teamId")({
   head: ({ loaderData, params }) => {
     const o = loaderData ?? ORGS.find((x) => x.id === params.teamId);
-export const Route = createFileRoute("/teams/$teamId")({
-  head: ({ loaderData, params }) => {
-    const o = loaderData ?? ORGS.find((x) => x.id === params.teamId);
     return { meta: [{ title: o ? `${(o as Org).name} — OpenRun` : "Team — OpenRun" }] };
   },
   // URL-persisted view: active tab (posts/about/games), post-kind filter,
