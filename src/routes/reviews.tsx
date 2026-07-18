@@ -1,6 +1,8 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { motion } from "framer-motion";
 import { Trophy, ArrowUpDown } from "lucide-react";
+import { zodValidator, fallback } from "@tanstack/zod-adapter";
+import { z } from "zod";
 import {
   computeReputation,
   getReviewsFor,
@@ -10,10 +12,17 @@ import {
   type RevieweeKind,
 } from "@/lib/reviews";
 import { ReputationBadge } from "@/components/ReputationBadge";
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 
 export const Route = createFileRoute("/reviews")({
   head: () => ({ meta: [{ title: "Reviews Dashboard — OpenRun" }] }),
+  // URL-persisted filter + sort so refresh/share preserves the view.
+  validateSearch: zodValidator(
+    z.object({
+      filter: fallback(z.string(), "").default(""),
+      sort: fallback(z.string(), "").default(""),
+    }),
+  ),
   component: ReviewsDashboard,
 });
 
