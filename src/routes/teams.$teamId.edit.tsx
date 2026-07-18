@@ -227,13 +227,6 @@ function EditOrg() {
       return next;
     });
   }
-  function onCoverUpload(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = () => typeof reader.result === "string" && setCover(reader.result);
-    reader.readAsDataURL(file);
-  }
   function handleDelete() {
     if (!confirm(`Delete ${org.name}? This cannot be undone.`)) return;
     deleteOrg(org.id);
