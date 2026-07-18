@@ -282,14 +282,8 @@ function TeamsPage() {
         </label>
       </div>
 
-      <ViewDensityToggle
-        view={viewMode}
-        onViewChange={switchView}
-        density={density}
-        onDensityChange={switchDensity}
-      />
-
       {viewMode === "map" ? (
+
         <PlayMapView />
       ) : (
         <div
