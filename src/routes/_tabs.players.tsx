@@ -95,9 +95,10 @@ function PlayersPage() {
       .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
   }, [hostedGames, user?.id]);
   const search = Route.useSearch();
+  type PlayersSearch = typeof search;
   const navigate = useNavigate({ from: "/players" });
-  const updateSearch = (patch: Partial<typeof search>) =>
-    navigate({ search: (prev) => ({ ...prev, ...patch }), replace: true });
+  const updateSearch = (patch: Partial<PlayersSearch>) =>
+    navigate({ search: (prev: PlayersSearch) => ({ ...prev, ...patch }), replace: true });
 
   const q = search.q;
   const sport = search.sport;
