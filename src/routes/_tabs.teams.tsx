@@ -1,7 +1,9 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import { Search, Plus, Megaphone, Users, GraduationCap, ArrowUpDown, MapPin } from "lucide-react";
+import { zodValidator, fallback } from "@tanstack/zod-adapter";
+import { z } from "zod";
 import { type OrgKind, type Sport } from "@/lib/sample-data";
 import { useAllOrgs } from "@/lib/org-store";
 import { OrgCard } from "@/components/OrgCard";
@@ -21,8 +23,22 @@ function pseudoDistance(id: string): number {
   return Math.round(((h % 400) / 10 + 0.3) * 10) / 10; // 0.3 – 40.3 mi
 }
 
+// URL-persisted Teams state. Refreshing or sharing the URL restores the
+// exact view: kind (team/coach), search text, sport, availability, sort,
+// and the view/density toggles. Invalid values silently revert to defaults.
+const teamsSearchSchema = z.object({
+  q: fallback(z.string(), "").default(""),
+  kind: fallback(z.string(), "team").default("team"),
+  sport: fallback(z.string(), "").default(""),
+  avail: fallback(z.string(), "any").default("any"),
+  sort: fallback(z.string(), "nearest").default("nearest"),
+  view: fallback(z.string(), "list").default("list"),
+  density: fallback(z.string(), "list").default("list"),
+});
+
 export const Route = createFileRoute("/_tabs/teams")({
   head: () => ({ meta: [{ title: "Teams & Coaches — OpenRun" }] }),
+  validateSearch: zodValidator(teamsSearchSchema),
   component: TeamsPage,
 });
 
