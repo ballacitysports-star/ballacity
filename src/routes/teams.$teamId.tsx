@@ -1,6 +1,8 @@
-import { createFileRoute, Link, notFound } from "@tanstack/react-router";
+import { createFileRoute, Link, notFound, useNavigate } from "@tanstack/react-router";
 import { motion } from "framer-motion";
 import { useEffect, useMemo, useState } from "react";
+import { zodValidator, fallback } from "@tanstack/zod-adapter";
+import { z } from "zod";
 import {
   ArrowLeft,
   ShieldCheck,
@@ -37,6 +39,15 @@ export const Route = createFileRoute("/teams/$teamId")({
     const o = loaderData ?? ORGS.find((x) => x.id === params.teamId);
     return { meta: [{ title: o ? `${(o as Org).name} — OpenRun` : "Team — OpenRun" }] };
   },
+  // URL-persisted view: active tab (posts/about/games), post-kind filter,
+  // and reviews modal. Refreshing or sharing the URL restores the same view.
+  validateSearch: zodValidator(
+    z.object({
+      tab: fallback(z.string(), "").default(""),
+      filter: fallback(z.string(), "").default(""),
+      modal: fallback(z.string(), "").default(""),
+    }),
+  ),
   component: TeamPage,
   errorComponent: () => (
     <div className="mx-auto w-full max-w-md sm:max-w-2xl lg:max-w-4xl px-6 pt-24 text-center">
@@ -79,11 +90,20 @@ const FILTERS: { key: PostKind | "all"; label: string }[] = [
 
 function TeamPage() {
   const org = Route.useLoaderData() as Org;
-  const [filter, setFilter] = useState<PostKind | "all">("all");
-  const [tab, setTab] = useState<"posts" | "about" | "games">("posts");
+  const search = Route.useSearch();
+  const navigate = useNavigate({ from: "/teams/$teamId" });
+  const tab: "posts" | "about" | "games" =
+    search.tab === "about" || search.tab === "games" ? search.tab : "posts";
+  const filter: PostKind | "all" = (search.filter || "all") as PostKind | "all";
+  const reviewsOpen = search.modal === "reviews";
+  const setTab = (v: "posts" | "about" | "games") =>
+    navigate({ search: (p: any) => ({ ...p, tab: v === "posts" ? "" : v }), replace: true });
+  const setFilter = (v: PostKind | "all") =>
+    navigate({ search: (p: any) => ({ ...p, filter: v === "all" ? "" : v }), replace: true });
+  const setReviewsOpen = (v: boolean) =>
+    navigate({ search: (p: any) => ({ ...p, modal: v ? "reviews" : "" }), replace: true });
   const [following, setFollowing] = useState(false);
   const [mounted, setMounted] = useState(false);
-  const [reviewsOpen, setReviewsOpen] = useState(false);
   useEffect(() => setMounted(true), []);
   const canEdit = mounted && isMyOrg(org.id);
 

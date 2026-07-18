@@ -1,4 +1,6 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { zodValidator, fallback } from "@tanstack/zod-adapter";
+import { z } from "zod";
 import { motion } from "framer-motion";
 import {
   Settings,
@@ -48,6 +50,10 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 export const Route = createFileRoute("/_tabs/profile")({
   head: () => ({ meta: [{ title: "Profile — OpenRun" }] }),
+  // URL-persisted requests filter (all/host/player).
+  validateSearch: zodValidator(
+    z.object({ req: fallback(z.string(), "").default("") }),
+  ),
   component: Profile,
 });
 
@@ -87,7 +93,12 @@ function Profile() {
   const [myRequests, setMyRequests] = useState<JoinRequest[]>([]);
   const [hostRequests, setHostRequests] = useState<JoinRequest[]>([]);
   const [requestsLoading, setRequestsLoading] = useState(true);
-  const [requestFilter, setRequestFilter] = useState<"all" | "host" | "player">("all");
+  const search = Route.useSearch();
+  const profileNav = useNavigate({ from: "/profile" });
+  const requestFilter: "all" | "host" | "player" =
+    search.req === "host" || search.req === "player" ? search.req : "all";
+  const setRequestFilter = (v: "all" | "host" | "player") =>
+    profileNav({ search: (p: any) => ({ ...p, req: v === "all" ? "" : v }), replace: true });
   const refreshRequests = async (opts: { silent?: boolean } = {}) => {
     if (!profileUser) {
       setMyRequests([]);

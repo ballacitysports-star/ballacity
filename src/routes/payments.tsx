@@ -34,16 +34,35 @@ import {
 import { LegalNotice } from "@/components/LegalNotice";
 import { GAMES } from "@/lib/sample-data";
 import { formatWhen } from "@/lib/format";
+import { zodValidator, fallback } from "@tanstack/zod-adapter";
+import { z } from "zod";
 
 export const Route = createFileRoute("/payments")({
   head: () => ({ meta: [{ title: "Payments — OpenRun" }] }),
+  // URL-persisted state: top tab (methods/verify/requests) plus verify-panel
+  // and requests-panel filters. Refresh or share preserves the exact view.
+  validateSearch: zodValidator(
+    z.object({
+      tab: fallback(z.string(), "").default(""),
+      verify: fallback(z.string(), "").default(""),
+      requests: fallback(z.string(), "").default(""),
+    }),
+  ),
   component: PaymentsHub,
 });
 
 function PaymentsHub() {
   const { user, loading } = useAuth();
   const nav = useNavigate();
-  const [tab, setTab] = useState<"methods" | "verify" | "requests">("methods");
+  const search = Route.useSearch();
+  const tab: "methods" | "verify" | "requests" =
+    search.tab === "verify" || search.tab === "requests" ? search.tab : "methods";
+  const setTab = (v: "methods" | "verify" | "requests") =>
+    nav({
+      to: "/payments",
+      search: (p: any) => ({ ...p, tab: v === "methods" ? "" : v }),
+      replace: true,
+    });
 
   useEffect(() => {
     if (!loading && !user) nav({ to: "/auth" });
@@ -371,7 +390,16 @@ function Input({
 
 // =============================================================
 function VerifyPanel() {
-  const [filter, setFilter] = useState<"pending" | "verified" | "rejected">("pending");
+  const search = Route.useSearch();
+  const nav = useNavigate();
+  const filter: "pending" | "verified" | "rejected" =
+    search.verify === "verified" || search.verify === "rejected" ? search.verify : "pending";
+  const setFilter = (v: "pending" | "verified" | "rejected") =>
+    nav({
+      to: "/payments",
+      search: (p: any) => ({ ...p, verify: v === "pending" ? "" : v }),
+      replace: true,
+    });
   const [subs, setSubs] = useState<PaymentSubmission[]>([]);
   const [pendingCount, setPendingCount] = useState(0);
   const refresh = () => {
@@ -618,7 +646,16 @@ function SubmissionCard({ sub, onReviewed }: { sub: PaymentSubmission; onReviewe
 
 // =============================================================
 function RequestsPanel() {
-  const [filter, setFilter] = useState<"pending" | "approved" | "rejected">("pending");
+  const search = Route.useSearch();
+  const nav = useNavigate();
+  const filter: "pending" | "approved" | "rejected" =
+    search.requests === "approved" || search.requests === "rejected" ? search.requests : "pending";
+  const setFilter = (v: "pending" | "approved" | "rejected") =>
+    nav({
+      to: "/payments",
+      search: (p: any) => ({ ...p, requests: v === "pending" ? "" : v }),
+      replace: true,
+    });
   const [reqs, setReqs] = useState<JoinRequest[]>([]);
   const refresh = () =>
     listHostJoinRequests(filter)

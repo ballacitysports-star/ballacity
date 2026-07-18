@@ -1,6 +1,8 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { motion } from "framer-motion";
 import { Trophy, ArrowUpDown } from "lucide-react";
+import { zodValidator, fallback } from "@tanstack/zod-adapter";
+import { z } from "zod";
 import {
   computeReputation,
   getReviewsFor,
@@ -10,10 +12,17 @@ import {
   type RevieweeKind,
 } from "@/lib/reviews";
 import { ReputationBadge } from "@/components/ReputationBadge";
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 
 export const Route = createFileRoute("/reviews")({
   head: () => ({ meta: [{ title: "Reviews Dashboard — OpenRun" }] }),
+  // URL-persisted filter + sort so refresh/share preserves the view.
+  validateSearch: zodValidator(
+    z.object({
+      filter: fallback(z.string(), "").default(""),
+      sort: fallback(z.string(), "").default(""),
+    }),
+  ),
   component: ReviewsDashboard,
 });
 
@@ -83,8 +92,14 @@ function RevieweeCard({
 
 function ReviewsDashboard() {
   const reviewees = useAllReviewees();
-  const [filter, setFilter] = useState<RevieweeKind | "all">("all");
-  const [sort, setSort] = useState<Sort>("trust");
+  const search = Route.useSearch();
+  const navigate = useNavigate({ from: "/reviews" });
+  const filter: RevieweeKind | "all" = (search.filter || "all") as RevieweeKind | "all";
+  const sort: Sort = ((search.sort as Sort) || "trust");
+  const setFilter = (v: RevieweeKind | "all") =>
+    navigate({ search: (p: any) => ({ ...p, filter: v === "all" ? "" : v }), replace: true });
+  const setSort = (v: Sort) =>
+    navigate({ search: (p: any) => ({ ...p, sort: v === "trust" ? "" : v }), replace: true });
 
   const filtered = useMemo(() => {
     let xs = reviewees;
