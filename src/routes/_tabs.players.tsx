@@ -336,6 +336,23 @@ function PlayersPage() {
         </div>
       </div>
 
+      <div className="-mx-4 overflow-x-auto px-4 mb-5">
+        <div className="flex gap-2 pb-1">
+          {([
+            { id: "any", label: "Anytime" },
+            { id: "today", label: "Today" },
+            { id: "week", label: "This week" },
+            { id: "weekend", label: "Weekend" },
+          ] as const).map((w) => (
+            <Chip key={w.id} active={when === w.id} onClick={() => setWhen(w.id)}>
+              {w.label}
+            </Chip>
+          ))}
+        </div>
+      </div>
+
+
+
       <ViewDensityToggle
         view={viewMode}
         onViewChange={switchView}
