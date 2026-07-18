@@ -1,13 +1,16 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { motion } from "framer-motion";
-import { Search, Plus, Megaphone, Users, GraduationCap, ArrowUpDown } from "lucide-react";
+import { Search, Plus, Megaphone, Users, GraduationCap, ArrowUpDown, MapPin } from "lucide-react";
 import { type OrgKind, type Sport } from "@/lib/sample-data";
 import { useAllOrgs } from "@/lib/org-store";
 import { OrgCard } from "@/components/OrgCard";
 import { SportChips } from "@/components/SportChips";
 import { ViewDensityToggle, type ViewMode, type Density } from "@/components/ViewDensityToggle";
 import { PlayMapView } from "@/components/PlayMapView";
+import { useMyProfile } from "@/lib/user-prefs-store";
+import { useAuth } from "@/hooks/use-auth";
+
 
 type SortBy = "nearest" | "followers" | "name";
 
@@ -56,9 +59,12 @@ const KIND_META: Record<
 };
 
 function TeamsPage() {
+  const { user } = useAuth();
+  const profile = useMyProfile(user);
   const [kind, setKind] = useState<OrgKind>("team");
   const [q, setQ] = useState("");
   const [sport, setSport] = useState<Sport | null>(null);
+
   const [sortBy, setSortBy] = useState<SortBy>("nearest");
   const [avail, setAvail] = useState<"any" | "recruiting" | "weekly" | "casual">("any");
   const [density, setDensity] = useState<Density>(() => {
@@ -130,7 +136,23 @@ function TeamsPage() {
         className="mb-4"
       >
         <h1 className="font-display text-3xl font-bold leading-tight">{meta.title}</h1>
-        <p className="text-muted-foreground text-sm">{meta.subtitle}</p>
+        <p className="text-muted-foreground text-sm inline-flex items-center gap-1">
+          {profile?.city ? (
+            <>
+              <MapPin className="h-3.5 w-3.5 text-lime" /> Nearest to {profile.city} ·{" "}
+              {list.length} {list.length === 1 ? "result" : "results"}
+            </>
+          ) : (
+            <>
+              {list.length} {list.length === 1 ? "result" : "results"} ·{" "}
+              <Link to="/profile/edit" className="text-lime font-semibold">
+                Set your city
+              </Link>{" "}
+              for nearby
+            </>
+          )}
+        </p>
+
       </motion.div>
 
       {/* Kind segmented control — primary split */}
@@ -177,6 +199,13 @@ function TeamsPage() {
       )}
 
       {/* Search */}
+      <ViewDensityToggle
+        view={viewMode}
+        onViewChange={switchView}
+        density={density}
+        onDensityChange={switchDensity}
+      />
+
       <div className="flex gap-2 mb-4">
         <div className="flex-1 flex items-center gap-2 rounded-full border border-border bg-surface px-4 py-2.5">
           <Search className="h-4 w-4 text-muted-foreground" />
@@ -195,6 +224,9 @@ function TeamsPage() {
           <Plus className="h-5 w-5" strokeWidth={2.5} />
         </Link>
       </div>
+
+
+
 
       {/* Sport filter chips */}
       <div className="mb-3">
@@ -250,14 +282,8 @@ function TeamsPage() {
         </label>
       </div>
 
-      <ViewDensityToggle
-        view={viewMode}
-        onViewChange={switchView}
-        density={density}
-        onDensityChange={switchDensity}
-      />
-
       {viewMode === "map" ? (
+
         <PlayMapView />
       ) : (
         <div

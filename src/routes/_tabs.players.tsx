@@ -49,6 +49,8 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { kmToMi, miToKm } from "@/lib/distance";
+import { useMyProfile } from "@/lib/user-prefs-store";
+
 
 export const Route = createFileRoute("/_tabs/players")({
   head: () => ({ meta: [{ title: "Players — OpenRun" }] }),
@@ -91,7 +93,9 @@ function loadStoredFilters(): StoredFilters {
 
 function PlayersPage() {
   const { user } = useAuth();
+  const profile = useMyProfile(user);
   const hostedGames = useHostedGames();
+
   const myUpcomingHosted = useMemo(() => {
     if (!user) return [];
     const now = Date.now();
@@ -279,10 +283,30 @@ function PlayersPage() {
 
       <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="mb-4">
         <h1 className="font-display text-3xl font-bold leading-tight">Players ready to run.</h1>
-        <p className="text-muted-foreground text-sm">
-          Browse availability posts. Message or send a contact request.
+        <p className="text-muted-foreground text-sm inline-flex items-center gap-1">
+          {profile?.city ? (
+            <>
+              <MapPin className="h-3.5 w-3.5 text-lime" /> Nearest to {profile.city} ·{" "}
+              {filtered?.length ?? 0} players
+            </>
+          ) : (
+            <>
+              {filtered?.length ?? 0} players ·{" "}
+              <Link to="/profile/edit" className="text-lime font-semibold">
+                Set your city
+              </Link>{" "}
+              for nearby
+            </>
+          )}
         </p>
       </motion.div>
+
+      <ViewDensityToggle
+        view={viewMode}
+        onViewChange={switchView}
+        density={density}
+        onDensityChange={switchDensity}
+      />
 
       <div className="flex gap-2 mb-4">
         <div className="flex-1 flex items-center gap-2 rounded-full border border-border bg-surface px-4 py-2.5">
@@ -351,14 +375,6 @@ function PlayersPage() {
         </div>
       </div>
 
-
-
-      <ViewDensityToggle
-        view={viewMode}
-        onViewChange={switchView}
-        density={density}
-        onDensityChange={switchDensity}
-      />
 
       {viewMode === "map" ? (
         <PlayMapView />
