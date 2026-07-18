@@ -277,6 +277,15 @@ export async function updateOrg(
     mapped.skill_min = patch.skillRange?.min ?? 1;
     mapped.skill_max = patch.skillRange?.max ?? 5;
   }
+  if (patch.format !== undefined) mapped.format = patch.format ?? null;
+  if (patch.venues !== undefined) mapped.venues = patch.venues ?? [];
+  if (patch.cadence !== undefined) mapped.cadence = patch.cadence ?? null;
+  if (patch.positionsNeeded !== undefined) mapped.positions_needed = patch.positionsNeeded ?? {};
+  if (patch.ratingSystem !== undefined) mapped.rating_system = patch.ratingSystem ?? null;
+  if (patch.ratingMin !== undefined) mapped.rating_min = patch.ratingMin ?? null;
+  if (patch.ratingMax !== undefined) mapped.rating_max = patch.ratingMax ?? null;
+  if (patch.distances !== undefined) mapped.distances = patch.distances ?? [];
+  if (patch.sessionTypes !== undefined) mapped.session_types = patch.sessionTypes ?? [];
 
   try {
     const row = (await updateTeam({ data: mapped as never })) as TeamRow;
