@@ -727,7 +727,64 @@ function CreateOrg() {
                 </>
               )}
 
+              {showTeamBlocks &&
+                sports
+                  .filter((s) => (SPORT_CONFIG[s]?.positions?.length ?? 0) > 0)
+                  .map((s) => (
+                    <Section key={`pos-${s}`} title={`${s} — positions needed`}>
+                      <PositionsPicker
+                        sport={s}
+                        value={positionsBySport[s] ?? {}}
+                        onChange={(next) =>
+                          setPositionsBySport((cur) => ({ ...cur, [s]: next }))
+                        }
+                      />
+                    </Section>
+                  ))}
+
+              {showDistances && (
+                <Section title="Typical distances">
+                  <ChipPicker
+                    options={SPORT_CONFIG.Running?.distances ?? []}
+                    selected={distances}
+                    onToggle={(v) =>
+                      setDistances((cur) =>
+                        cur.includes(v) ? cur.filter((x) => x !== v) : [...cur, v],
+                      )
+                    }
+                  />
+                </Section>
+              )}
+
               {kind === "coach" && (
+                <>
+                  <Section title="Session types">
+                    <ChipPicker
+                      options={SESSION_TYPES}
+                      selected={sessionTypes}
+                      onToggle={(v) =>
+                        setSessionTypes((cur) =>
+                          cur.includes(v) ? cur.filter((x) => x !== v) : [...cur, v],
+                        )
+                      }
+                    />
+                  </Section>
+
+                  {credentialPresets.length > 0 && (
+                    <Section title="Suggested credentials">
+                      <ChipPicker
+                        options={credentialPresets}
+                        selected={credentials}
+                        onToggle={(v) =>
+                          setCredentials((cur) =>
+                            cur.includes(v) ? cur.filter((x) => x !== v) : [...cur, v],
+                          )
+                        }
+                      />
+                    </Section>
+                  )}
+
+
                 <>
                   <Section title="Credentials">
                     <div className="flex gap-2">
