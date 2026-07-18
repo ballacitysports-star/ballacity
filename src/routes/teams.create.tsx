@@ -10,6 +10,7 @@ import {
   Sparkles,
   X,
   Plus,
+  Upload,
 } from "lucide-react";
 import {
   SPORTS,
