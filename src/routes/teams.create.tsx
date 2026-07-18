@@ -697,7 +697,55 @@ function CreateOrg() {
                 </p>
               </Section>
 
-              <Section title="Cover image">
+              <Section title="Team photo">
+                <div className="rounded-2xl border border-border bg-surface p-3">
+                  <div className="relative aspect-video overflow-hidden rounded-xl bg-background">
+                    <img src={cover} alt="" className="h-full w-full object-cover" />
+                    {customCover && (
+                      <span className="absolute top-2 left-2 rounded-full bg-lime/90 px-2 py-0.5 text-[10px] font-bold text-primary-foreground">
+                        Uploaded
+                      </span>
+                    )}
+                  </div>
+                  <div className="mt-3 flex gap-2">
+                    <label className="flex-1 inline-flex items-center justify-center gap-2 rounded-xl border border-lime bg-lime/10 px-3 py-2.5 text-sm font-bold text-lime cursor-pointer">
+                      <Upload className="h-4 w-4" />
+                      {customCover ? "Change photo" : "Upload photo"}
+                      <input
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        onChange={(e) => {
+                          onCoverFile(e.target.files?.[0]);
+                          e.target.value = "";
+                        }}
+                      />
+                    </label>
+                    {customCover && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setCustomCover(false);
+                          setCoverError(null);
+                          setCover(HERO_IMAGE);
+                        }}
+                        className="rounded-xl border border-border bg-background px-3 py-2.5 text-sm font-bold text-muted-foreground"
+                      >
+                        Remove
+                      </button>
+                    )}
+                  </div>
+                  {coverError && (
+                    <p className="mt-2 text-xs text-coral">{coverError}</p>
+                  )}
+                  <p className="mt-2 text-[10px] text-muted-foreground">
+                    JPG or PNG, up to 4 MB. Wide crops look best.
+                  </p>
+                </div>
+              </Section>
+
+              <Section title="Or pick a preset">
+
                 <div className="grid grid-cols-3 gap-2">
                   {(
                     [
