@@ -19,9 +19,24 @@ import {
   type OrgKind,
 } from "@/lib/sample-data";
 import { addOrg } from "@/lib/org-store";
+import {
+  SPORT_CONFIG,
+  SESSION_TYPES,
+  RATING_SYSTEM_LABEL,
+  primarySport,
+  mergedFormats,
+  mergedVenues,
+  mergedCadences,
+  mergedCredentialPresets,
+  ratingSystemFor,
+  ratingLevelsFor,
+  hasTeamSport,
+  hasRunning,
+} from "@/lib/sport-config";
 import { OrgCard } from "@/components/OrgCard";
 import { LocationAutocomplete } from "@/components/LocationAutocomplete";
 import { TeamCoverUploader } from "@/components/TeamCoverUploader";
+import { PositionsPicker, positionsCleanup, type PositionsNeeded } from "@/components/PositionsPicker";
 
 
 export const Route = createFileRoute("/teams/create")({
