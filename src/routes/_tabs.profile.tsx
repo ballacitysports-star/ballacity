@@ -50,6 +50,10 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 export const Route = createFileRoute("/_tabs/profile")({
   head: () => ({ meta: [{ title: "Profile — OpenRun" }] }),
+  // URL-persisted requests filter (all/host/player).
+  validateSearch: zodValidator(
+    z.object({ req: fallback(z.string(), "").default("") }),
+  ),
   component: Profile,
 });
 
