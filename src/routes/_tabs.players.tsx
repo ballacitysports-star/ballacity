@@ -309,7 +309,16 @@ function PlayersPage() {
         </div>
       </div>
 
-      {filtered === null ? (
+      <ViewDensityToggle
+        view={viewMode}
+        onViewChange={switchView}
+        density={density}
+        onDensityChange={switchDensity}
+      />
+
+      {viewMode === "map" ? (
+        <PlayMapView />
+      ) : filtered === null ? (
         <LoadingRows />
       ) : filtered.length === 0 ? (
         <EmptyState
@@ -343,29 +352,6 @@ function PlayersPage() {
             <h2 className="font-display text-sm font-bold uppercase tracking-wider text-muted-foreground">
               {filtered.length} player{filtered.length === 1 ? "" : "s"} available
             </h2>
-            <div className="inline-flex items-center gap-1 rounded-full border border-border bg-surface p-1" role="tablist" aria-label="Layout">
-              {([
-                { id: "list", label: "List", Icon: Rows3 },
-                { id: "grid", label: "Grid", Icon: LayoutGrid },
-              ] as const).map(({ id, label, Icon }) => {
-                const active = density === id;
-                return (
-                  <button
-                    key={id}
-                    role="tab"
-                    aria-selected={active}
-                    aria-label={`${label} view`}
-                    onClick={() => switchDensity(id)}
-                    className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-bold transition-colors ${
-                      active ? "bg-lime text-primary-foreground" : "text-muted-foreground"
-                    }`}
-                  >
-                    <Icon className="h-3.5 w-3.5" />
-                    {label}
-                  </button>
-                );
-              })}
-            </div>
           </div>
           <ul
             className={
@@ -389,6 +375,7 @@ function PlayersPage() {
           </ul>
         </>
       )}
+
 
       {postOpen && (
         <PostAvailabilityDialog
