@@ -43,7 +43,7 @@ const ACCENTS = [
 const STEPS = ["Type", "Identity", "Details", "Branding"] as const;
 
 const SKILL_LABELS = ["Beginner", "Recreational", "Intermediate", "Advanced", "Pro"] as const;
-const MAX_COVER_BYTES = 4 * 1024 * 1024;
+
 
 function initials(name: string) {
   const parts = name.trim().split(/\s+/).filter(Boolean);
