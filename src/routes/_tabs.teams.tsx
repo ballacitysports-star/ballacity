@@ -262,6 +262,24 @@ function TeamsPage() {
             className="flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
           />
         </div>
+        {(() => {
+          const activeFilterCount = (sport ? 1 : 0) + (avail !== "any" ? 1 : 0);
+          return (
+            <button
+              onClick={() => setFiltersOpen((v) => !v)}
+              className={`relative grid h-11 w-11 place-items-center rounded-full border bg-surface ${activeFilterCount ? "border-lime" : "border-border"}`}
+              aria-label="Filters"
+              aria-expanded={filtersOpen}
+            >
+              <SlidersHorizontal className="h-4 w-4" />
+              {activeFilterCount > 0 && (
+                <span className="absolute -top-1 -right-1 grid h-4 w-4 place-items-center rounded-full bg-lime text-[10px] font-bold text-primary-foreground">
+                  {activeFilterCount}
+                </span>
+              )}
+            </button>
+          );
+        })()}
         <Link
           to="/teams/create"
           className="grid h-11 w-11 place-items-center rounded-full bg-lime-gradient text-primary-foreground glow-lime"
@@ -271,40 +289,41 @@ function TeamsPage() {
         </Link>
       </div>
 
+      {filtersOpen && (
+        <>
+          {/* Sport filter chips */}
+          <div className="mb-3">
+            <SportChips selected={sport} onSelect={(s) => setSport(s as Sport | null)} />
+          </div>
 
-
-
-      {/* Sport filter chips */}
-      <div className="mb-3">
-        <SportChips selected={sport} onSelect={(s) => setSport(s as Sport | null)} />
-      </div>
-
-      {/* Availability filter chips */}
-      <div className="-mx-4 overflow-x-auto px-4 mb-4">
-        <div className="flex gap-2 pb-1">
-          {([
-            { id: "any", label: "Any availability" },
-            { id: "recruiting", label: kind === "coach" ? "Booking now" : "Recruiting" },
-            { id: "weekly", label: "Weekly+" },
-            { id: "casual", label: "Casual" },
-          ] as const).map((a) => {
-            const active = avail === a.id;
-            return (
-              <button
-                key={a.id}
-                onClick={() => setAvail(a.id)}
-                className={`whitespace-nowrap rounded-full border px-3.5 py-1.5 text-xs font-semibold transition-colors ${
-                  active
-                    ? "border-lime bg-lime text-primary-foreground"
-                    : "border-border bg-surface text-muted-foreground"
-                }`}
-              >
-                {a.label}
-              </button>
-            );
-          })}
-        </div>
-      </div>
+          {/* Availability filter chips */}
+          <div className="-mx-4 overflow-x-auto px-4 mb-4">
+            <div className="flex gap-2 pb-1">
+              {([
+                { id: "any", label: "Any availability" },
+                { id: "recruiting", label: kind === "coach" ? "Booking now" : "Recruiting" },
+                { id: "weekly", label: "Weekly+" },
+                { id: "casual", label: "Casual" },
+              ] as const).map((a) => {
+                const active = avail === a.id;
+                return (
+                  <button
+                    key={a.id}
+                    onClick={() => setAvail(a.id)}
+                    className={`whitespace-nowrap rounded-full border px-3.5 py-1.5 text-xs font-semibold transition-colors ${
+                      active
+                        ? "border-lime bg-lime text-primary-foreground"
+                        : "border-border bg-surface text-muted-foreground"
+                    }`}
+                  >
+                    {a.label}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        </>
+      )}
 
 
 
