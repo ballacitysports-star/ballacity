@@ -184,16 +184,42 @@ if (typeof window !== "undefined") {
 }
 
 export async function addOrg(org: Org): Promise<Org> {
-  const row = (await createTeam({ data: orgToInsert(org) })) as TeamRow;
-  mergeRow(row);
+  // Optimistic insert
+  const optimistic: Org = { ...org };
+  ORGS.unshift(optimistic);
+  if (currentUserId) {
+    myOrgIds.add(org.id);
+    ownerByOrgId.set(org.id, currentUserId);
+  }
   emit();
-  return rowToOrg(row);
+  try {
+    const row = (await createTeam({ data: orgToInsert(org) })) as TeamRow;
+    mergeRow(row);
+    emit();
+    return rowToOrg(row);
+  } catch (e) {
+    // Rollback
+    const idx = ORGS.findIndex((o) => o.id === org.id);
+    if (idx !== -1) ORGS.splice(idx, 1);
+    myOrgIds.delete(org.id);
+    ownerByOrgId.delete(org.id);
+    emit();
+    throw e;
+  }
 }
 
 export async function updateOrg(
   id: string,
   patch: Partial<Omit<Org, "id" | "kind" | "upcoming" | "posts">>,
 ): Promise<void> {
+  // Snapshot for rollback + optimistic merge
+  const idx = ORGS.findIndex((o) => o.id === id);
+  const prev = idx === -1 ? null : ORGS[idx];
+  if (idx !== -1 && prev) {
+    ORGS[idx] = { ...prev, ...patch } as Org;
+    emit();
+  }
+
   // Only send DB-mapped fields
   const mapped: Record<string, unknown> = { id };
   if (patch.name !== undefined) mapped.name = patch.name;
@@ -221,18 +247,43 @@ export async function updateOrg(
     mapped.skill_max = patch.skillRange?.max ?? 5;
   }
 
-  const row = (await updateTeam({ data: mapped as never })) as TeamRow;
-  mergeRow(row);
-  emit();
+  try {
+    const row = (await updateTeam({ data: mapped as never })) as TeamRow;
+    mergeRow(row);
+    emit();
+  } catch (e) {
+    // Rollback
+    if (prev) {
+      const cur = ORGS.findIndex((o) => o.id === id);
+      if (cur !== -1) ORGS[cur] = prev;
+      emit();
+    }
+    throw e;
+  }
 }
 
 export async function deleteOrg(id: string): Promise<void> {
-  await deleteTeam({ data: { id } });
+  // Snapshot + optimistic remove
   const idx = ORGS.findIndex((o) => o.id === id);
+  const prev = idx === -1 ? null : ORGS[idx];
+  const prevOwner = ownerByOrgId.get(id) ?? null;
+  const prevMine = myOrgIds.has(id);
   if (idx !== -1) ORGS.splice(idx, 1);
   myOrgIds.delete(id);
   ownerByOrgId.delete(id);
   emit();
+  try {
+    await deleteTeam({ data: { id } });
+  } catch (e) {
+    // Rollback
+    if (prev) {
+      ORGS.splice(Math.min(idx, ORGS.length), 0, prev);
+      if (prevOwner) ownerByOrgId.set(id, prevOwner);
+      if (prevMine) myOrgIds.add(id);
+      emit();
+    }
+    throw e;
+  }
 }
 
 export function getOrgById(id: string): Org | undefined {
