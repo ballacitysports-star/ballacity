@@ -1,5 +1,5 @@
 import { Link, useLocation } from "@tanstack/react-router";
-import { Home, Map, Plus, UserCheck, Dribbble, MessageCircle } from "lucide-react";
+import { Home, Map, Plus, UserCheck, Users, Dribbble, MessageCircle } from "lucide-react";
 import { motion } from "framer-motion";
 import { MyAvatar } from "@/components/UserAvatar";
 
@@ -12,9 +12,9 @@ type NavItem = {
 };
 
 /**
- * Simplified 5-tab layout with an elevated center "Host" FAB.
+ * 6-tab layout with an elevated center "Host" FAB.
  * Play merges the former Feed + Discover surfaces (list ⇄ map toggle lives inside).
- * Teams live under Players as a segmented control.
+ * The groups are sized equally so the FAB stays centered regardless of tab count.
  */
 const leftItems: NavItem[] = [
   {
@@ -24,7 +24,8 @@ const leftItems: NavItem[] = [
     // Play tab lights up for the merged surface and for legacy paths.
     match: (p) => p === "/feed" || p === "/discover" || p === "/pickup",
   },
-  { to: "/players", icon: UserCheck, label: "Players", match: (p) => p.startsWith("/players") || p.startsWith("/teams") },
+  { to: "/players", icon: UserCheck, label: "Players", match: (p) => p.startsWith("/players") },
+  { to: "/teams", icon: Users, label: "Teams", match: (p) => p.startsWith("/teams") },
 ];
 
 const rightItems: NavItem[] = [
@@ -48,39 +49,38 @@ export function BottomNav() {
     const active = it.match ? it.match(pathname) : pathname === it.to;
     const Icon = it.icon;
     return (
-      <li key={it.to} className="min-w-0">
-        <Link
-          to={it.to}
-          className="relative flex flex-col items-center gap-1 px-1 py-2.5 text-[10px] sm:text-[11px] font-medium transition-transform active:scale-95"
+      <Link
+        key={it.to}
+        to={it.to}
+        className="relative flex min-w-0 flex-col items-center gap-1 px-1 py-2.5 text-[10px] sm:text-[11px] font-medium transition-transform active:scale-95"
+      >
+        <span
+          className={`relative grid h-9 w-14 place-items-center rounded-2xl transition-colors ${
+            active
+              ? "bg-primary-gradient text-primary-foreground shadow-[0_6px_18px_-8px_var(--primary)]"
+              : "text-muted-foreground"
+          }`}
         >
-          <span
-            className={`relative grid h-9 w-14 place-items-center rounded-2xl transition-colors ${
-              active
-                ? "bg-primary-gradient text-primary-foreground shadow-[0_6px_18px_-8px_var(--primary)]"
-                : "text-muted-foreground"
-            }`}
-          >
-            {it.render
-              ? it.render(active)
-              : Icon
-                ? <Icon className="h-5 w-5" strokeWidth={active ? 2.5 : 2} />
-                : null}
-          </span>
-          <span
-            className={`truncate max-w-full tracking-wide ${
-              active ? "text-foreground" : "text-muted-foreground"
-            }`}
-          >
-            {it.label}
-          </span>
-          {active && (
-            <motion.span
-              layoutId="nav-dot"
-              className="absolute -bottom-0.5 h-[3px] w-6 rounded-full bg-primary-gradient"
-            />
-          )}
-        </Link>
-      </li>
+          {it.render
+            ? it.render(active)
+            : Icon
+              ? <Icon className="h-5 w-5" strokeWidth={active ? 2.5 : 2} />
+              : null}
+        </span>
+        <span
+          className={`truncate max-w-full tracking-wide ${
+            active ? "text-foreground" : "text-muted-foreground"
+          }`}
+        >
+          {it.label}
+        </span>
+        {active && (
+          <motion.span
+            layoutId="nav-dot"
+            className="absolute -bottom-0.5 h-[3px] w-6 rounded-full bg-primary-gradient"
+          />
+        )}
+      </Link>
     );
   };
 
@@ -89,11 +89,13 @@ export function BottomNav() {
   return (
     <nav className="fixed bottom-0 left-0 right-0 z-40 pb-[max(env(safe-area-inset-bottom),0.5rem)] pt-2 px-3">
       <div className="mx-auto max-w-md sm:max-w-xl lg:max-w-2xl rounded-3xl border border-border bg-surface/85 backdrop-blur-xl shadow-2xl">
-        <ul className="relative grid grid-cols-5 items-end">
-          {leftItems.map(renderTab)}
+        <div className="flex items-end justify-between">
+          <div className="flex flex-1 items-end justify-around" role="group" aria-label="Primary tabs">
+            {leftItems.map(renderTab)}
+          </div>
 
           {/* Center elevated Host FAB — PS-blue gradient primary action */}
-          <li className="min-w-0 flex justify-center">
+          <div className="flex justify-center">
             <Link
               to="/create"
               aria-label="Host a game"
@@ -101,10 +103,12 @@ export function BottomNav() {
             >
               <Plus className={`h-6 w-6 ${hostActive ? "rotate-45" : ""} transition-transform`} strokeWidth={3} />
             </Link>
-          </li>
+          </div>
 
-          {rightItems.map(renderTab)}
-        </ul>
+          <div className="flex flex-1 items-end justify-around" role="group" aria-label="Secondary tabs">
+            {rightItems.map(renderTab)}
+          </div>
+        </div>
       </div>
     </nav>
   );
