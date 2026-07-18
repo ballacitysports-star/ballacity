@@ -93,7 +93,12 @@ function Profile() {
   const [myRequests, setMyRequests] = useState<JoinRequest[]>([]);
   const [hostRequests, setHostRequests] = useState<JoinRequest[]>([]);
   const [requestsLoading, setRequestsLoading] = useState(true);
-  const [requestFilter, setRequestFilter] = useState<"all" | "host" | "player">("all");
+  const search = Route.useSearch();
+  const profileNav = useNavigate({ from: "/profile" });
+  const requestFilter: "all" | "host" | "player" =
+    search.req === "host" || search.req === "player" ? search.req : "all";
+  const setRequestFilter = (v: "all" | "host" | "player") =>
+    profileNav({ search: (p: any) => ({ ...p, req: v === "all" ? "" : v }), replace: true });
   const refreshRequests = async (opts: { silent?: boolean } = {}) => {
     if (!profileUser) {
       setMyRequests([]);
