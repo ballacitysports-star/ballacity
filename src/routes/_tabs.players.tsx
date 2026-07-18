@@ -22,6 +22,7 @@ import { AnimatePresence } from "framer-motion";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
 import { Logo } from "@/components/Logo";
+import { SportChips } from "@/components/SportChips";
 import { MyAvatar, UserAvatar } from "@/components/UserAvatar";
 import { useAuth } from "@/hooks/use-auth";
 import { useUnreadNotificationCount } from "@/lib/notifications";
@@ -361,32 +362,35 @@ function PlayersPage() {
         </button>
       </div>
 
-      <div className="-mx-4 overflow-x-auto px-4 mb-5">
-        <div className="flex gap-2 pb-1">
-          <Chip active={!sport} onClick={() => setSport("")}>
-            All sports
-          </Chip>
-          {SPORTS.map((s) => (
-            <Chip key={s.name} active={sport === s.name} onClick={() => setSport(s.name)}>
-              <span className="mr-1">{s.emoji}</span>
-              {s.name}
-            </Chip>
-          ))}
-        </div>
+      {/* Sport filter chips */}
+      <div className="mb-3">
+        <SportChips selected={sport || null} onSelect={(s) => setSport(s ?? "")} />
       </div>
 
-      <div className="-mx-4 overflow-x-auto px-4 mb-5">
+      {/* Availability filter chips */}
+      <div className="-mx-4 overflow-x-auto px-4 mb-4">
         <div className="flex gap-2 pb-1">
           {([
             { id: "any", label: "Anytime" },
             { id: "today", label: "Today" },
             { id: "week", label: "This week" },
             { id: "weekend", label: "Weekend" },
-          ] as const).map((w) => (
-            <Chip key={w.id} active={when === w.id} onClick={() => setWhen(w.id)}>
-              {w.label}
-            </Chip>
-          ))}
+          ] as const).map((w) => {
+            const active = when === w.id;
+            return (
+              <button
+                key={w.id}
+                onClick={() => setWhen(w.id)}
+                className={`whitespace-nowrap rounded-full border px-3.5 py-1.5 text-xs font-semibold transition-colors ${
+                  active
+                    ? "border-lime bg-lime text-primary-foreground"
+                    : "border-border bg-surface text-muted-foreground"
+                }`}
+              >
+                {w.label}
+              </button>
+            );
+          })}
         </div>
       </div>
 
