@@ -11,12 +11,13 @@ import {
   ChevronUp,
   ChevronDown,
   Trash2,
-  Upload,
 } from "lucide-react";
-import { SPORTS, imageFor, type Sport, type Org } from "@/lib/sample-data";
+import { SPORTS, HERO_IMAGE, type Sport, type Org } from "@/lib/sample-data";
 import { getOrgById, updateOrg, deleteOrg, isMyOrg } from "@/lib/org-store";
 import { OrgCard } from "@/components/OrgCard";
 import { LocationAutocomplete } from "@/components/LocationAutocomplete";
+import { TeamCoverUploader } from "@/components/TeamCoverUploader";
+
 
 export const Route = createFileRoute("/teams/$teamId/edit")({
   head: ({ params }) => {
@@ -95,6 +96,12 @@ function EditOrg() {
   const [accent, setAccent] = useState(org.accent);
   const [avatar, setAvatar] = useState(org.avatar);
   const [cover, setCover] = useState<string>(org.cover);
+  const [customCover, setCustomCover] = useState<boolean>(() => {
+    const c = org.cover;
+    // Uploaded photos live at Supabase Storage URLs or as data URLs; presets are bundled asset URLs.
+    return /\/storage\/v1\//.test(c) || c.startsWith("data:") || c.startsWith("blob:");
+  });
+
 
   const canNext = useMemo(() => {
     if (step === 1)
@@ -225,13 +232,6 @@ function EditOrg() {
       [next[i], next[j]] = [next[j], next[i]];
       return next;
     });
-  }
-  function onCoverUpload(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = () => typeof reader.result === "string" && setCover(reader.result);
-    reader.readAsDataURL(file);
   }
   function handleDelete() {
     if (!confirm(`Delete ${org.name}? This cannot be undone.`)) return;
@@ -671,51 +671,15 @@ function EditOrg() {
               </Section>
 
               <Section title="Cover image">
-                <div className="grid grid-cols-3 gap-2">
-                  {(
-                    [
-                      "Basketball",
-                      "Soccer",
-                      "Tennis",
-                      "Volleyball",
-                      "Pickleball",
-                      "Running",
-                    ] as Sport[]
-                  ).map((s) => {
-                    const src = imageFor(s);
-                    const active = cover === src;
-                    return (
-                      <button
-                        key={s}
-                        type="button"
-                        onClick={() => setCover(src)}
-                        className={`relative aspect-video overflow-hidden rounded-xl border-2 transition-all ${
-                          active ? "border-lime" : "border-transparent opacity-70 hover:opacity-100"
-                        }`}
-                      >
-                        <img src={src} alt="" className="h-full w-full object-cover" />
-                        {active && (
-                          <span className="absolute inset-0 bg-lime/20 grid place-items-center">
-                            <Check className="h-5 w-5 text-lime" />
-                          </span>
-                        )}
-                      </button>
-                    );
-                  })}
-                </div>
-                <label className="mt-2 flex cursor-pointer items-center justify-center gap-2 rounded-2xl border border-dashed border-border bg-surface/40 py-3 text-sm font-semibold text-muted-foreground hover:border-lime hover:text-lime">
-                  <Upload className="h-4 w-4" /> Upload custom cover
-                  <input type="file" accept="image/*" onChange={onCoverUpload} className="hidden" />
-                </label>
-                {cover.startsWith("data:") && (
-                  <div className="mt-2 relative aspect-video overflow-hidden rounded-xl border-2 border-lime">
-                    <img src={cover} alt="" className="h-full w-full object-cover" />
-                    <span className="absolute top-1.5 left-1.5 rounded-full bg-background/80 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider">
-                      Custom
-                    </span>
-                  </div>
-                )}
+                <TeamCoverUploader
+                  cover={cover}
+                  onCoverChange={setCover}
+                  isCustom={customCover}
+                  onCustomChange={setCustomCover}
+                  fallback={HERO_IMAGE}
+                />
               </Section>
+
 
               <Section title="Live preview">
                 <div className="rounded-3xl border border-lime/30 bg-surface/40 p-3">
