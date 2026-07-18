@@ -842,7 +842,7 @@ function CreateOrg() {
             </div>
           )}
 
-          {step === 3 && (
+          {step === 2 && (
             <div className="space-y-5">
               <Section title="Accent color">
                 <div className="grid grid-cols-4 gap-2">
