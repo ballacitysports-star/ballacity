@@ -201,6 +201,35 @@ function TeamsPage() {
         <SportChips selected={sport} onSelect={(s) => setSport(s as Sport | null)} />
       </div>
 
+      {/* Availability filter chips */}
+      <div className="-mx-4 overflow-x-auto px-4 mb-4">
+        <div className="flex gap-2 pb-1">
+          {([
+            { id: "any", label: "Any availability" },
+            { id: "recruiting", label: kind === "coach" ? "Booking now" : "Recruiting" },
+            { id: "weekly", label: "Weekly+" },
+            { id: "casual", label: "Casual" },
+          ] as const).map((a) => {
+            const active = avail === a.id;
+            return (
+              <button
+                key={a.id}
+                onClick={() => setAvail(a.id)}
+                className={`whitespace-nowrap rounded-full border px-3.5 py-1.5 text-xs font-semibold transition-colors ${
+                  active
+                    ? "border-lime bg-lime text-primary-foreground"
+                    : "border-border bg-surface text-muted-foreground"
+                }`}
+              >
+                {a.label}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+
+
       {/* Sort control + result count */}
       <div className="mb-4 flex items-center justify-between gap-2">
         <span className="text-xs text-muted-foreground">
