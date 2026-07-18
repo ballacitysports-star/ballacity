@@ -346,6 +346,60 @@ function CreateOrg() {
                 </div>
               </Section>
 
+              <Section title="Skill range">
+                <div className="rounded-2xl border border-border bg-surface p-4">
+                  <div className="flex items-center justify-between mb-3">
+                    <span className="text-sm text-muted-foreground">Who fits here?</span>
+                    <span className="text-sm font-bold text-lime">
+                      {SKILL_LABELS[skillMin - 1]} – {SKILL_LABELS[skillMax - 1]}
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <label className="rounded-xl border border-border bg-background/60 px-3 py-2">
+                      <div className="text-[10px] uppercase tracking-wider text-muted-foreground">
+                        Min
+                      </div>
+                      <select
+                        value={skillMin}
+                        onChange={(e) => {
+                          const v = +e.target.value;
+                          setSkillMin(v);
+                          if (v > skillMax) setSkillMax(v);
+                        }}
+                        className="w-full bg-transparent text-sm font-bold outline-none"
+                      >
+                        {SKILL_LABELS.map((l, i) => (
+                          <option key={l} value={i + 1}>
+                            {l}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    <label className="rounded-xl border border-border bg-background/60 px-3 py-2">
+                      <div className="text-[10px] uppercase tracking-wider text-muted-foreground">
+                        Max
+                      </div>
+                      <select
+                        value={skillMax}
+                        onChange={(e) => {
+                          const v = +e.target.value;
+                          setSkillMax(v);
+                          if (v < skillMin) setSkillMin(v);
+                        }}
+                        className="w-full bg-transparent text-sm font-bold outline-none"
+                      >
+                        {SKILL_LABELS.map((l, i) => (
+                          <option key={l} value={i + 1}>
+                            {l}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                  </div>
+                </div>
+              </Section>
+
+
               <Section title="Year founded">
                 <input
                   type="number"
