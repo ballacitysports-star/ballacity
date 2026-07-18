@@ -48,9 +48,12 @@ export const Route = createFileRoute("/_tabs/feed")({
 
 
 function Feed() {
-  const [q, setQ] = useState("");
+  const search = Route.useSearch();
+  const navigate = useNavigate({ from: "/feed" });
+  const [q, setQ] = useState(search.q ?? "");
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [viewMode, setViewMode] = useState<"list" | "map">(() => {
+    if (search.view === "list" || search.view === "map") return search.view;
     if (typeof window === "undefined") return "list";
     return (localStorage.getItem("openrun:play-view") as "list" | "map") ?? "list";
   });
@@ -59,6 +62,7 @@ function Feed() {
     try { localStorage.setItem("openrun:play-view", m); } catch { /* ignore */ }
   };
   const [density, setDensity] = useState<"grid" | "list">(() => {
+    if (search.density === "grid" || search.density === "list") return search.density;
     if (typeof window === "undefined") return "grid";
     return (localStorage.getItem("openrun:feed-density") as "grid" | "list") ?? "grid";
   });
@@ -78,7 +82,7 @@ function Feed() {
     const Skel = density === "list" ? GameListRowSkeleton : GameCardSkeleton;
     return Array.from({ length: count }, (_, i) => <Skel key={`sk-${i}`} />);
   };
-  const [positionFilter, setPositionFilter] = useState<string | null>(null);
+  const [positionFilter, setPositionFilter] = useState<string | null>(search.pos || null);
   const hosted = useHostedGames();
   const joinedIds = useJoinedGameIds();
   const prefs = useFeedPrefs();
@@ -86,10 +90,69 @@ function Feed() {
   const joinedSet = useMemo(() => new Set(joinedIds), [joinedIds]);
   const hostedIds = useMemo(() => new Set(hosted.map((g) => g.id)), [hosted]);
 
+  // One-time hydration: URL wins over the stored prefs so a shared link
+  // reproduces exactly what the sender saw. Runs once on mount.
+  const hydratedRef = useRef(false);
+  useEffect(() => {
+    if (hydratedRef.current) return;
+    hydratedRef.current = true;
+    const patch: Partial<typeof DEFAULT_PREFS> = {};
+    if (search.sport) {
+      const list = search.sport.split(",").map((s) => s.trim()).filter(Boolean) as Sport[];
+      patch.preferredSports = list;
+    }
+    if (search.sort === "nearest" || search.sort === "soonest") patch.sortBy = search.sort;
+    if (search.dist !== undefined) patch.maxDistanceMi = search.dist;
+    const sec = { ...prefs.sections };
+    let secTouched = false;
+    for (const [k, v] of [
+      ["showUrgent", search.urgent],
+      ["showForYou", search.foryou],
+      ["hostedByMeOnly", search.hosted],
+      ["joinedOnly", search.joined],
+      ["freeOnly", search.free],
+      ["paidOnly", search.paid],
+    ] as const) {
+      if (typeof v === "boolean") { (sec as any)[k] = v; secTouched = true; }
+    }
+    if (secTouched) patch.sections = sec;
+    if (Object.keys(patch).length > 0) setFeedPrefs({ ...prefs, ...patch });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Reflect current state back into the URL so refresh/share preserves it.
+  useEffect(() => {
+    if (!hydratedRef.current) return;
+    const next: Record<string, unknown> = {};
+    if (q) next.q = q;
+    if (prefs.preferredSports.length) next.sport = prefs.preferredSports.join(",");
+    if (prefs.sortBy !== DEFAULT_PREFS.sortBy) next.sort = prefs.sortBy;
+    if (prefs.maxDistanceMi != null) next.dist = prefs.maxDistanceMi;
+    if (positionFilter) next.pos = positionFilter;
+    if (viewMode !== "list") next.view = viewMode;
+    if (density !== "grid") next.density = density;
+    for (const [k, defKey, urlKey] of [
+      ["showUrgent", "showUrgent", "urgent"],
+      ["showForYou", "showForYou", "foryou"],
+      ["hostedByMeOnly", "showUrgent" as any, "hosted"],
+      ["joinedOnly", "showUrgent" as any, "joined"],
+      ["freeOnly", "showUrgent" as any, "free"],
+      ["paidOnly", "showUrgent" as any, "paid"],
+    ] as const) {
+      const cur = (prefs.sections as any)[k];
+      const def = (DEFAULT_PREFS.sections as any)[k];
+      if (cur !== def) next[urlKey] = cur;
+      void defKey;
+    }
+    navigate({ search: next as any, replace: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [q, prefs, positionFilter, viewMode, density]);
+
   const userCityToken = useMemo(
     () => (profile?.city ?? "").toLowerCase().split(",")[0].trim(),
     [profile?.city],
   );
+
   const isLocal = (g: { location: string; neighborhood?: string }) => {
     if (!userCityToken) return false;
     const hay = `${g.location} ${g.neighborhood ?? ""}`.toLowerCase();
