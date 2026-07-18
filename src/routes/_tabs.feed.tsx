@@ -455,6 +455,7 @@ function Feed() {
         <button
           onClick={() => setFiltersOpen(true)}
           className={`relative grid h-11 w-11 place-items-center rounded-full border bg-surface ${activeFilterCount ? "border-lime" : "border-border"}`}
+          aria-label="Filters"
         >
           <SlidersHorizontal className="h-4 w-4" />
           {activeFilterCount > 0 && (
@@ -463,6 +464,13 @@ function Feed() {
             </span>
           )}
         </button>
+        <Link
+          to="/create"
+          className="grid h-11 w-11 place-items-center rounded-full bg-lime-gradient text-primary-foreground glow-lime"
+          aria-label="Create game"
+        >
+          <Plus className="h-5 w-5" strokeWidth={2.5} />
+        </Link>
         {q && suggestions.length > 0 && (
           <div className="absolute left-0 right-14 top-full mt-2 z-20 rounded-2xl border border-border bg-surface shadow-lg overflow-hidden">
             {suggestions.map((s, idx) => (
