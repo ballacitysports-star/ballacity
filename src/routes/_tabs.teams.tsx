@@ -202,21 +202,39 @@ function TeamsPage() {
         </label>
       </div>
 
-      <div className="space-y-3 pb-6">
-        {list.map(({ o, dist }, i) => (
-          <div key={o.id} className="relative">
-            <OrgCard org={o} index={i} />
-            <span className="pointer-events-none absolute top-3 right-3 rounded-full bg-background/70 backdrop-blur px-2 py-0.5 text-[10px] font-bold text-foreground">
-              {dist} mi
-            </span>
-          </div>
-        ))}
-        {list.length === 0 && (
-          <div className="rounded-2xl border border-border bg-surface p-8 text-center text-muted-foreground">
-            {meta.emptyText}
-          </div>
-        )}
-      </div>
+      <ViewDensityToggle
+        view={viewMode}
+        onViewChange={switchView}
+        density={density}
+        onDensityChange={switchDensity}
+      />
+
+      {viewMode === "map" ? (
+        <PlayMapView />
+      ) : (
+        <div
+          className={
+            density === "grid"
+              ? "grid grid-cols-1 sm:grid-cols-2 gap-3 pb-6"
+              : "space-y-3 pb-6"
+          }
+        >
+          {list.map(({ o, dist }, i) => (
+            <div key={o.id} className="relative">
+              <OrgCard org={o} index={i} />
+              <span className="pointer-events-none absolute top-3 right-3 rounded-full bg-background/70 backdrop-blur px-2 py-0.5 text-[10px] font-bold text-foreground">
+                {dist} mi
+              </span>
+            </div>
+          ))}
+          {list.length === 0 && (
+            <div className="rounded-2xl border border-border bg-surface p-8 text-center text-muted-foreground sm:col-span-2">
+              {meta.emptyText}
+            </div>
+          )}
+        </div>
+      )}
+
 
     </div>
   );
