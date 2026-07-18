@@ -1,10 +1,20 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { motion } from "framer-motion";
-import { Search, Plus, Megaphone, Users, GraduationCap } from "lucide-react";
-import { type OrgKind } from "@/lib/sample-data";
+import { Search, Plus, Megaphone, Users, GraduationCap, ArrowUpDown } from "lucide-react";
+import { type OrgKind, type Sport } from "@/lib/sample-data";
 import { useAllOrgs } from "@/lib/org-store";
 import { OrgCard } from "@/components/OrgCard";
+import { SportChips } from "@/components/SportChips";
+
+type SortBy = "nearest" | "followers" | "name";
+
+// Deterministic pseudo-distance (miles) from a string, so sort order is stable.
+function pseudoDistance(id: string): number {
+  let h = 0;
+  for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) >>> 0;
+  return Math.round(((h % 400) / 10 + 0.3) * 10) / 10; // 0.3 – 40.3 mi
+}
 
 export const Route = createFileRoute("/_tabs/teams")({
   head: () => ({ meta: [{ title: "Teams & Coaches — OpenRun" }] }),
@@ -46,22 +56,30 @@ const KIND_META: Record<
 function TeamsPage() {
   const [kind, setKind] = useState<OrgKind>("team");
   const [q, setQ] = useState("");
+  const [sport, setSport] = useState<Sport | null>(null);
+  const [sortBy, setSortBy] = useState<SortBy>("nearest");
   const orgs = useAllOrgs();
   const meta = KIND_META[kind];
 
-  const list = useMemo(
-    () =>
-      orgs
-        .filter((o) => o.kind === kind)
-        .filter((o) =>
-          q
-            ? (o.name + o.handle + o.tagline + o.sports.join(" "))
-                .toLowerCase()
-                .includes(q.toLowerCase())
-            : true,
-        ),
-    [orgs, kind, q],
-  );
+  const list = useMemo(() => {
+    const filtered = orgs
+      .filter((o) => o.kind === kind)
+      .filter((o) => (sport ? o.sports.includes(sport) : true))
+      .filter((o) =>
+        q
+          ? (o.name + o.handle + o.tagline + o.city + o.sports.join(" "))
+              .toLowerCase()
+              .includes(q.toLowerCase())
+          : true,
+      );
+    const withDist = filtered.map((o) => ({ o, dist: pseudoDistance(o.id) }));
+    withDist.sort((a, b) => {
+      if (sortBy === "nearest") return a.dist - b.dist;
+      if (sortBy === "followers") return b.o.followers - a.o.followers;
+      return a.o.name.localeCompare(b.o.name);
+    });
+    return withDist;
+  }, [orgs, kind, sport, q, sortBy]);
 
   const featured =
     orgs.find((o) => o.verified && o.kind === kind) ?? orgs.find((o) => o.kind === kind);
@@ -141,9 +159,39 @@ function TeamsPage() {
         </Link>
       </div>
 
+      {/* Sport filter chips */}
+      <div className="mb-3">
+        <SportChips selected={sport} onSelect={(s) => setSport(s as Sport | null)} />
+      </div>
+
+      {/* Sort control + result count */}
+      <div className="mb-4 flex items-center justify-between gap-2">
+        <span className="text-xs text-muted-foreground">
+          {list.length} {list.length === 1 ? "result" : "results"}
+        </span>
+        <label className="inline-flex items-center gap-2 rounded-full border border-border bg-surface px-3 py-1.5 text-xs font-semibold">
+          <ArrowUpDown className="h-3.5 w-3.5 text-muted-foreground" />
+          <select
+            value={sortBy}
+            onChange={(e) => setSortBy(e.target.value as SortBy)}
+            className="bg-transparent outline-none"
+            aria-label="Sort teams"
+          >
+            <option value="nearest">Nearest</option>
+            <option value="followers">Most followers</option>
+            <option value="name">Name A–Z</option>
+          </select>
+        </label>
+      </div>
+
       <div className="space-y-3 pb-6">
-        {list.map((o, i) => (
-          <OrgCard key={o.id} org={o} index={i} />
+        {list.map(({ o, dist }, i) => (
+          <div key={o.id} className="relative">
+            <OrgCard org={o} index={i} />
+            <span className="pointer-events-none absolute top-3 right-3 rounded-full bg-background/70 backdrop-blur px-2 py-0.5 text-[10px] font-bold text-foreground">
+              {dist} mi
+            </span>
+          </div>
         ))}
         {list.length === 0 && (
           <div className="rounded-2xl border border-border bg-surface p-8 text-center text-muted-foreground">
@@ -151,6 +199,7 @@ function TeamsPage() {
           </div>
         )}
       </div>
+
     </div>
   );
 }
