@@ -158,7 +158,7 @@ function PlayersPage() {
         if (rawV === "map" || rawV === "list") patch.view = rawV;
         if (rawD === "grid" || rawD === "list") patch.density = rawD;
         if (Object.keys(patch).length > 0) {
-          navigate({ search: (prev) => ({ ...prev, ...patch }), replace: true });
+          navigate({ search: (prev: PlayersSearch) => ({ ...prev, ...patch }), replace: true });
         }
       }
       window.localStorage.removeItem("openrun.playersFilters.v1");
