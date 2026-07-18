@@ -1,14 +1,12 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { zodValidator, fallback } from "@tanstack/zod-adapter";
 import { z } from "zod";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   ArrowLeft,
   ArrowRight,
   Check,
-  Users,
-  GraduationCap,
   Sparkles,
   X,
   Plus,
@@ -63,7 +61,7 @@ const ACCENTS = [
   { name: "Violet", hex: "#a78bfa" },
 ];
 
-const STEPS = ["Type", "Identity", "Details", "Branding"] as const;
+const STEPS = ["Identity", "Details", "Branding"] as const;
 
 const SKILL_LABELS = ["Beginner", "Recreational", "Intermediate", "Advanced", "Pro"] as const;
 
@@ -78,12 +76,23 @@ function initials(name: string) {
 function CreateOrg() {
   const nav = useNavigate();
   const { kind: kindParam } = Route.useSearch();
-  const initialKind: OrgKind | null =
-    kindParam === "coach" || kindParam === "team" ? (kindParam as OrgKind) : null;
-  const [step, setStep] = useState(initialKind ? 1 : 0);
+  const resolvedKind: OrgKind =
+    kindParam === "coach" ? "coach" : "team";
+  const [step, setStep] = useState(0);
+
+  // Canonicalize URL: bare /teams/create → /teams/create?kind=team so
+  // deep links, refreshes, and Back always carry an explicit kind.
+  useEffect(() => {
+    if (kindParam !== "team" && kindParam !== "coach") {
+      nav({ to: "/teams/create", search: { kind: "team" }, replace: true });
+    }
+  }, [kindParam, nav]);
 
   // Form state
-  const [kind, setKind] = useState<OrgKind | null>(initialKind);
+  const [kind, setKind] = useState<OrgKind>(resolvedKind);
+  useEffect(() => {
+    setKind(resolvedKind);
+  }, [resolvedKind]);
   const [name, setName] = useState("");
   const [handle, setHandle] = useState("");
   const [tagline, setTagline] = useState("");
@@ -138,18 +147,17 @@ function CreateOrg() {
   const computedAvatar = avatar || initials(name || "Open Run");
 
   const canNext = useMemo(() => {
-    if (step === 0) return !!kind;
-    if (step === 1)
+    if (step === 0)
       return (
         name.trim().length > 1 &&
         handle.trim().length > 1 &&
         sports.length > 0 &&
         city.trim().length > 0
       );
-    if (step === 2) return bio.trim().length > 10;
-    if (step === 3) return true;
+    if (step === 1) return bio.trim().length > 10;
+    if (step === 2) return true;
     return false;
-  }, [step, kind, name, handle, sports, city, bio]);
+  }, [step, name, handle, sports, city, bio]);
 
   const handlePreview: Org = {
     id: "preview",
@@ -313,28 +321,6 @@ function CreateOrg() {
           transition={{ duration: 0.25 }}
         >
           {step === 0 && (
-            <div className="space-y-3">
-              <p className="text-sm text-muted-foreground mb-2">Who is this profile for?</p>
-              <TypeCard
-                active={kind === "team"}
-                onClick={() => setKind("team")}
-                icon={<Users className="h-6 w-6" />}
-                title="Team / Club"
-                desc="Run a roster, post tryouts, schedule pickups, share recaps."
-                badges={["Tryouts", "League play", "Roster"]}
-              />
-              <TypeCard
-                active={kind === "coach"}
-                onClick={() => setKind("coach")}
-                icon={<GraduationCap className="h-6 w-6" />}
-                title="Trainer"
-                desc="Showcase credentials, book sessions, run clinics & open workouts."
-                badges={["Clinics", "Bookings", "Reviews"]}
-              />
-            </div>
-          )}
-
-          {step === 1 && (
             <div className="space-y-5">
               <Section title={kind === "team" ? "Team name" : "Trainer name"}>
                 <input
@@ -551,7 +537,7 @@ function CreateOrg() {
             </div>
           )}
 
-          {step === 2 && (
+          {step === 1 && (
             <div className="space-y-5">
               <Section title="Bio">
                 <textarea
@@ -854,7 +840,7 @@ function CreateOrg() {
             </div>
           )}
 
-          {step === 3 && (
+          {step === 2 && (
             <div className="space-y-5">
               <Section title="Accent color">
                 <div className="grid grid-cols-4 gap-2">
@@ -918,19 +904,18 @@ function CreateOrg() {
       {/* Footer nav */}
       <div className="fixed bottom-[calc(env(safe-area-inset-bottom)+6rem)] left-0 right-0 z-30 px-4 pb-[max(env(safe-area-inset-bottom),0.75rem)] pt-3 bg-gradient-to-t from-background via-background/90 to-transparent">
         <div className="mx-auto max-w-md flex gap-2">
-          {step > 0 && !(initialKind && step === 1) && (
+          {step > 0 ? (
             <button
               type="button"
-              onClick={() => setStep((s) => Math.max(initialKind ? 1 : 0, s - 1))}
+              onClick={() => setStep((s) => Math.max(0, s - 1))}
               className="rounded-2xl border border-border bg-surface px-5 py-3.5 text-sm font-bold"
             >
               Back
             </button>
-          )}
-          {initialKind && step === 1 && (
+          ) : (
             <button
               type="button"
-              onClick={() => nav({ to: initialKind === "coach" ? "/trainers" : "/teams" })}
+              onClick={() => nav({ to: kind === "coach" ? "/trainers" : "/teams" })}
               className="rounded-2xl border border-border bg-surface px-5 py-3.5 text-sm font-bold"
             >
               Cancel
@@ -969,59 +954,8 @@ function CreateOrg() {
   );
 }
 
-function TypeCard({
-  active,
-  onClick,
-  icon,
-  title,
-  desc,
-  badges,
-}: {
-  active: boolean;
-  onClick: () => void;
-  icon: React.ReactNode;
-  title: string;
-  desc: string;
-  badges: string[];
-}) {
-  return (
-    <motion.button
-      type="button"
-      whileTap={{ scale: 0.98 }}
-      onClick={onClick}
-      className={`block w-full text-left rounded-3xl border-2 p-5 transition-all ${
-        active
-          ? "border-lime bg-lime/10 glow-lime"
-          : "border-border bg-surface hover:border-lime/40"
-      }`}
-    >
-      <div className="flex items-start gap-4">
-        <div
-          className={`grid h-12 w-12 shrink-0 place-items-center rounded-2xl ${active ? "bg-lime text-primary-foreground" : "bg-secondary text-foreground"}`}
-        >
-          {icon}
-        </div>
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2">
-            <h3 className="font-display text-lg font-bold">{title}</h3>
-            {active && <Check className="h-4 w-4 text-lime" />}
-          </div>
-          <p className="text-sm text-muted-foreground mt-1">{desc}</p>
-          <div className="mt-2 flex flex-wrap gap-1.5">
-            {badges.map((b) => (
-              <span
-                key={b}
-                className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider ${active ? "bg-background/40 text-foreground" : "bg-secondary text-muted-foreground"}`}
-              >
-                {b}
-              </span>
-            ))}
-          </div>
-        </div>
-      </div>
-    </motion.button>
-  );
-}
+
+
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
