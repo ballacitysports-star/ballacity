@@ -268,22 +268,7 @@ function PlayersPage() {
     return age;
   }
 
-  const [density, setDensity] = useState<Density>(() => {
-    if (typeof window === "undefined") return "list";
-    return (localStorage.getItem("openrun:players-density") as Density) ?? "list";
-  });
-  const switchDensity = (d: Density) => {
-    setDensity(d);
-    try { localStorage.setItem("openrun:players-density", d); } catch { /* ignore */ }
-  };
-  const [viewMode, setViewMode] = useState<ViewMode>(() => {
-    if (typeof window === "undefined") return "list";
-    return (localStorage.getItem("openrun:players-view") as ViewMode) ?? "list";
-  });
-  const switchView = (v: ViewMode) => {
-    setViewMode(v);
-    try { localStorage.setItem("openrun:players-view", v); } catch { /* ignore */ }
-  };
+
 
   return (
     <div className="mx-auto w-full max-w-md sm:max-w-2xl lg:max-w-4xl px-4 pt-6">
