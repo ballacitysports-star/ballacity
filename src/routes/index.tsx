@@ -25,22 +25,6 @@ export const Route = createFileRoute("/")({
 });
 
 function Landing() {
-  const router = useRouter();
-  const { user, loading } = useAuth();
-  const hasStoredSession =
-    typeof window !== "undefined" ? readStoredSupabaseSession() !== null : false;
-
-  useEffect(() => {
-    if (!loading && user) {
-      router.navigate({ to: "/feed", replace: true });
-    }
-  }, [loading, user, router]);
-
-  // Signed-in refresh at "/" must never flash the marketing hero. If a
-  // session is present (or still hydrating from localStorage on mobile),
-  // render nothing until the redirect above fires.
-  if (user || (loading && hasStoredSession)) return null;
-
   const trending = GAMES.filter((g) => g.trending).slice(0, 4);
 
   return (
