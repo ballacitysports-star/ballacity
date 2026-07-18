@@ -110,6 +110,7 @@ function PlayersPage() {
   const [ageMax, setAgeMax] = useState<number | "">(initial.ageMax);
   const [includeUnknownAge, setIncludeUnknownAge] = useState<boolean>(initial.includeUnknownAge);
   const [filtersOpen, setFiltersOpen] = useState(false);
+  const [when, setWhen] = useState<"any" | "today" | "week" | "weekend">("any");
   const [list, setList] = useState<AvailabilityWithAuthor[] | null>(null);
   const [postOpen, setPostOpen] = useState(false);
   const [contactFor, setContactFor] = useState<AvailabilityWithAuthor | null>(null);
