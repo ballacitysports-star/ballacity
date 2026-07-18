@@ -62,6 +62,10 @@ function rowToOrg(row: TeamRow): Org {
   const staff = Array.isArray(row.staff)
     ? (row.staff as { name: string; role: string; avatar: string }[])
     : [];
+  const positionsNeeded =
+    row.positions_needed && typeof row.positions_needed === "object"
+      ? (row.positions_needed as Record<string, Record<string, number>>)
+      : {};
   return {
     id: row.id,
     kind,
@@ -88,6 +92,15 @@ function rowToOrg(row: TeamRow): Org {
     homeCourt: kind === "team" ? row.home_court ?? undefined : undefined,
     staff: kind === "team" ? staff : undefined,
     skillRange: { min: row.skill_min, max: row.skill_max },
+    format: row.format ?? undefined,
+    venues: row.venues ?? [],
+    cadence: row.cadence ?? undefined,
+    positionsNeeded,
+    ratingSystem: (row.rating_system as Org["ratingSystem"]) ?? undefined,
+    ratingMin: row.rating_min ?? undefined,
+    ratingMax: row.rating_max ?? undefined,
+    distances: row.distances ?? [],
+    sessionTypes: row.session_types ?? [],
     upcoming: [],
     posts: [],
   };
