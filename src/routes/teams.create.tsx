@@ -743,14 +743,21 @@ function CreateOrg() {
               Continue <ArrowRight className="h-4 w-4" />
             </motion.button>
           ) : (
-            <motion.button
-              whileTap={{ scale: 0.98 }}
-              type="button"
-              onClick={submit}
-              className="flex-1 inline-flex items-center justify-center gap-2 rounded-2xl bg-coral-gradient py-3.5 text-sm font-bold text-white glow-coral"
-            >
-              <Sparkles className="h-4 w-4" /> Publish profile
-            </motion.button>
+            <div className="flex-1 flex flex-col gap-1">
+              <motion.button
+                whileTap={{ scale: 0.98 }}
+                type="button"
+                onClick={submit}
+                disabled={submitting}
+                className="inline-flex items-center justify-center gap-2 rounded-2xl bg-coral-gradient py-3.5 text-sm font-bold text-white glow-coral disabled:opacity-60"
+              >
+                <Sparkles className="h-4 w-4" />
+                {submitting ? "Publishing…" : "Publish profile"}
+              </motion.button>
+              {submitError && (
+                <div className="text-[11px] text-coral text-center">{submitError}</div>
+              )}
+            </div>
           )}
         </div>
       </div>
