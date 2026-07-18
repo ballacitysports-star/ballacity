@@ -47,6 +47,15 @@ const TeamInput = z.object({
   rate_per_hour: z.number().int().nullable().optional(),
   skill_min: z.number().int().min(1).max(5).default(1),
   skill_max: z.number().int().min(1).max(5).default(5),
+  format: z.string().max(120).nullable().optional(),
+  venues: z.array(z.string().max(60)).default([]),
+  cadence: z.string().max(60).nullable().optional(),
+  positions_needed: z.record(z.string(), z.record(z.string(), z.number().int().min(0).max(30))).default({}),
+  rating_system: z.enum(["NTRP", "DUPR", "UTR", "PACE", "SELF"]).nullable().optional(),
+  rating_min: z.string().max(20).nullable().optional(),
+  rating_max: z.string().max(20).nullable().optional(),
+  distances: z.array(z.string().max(40)).default([]),
+  session_types: z.array(z.string().max(40)).default([]),
 });
 
 const TeamPatch = TeamInput.partial().extend({ id: z.string() });
