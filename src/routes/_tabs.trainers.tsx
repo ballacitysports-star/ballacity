@@ -220,7 +220,6 @@ function TrainersPage() {
         })()}
         <Link
           to="/teams/create"
-          search={{ kind: "coach" } as never}
           className="grid h-11 w-11 place-items-center rounded-full bg-lime-gradient text-primary-foreground glow-lime"
           aria-label="Create trainer profile"
         >
