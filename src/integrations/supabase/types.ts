@@ -1168,11 +1168,14 @@ export type Database = {
           achievements: string[]
           avatar: string
           bio: string
+          cadence: string | null
           city: string
           cover: string
           created_at: string
           credentials: string[]
+          distances: string[]
           followers: number
+          format: string | null
           founded: number | null
           handle: string
           home_court: string | null
@@ -1182,13 +1185,19 @@ export type Database = {
           losses: number
           name: string
           owner_id: string
+          positions_needed: Json
           rate_per_hour: number | null
+          rating_max: string | null
+          rating_min: string | null
+          rating_system: string | null
+          session_types: string[]
           skill_max: number
           skill_min: number
           sports: string[]
           staff: Json
           tagline: string
           updated_at: string
+          venues: string[]
           verified: boolean
           wins: number
         }
@@ -1197,11 +1206,14 @@ export type Database = {
           achievements?: string[]
           avatar?: string
           bio?: string
+          cadence?: string | null
           city?: string
           cover?: string
           created_at?: string
           credentials?: string[]
+          distances?: string[]
           followers?: number
+          format?: string | null
           founded?: number | null
           handle: string
           home_court?: string | null
@@ -1211,13 +1223,19 @@ export type Database = {
           losses?: number
           name: string
           owner_id: string
+          positions_needed?: Json
           rate_per_hour?: number | null
+          rating_max?: string | null
+          rating_min?: string | null
+          rating_system?: string | null
+          session_types?: string[]
           skill_max?: number
           skill_min?: number
           sports?: string[]
           staff?: Json
           tagline?: string
           updated_at?: string
+          venues?: string[]
           verified?: boolean
           wins?: number
         }
@@ -1226,11 +1244,14 @@ export type Database = {
           achievements?: string[]
           avatar?: string
           bio?: string
+          cadence?: string | null
           city?: string
           cover?: string
           created_at?: string
           credentials?: string[]
+          distances?: string[]
           followers?: number
+          format?: string | null
           founded?: number | null
           handle?: string
           home_court?: string | null
@@ -1240,13 +1261,19 @@ export type Database = {
           losses?: number
           name?: string
           owner_id?: string
+          positions_needed?: Json
           rate_per_hour?: number | null
+          rating_max?: string | null
+          rating_min?: string | null
+          rating_system?: string | null
+          session_types?: string[]
           skill_max?: number
           skill_min?: number
           sports?: string[]
           staff?: Json
           tagline?: string
           updated_at?: string
+          venues?: string[]
           verified?: boolean
           wins?: number
         }

@@ -380,6 +380,16 @@ export type Org = {
   staff?: { name: string; role: string; avatar: string }[];
   // Both
   skillRange?: { min: number; max: number }; // 1=Beginner … 5=Pro
+  // Sport-specific extensions (all optional)
+  format?: string;
+  venues?: string[];
+  cadence?: string;
+  positionsNeeded?: Record<string, Record<string, number>>; // sport → position → count
+  ratingSystem?: "NTRP" | "DUPR" | "UTR" | "PACE" | "SELF";
+  ratingMin?: string;
+  ratingMax?: string;
+  distances?: string[];
+  sessionTypes?: string[];
   upcoming: string[]; // game ids
   posts: OrgPost[];
 };

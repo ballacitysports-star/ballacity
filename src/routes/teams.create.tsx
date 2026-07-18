@@ -14,14 +14,30 @@ import {
 import {
   SPORTS,
   HERO_IMAGE,
+  POSITIONS_BY_SPORT,
   type Sport,
   type Org,
   type OrgKind,
 } from "@/lib/sample-data";
 import { addOrg } from "@/lib/org-store";
+import {
+  SPORT_CONFIG,
+  SESSION_TYPES,
+  RATING_SYSTEM_LABEL,
+  primarySport,
+  mergedFormats,
+  mergedVenues,
+  mergedCadences,
+  mergedCredentialPresets,
+  ratingSystemFor,
+  ratingLevelsFor,
+  hasTeamSport,
+  hasRunning,
+} from "@/lib/sport-config";
 import { OrgCard } from "@/components/OrgCard";
 import { LocationAutocomplete } from "@/components/LocationAutocomplete";
 import { TeamCoverUploader } from "@/components/TeamCoverUploader";
+import { PositionsPicker, positionsCleanup, type PositionsNeeded } from "@/components/PositionsPicker";
 
 
 export const Route = createFileRoute("/teams/create")({
@@ -87,6 +103,27 @@ function CreateOrg() {
   const [skillMin, setSkillMin] = useState(1); // 1 = Beginner
   const [skillMax, setSkillMax] = useState(3); // 3 = Intermediate
 
+  // Sport-specific extensions
+  const [format, setFormat] = useState<string>("");
+  const [venues, setVenues] = useState<string[]>([]);
+  const [cadence, setCadence] = useState<string>("");
+  const [positionsBySport, setPositionsBySport] = useState<Record<string, PositionsNeeded>>({});
+  const [ratingMin, setRatingMin] = useState<string>("");
+  const [ratingMax, setRatingMax] = useState<string>("");
+  const [distances, setDistances] = useState<string[]>([]);
+  const [sessionTypes, setSessionTypes] = useState<string[]>([]);
+
+  const primary = primarySport(sports);
+  const ratingSystem = ratingSystemFor(primary);
+  const ratingLevels = ratingLevelsFor(primary);
+  const usesSelfRating = ratingSystem === "SELF";
+  const formatOptions = useMemo(() => mergedFormats(sports), [sports]);
+  const venueOptions = useMemo(() => mergedVenues(sports), [sports]);
+  const cadenceOptions = useMemo(() => mergedCadences(sports), [sports]);
+  const credentialPresets = useMemo(() => mergedCredentialPresets(sports), [sports]);
+  const showTeamBlocks = kind === "team" && hasTeamSport(sports);
+  const showDistances = hasRunning(sports);
+
 
   const computedAvatar = avatar || initials(name || "Open Run");
 
@@ -130,6 +167,17 @@ function CreateOrg() {
     homeCourt: kind === "team" ? homeCourt : undefined,
     staff: kind === "team" ? staff : undefined,
     skillRange: { min: skillMin, max: skillMax },
+    format: format || undefined,
+    venues,
+    cadence: cadence || undefined,
+    positionsNeeded: Object.fromEntries(
+      Object.entries(positionsBySport).map(([k, v]) => [k, positionsCleanup(v)]),
+    ),
+    ratingSystem,
+    ratingMin: ratingMin || undefined,
+    ratingMax: ratingMax || undefined,
+    distances,
+    sessionTypes: kind === "coach" ? sessionTypes : undefined,
     upcoming: [],
     posts: [],
   };
@@ -344,7 +392,44 @@ function CreateOrg() {
                 </div>
               </Section>
 
+              {sports.length > 0 && formatOptions.length > 0 && (
+                <Section title="Preferred format">
+                  <ChipPicker
+                    options={formatOptions}
+                    selected={format ? [format] : []}
+                    onToggle={(v) => setFormat((cur) => (cur === v ? "" : v))}
+                    single
+                  />
+                </Section>
+              )}
+
+              {sports.length > 0 && venueOptions.length > 0 && (
+                <Section title="Venues / surfaces">
+                  <ChipPicker
+                    options={venueOptions}
+                    selected={venues}
+                    onToggle={(v) =>
+                      setVenues((cur) =>
+                        cur.includes(v) ? cur.filter((x) => x !== v) : [...cur, v],
+                      )
+                    }
+                  />
+                </Section>
+              )}
+
+              {sports.length > 0 && (
+                <Section title="Meeting cadence">
+                  <ChipPicker
+                    options={cadenceOptions}
+                    selected={cadence ? [cadence] : []}
+                    onToggle={(v) => setCadence((cur) => (cur === v ? "" : v))}
+                    single
+                  />
+                </Section>
+              )}
+
               <Section title="Skill range">
+
                 <div className="rounded-2xl border border-border bg-surface p-4">
                   <div className="flex items-center justify-between mb-3">
                     <span className="text-sm text-muted-foreground">Who fits here?</span>
@@ -396,6 +481,51 @@ function CreateOrg() {
                   </div>
                 </div>
               </Section>
+
+              {!usesSelfRating && (
+                <Section title={`${RATING_SYSTEM_LABEL[ratingSystem]} band`}>
+                  <div className="rounded-2xl border border-border bg-surface p-4">
+                    <div className="flex items-center justify-between mb-3">
+                      <span className="text-sm text-muted-foreground">
+                        {ratingSystem === "PACE" ? "Typical pace range" : "Rating range"}
+                      </span>
+                      <span className="text-sm font-bold text-lime">
+                        {ratingMin || "—"} – {ratingMax || "—"}
+                      </span>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <label className="rounded-xl border border-border bg-background/60 px-3 py-2">
+                        <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Min</div>
+                        <select
+                          value={ratingMin}
+                          onChange={(e) => setRatingMin(e.target.value)}
+                          className="w-full bg-transparent text-sm font-bold outline-none"
+                        >
+                          <option value="">—</option>
+                          {ratingLevels.map((l) => (
+                            <option key={l} value={l}>{l}</option>
+                          ))}
+                        </select>
+                      </label>
+                      <label className="rounded-xl border border-border bg-background/60 px-3 py-2">
+                        <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Max</div>
+                        <select
+                          value={ratingMax}
+                          onChange={(e) => setRatingMax(e.target.value)}
+                          className="w-full bg-transparent text-sm font-bold outline-none"
+                        >
+                          <option value="">—</option>
+                          {ratingLevels.map((l) => (
+                            <option key={l} value={l}>{l}</option>
+                          ))}
+                        </select>
+                      </label>
+                    </div>
+                  </div>
+                </Section>
+              )}
+
+
 
 
               <Section title="Year founded">
@@ -598,9 +728,64 @@ function CreateOrg() {
                 </>
               )}
 
+              {showTeamBlocks &&
+                sports
+                  .filter((s) => (POSITIONS_BY_SPORT[s]?.length ?? 0) > 0)
+                  .map((s) => (
+                    <Section key={`pos-${s}`} title={`${s} — positions needed`}>
+                      <PositionsPicker
+                        sport={s}
+                        value={positionsBySport[s] ?? {}}
+                        onChange={(next) =>
+                          setPositionsBySport((cur) => ({ ...cur, [s]: next }))
+                        }
+                      />
+                    </Section>
+                  ))}
+
+              {showDistances && (
+                <Section title="Typical distances">
+                  <ChipPicker
+                    options={SPORT_CONFIG.Running?.distances ?? []}
+                    selected={distances}
+                    onToggle={(v) =>
+                      setDistances((cur) =>
+                        cur.includes(v) ? cur.filter((x) => x !== v) : [...cur, v],
+                      )
+                    }
+                  />
+                </Section>
+              )}
+
               {kind === "coach" && (
                 <>
+                  <Section title="Session types">
+                    <ChipPicker
+                      options={SESSION_TYPES}
+                      selected={sessionTypes}
+                      onToggle={(v) =>
+                        setSessionTypes((cur) =>
+                          cur.includes(v) ? cur.filter((x) => x !== v) : [...cur, v],
+                        )
+                      }
+                    />
+                  </Section>
+
+                  {credentialPresets.length > 0 && (
+                    <Section title="Suggested credentials">
+                      <ChipPicker
+                        options={credentialPresets}
+                        selected={credentials}
+                        onToggle={(v) =>
+                          setCredentials((cur) =>
+                            cur.includes(v) ? cur.filter((x) => x !== v) : [...cur, v],
+                          )
+                        }
+                      />
+                    </Section>
+                  )}
                   <Section title="Credentials">
+
                     <div className="flex gap-2">
                       <input
                         value={credInput}
@@ -829,3 +1014,43 @@ function Section({ title, children }: { title: string; children: React.ReactNode
     </div>
   );
 }
+
+function ChipPicker({
+  options,
+  selected,
+  onToggle,
+  single = false,
+}: {
+  options: string[];
+  selected: string[];
+  onToggle: (v: string) => void;
+  single?: boolean;
+}) {
+  if (options.length === 0) return null;
+  return (
+    <div className="flex flex-wrap gap-2">
+      {options.map((opt) => {
+        const active = selected.includes(opt);
+        return (
+          <button
+            key={opt}
+            type="button"
+            onClick={() => onToggle(opt)}
+            className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors ${
+              active
+                ? "border-lime bg-lime/10 text-lime"
+                : "border-border bg-surface text-muted-foreground hover:border-lime/40"
+            }`}
+            aria-pressed={active}
+          >
+            {opt}
+          </button>
+        );
+      })}
+      {single && selected.length > 0 && (
+        <span className="sr-only">Single-select</span>
+      )}
+    </div>
+  );
+}
+

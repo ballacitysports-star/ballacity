@@ -34,6 +34,15 @@ type TeamRow = {
   skill_max: number;
   followers: number;
   verified: boolean;
+  format: string | null;
+  venues: string[] | null;
+  cadence: string | null;
+  positions_needed: unknown;
+  rating_system: string | null;
+  rating_min: string | null;
+  rating_max: string | null;
+  distances: string[] | null;
+  session_types: string[] | null;
 };
 
 const myOrgIds = new Set<string>();
@@ -53,6 +62,10 @@ function rowToOrg(row: TeamRow): Org {
   const staff = Array.isArray(row.staff)
     ? (row.staff as { name: string; role: string; avatar: string }[])
     : [];
+  const positionsNeeded =
+    row.positions_needed && typeof row.positions_needed === "object"
+      ? (row.positions_needed as Record<string, Record<string, number>>)
+      : {};
   return {
     id: row.id,
     kind,
@@ -79,6 +92,15 @@ function rowToOrg(row: TeamRow): Org {
     homeCourt: kind === "team" ? row.home_court ?? undefined : undefined,
     staff: kind === "team" ? staff : undefined,
     skillRange: { min: row.skill_min, max: row.skill_max },
+    format: row.format ?? undefined,
+    venues: row.venues ?? [],
+    cadence: row.cadence ?? undefined,
+    positionsNeeded,
+    ratingSystem: (row.rating_system as Org["ratingSystem"]) ?? undefined,
+    ratingMin: row.rating_min ?? undefined,
+    ratingMax: row.rating_max ?? undefined,
+    distances: row.distances ?? [],
+    sessionTypes: row.session_types ?? [],
     upcoming: [],
     posts: [],
   };
@@ -108,6 +130,15 @@ function orgToInsert(org: Org) {
     rate_per_hour: org.ratePerHour ?? null,
     skill_min: org.skillRange?.min ?? 1,
     skill_max: org.skillRange?.max ?? 5,
+    format: org.format ?? null,
+    venues: org.venues ?? [],
+    cadence: org.cadence ?? null,
+    positions_needed: org.positionsNeeded ?? {},
+    rating_system: org.ratingSystem ?? null,
+    rating_min: org.ratingMin ?? null,
+    rating_max: org.ratingMax ?? null,
+    distances: org.distances ?? [],
+    session_types: org.sessionTypes ?? [],
   };
 }
 
@@ -246,6 +277,15 @@ export async function updateOrg(
     mapped.skill_min = patch.skillRange?.min ?? 1;
     mapped.skill_max = patch.skillRange?.max ?? 5;
   }
+  if (patch.format !== undefined) mapped.format = patch.format ?? null;
+  if (patch.venues !== undefined) mapped.venues = patch.venues ?? [];
+  if (patch.cadence !== undefined) mapped.cadence = patch.cadence ?? null;
+  if (patch.positionsNeeded !== undefined) mapped.positions_needed = patch.positionsNeeded ?? {};
+  if (patch.ratingSystem !== undefined) mapped.rating_system = patch.ratingSystem ?? null;
+  if (patch.ratingMin !== undefined) mapped.rating_min = patch.ratingMin ?? null;
+  if (patch.ratingMax !== undefined) mapped.rating_max = patch.ratingMax ?? null;
+  if (patch.distances !== undefined) mapped.distances = patch.distances ?? [];
+  if (patch.sessionTypes !== undefined) mapped.session_types = patch.sessionTypes ?? [];
 
   try {
     const row = (await updateTeam({ data: mapped as never })) as TeamRow;
