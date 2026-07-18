@@ -269,7 +269,7 @@ function EditOrg() {
           <h1 className="font-display text-xl font-bold leading-tight">{STEPS[step - 1]}</h1>
         </div>
         <div className="rounded-full bg-secondary px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-          {kind === "team" ? "Team" : "Coach"}
+          {kind === "team" ? "Team" : "Trainer"}
         </div>
       </div>
 
@@ -297,11 +297,11 @@ function EditOrg() {
         >
           {step === 1 && (
             <div className="space-y-5">
-              <Section title={kind === "team" ? "Team name" : "Coach name"}>
+              <Section title={kind === "team" ? "Team name" : "Trainer name"}>
                 <input
                   value={name}
                   onChange={(e) => setName(e.target.value)}
-                  placeholder={kind === "team" ? "Eastside Elite" : "Coach Jordan Kim"}
+                  placeholder={kind === "team" ? "Eastside Elite" : "Trainer Jordan Kim"}
                   className="w-full rounded-2xl border border-border bg-surface px-4 py-3 text-sm outline-none focus:border-lime"
                 />
               </Section>

@@ -1,48 +1,44 @@
-## Problem
-
-The Map view uses the same `PlayMapView` component on Feed, Players, and Teams. It always plots sample `GAMES` + hosted games and shows a game card at the bottom — so switching to Map on `/players` or `/teams` shows games, not the people/teams the page is about.
-
 ## Goal
 
-Map view on each tab should plot and preview the entities from that tab, using the same filters that the list view already applies.
+Give trainers (currently the "coach" tab inside `/teams`) their own dedicated page at `/trainers`, rename all user-facing "Coach/Coaches" copy to "Trainer/Trainers", and add a link to the bottom navigation bar.
 
-- Feed → games (unchanged)
-- Players → available players (from `filtered` in `_tabs.players.tsx`)
-- Teams → teams / coaches (from `list` in `_tabs.teams.tsx`)
+Note: the underlying data model keeps `kind: "coach"` in the DB (`teams.kind`, `org-store`, etc.) so existing rows and edge cases keep working — only UI labels and the route layout change.
 
-## Approach
+## Changes
 
-1. Generalize `PlayMapView` into a small, generic map surface that accepts:
-   - `pins: MapPinItem[]`
-   - `activeId` / `onSelect`
-   - a `renderCard(activeItem)` render prop for the bottom card
-   - the "in view / nearby" label noun ("games" | "players" | "teams")
-   - `defaultLocation` (kept)
-   Keep the existing games behavior by extracting the current bottom card into a `GameActiveCard` and passing it from Feed.
+1. **New route `src/routes/_tabs.trainers.tsx`**
+   - Cloned from `_tabs.teams.tsx`, hard-locked to `kind = "coach"`.
+   - Drops the Teams/Coaches kind switcher entirely (single-purpose page).
+   - URL schema mirrors teams: `q`, `sport`, `avail`, `sort`, `view`, `density`.
+   - Copy uses "Trainers" everywhere (title "Trainers & coaches.", search placeholder, empty state, create button "Create trainer profile", availability chip "Booking now").
+   - Reuses `OrgCard`, `SportChips`, `TeamsMapView` (passing coach-filtered orgs). No component-level changes needed since these already handle `kind === "coach"`.
+   - `head()` sets a unique title + description + og tags per project SEO rules.
 
-2. Add `PlayersMapView` and `TeamsMapView` thin wrappers (or inline usages) that:
-   - Build pins from the already-filtered list on each page.
-   - Since players/orgs have no `lat`/`lng` (only `city`), derive stable pseudo-coords from `id` (same trick as `pseudoDistance` in Teams) so pins stay put across renders. Later this can be swapped for real geocoded coords without touching the map component.
-   - Provide bottom-card renderers linking to the player profile (`/players/$userId`) or team page (`/teams/$teamId`).
+2. **`src/routes/_tabs.teams.tsx`**
+   - Remove the coach kind switcher and the `KIND_META.coach` branch; page becomes teams-only.
+   - Simplify state: drop `kind` from the URL schema, hard-code `kind = "team"` when filtering.
+   - Update `head()` title to "Teams — OpenRun".
+   - Legacy `/teams?kind=coach` URLs: `validateSearch` will just ignore the extra param; no redirect needed, but we can optionally add a small `useEffect` to redirect `?kind=coach` → `/trainers` preserving other params. Included in the plan.
 
-3. Wire each tab's `viewMode === "map"` branch to its own map view instead of `PlayMapView`:
-   - `_tabs.feed.tsx` → `<GamesMapView games={visible} />` (same behavior as today)
-   - `_tabs.players.tsx` → `<PlayersMapView players={filtered ?? []} />`
-   - `_tabs.teams.tsx` → `<TeamsMapView orgs={list.map(x=>x.o)} kind={kind} />`
+3. **Rename user-facing labels to "Trainer" (data key stays `"coach"`)**
+   - `src/components/OrgCard.tsx`: `"Coach"` badge → `"Trainer"`.
+   - `src/components/TeamsMapView.tsx`: `noun`, fallback label, and any visible copy switch from "coach" → "trainer" / "Trainer".
+   - `src/routes/teams.create.tsx`, `teams.$teamId.tsx`, `teams.$teamId.edit.tsx`, `profile.edit.tsx`, `review.new.tsx`, `available-players.tsx`: swap visible "Coach"/"coach" strings to "Trainer"/"trainer" where they appear in JSX/toasts. Enum values, DB columns, and internal identifiers (`kind === "coach"`, `credentials`, `rate_per_hour`) are left untouched.
+   - Sport-config, transactions, reviews, sample-data, org-store, teams.functions: leave `kind: "coach"` as the stored value.
 
-4. Empty-state copy per tab ("No players in this area", "No teams in this area").
+4. **`src/components/BottomNav.tsx` — add Trainers**
+   - Insert a new left-side item using the `GraduationCap` icon:
+     `{ to: "/trainers", icon: GraduationCap, label: "Trainers", match: (p) => p.startsWith("/trainers") }`.
+   - Left group becomes 4 items (Play, Players, Teams, Trainers); right stays 2 (Inbox, You), plus the center Host FAB. That's 7 total — tight on small phones. To keep it legible we:
+     - Tighten each tab's horizontal padding (`px-1` → `px-0.5`) and icon container width (`w-14` → `w-12`) on small screens only.
+     - Keep the existing `max-w-md sm:max-w-xl` container so it doesn't overflow.
+   - No changes to public-path hiding logic or the FAB.
+
+5. **Verification**
+   - `tsgo` typecheck.
+   - Manual: visit `/trainers` (list + map + filters + create CTA), verify `/teams` no longer shows the kind switcher, confirm `/teams?kind=coach` redirects to `/trainers`, confirm bottom nav shows the new tab and highlights it on `/trainers`.
 
 ## Out of scope
 
-- Real geocoding for players/teams (pseudo-coords for now; deterministic and stable).
-- Changing filters, sort, or list UI.
-- Any backend changes.
-
-## Files touched
-
-- `src/components/PlayMapView.tsx` — refactor into generic map + extract `GameActiveCard`; export a `GamesMapView` wrapper preserving current Feed behavior.
-- `src/components/PlayersMapView.tsx` — new; pins + player bottom card.
-- `src/components/TeamsMapView.tsx` — new; pins + team/coach bottom card.
-- `src/routes/_tabs.feed.tsx` — swap `PlayMapView` → `GamesMapView` (pass current visible games).
-- `src/routes/_tabs.players.tsx` — swap `PlayMapView` → `PlayersMapView`.
-- `src/routes/_tabs.teams.tsx` — swap `PlayMapView` → `TeamsMapView`.
+- Renaming the DB column or `OrgKind` union from `"coach"` to `"trainer"` (would require a migration and a wide refactor; deferred).
+- Redesigning `OrgCard` for trainer-specific fields — existing coach branch already handles rate/credentials.

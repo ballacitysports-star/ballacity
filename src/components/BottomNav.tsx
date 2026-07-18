@@ -1,5 +1,5 @@
 import { Link, useLocation } from "@tanstack/react-router";
-import { Home, Map, Plus, UserCheck, Users, Dribbble, MessageCircle } from "lucide-react";
+import { Home, Map, Plus, UserCheck, Users, Dribbble, MessageCircle, GraduationCap } from "lucide-react";
 import { motion } from "framer-motion";
 import { MyAvatar } from "@/components/UserAvatar";
 
@@ -26,6 +26,7 @@ const leftItems: NavItem[] = [
   },
   { to: "/players", icon: UserCheck, label: "Players", match: (p) => p.startsWith("/players") },
   { to: "/teams", icon: Users, label: "Teams", match: (p) => p.startsWith("/teams") },
+  { to: "/trainers", icon: GraduationCap, label: "Trainers", match: (p) => p.startsWith("/trainers") },
 ];
 
 const rightItems: NavItem[] = [
@@ -52,10 +53,10 @@ export function BottomNav() {
       <Link
         key={it.to}
         to={it.to}
-        className="relative flex min-w-0 flex-col items-center gap-1 px-1 py-2.5 text-[10px] sm:text-[11px] font-medium transition-transform active:scale-95"
+        className="relative flex min-w-0 flex-col items-center gap-1 px-0.5 py-2.5 text-[10px] sm:text-[11px] font-medium transition-transform active:scale-95"
       >
         <span
-          className={`relative grid h-9 w-14 place-items-center rounded-2xl transition-colors ${
+          className={`relative grid h-9 w-11 sm:w-14 place-items-center rounded-2xl transition-colors ${
             active
               ? "bg-primary-gradient text-primary-foreground shadow-[0_6px_18px_-8px_var(--primary)]"
               : "text-muted-foreground"

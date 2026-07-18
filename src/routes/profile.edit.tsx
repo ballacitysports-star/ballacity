@@ -746,7 +746,7 @@ function EditProfile() {
             <div className="mx-auto grid h-12 w-12 place-items-center rounded-2xl bg-lime/15 text-lime mb-2">
               <Users className="h-6 w-6" />
             </div>
-            <div className="font-display text-base font-bold">Start a team or coach profile</div>
+            <div className="font-display text-base font-bold">Start a team or trainer profile</div>
             <p className="text-xs text-muted-foreground mt-1">
               Post tryouts, run pickups, build your following.
             </p>
