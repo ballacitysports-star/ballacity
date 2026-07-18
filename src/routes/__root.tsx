@@ -20,6 +20,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { useNotificationPush } from "@/lib/notifications";
 import { useOneSignal } from "@/lib/onesignal";
 import { logAuthGateDecision, readStoredSupabaseSession } from "@/lib/authgate-log";
+import { clearLastVisited, rememberLastVisited } from "@/lib/last-visited";
 
 function NotFoundComponent() {
   return (
@@ -412,6 +413,13 @@ function RootComponent() {
     window.addEventListener("error", onError);
     window.addEventListener("unhandledrejection", onRejection);
 
+    // Record initial URL, then every resolved navigation, so a later visit
+    // to `/` (refresh, bookmark, OAuth return) can restore the page.
+    rememberLastVisited(router.state.location.href);
+    const unsubRouter = router.subscribe("onResolved", () => {
+      rememberLastVisited(router.state.location.href);
+    });
+
     // Run once on mount for already-signed-in users.
     supabase.auth.getUser().then(({ data }) => {
       if (data.user) runLegacyHostMigration(data.user.id);
@@ -426,6 +434,9 @@ function RootComponent() {
       router.invalidate();
       if (event !== "SIGNED_OUT") {
         queryClient.invalidateQueries();
+      } else {
+        // Don't leak the previous user's history into the next session.
+        clearLastVisited();
       }
       if ((event === "SIGNED_IN" || event === "USER_UPDATED") && session?.user) {
         runLegacyHostMigration(session.user.id);
@@ -433,6 +444,7 @@ function RootComponent() {
     });
     return () => {
       sub.subscription.unsubscribe();
+      unsubRouter();
       window.removeEventListener("error", onError);
       window.removeEventListener("unhandledrejection", onRejection);
     };

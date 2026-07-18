@@ -7,6 +7,7 @@ import { lovable } from "@/integrations/lovable";
 import { useAuth } from "@/hooks/use-auth";
 import { trackSigninEvent } from "@/lib/auth-signin-telemetry";
 import { sanitizeNextPath } from "@/routes/__root";
+import { readLastVisited } from "@/lib/last-visited";
 
 export const Route = createFileRoute("/auth")({
   head: () => ({ meta: [{ title: "Sign in — OpenRun" }] }),
@@ -29,6 +30,7 @@ function AuthPage() {
 
   const goPostAuth = () => {
     let dest = sanitizeNextPath(next);
+    if (!dest) dest = readLastVisited() ?? undefined;
     if (!dest) {
       // Some mobile in-app browsers strip the `next` query on redirects;
       // fall back to a same-origin referrer, then to the in-app default
