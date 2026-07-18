@@ -1015,3 +1015,43 @@ function Section({ title, children }: { title: string; children: React.ReactNode
     </div>
   );
 }
+
+function ChipPicker({
+  options,
+  selected,
+  onToggle,
+  single = false,
+}: {
+  options: string[];
+  selected: string[];
+  onToggle: (v: string) => void;
+  single?: boolean;
+}) {
+  if (options.length === 0) return null;
+  return (
+    <div className="flex flex-wrap gap-2">
+      {options.map((opt) => {
+        const active = selected.includes(opt);
+        return (
+          <button
+            key={opt}
+            type="button"
+            onClick={() => onToggle(opt)}
+            className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors ${
+              active
+                ? "border-lime bg-lime/10 text-lime"
+                : "border-border bg-surface text-muted-foreground hover:border-lime/40"
+            }`}
+            aria-pressed={active}
+          >
+            {opt}
+          </button>
+        );
+      })}
+      {single && selected.length > 0 && (
+        <span className="sr-only">Single-select</span>
+      )}
+    </div>
+  );
+}
+
