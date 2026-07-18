@@ -10,8 +10,10 @@ import { OrgCard } from "@/components/OrgCard";
 import { SportChips } from "@/components/SportChips";
 import { ViewDensityToggle, type ViewMode, type Density } from "@/components/ViewDensityToggle";
 import { TeamsMapView } from "@/components/TeamsMapView";
+import { TrainerActions } from "@/components/TrainerActions";
 import { useMyProfile } from "@/lib/user-prefs-store";
 import { useAuth } from "@/hooks/use-auth";
+import { toast } from "sonner";
 
 type SortBy = "nearest" | "followers" | "name";
 
@@ -99,6 +101,23 @@ function TrainersPage() {
   }, []);
 
   const orgs = useAllOrgs();
+
+  // Real-time availability change indicator
+  const trainerSig = useMemo(
+    () =>
+      orgs
+        .filter((o) => o.kind === "coach")
+        .map((o) => `${o.id}:${o.cadence ?? ""}:${JSON.stringify(o.positionsNeeded ?? {})}`)
+        .join("|"),
+    [orgs],
+  );
+  const prevSigRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (prevSigRef.current !== null && prevSigRef.current !== trainerSig) {
+      toast("Trainer availability updated", { duration: 2000 });
+    }
+    prevSigRef.current = trainerSig;
+  }, [trainerSig]);
 
   const list = useMemo(() => {
     const isBooking = (o: typeof orgs[number]) => {
@@ -297,6 +316,7 @@ function TrainersPage() {
               <span className="pointer-events-none absolute top-3 right-3 rounded-full bg-background/70 backdrop-blur px-2 py-0.5 text-[10px] font-bold text-foreground">
                 {dist} mi
               </span>
+              <TrainerActions org={o} />
             </div>
           ))}
           {list.length === 0 && (
