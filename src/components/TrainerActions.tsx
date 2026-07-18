@@ -1,17 +1,56 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "@tanstack/react-router";
-import { UserPlus, UserCheck, MessageCircle, CalendarClock } from "lucide-react";
+import {
+  UserPlus,
+  UserCheck,
+  MessageCircle,
+  CalendarClock,
+  Clock,
+  CheckCircle2,
+  XCircle,
+} from "lucide-react";
 import { toast } from "sonner";
 import type { Org } from "@/lib/sample-data";
 import { useFollow } from "@/lib/follows";
 import { useAuth } from "@/hooks/use-auth";
 import { BookSessionSheet } from "@/components/BookSessionSheet";
+import {
+  getMyPendingRequestForTrainer,
+  subscribeToMyTrainerRequests,
+  type TrainerSessionRequest,
+} from "@/lib/trainer-requests";
+
+function useMyTrainerRequest(trainerId: string) {
+  const { user } = useAuth();
+  const [row, setRow] = useState<TrainerSessionRequest | null>(null);
+
+  const refresh = () => {
+    if (!user) {
+      setRow(null);
+      return;
+    }
+    getMyPendingRequestForTrainer(trainerId)
+      .then((r) => setRow(r && (r.status === "pending" || r.status === "accepted") ? r : null))
+      .catch(() => {});
+  };
+
+  useEffect(() => {
+    refresh();
+    if (!user) return;
+    const unsub = subscribeToMyTrainerRequests(user.id, refresh);
+    return unsub;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id, trainerId]);
+
+  return { row, refresh };
+}
 
 export function TrainerActions({ org }: { org: Org }) {
   const nav = useNavigate();
   const { user } = useAuth();
   const { isFollowing, pending, toggle } = useFollow(org.id);
   const [bookOpen, setBookOpen] = useState(false);
+  const { row, refresh } = useMyTrainerRequest(org.id);
 
   const requireAuth = () => {
     if (!user) {
@@ -21,6 +60,29 @@ export function TrainerActions({ org }: { org: Org }) {
     }
     return true;
   };
+
+  const status = row?.status ?? null;
+  const requestBtn = (() => {
+    if (status === "pending") {
+      return {
+        cls: "bg-amber-500/15 border border-amber-500/50 text-amber-300",
+        Icon: Clock,
+        label: "Pending",
+      };
+    }
+    if (status === "accepted") {
+      return {
+        cls: "bg-lime/15 border border-lime/50 text-lime",
+        Icon: CheckCircle2,
+        label: "Accepted",
+      };
+    }
+    return {
+      cls: "bg-lime-gradient text-primary-foreground glow-lime",
+      Icon: CalendarClock,
+      label: "Request",
+    };
+  })();
 
   return (
     <>
@@ -66,15 +128,29 @@ export function TrainerActions({ org }: { org: Org }) {
             if (!requireAuth()) return;
             setBookOpen(true);
           }}
-          className="inline-flex items-center justify-center gap-1.5 rounded-full bg-lime-gradient px-2.5 py-2 text-xs font-bold text-primary-foreground glow-lime"
-          aria-label={`Request availability from ${org.name}`}
+          className={`inline-flex items-center justify-center gap-1.5 rounded-full px-2.5 py-2 text-xs font-bold ${requestBtn.cls}`}
+          aria-label={
+            status === "pending"
+              ? `Session request pending with ${org.name}`
+              : status === "accepted"
+                ? `Session accepted by ${org.name}`
+                : `Request availability from ${org.name}`
+          }
         >
-          <CalendarClock className="h-3.5 w-3.5" />
-          <span className="truncate">Request</span>
+          <requestBtn.Icon className={`h-3.5 w-3.5 ${status === "pending" ? "" : ""}`} />
+          <span className="truncate">{requestBtn.label}</span>
         </button>
       </div>
 
-      <BookSessionSheet org={org} open={bookOpen} onOpenChange={setBookOpen} />
+      <BookSessionSheet
+        org={org}
+        open={bookOpen}
+        onOpenChange={setBookOpen}
+        onStatusChange={refresh}
+      />
     </>
   );
 }
+
+// Re-export so trainer profile can render status/cancel without duplicate hook code
+export { useMyTrainerRequest };
