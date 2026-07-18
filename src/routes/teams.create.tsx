@@ -956,59 +956,8 @@ function CreateOrg() {
   );
 }
 
-function TypeCard({
-  active,
-  onClick,
-  icon,
-  title,
-  desc,
-  badges,
-}: {
-  active: boolean;
-  onClick: () => void;
-  icon: React.ReactNode;
-  title: string;
-  desc: string;
-  badges: string[];
-}) {
-  return (
-    <motion.button
-      type="button"
-      whileTap={{ scale: 0.98 }}
-      onClick={onClick}
-      className={`block w-full text-left rounded-3xl border-2 p-5 transition-all ${
-        active
-          ? "border-lime bg-lime/10 glow-lime"
-          : "border-border bg-surface hover:border-lime/40"
-      }`}
-    >
-      <div className="flex items-start gap-4">
-        <div
-          className={`grid h-12 w-12 shrink-0 place-items-center rounded-2xl ${active ? "bg-lime text-primary-foreground" : "bg-secondary text-foreground"}`}
-        >
-          {icon}
-        </div>
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2">
-            <h3 className="font-display text-lg font-bold">{title}</h3>
-            {active && <Check className="h-4 w-4 text-lime" />}
-          </div>
-          <p className="text-sm text-muted-foreground mt-1">{desc}</p>
-          <div className="mt-2 flex flex-wrap gap-1.5">
-            {badges.map((b) => (
-              <span
-                key={b}
-                className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider ${active ? "bg-background/40 text-foreground" : "bg-secondary text-muted-foreground"}`}
-              >
-                {b}
-              </span>
-            ))}
-          </div>
-        </div>
-      </div>
-    </motion.button>
-  );
-}
+
+
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
