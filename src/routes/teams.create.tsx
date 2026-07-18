@@ -1,4 +1,6 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { zodValidator, fallback } from "@tanstack/zod-adapter";
+import { z } from "zod";
 import { useMemo, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -41,6 +43,11 @@ import { PositionsPicker, positionsCleanup, type PositionsNeeded } from "@/compo
 
 
 export const Route = createFileRoute("/teams/create")({
+  validateSearch: zodValidator(
+    z.object({
+      kind: fallback(z.string(), "").default(""),
+    }),
+  ),
   head: () => ({ meta: [{ title: "Create a profile — OpenRun" }] }),
   component: CreateOrg,
 });
@@ -70,10 +77,13 @@ function initials(name: string) {
 
 function CreateOrg() {
   const nav = useNavigate();
-  const [step, setStep] = useState(0);
+  const { kind: kindParam } = Route.useSearch();
+  const initialKind: OrgKind | null =
+    kindParam === "coach" || kindParam === "team" ? (kindParam as OrgKind) : null;
+  const [step, setStep] = useState(initialKind ? 1 : 0);
 
   // Form state
-  const [kind, setKind] = useState<OrgKind | null>(null);
+  const [kind, setKind] = useState<OrgKind | null>(initialKind);
   const [name, setName] = useState("");
   const [handle, setHandle] = useState("");
   const [tagline, setTagline] = useState("");
