@@ -316,6 +316,7 @@ function TrainersPage() {
               <span className="pointer-events-none absolute top-3 right-3 rounded-full bg-background/70 backdrop-blur px-2 py-0.5 text-[10px] font-bold text-foreground">
                 {dist} mi
               </span>
+              <TrainerActions org={o} />
             </div>
           ))}
           {list.length === 0 && (
