@@ -7,8 +7,6 @@ import {
   ArrowLeft,
   ArrowRight,
   Check,
-  Users,
-  GraduationCap,
   Sparkles,
   X,
   Plus,
