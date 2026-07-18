@@ -539,7 +539,7 @@ function CreateOrg() {
             </div>
           )}
 
-          {step === 2 && (
+          {step === 1 && (
             <div className="space-y-5">
               <Section title="Bio">
                 <textarea
