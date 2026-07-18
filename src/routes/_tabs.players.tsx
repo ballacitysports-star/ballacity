@@ -1,5 +1,7 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { zodValidator, fallback } from "@tanstack/zod-adapter";
+import { z } from "zod";
 import {
   Search,
   X,
@@ -51,45 +53,32 @@ import { Label } from "@/components/ui/label";
 import { kmToMi, miToKm } from "@/lib/distance";
 import { useMyProfile } from "@/lib/user-prefs-store";
 
+// URL-persisted Players state. Refreshing or sharing the URL restores the
+// exact view: search text, sport chip, skill, distance cap, age range,
+// when-filter, and the view/density toggles. Invalid values silently
+// revert to defaults per zod-adapter fallback().
+const playersSearchSchema = z.object({
+  q: fallback(z.string(), "").default(""),
+  sport: fallback(z.string(), "").default(""),
+  skill: fallback(z.string(), "").default(""),
+  dist: fallback(z.number(), 0).default(0),
+  ageMin: fallback(z.number().optional(), undefined).default(undefined),
+  ageMax: fallback(z.number().optional(), undefined).default(undefined),
+  unknownAge: fallback(z.boolean(), true).default(true),
+  when: fallback(z.string(), "any").default("any"),
+  view: fallback(z.string(), "list").default("list"),
+  density: fallback(z.string(), "list").default("list"),
+});
 
 export const Route = createFileRoute("/_tabs/players")({
   head: () => ({ meta: [{ title: "Players — OpenRun" }] }),
+  validateSearch: zodValidator(playersSearchSchema),
   component: PlayersPage,
 });
 
 const SKILLS = ["All Levels", "Beginner", "Intermediate", "Advanced"] as const;
 const WEEKDAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
-const FILTERS_STORAGE_KEY = "openrun.playersFilters.v1";
-type StoredFilters = {
-  q: string;
-  sport: string;
-  skill: string;
-  maxDistance: number;
-  ageMin: number | "";
-  ageMax: number | "";
-  includeUnknownAge: boolean;
-};
-const DEFAULT_FILTERS: StoredFilters = {
-  q: "",
-  sport: "",
-  skill: "",
-  maxDistance: 0,
-  ageMin: "",
-  ageMax: "",
-  includeUnknownAge: true,
-};
-function loadStoredFilters(): StoredFilters {
-  if (typeof window === "undefined") return DEFAULT_FILTERS;
-  try {
-    const raw = window.localStorage.getItem(FILTERS_STORAGE_KEY);
-    if (!raw) return DEFAULT_FILTERS;
-    const parsed = JSON.parse(raw) as Partial<StoredFilters>;
-    return { ...DEFAULT_FILTERS, ...parsed };
-  } catch {
-    return DEFAULT_FILTERS;
-  }
-}
 
 function PlayersPage() {
   const { user } = useAuth();
@@ -105,40 +94,81 @@ function PlayersPage() {
       )
       .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
   }, [hostedGames, user?.id]);
-  const initial = loadStoredFilters();
-  const [q, setQ] = useState(initial.q);
-  const [sport, setSport] = useState(initial.sport);
-  const [skill, setSkill] = useState<string>(initial.skill);
-  const [maxDistance, setMaxDistance] = useState<number>(initial.maxDistance);
-  const [ageMin, setAgeMin] = useState<number | "">(initial.ageMin);
-  const [ageMax, setAgeMax] = useState<number | "">(initial.ageMax);
-  const [includeUnknownAge, setIncludeUnknownAge] = useState<boolean>(initial.includeUnknownAge);
+  const search = Route.useSearch();
+  type PlayersSearch = typeof search;
+  const navigate = useNavigate({ from: "/players" });
+  const updateSearch = (patch: Partial<PlayersSearch>) =>
+    navigate({ search: (prev: PlayersSearch) => ({ ...prev, ...patch }), replace: true });
+
+  const q = search.q;
+  const sport = search.sport;
+  const skill = search.skill;
+  const maxDistance = search.dist;
+  const ageMin: number | "" = search.ageMin ?? "";
+  const ageMax: number | "" = search.ageMax ?? "";
+  const includeUnknownAge = search.unknownAge;
+  const when: "any" | "today" | "week" | "weekend" =
+    search.when === "today" || search.when === "week" || search.when === "weekend"
+      ? search.when
+      : "any";
+  const viewMode: ViewMode = search.view === "map" ? "map" : "list";
+  const density: Density = search.density === "grid" ? "grid" : "list";
+
+  const setQ = (v: string) => updateSearch({ q: v });
+  const setSport = (v: string) => updateSearch({ sport: v });
+  const setSkill = (v: string) => updateSearch({ skill: v });
+  const setMaxDistance = (v: number) => updateSearch({ dist: v });
+  const setAgeMin = (v: number | "") => updateSearch({ ageMin: v === "" ? undefined : v });
+  const setAgeMax = (v: number | "") => updateSearch({ ageMax: v === "" ? undefined : v });
+  const setIncludeUnknownAge = (v: boolean) => updateSearch({ unknownAge: v });
+  const setWhen = (v: "any" | "today" | "week" | "weekend") => updateSearch({ when: v });
+  const switchView = (v: ViewMode) => updateSearch({ view: v });
+  const switchDensity = (d: Density) => updateSearch({ density: d });
+
   const [filtersOpen, setFiltersOpen] = useState(false);
-  const [when, setWhen] = useState<"any" | "today" | "week" | "weekend">("any");
   const [list, setList] = useState<AvailabilityWithAuthor[] | null>(null);
   const [postOpen, setPostOpen] = useState(false);
   const [contactFor, setContactFor] = useState<AvailabilityWithAuthor | null>(null);
   const [reloadTick, setReloadTick] = useState(0);
 
+  // One-time migration: hydrate URL from previously-persisted localStorage
+  // when the URL has no relevant params, then drop the old keys.
+  const migratedRef = useRef(false);
   useEffect(() => {
+    if (migratedRef.current) return;
+    migratedRef.current = true;
     if (typeof window === "undefined") return;
     try {
-      window.localStorage.setItem(
-        FILTERS_STORAGE_KEY,
-        JSON.stringify({
-          q,
-          sport,
-          skill,
-          maxDistance,
-          ageMin,
-          ageMax,
-          includeUnknownAge,
-        } satisfies StoredFilters),
-      );
+      const hasSearch = window.location.search.length > 1;
+      const rawF = window.localStorage.getItem("openrun.playersFilters.v1");
+      const rawV = window.localStorage.getItem("openrun:players-view");
+      const rawD = window.localStorage.getItem("openrun:players-density");
+      if (!hasSearch && (rawF || rawV || rawD)) {
+        const patch: Partial<typeof search> = {};
+        if (rawF) {
+          const f = JSON.parse(rawF) as Record<string, unknown>;
+          if (typeof f.q === "string" && f.q) patch.q = f.q;
+          if (typeof f.sport === "string" && f.sport) patch.sport = f.sport;
+          if (typeof f.skill === "string" && f.skill) patch.skill = f.skill;
+          if (typeof f.maxDistance === "number" && f.maxDistance > 0) patch.dist = f.maxDistance;
+          if (typeof f.ageMin === "number") patch.ageMin = f.ageMin;
+          if (typeof f.ageMax === "number") patch.ageMax = f.ageMax;
+          if (typeof f.includeUnknownAge === "boolean") patch.unknownAge = f.includeUnknownAge;
+        }
+        if (rawV === "map" || rawV === "list") patch.view = rawV;
+        if (rawD === "grid" || rawD === "list") patch.density = rawD;
+        if (Object.keys(patch).length > 0) {
+          navigate({ search: (prev: PlayersSearch) => ({ ...prev, ...patch }), replace: true });
+        }
+      }
+      window.localStorage.removeItem("openrun.playersFilters.v1");
+      window.localStorage.removeItem("openrun:players-view");
+      window.localStorage.removeItem("openrun:players-density");
     } catch {
-      // ignore quota / private mode failures
+      // ignore
     }
-  }, [q, sport, skill, maxDistance, ageMin, ageMax, includeUnknownAge]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -239,22 +269,7 @@ function PlayersPage() {
     return age;
   }
 
-  const [density, setDensity] = useState<Density>(() => {
-    if (typeof window === "undefined") return "list";
-    return (localStorage.getItem("openrun:players-density") as Density) ?? "list";
-  });
-  const switchDensity = (d: Density) => {
-    setDensity(d);
-    try { localStorage.setItem("openrun:players-density", d); } catch { /* ignore */ }
-  };
-  const [viewMode, setViewMode] = useState<ViewMode>(() => {
-    if (typeof window === "undefined") return "list";
-    return (localStorage.getItem("openrun:players-view") as ViewMode) ?? "list";
-  });
-  const switchView = (v: ViewMode) => {
-    setViewMode(v);
-    try { localStorage.setItem("openrun:players-view", v); } catch { /* ignore */ }
-  };
+
 
   return (
     <div className="mx-auto w-full max-w-md sm:max-w-2xl lg:max-w-4xl px-4 pt-6">

@@ -1,7 +1,9 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import { Search, Plus, Megaphone, Users, GraduationCap, ArrowUpDown, MapPin } from "lucide-react";
+import { zodValidator, fallback } from "@tanstack/zod-adapter";
+import { z } from "zod";
 import { type OrgKind, type Sport } from "@/lib/sample-data";
 import { useAllOrgs } from "@/lib/org-store";
 import { OrgCard } from "@/components/OrgCard";
@@ -21,8 +23,22 @@ function pseudoDistance(id: string): number {
   return Math.round(((h % 400) / 10 + 0.3) * 10) / 10; // 0.3 – 40.3 mi
 }
 
+// URL-persisted Teams state. Refreshing or sharing the URL restores the
+// exact view: kind (team/coach), search text, sport, availability, sort,
+// and the view/density toggles. Invalid values silently revert to defaults.
+const teamsSearchSchema = z.object({
+  q: fallback(z.string(), "").default(""),
+  kind: fallback(z.string(), "team").default("team"),
+  sport: fallback(z.string(), "").default(""),
+  avail: fallback(z.string(), "any").default("any"),
+  sort: fallback(z.string(), "nearest").default("nearest"),
+  view: fallback(z.string(), "list").default("list"),
+  density: fallback(z.string(), "list").default("list"),
+});
+
 export const Route = createFileRoute("/_tabs/teams")({
   head: () => ({ meta: [{ title: "Teams & Coaches — OpenRun" }] }),
+  validateSearch: zodValidator(teamsSearchSchema),
   component: TeamsPage,
 });
 
@@ -61,28 +77,58 @@ const KIND_META: Record<
 function TeamsPage() {
   const { user } = useAuth();
   const profile = useMyProfile(user);
-  const [kind, setKind] = useState<OrgKind>("team");
-  const [q, setQ] = useState("");
-  const [sport, setSport] = useState<Sport | null>(null);
+  const search = Route.useSearch();
+  type TeamsSearch = typeof search;
+  const navigate = useNavigate({ from: "/teams" });
+  const updateSearch = (patch: Partial<TeamsSearch>) =>
+    navigate({ search: (prev: TeamsSearch) => ({ ...prev, ...patch }), replace: true });
 
-  const [sortBy, setSortBy] = useState<SortBy>("nearest");
-  const [avail, setAvail] = useState<"any" | "recruiting" | "weekly" | "casual">("any");
-  const [density, setDensity] = useState<Density>(() => {
-    if (typeof window === "undefined") return "list";
-    return (localStorage.getItem("openrun:teams-density") as Density) ?? "list";
-  });
-  const switchDensity = (d: Density) => {
-    setDensity(d);
-    try { localStorage.setItem("openrun:teams-density", d); } catch { /* ignore */ }
-  };
-  const [viewMode, setViewMode] = useState<ViewMode>(() => {
-    if (typeof window === "undefined") return "list";
-    return (localStorage.getItem("openrun:teams-view") as ViewMode) ?? "list";
-  });
-  const switchView = (v: ViewMode) => {
-    setViewMode(v);
-    try { localStorage.setItem("openrun:teams-view", v); } catch { /* ignore */ }
-  };
+  const kind: OrgKind = search.kind === "coach" ? "coach" : "team";
+  const q = search.q;
+  const sport: Sport | null = (search.sport || null) as Sport | null;
+  const sortBy: SortBy =
+    search.sort === "followers" || search.sort === "name" ? search.sort : "nearest";
+  const avail: "any" | "recruiting" | "weekly" | "casual" =
+    search.avail === "recruiting" || search.avail === "weekly" || search.avail === "casual"
+      ? search.avail
+      : "any";
+  const viewMode: ViewMode = search.view === "map" ? "map" : "list";
+  const density: Density = search.density === "grid" ? "grid" : "list";
+
+  const setKind = (v: OrgKind) => updateSearch({ kind: v });
+  const setQ = (v: string) => updateSearch({ q: v });
+  const setSport = (v: Sport | null) => updateSearch({ sport: v ?? "" });
+  const setSortBy = (v: SortBy) => updateSearch({ sort: v });
+  const setAvail = (v: "any" | "recruiting" | "weekly" | "casual") => updateSearch({ avail: v });
+  const switchView = (v: ViewMode) => updateSearch({ view: v });
+  const switchDensity = (d: Density) => updateSearch({ density: d });
+
+  // One-time migration from previously-persisted localStorage keys.
+  const migratedRef = useRef(false);
+  useEffect(() => {
+    if (migratedRef.current) return;
+    migratedRef.current = true;
+    if (typeof window === "undefined") return;
+    try {
+      const hasSearch = window.location.search.length > 1;
+      const rawV = window.localStorage.getItem("openrun:teams-view");
+      const rawD = window.localStorage.getItem("openrun:teams-density");
+      if (!hasSearch && (rawV || rawD)) {
+        const patch: Partial<TeamsSearch> = {};
+        if (rawV === "map" || rawV === "list") patch.view = rawV;
+        if (rawD === "grid" || rawD === "list") patch.density = rawD;
+        if (Object.keys(patch).length > 0) {
+          navigate({ search: (prev: TeamsSearch) => ({ ...prev, ...patch }), replace: true });
+        }
+      }
+      window.localStorage.removeItem("openrun:teams-view");
+      window.localStorage.removeItem("openrun:teams-density");
+    } catch {
+      // ignore
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const orgs = useAllOrgs();
   const meta = KIND_META[kind];
 
