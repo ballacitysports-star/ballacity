@@ -78,12 +78,23 @@ function initials(name: string) {
 function CreateOrg() {
   const nav = useNavigate();
   const { kind: kindParam } = Route.useSearch();
-  const initialKind: OrgKind | null =
-    kindParam === "coach" || kindParam === "team" ? (kindParam as OrgKind) : null;
-  const [step, setStep] = useState(initialKind ? 1 : 0);
+  const resolvedKind: OrgKind =
+    kindParam === "coach" ? "coach" : "team";
+  const [step, setStep] = useState(0);
+
+  // Canonicalize URL: bare /teams/create → /teams/create?kind=team so
+  // deep links, refreshes, and Back always carry an explicit kind.
+  useEffect(() => {
+    if (kindParam !== "team" && kindParam !== "coach") {
+      nav({ to: "/teams/create", search: { kind: "team" }, replace: true });
+    }
+  }, [kindParam, nav]);
 
   // Form state
-  const [kind, setKind] = useState<OrgKind | null>(initialKind);
+  const [kind, setKind] = useState<OrgKind>(resolvedKind);
+  useEffect(() => {
+    setKind(resolvedKind);
+  }, [resolvedKind]);
   const [name, setName] = useState("");
   const [handle, setHandle] = useState("");
   const [tagline, setTagline] = useState("");
