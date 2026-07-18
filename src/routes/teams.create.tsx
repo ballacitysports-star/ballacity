@@ -481,6 +481,51 @@ function CreateOrg() {
                 </div>
               </Section>
 
+              {!usesSelfRating && (
+                <Section title={`${RATING_SYSTEM_LABEL[ratingSystem]} band`}>
+                  <div className="rounded-2xl border border-border bg-surface p-4">
+                    <div className="flex items-center justify-between mb-3">
+                      <span className="text-sm text-muted-foreground">
+                        {ratingSystem === "PACE" ? "Typical pace range" : "Rating range"}
+                      </span>
+                      <span className="text-sm font-bold text-lime">
+                        {ratingMin || "—"} – {ratingMax || "—"}
+                      </span>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <label className="rounded-xl border border-border bg-background/60 px-3 py-2">
+                        <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Min</div>
+                        <select
+                          value={ratingMin}
+                          onChange={(e) => setRatingMin(e.target.value)}
+                          className="w-full bg-transparent text-sm font-bold outline-none"
+                        >
+                          <option value="">—</option>
+                          {ratingLevels.map((l) => (
+                            <option key={l} value={l}>{l}</option>
+                          ))}
+                        </select>
+                      </label>
+                      <label className="rounded-xl border border-border bg-background/60 px-3 py-2">
+                        <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Max</div>
+                        <select
+                          value={ratingMax}
+                          onChange={(e) => setRatingMax(e.target.value)}
+                          className="w-full bg-transparent text-sm font-bold outline-none"
+                        >
+                          <option value="">—</option>
+                          {ratingLevels.map((l) => (
+                            <option key={l} value={l}>{l}</option>
+                          ))}
+                        </select>
+                      </label>
+                    </div>
+                  </div>
+                </Section>
+              )}
+
+
+
 
               <Section title="Year founded">
                 <input
