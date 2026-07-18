@@ -89,7 +89,7 @@ export function BottomNav() {
   return (
     <nav className="fixed bottom-0 left-0 right-0 z-40 pb-[max(env(safe-area-inset-bottom),0.5rem)] pt-2 px-3">
       <div className="mx-auto max-w-md sm:max-w-xl lg:max-w-2xl rounded-3xl border border-border bg-surface/85 backdrop-blur-xl shadow-2xl">
-        <ul className="relative grid grid-cols-5 items-end">
+        <ul className="relative grid grid-cols-6 items-end">
           {leftItems.map(renderTab)}
 
           {/* Center elevated Host FAB — PS-blue gradient primary action */}
