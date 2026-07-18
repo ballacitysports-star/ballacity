@@ -10,12 +10,10 @@ import {
   Sparkles,
   X,
   Plus,
-  Upload,
 } from "lucide-react";
 import {
   SPORTS,
   HERO_IMAGE,
-  imageFor,
   type Sport,
   type Org,
   type OrgKind,
@@ -23,6 +21,8 @@ import {
 import { addOrg } from "@/lib/org-store";
 import { OrgCard } from "@/components/OrgCard";
 import { LocationAutocomplete } from "@/components/LocationAutocomplete";
+import { TeamCoverUploader } from "@/components/TeamCoverUploader";
+
 
 export const Route = createFileRoute("/teams/create")({
   head: () => ({ meta: [{ title: "Create a profile — OpenRun" }] }),
