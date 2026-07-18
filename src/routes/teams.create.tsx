@@ -783,10 +783,8 @@ function CreateOrg() {
                       />
                     </Section>
                   )}
-
-
-                <>
                   <Section title="Credentials">
+
                     <div className="flex gap-2">
                       <input
                         value={credInput}
