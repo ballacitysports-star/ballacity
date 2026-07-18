@@ -5,6 +5,7 @@ import { useEffect } from "react";
 import { Logo } from "@/components/Logo";
 import { HERO_IMAGE, SPORTS, GAMES } from "@/lib/sample-data";
 import { GameCard } from "@/components/GameCard";
+import { AuthRedirectSkeleton } from "@/components/AuthRedirectSkeleton";
 import { useAuth } from "@/hooks/use-auth";
 import { readStoredSupabaseSession } from "@/lib/authgate-log";
 import { readLastVisited } from "@/lib/last-visited";
@@ -41,9 +42,8 @@ function Landing() {
   }, [loading, user, router]);
 
   // Signed-in users (or those with a persisted session still hydrating)
-  // shouldn't flash the marketing hero before we redirect them back to
-  // their last page.
-  if (user || (loading && hasStoredSession)) return null;
+  // see a skeleton instead of the marketing hero while we redirect.
+  if (user || (loading && hasStoredSession)) return <AuthRedirectSkeleton />;
 
   const trending = GAMES.filter((g) => g.trending).slice(0, 4);
 
