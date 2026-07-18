@@ -175,12 +175,19 @@ function TrainersPage() {
       if (target === "weekly") return /week|multiple|daily/.test(c);
       return /month|casual|occasion|pickup|drop/.test(c);
     };
+    const specialtyLower = specialty.toLowerCase();
     const filtered = orgs
       .filter((o) => o.kind === "coach")
       .filter((o) => (sport ? o.sports.includes(sport) : true))
       .filter((o) => {
+        if (!specialty) return true;
+        const hay = `${o.tagline ?? ""} ${o.name ?? ""}`.toLowerCase();
+        return hay.includes(specialtyLower);
+      })
+      .filter((o) => {
         if (avail === "any") return true;
         if (avail === "recruiting") return isBooking(o);
+        if (avail === "soon") return availabilityScore(o) <= 2;
         return cadenceMatches(o, avail);
       })
       .filter((o) =>
@@ -190,14 +197,19 @@ function TrainersPage() {
               .includes(q.toLowerCase())
           : true,
       );
-    const withDist = filtered.map((o) => ({ o, dist: pseudoDistance(o.id) }));
+    const withDist = filtered.map((o) => ({
+      o,
+      dist: pseudoDistance(o.id),
+      score: availabilityScore(o),
+    }));
     withDist.sort((a, b) => {
       if (sortBy === "nearest") return a.dist - b.dist;
+      if (sortBy === "soonest") return a.score - b.score || a.dist - b.dist;
       if (sortBy === "followers") return b.o.followers - a.o.followers;
       return a.o.name.localeCompare(b.o.name);
     });
     return withDist;
-  }, [orgs, sport, q, sortBy, avail]);
+  }, [orgs, sport, specialty, q, sortBy, avail]);
 
   const featured =
     orgs.find((o) => o.verified && o.kind === "coach") ?? orgs.find((o) => o.kind === "coach");
