@@ -338,6 +338,19 @@ export async function ensureOrgById(id: string): Promise<Org | undefined> {
   return getOrgById(id);
 }
 
+/** Returns the auth.users id of the trainer/team owner, if known locally. */
+export function getOrgOwnerId(id: string): string | null {
+  return ownerByOrgId.get(id) ?? null;
+}
+
+/** Async owner lookup: hydrates orgs from the DB when the id isn't cached. */
+export async function ensureOrgOwnerId(id: string): Promise<string | null> {
+  const cached = ownerByOrgId.get(id);
+  if (cached) return cached;
+  await hydrateOrgs();
+  return ownerByOrgId.get(id) ?? null;
+}
+
 export function isMyOrg(id: string): boolean {
   return myOrgIds.has(id);
 }
