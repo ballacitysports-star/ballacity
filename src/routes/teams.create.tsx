@@ -323,28 +323,6 @@ function CreateOrg() {
           transition={{ duration: 0.25 }}
         >
           {step === 0 && (
-            <div className="space-y-3">
-              <p className="text-sm text-muted-foreground mb-2">Who is this profile for?</p>
-              <TypeCard
-                active={kind === "team"}
-                onClick={() => setKind("team")}
-                icon={<Users className="h-6 w-6" />}
-                title="Team / Club"
-                desc="Run a roster, post tryouts, schedule pickups, share recaps."
-                badges={["Tryouts", "League play", "Roster"]}
-              />
-              <TypeCard
-                active={kind === "coach"}
-                onClick={() => setKind("coach")}
-                icon={<GraduationCap className="h-6 w-6" />}
-                title="Trainer"
-                desc="Showcase credentials, book sessions, run clinics & open workouts."
-                badges={["Clinics", "Bookings", "Reviews"]}
-              />
-            </div>
-          )}
-
-          {step === 1 && (
             <div className="space-y-5">
               <Section title={kind === "team" ? "Team name" : "Trainer name"}>
                 <input
