@@ -34,6 +34,7 @@ import { Route as CheckoutReturnRouteImport } from './routes/checkout.return'
 import { Route as AdminLocationAnalyticsRouteImport } from './routes/admin.location-analytics'
 import { Route as AccountSecurityRouteImport } from './routes/account.security'
 import { Route as AccountNotificationsRouteImport } from './routes/account.notifications'
+import { Route as TabsTrainersRouteImport } from './routes/_tabs.trainers'
 import { Route as TabsTeamsRouteImport } from './routes/_tabs.teams'
 import { Route as TabsReelsRouteImport } from './routes/_tabs.reels'
 import { Route as TabsProfileRouteImport } from './routes/_tabs.profile'
@@ -177,6 +178,11 @@ const AccountNotificationsRoute = AccountNotificationsRouteImport.update({
   path: '/account/notifications',
   getParentRoute: () => rootRouteImport,
 } as any)
+const TabsTrainersRoute = TabsTrainersRouteImport.update({
+  id: '/trainers',
+  path: '/trainers',
+  getParentRoute: () => TabsRoute,
+} as any)
 const TabsTeamsRoute = TabsTeamsRouteImport.update({
   id: '/teams',
   path: '/teams',
@@ -295,6 +301,7 @@ export interface FileRoutesByFullPath {
   '/profile': typeof TabsProfileRoute
   '/reels': typeof TabsReelsRoute
   '/teams': typeof TabsTeamsRoute
+  '/trainers': typeof TabsTrainersRoute
   '/account/notifications': typeof AccountNotificationsRoute
   '/account/security': typeof AccountSecurityRoute
   '/admin/location-analytics': typeof AdminLocationAnalyticsRoute
@@ -339,6 +346,7 @@ export interface FileRoutesByTo {
   '/profile': typeof TabsProfileRoute
   '/reels': typeof TabsReelsRoute
   '/teams': typeof TabsTeamsRoute
+  '/trainers': typeof TabsTrainersRoute
   '/account/notifications': typeof AccountNotificationsRoute
   '/account/security': typeof AccountSecurityRoute
   '/admin/location-analytics': typeof AdminLocationAnalyticsRoute
@@ -384,6 +392,7 @@ export interface FileRoutesById {
   '/_tabs/profile': typeof TabsProfileRoute
   '/_tabs/reels': typeof TabsReelsRoute
   '/_tabs/teams': typeof TabsTeamsRoute
+  '/_tabs/trainers': typeof TabsTrainersRoute
   '/account/notifications': typeof AccountNotificationsRoute
   '/account/security': typeof AccountSecurityRoute
   '/admin/location-analytics': typeof AdminLocationAnalyticsRoute
@@ -430,6 +439,7 @@ export interface FileRouteTypes {
     | '/profile'
     | '/reels'
     | '/teams'
+    | '/trainers'
     | '/account/notifications'
     | '/account/security'
     | '/admin/location-analytics'
@@ -474,6 +484,7 @@ export interface FileRouteTypes {
     | '/profile'
     | '/reels'
     | '/teams'
+    | '/trainers'
     | '/account/notifications'
     | '/account/security'
     | '/admin/location-analytics'
@@ -518,6 +529,7 @@ export interface FileRouteTypes {
     | '/_tabs/profile'
     | '/_tabs/reels'
     | '/_tabs/teams'
+    | '/_tabs/trainers'
     | '/account/notifications'
     | '/account/security'
     | '/admin/location-analytics'
@@ -750,6 +762,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AccountNotificationsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/_tabs/trainers': {
+      id: '/_tabs/trainers'
+      path: '/trainers'
+      fullPath: '/trainers'
+      preLoaderRoute: typeof TabsTrainersRouteImport
+      parentRoute: typeof TabsRoute
+    }
     '/_tabs/teams': {
       id: '/_tabs/teams'
       path: '/teams'
@@ -888,6 +907,7 @@ interface TabsRouteChildren {
   TabsProfileRoute: typeof TabsProfileRoute
   TabsReelsRoute: typeof TabsReelsRoute
   TabsTeamsRoute: typeof TabsTeamsRoute
+  TabsTrainersRoute: typeof TabsTrainersRoute
 }
 
 const TabsRouteChildren: TabsRouteChildren = {
@@ -899,6 +919,7 @@ const TabsRouteChildren: TabsRouteChildren = {
   TabsProfileRoute: TabsProfileRoute,
   TabsReelsRoute: TabsReelsRoute,
   TabsTeamsRoute: TabsTeamsRoute,
+  TabsTrainersRoute: TabsTrainersRoute,
 }
 
 const TabsRouteWithChildren = TabsRoute._addFileChildren(TabsRouteChildren)
