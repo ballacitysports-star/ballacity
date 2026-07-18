@@ -34,6 +34,15 @@ type TeamRow = {
   skill_max: number;
   followers: number;
   verified: boolean;
+  format: string | null;
+  venues: string[] | null;
+  cadence: string | null;
+  positions_needed: unknown;
+  rating_system: string | null;
+  rating_min: string | null;
+  rating_max: string | null;
+  distances: string[] | null;
+  session_types: string[] | null;
 };
 
 const myOrgIds = new Set<string>();
