@@ -16,6 +16,7 @@ import { useHostedGames } from "@/lib/hosted-games-store";
 import { useJoinedGameIds } from "@/lib/games-store";
 import { useFeedPrefs, setFeedPrefs, DEFAULT_PREFS, useMyProfile } from "@/lib/user-prefs-store";
 import { miToKm } from "@/lib/distance";
+import { clearScrollRestore, useScrollRestore } from "@/hooks/use-scroll-restore";
 import { motion, AnimatePresence } from "framer-motion";
 
 export const Route = createFileRoute("/_tabs/feed")({
@@ -200,6 +201,17 @@ function Feed() {
     return () => io.disconnect();
   }, [hasMore, filtered.length]);
   const visible = useMemo(() => filtered.slice(0, visibleCount), [filtered, visibleCount]);
+
+  // Persist + restore scroll position and pagination depth across refresh /
+  // back-forward so the user lands right back where they left off.
+  useScrollRestore("feed", {
+    pages: visibleCount,
+    enabled: filtered.length > 0,
+    onRestorePages: (n) => {
+      if (!Number.isFinite(n)) return;
+      setVisibleCount((cur) => Math.max(cur, Math.max(PAGE_SIZE, Math.min(n, filtered.length))));
+    },
+  });
 
   // Pull-to-refresh: drag from the top of the page when scrollY === 0.
   const router = useRouter();
