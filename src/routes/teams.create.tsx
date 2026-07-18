@@ -102,6 +102,27 @@ function CreateOrg() {
   const [skillMin, setSkillMin] = useState(1); // 1 = Beginner
   const [skillMax, setSkillMax] = useState(3); // 3 = Intermediate
 
+  // Sport-specific extensions
+  const [format, setFormat] = useState<string>("");
+  const [venues, setVenues] = useState<string[]>([]);
+  const [cadence, setCadence] = useState<string>("");
+  const [positionsBySport, setPositionsBySport] = useState<Record<string, PositionsNeeded>>({});
+  const [ratingMin, setRatingMin] = useState<string>("");
+  const [ratingMax, setRatingMax] = useState<string>("");
+  const [distances, setDistances] = useState<string[]>([]);
+  const [sessionTypes, setSessionTypes] = useState<string[]>([]);
+
+  const primary = primarySport(sports);
+  const ratingSystem = ratingSystemFor(primary);
+  const ratingLevels = ratingLevelsFor(primary);
+  const usesSelfRating = ratingSystem === "SELF";
+  const formatOptions = useMemo(() => mergedFormats(sports), [sports]);
+  const venueOptions = useMemo(() => mergedVenues(sports), [sports]);
+  const cadenceOptions = useMemo(() => mergedCadences(sports), [sports]);
+  const credentialPresets = useMemo(() => mergedCredentialPresets(sports), [sports]);
+  const showTeamBlocks = kind === "team" && hasTeamSport(sports);
+  const showDistances = hasRunning(sports);
+
 
   const computedAvatar = avatar || initials(name || "Open Run");
 
