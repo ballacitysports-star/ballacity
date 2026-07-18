@@ -1,5 +1,5 @@
 import { Link, useLocation } from "@tanstack/react-router";
-import { Home, Map, Plus, UserCheck, Dribbble, MessageCircle } from "lucide-react";
+import { Home, Map, Plus, UserCheck, Users, Dribbble, MessageCircle } from "lucide-react";
 import { motion } from "framer-motion";
 import { MyAvatar } from "@/components/UserAvatar";
 
@@ -12,9 +12,8 @@ type NavItem = {
 };
 
 /**
- * Simplified 5-tab layout with an elevated center "Host" FAB.
+ * 6-tab layout with an elevated center "Host" FAB.
  * Play merges the former Feed + Discover surfaces (list ⇄ map toggle lives inside).
- * Teams live under Players as a segmented control.
  */
 const leftItems: NavItem[] = [
   {
@@ -24,7 +23,8 @@ const leftItems: NavItem[] = [
     // Play tab lights up for the merged surface and for legacy paths.
     match: (p) => p === "/feed" || p === "/discover" || p === "/pickup",
   },
-  { to: "/players", icon: UserCheck, label: "Players", match: (p) => p.startsWith("/players") || p.startsWith("/teams") },
+  { to: "/players", icon: UserCheck, label: "Players", match: (p) => p.startsWith("/players") },
+  { to: "/teams", icon: Users, label: "Teams", match: (p) => p.startsWith("/teams") },
 ];
 
 const rightItems: NavItem[] = [
