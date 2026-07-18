@@ -30,7 +30,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { errorComponentFactory } from "@/lib/error-page";
+
 
 export const Route = createFileRoute("/teams/$teamId")({
   head: ({ loaderData, params }) => {
