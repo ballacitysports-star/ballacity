@@ -1,10 +1,20 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { motion } from "framer-motion";
-import { Search, Plus, Megaphone, Users, GraduationCap } from "lucide-react";
-import { type OrgKind } from "@/lib/sample-data";
+import { Search, Plus, Megaphone, Users, GraduationCap, ArrowUpDown } from "lucide-react";
+import { type OrgKind, type Sport } from "@/lib/sample-data";
 import { useAllOrgs } from "@/lib/org-store";
 import { OrgCard } from "@/components/OrgCard";
+import { SportChips } from "@/components/SportChips";
+
+type SortBy = "nearest" | "followers" | "name";
+
+// Deterministic pseudo-distance (miles) from a string, so sort order is stable.
+function pseudoDistance(id: string): number {
+  let h = 0;
+  for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) >>> 0;
+  return Math.round(((h % 400) / 10 + 0.3) * 10) / 10; // 0.3 – 40.3 mi
+}
 
 export const Route = createFileRoute("/_tabs/teams")({
   head: () => ({ meta: [{ title: "Teams & Coaches — OpenRun" }] }),
