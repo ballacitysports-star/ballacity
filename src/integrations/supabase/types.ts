@@ -1279,6 +1279,59 @@ export type Database = {
         }
         Relationships: []
       }
+      trainer_session_requests: {
+        Row: {
+          created_at: string
+          duration_minutes: number
+          from_user_id: string
+          id: string
+          message: string | null
+          preferred_date: string | null
+          responder_note: string | null
+          session_type: string
+          status: string
+          to_user_id: string
+          trainer_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          duration_minutes?: number
+          from_user_id: string
+          id?: string
+          message?: string | null
+          preferred_date?: string | null
+          responder_note?: string | null
+          session_type?: string
+          status?: string
+          to_user_id: string
+          trainer_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          duration_minutes?: number
+          from_user_id?: string
+          id?: string
+          message?: string | null
+          preferred_date?: string | null
+          responder_note?: string | null
+          session_type?: string
+          status?: string
+          to_user_id?: string
+          trainer_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "trainer_session_requests_trainer_id_fkey"
+            columns: ["trainer_id"]
+            isOneToOne: false
+            referencedRelation: "teams"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_blocks: {
         Row: {
           blocked_id: string
