@@ -84,9 +84,9 @@ function CreateOrg() {
   const [avatar, setAvatar] = useState("");
   const [cover, setCover] = useState<string>(HERO_IMAGE);
   const [customCover, setCustomCover] = useState(false);
-  const [coverError, setCoverError] = useState<string | null>(null);
   const [skillMin, setSkillMin] = useState(1); // 1 = Beginner
   const [skillMax, setSkillMax] = useState(3); // 3 = Intermediate
+
 
   const computedAvatar = avatar || initials(name || "Open Run");
 
