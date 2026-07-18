@@ -37,8 +37,20 @@ import {
 export const Route = createFileRoute("/teams/$teamId")({
   head: ({ loaderData, params }) => {
     const o = loaderData ?? ORGS.find((x) => x.id === params.teamId);
+export const Route = createFileRoute("/teams/$teamId")({
+  head: ({ loaderData, params }) => {
+    const o = loaderData ?? ORGS.find((x) => x.id === params.teamId);
     return { meta: [{ title: o ? `${(o as Org).name} — OpenRun` : "Team — OpenRun" }] };
   },
+  // URL-persisted view: active tab (posts/about/games), post-kind filter,
+  // and reviews modal. Refreshing or sharing the URL restores the same view.
+  validateSearch: zodValidator(
+    z.object({
+      tab: fallback(z.string(), "").default(""),
+      filter: fallback(z.string(), "").default(""),
+      modal: fallback(z.string(), "").default(""),
+    }),
+  ),
   component: TeamPage,
   errorComponent: () => (
     <div className="mx-auto w-full max-w-md sm:max-w-2xl lg:max-w-4xl px-6 pt-24 text-center">
