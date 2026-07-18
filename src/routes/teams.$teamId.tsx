@@ -16,7 +16,7 @@ import {
   Pencil,
 } from "lucide-react";
 import { ORGS, GAMES, POST_KIND_META, type PostKind, type Org } from "@/lib/sample-data";
-import { isMyOrg } from "@/lib/org-store";
+import { isMyOrg, ensureOrgById } from "@/lib/org-store";
 import { PostCard } from "@/components/PostCard";
 import { GameCard } from "@/components/GameCard";
 import { ReviewsSection } from "@/components/ReviewsSection";
@@ -30,13 +30,25 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { errorComponentFactory } from "@/lib/error-page";
 
 export const Route = createFileRoute("/teams/$teamId")({
-  head: ({ params }) => {
-    const o = ORGS.find((x) => x.id === params.teamId);
-    return { meta: [{ title: o ? `${o.name} — OpenRun` : "Team — OpenRun" }] };
+  head: ({ loaderData, params }) => {
+    const o = loaderData ?? ORGS.find((x) => x.id === params.teamId);
+    return { meta: [{ title: o ? `${(o as Org).name} — OpenRun` : "Team — OpenRun" }] };
   },
   component: TeamPage,
+  errorComponent: () => (
+    <div className="mx-auto w-full max-w-md sm:max-w-2xl lg:max-w-4xl px-6 pt-24 text-center">
+      <p className="text-muted-foreground">Couldn't load this team.</p>
+      <Link
+        to="/teams"
+        className="mt-4 inline-block rounded-full bg-lime px-4 py-2 text-sm font-bold text-primary-foreground"
+      >
+        Back to Teams
+      </Link>
+    </div>
+  ),
   notFoundComponent: () => (
     <div className="mx-auto w-full max-w-md sm:max-w-2xl lg:max-w-4xl px-6 pt-24 text-center">
       <p className="text-muted-foreground">Team not found.</p>
@@ -48,12 +60,14 @@ export const Route = createFileRoute("/teams/$teamId")({
       </Link>
     </div>
   ),
-  loader: ({ params }) => {
-    const org = ORGS.find((o) => o.id === params.teamId);
+  loader: async ({ params }) => {
+    const org = await ensureOrgById(params.teamId);
     if (!org) throw notFound();
     return org;
   },
 });
+// touch unused helper import guard
+void errorComponentFactory;
 
 const FILTERS: { key: PostKind | "all"; label: string }[] = [
   { key: "all", label: "All posts" },
