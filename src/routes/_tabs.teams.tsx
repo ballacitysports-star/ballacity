@@ -81,9 +81,27 @@ function TeamsPage() {
   const meta = KIND_META[kind];
 
   const list = useMemo(() => {
+    const isRecruiting = (o: typeof orgs[number]) => {
+      const pn = o.positionsNeeded;
+      if (!pn) return false;
+      return Object.values(pn).some((byPos) =>
+        Object.values(byPos ?? {}).some((n) => Number(n) > 0),
+      );
+    };
+    const cadenceMatches = (o: typeof orgs[number], target: "weekly" | "casual") => {
+      const c = (o.cadence ?? "").toLowerCase();
+      if (!c) return false;
+      if (target === "weekly") return /week|multiple|daily/.test(c);
+      return /month|casual|occasion|pickup|drop/.test(c);
+    };
     const filtered = orgs
       .filter((o) => o.kind === kind)
       .filter((o) => (sport ? o.sports.includes(sport) : true))
+      .filter((o) => {
+        if (avail === "any") return true;
+        if (avail === "recruiting") return isRecruiting(o);
+        return cadenceMatches(o, avail);
+      })
       .filter((o) =>
         q
           ? (o.name + o.handle + o.tagline + o.city + o.sports.join(" "))
@@ -98,7 +116,7 @@ function TeamsPage() {
       return a.o.name.localeCompare(b.o.name);
     });
     return withDist;
-  }, [orgs, kind, sport, q, sortBy]);
+  }, [orgs, kind, sport, q, sortBy, avail]);
 
   const featured =
     orgs.find((o) => o.verified && o.kind === kind) ?? orgs.find((o) => o.kind === kind);
