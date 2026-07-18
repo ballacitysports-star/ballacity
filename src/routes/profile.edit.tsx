@@ -730,19 +730,26 @@ function EditProfile() {
       <Section
         title="My organizations"
         right={
-          <Link
-            to="/teams/create"
-            className="inline-flex items-center gap-1 text-xs font-bold text-lime"
-          >
-            <Plus className="h-3.5 w-3.5" /> New
-          </Link>
+          <div className="flex items-center gap-1.5">
+            <Link
+              to="/teams/create"
+              search={{ kind: "team" }}
+              className="inline-flex items-center gap-1 rounded-full border border-border bg-surface px-2.5 py-1 text-xs font-bold hover:border-lime/40"
+            >
+              <Plus className="h-3 w-3" /> Team
+            </Link>
+            <Link
+              to="/teams/create"
+              search={{ kind: "coach" }}
+              className="inline-flex items-center gap-1 rounded-full border border-border bg-surface px-2.5 py-1 text-xs font-bold hover:border-lime/40"
+            >
+              <Plus className="h-3 w-3" /> Trainer
+            </Link>
+          </div>
         }
       >
         {myOrgs.length === 0 ? (
-          <Link
-            to="/teams/create"
-            className="block rounded-3xl border border-dashed border-border bg-surface/40 p-5 text-center hover:border-lime/40"
-          >
+          <div className="rounded-3xl border border-dashed border-border bg-surface/40 p-5 text-center">
             <div className="mx-auto grid h-12 w-12 place-items-center rounded-2xl bg-lime/15 text-lime mb-2">
               <Users className="h-6 w-6" />
             </div>
@@ -750,7 +757,23 @@ function EditProfile() {
             <p className="text-xs text-muted-foreground mt-1">
               Post tryouts, run pickups, build your following.
             </p>
-          </Link>
+            <div className="mt-4 grid grid-cols-2 gap-2">
+              <Link
+                to="/teams/create"
+                search={{ kind: "team" }}
+                className="rounded-2xl bg-lime-gradient py-2.5 text-xs font-bold text-primary-foreground glow-lime"
+              >
+                Start a team
+              </Link>
+              <Link
+                to="/teams/create"
+                search={{ kind: "coach" }}
+                className="rounded-2xl border border-border bg-surface py-2.5 text-xs font-bold hover:border-lime/40"
+              >
+                Trainer profile
+              </Link>
+            </div>
+          </div>
         ) : (
           <div className="space-y-3">
             {myOrgs.map((o, i) => (
