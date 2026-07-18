@@ -14,8 +14,41 @@ import { TrainerActions } from "@/components/TrainerActions";
 import { useMyProfile } from "@/lib/user-prefs-store";
 import { useAuth } from "@/hooks/use-auth";
 import { toast } from "sonner";
+import { SPORT_CONFIG, SESSION_TYPES } from "@/lib/sport-config";
 
-type SortBy = "nearest" | "followers" | "name";
+type SortBy = "nearest" | "soonest" | "followers" | "name";
+type Avail = "any" | "soon" | "recruiting" | "weekly" | "casual";
+
+// Lower = sooner. Used for the "Soonest available" sort.
+function availabilityScore(o: {
+  cadence?: string | null;
+  positionsNeeded?: Record<string, Record<string, number>> | null;
+}): number {
+  const pn = o.positionsNeeded;
+  const isBooking =
+    !!pn &&
+    Object.values(pn).some((byPos) =>
+      Object.values(byPos ?? {}).some((n) => Number(n) > 0),
+    );
+  const c = (o.cadence ?? "").toLowerCase();
+  if (isBooking) return 0;
+  if (/on.?demand/.test(c)) return 1;
+  if (/week/.test(c) && !/bi/.test(c)) return 2;
+  if (/bi.?week/.test(c)) return 3;
+  if (/month/.test(c)) return 4;
+  if (/season/.test(c)) return 5;
+  return 9;
+}
+
+function availabilityLabel(score: number): string {
+  if (score === 0) return "Booking now";
+  if (score === 1) return "On-demand";
+  if (score === 2) return "This week";
+  if (score === 3) return "Bi-weekly";
+  if (score === 4) return "Monthly";
+  if (score === 5) return "Seasonal";
+  return "Ask";
+}
 
 function pseudoDistance(id: string): number {
   let h = 0;
@@ -26,6 +59,7 @@ function pseudoDistance(id: string): number {
 const trainersSearchSchema = z.object({
   q: fallback(z.string(), "").default(""),
   sport: fallback(z.string(), "").default(""),
+  specialty: fallback(z.string(), "").default(""),
   avail: fallback(z.string(), "any").default("any"),
   sort: fallback(z.string(), "nearest").default("nearest"),
   view: fallback(z.string(), "list").default("list"),
@@ -58,19 +92,27 @@ function TrainersPage() {
 
   const q = search.q;
   const sport: Sport | null = (search.sport || null) as Sport | null;
+  const specialty: string = search.specialty || "";
   const sortBy: SortBy =
-    search.sort === "followers" || search.sort === "name" ? search.sort : "nearest";
-  const avail: "any" | "recruiting" | "weekly" | "casual" =
-    search.avail === "recruiting" || search.avail === "weekly" || search.avail === "casual"
+    search.sort === "soonest" || search.sort === "followers" || search.sort === "name"
+      ? search.sort
+      : "nearest";
+  const avail: Avail =
+    search.avail === "soon" ||
+    search.avail === "recruiting" ||
+    search.avail === "weekly" ||
+    search.avail === "casual"
       ? search.avail
       : "any";
   const viewMode: ViewMode = search.view === "map" ? "map" : "list";
   const density: Density = search.density === "grid" ? "grid" : "list";
 
   const setQ = (v: string) => updateSearch({ q: v });
-  const setSport = (v: Sport | null) => updateSearch({ sport: v ?? "" });
+  const setSport = (v: Sport | null) => updateSearch({ sport: v ?? "", specialty: "" });
+  const setSpecialty = (v: string) =>
+    updateSearch({ specialty: specialty === v ? "" : v });
   const setSortBy = (v: SortBy) => updateSearch({ sort: v });
-  const setAvail = (v: "any" | "recruiting" | "weekly" | "casual") => updateSearch({ avail: v });
+  const setAvail = (v: Avail) => updateSearch({ avail: v });
   const [filtersOpen, setFiltersOpen] = useState(false);
   const switchView = (v: ViewMode) => updateSearch({ view: v });
   const switchDensity = (d: Density) => updateSearch({ density: d });
@@ -133,12 +175,19 @@ function TrainersPage() {
       if (target === "weekly") return /week|multiple|daily/.test(c);
       return /month|casual|occasion|pickup|drop/.test(c);
     };
+    const specialtyLower = specialty.toLowerCase();
     const filtered = orgs
       .filter((o) => o.kind === "coach")
       .filter((o) => (sport ? o.sports.includes(sport) : true))
       .filter((o) => {
+        if (!specialty) return true;
+        const hay = `${o.tagline ?? ""} ${o.name ?? ""}`.toLowerCase();
+        return hay.includes(specialtyLower);
+      })
+      .filter((o) => {
         if (avail === "any") return true;
         if (avail === "recruiting") return isBooking(o);
+        if (avail === "soon") return availabilityScore(o) <= 2;
         return cadenceMatches(o, avail);
       })
       .filter((o) =>
@@ -148,14 +197,19 @@ function TrainersPage() {
               .includes(q.toLowerCase())
           : true,
       );
-    const withDist = filtered.map((o) => ({ o, dist: pseudoDistance(o.id) }));
+    const withDist = filtered.map((o) => ({
+      o,
+      dist: pseudoDistance(o.id),
+      score: availabilityScore(o),
+    }));
     withDist.sort((a, b) => {
       if (sortBy === "nearest") return a.dist - b.dist;
+      if (sortBy === "soonest") return a.score - b.score || a.dist - b.dist;
       if (sortBy === "followers") return b.o.followers - a.o.followers;
       return a.o.name.localeCompare(b.o.name);
     });
     return withDist;
-  }, [orgs, sport, q, sortBy, avail]);
+  }, [orgs, sport, specialty, q, sortBy, avail]);
 
   const featured =
     orgs.find((o) => o.verified && o.kind === "coach") ?? orgs.find((o) => o.kind === "coach");
@@ -220,7 +274,8 @@ function TrainersPage() {
           />
         </div>
         {(() => {
-          const activeFilterCount = (sport ? 1 : 0) + (avail !== "any" ? 1 : 0);
+          const activeFilterCount =
+            (sport ? 1 : 0) + (specialty ? 1 : 0) + (avail !== "any" ? 1 : 0);
           return (
             <button
               onClick={() => setFiltersOpen((v) => !v)}
@@ -253,11 +308,46 @@ function TrainersPage() {
             <SportChips selected={sport} onSelect={(s) => setSport(s as Sport | null)} />
           </div>
 
+          {(() => {
+            const specialties = sport
+              ? SPORT_CONFIG[sport].formats
+              : SESSION_TYPES;
+            return (
+              <div className="-mx-4 overflow-x-auto px-4 mb-3">
+                <div className="flex gap-2 pb-1">
+                  <span className="self-center text-[10px] font-bold uppercase tracking-wider text-muted-foreground pr-1">
+                    Specialty
+                  </span>
+                  {specialties.map((s) => {
+                    const active = specialty === s;
+                    return (
+                      <button
+                        key={s}
+                        onClick={() => setSpecialty(s)}
+                        className={`whitespace-nowrap rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors ${
+                          active
+                            ? "border-lime bg-lime text-primary-foreground"
+                            : "border-border bg-surface text-muted-foreground"
+                        }`}
+                      >
+                        {s}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })()}
+
           <div className="-mx-4 overflow-x-auto px-4 mb-4">
             <div className="flex gap-2 pb-1">
+              <span className="self-center text-[10px] font-bold uppercase tracking-wider text-muted-foreground pr-1">
+                Available
+              </span>
               {([
-                { id: "any", label: "Any availability" },
+                { id: "any", label: "Any time" },
                 { id: "recruiting", label: "Booking now" },
+                { id: "soon", label: "This week" },
                 { id: "weekly", label: "Weekly+" },
                 { id: "casual", label: "Casual" },
               ] as const).map((a) => {
@@ -294,6 +384,7 @@ function TrainersPage() {
             aria-label="Sort trainers"
           >
             <option value="nearest">Nearest</option>
+            <option value="soonest">Soonest available</option>
             <option value="followers">Most followers</option>
             <option value="name">Name A–Z</option>
           </select>
@@ -310,12 +401,25 @@ function TrainersPage() {
               : "space-y-3 pb-6"
           }
         >
-          {list.map(({ o, dist }, i) => (
+          {list.map(({ o, dist, score }, i) => (
             <div key={o.id} className="relative">
               <OrgCard org={o} index={i} />
-              <span className="pointer-events-none absolute top-3 right-3 rounded-full bg-background/70 backdrop-blur px-2 py-0.5 text-[10px] font-bold text-foreground">
-                {dist} mi
-              </span>
+              <div className="pointer-events-none absolute top-3 right-3 flex flex-col items-end gap-1">
+                <span className="rounded-full bg-background/70 backdrop-blur px-2 py-0.5 text-[10px] font-bold text-foreground">
+                  {dist} mi
+                </span>
+                <span
+                  className={`rounded-full backdrop-blur px-2 py-0.5 text-[10px] font-bold ${
+                    score === 0
+                      ? "bg-lime text-primary-foreground"
+                      : score <= 2
+                        ? "bg-lime/20 text-lime"
+                        : "bg-background/70 text-muted-foreground"
+                  }`}
+                >
+                  {availabilityLabel(score)}
+                </span>
+              </div>
               <TrainerActions org={o} />
             </div>
           ))}
