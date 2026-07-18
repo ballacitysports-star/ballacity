@@ -1,33 +1,32 @@
-## Add date range option to Host a Game
+## Problem
 
-Let hosts optionally schedule the same game on multiple days at the same time. When a range is chosen, publishing creates one game instance per day in the range.
+When you refresh, you land on the marketing hero at `/`. That's because `src/routes/index.tsx` unconditionally renders the `Landing` component regardless of whether you're signed in — so any code path that ends up at `/` (a shared link, a link back to `/`, an OAuth redirect that drops `next`, or a bookmarked home) shows the marketing page instead of the in‑app surface (`/feed`).
 
-### UI changes (`src/routes/_tabs.create.tsx`)
+The mobile/desktop AuthGate refresh fix from previous turns already keeps you on your current URL when it's a protected route — but it doesn't do anything when the URL genuinely is `/`.
 
-- Under the existing "When" datetime input, add a toggle: **"Repeat on multiple days"** (off by default).
-- When on:
-  - The existing "When" input becomes the **time** used for every day in the range (label switches to "Time").
-  - Add two date pickers: **Start date** and **End date** (end date must be ≥ start date).
-  - Show a small helper line: "Will create N games, one per day."
-- When off: behavior is unchanged (single game at the chosen datetime).
+## Fix
 
-### Publish logic
+Make `/` session‑aware:
 
-- Off: unchanged — one `addHostedGame` call.
-- On:
-  - Build the list of dates from start→end (inclusive, cap at 60 to prevent runaway).
-  - For each date, combine with the chosen time to build an ISO datetime, then call `addHostedGame` with the same title/sport/location/size/price/etc.
-  - If `game_payment_settings` are used, call `upsertGamePaymentSettings` for each created game (same values).
-  - Show a single toast: "Created N games" and navigate to `/feed` (or the first game) as today.
-- All-or-nothing failure: if any insert fails, surface the error toast and stop; already-created games remain (no rollback — matches current single-create behavior).
+1. In `src/routes/index.tsx`, when a signed‑in session is detected, immediately `router.navigate({ to: "/feed", replace: true })`.
+   - Read auth via the existing `useAuth()` hook (localStorage‑hydrated, mobile‑safe).
+   - While `loading` is true, render nothing (or a tiny spinner) instead of the marketing hero to avoid the "flash of marketing" for signed‑in users.
+   - When `loading` is false and there's no user, render the existing `Landing` unchanged.
+2. Also short‑circuit on the very first client tick using `readStoredSupabaseSession()` (already used by `AuthGate`) so signed‑in refreshes on `/` never even paint the hero for a frame.
+3. Keep the "Open app" and every other `<Link to="/">` in the app working — signed‑out visitors still see marketing.
 
-### Out of scope
+No changes to `AuthGate`, `auth.tsx`, the OneSignal SW, or any other route — those are already correct.
 
-- No schema changes (no "series" grouping table).
-- No RRULE/weekday-selection recurrence — strictly one-per-day across a contiguous range.
-- No edit-all-in-series; each game is independent after creation.
+## Verification
 
-### Verification
+- Signed‑in refresh at `/` → replaced with `/feed` without flashing marketing.
+- Signed‑out refresh at `/` → marketing hero renders as today.
+- Signed‑in refresh at `/feed`, `/profile`, `/games/:id`, etc. → unchanged (still handled by `AuthGate`).
+- Existing e2e specs (`desktop-refresh-protected.spec.ts`, `mobile-refresh-protected.spec.ts`) still pass.
+- Add one new e2e case: signed‑in refresh at `/` ends up at `/feed`.
 
-- `bunx tsgo --noEmit`.
-- Manually: toggle off → single game as before; toggle on with a 3-day range → 3 games appear on the feed, each at the chosen time.
+## Technical notes
+
+- Use `useRouter().navigate({ to: "/feed", replace: true })` inside a `useEffect` gated on `!loading && user`.
+- Pre‑paint gate: `const stored = typeof window !== "undefined" ? readStoredSupabaseSession() : null;` — if `stored` exists, return `null` on the first render so React never commits the marketing tree before the redirect fires.
+- The route stays a public route in `PUBLIC_ROUTES`, so `AuthGate` doesn't interfere.
