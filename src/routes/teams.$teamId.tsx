@@ -97,11 +97,11 @@ function TeamPage() {
   const filter: PostKind | "all" = (search.filter || "all") as PostKind | "all";
   const reviewsOpen = search.modal === "reviews";
   const setTab = (v: "posts" | "about" | "games") =>
-    navigate({ search: (p) => ({ ...p, tab: v === "posts" ? "" : v }), replace: true });
+    navigate({ search: (p: any) => ({ ...p, tab: v === "posts" ? "" : v }), replace: true });
   const setFilter = (v: PostKind | "all") =>
-    navigate({ search: (p) => ({ ...p, filter: v === "all" ? "" : v }), replace: true });
+    navigate({ search: (p: any) => ({ ...p, filter: v === "all" ? "" : v }), replace: true });
   const setReviewsOpen = (v: boolean) =>
-    navigate({ search: (p) => ({ ...p, modal: v ? "reviews" : "" }), replace: true });
+    navigate({ search: (p: any) => ({ ...p, modal: v ? "reviews" : "" }), replace: true });
   const [following, setFollowing] = useState(false);
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
