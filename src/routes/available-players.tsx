@@ -205,7 +205,7 @@ function AvailablePlayersPage() {
         <div className="flex-1">
           <h1 className="font-display text-2xl font-bold leading-tight">Available players</h1>
           <p className="text-xs text-muted-foreground">
-            Post when you're free. Coaches & teams reach out.
+            Post when you're free. Trainers & teams reach out.
           </p>
         </div>
         <button
