@@ -1,4 +1,4 @@
-import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate, useRouter } from "@tanstack/react-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Loader2, RefreshCw } from "lucide-react";
@@ -18,11 +18,34 @@ import { useFeedPrefs, setFeedPrefs, DEFAULT_PREFS, useMyProfile } from "@/lib/u
 import { miToKm } from "@/lib/distance";
 import { clearScrollRestore, useScrollRestore } from "@/hooks/use-scroll-restore";
 import { motion, AnimatePresence } from "framer-motion";
+import { zodValidator, fallback } from "@tanstack/zod-adapter";
+import { z } from "zod";
+
+// URL-persisted feed state. Refreshing or sharing the URL preserves search
+// text, sport chip, sort, distance cap, position, view/density toggles, and
+// section flags. Values fall back to defaults when malformed or absent.
+const feedSearchSchema = z.object({
+  q: fallback(z.string(), "").default(""),
+  sport: fallback(z.string(), "").default(""),
+  sort: fallback(z.string(), "").default(""),
+  dist: fallback(z.number().nullable(), null).default(null),
+  pos: fallback(z.string(), "").default(""),
+  view: fallback(z.string(), "").default(""),
+  density: fallback(z.string(), "").default(""),
+  urgent: fallback(z.boolean().optional(), undefined).default(undefined),
+  foryou: fallback(z.boolean().optional(), undefined).default(undefined),
+  hosted: fallback(z.boolean().optional(), undefined).default(undefined),
+  joined: fallback(z.boolean().optional(), undefined).default(undefined),
+  free: fallback(z.boolean().optional(), undefined).default(undefined),
+  paid: fallback(z.boolean().optional(), undefined).default(undefined),
+});
 
 export const Route = createFileRoute("/_tabs/feed")({
   head: () => ({ meta: [{ title: "Feed — OpenRun" }] }),
+  validateSearch: zodValidator(feedSearchSchema),
   component: Feed,
 });
+
 
 function Feed() {
   const [q, setQ] = useState("");
