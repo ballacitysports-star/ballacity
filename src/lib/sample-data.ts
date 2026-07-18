@@ -379,6 +379,7 @@ export type Org = {
   homeCourt?: string;
   staff?: { name: string; role: string; avatar: string }[];
   // Both
+  skillRange?: { min: number; max: number }; // 1=Beginner … 5=Pro
   upcoming: string[]; // game ids
   posts: OrgPost[];
 };

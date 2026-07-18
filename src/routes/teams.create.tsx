@@ -10,6 +10,7 @@ import {
   Sparkles,
   X,
   Plus,
+  Upload,
 } from "lucide-react";
 import {
   SPORTS,
@@ -40,6 +41,9 @@ const ACCENTS = [
 ];
 
 const STEPS = ["Type", "Identity", "Details", "Branding"] as const;
+
+const SKILL_LABELS = ["Beginner", "Recreational", "Intermediate", "Advanced", "Pro"] as const;
+const MAX_COVER_BYTES = 4 * 1024 * 1024;
 
 function initials(name: string) {
   const parts = name.trim().split(/\s+/).filter(Boolean);
@@ -79,6 +83,10 @@ function CreateOrg() {
   const [accent, setAccent] = useState(ACCENTS[0].hex);
   const [avatar, setAvatar] = useState("");
   const [cover, setCover] = useState<string>(HERO_IMAGE);
+  const [customCover, setCustomCover] = useState(false);
+  const [coverError, setCoverError] = useState<string | null>(null);
+  const [skillMin, setSkillMin] = useState(1); // 1 = Beginner
+  const [skillMax, setSkillMax] = useState(3); // 3 = Intermediate
 
   const computedAvatar = avatar || initials(name || "Open Run");
 
@@ -121,9 +129,31 @@ function CreateOrg() {
     record: kind === "team" ? { w: wins, l: losses } : undefined,
     homeCourt: kind === "team" ? homeCourt : undefined,
     staff: kind === "team" ? staff : undefined,
+    skillRange: { min: skillMin, max: skillMax },
     upcoming: [],
     posts: [],
   };
+
+  function onCoverFile(file: File | undefined) {
+    if (!file) return;
+    if (!file.type.startsWith("image/")) {
+      setCoverError("Please choose an image file.");
+      return;
+    }
+    if (file.size > MAX_COVER_BYTES) {
+      setCoverError("Image is too large — max 4 MB.");
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => {
+      if (typeof reader.result === "string") {
+        setCover(reader.result);
+        setCustomCover(true);
+        setCoverError(null);
+      }
+    };
+    reader.readAsDataURL(file);
+  }
 
   function submit() {
     const id = `${kind === "team" ? "t" : "c"}-${(name || "org").toLowerCase().replace(/[^a-z0-9]+/g, "-")}-${Date.now().toString(36).slice(-4)}`;
@@ -315,6 +345,60 @@ function CreateOrg() {
                   })}
                 </div>
               </Section>
+
+              <Section title="Skill range">
+                <div className="rounded-2xl border border-border bg-surface p-4">
+                  <div className="flex items-center justify-between mb-3">
+                    <span className="text-sm text-muted-foreground">Who fits here?</span>
+                    <span className="text-sm font-bold text-lime">
+                      {SKILL_LABELS[skillMin - 1]} – {SKILL_LABELS[skillMax - 1]}
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <label className="rounded-xl border border-border bg-background/60 px-3 py-2">
+                      <div className="text-[10px] uppercase tracking-wider text-muted-foreground">
+                        Min
+                      </div>
+                      <select
+                        value={skillMin}
+                        onChange={(e) => {
+                          const v = +e.target.value;
+                          setSkillMin(v);
+                          if (v > skillMax) setSkillMax(v);
+                        }}
+                        className="w-full bg-transparent text-sm font-bold outline-none"
+                      >
+                        {SKILL_LABELS.map((l, i) => (
+                          <option key={l} value={i + 1}>
+                            {l}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    <label className="rounded-xl border border-border bg-background/60 px-3 py-2">
+                      <div className="text-[10px] uppercase tracking-wider text-muted-foreground">
+                        Max
+                      </div>
+                      <select
+                        value={skillMax}
+                        onChange={(e) => {
+                          const v = +e.target.value;
+                          setSkillMax(v);
+                          if (v < skillMin) setSkillMin(v);
+                        }}
+                        className="w-full bg-transparent text-sm font-bold outline-none"
+                      >
+                        {SKILL_LABELS.map((l, i) => (
+                          <option key={l} value={i + 1}>
+                            {l}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                  </div>
+                </div>
+              </Section>
+
 
               <Section title="Year founded">
                 <input
@@ -613,7 +697,55 @@ function CreateOrg() {
                 </p>
               </Section>
 
-              <Section title="Cover image">
+              <Section title="Team photo">
+                <div className="rounded-2xl border border-border bg-surface p-3">
+                  <div className="relative aspect-video overflow-hidden rounded-xl bg-background">
+                    <img src={cover} alt="" className="h-full w-full object-cover" />
+                    {customCover && (
+                      <span className="absolute top-2 left-2 rounded-full bg-lime/90 px-2 py-0.5 text-[10px] font-bold text-primary-foreground">
+                        Uploaded
+                      </span>
+                    )}
+                  </div>
+                  <div className="mt-3 flex gap-2">
+                    <label className="flex-1 inline-flex items-center justify-center gap-2 rounded-xl border border-lime bg-lime/10 px-3 py-2.5 text-sm font-bold text-lime cursor-pointer">
+                      <Upload className="h-4 w-4" />
+                      {customCover ? "Change photo" : "Upload photo"}
+                      <input
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        onChange={(e) => {
+                          onCoverFile(e.target.files?.[0]);
+                          e.target.value = "";
+                        }}
+                      />
+                    </label>
+                    {customCover && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setCustomCover(false);
+                          setCoverError(null);
+                          setCover(HERO_IMAGE);
+                        }}
+                        className="rounded-xl border border-border bg-background px-3 py-2.5 text-sm font-bold text-muted-foreground"
+                      >
+                        Remove
+                      </button>
+                    )}
+                  </div>
+                  {coverError && (
+                    <p className="mt-2 text-xs text-coral">{coverError}</p>
+                  )}
+                  <p className="mt-2 text-[10px] text-muted-foreground">
+                    JPG or PNG, up to 4 MB. Wide crops look best.
+                  </p>
+                </div>
+              </Section>
+
+              <Section title="Or pick a preset">
+
                 <div className="grid grid-cols-3 gap-2">
                   {(
                     [
@@ -631,7 +763,11 @@ function CreateOrg() {
                       <button
                         key={s}
                         type="button"
-                        onClick={() => setCover(src)}
+                        onClick={() => {
+                          setCover(src);
+                          setCustomCover(false);
+                          setCoverError(null);
+                        }}
                         className={`relative aspect-video overflow-hidden rounded-xl border-2 transition-all ${
                           active ? "border-lime" : "border-transparent opacity-70 hover:opacity-100"
                         }`}

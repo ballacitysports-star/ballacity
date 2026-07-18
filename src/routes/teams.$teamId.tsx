@@ -181,6 +181,13 @@ function TeamPage() {
                 {s}
               </span>
             ))}
+            {org.skillRange && (
+              <span className="rounded-full border border-lime/40 bg-lime/10 px-2.5 py-1 text-xs font-semibold text-lime">
+                {["Beginner", "Recreational", "Intermediate", "Advanced", "Pro"][org.skillRange.min - 1]}
+                {org.skillRange.min !== org.skillRange.max &&
+                  ` – ${["Beginner", "Recreational", "Intermediate", "Advanced", "Pro"][org.skillRange.max - 1]}`}
+              </span>
+            )}
           </div>
         </div>
 
