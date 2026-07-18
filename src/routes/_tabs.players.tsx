@@ -169,9 +169,35 @@ function PlayersPage() {
       minA = maxA;
       maxA = tmp;
     }
+    const now = new Date();
+    const todayISO = now.toISOString().slice(0, 10);
+    const weekEnd = new Date(now.getTime() + 7 * 86400_000).toISOString().slice(0, 10);
+    const dow = now.getDay(); // 0=Sun … 6=Sat
+    const daysUntilSat = (6 - dow + 7) % 7;
+    const satISO = new Date(now.getTime() + daysUntilSat * 86400_000).toISOString().slice(0, 10);
+    const sunISO = new Date(now.getTime() + (daysUntilSat + 1) * 86400_000).toISOString().slice(0, 10);
+    const overlaps = (start: string | null, end: string | null, from: string, to: string) => {
+      const s = start ?? from;
+      const e = end ?? to;
+      return s <= to && e >= from;
+    };
+    const hasWeekendDay = (days: string[]) =>
+      days.some((d) => /sat|sun/i.test(d));
     return list.filter((a) => {
+      if (sport && !a.sports.some((s) => s.toLowerCase() === sport.toLowerCase())) return false;
       if (skill && a.skill_level !== skill) return false;
       if (maxDistance > 0 && kmToMi(a.travel_radius_km) > maxDistance) return false;
+      if (when !== "any") {
+        if (when === "today") {
+          if (!overlaps(a.starts_on, a.ends_on, todayISO, todayISO)) return false;
+        } else if (when === "week") {
+          if (!overlaps(a.starts_on, a.ends_on, todayISO, weekEnd)) return false;
+        } else if (when === "weekend") {
+          const dateHit = overlaps(a.starts_on, a.ends_on, satISO, sunISO);
+          const recurHit = hasWeekendDay(a.recurring_days ?? []);
+          if (!dateHit && !recurHit) return false;
+        }
+      }
       if (minA !== null || maxA !== null) {
         const age = ageFromBirthday(a.author_birthday);
         if (age === null) {
@@ -196,7 +222,7 @@ function PlayersPage() {
       }
       return true;
     });
-  }, [list, q, skill, maxDistance, ageMin, ageMax, includeUnknownAge]);
+  }, [list, q, sport, skill, maxDistance, ageMin, ageMax, includeUnknownAge, when]);
 
   function ageFromBirthday(iso: string | null): number | null {
     if (!iso) return null;
