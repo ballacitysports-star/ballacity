@@ -1052,7 +1052,7 @@ function MineTab({
           <ul className="space-y-2">
             {inbox.map((r) => (
               <li key={r.id} className="rounded-2xl border border-border bg-surface p-3 text-sm">
-                <p className="text-xs text-muted-foreground">From a coach/team</p>
+                <p className="text-xs text-muted-foreground">From a trainer/team</p>
                 {r.message && <p className="mt-1">{r.message}</p>}
                 <div className="mt-2 flex items-center justify-between">
                   <span className="text-[10px] uppercase font-bold text-muted-foreground">
