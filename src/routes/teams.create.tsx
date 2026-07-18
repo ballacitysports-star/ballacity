@@ -763,7 +763,11 @@ function CreateOrg() {
                       <button
                         key={s}
                         type="button"
-                        onClick={() => setCover(src)}
+                        onClick={() => {
+                          setCover(src);
+                          setCustomCover(false);
+                          setCoverError(null);
+                        }}
                         className={`relative aspect-video overflow-hidden rounded-xl border-2 transition-all ${
                           active ? "border-lime" : "border-transparent opacity-70 hover:opacity-100"
                         }`}
