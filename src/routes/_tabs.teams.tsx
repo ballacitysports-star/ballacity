@@ -6,6 +6,8 @@ import { type OrgKind, type Sport } from "@/lib/sample-data";
 import { useAllOrgs } from "@/lib/org-store";
 import { OrgCard } from "@/components/OrgCard";
 import { SportChips } from "@/components/SportChips";
+import { ViewDensityToggle, type ViewMode, type Density } from "@/components/ViewDensityToggle";
+import { PlayMapView } from "@/components/PlayMapView";
 
 type SortBy = "nearest" | "followers" | "name";
 
