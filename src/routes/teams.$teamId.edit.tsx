@@ -671,51 +671,15 @@ function EditOrg() {
               </Section>
 
               <Section title="Cover image">
-                <div className="grid grid-cols-3 gap-2">
-                  {(
-                    [
-                      "Basketball",
-                      "Soccer",
-                      "Tennis",
-                      "Volleyball",
-                      "Pickleball",
-                      "Running",
-                    ] as Sport[]
-                  ).map((s) => {
-                    const src = imageFor(s);
-                    const active = cover === src;
-                    return (
-                      <button
-                        key={s}
-                        type="button"
-                        onClick={() => setCover(src)}
-                        className={`relative aspect-video overflow-hidden rounded-xl border-2 transition-all ${
-                          active ? "border-lime" : "border-transparent opacity-70 hover:opacity-100"
-                        }`}
-                      >
-                        <img src={src} alt="" className="h-full w-full object-cover" />
-                        {active && (
-                          <span className="absolute inset-0 bg-lime/20 grid place-items-center">
-                            <Check className="h-5 w-5 text-lime" />
-                          </span>
-                        )}
-                      </button>
-                    );
-                  })}
-                </div>
-                <label className="mt-2 flex cursor-pointer items-center justify-center gap-2 rounded-2xl border border-dashed border-border bg-surface/40 py-3 text-sm font-semibold text-muted-foreground hover:border-lime hover:text-lime">
-                  <Upload className="h-4 w-4" /> Upload custom cover
-                  <input type="file" accept="image/*" onChange={onCoverUpload} className="hidden" />
-                </label>
-                {cover.startsWith("data:") && (
-                  <div className="mt-2 relative aspect-video overflow-hidden rounded-xl border-2 border-lime">
-                    <img src={cover} alt="" className="h-full w-full object-cover" />
-                    <span className="absolute top-1.5 left-1.5 rounded-full bg-background/80 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider">
-                      Custom
-                    </span>
-                  </div>
-                )}
+                <TeamCoverUploader
+                  cover={cover}
+                  onCoverChange={setCover}
+                  isCustom={customCover}
+                  onCustomChange={setCustomCover}
+                  fallback={HERO_IMAGE}
+                />
               </Section>
+
 
               <Section title="Live preview">
                 <div className="rounded-3xl border border-lime/30 bg-surface/40 p-3">
