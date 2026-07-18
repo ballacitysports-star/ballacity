@@ -155,6 +155,32 @@ if (typeof window !== "undefined") {
       void hydrateOrgs();
     }
   });
+
+  // Realtime: reflect inserts/updates/deletes from any client instantly.
+  supabase
+    .channel("public:teams")
+    .on(
+      "postgres_changes",
+      { event: "*", schema: "public", table: "teams" },
+      (payload) => {
+        if (payload.eventType === "DELETE") {
+          const oldRow = payload.old as { id?: string } | null;
+          const id = oldRow?.id;
+          if (!id) return;
+          const idx = ORGS.findIndex((o) => o.id === id);
+          if (idx !== -1) ORGS.splice(idx, 1);
+          myOrgIds.delete(id);
+          ownerByOrgId.delete(id);
+          emit();
+          return;
+        }
+        const row = payload.new as TeamRow | null;
+        if (!row?.id) return;
+        mergeRow(row);
+        emit();
+      },
+    )
+    .subscribe();
 }
 
 export async function addOrg(org: Org): Promise<Org> {
