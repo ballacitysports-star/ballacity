@@ -13,9 +13,9 @@ import {
   Loader2,
   SlidersHorizontal,
   Ticket,
-  LayoutGrid,
-  Rows3,
 } from "lucide-react";
+import { ViewDensityToggle, type ViewMode, type Density } from "@/components/ViewDensityToggle";
+import { PlayMapView } from "@/components/PlayMapView";
 import { AnimatePresence } from "framer-motion";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
@@ -208,13 +208,21 @@ function PlayersPage() {
     return age;
   }
 
-  const [density, setDensity] = useState<"grid" | "list">(() => {
+  const [density, setDensity] = useState<Density>(() => {
     if (typeof window === "undefined") return "list";
-    return (localStorage.getItem("openrun:players-density") as "grid" | "list") ?? "list";
+    return (localStorage.getItem("openrun:players-density") as Density) ?? "list";
   });
-  const switchDensity = (d: "grid" | "list") => {
+  const switchDensity = (d: Density) => {
     setDensity(d);
     try { localStorage.setItem("openrun:players-density", d); } catch { /* ignore */ }
+  };
+  const [viewMode, setViewMode] = useState<ViewMode>(() => {
+    if (typeof window === "undefined") return "list";
+    return (localStorage.getItem("openrun:players-view") as ViewMode) ?? "list";
+  });
+  const switchView = (v: ViewMode) => {
+    setViewMode(v);
+    try { localStorage.setItem("openrun:players-view", v); } catch { /* ignore */ }
   };
 
   return (
@@ -301,7 +309,16 @@ function PlayersPage() {
         </div>
       </div>
 
-      {filtered === null ? (
+      <ViewDensityToggle
+        view={viewMode}
+        onViewChange={switchView}
+        density={density}
+        onDensityChange={switchDensity}
+      />
+
+      {viewMode === "map" ? (
+        <PlayMapView />
+      ) : filtered === null ? (
         <LoadingRows />
       ) : filtered.length === 0 ? (
         <EmptyState
@@ -335,29 +352,6 @@ function PlayersPage() {
             <h2 className="font-display text-sm font-bold uppercase tracking-wider text-muted-foreground">
               {filtered.length} player{filtered.length === 1 ? "" : "s"} available
             </h2>
-            <div className="inline-flex items-center gap-1 rounded-full border border-border bg-surface p-1" role="tablist" aria-label="Layout">
-              {([
-                { id: "list", label: "List", Icon: Rows3 },
-                { id: "grid", label: "Grid", Icon: LayoutGrid },
-              ] as const).map(({ id, label, Icon }) => {
-                const active = density === id;
-                return (
-                  <button
-                    key={id}
-                    role="tab"
-                    aria-selected={active}
-                    aria-label={`${label} view`}
-                    onClick={() => switchDensity(id)}
-                    className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-bold transition-colors ${
-                      active ? "bg-lime text-primary-foreground" : "text-muted-foreground"
-                    }`}
-                  >
-                    <Icon className="h-3.5 w-3.5" />
-                    {label}
-                  </button>
-                );
-              })}
-            </div>
           </div>
           <ul
             className={
@@ -381,6 +375,7 @@ function PlayersPage() {
           </ul>
         </>
       )}
+
 
       {postOpen && (
         <PostAvailabilityDialog

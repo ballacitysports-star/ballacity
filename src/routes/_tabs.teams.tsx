@@ -6,6 +6,8 @@ import { type OrgKind, type Sport } from "@/lib/sample-data";
 import { useAllOrgs } from "@/lib/org-store";
 import { OrgCard } from "@/components/OrgCard";
 import { SportChips } from "@/components/SportChips";
+import { ViewDensityToggle, type ViewMode, type Density } from "@/components/ViewDensityToggle";
+import { PlayMapView } from "@/components/PlayMapView";
 
 type SortBy = "nearest" | "followers" | "name";
 
@@ -58,6 +60,22 @@ function TeamsPage() {
   const [q, setQ] = useState("");
   const [sport, setSport] = useState<Sport | null>(null);
   const [sortBy, setSortBy] = useState<SortBy>("nearest");
+  const [density, setDensity] = useState<Density>(() => {
+    if (typeof window === "undefined") return "list";
+    return (localStorage.getItem("openrun:teams-density") as Density) ?? "list";
+  });
+  const switchDensity = (d: Density) => {
+    setDensity(d);
+    try { localStorage.setItem("openrun:teams-density", d); } catch { /* ignore */ }
+  };
+  const [viewMode, setViewMode] = useState<ViewMode>(() => {
+    if (typeof window === "undefined") return "list";
+    return (localStorage.getItem("openrun:teams-view") as ViewMode) ?? "list";
+  });
+  const switchView = (v: ViewMode) => {
+    setViewMode(v);
+    try { localStorage.setItem("openrun:teams-view", v); } catch { /* ignore */ }
+  };
   const orgs = useAllOrgs();
   const meta = KIND_META[kind];
 
@@ -184,21 +202,39 @@ function TeamsPage() {
         </label>
       </div>
 
-      <div className="space-y-3 pb-6">
-        {list.map(({ o, dist }, i) => (
-          <div key={o.id} className="relative">
-            <OrgCard org={o} index={i} />
-            <span className="pointer-events-none absolute top-3 right-3 rounded-full bg-background/70 backdrop-blur px-2 py-0.5 text-[10px] font-bold text-foreground">
-              {dist} mi
-            </span>
-          </div>
-        ))}
-        {list.length === 0 && (
-          <div className="rounded-2xl border border-border bg-surface p-8 text-center text-muted-foreground">
-            {meta.emptyText}
-          </div>
-        )}
-      </div>
+      <ViewDensityToggle
+        view={viewMode}
+        onViewChange={switchView}
+        density={density}
+        onDensityChange={switchDensity}
+      />
+
+      {viewMode === "map" ? (
+        <PlayMapView />
+      ) : (
+        <div
+          className={
+            density === "grid"
+              ? "grid grid-cols-1 sm:grid-cols-2 gap-3 pb-6"
+              : "space-y-3 pb-6"
+          }
+        >
+          {list.map(({ o, dist }, i) => (
+            <div key={o.id} className="relative">
+              <OrgCard org={o} index={i} />
+              <span className="pointer-events-none absolute top-3 right-3 rounded-full bg-background/70 backdrop-blur px-2 py-0.5 text-[10px] font-bold text-foreground">
+                {dist} mi
+              </span>
+            </div>
+          ))}
+          {list.length === 0 && (
+            <div className="rounded-2xl border border-border bg-surface p-8 text-center text-muted-foreground sm:col-span-2">
+              {meta.emptyText}
+            </div>
+          )}
+        </div>
+      )}
+
 
     </div>
   );
