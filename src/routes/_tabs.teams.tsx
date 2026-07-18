@@ -217,6 +217,15 @@ function TeamsPage() {
           />
         </div>
         <Link
+          to="/teams/create"
+          className="grid h-11 w-11 place-items-center rounded-full bg-lime-gradient text-primary-foreground glow-lime"
+          aria-label={kind === "team" ? "Create team" : "Create coach profile"}
+        >
+          <Plus className="h-5 w-5" strokeWidth={2.5} />
+        </Link>
+      </div>
+
+
 
 
       {/* Sport filter chips */}
