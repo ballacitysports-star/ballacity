@@ -66,8 +66,8 @@ export const Route = createFileRoute("/teams/$teamId")({
     return org;
   },
 });
-// touch unused helper import guard
-void errorComponentFactory;
+
+
 
 const FILTERS: { key: PostKind | "all"; label: string }[] = [
   { key: "all", label: "All posts" },
