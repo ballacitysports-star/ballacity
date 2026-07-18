@@ -98,7 +98,7 @@ function Feed() {
     hydratedRef.current = true;
     const patch: Partial<typeof DEFAULT_PREFS> = {};
     if (search.sport) {
-      const list = search.sport.split(",").map((s) => s.trim()).filter(Boolean) as Sport[];
+      const list = search.sport.split(",").map((s: string) => s.trim()).filter(Boolean) as Sport[];
       patch.preferredSports = list;
     }
     if (search.sort === "nearest" || search.sort === "soonest") patch.sortBy = search.sort;
