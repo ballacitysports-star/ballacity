@@ -26,6 +26,7 @@ const leftItems: NavItem[] = [
   },
   { to: "/players", icon: UserCheck, label: "Players", match: (p) => p.startsWith("/players") },
   { to: "/teams", icon: Users, label: "Teams", match: (p) => p.startsWith("/teams") },
+  { to: "/trainers", icon: GraduationCap, label: "Trainers", match: (p) => p.startsWith("/trainers") },
 ];
 
 const rightItems: NavItem[] = [
