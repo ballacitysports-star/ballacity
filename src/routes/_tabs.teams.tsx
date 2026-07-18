@@ -100,6 +100,7 @@ function TeamsPage() {
   const setSport = (v: Sport | null) => updateSearch({ sport: v ?? "" });
   const setSortBy = (v: SortBy) => updateSearch({ sort: v });
   const setAvail = (v: "any" | "recruiting" | "weekly" | "casual") => updateSearch({ avail: v });
+  const [filtersOpen, setFiltersOpen] = useState(false);
   const switchView = (v: ViewMode) => updateSearch({ view: v });
   const switchDensity = (d: Density) => updateSearch({ density: d });
 
