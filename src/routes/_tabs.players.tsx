@@ -91,7 +91,9 @@ function loadStoredFilters(): StoredFilters {
 
 function PlayersPage() {
   const { user } = useAuth();
+  const profile = useMyProfile(user);
   const hostedGames = useHostedGames();
+
   const myUpcomingHosted = useMemo(() => {
     if (!user) return [];
     const now = Date.now();
