@@ -31,8 +31,8 @@ export function TeamsMapView({ orgs, kind }: { orgs: Org[]; kind: OrgKind }) {
       emptyLabel={`No ${noun}s in this area.`}
       renderCard={(o) => (
         <Link
-          to="/teams/$teamId"
-          params={{ teamId: o.id }}
+          to={o.kind === "coach" ? "/trainers/$trainerId" : "/teams/$teamId"}
+          params={o.kind === "coach" ? { trainerId: o.id } : { teamId: o.id }}
           className="flex gap-3 rounded-3xl border border-border bg-surface/90 backdrop-blur-xl p-3 shadow-2xl"
         >
           <img
