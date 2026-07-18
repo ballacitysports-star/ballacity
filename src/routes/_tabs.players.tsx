@@ -53,9 +53,6 @@ import { Label } from "@/components/ui/label";
 import { kmToMi, miToKm } from "@/lib/distance";
 import { useMyProfile } from "@/lib/user-prefs-store";
 
-
-export const Route = createFileRoute("/_tabs/players")({
-  head: () => ({ meta: [{ title: "Players — OpenRun" }] }),
 // URL-persisted Players state. Refreshing or sharing the URL restores the
 // exact view: search text, sport chip, skill, distance cap, age range,
 // when-filter, and the view/density toggles. Invalid values silently
@@ -82,36 +79,6 @@ export const Route = createFileRoute("/_tabs/players")({
 const SKILLS = ["All Levels", "Beginner", "Intermediate", "Advanced"] as const;
 const WEEKDAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
-const FILTERS_STORAGE_KEY = "openrun.playersFilters.v1";
-type StoredFilters = {
-  q: string;
-  sport: string;
-  skill: string;
-  maxDistance: number;
-  ageMin: number | "";
-  ageMax: number | "";
-  includeUnknownAge: boolean;
-};
-const DEFAULT_FILTERS: StoredFilters = {
-  q: "",
-  sport: "",
-  skill: "",
-  maxDistance: 0,
-  ageMin: "",
-  ageMax: "",
-  includeUnknownAge: true,
-};
-function loadStoredFilters(): StoredFilters {
-  if (typeof window === "undefined") return DEFAULT_FILTERS;
-  try {
-    const raw = window.localStorage.getItem(FILTERS_STORAGE_KEY);
-    if (!raw) return DEFAULT_FILTERS;
-    const parsed = JSON.parse(raw) as Partial<StoredFilters>;
-    return { ...DEFAULT_FILTERS, ...parsed };
-  } catch {
-    return DEFAULT_FILTERS;
-  }
-}
 
 function PlayersPage() {
   const { user } = useAuth();
