@@ -20,7 +20,7 @@ export function TeamsMapView({ orgs, kind }: { orgs: Org[]; kind: OrgKind }) {
     };
   });
 
-  const noun = kind === "coach" ? "coach" : "team";
+  const noun = kind === "coach" ? "trainer" : "team";
   const Icon = kind === "coach" ? GraduationCap : Users;
 
   return (
