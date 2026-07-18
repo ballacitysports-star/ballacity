@@ -13,9 +13,9 @@ import {
   Loader2,
   SlidersHorizontal,
   Ticket,
-  LayoutGrid,
-  Rows3,
 } from "lucide-react";
+import { ViewDensityToggle, type ViewMode, type Density } from "@/components/ViewDensityToggle";
+import { PlayMapView } from "@/components/PlayMapView";
 import { AnimatePresence } from "framer-motion";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
