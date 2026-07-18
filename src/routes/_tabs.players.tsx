@@ -56,6 +56,26 @@ import { useMyProfile } from "@/lib/user-prefs-store";
 
 export const Route = createFileRoute("/_tabs/players")({
   head: () => ({ meta: [{ title: "Players — OpenRun" }] }),
+// URL-persisted Players state. Refreshing or sharing the URL restores the
+// exact view: search text, sport chip, skill, distance cap, age range,
+// when-filter, and the view/density toggles. Invalid values silently
+// revert to defaults per zod-adapter fallback().
+const playersSearchSchema = z.object({
+  q: fallback(z.string(), "").default(""),
+  sport: fallback(z.string(), "").default(""),
+  skill: fallback(z.string(), "").default(""),
+  dist: fallback(z.number(), 0).default(0),
+  ageMin: fallback(z.number().optional(), undefined).default(undefined),
+  ageMax: fallback(z.number().optional(), undefined).default(undefined),
+  unknownAge: fallback(z.boolean(), true).default(true),
+  when: fallback(z.string(), "any").default("any"),
+  view: fallback(z.string(), "list").default("list"),
+  density: fallback(z.string(), "list").default("list"),
+});
+
+export const Route = createFileRoute("/_tabs/players")({
+  head: () => ({ meta: [{ title: "Players — OpenRun" }] }),
+  validateSearch: zodValidator(playersSearchSchema),
   component: PlayersPage,
 });
 
