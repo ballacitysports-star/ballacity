@@ -49,6 +49,8 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { kmToMi, miToKm } from "@/lib/distance";
+import { useMyProfile } from "@/lib/user-prefs-store";
+
 
 export const Route = createFileRoute("/_tabs/players")({
   head: () => ({ meta: [{ title: "Players — OpenRun" }] }),
