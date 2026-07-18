@@ -391,7 +391,44 @@ function CreateOrg() {
                 </div>
               </Section>
 
+              {sports.length > 0 && formatOptions.length > 0 && (
+                <Section title="Preferred format">
+                  <ChipPicker
+                    options={formatOptions}
+                    selected={format ? [format] : []}
+                    onToggle={(v) => setFormat((cur) => (cur === v ? "" : v))}
+                    single
+                  />
+                </Section>
+              )}
+
+              {sports.length > 0 && venueOptions.length > 0 && (
+                <Section title="Venues / surfaces">
+                  <ChipPicker
+                    options={venueOptions}
+                    selected={venues}
+                    onToggle={(v) =>
+                      setVenues((cur) =>
+                        cur.includes(v) ? cur.filter((x) => x !== v) : [...cur, v],
+                      )
+                    }
+                  />
+                </Section>
+              )}
+
+              {sports.length > 0 && (
+                <Section title="Meeting cadence">
+                  <ChipPicker
+                    options={cadenceOptions}
+                    selected={cadence ? [cadence] : []}
+                    onToggle={(v) => setCadence((cur) => (cur === v ? "" : v))}
+                    single
+                  />
+                </Section>
+              )}
+
               <Section title="Skill range">
+
                 <div className="rounded-2xl border border-border bg-surface p-4">
                   <div className="flex items-center justify-between mb-3">
                     <span className="text-sm text-muted-foreground">Who fits here?</span>
