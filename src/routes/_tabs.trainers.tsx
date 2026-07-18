@@ -384,6 +384,7 @@ function TrainersPage() {
             aria-label="Sort trainers"
           >
             <option value="nearest">Nearest</option>
+            <option value="soonest">Soonest available</option>
             <option value="followers">Most followers</option>
             <option value="name">Name A–Z</option>
           </select>
