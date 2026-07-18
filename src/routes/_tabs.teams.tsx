@@ -60,6 +60,7 @@ function TeamsPage() {
   const [q, setQ] = useState("");
   const [sport, setSport] = useState<Sport | null>(null);
   const [sortBy, setSortBy] = useState<SortBy>("nearest");
+  const [avail, setAvail] = useState<"any" | "recruiting" | "weekly" | "casual">("any");
   const [density, setDensity] = useState<Density>(() => {
     if (typeof window === "undefined") return "list";
     return (localStorage.getItem("openrun:teams-density") as Density) ?? "list";
