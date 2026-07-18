@@ -45,7 +45,7 @@ export function TeamsMapView({ orgs, kind }: { orgs: Org[]; kind: OrgKind }) {
             <div className="flex items-center gap-2 text-xs">
               <Icon className="h-3.5 w-3.5 text-lime" strokeWidth={2.5} />
               <span className="font-semibold">
-                {o.sports?.[0] ?? (kind === "coach" ? "Coach" : "Team")}
+                {o.sports?.[0] ?? (kind === "coach" ? "Trainer" : "Team")}
               </span>
               {o.verified && (
                 <span className="text-muted-foreground">· Verified</span>
