@@ -1,37 +1,44 @@
-## Goal
+## Context
 
-Preserve the user's vertical scroll position on the feed (and similar list surfaces) across hard refresh, tab reopen, and in-app back/forward navigation. Today TanStack Router's `scrollRestoration: true` handles back/forward for already-rendered routes, but hard refresh loses the position and the feed's paginated list starts back at page 1.
+`/teams/create` already exists as a 4-step wizard (Type → Identity → Details → Branding) that collects name, handle, sports, city, bio, and branding, then calls `addOrg()` and redirects to `/teams/$teamId`. Two of the fields you asked for are missing:
 
-## Fix
+- **Skill range** — not captured anywhere on the `Org` type.
+- **Team photo** — the "Cover image" step only lets users pick from 6 preset sport images; no upload.
 
-1. **New hook** `src/hooks/use-scroll-restore.ts`
-   - `useScrollRestore(key: string, opts?: { pages?: number; onRestorePages?: (n: number) => void })`.
-   - Storage: `sessionStorage` under `openrun:scroll:<key>`. Value: `{ y: number; pages?: number; ts: number }`. TTL ~30 min (older entries ignored so a cold-open next day starts at the top).
-   - Save: throttled `scroll` listener (rAF-coalesced, max ~4/s) writes current `window.scrollY` and the caller-provided `pages`. Also flush on `pagehide` / `visibilitychange === "hidden"` so mobile refreshes and tab suspensions don't lose the last value.
-   - Restore: on mount, read the entry, call `onRestorePages(entry.pages)` synchronously so infinite lists rehydrate their `visibleCount`, then run a rAF loop (bounded ~1.5s) that calls `window.scrollTo(0, entry.y)` once `document.documentElement.scrollHeight >= entry.y + window.innerHeight` — retries let images/skeletons hydrate before we settle. Aborts if the user scrolls in the meantime.
-   - Skip restore when TanStack Router's own `history.scrollRestoration = "manual"` state signals a fresh in-app navigation with no saved offset (e.g., a Link click to `/feed`); use `performance.getEntriesByType("navigation")[0].type` — restore only on `reload` and `back_forward`, or when the entry's `ts` is fresh (last 5 s) to also cover Tab reopen.
+Redirect-after-create already works, and name/sport/location are already there.
 
-2. **`src/routes/_tabs.feed.tsx`**
-   - Call `useScrollRestore("feed", { pages: visibleCount, onRestorePages: (n) => setVisibleCount(Math.max(PAGE_SIZE, Math.min(n, filtered.length))) })` right after `visibleCount` is declared.
-   - Guard: don't clobber `visibleCount` while `filtered.length === 0` (initial data still loading) — the hook retries on next paint via its rAF loop, so passing `filtered.length` in the dependency chain naturally recomputes once data arrives.
-   - `runRefresh` (pull-to-refresh) already resets `visibleCount` to `PAGE_SIZE` — extend it to also `sessionStorage.removeItem(...)` for the feed key so an intentional refresh starts at the top.
+## Plan
 
-3. **`src/router.tsx`**
-   - Keep `scrollRestoration: true` (handles back/forward for cached matches). Also set `scrollRestorationBehavior: "instant"` so restored jumps don't animate on top of the rAF settle.
+1. **Extend the `Org` type** (`src/lib/sample-data.ts`)
+   - Add optional `skillRange?: { min: number; max: number }` where 1 = Beginner and 5 = Pro.
 
-4. **Reusable for other lists (optional, same hook, no extra code here)**
-   - Document the hook usage so `/players`, `/notifications`, `/messages` can adopt it with a one-liner. Not applied in this change to keep the diff scoped to the reported feed regression.
+2. **Add "Skill range" field to Identity step** (`src/routes/teams.create.tsx`)
+   - Dual-thumb-style min/max via two selects or a compact range control with labels: Beginner · Recreational · Intermediate · Advanced · Pro.
+   - Default: 2–4 (Recreational to Advanced).
+   - Include in `handlePreview` and the submitted `Org`.
 
-## Verification
+3. **Add photo upload to Branding step**
+   - New "Team photo" control above the preset picker:
+     - "Upload photo" button (hidden `<input type="file" accept="image/*">`).
+     - Reads via `FileReader.readAsDataURL()` → sets `cover` state to the data URL (same pattern already used for `updateStaffAvatar`).
+     - Client-side validation: image mime type, ≤ 4MB (reject with inline error).
+     - Show a "Remove" button when a custom upload is active to revert to the sport preset.
+   - Presets remain as a fallback grid below.
 
-- Scroll ~5 pages into `/feed`, hard-refresh → same cards visible, same scroll offset within a few px. Console shows no double-fetches.
-- Scroll into feed, tap a game, then back → same offset (already works via router, still works).
-- Scroll into feed, pull-to-refresh → jumps to top and stays there on next refresh.
-- Signed-out `/` → unchanged (hook is scoped to feed).
-- `bunx tsgo --noEmit` passes.
+4. **Surface skill range on the team page** (`src/routes/teams.$teamId.tsx`)
+   - Small pill under the tagline showing "Skill: Recreational–Advanced" when set. Read-only display only; no other logic changes.
 
-## Technical notes
+5. **Keep redirect behavior**
+   - `submit()` already navigates to `/teams/$teamId` with the new id — no change.
 
-- Files touched: new `src/hooks/use-scroll-restore.ts`; edits to `src/routes/_tabs.feed.tsx`, `src/router.tsx`.
-- `sessionStorage` (not `localStorage`) — scroll intent is tab-scoped; sharing across tabs would jump users to a position from a different window.
-- No schema, auth, or SSR changes. Hook is client-only, guarded with `typeof window` checks.
+## Out of scope
+
+- No database work: teams still live in the in-memory `org-store` (matches the rest of the teams feature).
+- No changes to the edit-team route (can follow in a separate pass if you want parity).
+- No image cropping — plain upload + preview.
+
+## Technical details
+
+- File-size guard: reject `file.size > 4 * 1024 * 1024` before reading.
+- Skill labels array lives in `teams.create.tsx` as a local const; the numeric min/max is what gets stored so it's easy to render/sort later.
+- No new dependencies.
