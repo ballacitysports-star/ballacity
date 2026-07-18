@@ -63,7 +63,7 @@ const ACCENTS = [
   { name: "Violet", hex: "#a78bfa" },
 ];
 
-const STEPS = ["Type", "Identity", "Details", "Branding"] as const;
+const STEPS = ["Identity", "Details", "Branding"] as const;
 
 const SKILL_LABELS = ["Beginner", "Recreational", "Intermediate", "Advanced", "Pro"] as const;
 
