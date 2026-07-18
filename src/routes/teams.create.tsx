@@ -317,7 +317,7 @@ function CreateOrg() {
                 active={kind === "coach"}
                 onClick={() => setKind("coach")}
                 icon={<GraduationCap className="h-6 w-6" />}
-                title="Coach / Trainer"
+                title="Trainer"
                 desc="Showcase credentials, book sessions, run clinics & open workouts."
                 badges={["Clinics", "Bookings", "Reviews"]}
               />
