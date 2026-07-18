@@ -269,7 +269,7 @@ function EditOrg() {
           <h1 className="font-display text-xl font-bold leading-tight">{STEPS[step - 1]}</h1>
         </div>
         <div className="rounded-full bg-secondary px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-          {kind === "team" ? "Team" : "Coach"}
+          {kind === "team" ? "Team" : "Trainer"}
         </div>
       </div>
 
