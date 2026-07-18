@@ -24,7 +24,7 @@ export function OrgCard({ org, index = 0 }: { org: Org; index?: number }) {
           />
           <div className="absolute inset-0 bg-gradient-to-t from-surface via-surface/40 to-transparent" />
           <span className="absolute top-3 left-3 rounded-full bg-background/70 backdrop-blur px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider">
-            {org.kind === "team" ? "Team" : "Coach"}
+            {org.kind === "team" ? "Team" : "Trainer"}
           </span>
         </div>
 
