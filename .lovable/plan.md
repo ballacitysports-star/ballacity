@@ -1,32 +1,30 @@
 ## Problem
 
-When you refresh, you land on the marketing hero at `/`. That's because `src/routes/index.tsx` unconditionally renders the `Landing` component regardless of whether you're signed in — so any code path that ends up at `/` (a shared link, a link back to `/`, an OAuth redirect that drops `next`, or a bookmarked home) shows the marketing page instead of the in‑app surface (`/feed`).
+The previous turn added an auto-redirect in `src/routes/index.tsx`: any signed-in visit to `/` is replaced with `/feed`. That means if a refresh ever resolves to `/` — a bookmarked home, an OAuth return, a mobile webview that drops the path, or any link back to `/` — the user is thrown onto `/feed` and loses whatever page + query params they were on.
 
-The mobile/desktop AuthGate refresh fix from previous turns already keeps you on your current URL when it's a protected route — but it doesn't do anything when the URL genuinely is `/`.
+The user wants the opposite: refresh should keep them exactly where they were, query string intact, and never force-navigate to `/feed`.
 
 ## Fix
 
-Make `/` session‑aware:
+1. **Remove the `/` → `/feed` auto-redirect** in `src/routes/index.tsx`.
+   - Delete the `useEffect` that calls `router.navigate({ to: "/feed", replace: true })`.
+   - Delete the pre-paint gate that returns `null` when a stored session exists.
+   - Drop the now-unused imports (`useEffect`, `useRouter`, `useAuth`, `readStoredSupabaseSession`).
+   - `/` always renders the marketing `Landing` — for everyone, signed-in or not. The header already has an "Open app" link for signed-in users to jump into `/feed` on their own.
 
-1. In `src/routes/index.tsx`, when a signed‑in session is detected, immediately `router.navigate({ to: "/feed", replace: true })`.
-   - Read auth via the existing `useAuth()` hook (localStorage‑hydrated, mobile‑safe).
-   - While `loading` is true, render nothing (or a tiny spinner) instead of the marketing hero to avoid the "flash of marketing" for signed‑in users.
-   - When `loading` is false and there's no user, render the existing `Landing` unchanged.
-2. Also short‑circuit on the very first client tick using `readStoredSupabaseSession()` (already used by `AuthGate`) so signed‑in refreshes on `/` never even paint the hero for a frame.
-3. Keep the "Open app" and every other `<Link to="/">` in the app working — signed‑out visitors still see marketing.
+2. **Leave `AuthGate` alone.** It already preserves the current URL + query on refresh for protected routes (the 4s hydration wait + `sanitizeNextPath(router.state.location.href)` behavior shipped earlier). No changes there.
 
-No changes to `AuthGate`, `auth.tsx`, the OneSignal SW, or any other route — those are already correct.
+3. **Leave `src/routes/auth.tsx` alone.** `goPostAuth` still falls back to `/feed` only when there is no `next` and no same-origin referrer — that only runs after an explicit sign-in, not on refresh, so it doesn't affect this bug.
 
 ## Verification
 
-- Signed‑in refresh at `/` → replaced with `/feed` without flashing marketing.
-- Signed‑out refresh at `/` → marketing hero renders as today.
-- Signed‑in refresh at `/feed`, `/profile`, `/games/:id`, etc. → unchanged (still handled by `AuthGate`).
-- Existing e2e specs (`desktop-refresh-protected.spec.ts`, `mobile-refresh-protected.spec.ts`) still pass.
-- Add one new e2e case: signed‑in refresh at `/` ends up at `/feed`.
+- Signed-in refresh at `/profile?tab=hosting` → stays on `/profile?tab=hosting`.
+- Signed-in refresh at `/games/:id?foo=bar` → stays there.
+- Signed-in refresh at `/` → renders marketing landing (no forced jump to `/feed`).
+- Signed-out refresh at `/` → renders marketing landing (unchanged).
+- Existing `e2e/desktop-refresh-protected.spec.ts` and `e2e/mobile-refresh-protected.spec.ts` still pass.
 
 ## Technical notes
 
-- Use `useRouter().navigate({ to: "/feed", replace: true })` inside a `useEffect` gated on `!loading && user`.
-- Pre‑paint gate: `const stored = typeof window !== "undefined" ? readStoredSupabaseSession() : null;` — if `stored` exists, return `null` on the first render so React never commits the marketing tree before the redirect fires.
-- The route stays a public route in `PUBLIC_ROUTES`, so `AuthGate` doesn't interfere.
+- Only `src/routes/index.tsx` changes. Route stays public in `PUBLIC_ROUTES`, so `AuthGate` doesn't touch it.
+- No new dependencies, no schema changes, no test rewrites.
