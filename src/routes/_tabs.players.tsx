@@ -22,6 +22,7 @@ import { AnimatePresence } from "framer-motion";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
 import { Logo } from "@/components/Logo";
+import { SportChips } from "@/components/SportChips";
 import { MyAvatar, UserAvatar } from "@/components/UserAvatar";
 import { useAuth } from "@/hooks/use-auth";
 import { useUnreadNotificationCount } from "@/lib/notifications";
