@@ -129,9 +129,31 @@ function CreateOrg() {
     record: kind === "team" ? { w: wins, l: losses } : undefined,
     homeCourt: kind === "team" ? homeCourt : undefined,
     staff: kind === "team" ? staff : undefined,
+    skillRange: { min: skillMin, max: skillMax },
     upcoming: [],
     posts: [],
   };
+
+  function onCoverFile(file: File | undefined) {
+    if (!file) return;
+    if (!file.type.startsWith("image/")) {
+      setCoverError("Please choose an image file.");
+      return;
+    }
+    if (file.size > MAX_COVER_BYTES) {
+      setCoverError("Image is too large — max 4 MB.");
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => {
+      if (typeof reader.result === "string") {
+        setCover(reader.result);
+        setCustomCover(true);
+        setCoverError(null);
+      }
+    };
+    reader.readAsDataURL(file);
+  }
 
   function submit() {
     const id = `${kind === "team" ? "t" : "c"}-${(name || "org").toLowerCase().replace(/[^a-z0-9]+/g, "-")}-${Date.now().toString(36).slice(-4)}`;
