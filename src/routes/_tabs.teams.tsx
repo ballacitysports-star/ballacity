@@ -159,9 +159,39 @@ function TeamsPage() {
         </Link>
       </div>
 
+      {/* Sport filter chips */}
+      <div className="mb-3">
+        <SportChips selected={sport} onSelect={(s) => setSport(s as Sport | null)} />
+      </div>
+
+      {/* Sort control + result count */}
+      <div className="mb-4 flex items-center justify-between gap-2">
+        <span className="text-xs text-muted-foreground">
+          {list.length} {list.length === 1 ? "result" : "results"}
+        </span>
+        <label className="inline-flex items-center gap-2 rounded-full border border-border bg-surface px-3 py-1.5 text-xs font-semibold">
+          <ArrowUpDown className="h-3.5 w-3.5 text-muted-foreground" />
+          <select
+            value={sortBy}
+            onChange={(e) => setSortBy(e.target.value as SortBy)}
+            className="bg-transparent outline-none"
+            aria-label="Sort teams"
+          >
+            <option value="nearest">Nearest</option>
+            <option value="followers">Most followers</option>
+            <option value="name">Name A–Z</option>
+          </select>
+        </label>
+      </div>
+
       <div className="space-y-3 pb-6">
-        {list.map((o, i) => (
-          <OrgCard key={o.id} org={o} index={i} />
+        {list.map(({ o, dist }, i) => (
+          <div key={o.id} className="relative">
+            <OrgCard org={o} index={i} />
+            <span className="pointer-events-none absolute top-3 right-3 rounded-full bg-background/70 backdrop-blur px-2 py-0.5 text-[10px] font-bold text-foreground">
+              {dist} mi
+            </span>
+          </div>
         ))}
         {list.length === 0 && (
           <div className="rounded-2xl border border-border bg-surface p-8 text-center text-muted-foreground">
@@ -169,6 +199,7 @@ function TeamsPage() {
           </div>
         )}
       </div>
+
     </div>
   );
 }
