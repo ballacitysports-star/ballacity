@@ -225,6 +225,7 @@ function Feed() {
     refreshingRef.current = true;
     setRefreshing(true);
     setVisibleCount(PAGE_SIZE);
+    clearScrollRestore("feed");
     try {
       await router.invalidate();
       await new Promise((r) => setTimeout(r, 450));
