@@ -390,7 +390,16 @@ function Input({
 
 // =============================================================
 function VerifyPanel() {
-  const [filter, setFilter] = useState<"pending" | "verified" | "rejected">("pending");
+  const search = Route.useSearch();
+  const nav = useNavigate();
+  const filter: "pending" | "verified" | "rejected" =
+    search.verify === "verified" || search.verify === "rejected" ? search.verify : "pending";
+  const setFilter = (v: "pending" | "verified" | "rejected") =>
+    nav({
+      to: "/payments",
+      search: (p: any) => ({ ...p, verify: v === "pending" ? "" : v }),
+      replace: true,
+    });
   const [subs, setSubs] = useState<PaymentSubmission[]>([]);
   const [pendingCount, setPendingCount] = useState(0);
   const refresh = () => {
