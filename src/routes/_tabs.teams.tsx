@@ -1,7 +1,7 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { motion } from "framer-motion";
-import { Search, Plus, Megaphone, Users, GraduationCap, ArrowUpDown, MapPin } from "lucide-react";
+import { Search, Plus, Megaphone, Users, GraduationCap, ArrowUpDown, MapPin, SlidersHorizontal } from "lucide-react";
 import { zodValidator, fallback } from "@tanstack/zod-adapter";
 import { z } from "zod";
 import { type OrgKind, type Sport } from "@/lib/sample-data";
