@@ -210,7 +210,8 @@ function TrainersPage() {
     };
     const specialtyLower = specialty.toLowerCase();
     const byVenue = filterTrainersByVenue(orgs, venue);
-    const filtered = byVenue
+    const byOrg = orgId ? byVenue.filter((o) => orgMemberIds.has(o.id)) : byVenue;
+    const filtered = byOrg
       .filter((o) => (sport ? o.sports.includes(sport) : true))
       .filter((o) => {
         if (!specialty) return true;
