@@ -65,6 +65,7 @@ const trainersSearchSchema = z.object({
   sport: fallback(z.string(), "").default(""),
   specialty: fallback(z.string(), "").default(""),
   venue: fallback(z.string(), "").default(""),
+  orgId: fallback(z.string(), "").default(""),
   radius: fallback(z.coerce.number().min(0).max(200), 0).default(0),
   avail: fallback(z.string(), "any").default("any"),
   sort: fallback(z.string(), "nearest").default("nearest"),
