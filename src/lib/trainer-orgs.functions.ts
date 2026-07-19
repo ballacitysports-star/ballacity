@@ -68,6 +68,9 @@ export const createTrainerOrg = createServerFn({ method: "POST" })
     city?: string;
     avatar?: string;
     website?: string;
+    address?: string;
+    placeId?: string;
+    geo?: { lat: number; lng: number } | null;
   }) =>
     z
       .object({
@@ -78,6 +81,12 @@ export const createTrainerOrg = createServerFn({ method: "POST" })
         city: z.string().max(120).optional(),
         avatar: z.string().max(10).optional(),
         website: z.string().url().max(300).optional(),
+        address: z.string().max(300).optional(),
+        placeId: z.string().max(200).optional(),
+        geo: z
+          .object({ lat: z.number().min(-90).max(90), lng: z.number().min(-180).max(180) })
+          .nullable()
+          .optional(),
       })
       .parse(d),
   )
@@ -90,10 +99,14 @@ export const createTrainerOrg = createServerFn({ method: "POST" })
       _avatar: data.avatar ?? undefined,
       _city: data.city ?? undefined,
       _website: data.website ?? undefined,
+      _address: data.address ?? undefined,
+      _place_id: data.placeId ?? undefined,
+      _geo: data.geo ?? undefined,
     });
     if (error) throw new Error(error.message);
     return id as string;
   });
+
 
 export const listMyTrainerOrgMemberships = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
