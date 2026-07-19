@@ -98,6 +98,7 @@ export function CreateOrgWizard({ kind }: { kind: OrgKind }) {
   const [formats, setFormats] = useState<string[]>([]);
   const [venues, setVenues] = useState<string[]>([]);
   const [venueAddresses, setVenueAddresses] = useState<string[]>([]);
+  const [primaryVenue, setPrimaryVenue] = useState<string | null>(null);
   const [cadences, setCadences] = useState<string[]>([]);
   const [positionsBySport, setPositionsBySport] = useState<Record<string, PositionsNeeded>>({});
   const [ratingMin, setRatingMin] = useState<string>("");
@@ -166,6 +167,11 @@ export function CreateOrgWizard({ kind }: { kind: OrgKind }) {
     formats,
     venues,
     venueAddresses: isCoach ? venueAddresses.filter((v) => v.trim().length > 0) : undefined,
+    primaryVenue: isCoach
+      ? (primaryVenue && venueAddresses.map((v) => v.trim()).includes(primaryVenue.trim())
+          ? primaryVenue.trim()
+          : undefined)
+      : undefined,
     cadence: cadences[0],
     cadences,
     positionsNeeded: Object.fromEntries(
@@ -177,7 +183,15 @@ export function CreateOrgWizard({ kind }: { kind: OrgKind }) {
     distances,
     sessionTypes: isCoach ? sessionTypes : undefined,
     availabilitySlots: isCoach
-      ? slots.filter((s) => s.start && s.end && s.end > s.start)
+      ? slots
+          .filter((s) => s.start && s.end && s.end > s.start)
+          .map((s) => ({
+            ...s,
+            venue:
+              s.venue && venueAddresses.map((v) => v.trim()).includes(s.venue.trim())
+                ? s.venue.trim()
+                : undefined,
+          }))
       : undefined,
     upcoming: [],
     posts: [],
