@@ -734,6 +734,47 @@ function EditOrg() {
                       </button>
                     </div>
                   </Section>
+
+                  <Section title="Session venues">
+                    <div className="space-y-2">
+                      {venueAddresses.length === 0 && (
+                        <p className="text-xs text-muted-foreground">
+                          Add one or more addresses where you hold sessions — bookers see these on your profile.
+                        </p>
+                      )}
+                      {venueAddresses.map((addr, i) => (
+                        <div key={i} className="flex items-start gap-2">
+                          <div className="flex-1">
+                            <LocationAutocomplete
+                              value={addr}
+                              onChange={(v) =>
+                                setVenueAddresses((cur) =>
+                                  cur.map((a, j) => (j === i ? v : a)),
+                                )
+                              }
+                              placeholder="Gym, park, or full address"
+                            />
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setVenueAddresses((cur) => cur.filter((_, j) => j !== i))
+                            }
+                            className="mt-1 rounded-full p-2 text-muted-foreground hover:bg-surface"
+                            aria-label="Remove venue"
+                          >
+                            <X className="h-4 w-4" />
+                          </button>
+                        </div>
+                      ))}
+                      <button
+                        type="button"
+                        onClick={() => setVenueAddresses((cur) => [...cur, ""])}
+                        className="inline-flex items-center gap-1.5 rounded-2xl border border-dashed border-border bg-surface px-3 py-2 text-sm font-semibold text-foreground hover:border-lime"
+                      >
+                        <Plus className="h-4 w-4" /> Add venue
+                      </button>
+                    </div>
                 </>
               )}
             </div>
