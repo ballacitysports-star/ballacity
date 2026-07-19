@@ -1,31 +1,59 @@
 ## Goal
 
-When editing a trainer profile, keep the URL under `/trainers/...` instead of jumping to `/teams/$teamId/edit`.
+Bring Google Places autocomplete to two org/gym touchpoints:
 
-## Approach
-
-Add a dedicated trainer edit route that reuses the existing editor UI, and point trainer-facing Edit links at it. Team edits keep using `/teams/$teamId/edit`.
+1. **Org/gym profile address** — new full street-address field on org create + edit (currently only "City" is autocompleted).
+2. **Trainer wizard "Organization / Gym" typeahead** — when a user searches for an org that isn't in our DB, also show Google Places results so they can create a new org pre-filled with a verified address.
 
 ## Changes
 
-1. **New route `src/routes/trainers.$trainerId.edit.tsx`**
-   - `createFileRoute("/trainers/$trainerId/edit")`, `ssr: false`.
-   - Extract the current `EditOrg` component from `src/routes/teams.$teamId.edit.tsx` into a shared module `src/components/edit/EditOrgScreen.tsx` that takes `orgId` as a prop.
-   - The trainer route reads `trainerId` param, passes it as `orgId`, and on save/cancel navigates back to `/trainers/$trainerId`.
+### 1. Schema (migration)
 
-2. **Update `src/routes/teams.$teamId.edit.tsx`**
-   - Becomes a thin wrapper that renders `<EditOrgScreen orgId={teamId} backTo="team" />`.
-   - Coach-kind orgs opened here still work, but success redirect goes to `/teams/$teamId` (unchanged for team-kind).
+Add address columns to `public.trainer_orgs`:
+- `address text` — formatted street address
+- `place_id text` — Google Place ID (for dedupe / re-verification)
+- `geo jsonb` — `{ lat, lng }` for map preview
 
-3. **Repoint trainer-facing Edit links to the new route**
-   - `src/routes/trainers.$trainerId.tsx:240` → `to="/trainers/$trainerId/edit"` with `params={{ trainerId }}`.
-   - `src/components/TrainerProfileChecklist.tsx:37` → same.
-   - Leave team-oriented links (`OrgCard`, `TeamsMapView`, `CreateOrgWizard`, review routes) untouched.
+No RLS/grant changes needed (existing policies on `trainer_orgs` cover new columns).
 
-4. **Post-save navigation inside `EditOrgScreen`**
-   - Already redirects to `/trainers/$id` for coach kind and `/teams/$id` for team kind — keep that behavior so both entry points land back where the user came from.
+### 2. Org/gym wizard — add address field
 
-## Verification
+Files: `src/components/CreateOrgWizard.tsx`, `src/routes/teams.$teamId.edit.tsx` (org kind = `coach-org` / gym branch)
 
-- Typecheck.
-- Playwright: open `/trainers/c-nc-4kgo`, click Edit, assert URL is `/trainers/c-nc-4kgo/edit`, advance one step, Save, assert redirect to `/trainers/c-nc-4kgo`.
+- Add an "Address" step field using `<LocationAutocomplete mode="place" />` beneath City.
+- Persist `address`, `placeId`, `geo` in draft + submit payload.
+- Show `<VenueMapPreview>` under the field when a place is picked (reuse existing component).
+- Save through existing `addOrg` / org update path so both create and edit persist.
+
+### 3. Org profile display
+
+File: `src/routes/orgs.$orgId.tsx`
+- Render address + small map preview when present.
+
+### 4. Trainer wizard — hybrid org typeahead
+
+File: `src/components/create/CreateTrainerWizard.tsx` (Organization / Gym section)
+
+Current: searches only `listTrainerOrgs` (our DB). "Create new org" uses just the typed name.
+
+New behavior:
+- Keep DB results at the top ("Existing orgs").
+- Below, when DB has 0–few matches, call `autocompletePlaces` (existing server fn in `src/lib/places.functions.ts`) filtered to establishments to show Google suggestions labeled "From Google".
+- Selecting a Google suggestion sets `orgChoice = { mode: "new", name, placeId, address, geo }` (fetch details via `getPlaceDetails` for address + geo).
+- On publish, `createTrainerOrg` receives the address/placeId/geo, creating the new org with a verified location in one step.
+
+### 5. Trainer-orgs server fn
+
+File: `src/lib/trainer-orgs.functions.ts`
+- Extend `createTrainerOrg` input validator + insert to accept optional `address`, `placeId`, `geo`.
+
+## Non-goals
+
+- No changes to venue/session-venue flows (already Google-autocompleted).
+- No changes to team wizard address (teams don't need a street address).
+
+## Technical notes
+
+- Reuse `LocationAutocomplete`, `autocompletePlaces`, `getPlaceDetails`, `VenueMapPreview` — no new libraries.
+- Zod schema in `createTrainerOrg` guards optional address fields.
+- Migration is additive; existing orgs remain valid with null address.

@@ -244,8 +244,18 @@ export function CreateOrgWizard({ kind }: { kind: OrgKind }) {
   type OrgChoice =
     | { mode: "independent" }
     | { mode: "join"; orgId: string; orgName: string }
-    | { mode: "create"; name: string; handle: string; city: string; bio: string };
+    | {
+        mode: "create";
+        name: string;
+        handle: string;
+        city: string;
+        bio: string;
+        address?: string;
+        placeId?: string;
+        geo?: { lat: number; lng: number } | null;
+      };
   const [orgChoice, setOrgChoice] = useState<OrgChoice>({ mode: "independent" });
+
   const [orgSearch, setOrgSearch] = useState("");
   const orgSearchResults = useQuery({
     queryKey: ["trainer-orgs-wizard-search", orgSearch],
@@ -298,9 +308,13 @@ export function CreateOrgWizard({ kind }: { kind: OrgKind }) {
                 trainerId: saved.id,
                 city: orgChoice.city.trim() || undefined,
                 bio: orgChoice.bio.trim() || undefined,
+                address: orgChoice.address?.trim() || undefined,
+                placeId: orgChoice.placeId || undefined,
+                geo: orgChoice.geo ?? undefined,
               },
             });
             toast.success("Organization created");
+
           } else if (orgChoice.mode === "join") {
             await requestToJoinTrainerOrg({
               data: { orgId: orgChoice.orgId, trainerId: saved.id },
@@ -1323,6 +1337,27 @@ export function CreateOrgWizard({ kind }: { kind: OrgKind }) {
                         placeholder="City (optional)"
                         className="w-full rounded-2xl border border-border bg-surface px-4 py-3 text-sm outline-none focus:border-lime"
                       />
+                      <LocationAutocomplete
+                        value={orgChoice.address ?? ""}
+                        onChange={(v) => setOrgChoice({ ...orgChoice, address: v, placeId: undefined, geo: null })}
+                        onPick={(v, placeId, geo) =>
+                          setOrgChoice({
+                            ...orgChoice,
+                            address: v,
+                            placeId,
+                            geo: geo ? { lat: geo.lat, lng: geo.lng } : null,
+                          })
+                        }
+                        placeholder="Street address (optional)"
+                        mode="place"
+                        showCurrentButton={false}
+                      />
+                      {orgChoice.geo && (
+                        <div className="overflow-hidden rounded-2xl border border-border">
+                          <VenueMapPreview address={orgChoice.address ?? orgChoice.name} lat={orgChoice.geo.lat} lng={orgChoice.geo.lng} placeId={orgChoice.placeId} />
+                        </div>
+                      )}
+
                       <textarea
                         value={orgChoice.bio}
                         onChange={(e) =>
