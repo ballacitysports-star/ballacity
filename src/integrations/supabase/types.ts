@@ -1166,6 +1166,7 @@ export type Database = {
         Row: {
           accent: string
           achievements: string[]
+          availability_overrides: Json
           availability_slots: Json
           avatar: string
           bio: string
@@ -1209,6 +1210,7 @@ export type Database = {
         Insert: {
           accent?: string
           achievements?: string[]
+          availability_overrides?: Json
           availability_slots?: Json
           avatar?: string
           bio?: string
@@ -1252,6 +1254,7 @@ export type Database = {
         Update: {
           accent?: string
           achievements?: string[]
+          availability_overrides?: Json
           availability_slots?: Json
           avatar?: string
           bio?: string

@@ -19,6 +19,7 @@ import {
   type TrainerSessionRequest,
 } from "@/lib/trainer-requests";
 import { useAuth } from "@/hooks/use-auth";
+import { resolveDay, fromDateKey, maxHorizonDate, toDateKey } from "@/lib/availability-resolve";
 
 type Mode = "form" | "existing" | "sent";
 
@@ -206,9 +207,29 @@ export function BookSessionSheet({
                   type="date"
                   value={date}
                   min={new Date().toISOString().slice(0, 10)}
+                  max={toDateKey(maxHorizonDate())}
                   onChange={(e) => setDate(e.target.value)}
                   className="w-full rounded-2xl border border-border bg-surface px-3 py-2.5 text-sm outline-none focus:border-lime"
                 />
+                {date && (() => {
+                  const windows = resolveDay(
+                    fromDateKey(date),
+                    org.availabilitySlots ?? [],
+                    org.availabilityOverrides ?? [],
+                  );
+                  if (windows.length === 0) {
+                    return (
+                      <p className="mt-1 text-[11px] text-rose-300">
+                        Trainer is not available this day — request anyway or pick another date.
+                      </p>
+                    );
+                  }
+                  return (
+                    <p className="mt-1 text-[11px] text-muted-foreground">
+                      Available: {windows.map((w) => `${w.start}–${w.end}`).join(", ")}
+                    </p>
+                  );
+                })()}
               </label>
               <div>
                 <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-1.5 flex items-center gap-1">

@@ -74,6 +74,23 @@ const TeamShape = z.object({
       }),
     )
     .default([]),
+  availability_overrides: z
+    .array(
+      z.object({
+        date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+        closed: z.boolean().optional(),
+        windows: z
+          .array(
+            z.object({
+              start: z.string().regex(/^\d{2}:\d{2}$/),
+              end: z.string().regex(/^\d{2}:\d{2}$/),
+              venue: z.string().max(300).optional(),
+            }),
+          )
+          .optional(),
+      }),
+    )
+    .default([]),
 });
 
 function refineVenues(

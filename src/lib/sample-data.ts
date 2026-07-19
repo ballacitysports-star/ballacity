@@ -396,6 +396,7 @@ export type Org = {
   distances?: string[];
   sessionTypes?: string[];
   availabilitySlots?: { day: "mon" | "tue" | "wed" | "thu" | "fri" | "sat" | "sun"; start: string; end: string; venue?: string }[];
+  availabilityOverrides?: { date: string; closed?: boolean; windows?: { start: string; end: string; venue?: string }[] }[];
   upcoming: string[]; // game ids
   posts: OrgPost[];
 };

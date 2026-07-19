@@ -27,6 +27,7 @@ import { computeReputation, useReviewsFor } from "@/lib/reviews";
 import { ReputationBadge } from "@/components/ReputationBadge";
 import { useCanReview } from "@/lib/transactions";
 import { BookSessionSheet } from "@/components/BookSessionSheet";
+import { TrainerAvailabilityMonth } from "@/components/TrainerAvailabilityMonth";
 import {
   Dialog,
   DialogContent,
@@ -448,94 +449,22 @@ function TrainerPage() {
               </Section>
             )}
 
-            {org.availabilitySlots && org.availabilitySlots.length > 0 && (
+            {((org.availabilitySlots?.length ?? 0) > 0 || (org.availabilityOverrides?.length ?? 0) > 0) && (
               <Section
                 title={
                   <>
-                    <Calendar className="h-4 w-4" /> Weekly availability
+                    <Calendar className="h-4 w-4" /> Availability
                   </>
                 }
               >
-                {(() => {
-                  const dayLabel: Record<string, string> = {
-                    mon: "Monday", tue: "Tuesday", wed: "Wednesday",
-                    thu: "Thursday", fri: "Friday", sat: "Saturday", sun: "Sunday",
-                  };
-                  const venueList = org.venueAddresses ?? [];
-                  const primary = org.primaryVenue?.trim();
-                  const groupsOrder: string[] = [];
-                  if (primary && venueList.map((v) => v.trim()).includes(primary)) {
-                    groupsOrder.push(primary);
-                  }
-                  for (const v of venueList) {
-                    const t = v.trim();
-                    if (t && !groupsOrder.includes(t)) groupsOrder.push(t);
-                  }
-                  const groups = new Map<string, typeof org.availabilitySlots>();
-                  const anySlots: NonNullable<typeof org.availabilitySlots> = [];
-                  for (const s of org.availabilitySlots ?? []) {
-                    const key = s.venue?.trim();
-                    if (key && groupsOrder.includes(key)) {
-                      const arr = groups.get(key) ?? [];
-                      arr.push(s);
-                      groups.set(key, arr);
-                    } else {
-                      anySlots.push(s);
-                    }
-                  }
-                  const hasVenues = venueList.some((v) => v.trim().length > 0);
-                  const renderSlots = (list: NonNullable<typeof org.availabilitySlots>) => (
-                    <ul className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                      {list.map((s, i) => (
-                        <li
-                          key={i}
-                          className="flex items-center justify-between rounded-2xl border border-border bg-surface px-3 py-2 text-sm"
-                        >
-                          <span className="font-semibold">{dayLabel[s.day] ?? s.day}</span>
-                          <span className="text-muted-foreground">
-                            {s.start} – {s.end}
-                          </span>
-                        </li>
-                      ))}
-                    </ul>
-                  );
-                  if (!hasVenues) {
-                    return renderSlots(org.availabilitySlots ?? []);
-                  }
-                  return (
-                    <div className="space-y-4">
-                      {groupsOrder.map((v) => {
-                        const list = groups.get(v);
-                        if (!list || list.length === 0) return null;
-                        const isPrimary = primary === v;
-                        return (
-                          <div key={v} className="space-y-1.5">
-                            <div className="flex items-center gap-2 px-1">
-                              <MapPin className="h-3.5 w-3.5 text-coral shrink-0" />
-                              <span className="text-xs font-semibold truncate">{v}</span>
-                              {isPrimary && (
-                                <span className="shrink-0 rounded-full border border-lime bg-lime/20 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-lime">
-                                  Primary
-                                </span>
-                              )}
-                            </div>
-                            {renderSlots(list)}
-                          </div>
-                        );
-                      })}
-                      {anySlots.length > 0 && (
-                        <div className="space-y-1.5">
-                          <div className="px-1 text-xs font-semibold text-muted-foreground">
-                            Any venue
-                          </div>
-                          {renderSlots(anySlots)}
-                        </div>
-                      )}
-                    </div>
-                  );
-                })()}
+                <TrainerAvailabilityMonth
+                  weekly={org.availabilitySlots ?? []}
+                  overrides={org.availabilityOverrides ?? []}
+                  primaryVenue={org.primaryVenue ?? null}
+                />
               </Section>
             )}
+
 
             <Section
               title={

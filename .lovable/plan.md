@@ -1,39 +1,71 @@
-## Goal
-Only allow trainer venue addresses that were selected from Google Places autocomplete. Block save/publish on any free-typed or edited-after-pick entries.
+# Monthly availability calendar (up to 6 months out)
 
-## Approach
-Track a client-side set of "verified" address strings per row — an address is verified only when the user taps a Places suggestion. Any manual keystroke after that clears the verified flag for that row. Save/publish is disabled until every non-empty venue row is verified. Server-side validation also rejects unverified entries as a defense-in-depth check.
+Replace the trainer "Weekly availability" UI with a monthly calendar. Keep a weekly recurring base as the underlying pattern, layered with per-date overrides. Each time window still picks a venue. Existing weekly slots are discarded on migration — trainers start fresh.
 
-## Changes
+## Model
 
-### 1. `src/components/LocationAutocomplete.tsx`
-- Add optional prop `requirePick?: boolean` and `onPick?: (v: string, placeId: string) => void` (extend existing `onPick`).
-- Pass the Places `placeId` into `pick()` and forward via `onPick`.
-- When `requirePick` is on and the user types (not picks), surface a helper message: "Choose an address from the list to save it."
+Two-layer availability:
 
-### 2. `src/components/CreateOrgWizard.tsx` (Session venues step)
-- Add state `verifiedVenues: Set<string>` (values are trimmed address strings).
-- On Places pick: add the address to the set.
-- On text edit: remove the old trimmed value from the set.
-- Show per-row status: green "✓ Verified" chip when the trimmed value is in the set; amber "Pick from suggestions" hint when non-empty but unverified.
-- Extend `venueValidation` gating so `nextDisabled`/`submit` are blocked if any non-empty venue is unverified.
+- **Weekly base** (existing `availability_slots` jsonb): `{ weekday, start, end, venue? }[]` — recurring pattern that projects forward every week.
+- **Date overrides** (new `availability_overrides` jsonb): keyed by ISO date `YYYY-MM-DD`:
+  - `{ "2026-08-14": { blocked: true } }` — cancel all base slots that day.
+  - `{ "2026-08-14": { windows: [{ start, end, venue? }] } }` — replace base with explicit windows (empty array also blocks).
+  - Overrides are only allowed for dates within the next 6 months (rolling window from today).
 
-### 3. `src/routes/teams.$teamId.edit.tsx` (Session venues section)
-- Mirror the same `verifiedVenues` state and per-row UI.
-- Seed the set on load with the org's saved `venueAddresses` (already persisted values are treated as verified — no forced re-pick for existing trainers).
-- Block Save when any non-empty row is unverified.
+Resolution per date = override.windows if present, else (blocked ? [] : projected base slots for that weekday).
 
-### 4. `src/lib/venue-address.ts`
-- Extend `validateVenueAddresses` to accept an optional `verified: Set<string>` and return an "unverified" error message for any non-empty address not in the set. Existing callers stay backward-compatible.
+## Data changes
 
-### 5. `src/lib/teams.functions.ts`
-- Add a `verifiedVenues?: string[]` field to the venue-carrying inputs (trainer create/update).
-- In the Zod `.superRefine`, reject any `venue_addresses` entry not present in `verifiedVenues` with "Venue must be selected from suggestions." Existing trainers editing without touching venues send their saved list back as verified.
+Migration on `public.teams`:
+- Add `availability_overrides jsonb NOT NULL DEFAULT '{}'::jsonb`.
+- Clear existing weekly slots: `UPDATE public.teams SET availability_slots = '[]'::jsonb WHERE kind = 'trainer'` (fresh start, per user choice).
+- No RLS changes (existing team policies apply).
+
+## UI
+
+New component `src/components/AvailabilityCalendar.tsx`:
+- Month grid (Sun–Sat), prev/next month arrows, clamped to `[thisMonth, thisMonth+5]` (6-month horizon).
+- Each day cell shows: dot count of resolved windows, "blocked" indicator, or "+" if empty.
+- Tap a date → bottom sheet (mobile) / popover (desktop) with:
+  - Base slots for that weekday (read-only preview, "Edit weekly pattern" link).
+  - Override editor: `[+ Add window]` rows with start/end time pickers and venue dropdown (reuses verified `venue_addresses`, primary first).
+  - "Block this day" toggle.
+  - "Reset to weekly" clears the override for that date.
+- Legend at top: weekly base • override • blocked.
+- Secondary "Weekly base pattern" accordion below the calendar for editing the recurring baseline (same row UI as before, but collapsed).
+
+Integration points:
+- `src/components/CreateOrgWizard.tsx` (Step 0, trainer only): replace the current weekly list with `<AvailabilityCalendar />`; weekly base editor lives inside the collapsed accordion.
+- `src/routes/teams.$teamId.edit.tsx`: same swap; seed with existing `availability_overrides`.
+- `src/routes/trainers.$trainerId.tsx` (public profile): read-only calendar variant — highlight dates with any resolved availability, tap to see that day's windows grouped by venue.
+
+## Validation
+
+Extend `src/lib/availability-slots.ts`:
+- `validateOverrides(overrides, venues)` — reject windows outside 6-month horizon, past dates, overlapping windows within the same date, invalid `start >= end`, or venues not in the verified list.
+- Called client-side in wizard/edit and server-side via Zod `superRefine` in `src/lib/teams.functions.ts` (`TeamInput` gains `availability_overrides`).
+
+## Booking flow
+
+`src/components/BookSessionSheet.tsx` and `src/lib/trainer-requests.ts`:
+- Replace weekday-based slot picking with a date picker (next 6 months) + resolved-window dropdown for the selected date.
+- Persist `session_date` (already exists on `trainer_session_requests` as scheduled timestamp).
 
 ## Out of scope
-- Persisting `place_id` / lat/lng to the DB (can be a follow-up if you want map pins later).
-- Retro-validating existing saved venues.
 
-## Technical notes
-- The trimmed address string (`address.trim()`) is the identity key for verification — matches how `venue-address.ts` currently dedupes.
-- Placeholder "Any venue" option in the slot dropdown is unaffected — that references venues by their existing string.
+- No recurrence beyond the weekly base (no biweekly/monthly rules).
+- No iCal export.
+- No timezone changes — continue using trainer's stored timezone.
+
+## Technical section
+
+- Zod schemas:
+  - `OverrideWindow = { start: HHmm, end: HHmm, venue?: string }`
+  - `DayOverride = { blocked?: boolean, windows?: OverrideWindow[] }`
+  - `AvailabilityOverrides = Record<ISODate, DayOverride>`
+- New utility `src/lib/availability-resolve.ts`:
+  - `resolveDay(date, base, overrides): OverrideWindow[]`
+  - `resolveRange(start, end, base, overrides): Map<ISODate, OverrideWindow[]>` (used by the public profile and booking sheet).
+- `AvailabilityCalendar` is fully controlled: props `{ base, overrides, venues, primaryVenue, onChange }`. No internal server calls.
+- Persistence flows through existing `updateOrg` / `createTeam` in `src/lib/org-store.ts` and `src/lib/teams.functions.ts` — add `availability_overrides` mapping alongside `availability_slots`.
+- 6-month horizon computed as `addMonths(startOfToday(), 6)`; enforced in validator and calendar navigation.
