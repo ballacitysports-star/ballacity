@@ -101,11 +101,23 @@ export function LocationAutocomplete({
   const pick = (s: PlaceSuggestion) => {
     const full = s.secondary ? `${s.primary}, ${s.secondary}` : s.primary;
     onChange(full);
+    // Fire optimistic pick without geo, then enrich with lat/lng once resolved.
     onPick?.(full, s.id);
     setOpen(false);
     setSuggestions([]);
+    const tokenAtPick = sessionTokenRef.current;
     // Rotate session token after a selection (Places billing convention).
     sessionTokenRef.current = randomToken();
+    placeDetails({ data: { placeId: s.id, sessionToken: tokenAtPick } })
+      .then((d) => {
+        const resolved = d.formattedAddress || full;
+        // Only replace the input text if the user hasn't kept editing.
+        if (d.formattedAddress && d.formattedAddress !== full) onChange(resolved);
+        onPick?.(resolved, s.id, { lat: d.lat, lng: d.lng, formattedAddress: d.formattedAddress });
+      })
+      .catch((err) => {
+        console.error("[LocationAutocomplete] place details failed:", err);
+      });
   };
 
   const useCurrentLocation = () => {
