@@ -101,6 +101,7 @@ function TrainersPage() {
   const updateSearch = (patch: Partial<TrainersSearch>) =>
     navigate({ search: (prev: TrainersSearch) => ({ ...prev, ...patch }), replace: true });
 
+  const mode: "trainers" | "gyms" = search.mode === "gyms" ? "gyms" : "trainers";
   const q = search.q;
   const sport: Sport | null = (search.sport || null) as Sport | null;
   const specialty: string = search.specialty || "";
@@ -300,12 +301,32 @@ function TrainersPage() {
   const featured =
     orgs.find((o) => o.verified && o.kind === "coach") ?? orgs.find((o) => o.kind === "coach");
 
+  const gymsList = useMemo(() => {
+    const rows = orgsListQuery.data ?? [];
+    const ql = q.trim().toLowerCase();
+    const filtered = ql
+      ? rows.filter((o) =>
+          `${o.name ?? ""} ${o.handle ?? ""} ${o.city ?? ""} ${o.bio ?? ""}`
+            .toLowerCase()
+            .includes(ql),
+        )
+      : rows;
+    return [...filtered].sort((a, b) => (a.name ?? "").localeCompare(b.name ?? ""));
+  }, [orgsListQuery.data, q]);
+
   return (
     <div className="mx-auto w-full max-w-md sm:max-w-2xl lg:max-w-4xl px-4 pt-6">
       <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="mb-4">
-        <h1 className="font-display text-3xl font-bold leading-tight">Trainers & coaches.</h1>
+        <h1 className="font-display text-3xl font-bold leading-tight">
+          {mode === "gyms" ? "Gyms & organizations." : "Trainers & coaches."}
+        </h1>
         <p className="text-muted-foreground text-sm inline-flex items-center gap-1">
-          {profile?.city ? (
+          {mode === "gyms" ? (
+            <>
+              {gymsList.length} {gymsList.length === 1 ? "gym" : "gyms"}
+              {profile?.city ? <> · near {profile.city}</> : null}
+            </>
+          ) : profile?.city ? (
             <>
               <MapPin className="h-3.5 w-3.5 text-lime" /> Nearest to {profile.city} ·{" "}
               {list.length} {list.length === 1 ? "result" : "results"}
@@ -321,6 +342,39 @@ function TrainersPage() {
           )}
         </p>
       </motion.div>
+
+      {/* Trainers / Gyms tabs */}
+      <div className="mb-4 inline-flex rounded-full border border-border bg-surface p-1 text-xs font-bold">
+        {([
+          { id: "trainers", label: "Trainers", Icon: GraduationCap },
+          { id: "gyms", label: "Gyms", Icon: Building2 },
+        ] as const).map((t) => {
+          const active = mode === t.id;
+          return (
+            <button
+              key={t.id}
+              onClick={() =>
+                updateSearch({
+                  mode: t.id,
+                  // reset trainer-only filters when switching
+                  ...(t.id === "gyms"
+                    ? { sport: "", specialty: "", venue: "", orgId: "", avail: "any", radius: 0 }
+                    : {}),
+                })
+              }
+              className={`inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 transition-colors ${
+                active
+                  ? "bg-lime text-primary-foreground"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+              aria-pressed={active}
+            >
+              <t.Icon className="h-3.5 w-3.5" />
+              {t.label}
+            </button>
+          );
+        })}
+      </div>
 
       {featured && (
         <motion.div
