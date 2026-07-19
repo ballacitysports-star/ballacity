@@ -2,6 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { createClient } from "@supabase/supabase-js";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { validateVenueList } from "./venue-address";
 import type { Database } from "@/integrations/supabase/types";
 
 function publicClient() {
@@ -50,7 +51,15 @@ const TeamInput = z.object({
   format: z.string().max(120).nullable().optional(),
   formats: z.array(z.string().max(120)).default([]),
   venues: z.array(z.string().max(60)).default([]),
-  venue_addresses: z.array(z.string().max(300)).default([]),
+  venue_addresses: z
+    .array(z.string())
+    .default([])
+    .superRefine((list, ctx) => {
+      const { errors } = validateVenueList(list);
+      errors.forEach((err, i) => {
+        if (err) ctx.addIssue({ code: z.ZodIssueCode.custom, path: [i], message: err });
+      });
+    }),
   cadence: z.string().max(60).nullable().optional(),
   cadences: z.array(z.string().max(60)).default([]),
   positions_needed: z.record(z.string(), z.record(z.string(), z.number().int().min(0).max(30))).default({}),

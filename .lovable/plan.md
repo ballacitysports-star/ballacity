@@ -1,26 +1,39 @@
-## Changes to `src/components/CreateOrgWizard.tsx`
+## Goal
+Prevent trainers from saving empty or malformed venue addresses in both the create-trainer wizard (`CreateOrgWizard.tsx`) and the edit page (`teams.$teamId.edit.tsx`). Today empty rows are silently stripped and any free-typed string is accepted.
 
-**1. Move "Weekly availability" (trainers only) into Step 1 Identity**
-- Cut the `<Section title="Weekly availability">` block (lines ~745–823) out of the `{isCoach && (...)}` group in Step 1 Details.
-- Re-insert it in Step 0 Identity, right after the Sports selector so it's visible from the start of trainer creation.
-- Keep validation wiring (`slotsError`, disabled Add/Publish) unchanged.
+## Validation rules (shared)
+Add `src/lib/venue-address.ts` exporting:
+- `validateVenueAddress(raw: string): { ok: boolean; error?: string; value: string }` — trims, then flags:
+  - empty → "Address is required"
+  - length < 5 → "Address is too short"
+  - length > 200 → "Address is too long"
+  - no letter or no digit/comma (heuristic for a real place) → "Enter a full address (street, city)"
+  - control chars / URLs (`http`, `<`, `>`) → "Enter a plain address"
+- `validateVenueList(list: string[]): { errors: (string|null)[]; hasError: boolean; deduped: string[] }` — also flags case-insensitive duplicates.
 
-**2. Add "Session venues" (trainers only, multiple addresses) in Step 0 Identity**
-- Add a new coach-only `venueAddresses: string[]` state, rendered directly under the new Availability section.
-- UI: list of rows, each an address input backed by `LocationAutocomplete` (mode not `city`, i.e. full place) with an X to remove, plus a dashed "Add venue" button.
-- Persist to a new `Org.venueAddresses?: string[]` field (added to `src/lib/sample-data.ts` `Org` type) so it flows through `handlePreview` → `addOrg`.
-- Display on `src/routes/trainers.$trainerId.tsx` as a "Session venues" list under the profile info block (only if present).
-- Storage: piggyback on the existing `teams` table by extending the JSON payload persisted via `org-store` (no schema change required if we serialize into an existing jsonb field). Confirmation needed only for the storage column — see Technical notes.
+## Server-side hardening
+- `src/lib/teams.functions.ts` `TeamInput.venue_addresses`: tighten from `z.array(z.string().max(300))` to `z.array(z.string().trim().min(5).max(200))` with a `.superRefine` that reuses the same regex checks and rejects duplicates. Same tightening applied via `TeamPatch` (already `.partial()`).
 
-**3. Multi-select for "Preferred format" and "Meeting cadence"**
-- Change `format: string` → `formats: string[]`, `cadence: string` → `cadences: string[]`.
-- Update the two `<ChipPicker ... single />` in Step 0 to remove `single` and use array toggle handlers like the existing Venues chip picker.
-- Update `handlePreview` mapping and `Org` type (`format?: string` → `formats?: string[]`, same for cadence). Add a shim so old single-value data still reads (fallback: `formats ?? (format ? [format] : [])`).
-- Update read sites that display these fields (trainer + team profile cards, feed filters) to join arrays with `, ` and, for filter matching, use `.some()` instead of equality.
-- Mirror the same change in `src/routes/teams.$teamId.edit.tsx` so edits stay consistent.
+## Optional geocode verification
+Add a lightweight "Verify" affordance: on blur of a venue row, call the existing `geocodeAddress` server fn (`src/lib/geocode.functions.ts`). If it resolves, mark the row verified (green check, replace value with `formatted`). If it fails, show inline error "We couldn't find this address". Verification is best-effort — a network failure does not block save as long as the local heuristic passes, so users in offline/dev still work.
+
+## Wizard changes — `src/components/CreateOrgWizard.tsx`
+- Track per-row error state `venueErrors: (string|null)[]` and `venueVerified: boolean[]`.
+- On every `onChange`/add/remove, re-run `validateVenueList` and update errors.
+- Render error text under each `LocationAutocomplete` row (reuse existing muted-text pattern) and a red border when invalid.
+- On blur, call `geocodeAddress`; on success snap to formatted address and mark verified; on failure set row error.
+- Extend the existing `slotsError`/disabled logic: compute `venuesError = isCoach && venueErrors.some(Boolean)`. Publish button is disabled and shows the first error when `venuesError` is true.
+- In `handlePreview`, stop silently filtering empty rows — instead early-return with a toast if any row is invalid.
+
+## Edit page changes — `src/routes/teams.$teamId.edit.tsx`
+- Mirror the wizard: `venueErrors` state, inline error rendering under each row, disable Save while any row is invalid, blur-time geocode verification with the same behavior.
+- Replace the current `.map(a => a.trim()).filter(a => a.length > 0)` in the save payload with the validated list; if invalid, show a toast and abort save.
+
+## Trainer profile display — `src/routes/trainers.$trainerId.tsx`
+No behavior change; already only renders non-empty entries. Confirmed venueAddresses render stays the same.
 
 ## Technical notes
-
-- `Org.venueAddresses`, `Org.formats`, `Org.cadences` need to be added to the `Org` type in `src/lib/sample-data.ts` and mapped in `src/lib/org-store.ts` (row → Org and Org → row insert/update). If the current teams row doesn't have a matching column for these, extend the same `availability_slots`-style pattern: add a jsonb column via migration (`venue_addresses jsonb`, and either widen `format`/`cadence` to `text[]` or add `formats`/`cadences` jsonb) so the wizard's output survives a refresh.
-- Consumers of the old scalar `format` / `cadence` fields: profile card, feed filters, trainer profile, edit page — each needs the tiny read-side update above. No business logic changes beyond that.
-- Skill range, session types, credentials, rate, etc. stay in Step 1 Details.
+- No DB migration needed; column stays `jsonb`.
+- Reuse existing `LocationAutocomplete` — no changes to the component itself; the new error UI lives in the parent forms.
+- Geocode call is auth-protected (already the case) and only fires on blur to keep the Places autocomplete UX unchanged while typing.
+- `venue-address.ts` has no React deps so it's importable from both the wizard and the edit page; the same rules run client-side and are mirrored in the server Zod schema so a hand-crafted API call can't bypass them.

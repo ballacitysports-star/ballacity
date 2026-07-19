@@ -19,6 +19,7 @@ import {
 } from "@/lib/sample-data";
 import { addOrg } from "@/lib/org-store";
 import { validateSlots } from "@/lib/availability-slots";
+import { validateVenueList } from "@/lib/venue-address";
 import {
   SPORT_CONFIG,
   SESSION_TYPES,
@@ -106,6 +107,8 @@ export function CreateOrgWizard({ kind }: { kind: OrgKind }) {
   type Slot = NonNullable<Org["availabilitySlots"]>[number];
   const [slots, setSlots] = useState<Slot[]>([]);
   const slotsError = useMemo(() => validateSlots(slots), [slots]);
+  const venueValidation = useMemo(() => validateVenueList(venueAddresses), [venueAddresses]);
+  const venuesError = isCoach && venueAddresses.length > 0 && venueValidation.hasError;
 
   const primary = primarySport(sports);
   const ratingSystem = ratingSystemFor(primary);
@@ -187,6 +190,10 @@ export function CreateOrgWizard({ kind }: { kind: OrgKind }) {
     if (submitting) return;
     if (isCoach && slotsError) {
       setSubmitError(slotsError.message);
+      return;
+    }
+    if (venuesError) {
+      setSubmitError(venueValidation.firstError ?? "Fix venue addresses");
       return;
     }
     setSubmitError(null);
@@ -421,31 +428,39 @@ export function CreateOrgWizard({ kind }: { kind: OrgKind }) {
                         Add one or more addresses where you hold sessions.
                       </p>
                     )}
-                    {venueAddresses.map((addr, i) => (
-                      <div key={i} className="flex items-start gap-2">
-                        <div className="flex-1">
-                          <LocationAutocomplete
-                            value={addr}
-                            onChange={(v) =>
-                              setVenueAddresses((cur) =>
-                                cur.map((a, j) => (j === i ? v : a)),
-                              )
-                            }
-                            placeholder="Gym, park, or full address"
-                          />
+                    {venueAddresses.map((addr, i) => {
+                      const rowError = venueValidation.errors[i];
+                      return (
+                        <div key={i} className="space-y-1">
+                          <div className="flex items-start gap-2">
+                            <div className={`flex-1 ${rowError ? "rounded-2xl ring-1 ring-coral" : ""}`}>
+                              <LocationAutocomplete
+                                value={addr}
+                                onChange={(v) =>
+                                  setVenueAddresses((cur) =>
+                                    cur.map((a, j) => (j === i ? v : a)),
+                                  )
+                                }
+                                placeholder="Gym, park, or full address"
+                              />
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setVenueAddresses((cur) => cur.filter((_, j) => j !== i))
+                              }
+                              className="mt-1 rounded-full p-2 text-muted-foreground hover:bg-surface"
+                              aria-label="Remove venue"
+                            >
+                              <X className="h-4 w-4" />
+                            </button>
+                          </div>
+                          {rowError && (
+                            <p className="px-1 text-[11px] text-coral">{rowError}</p>
+                          )}
                         </div>
-                        <button
-                          type="button"
-                          onClick={() =>
-                            setVenueAddresses((cur) => cur.filter((_, j) => j !== i))
-                          }
-                          className="mt-1 rounded-full p-2 text-muted-foreground hover:bg-surface"
-                          aria-label="Remove venue"
-                        >
-                          <X className="h-4 w-4" />
-                        </button>
-                      </div>
-                    ))}
+                      );
+                    })}
                     <button
                       type="button"
                       onClick={() => setVenueAddresses((cur) => [...cur, ""])}
@@ -1044,7 +1059,7 @@ export function CreateOrgWizard({ kind }: { kind: OrgKind }) {
                 whileTap={{ scale: 0.98 }}
                 type="button"
                 onClick={submit}
-                disabled={submitting || (isCoach && !!slotsError)}
+                disabled={submitting || (isCoach && !!slotsError) || venuesError}
                 className="inline-flex items-center justify-center gap-2 rounded-2xl bg-coral-gradient py-3.5 text-sm font-bold text-white glow-coral disabled:opacity-60"
               >
                 <Sparkles className="h-4 w-4" />

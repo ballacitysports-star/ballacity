@@ -15,6 +15,7 @@ import {
 import { SPORTS, HERO_IMAGE, type Sport, type Org } from "@/lib/sample-data";
 import { getOrgById, updateOrg, deleteOrg, isMyOrg } from "@/lib/org-store";
 import { validateSlots } from "@/lib/availability-slots";
+import { validateVenueList } from "@/lib/venue-address";
 import { OrgCard } from "@/components/OrgCard";
 import { LocationAutocomplete } from "@/components/LocationAutocomplete";
 import { TeamCoverUploader } from "@/components/TeamCoverUploader";
@@ -97,6 +98,8 @@ function EditOrg() {
   const [slots, setSlots] = useState<Slot[]>(org.availabilitySlots ?? []);
   const [venueAddresses, setVenueAddresses] = useState<string[]>(org.venueAddresses ?? []);
   const slotsError = useMemo(() => validateSlots(slots), [slots]);
+  const venueValidation = useMemo(() => validateVenueList(venueAddresses), [venueAddresses]);
+  const venuesError = org.kind === "coach" && venueAddresses.length > 0 && venueValidation.hasError;
   // Branding
   const [accent, setAccent] = useState(org.accent);
   const [avatar, setAvatar] = useState(org.avatar);
@@ -165,6 +168,10 @@ function EditOrg() {
   async function save() {
     if (kind === "coach" && slotsError) {
       alert(slotsError.message);
+      return;
+    }
+    if (kind === "coach" && venuesError) {
+      alert(venueValidation.firstError ?? "Fix venue addresses");
       return;
     }
     const handleClean = (handle.startsWith("@") ? handle.slice(1) : handle)
@@ -742,31 +749,39 @@ function EditOrg() {
                           Add one or more addresses where you hold sessions — bookers see these on your profile.
                         </p>
                       )}
-                      {venueAddresses.map((addr, i) => (
-                        <div key={i} className="flex items-start gap-2">
-                          <div className="flex-1">
-                            <LocationAutocomplete
-                              value={addr}
-                              onChange={(v) =>
-                                setVenueAddresses((cur) =>
-                                  cur.map((a, j) => (j === i ? v : a)),
-                                )
-                              }
-                              placeholder="Gym, park, or full address"
-                            />
+                      {venueAddresses.map((addr, i) => {
+                        const rowError = venueValidation.errors[i];
+                        return (
+                          <div key={i} className="space-y-1">
+                            <div className="flex items-start gap-2">
+                              <div className={`flex-1 ${rowError ? "rounded-2xl ring-1 ring-coral" : ""}`}>
+                                <LocationAutocomplete
+                                  value={addr}
+                                  onChange={(v) =>
+                                    setVenueAddresses((cur) =>
+                                      cur.map((a, j) => (j === i ? v : a)),
+                                    )
+                                  }
+                                  placeholder="Gym, park, or full address"
+                                />
+                              </div>
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  setVenueAddresses((cur) => cur.filter((_, j) => j !== i))
+                                }
+                                className="mt-1 rounded-full p-2 text-muted-foreground hover:bg-surface"
+                                aria-label="Remove venue"
+                              >
+                                <X className="h-4 w-4" />
+                              </button>
+                            </div>
+                            {rowError && (
+                              <p className="px-1 text-[11px] text-coral">{rowError}</p>
+                            )}
                           </div>
-                          <button
-                            type="button"
-                            onClick={() =>
-                              setVenueAddresses((cur) => cur.filter((_, j) => j !== i))
-                            }
-                            className="mt-1 rounded-full p-2 text-muted-foreground hover:bg-surface"
-                            aria-label="Remove venue"
-                          >
-                            <X className="h-4 w-4" />
-                          </button>
-                        </div>
-                      ))}
+                        );
+                      })}
                       <button
                         type="button"
                         onClick={() => setVenueAddresses((cur) => [...cur, ""])}
@@ -882,7 +897,7 @@ function EditOrg() {
               whileTap={{ scale: 0.98 }}
               type="button"
               onClick={save}
-              disabled={kind === "coach" && !!slotsError}
+              disabled={kind === "coach" && (!!slotsError || venuesError)}
               className="flex-1 inline-flex items-center justify-center gap-2 rounded-2xl bg-coral-gradient py-3.5 text-sm font-bold text-white glow-coral disabled:opacity-50"
             >
               <Sparkles className="h-4 w-4" /> Save changes
