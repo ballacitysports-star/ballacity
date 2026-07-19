@@ -238,6 +238,7 @@ export function CreateTrainerWizard() {
             {step === 1 && "Your expertise"}
             {step === 2 && "Where you train"}
             {step === 3 && "When you're available"}
+            {step === 4 && "Confirm your schedule"}
           </h1>
         </div>
       </div>
