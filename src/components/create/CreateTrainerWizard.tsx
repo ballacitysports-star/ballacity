@@ -15,6 +15,7 @@ import { VenueMapPreview } from "@/components/VenueMapPreview";
 import { OrgCard } from "@/components/OrgCard";
 import { ImageUploader } from "@/components/ImageUploader";
 import { useAuth } from "@/hooks/use-auth";
+import { useUserLocation } from "@/lib/geo";
 
 import { AvailabilityCalendar } from "@/components/AvailabilityCalendar";
 import { AvailabilityRulesEditor } from "@/components/AvailabilityRulesEditor";
@@ -165,7 +166,8 @@ export function CreateTrainerWizard() {
     staleTime: 15_000,
   });
 
-  // Debounced Google Places lookup for real-world gyms/academies.
+  // Debounced Google Places lookup for real-world gyms/academies, biased to the user's location.
+  const { coords: userCoords, status: geoStatus, request: requestUserLocation } = useUserLocation();
   const [orgSearchDebounced, setOrgSearchDebounced] = useState("");
   const [placesSessionToken, setPlacesSessionToken] = useState<string>(() =>
     typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).slice(2),
@@ -174,11 +176,26 @@ export function CreateTrainerWizard() {
     const t = window.setTimeout(() => setOrgSearchDebounced(orgSearch.trim()), 250);
     return () => window.clearTimeout(t);
   }, [orgSearch]);
+  // Ask for location once the user actually starts typing a gym name.
+  useEffect(() => {
+    if (orgSearchDebounced.length >= 2 && geoStatus === "idle") requestUserLocation();
+  }, [orgSearchDebounced, geoStatus, requestUserLocation]);
   const placesResults = useQuery({
-    queryKey: ["trainer-orgs-places", orgSearchDebounced, placesSessionToken],
+    queryKey: [
+      "trainer-orgs-places",
+      orgSearchDebounced,
+      placesSessionToken,
+      userCoords?.lat ?? null,
+      userCoords?.lng ?? null,
+    ],
     queryFn: () =>
       placesAutocomplete({
-        data: { input: orgSearchDebounced, sessionToken: placesSessionToken },
+        data: {
+          input: orgSearchDebounced,
+          sessionToken: placesSessionToken,
+          lat: userCoords?.lat ?? null,
+          lng: userCoords?.lng ?? null,
+        },
       }),
     enabled: orgSearchDebounced.length >= 2,
     staleTime: 30_000,
