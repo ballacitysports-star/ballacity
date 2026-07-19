@@ -1,39 +1,45 @@
-## Add venue location filter to trainer search & profile
+## Goal
 
-### 1. Trainers feed (`src/routes/_tabs.trainers.tsx`)
+One-click access to both direct messages and notifications from the bottom nav, and a cleaner nav bar without the elevated "+" host button.
 
-Add a **Venue** filter that narrows the trainer list to those whose `venueAddresses` include the selected location.
+## Changes
 
-- Extend `trainersSearchSchema` with `venue: fallback(z.string(), "").default("")` so the selection persists in the URL and survives refresh/sharing.
-- Derive a deduped, sorted list of venue options from `orgs.filter(kind==="coach")` — flatten `venueAddresses`, trim, case-insensitive dedupe. Primary venues surface first.
-- Render a new chip row inside the existing `filtersOpen` panel labeled "Venue", styled like the Specialty/Available rows. Chips toggle the active venue; include an "Any venue" chip for reset. Use a horizontally scrollable list to handle many venues.
-- Add the venue predicate to the `list` `useMemo` filter chain (case-insensitive substring / equality match against `o.venueAddresses`).
-- Include venue in the active-filter badge count next to the filter toggle.
+### 1. Unified Inbox (`/messages`)
 
-### 2. Trainer profile (`src/routes/trainers.$trainerId.tsx`)
+Turn `src/routes/messages.index.tsx` into a two-tab surface:
 
-When a trainer has multiple `venueAddresses`, let visitors focus the profile on one venue:
+- **Messages** tab — current conversation list (unchanged behavior).
+- **Alerts** tab — the notification feed currently rendered by `src/routes/_tabs.notifications.tsx`.
 
-- Add local state `selectedVenue: string | null` (default = `primaryVenue` when present, else null).
-- Persist selection in the route search params (extend the existing `validateSearch` with `venue`) so a shared/refreshed URL keeps the choice.
-- Above the venue list in the "Session venues" section, render chip filters (one per venue + "All venues"). Selecting a chip:
-  - Highlights that venue row (and hides others if we want strict focus — plan: keep all visible but visually emphasize the selected).
-  - Filters the "Availability" `TrainerAvailabilityMonth` view by passing a new `venueFilter` prop; the resolver hides slots whose `venue` doesn't match.
-- Skip the filter UI when the trainer has ≤1 venue.
+Implementation:
+- Extract the notification list body from `_tabs.notifications.tsx` into a reusable `<NotificationsPanel />` component (keeps its realtime subscription, push-permission banner, mark-as-read, and "Notification settings" link).
+- Extract the conversation list body from `messages.index.tsx` into `<ConversationsPanel />`.
+- In `messages.index.tsx`, render a shadcn `Tabs` header (`Messages` | `Alerts`) with unread-count badges pulled from the existing message/notification hooks.
+- Persist the active tab in the URL via `validateSearch` (`?tab=messages|alerts`) so refresh and deep links keep the view.
+- Header shows a single combined unread pill.
 
-### 3. Availability month helper
+### 2. Redirect old Alerts route
 
-- Update `TrainerAvailabilityMonth` (and the underlying `availability-resolve.ts` resolver) to accept an optional `venueFilter` string. When set, only slots/overrides tagged with that venue (or untagged/primary when it matches primary) are returned.
-- Booking sheet (`BookSessionSheet.tsx`) — out of scope for this change; venue selection there already exists per-slot.
+- Keep `/notifications` working by redirecting `_tabs.notifications.tsx` to `/messages?tab=alerts` (via `beforeLoad`), so existing links from Feed and Players cards, push deep-links, and account settings still land correctly.
+- Update the two in-app links (`src/routes/_tabs.feed.tsx:653`, `src/routes/_tabs.players.tsx:734`) to point at `/messages` with `search: { tab: "alerts" }`.
 
-### Technical notes
+### 3. Bottom navigation cleanup (`src/components/BottomNav.tsx`)
 
-- No DB schema changes: filter operates on existing `venueAddresses` / `primary_venue` / slot `venue` fields.
-- All new state flows through `validateSearch` + `Route.useSearch()` for URL persistence, matching existing filter patterns.
-- No changes to org-store, server functions, or Supabase policies.
+- Remove the center elevated Host FAB (`Plus` button linking to `/create`) and its wrapper.
+- Drop the `Plus` icon import and the `hostActive` variable.
+- Collapse the left/right groups into a single evenly-spaced flex row containing: Play, Players, Teams, Trainers, Inbox, You (6 tabs).
+- The Inbox tab label stays "Inbox"; its badge (already tracks unread messages) will now reflect messages + alerts combined via the shared unread hook.
 
-### Files touched
+Users can still create a game from the existing "Create game" button on the Feed header (added earlier) and from the profile/host surfaces — no other entry points change.
 
-- `src/routes/_tabs.trainers.tsx` — schema + chip row + filter predicate.
-- `src/routes/trainers.$trainerId.tsx` — schema + venue chip UI + wire `venueFilter` into month view.
-- `src/components/TrainerAvailabilityMonth.tsx` + `src/lib/availability-resolve.ts` — optional `venueFilter` support.
+## Technical notes
+
+- Unread count for the Inbox tab badge: sum of `useUnreadMessages` and `useUnreadNotifications` (already available in `src/lib/messages.ts` and `src/lib/notifications.ts`).
+- Tabs state uses zod `validateSearch` with default `"messages"`, matching the URL-persistence pattern used elsewhere.
+- Push notification deep-links that currently target `/notifications` continue to work via the redirect.
+- No schema changes.
+
+## Out of scope
+
+- Merging message and notification data models.
+- Changing notification preferences UI at `/account/notifications`.

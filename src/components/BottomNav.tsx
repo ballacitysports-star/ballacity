@@ -1,5 +1,5 @@
 import { Link, useLocation } from "@tanstack/react-router";
-import { Home, Map, Plus, UserCheck, Users, Dribbble, MessageCircle, GraduationCap } from "lucide-react";
+import { Home, UserCheck, Users, Dribbble, MessageCircle, GraduationCap } from "lucide-react";
 import { motion } from "framer-motion";
 import { MyAvatar } from "@/components/UserAvatar";
 
@@ -12,25 +12,24 @@ type NavItem = {
 };
 
 /**
- * 6-tab layout with an elevated center "Host" FAB.
- * Play merges the former Feed + Discover surfaces (list ⇄ map toggle lives inside).
- * The groups are sized equally so the FAB stays centered regardless of tab count.
+ * Flat 6-tab layout. Inbox merges direct messages and alerts.
  */
-const leftItems: NavItem[] = [
+const items: NavItem[] = [
   {
     to: "/feed",
     icon: Dribbble,
     label: "Play",
-    // Play tab lights up for the merged surface and for legacy paths.
     match: (p) => p === "/feed" || p === "/discover" || p === "/pickup",
   },
   { to: "/players", icon: UserCheck, label: "Players", match: (p) => p.startsWith("/players") },
   { to: "/teams", icon: Users, label: "Teams", match: (p) => p.startsWith("/teams") },
   { to: "/trainers", icon: GraduationCap, label: "Trainers", match: (p) => p.startsWith("/trainers") },
-];
-
-const rightItems: NavItem[] = [
-  { to: "/messages", icon: MessageCircle, label: "Inbox", match: (p) => p.startsWith("/messages") },
+  {
+    to: "/messages",
+    icon: MessageCircle,
+    label: "Inbox",
+    match: (p) => p.startsWith("/messages") || p.startsWith("/notifications"),
+  },
   {
     to: "/profile",
     label: "You",
@@ -85,35 +84,15 @@ export function BottomNav() {
     );
   };
 
-  const hostActive = pathname === "/create" || pathname.startsWith("/create");
-
   return (
     <nav className="fixed bottom-0 left-0 right-0 z-40 pb-[max(env(safe-area-inset-bottom),0.5rem)] pt-2 px-3">
       <div className="mx-auto max-w-md sm:max-w-xl lg:max-w-2xl rounded-3xl border border-border bg-surface/85 backdrop-blur-xl shadow-2xl">
-        <div className="flex items-end justify-between">
-          <div className="flex flex-1 items-end justify-around" role="group" aria-label="Primary tabs">
-            {leftItems.map(renderTab)}
-          </div>
-
-          {/* Center elevated Host FAB — PS-blue gradient primary action */}
-          <div className="flex justify-center">
-            <Link
-              to="/create"
-              aria-label="Host a game"
-              className="relative -mt-7 grid h-14 w-14 place-items-center rounded-full bg-primary-gradient text-primary-foreground shadow-xl glow-primary ring-4 ring-background transition-transform active:scale-95"
-            >
-              <Plus className={`h-6 w-6 ${hostActive ? "rotate-45" : ""} transition-transform`} strokeWidth={3} />
-            </Link>
-          </div>
-
-          <div className="flex flex-1 items-end justify-around" role="group" aria-label="Secondary tabs">
-            {rightItems.map(renderTab)}
-          </div>
+        <div className="flex items-end justify-around" role="group" aria-label="Primary tabs">
+          {items.map(renderTab)}
         </div>
       </div>
     </nav>
   );
 }
 
-// Legacy re-export retained for any callers still importing Map/Home icons — no-op.
 export type { NavItem };
