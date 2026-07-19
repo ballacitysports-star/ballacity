@@ -651,7 +651,7 @@ export const denyOrgMemberRequest = createServerFn({ method: "POST" })
     return { ok: true };
   });
 
-export const removeOrgMember = createServerFn({ method: "POST" })
+export const removeGenericOrgMember = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: { orgId: string; userId: string }) =>
     z.object({ orgId: z.string().uuid(), userId: z.string().uuid() }).parse(d),
