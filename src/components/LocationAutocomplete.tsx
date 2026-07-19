@@ -37,6 +37,7 @@ export function LocationAutocomplete({
   const [searchError, setSearchError] = useState<string | null>(null);
   const reverse = useServerFn(reverseGeocode);
   const autocomplete = useServerFn(autocompletePlaces);
+  const placeDetails = useServerFn(getPlaceDetails);
   const sessionTokenRef = useRef<string>(randomToken());
   const timerRef = useRef<number | null>(null);
   const biasRef = useRef<{ lat: number; lng: number } | null>(null);
