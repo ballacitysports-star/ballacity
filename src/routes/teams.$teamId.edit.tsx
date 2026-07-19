@@ -188,6 +188,9 @@ function EditOrg() {
         availabilitySlots: kind === "coach"
           ? slots.filter((s) => s.start && s.end && s.end > s.start)
           : undefined,
+        venueAddresses: kind === "coach"
+          ? venueAddresses.map((a) => a.trim()).filter((a) => a.length > 0)
+          : undefined,
         league: kind === "team" ? league : undefined,
         record: kind === "team" ? { w: wins, l: losses } : undefined,
         homeCourt: kind === "team" ? homeCourt : undefined,
