@@ -271,6 +271,17 @@ function TrainerPage() {
             <span>Since {org.founded}</span>
           </div>
           <p className="mt-2 text-sm text-foreground/90">{org.tagline}</p>
+          {linkedOrg && (
+            <Link
+              to="/orgs/$orgId"
+              params={{ orgId: linkedOrg.id }}
+              className="mt-2 inline-flex items-center gap-1.5 rounded-full border border-border/60 bg-background px-3 py-1 text-xs font-medium text-foreground hover:border-lime/60 hover:text-lime"
+            >
+              <Building2 className="h-3.5 w-3.5" />
+              at {linkedOrg.name}
+              {linkedOrg.verified ? " ✓" : ""}
+            </Link>
+          )}
         </div>
 
         {/* Stats */}
