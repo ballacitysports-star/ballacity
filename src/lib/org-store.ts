@@ -186,6 +186,7 @@ function orgToInsert(org: Org) {
     session_types: org.sessionTypes ?? [],
     availability_slots: org.kind === "coach" ? org.availabilitySlots ?? [] : [],
     availability_overrides: org.kind === "coach" ? org.availabilityOverrides ?? [] : [],
+    availability_rules: org.kind === "coach" ? org.availabilityRules ?? [] : [],
     timezone: org.kind === "coach" ? org.timezone ?? undefined : undefined,
   };
 }
