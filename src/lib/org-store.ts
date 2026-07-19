@@ -303,8 +303,17 @@ export async function updateOrg(
     mapped.skill_max = patch.skillRange?.max ?? 5;
   }
   if (patch.format !== undefined) mapped.format = patch.format ?? null;
+  if (patch.formats !== undefined) {
+    mapped.formats = patch.formats ?? [];
+    mapped.format = patch.formats?.[0] ?? null;
+  }
   if (patch.venues !== undefined) mapped.venues = patch.venues ?? [];
+  if (patch.venueAddresses !== undefined) mapped.venue_addresses = patch.venueAddresses ?? [];
   if (patch.cadence !== undefined) mapped.cadence = patch.cadence ?? null;
+  if (patch.cadences !== undefined) {
+    mapped.cadences = patch.cadences ?? [];
+    mapped.cadence = patch.cadences?.[0] ?? null;
+  }
   if (patch.positionsNeeded !== undefined) mapped.positions_needed = patch.positionsNeeded ?? {};
   if (patch.ratingSystem !== undefined) mapped.rating_system = patch.ratingSystem ?? null;
   if (patch.ratingMin !== undefined) mapped.rating_min = patch.ratingMin ?? null;
