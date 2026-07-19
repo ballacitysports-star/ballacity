@@ -417,7 +417,8 @@ export function BookSessionSheet({
                 )}
                 {date && availWindows.length > 0 && (
                   <p className="mt-1 text-[11px] text-muted-foreground">
-                    Available: {availWindows.map((w) => `${w.start}–${w.end}`).join(", ")}
+                    Available: {availWindows.map((w) => `${fmt12(w.start)}–${fmt12(w.end)}`).join(", ")}{" "}
+                    <span className="font-semibold text-foreground">{trainerTzShort}</span>
                   </p>
                 )}
               </label>
