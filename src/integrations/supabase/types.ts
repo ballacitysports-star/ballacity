@@ -1455,46 +1455,55 @@ export type Database = {
       }
       trainer_orgs: {
         Row: {
+          address: string | null
           avatar: string | null
           avatar_url: string | null
           bio: string | null
           city: string | null
           cover_url: string | null
           created_at: string
+          geo: Json | null
           handle: string
           id: string
           name: string
           owner_id: string
+          place_id: string | null
           updated_at: string
           verified: boolean
           website: string | null
         }
         Insert: {
+          address?: string | null
           avatar?: string | null
           avatar_url?: string | null
           bio?: string | null
           city?: string | null
           cover_url?: string | null
           created_at?: string
+          geo?: Json | null
           handle: string
           id?: string
           name: string
           owner_id: string
+          place_id?: string | null
           updated_at?: string
           verified?: boolean
           website?: string | null
         }
         Update: {
+          address?: string | null
           avatar?: string | null
           avatar_url?: string | null
           bio?: string | null
           city?: string | null
           cover_url?: string | null
           created_at?: string
+          geo?: Json | null
           handle?: string
           id?: string
           name?: string
           owner_id?: string
+          place_id?: string | null
           updated_at?: string
           verified?: boolean
           website?: string | null
@@ -1645,18 +1654,34 @@ export type Database = {
         Args: { _game_id?: string; _other_user: string }
         Returns: string
       }
-      create_trainer_org_with_owner: {
-        Args: {
-          _avatar?: string
-          _bio?: string
-          _city?: string
-          _handle: string
-          _name: string
-          _trainer_id: string
-          _website?: string
-        }
-        Returns: string
-      }
+      create_trainer_org_with_owner:
+        | {
+            Args: {
+              _avatar?: string
+              _bio?: string
+              _city?: string
+              _handle: string
+              _name: string
+              _trainer_id: string
+              _website?: string
+            }
+            Returns: string
+          }
+        | {
+            Args: {
+              _address?: string
+              _avatar?: string
+              _bio?: string
+              _city?: string
+              _geo?: Json
+              _handle: string
+              _name: string
+              _place_id?: string
+              _trainer_id: string
+              _website?: string
+            }
+            Returns: string
+          }
       decline_conversation: { Args: { _conv: string }; Returns: undefined }
       free_reels_used: {
         Args: { check_env?: string; user_uuid: string }
