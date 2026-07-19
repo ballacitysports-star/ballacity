@@ -572,9 +572,15 @@ function TrainersPage() {
                   ? `${minKm.toFixed(1)} km`
                   : `${(minKm * MI_PER_KM).toFixed(1)} mi`
                 : `${dist} mi`;
+            const venueOffered =
+              !!venue &&
+              (o.venueAddresses ?? []).some(
+                (a) => a.trim().toLowerCase() === venue.trim().toLowerCase(),
+              );
+            const cardSearch = venueOffered ? { venue } : undefined;
             return (
               <div key={o.id} className="relative">
-                <OrgCard org={o} index={i} />
+                <OrgCard org={o} index={i} search={cardSearch} />
                 <div className="pointer-events-none absolute top-3 right-3 flex flex-col items-end gap-1">
                   <span className="rounded-full bg-background/70 backdrop-blur px-2 py-0.5 text-[10px] font-bold text-foreground">
                     {distLabel}
@@ -591,7 +597,7 @@ function TrainersPage() {
                     {availabilityLabel(score)}
                   </span>
                 </div>
-                <TrainerActions org={o} />
+                <TrainerActions org={o} defaultVenue={venue || null} />
               </div>
             );
           })}

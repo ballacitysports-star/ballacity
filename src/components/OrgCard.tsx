@@ -3,7 +3,15 @@ import { motion } from "framer-motion";
 import { ShieldCheck, Star, Users } from "lucide-react";
 import type { Org } from "@/lib/sample-data";
 
-export function OrgCard({ org, index = 0 }: { org: Org; index?: number }) {
+export function OrgCard({
+  org,
+  index = 0,
+  search,
+}: {
+  org: Org;
+  index?: number;
+  search?: Record<string, unknown>;
+}) {
   return (
     <motion.div
       initial={{ opacity: 0, y: 14 }}
@@ -13,6 +21,7 @@ export function OrgCard({ org, index = 0 }: { org: Org; index?: number }) {
       <Link
         to={org.kind === "coach" ? "/trainers/$trainerId" : "/teams/$teamId"}
         params={org.kind === "coach" ? { trainerId: org.id } : { teamId: org.id }}
+        search={search as never}
         className="group block overflow-hidden rounded-3xl border border-border bg-surface transition-all hover:border-lime/40 hover:-translate-y-0.5"
       >
         <div className="relative h-28 overflow-hidden">

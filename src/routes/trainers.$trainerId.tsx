@@ -166,6 +166,7 @@ function TrainerPage() {
         <div className="absolute inset-0 bg-gradient-to-b from-background/40 via-background/30 to-background" />
         <Link
           to="/trainers"
+          search={selectedVenue ? ({ venue: selectedVenue } as never) : undefined}
           className="absolute top-4 left-4 grid h-10 w-10 place-items-center rounded-full border border-border bg-background/70 backdrop-blur"
           aria-label="Back to trainers"
         >
@@ -607,7 +608,15 @@ function TrainerPage() {
                 <MessageCircle className="h-4 w-4" /> Message
               </Link>
               <button
-                onClick={() => setBookOpen(true)}
+                onClick={() => {
+                  const venueOffered =
+                    !!selectedVenue &&
+                    (org.venueAddresses ?? []).some(
+                      (a) => a.trim().toLowerCase() === selectedVenue.trim().toLowerCase(),
+                    );
+                  setBookPrefill(venueOffered ? { venue: selectedVenue } : null);
+                  setBookOpen(true);
+                }}
                 className="flex-1 inline-flex items-center justify-center gap-2 rounded-full bg-lime-gradient px-4 py-3 text-sm font-bold text-primary-foreground glow-lime"
               >
                 <Calendar className="h-4 w-4" /> Book session
