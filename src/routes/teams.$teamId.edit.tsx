@@ -775,6 +775,7 @@ function EditOrg() {
                         <Plus className="h-4 w-4" /> Add venue
                       </button>
                     </div>
+                  </Section>
                 </>
               )}
             </div>
