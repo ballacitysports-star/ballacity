@@ -161,6 +161,10 @@ function EditOrg() {
   };
 
   async function save() {
+    if (kind === "coach" && slotsError) {
+      alert(slotsError.message);
+      return;
+    }
     const handleClean = (handle.startsWith("@") ? handle.slice(1) : handle)
       .replace(/[^a-zA-Z0-9_]/g, "")
       .toLowerCase();
