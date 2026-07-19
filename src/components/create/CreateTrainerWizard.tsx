@@ -151,7 +151,7 @@ export function CreateTrainerWizard() {
     return true;
   }, [step, draft, bioOk, venueOk]);
 
-  const canSkip = step === 1 || step === 3 || step === 4;
+  const canSkip = step === 1 || step === 3;
 
   const previewOrg: Org = {
     id: "preview",
