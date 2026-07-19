@@ -651,6 +651,25 @@ export const denyOrgMemberRequest = createServerFn({ method: "POST" })
     return { ok: true };
   });
 
+export const setGenericOrgMemberRole = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { orgId: string; userId: string; role: "admin" | "member" }) =>
+    z.object({
+      orgId: z.string().uuid(),
+      userId: z.string().uuid(),
+      role: z.enum(["admin", "member"]),
+    }).parse(d),
+  )
+  .handler(async ({ data, context }) => {
+    const { error } = await context.supabase
+      .from("org_members")
+      .update({ role: data.role })
+      .eq("org_id", data.orgId)
+      .eq("user_id", data.userId);
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
+
 export const removeGenericOrgMember = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: { orgId: string; userId: string }) =>

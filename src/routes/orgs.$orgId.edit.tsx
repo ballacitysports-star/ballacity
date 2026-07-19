@@ -10,6 +10,9 @@ import {
   deleteTrainerOrg,
   setOrgMemberRole,
   removeOrgMember,
+  listOrgMembers,
+  setGenericOrgMemberRole,
+  removeGenericOrgMember,
 } from "@/lib/trainer-orgs.functions";
 import { OrgForm, type OrgFormValue } from "@/components/OrgForm";
 
@@ -45,6 +48,8 @@ function EditOrg() {
   const del = useServerFn(deleteTrainerOrg);
   const setRole = useServerFn(setOrgMemberRole);
   const remove = useServerFn(removeOrgMember);
+  const setGenericRole = useServerFn(setGenericOrgMemberRole);
+  const removeGeneric = useServerFn(removeGenericOrgMember);
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => setUserId(data.user?.id ?? null));
@@ -84,6 +89,11 @@ function EditOrg() {
         };
       });
     },
+  });
+
+  const genericMembersQ = useQuery({
+    queryKey: ["org-edit-generic-members", orgId],
+    queryFn: () => listOrgMembers({ data: { orgId } }),
   });
 
   useEffect(() => {
@@ -209,9 +219,17 @@ function EditOrg() {
       />
 
       <section className="rounded-2xl border border-border bg-surface p-4 space-y-3">
-        <h2 className="text-xs uppercase tracking-wider font-bold text-muted-foreground">
-          Members
-        </h2>
+        <div className="flex items-center justify-between">
+          <h2 className="text-xs uppercase tracking-wider font-bold text-muted-foreground">
+            Trainer members
+          </h2>
+          <span className="text-[11px] text-muted-foreground">
+            {(membersQ.data ?? []).length} total
+          </span>
+        </div>
+        <p className="text-[11px] text-muted-foreground">
+          Trainers linked to this gym. Owners can promote to admin, demote to member, or transfer ownership.
+        </p>
         {membersQ.isLoading ? (
           <div className="text-xs text-muted-foreground">Loading…</div>
         ) : (membersQ.data ?? []).length === 0 ? (
@@ -288,6 +306,99 @@ function EditOrg() {
             <Trash2 className="h-3 w-3" /> Owner-only actions like transferring ownership and
             deleting the gym are above.
           </p>
+        )}
+      </section>
+
+      <section className="rounded-2xl border border-border bg-surface p-4 space-y-3">
+        <div className="flex items-center justify-between">
+          <h2 className="text-xs uppercase tracking-wider font-bold text-muted-foreground">
+            People
+          </h2>
+          <span className="text-[11px] text-muted-foreground">
+            {(genericMembersQ.data ?? []).length} total
+          </span>
+        </div>
+        <p className="text-[11px] text-muted-foreground">
+          Members who joined this gym through a request to join. Change their role or remove them.
+        </p>
+        {genericMembersQ.isLoading ? (
+          <div className="text-xs text-muted-foreground">Loading…</div>
+        ) : (genericMembersQ.data ?? []).length === 0 ? (
+          <div className="text-xs text-muted-foreground">No members yet.</div>
+        ) : (
+          <ul className="space-y-2">
+            {(genericMembersQ.data ?? []).map((m) => {
+              const name = m.profile?.display_name || "Member";
+              const initials =
+                m.profile?.avatar_initials ||
+                name.slice(0, 2).toUpperCase();
+              return (
+                <li
+                  key={m.id}
+                  className="flex items-center gap-3 rounded-xl border border-border bg-background p-2"
+                >
+                  <div className="grid h-9 w-9 place-items-center overflow-hidden rounded-full bg-lime-gradient text-xs font-bold text-primary-foreground">
+                    {m.profile?.avatar_url ? (
+                      <img src={m.profile.avatar_url} alt="" className="h-full w-full object-cover" />
+                    ) : (
+                      initials
+                    )}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="truncate text-sm font-semibold">{name}</div>
+                    <div className="flex items-center gap-1 text-[11px] uppercase tracking-wider text-muted-foreground">
+                      {m.role === "admin" && <Shield className="h-3 w-3 text-lime" />}
+                      {m.role}
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <select
+                      value={m.role === "admin" ? "admin" : "member"}
+                      onChange={async (e) => {
+                        const role = e.target.value as "admin" | "member";
+                        try {
+                          await setGenericRole({
+                            data: { orgId, userId: m.user_id, role },
+                          });
+                          qc.invalidateQueries({
+                            queryKey: ["org-edit-generic-members", orgId],
+                          });
+                          toast.success(`Set to ${role}`);
+                        } catch (err) {
+                          toast.error(err instanceof Error ? err.message : "Failed");
+                        }
+                      }}
+                      className="rounded-lg border border-border bg-surface px-2 py-1 text-xs"
+                    >
+                      <option value="member">member</option>
+                      <option value="admin">admin</option>
+                    </select>
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        if (!confirm(`Remove ${name} from this gym?`)) return;
+                        try {
+                          await removeGeneric({
+                            data: { orgId, userId: m.user_id },
+                          });
+                          qc.invalidateQueries({
+                            queryKey: ["org-edit-generic-members", orgId],
+                          });
+                          toast.success("Removed");
+                        } catch (err) {
+                          toast.error(err instanceof Error ? err.message : "Failed");
+                        }
+                      }}
+                      className="rounded-lg border border-coral/40 bg-coral/10 p-1.5 text-coral"
+                      aria-label="Remove"
+                    >
+                      <UserMinus className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
         )}
       </section>
     </div>
