@@ -130,6 +130,18 @@ function TrainersPage() {
   const setSpecialty = (v: string) =>
     updateSearch({ specialty: specialty === v ? "" : v });
   const setVenue = (v: string) => updateSearch({ venue: venue === v ? "" : v });
+  const setOrgId = (v: string) => updateSearch({ orgId: orgId === v ? "" : v });
+
+  const orgsListQuery = useQuery({
+    queryKey: ["trainer-orgs-list"],
+    queryFn: () => listTrainerOrgs({ data: { limit: 50 } }),
+  });
+  const orgMembersQuery = useQuery({
+    queryKey: ["trainer-org-members", orgId],
+    queryFn: () => listTrainerIdsForOrg({ data: { orgId } }),
+    enabled: !!orgId,
+  });
+  const orgMemberIds = useMemo(() => new Set(orgMembersQuery.data ?? []), [orgMembersQuery.data]);
   const setRadius = (v: number) => updateSearch({ radius: v });
   const setSortBy = (v: SortBy) => updateSearch({ sort: v });
   const setAvail = (v: Avail) => updateSearch({ avail: v });
