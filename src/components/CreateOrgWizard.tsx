@@ -100,6 +100,7 @@ export function CreateOrgWizard({ kind }: { kind: OrgKind }) {
   const [venues, setVenues] = useState<string[]>([]);
   const [venueAddresses, setVenueAddresses] = useState<string[]>([]);
   const [verifiedVenues, setVerifiedVenues] = useState<Set<string>>(new Set());
+  const [venueGeoMap, setVenueGeoMap] = useState<Record<string, { placeId: string; lat: number; lng: number }>>({});
   const [primaryVenue, setPrimaryVenue] = useState<string | null>(null);
   const [cadences, setCadences] = useState<string[]>([]);
   const [positionsBySport, setPositionsBySport] = useState<Record<string, PositionsNeeded>>({});
