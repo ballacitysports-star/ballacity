@@ -219,9 +219,17 @@ function EditOrg() {
       />
 
       <section className="rounded-2xl border border-border bg-surface p-4 space-y-3">
-        <h2 className="text-xs uppercase tracking-wider font-bold text-muted-foreground">
-          Members
-        </h2>
+        <div className="flex items-center justify-between">
+          <h2 className="text-xs uppercase tracking-wider font-bold text-muted-foreground">
+            Trainer members
+          </h2>
+          <span className="text-[11px] text-muted-foreground">
+            {(membersQ.data ?? []).length} total
+          </span>
+        </div>
+        <p className="text-[11px] text-muted-foreground">
+          Trainers linked to this gym. Owners can promote to admin, demote to member, or transfer ownership.
+        </p>
         {membersQ.isLoading ? (
           <div className="text-xs text-muted-foreground">Loading…</div>
         ) : (membersQ.data ?? []).length === 0 ? (
