@@ -45,12 +45,18 @@ function useMyTrainerRequest(trainerId: string) {
   return { row, refresh };
 }
 
-export function TrainerActions({ org }: { org: Org }) {
+export function TrainerActions({ org, defaultVenue = null }: { org: Org; defaultVenue?: string | null }) {
   const nav = useNavigate();
   const { user } = useAuth();
   const { isFollowing, pending, toggle } = useFollow(org.id);
   const [bookOpen, setBookOpen] = useState(false);
   const { row, refresh } = useMyTrainerRequest(org.id);
+  const venueOffered =
+    !!defaultVenue &&
+    (org.venueAddresses ?? []).some(
+      (a) => a.trim().toLowerCase() === defaultVenue.trim().toLowerCase(),
+    );
+  const prefill = venueOffered ? { venue: defaultVenue } : null;
 
   const requireAuth = () => {
     if (!user) {
