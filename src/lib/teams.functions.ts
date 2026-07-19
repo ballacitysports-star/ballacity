@@ -51,15 +51,8 @@ const TeamInput = z.object({
   format: z.string().max(120).nullable().optional(),
   formats: z.array(z.string().max(120)).default([]),
   venues: z.array(z.string().max(60)).default([]),
-  venue_addresses: z
-    .array(z.string())
-    .default([])
-    .superRefine((list, ctx) => {
-      const { errors } = validateVenueList(list);
-      errors.forEach((err, i) => {
-        if (err) ctx.addIssue({ code: z.ZodIssueCode.custom, path: [i], message: err });
-      });
-    }),
+  venue_addresses: z.array(z.string()).default([]),
+  verified_venues: z.array(z.string()).default([]),
   primary_venue: z.string().max(300).nullable().optional(),
   cadence: z.string().max(60).nullable().optional(),
   cadences: z.array(z.string().max(60)).default([]),
@@ -79,6 +72,16 @@ const TeamInput = z.object({
       }),
     )
     .default([]),
+}).superRefine((obj, ctx) => {
+  const { errors } = validateVenueList(obj.venue_addresses ?? [], obj.verified_venues ?? []);
+  errors.forEach((err, i) => {
+    if (err)
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["venue_addresses", i],
+        message: err,
+      });
+  });
 });
 
 const TeamPatch = TeamInput.partial().extend({ id: z.string() });
