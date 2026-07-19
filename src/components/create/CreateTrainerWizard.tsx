@@ -120,6 +120,8 @@ function initialDraft(): Draft {
 
 export function CreateTrainerWizard() {
   const nav = useNavigate();
+  const { user } = useAuth();
+
 
   const [draft, setDraft] = useState<Draft>(() => {
     if (typeof window === "undefined") return initialDraft();
