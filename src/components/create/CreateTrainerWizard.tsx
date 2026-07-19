@@ -549,10 +549,26 @@ export function CreateTrainerWizard() {
 
           {step === 3 && (
             <div className="space-y-5">
-              <Section title="Weekly template">
-                <WeeklyQuickPick
-                  value={draft.slots}
-                  onChange={(slots) => setDraft((d) => ({ ...d, slots }))}
+              <Section
+                title="Availability"
+                hint="Set your weekly base hours and tap any date to add overrides or block a day. You can schedule up to 6 months out."
+              >
+                <AvailabilityCalendar
+                  weekly={draft.slots}
+                  overrides={draft.overrides}
+                  venues={draft.venue && draft.venuePlaceId ? [draft.venue] : []}
+                  primaryVenue={draft.venue || null}
+                  timezone={draft.timezone}
+                  onWeeklyChange={(slots) => setDraft((d) => ({ ...d, slots }))}
+                  onOverridesChange={(overrides) => setDraft((d) => ({ ...d, overrides }))}
+                />
+              </Section>
+
+              <Section title="Recurring rules (optional)" hint="For patterns like every other Tuesday.">
+                <AvailabilityRulesEditor
+                  value={draft.rules}
+                  onChange={(rules) => setDraft((d) => ({ ...d, rules }))}
+                  venues={draft.venue && draft.venuePlaceId ? [draft.venue] : []}
                 />
               </Section>
 
@@ -567,24 +583,6 @@ export function CreateTrainerWizard() {
             </div>
           )}
 
-          {step === 4 && (
-            <div className="space-y-5">
-              {draft.slots.length === 0 ? (
-                <div className="rounded-2xl border border-dashed border-border bg-surface/60 p-5 text-center text-sm text-muted-foreground">
-                  No weekly template yet. Go back and pick one, or skip — you can manage availability later.
-                </div>
-              ) : (
-                <AvailabilityConfirm
-                  slots={draft.slots}
-                  overrides={draft.overrides}
-                  timezone={draft.timezone}
-                  onChangeOverrides={(o) => setDraft((d) => ({ ...d, overrides: o }))}
-                  onChangeTimezone={(tz) => setDraft((d) => ({ ...d, timezone: tz }))}
-                  onReset={() => setDraft((d) => ({ ...d, overrides: [] }))}
-                />
-              )}
-            </div>
-          )}
         </motion.div>
       </AnimatePresence>
 
