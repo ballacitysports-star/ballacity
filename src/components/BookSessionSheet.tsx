@@ -342,6 +342,23 @@ export function BookSessionSheet({
               </div>
             )}
 
+            {!date && (
+              <div>
+                <div className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2">
+                  Next available
+                </div>
+                <NextAvailableList
+                  org={org}
+                  limit={3}
+                  compact
+                  onPick={(s) => {
+                    setDate(s.dateKey);
+                    setStartTime(s.trainerStart ?? s.start);
+                  }}
+                />
+              </div>
+            )}
+
             {/* Conflict / off-availability warning */}
             {selWindow && (conflict || offAvailability) && (
               <div
