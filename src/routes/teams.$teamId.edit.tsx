@@ -12,6 +12,7 @@ import {
   ChevronDown,
   Trash2,
   ShieldAlert,
+  MapPin,
 } from "lucide-react";
 import { SPORTS, HERO_IMAGE, type Sport, type Org } from "@/lib/sample-data";
 import { getOrgById, ensureOrgById, updateOrg, deleteOrg, isMyOrg } from "@/lib/org-store";
