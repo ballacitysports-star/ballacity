@@ -113,10 +113,14 @@ function TrainerPage() {
   const tab: "about" | "experience" | "reviews" =
     search.tab === "experience" || search.tab === "reviews" ? search.tab : "about";
   const reviewsOpen = search.modal === "reviews";
+  const selectedVenue: string = search.venue || "";
   const setTab = (v: "about" | "experience" | "reviews") =>
     navigate({ search: (p: any) => ({ ...p, tab: v === "about" ? "" : v }), replace: true });
   const setReviewsOpen = (v: boolean) =>
     navigate({ search: (p: any) => ({ ...p, modal: v ? "reviews" : "" }), replace: true });
+  const setSelectedVenue = (v: string) =>
+    navigate({ search: (p: any) => ({ ...p, venue: selectedVenue === v ? "" : v }), replace: true });
+
 
   const [bookOpen, setBookOpen] = useState(false);
   const [following, setFollowing] = useState(false);
