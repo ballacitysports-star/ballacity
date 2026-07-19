@@ -24,6 +24,14 @@ import { useAuth } from "@/hooks/use-auth";
 import { resolveDay, fromDateKey, maxHorizonDate, toDateKey } from "@/lib/availability-resolve";
 import { DEFAULT_TZ, getBrowserTz, tzShortName, wallTimeToInstant, instantToWall } from "@/lib/tz";
 import { Globe } from "lucide-react";
+import { NextAvailableList } from "@/components/NextAvailableList";
+
+export type BookPrefill = {
+  date?: string;
+  startTime?: string;
+  venue?: string | null;
+  duration?: "30" | "60" | "90";
+};
 
 type Mode = "form" | "existing" | "sent";
 
@@ -48,11 +56,13 @@ export function BookSessionSheet({
   open,
   onOpenChange,
   onStatusChange,
+  prefill,
 }: {
   org: Org;
   open: boolean;
   onOpenChange: (v: boolean) => void;
   onStatusChange?: () => void;
+  prefill?: BookPrefill | null;
 }) {
   const nav = useNavigate();
   const { user } = useAuth();
@@ -94,6 +104,14 @@ export function BookSessionSheet({
       cancelled = true;
     };
   }, [open, user, org.id]);
+
+  // Apply prefill when the sheet opens (or prefill changes while open).
+  useEffect(() => {
+    if (!open || !prefill) return;
+    if (prefill.date) setDate(prefill.date);
+    if (prefill.startTime) setStartTime(prefill.startTime);
+    if (prefill.duration) setDuration(prefill.duration);
+  }, [open, prefill]);
 
   // Load trainer's booked slots when the date changes
   useEffect(() => {
@@ -321,6 +339,23 @@ export function BookSessionSheet({
                   Times below are shown in trainer time — we'll also show what that is in your local time
                   ({viewerTzShort}).
                 </span>
+              </div>
+            )}
+
+            {!date && (
+              <div>
+                <div className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2">
+                  Next available
+                </div>
+                <NextAvailableList
+                  org={org}
+                  limit={3}
+                  compact
+                  onPick={(s) => {
+                    setDate(s.dateKey);
+                    setStartTime(s.trainerStart ?? s.start);
+                  }}
+                />
               </div>
             )}
 
