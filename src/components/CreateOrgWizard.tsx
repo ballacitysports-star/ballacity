@@ -664,6 +664,21 @@ export function CreateOrgWizard({ kind }: { kind: OrgKind }) {
                     onWeeklyChange={setSlots}
                     onOverridesChange={setOverrides}
                   />
+                  <div className="mt-4 pt-4 border-t border-border">
+                    <div className="mb-2">
+                      <div className="text-sm font-semibold">Recurring rules</div>
+                      <p className="text-xs text-muted-foreground">
+                        Set patterns like "Every Tue/Thu" or "1st & 3rd Monday" — they auto-fill the calendar.
+                      </p>
+                    </div>
+                    <AvailabilityRulesEditor
+                      value={rules}
+                      onChange={setRules}
+                      venues={venueAddresses
+                        .map((v) => v.trim())
+                        .filter((v, idx, arr) => v && verifiedVenues.has(v.toLowerCase()) && arr.indexOf(v) === idx)}
+                    />
+                  </div>
                 </Section>
               )}
 
