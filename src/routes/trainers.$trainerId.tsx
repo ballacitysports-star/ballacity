@@ -124,6 +124,7 @@ function TrainerPage() {
 
 
   const [bookOpen, setBookOpen] = useState(false);
+  const [bookPrefill, setBookPrefill] = useState<BookPrefill | null>(null);
   const [following, setFollowing] = useState(false);
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
@@ -524,6 +525,20 @@ function TrainerPage() {
                   </>
                 }
               >
+                <div className="mb-3">
+                  <NextAvailableList
+                    org={org}
+                    venueFilter={selectedVenue || null}
+                    onPick={(s) => {
+                      setBookPrefill({
+                        date: s.dateKey,
+                        startTime: s.trainerStart ?? s.start,
+                        venue: s.venue ?? null,
+                      });
+                      setBookOpen(true);
+                    }}
+                  />
+                </div>
                 <TrainerAvailabilityMonth
                   weekly={org.availabilitySlots ?? []}
                   overrides={org.availabilityOverrides ?? []}
@@ -602,7 +617,15 @@ function TrainerPage() {
         </div>
       )}
 
-      <BookSessionSheet org={org} open={bookOpen} onOpenChange={setBookOpen} />
+      <BookSessionSheet
+        org={org}
+        open={bookOpen}
+        onOpenChange={(v) => {
+          setBookOpen(v);
+          if (!v) setBookPrefill(null);
+        }}
+        prefill={bookPrefill}
+      />
 
       <Dialog open={reviewsOpen} onOpenChange={setReviewsOpen}>
         <DialogContent
