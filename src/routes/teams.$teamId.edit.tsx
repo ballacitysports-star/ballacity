@@ -758,6 +758,12 @@ function EditOrg() {
                                         next.delete(prevKey);
                                         return next;
                                       });
+                                      setVenueGeoMap((cur) => {
+                                        if (!(prevKey in cur)) return cur;
+                                        const next = { ...cur };
+                                        delete next[prevKey];
+                                        return next;
+                                      });
                                     }
                                     if (isPrimary) setPrimaryVenue(v.trim() || null);
                                     if (prevTrim) {
@@ -770,7 +776,7 @@ function EditOrg() {
                                       );
                                     }
                                   }}
-                                  onPick={(full) => {
+                                  onPick={(full, placeId, geo) => {
                                     const key = full.trim().toLowerCase();
                                     const prevKey = trimmed.toLowerCase();
                                     setVenueAddresses((cur) =>
@@ -782,6 +788,14 @@ function EditOrg() {
                                       next.add(key);
                                       return next;
                                     });
+                                    if (geo) {
+                                      setVenueGeoMap((cur) => {
+                                        const next = { ...cur };
+                                        if (prevKey && prevKey !== key) delete next[prevKey];
+                                        next[key] = { placeId, lat: geo.lat, lng: geo.lng };
+                                        return next;
+                                      });
+                                    }
                                     if (isPrimary) setPrimaryVenue(full.trim());
                                     if (trimmed) {
                                       setSlots((cur) =>
@@ -813,6 +827,13 @@ function EditOrg() {
                                       if (!cur.has(key)) return cur;
                                       const next = new Set(cur);
                                       next.delete(key);
+                                      return next;
+                                    });
+                                    setVenueGeoMap((cur) => {
+                                      const key = trimmed.toLowerCase();
+                                      if (!(key in cur)) return cur;
+                                      const next = { ...cur };
+                                      delete next[key];
                                       return next;
                                     });
                                   }
