@@ -38,6 +38,8 @@ import {
   getTrainerOrgForTrainer,
   leaveTrainerOrg,
 } from "@/lib/trainer-orgs.functions";
+import { autocompletePlaces, getPlaceDetails } from "@/lib/places.functions";
+import { useUserLocation } from "@/lib/geo";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/teams/$teamId/edit")({
