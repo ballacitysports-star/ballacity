@@ -151,6 +151,20 @@ export function AvailabilityCalendar({
         </div>
       )}
 
+      {overrides.length > 0 && (
+        <button
+          type="button"
+          onClick={() => onOverridesChange([])}
+          className="flex w-full items-center justify-center gap-2 rounded-2xl border border-border bg-surface px-4 py-2.5 text-xs font-bold text-muted-foreground transition-colors hover:border-lime hover:text-lime"
+        >
+          <RotateCcw className="h-3.5 w-3.5" />
+          Reset to weekly template
+          <span className="rounded-full bg-coral/10 px-2 py-0.5 text-[10px] text-coral">
+            {overrides.length} override{overrides.length === 1 ? "" : "s"}
+          </span>
+        </button>
+      )}
+
       {/* Day-of-week header */}
       <div className="grid grid-cols-7 gap-1 px-1 text-center text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
         {DAY_LABELS.map((l) => (
