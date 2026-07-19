@@ -657,8 +657,11 @@ function EditOrg() {
                           Add the windows you're usually free — bookers see these on your profile.
                         </p>
                       )}
-                      {slots.map((slot, i) => (
-                        <div key={i} className="flex items-center gap-2">
+                      {slots.map((slot, i) => {
+                        const rowError = slotsError?.index === i ? slotsError : null;
+                        return (
+                        <div key={i} className="space-y-1">
+                          <div className="flex items-center gap-2">
                           <select
                             value={slot.day}
                             onChange={(e) =>
@@ -668,7 +671,7 @@ function EditOrg() {
                                 ),
                               )
                             }
-                            className="rounded-2xl border border-border bg-surface px-3 py-2 text-sm outline-none focus:border-lime"
+                            className={`rounded-2xl border bg-surface px-3 py-2 text-sm outline-none focus:border-lime ${rowError ? "border-red-500" : "border-border"}`}
                           >
                             <option value="mon">Mon</option>
                             <option value="tue">Tue</option>
@@ -686,7 +689,7 @@ function EditOrg() {
                                 cur.map((s, j) => (j === i ? { ...s, start: e.target.value } : s)),
                               )
                             }
-                            className="flex-1 rounded-2xl border border-border bg-surface px-3 py-2 text-sm outline-none focus:border-lime"
+                            className={`flex-1 rounded-2xl border bg-surface px-3 py-2 text-sm outline-none focus:border-lime ${rowError ? "border-red-500" : "border-border"}`}
                           />
                           <span className="text-xs text-muted-foreground">–</span>
                           <input
@@ -697,7 +700,7 @@ function EditOrg() {
                                 cur.map((s, j) => (j === i ? { ...s, end: e.target.value } : s)),
                               )
                             }
-                            className="flex-1 rounded-2xl border border-border bg-surface px-3 py-2 text-sm outline-none focus:border-lime"
+                            className={`flex-1 rounded-2xl border bg-surface px-3 py-2 text-sm outline-none focus:border-lime ${rowError ? "border-red-500" : "border-border"}`}
                           />
                           <button
                             type="button"
@@ -707,14 +710,20 @@ function EditOrg() {
                           >
                             <X className="h-4 w-4" />
                           </button>
+                          </div>
+                          {rowError && (
+                            <p className="text-xs text-red-500">{rowError.message}</p>
+                          )}
                         </div>
-                      ))}
+                        );
+                      })}
                       <button
                         type="button"
+                        disabled={!!slotsError}
                         onClick={() =>
                           setSlots((cur) => [...cur, { day: "mon", start: "17:00", end: "19:00" }])
                         }
-                        className="inline-flex items-center gap-1.5 rounded-2xl border border-dashed border-border bg-surface px-3 py-2 text-sm font-semibold text-foreground hover:border-lime"
+                        className="inline-flex items-center gap-1.5 rounded-2xl border border-dashed border-border bg-surface px-3 py-2 text-sm font-semibold text-foreground hover:border-lime disabled:cursor-not-allowed disabled:opacity-50"
                       >
                         <Plus className="h-4 w-4" /> Add time
                       </button>
