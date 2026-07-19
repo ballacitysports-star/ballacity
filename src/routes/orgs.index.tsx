@@ -82,7 +82,9 @@ function OrgsIndex() {
                 className="flex items-center gap-3 rounded-2xl border border-border bg-surface p-3 transition-colors hover:border-lime/40"
               >
                 <div className="grid h-14 w-14 shrink-0 place-items-center overflow-hidden rounded-2xl border border-border bg-lime-gradient font-display text-base font-bold text-primary-foreground">
-                  {o.avatar && (o.avatar.startsWith("http") || o.avatar.startsWith("/")) ? (
+                  {(o as { avatar_url?: string | null }).avatar_url ? (
+                    <img src={(o as { avatar_url: string }).avatar_url} alt="" className="h-full w-full object-cover" />
+                  ) : o.avatar && (o.avatar.startsWith("http") || o.avatar.startsWith("/")) ? (
                     <img src={o.avatar} alt="" className="h-full w-full object-cover" />
                   ) : (
                     (o.avatar || o.name.slice(0, 2)).toUpperCase().slice(0, 3)
