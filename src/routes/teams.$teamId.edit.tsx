@@ -104,6 +104,14 @@ function EditOrg() {
   const [verifiedVenues, setVerifiedVenues] = useState<Set<string>>(
     () => new Set((org.venueAddresses ?? []).map((v) => v.trim().toLowerCase()).filter(Boolean)),
   );
+  const [venueGeoMap, setVenueGeoMap] = useState<Record<string, { placeId: string; lat: number; lng: number }>>(
+    () => Object.fromEntries(
+      (org.venueGeo ?? []).map((g) => [
+        g.address.trim().toLowerCase(),
+        { placeId: g.placeId, lat: g.lat, lng: g.lng },
+      ]),
+    ),
+  );
   const slotsError = useMemo(() => validateSlots(slots), [slots]);
   const overridesError = useMemo(
     () => validateOverrides(overrides, verifiedVenues),
