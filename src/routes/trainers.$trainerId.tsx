@@ -608,7 +608,15 @@ function TrainerPage() {
                 <MessageCircle className="h-4 w-4" /> Message
               </Link>
               <button
-                onClick={() => setBookOpen(true)}
+                onClick={() => {
+                  const venueOffered =
+                    !!selectedVenue &&
+                    (org.venueAddresses ?? []).some(
+                      (a) => a.trim().toLowerCase() === selectedVenue.trim().toLowerCase(),
+                    );
+                  setBookPrefill(venueOffered ? { venue: selectedVenue } : null);
+                  setBookOpen(true);
+                }}
                 className="flex-1 inline-flex items-center justify-center gap-2 rounded-full bg-lime-gradient px-4 py-3 text-sm font-bold text-primary-foreground glow-lime"
               >
                 <Calendar className="h-4 w-4" /> Book session
