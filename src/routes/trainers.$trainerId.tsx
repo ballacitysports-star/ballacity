@@ -526,7 +526,9 @@ function TrainerPage() {
                   overrides={org.availabilityOverrides ?? []}
                   primaryVenue={org.primaryVenue ?? null}
                   venueFilter={selectedVenue || null}
+                  trainerTz={org.timezone ?? null}
                 />
+
               </Section>
             )}
 
