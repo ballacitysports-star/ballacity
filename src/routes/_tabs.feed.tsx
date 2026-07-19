@@ -650,7 +650,8 @@ function BellLink() {
   const unread = useUnreadNotificationCount();
   return (
     <Link
-      to="/notifications"
+      to="/messages"
+      search={{ tab: "alerts" } as any}
       className="relative grid h-10 w-10 place-items-center rounded-full border border-border bg-surface"
       aria-label="Notifications"
     >
