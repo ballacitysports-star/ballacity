@@ -25,10 +25,12 @@ export function TrainerAvailabilityMonth({
   weekly,
   overrides,
   primaryVenue,
+  venueFilter,
 }: {
   weekly: Slot[];
   overrides: DayOverride[];
   primaryVenue?: string | null;
+  venueFilter?: string | null;
 }) {
   const today = useMemo(() => {
     const t = new Date();
@@ -52,10 +54,11 @@ export function TrainerAvailabilityMonth({
   const canGoNext = monthStart < startOfMonth(horizon);
 
   const selectedResolved = useMemo(
-    () => resolveDay(fromDateKey(selected), weekly, overrides),
-    [selected, weekly, overrides],
+    () => resolveDay(fromDateKey(selected), weekly, overrides, venueFilter),
+    [selected, weekly, overrides, venueFilter],
   );
   const selectedOverride = overrides.find((o) => o.date === selected);
+
 
   return (
     <div className="space-y-3">
