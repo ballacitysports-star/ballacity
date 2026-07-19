@@ -91,6 +91,11 @@ function EditOrg() {
     },
   });
 
+  const genericMembersQ = useQuery({
+    queryKey: ["org-edit-generic-members", orgId],
+    queryFn: () => listOrgMembers({ data: { orgId } }),
+  });
+
   useEffect(() => {
     if (orgQ.data && !value) {
       const geo = orgQ.data.geo as { lat?: number; lng?: number } | null;
