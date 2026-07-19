@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { ChevronLeft, ChevronRight, X, Plus, Ban } from "lucide-react";
+import { ChevronLeft, ChevronRight, X, Plus, Ban, RotateCcw } from "lucide-react";
 import {
   Sheet,
   SheetContent,
@@ -149,6 +149,20 @@ export function AvailabilityCalendar({
           Times shown in <span className="font-semibold text-foreground">{timezone.replace(/_/g, " ")}</span> —
           this is the timezone attendees will see converted to their local time.
         </div>
+      )}
+
+      {overrides.length > 0 && (
+        <button
+          type="button"
+          onClick={() => onOverridesChange([])}
+          className="flex w-full items-center justify-center gap-2 rounded-2xl border border-border bg-surface px-4 py-2.5 text-xs font-bold text-muted-foreground transition-colors hover:border-lime hover:text-lime"
+        >
+          <RotateCcw className="h-3.5 w-3.5" />
+          Reset to weekly template
+          <span className="rounded-full bg-coral/10 px-2 py-0.5 text-[10px] text-coral">
+            {overrides.length} override{overrides.length === 1 ? "" : "s"}
+          </span>
+        </button>
       )}
 
       {/* Day-of-week header */}

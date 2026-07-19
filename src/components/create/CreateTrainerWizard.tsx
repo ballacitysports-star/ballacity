@@ -574,6 +574,7 @@ export function CreateTrainerWizard() {
                   timezone={draft.timezone}
                   onChangeOverrides={(o) => setDraft((d) => ({ ...d, overrides: o }))}
                   onChangeTimezone={(tz) => setDraft((d) => ({ ...d, timezone: tz }))}
+                  onReset={() => setDraft((d) => ({ ...d, overrides: [] }))}
                 />
               )}
             </div>
