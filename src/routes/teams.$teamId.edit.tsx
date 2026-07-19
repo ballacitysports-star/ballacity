@@ -14,8 +14,10 @@ import {
 } from "lucide-react";
 import { SPORTS, HERO_IMAGE, type Sport, type Org } from "@/lib/sample-data";
 import { getOrgById, updateOrg, deleteOrg, isMyOrg } from "@/lib/org-store";
-import { validateSlots, validateOverrides, type DayOverride } from "@/lib/availability-slots";
+import { validateSlots, validateOverrides, validateRules, type DayOverride } from "@/lib/availability-slots";
+import type { AvailabilityRule } from "@/lib/availability-resolve";
 import { AvailabilityCalendar } from "@/components/AvailabilityCalendar";
+import { AvailabilityRulesEditor } from "@/components/AvailabilityRulesEditor";
 import { TimezoneSelect } from "@/components/TimezoneSelect";
 import { getBrowserTz } from "@/lib/tz";
 import { validateVenueList, buildVenueGeo } from "@/lib/venue-address";
