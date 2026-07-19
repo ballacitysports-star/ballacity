@@ -101,9 +101,9 @@ function initialDraft(): Draft {
     skillMax: 3,
     sessionTypes: [],
     credentials: [],
-    venue: "",
-    venuePlaceId: "",
-    venueGeo: null,
+    venues: [],
+    primaryVenueIdx: 0,
+
     slots: [],
     overrides: [],
     rules: [],
