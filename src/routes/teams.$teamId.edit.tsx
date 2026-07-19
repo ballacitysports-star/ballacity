@@ -24,7 +24,8 @@ import { validateVenueList, buildVenueGeo } from "@/lib/venue-address";
 import { OrgCard } from "@/components/OrgCard";
 import { LocationAutocomplete } from "@/components/LocationAutocomplete";
 import { VenueMapPreview } from "@/components/VenueMapPreview";
-import { TeamCoverUploader } from "@/components/TeamCoverUploader";
+import { ImageUploader } from "@/components/ImageUploader";
+import { useAuth } from "@/hooks/use-auth";
 
 
 export const Route = createFileRoute("/teams/$teamId/edit")({
