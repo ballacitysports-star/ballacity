@@ -101,7 +101,7 @@ export function TrainerAvailabilityMonth({
           const disabled = past || beyond;
           const override = overrides.find((o) => o.date === key);
           const closed = override?.closed;
-          const hasAny = resolveDay(d, weekly, overrides).length > 0;
+          const hasAny = resolveDay(d, weekly, overrides, venueFilter).length > 0;
           const isSelected = key === selected;
           const state = disabled
             ? "border-border/30 bg-transparent text-muted-foreground/40 cursor-not-allowed"
