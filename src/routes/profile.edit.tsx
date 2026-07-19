@@ -82,49 +82,6 @@ function EditProfile() {
 
   const markDirty = () => setIsDirty(true);
 
-  const [cropTarget, setCropTarget] = useState<"avatar" | "cover" | null>(null);
-  const [cropFile, setCropFile] = useState<File | null>(null);
-
-  const onPickAvatar = (file: File | null) => {
-    if (!file) return;
-    if (!file.type.startsWith("image/")) {
-      toast.error("Please choose an image");
-      return;
-    }
-    setCropFile(file);
-    setCropTarget("avatar");
-  };
-
-  const onPickCover = (file: File | null) => {
-    if (!file) return;
-    if (!file.type.startsWith("image/")) {
-      toast.error("Please choose an image");
-      return;
-    }
-    setCropFile(file);
-    setCropTarget("cover");
-  };
-
-  const [uploadingImg, setUploadingImg] = useState<null | "avatar" | "cover">(null);
-
-  const onCropConfirm = async (dataUrl: string) => {
-    const target = cropTarget;
-    setCropTarget(null);
-    setCropFile(null);
-    if (!target || !profileUser) return;
-    markDirty();
-    setUploadingImg(target);
-    try {
-      const bucket = target === "avatar" ? "avatars" : "covers";
-      const url = await uploadDataUrlToBucket(bucket, profileUser.id, dataUrl);
-      if (target === "avatar") setAvatarUrl(url);
-      else setCoverUrl(url);
-    } catch (e: any) {
-      toast.error(e?.message ?? "Upload failed");
-    } finally {
-      setUploadingImg(null);
-    }
-  };
 
   const addLink = (type: ProfileLinkType) => {
     markDirty();
