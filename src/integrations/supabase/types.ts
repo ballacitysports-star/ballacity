@@ -1203,6 +1203,7 @@ export type Database = {
           tagline: string
           updated_at: string
           venue_addresses: Json
+          venue_geo: Json
           venues: string[]
           verified: boolean
           wins: number
@@ -1247,6 +1248,7 @@ export type Database = {
           tagline?: string
           updated_at?: string
           venue_addresses?: Json
+          venue_geo?: Json
           venues?: string[]
           verified?: boolean
           wins?: number
@@ -1291,6 +1293,7 @@ export type Database = {
           tagline?: string
           updated_at?: string
           venue_addresses?: Json
+          venue_geo?: Json
           venues?: string[]
           verified?: boolean
           wins?: number
