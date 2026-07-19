@@ -253,6 +253,7 @@ function EditOrg() {
               }))
           : undefined,
         availabilityOverrides: kind === "coach" ? overrides : undefined,
+        availabilityRules: kind === "coach" ? rules : undefined,
         timezone: kind === "coach" ? timezone : undefined,
         venueAddresses: kind === "coach"
           ? venueAddresses.map((a) => a.trim()).filter((a) => a.length > 0)
