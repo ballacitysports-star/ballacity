@@ -101,6 +101,8 @@ export function CreateOrgWizard({ kind }: { kind: OrgKind }) {
   const [ratingMax, setRatingMax] = useState<string>("");
   const [distances, setDistances] = useState<string[]>([]);
   const [sessionTypes, setSessionTypes] = useState<string[]>([]);
+  type Slot = NonNullable<Org["availabilitySlots"]>[number];
+  const [slots, setSlots] = useState<Slot[]>([]);
 
   const primary = primarySport(sports);
   const ratingSystem = ratingSystemFor(primary);
@@ -165,6 +167,9 @@ export function CreateOrgWizard({ kind }: { kind: OrgKind }) {
     ratingMax: ratingMax || undefined,
     distances,
     sessionTypes: isCoach ? sessionTypes : undefined,
+    availabilitySlots: isCoach
+      ? slots.filter((s) => s.start && s.end && s.end > s.start)
+      : undefined,
     upcoming: [],
     posts: [],
   };
