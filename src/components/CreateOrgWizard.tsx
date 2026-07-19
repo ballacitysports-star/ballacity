@@ -76,6 +76,7 @@ function initials(name: string) {
 
 export function CreateOrgWizard({ kind }: { kind: OrgKind }) {
   const nav = useNavigate();
+  const { user } = useAuth();
   const isCoach = kind === "coach";
   const backHref = isCoach ? "/trainers" : "/teams";
   const [step, setStep] = useState(0);
@@ -1178,13 +1179,36 @@ export function CreateOrgWizard({ kind }: { kind: OrgKind }) {
                 </p>
               </Section>
 
-              <Section title={isCoach ? "Trainer photo" : "Team photo"}>
-                <TeamCoverUploader
-                  cover={cover}
-                  onCoverChange={setCover}
-                  isCustom={customCover}
-                  onCustomChange={setCustomCover}
-                  fallback={HERO_IMAGE}
+              <Section title={isCoach ? "Trainer photo" : "Team logo"}>
+                <ImageUploader
+                  kind="avatar"
+                  bucket={isCoach ? "trainer-avatars" : "team-avatars"}
+                  pathPrefix={user?.id}
+                  value={avatar.startsWith("http") || avatar.startsWith("data:") ? avatar : ""}
+                  onChange={(url) => {
+                    setAvatar(url);
+                  }}
+                  onClear={() => setAvatar("")}
+                  label={isCoach ? "Trainer photo" : "Team logo"}
+                />
+              </Section>
+
+              <Section title={isCoach ? "Cover image" : "Team cover"}>
+                <ImageUploader
+                  kind="cover"
+                  bucket="team-covers"
+                  pathPrefix={user?.id}
+                  value={customCover ? cover : ""}
+                  fallback={cover}
+                  onChange={(url) => {
+                    setCover(url);
+                    setCustomCover(true);
+                  }}
+                  onClear={() => {
+                    setCover(HERO_IMAGE);
+                    setCustomCover(false);
+                  }}
+                  presets={sports.length ? sports : undefined}
                 />
               </Section>
 
