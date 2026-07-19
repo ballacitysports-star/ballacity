@@ -417,6 +417,30 @@ export function CreateTrainerWizard() {
                   className="w-full rounded-2xl border border-border bg-surface px-4 py-3 text-sm outline-none focus:border-lime"
                 />
               </Section>
+
+              <Section title="Profile photo (optional)">
+                <ImageUploader
+                  kind="avatar"
+                  bucket="trainer-avatars"
+                  pathPrefix={user?.id}
+                  value={draft.avatarUrl ?? ""}
+                  onChange={(url) => setDraft((d) => ({ ...d, avatarUrl: url }))}
+                  onClear={() => setDraft((d) => ({ ...d, avatarUrl: null }))}
+                />
+              </Section>
+
+              <Section title="Cover image (optional)">
+                <ImageUploader
+                  kind="cover"
+                  bucket="team-covers"
+                  pathPrefix={user?.id}
+                  value={draft.coverUrl ?? ""}
+                  fallback={HERO_IMAGE}
+                  onChange={(url) => setDraft((d) => ({ ...d, coverUrl: url }))}
+                  onClear={() => setDraft((d) => ({ ...d, coverUrl: null }))}
+                  presets={draft.primarySport ? [draft.primarySport] : undefined}
+                />
+              </Section>
             </div>
           )}
 
