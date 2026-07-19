@@ -1,13 +1,20 @@
 import { createFileRoute, Link, notFound } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useState } from "react";
 import { useAuth } from "@/hooks/use-auth";
-import { Building2, MapPin, Users, ShieldCheck, Check, X } from "lucide-react";
+import { Building2, MapPin, Users, ShieldCheck, Check, X, LogIn, UserPlus, Clock, Crown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import {
   getTrainerOrg,
   listJoinRequestsForOrg,
   reviewJoinRequest,
+  listMyTrainerProfiles,
+  getMyJoinRequestsForOrg,
+  listInvitesForTrainer,
+  requestToJoinTrainerOrg,
+  respondToTrainerOrgInvite,
+  leaveTrainerOrg,
 } from "@/lib/trainer-orgs.functions";
 
 export const Route = createFileRoute("/orgs/$orgId")({
@@ -55,11 +62,10 @@ function OrgPage() {
     role: string;
     teams?: { id: string; name: string; handle: string; avatar: string | null; city: string | null; sports: string[] | null } | null;
   }>;
+  const myMembership = auth.user ? members.find((m) => m.user_id === auth.user!.id) : null;
+  const isOwner = !!auth.user && !!org && org.owner_id === auth.user.id;
   const isAdmin =
-    !!auth.user &&
-    !!org &&
-    (org.owner_id === auth.user.id ||
-      members.some((m) => m.user_id === auth.user!.id && (m.role === "owner" || m.role === "admin")));
+    isOwner || (!!myMembership && (myMembership.role === "owner" || myMembership.role === "admin"));
 
   const requests = useQuery({
     queryKey: ["trainer-org-requests", orgId],
@@ -88,11 +94,16 @@ function OrgPage() {
             {org.avatar || <Building2 className="h-6 w-6 text-lime" />}
           </div>
           <div className="min-w-0 flex-1">
-            <h1 className="font-display text-2xl font-bold flex items-center gap-2">
+            <h1 className="font-display text-2xl font-bold flex items-center gap-2 flex-wrap">
               {org.name}
               {org.verified && (
                 <span className="inline-flex items-center gap-1 rounded-full bg-lime/15 px-2 py-0.5 text-xs font-bold text-lime">
                   <ShieldCheck className="h-3 w-3" /> Verified
+                </span>
+              )}
+              {isAdmin && (
+                <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/15 px-2 py-0.5 text-xs font-bold text-amber-500">
+                  <Crown className="h-3 w-3" /> {isOwner ? "Owner" : "Admin"}
                 </span>
               )}
             </h1>
@@ -122,6 +133,9 @@ function OrgPage() {
                 {org.website}
               </a>
             )}
+            <div className="mt-4">
+              <MembershipCta orgId={orgId} members={members} />
+            </div>
           </div>
         </div>
       </header>
@@ -195,5 +209,214 @@ function OrgPage() {
         </section>
       )}
     </div>
+  );
+}
+
+function MembershipCta({
+  orgId,
+  members,
+}: {
+  orgId: string;
+  members: Array<{ trainer_id: string; user_id: string; role: string }>;
+}) {
+  const auth = useAuth();
+  const qc = useQueryClient();
+  const signedIn = !!auth.user;
+
+  const myTrainers = useQuery({
+    queryKey: ["my-trainer-profiles"],
+    queryFn: () => listMyTrainerProfiles(),
+    enabled: signedIn,
+  });
+  const myRequests = useQuery({
+    queryKey: ["my-org-join-requests", orgId],
+    queryFn: () => getMyJoinRequestsForOrg({ data: { orgId } }),
+    enabled: signedIn,
+  });
+
+  const owned = myTrainers.data ?? [];
+  const ownedIds = new Set(owned.map((t) => t.id));
+
+  const myMember = signedIn
+    ? members.find((m) => m.user_id === auth.user!.id && ownedIds.has(m.trainer_id))
+    : undefined;
+
+  const invites = useQuery({
+    queryKey: ["my-invites-for-org", orgId, owned.map((t) => t.id).join(",")],
+    queryFn: async () => {
+      const results = await Promise.all(
+        owned.map((t) => listInvitesForTrainer({ data: { trainerId: t.id } })),
+      );
+      return results.flat().filter((inv) => inv.org_id === orgId);
+    },
+    enabled: signedIn && owned.length > 0 && !myMember,
+  });
+
+  if (!signedIn) {
+    return (
+      <Link
+        to="/auth"
+        search={{ next: `/orgs/${orgId}` }}
+        className="inline-flex items-center gap-1.5 rounded-full bg-lime px-4 py-1.5 text-xs font-bold text-background hover:opacity-90"
+      >
+        <LogIn className="h-3.5 w-3.5" /> Sign in to join
+      </Link>
+    );
+  }
+
+  if (myTrainers.isLoading) {
+    return <div className="text-xs text-muted-foreground">Loading…</div>;
+  }
+
+  function invalidate() {
+    qc.invalidateQueries({ queryKey: ["trainer-org", orgId] });
+    qc.invalidateQueries({ queryKey: ["my-org-join-requests", orgId] });
+    qc.invalidateQueries({ queryKey: ["my-invites-for-org", orgId] });
+  }
+
+  // Already a member
+  if (myMember) {
+    return (
+      <div className="flex items-center gap-2">
+        <span className="inline-flex items-center gap-1 rounded-full bg-lime/15 px-3 py-1 text-xs font-bold text-lime">
+          <Check className="h-3 w-3" /> Member · {myMember.role}
+        </span>
+        {myMember.role !== "owner" && (
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={async () => {
+              try {
+                await leaveTrainerOrg({ data: { orgId, trainerId: myMember.trainer_id } });
+                toast.success("Left organization");
+                invalidate();
+              } catch (e) {
+                toast.error(e instanceof Error ? e.message : "Failed");
+              }
+            }}
+          >
+            Leave
+          </Button>
+        )}
+      </div>
+    );
+  }
+
+  // No trainer profile
+  if (owned.length === 0) {
+    return (
+      <div className="text-xs text-muted-foreground">
+        <Link to="/trainers/create" className="text-lime hover:underline font-semibold">
+          Create a trainer profile
+        </Link>{" "}
+        to join this organization.
+      </div>
+    );
+  }
+
+  // Pending invite (respond)
+  const pendingInvite = (invites.data ?? [])[0];
+  if (pendingInvite) {
+    return (
+      <div className="flex items-center gap-2">
+        <span className="text-xs text-muted-foreground">Invited as {pendingInvite.role}</span>
+        <Button
+          size="sm"
+          variant="secondary"
+          onClick={async () => {
+            try {
+              await respondToTrainerOrgInvite({ data: { inviteId: pendingInvite.id, action: "accept" } });
+              toast.success("Joined organization");
+              invalidate();
+            } catch (e) {
+              toast.error(e instanceof Error ? e.message : "Failed");
+            }
+          }}
+        >
+          <Check className="h-3.5 w-3.5 mr-1" /> Accept
+        </Button>
+        <Button
+          size="sm"
+          variant="ghost"
+          onClick={async () => {
+            try {
+              await respondToTrainerOrgInvite({ data: { inviteId: pendingInvite.id, action: "decline" } });
+              invalidate();
+            } catch (e) {
+              toast.error(e instanceof Error ? e.message : "Failed");
+            }
+          }}
+        >
+          Decline
+        </Button>
+      </div>
+    );
+  }
+
+  // Pending join request
+  const myPending = myRequests.data ?? [];
+  if (myPending.length > 0) {
+    return (
+      <span className="inline-flex items-center gap-1 rounded-full bg-muted px-3 py-1 text-xs font-semibold text-muted-foreground">
+        <Clock className="h-3 w-3" /> Requested — awaiting review
+      </span>
+    );
+  }
+
+  // Request to join
+  return <RequestToJoin orgId={orgId} trainers={owned} onDone={invalidate} />;
+}
+
+function RequestToJoin({
+  orgId,
+  trainers,
+  onDone,
+}: {
+  orgId: string;
+  trainers: Array<{ id: string; name: string }>;
+  onDone: () => void;
+}) {
+  const [pending, setPending] = useState(false);
+  const [selected, setSelected] = useState(trainers[0]?.id ?? "");
+
+  async function submit() {
+    if (!selected) return;
+    setPending(true);
+    try {
+      await requestToJoinTrainerOrg({ data: { orgId, trainerId: selected } });
+      toast.success("Join request sent");
+      onDone();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Failed");
+    } finally {
+      setPending(false);
+    }
+  }
+
+  if (trainers.length > 1) {
+    return (
+      <div className="flex items-center gap-2 flex-wrap">
+        <select
+          value={selected}
+          onChange={(e) => setSelected(e.target.value)}
+          className="h-9 rounded-lg border border-border/60 bg-background px-2 text-xs"
+        >
+          {trainers.map((t) => (
+            <option key={t.id} value={t.id}>
+              {t.name}
+            </option>
+          ))}
+        </select>
+        <Button size="sm" disabled={pending} onClick={submit}>
+          <UserPlus className="h-3.5 w-3.5 mr-1" /> Request to join
+        </Button>
+      </div>
+    );
+  }
+
+  return (
+    <Button size="sm" disabled={pending} onClick={submit}>
+      <UserPlus className="h-3.5 w-3.5 mr-1" /> Request to join
+    </Button>
   );
 }

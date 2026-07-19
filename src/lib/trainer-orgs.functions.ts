@@ -278,3 +278,29 @@ export const listTrainerIdsForOrg = createServerFn({ method: "GET" })
     if (error) throw new Error(error.message);
     return (rows ?? []).map((r) => r.trainer_id as string);
   });
+
+export const listMyTrainerProfiles = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const { data: rows, error } = await context.supabase
+      .from("teams")
+      .select("id,name,handle,avatar")
+      .eq("owner_id", context.userId)
+      .eq("kind", "coach");
+    if (error) throw new Error(error.message);
+    return rows ?? [];
+  });
+
+export const getMyJoinRequestsForOrg = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { orgId: string }) => z.object({ orgId: z.string().uuid() }).parse(d))
+  .handler(async ({ data, context }) => {
+    const { data: rows, error } = await context.supabase
+      .from("trainer_org_join_requests")
+      .select("id,trainer_id,status,created_at")
+      .eq("org_id", data.orgId)
+      .eq("requested_by", context.userId)
+      .eq("status", "pending");
+    if (error) throw new Error(error.message);
+    return rows ?? [];
+  });
