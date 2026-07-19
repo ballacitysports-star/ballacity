@@ -829,7 +829,34 @@ export function EditOrgScreen({ org }: { org: Org }) {
                           </button>
                         ))}
                         {orgResults.data && orgResults.data.length === 0 && !orgResults.isLoading && (
-                          <div className="text-[11px] text-muted-foreground">No match.</div>
+                          <div className="text-[11px] text-muted-foreground">No match on OpenRun.</div>
+                        )}
+                        {placesResults.data?.suggestions && placesResults.data.suggestions.length > 0 && (
+                          <>
+                            <div className="pt-1 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                              From Google
+                            </div>
+                            {placesResults.data.suggestions.map((s) => (
+                              <button
+                                key={s.id}
+                                type="button"
+                                onClick={() => pickPlaceAsNewOrg(s.id, s.primary, s.secondary)}
+                                className="flex w-full items-start gap-2 rounded-2xl border border-border bg-surface px-3 py-2.5 text-left hover:border-lime"
+                              >
+                                <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-coral" />
+                                <div className="min-w-0 flex-1">
+                                  <div className="truncate text-sm font-bold">{s.primary}</div>
+                                  {s.secondary && (
+                                    <div className="truncate text-[11px] text-muted-foreground">{s.secondary}</div>
+                                  )}
+                                </div>
+                                <Plus className="h-4 w-4 text-lime shrink-0" />
+                              </button>
+                            ))}
+                          </>
+                        )}
+                        {placesResults.isLoading && (
+                          <div className="text-[11px] text-muted-foreground">Searching Google…</div>
                         )}
                         <button
                           type="button"
