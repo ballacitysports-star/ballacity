@@ -25,12 +25,21 @@ export function validateVenueAddress(raw: string): {
   return { ok: true, value };
 }
 
-export function validateVenueList(list: string[]): {
+export function validateVenueList(
+  list: string[],
+  verified?: Set<string> | string[],
+): {
   errors: VenueAddressError[];
   hasError: boolean;
   deduped: string[];
   firstError: string | null;
 } {
+  const verifiedSet =
+    verified instanceof Set
+      ? verified
+      : verified
+        ? new Set(verified.map((v) => v.trim().toLowerCase()))
+        : null;
   const errors: VenueAddressError[] = [];
   const seen = new Map<string, number>();
   let firstError: string | null = null;
@@ -42,6 +51,9 @@ export function validateVenueList(list: string[]): {
       const key = res.value.toLowerCase();
       if (seen.has(key)) err = "Duplicate address";
       else seen.set(key, i);
+      if (!err && verifiedSet && !verifiedSet.has(key)) {
+        err = "Pick this address from Google suggestions";
+      }
     }
     errors.push(err);
     if (err && !firstError) firstError = err;

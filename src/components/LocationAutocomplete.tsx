@@ -27,7 +27,7 @@ export function LocationAutocomplete({
   /** "place" returns full venue address; "city" returns just city, region */
   mode?: "place" | "city";
   showCurrentButton?: boolean;
-  onPick?: (v: string) => void;
+  onPick?: (v: string, placeId: string) => void;
 }) {
   const [suggestions, setSuggestions] = useState<PlaceSuggestion[]>([]);
   const [open, setOpen] = useState(false);
@@ -98,7 +98,7 @@ export function LocationAutocomplete({
   const pick = (s: PlaceSuggestion) => {
     const full = s.secondary ? `${s.primary}, ${s.secondary}` : s.primary;
     onChange(full);
-    onPick?.(full);
+    onPick?.(full, s.id);
     setOpen(false);
     setSuggestions([]);
     // Rotate session token after a selection (Places billing convention).

@@ -98,8 +98,15 @@ function EditOrg() {
   const [slots, setSlots] = useState<Slot[]>(org.availabilitySlots ?? []);
   const [venueAddresses, setVenueAddresses] = useState<string[]>(org.venueAddresses ?? []);
   const [primaryVenue, setPrimaryVenue] = useState<string | null>(org.primaryVenue ?? null);
+  // Seed verified set with whatever addresses are already saved — existing entries remain valid.
+  const [verifiedVenues, setVerifiedVenues] = useState<Set<string>>(
+    () => new Set((org.venueAddresses ?? []).map((v) => v.trim().toLowerCase()).filter(Boolean)),
+  );
   const slotsError = useMemo(() => validateSlots(slots), [slots]);
-  const venueValidation = useMemo(() => validateVenueList(venueAddresses), [venueAddresses]);
+  const venueValidation = useMemo(
+    () => validateVenueList(venueAddresses, verifiedVenues),
+    [venueAddresses, verifiedVenues],
+  );
   const venuesError = org.kind === "coach" && venueAddresses.length > 0 && venueValidation.hasError;
   // Branding
   const [accent, setAccent] = useState(org.accent);
@@ -212,6 +219,7 @@ function EditOrg() {
         venueAddresses: kind === "coach"
           ? venueAddresses.map((a) => a.trim()).filter((a) => a.length > 0)
           : undefined,
+        verifiedVenues: kind === "coach" ? Array.from(verifiedVenues) : undefined,
         primaryVenue: kind === "coach"
           ? (primaryVenue && venueAddresses.map((v) => v.trim()).includes(primaryVenue.trim())
               ? primaryVenue.trim()
@@ -803,9 +811,19 @@ function EditOrg() {
                                   value={addr}
                                   onChange={(v) => {
                                     const prevTrim = trimmed;
+                                    const prevKey = prevTrim.toLowerCase();
+                                    const newKey = v.trim().toLowerCase();
                                     setVenueAddresses((cur) =>
                                       cur.map((a, j) => (j === i ? v : a)),
                                     );
+                                    if (prevKey && prevKey !== newKey) {
+                                      setVerifiedVenues((cur) => {
+                                        if (!cur.has(prevKey)) return cur;
+                                        const next = new Set(cur);
+                                        next.delete(prevKey);
+                                        return next;
+                                      });
+                                    }
                                     if (isPrimary) setPrimaryVenue(v.trim() || null);
                                     if (prevTrim) {
                                       setSlots((cur) =>
@@ -817,7 +835,30 @@ function EditOrg() {
                                       );
                                     }
                                   }}
-                                  placeholder="Gym, park, or full address"
+                                  onPick={(full) => {
+                                    const key = full.trim().toLowerCase();
+                                    const prevKey = trimmed.toLowerCase();
+                                    setVenueAddresses((cur) =>
+                                      cur.map((a, j) => (j === i ? full : a)),
+                                    );
+                                    setVerifiedVenues((cur) => {
+                                      const next = new Set(cur);
+                                      if (prevKey && prevKey !== key) next.delete(prevKey);
+                                      next.add(key);
+                                      return next;
+                                    });
+                                    if (isPrimary) setPrimaryVenue(full.trim());
+                                    if (trimmed) {
+                                      setSlots((cur) =>
+                                        cur.map((s) =>
+                                          s.venue?.trim() === trimmed
+                                            ? { ...s, venue: full.trim() }
+                                            : s,
+                                        ),
+                                      );
+                                    }
+                                  }}
+                                  placeholder="Start typing then pick a Google suggestion"
                                 />
                               </div>
                               <button
@@ -832,6 +873,13 @@ function EditOrg() {
                                           : s,
                                       ),
                                     );
+                                    setVerifiedVenues((cur) => {
+                                      const key = trimmed.toLowerCase();
+                                      if (!cur.has(key)) return cur;
+                                      const next = new Set(cur);
+                                      next.delete(key);
+                                      return next;
+                                    });
                                   }
                                   setVenueAddresses((cur) => cur.filter((_, j) => j !== i));
                                 }}
@@ -841,19 +889,26 @@ function EditOrg() {
                                 <X className="h-4 w-4" />
                               </button>
                             </div>
-                            <div className="flex items-center justify-between px-1">
-                              <button
-                                type="button"
-                                disabled={!trimmed || !!rowError}
-                                onClick={() => setPrimaryVenue(isPrimary ? null : trimmed)}
-                                className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-semibold transition ${
-                                  isPrimary
-                                    ? "border-lime bg-lime/20 text-lime"
-                                    : "border-border bg-surface text-muted-foreground hover:border-lime hover:text-lime"
-                                } disabled:opacity-40 disabled:cursor-not-allowed`}
-                              >
-                                {isPrimary ? "★ Primary" : "Set as primary"}
-                              </button>
+                            <div className="flex items-center justify-between gap-2 px-1">
+                              <div className="flex items-center gap-2">
+                                <button
+                                  type="button"
+                                  disabled={!trimmed || !!rowError}
+                                  onClick={() => setPrimaryVenue(isPrimary ? null : trimmed)}
+                                  className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-semibold transition ${
+                                    isPrimary
+                                      ? "border-lime bg-lime/20 text-lime"
+                                      : "border-border bg-surface text-muted-foreground hover:border-lime hover:text-lime"
+                                  } disabled:opacity-40 disabled:cursor-not-allowed`}
+                                >
+                                  {isPrimary ? "★ Primary" : "Set as primary"}
+                                </button>
+                                {trimmed && verifiedVenues.has(trimmed.toLowerCase()) && !rowError && (
+                                  <span className="inline-flex items-center gap-1 rounded-full border border-lime/40 bg-lime/10 px-2 py-0.5 text-[11px] font-semibold text-lime">
+                                    <Check className="h-3 w-3" /> Verified
+                                  </span>
+                                )}
+                              </div>
                               {rowError && (
                                 <p className="text-[11px] text-coral">{rowError}</p>
                               )}
