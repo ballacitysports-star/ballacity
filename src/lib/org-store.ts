@@ -50,6 +50,7 @@ type TeamRow = {
   session_types: string[] | null;
   availability_slots: unknown;
   availability_overrides: unknown;
+  availability_rules: unknown;
   timezone: string | null;
 };
 
