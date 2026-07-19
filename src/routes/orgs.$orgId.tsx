@@ -3,6 +3,8 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { Building2, MapPin, Users, ShieldCheck, Check, X, LogIn, UserPlus, Clock, Crown } from "lucide-react";
+import { VenueMapPreview } from "@/components/VenueMapPreview";
+
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import {
