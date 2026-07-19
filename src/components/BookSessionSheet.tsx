@@ -137,8 +137,9 @@ export function BookSessionSheet({
       fromDateKey(date),
       org.availabilitySlots ?? [],
       org.availabilityOverrides ?? [],
+      { rules: org.availabilityRules ?? [] },
     );
-  }, [date, org.availabilitySlots, org.availabilityOverrides]);
+  }, [date, org.availabilitySlots, org.availabilityOverrides, org.availabilityRules]);
 
   const durMin = Number(duration);
   const selWindow = useMemo(() => {
