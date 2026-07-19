@@ -228,7 +228,7 @@ function MembershipCta({
     return (
       <Link
         to="/auth"
-        search={{ redirect: `/orgs/${orgId}` }}
+        search={{ next: `/orgs/${orgId}` }}
         className="inline-flex items-center gap-1.5 rounded-full bg-lime px-4 py-1.5 text-xs font-bold text-background hover:opacity-90"
       >
         <LogIn className="h-3.5 w-3.5" /> Sign in to join
