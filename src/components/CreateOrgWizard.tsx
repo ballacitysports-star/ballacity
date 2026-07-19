@@ -594,7 +594,7 @@ export function CreateOrgWizard({ kind }: { kind: OrgKind }) {
                   <AvailabilityCalendar
                     weekly={slots}
                     overrides={overrides}
-                    venues={Array.from(verifiedVenues.values ? [] : []).length ? [] : venueAddresses
+                    venues={venueAddresses
                       .map((v) => v.trim())
                       .filter((v, idx, arr) => v && verifiedVenues.has(v.toLowerCase()) && arr.indexOf(v) === idx)}
                     primaryVenue={primaryVenue}
