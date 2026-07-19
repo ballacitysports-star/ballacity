@@ -103,6 +103,7 @@ export function CreateOrgWizard({ kind }: { kind: OrgKind }) {
   const [sessionTypes, setSessionTypes] = useState<string[]>([]);
   type Slot = NonNullable<Org["availabilitySlots"]>[number];
   const [slots, setSlots] = useState<Slot[]>([]);
+  const slotsError = useMemo(() => validateSlots(slots), [slots]);
 
   const primary = primarySport(sports);
   const ratingSystem = ratingSystemFor(primary);
