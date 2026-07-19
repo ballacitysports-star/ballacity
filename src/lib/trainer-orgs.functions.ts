@@ -317,3 +317,219 @@ export const getMyJoinRequestsForOrg = createServerFn({ method: "GET" })
     if (error) throw new Error(error.message);
     return rows ?? [];
   });
+
+// -----------------------------------------------------------------------
+// Standalone org create / update / member management
+// -----------------------------------------------------------------------
+
+const geoSchema = z
+  .object({ lat: z.number().min(-90).max(90), lng: z.number().min(-180).max(180) })
+  .nullable()
+  .optional();
+
+export const createStandaloneOrg = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: {
+    name: string;
+    handle: string;
+    bio?: string;
+    city?: string;
+    avatar?: string;
+    avatarUrl?: string;
+    coverUrl?: string;
+    website?: string;
+    address?: string;
+    placeId?: string;
+    geo?: { lat: number; lng: number } | null;
+  }) =>
+    z
+      .object({
+        name: z.string().min(2).max(120),
+        handle: z.string().min(3).max(40).regex(handleRe, "3–40 chars, a–z, 0–9, - or _"),
+        bio: z.string().max(2000).optional(),
+        city: z.string().max(120).optional(),
+        avatar: z.string().max(10).optional(),
+        avatarUrl: z.string().url().max(1000).optional(),
+        coverUrl: z.string().url().max(1000).optional(),
+        website: z.string().url().max(300).optional(),
+        address: z.string().max(300).optional(),
+        placeId: z.string().max(200).optional(),
+        geo: geoSchema,
+      })
+      .parse(d),
+  )
+  .handler(async ({ data, context }) => {
+    const { data: row, error } = await context.supabase
+      .from("trainer_orgs")
+      .insert({
+        owner_id: context.userId,
+        name: data.name,
+        handle: data.handle,
+        bio: data.bio ?? null,
+        city: data.city ?? null,
+        avatar: data.avatar ?? null,
+        avatar_url: data.avatarUrl ?? null,
+        cover_url: data.coverUrl ?? null,
+        website: data.website ?? null,
+        address: data.address ?? null,
+        place_id: data.placeId ?? null,
+        geo: data.geo ?? null,
+      })
+      .select("id")
+      .single();
+    if (error) throw new Error(error.message);
+
+    // Best-effort: if caller owns any trainer profiles, seed the first one as
+    // an owner member so the roster and manage view stay consistent.
+    const { data: myTrainers } = await context.supabase
+      .from("teams")
+      .select("id")
+      .eq("owner_id", context.userId)
+      .eq("kind", "coach")
+      .limit(1);
+    const seed = myTrainers?.[0]?.id;
+    if (seed) {
+      await context.supabase
+        .from("trainer_org_members")
+        .insert({ org_id: row.id, trainer_id: seed, user_id: context.userId, role: "owner" })
+        .then(() => undefined, () => undefined);
+    }
+
+    return row.id as string;
+  });
+
+export const updateTrainerOrg = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: {
+    id: string;
+    name?: string;
+    handle?: string;
+    bio?: string | null;
+    city?: string | null;
+    website?: string | null;
+    avatar?: string | null;
+    avatarUrl?: string | null;
+    coverUrl?: string | null;
+    address?: string | null;
+    placeId?: string | null;
+    geo?: { lat: number; lng: number } | null;
+  }) =>
+    z
+      .object({
+        id: z.string().uuid(),
+        name: z.string().min(2).max(120).optional(),
+        handle: z.string().min(3).max(40).regex(handleRe).optional(),
+        bio: z.string().max(2000).nullable().optional(),
+        city: z.string().max(120).nullable().optional(),
+        website: z.string().url().max(300).nullable().optional(),
+        avatar: z.string().max(10).nullable().optional(),
+        avatarUrl: z.string().url().max(1000).nullable().optional(),
+        coverUrl: z.string().url().max(1000).nullable().optional(),
+        address: z.string().max(300).nullable().optional(),
+        placeId: z.string().max(200).nullable().optional(),
+        geo: geoSchema,
+      })
+      .parse(d),
+  )
+  .handler(async ({ data, context }) => {
+    const patch: Database["public"]["Tables"]["trainer_orgs"]["Update"] = {};
+    if (data.name !== undefined) patch.name = data.name;
+    if (data.handle !== undefined) patch.handle = data.handle;
+    if (data.bio !== undefined) patch.bio = data.bio;
+    if (data.city !== undefined) patch.city = data.city;
+    if (data.website !== undefined) patch.website = data.website;
+    if (data.avatar !== undefined) patch.avatar = data.avatar;
+    if (data.avatarUrl !== undefined) patch.avatar_url = data.avatarUrl;
+    if (data.coverUrl !== undefined) patch.cover_url = data.coverUrl;
+    if (data.address !== undefined) patch.address = data.address;
+    if (data.placeId !== undefined) patch.place_id = data.placeId;
+    if (data.geo !== undefined) patch.geo = data.geo ?? null;
+    const { error } = await context.supabase
+      .from("trainer_orgs")
+      .update(patch)
+      .eq("id", data.id);
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
+
+export const setOrgMemberRole = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { orgId: string; trainerId: string; role: "owner" | "admin" | "member" }) =>
+    z
+      .object({
+        orgId: z.string().uuid(),
+        trainerId: z.string().min(1),
+        role: z.enum(["owner", "admin", "member"]),
+      })
+      .parse(d),
+  )
+  .handler(async ({ data, context }) => {
+    // Owner-only for owner-role changes; enforce last-owner safety.
+    const { data: org } = await context.supabase
+      .from("trainer_orgs")
+      .select("owner_id")
+      .eq("id", data.orgId)
+      .maybeSingle();
+    if (!org) throw new Error("Organization not found");
+    if (data.role === "owner" && org.owner_id !== context.userId) {
+      throw new Error("Only the owner can promote to owner.");
+    }
+    if (data.role !== "owner") {
+      const { data: current } = await context.supabase
+        .from("trainer_org_members")
+        .select("role")
+        .eq("org_id", data.orgId)
+        .eq("trainer_id", data.trainerId)
+        .maybeSingle();
+      if (current?.role === "owner") {
+        const { count } = await context.supabase
+          .from("trainer_org_members")
+          .select("id", { count: "exact", head: true })
+          .eq("org_id", data.orgId)
+          .eq("role", "owner");
+        if ((count ?? 0) <= 1) {
+          throw new Error("Cannot demote the last owner.");
+        }
+      }
+    }
+    const { error } = await context.supabase
+      .from("trainer_org_members")
+      .update({ role: data.role })
+      .eq("org_id", data.orgId)
+      .eq("trainer_id", data.trainerId);
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
+
+export const removeOrgMember = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { orgId: string; trainerId: string }) =>
+    z.object({ orgId: z.string().uuid(), trainerId: z.string().min(1) }).parse(d),
+  )
+  .handler(async ({ data, context }) => {
+    const { data: target } = await context.supabase
+      .from("trainer_org_members")
+      .select("role")
+      .eq("org_id", data.orgId)
+      .eq("trainer_id", data.trainerId)
+      .maybeSingle();
+    if (target?.role === "owner") {
+      throw new Error("Transfer ownership before removing the owner.");
+    }
+    const { error } = await context.supabase
+      .from("trainer_org_members")
+      .delete()
+      .eq("org_id", data.orgId)
+      .eq("trainer_id", data.trainerId);
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
+
+export const deleteTrainerOrg = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { id: string }) => z.object({ id: z.string().uuid() }).parse(d))
+  .handler(async ({ data, context }) => {
+    const { error } = await context.supabase.from("trainer_orgs").delete().eq("id", data.id);
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
