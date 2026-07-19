@@ -18,6 +18,7 @@ import {
   type OrgKind,
 } from "@/lib/sample-data";
 import { addOrg } from "@/lib/org-store";
+import { validateSlots } from "@/lib/availability-slots";
 import {
   SPORT_CONFIG,
   SESSION_TYPES,
