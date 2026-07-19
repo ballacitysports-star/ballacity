@@ -764,7 +764,7 @@ export function CreateTrainerWizard() {
                 <AvailabilityRulesEditor
                   value={draft.rules}
                   onChange={(rules) => setDraft((d) => ({ ...d, rules }))}
-                  venues={draft.venue && draft.venuePlaceId ? [draft.venue] : []}
+                  venues={verifiedVenueAddresses}
                 />
               </Section>
 
