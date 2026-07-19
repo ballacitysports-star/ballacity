@@ -109,6 +109,9 @@ function rowToOrg(row: TeamRow): Org {
     venueAddresses: Array.isArray(row.venue_addresses)
       ? (row.venue_addresses as string[])
       : [],
+    venueGeo: Array.isArray(row.venue_geo)
+      ? (row.venue_geo as { address: string; placeId: string; lat: number; lng: number }[])
+      : [],
     primaryVenue: kind === "coach" ? row.primary_venue ?? undefined : undefined,
     cadence: row.cadence ?? undefined,
     cadences: Array.isArray(row.cadences)
