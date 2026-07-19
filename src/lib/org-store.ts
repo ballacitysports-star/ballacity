@@ -157,6 +157,7 @@ function orgToInsert(org: Org) {
     formats: org.formats ?? (org.format ? [org.format] : []),
     venues: org.venues ?? [],
     venue_addresses: org.venueAddresses ?? [],
+    verified_venues: org.verifiedVenues ?? (org.venueAddresses ?? []),
     primary_venue: org.kind === "coach" ? org.primaryVenue ?? null : null,
     cadence: org.cadences?.[0] ?? org.cadence ?? null,
     cadences: org.cadences ?? (org.cadence ? [org.cadence] : []),
@@ -314,6 +315,7 @@ export async function updateOrg(
   }
   if (patch.venues !== undefined) mapped.venues = patch.venues ?? [];
   if (patch.venueAddresses !== undefined) mapped.venue_addresses = patch.venueAddresses ?? [];
+  if (patch.verifiedVenues !== undefined) mapped.verified_venues = patch.verifiedVenues ?? [];
   if (patch.primaryVenue !== undefined) mapped.primary_venue = patch.primaryVenue ?? null;
   if (patch.cadence !== undefined) mapped.cadence = patch.cadence ?? null;
   if (patch.cadences !== undefined) {
