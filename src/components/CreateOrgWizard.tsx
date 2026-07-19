@@ -98,6 +98,7 @@ export function CreateOrgWizard({ kind }: { kind: OrgKind }) {
   const [formats, setFormats] = useState<string[]>([]);
   const [venues, setVenues] = useState<string[]>([]);
   const [venueAddresses, setVenueAddresses] = useState<string[]>([]);
+  const [verifiedVenues, setVerifiedVenues] = useState<Set<string>>(new Set());
   const [primaryVenue, setPrimaryVenue] = useState<string | null>(null);
   const [cadences, setCadences] = useState<string[]>([]);
   const [positionsBySport, setPositionsBySport] = useState<Record<string, PositionsNeeded>>({});
@@ -108,7 +109,10 @@ export function CreateOrgWizard({ kind }: { kind: OrgKind }) {
   type Slot = NonNullable<Org["availabilitySlots"]>[number];
   const [slots, setSlots] = useState<Slot[]>([]);
   const slotsError = useMemo(() => validateSlots(slots), [slots]);
-  const venueValidation = useMemo(() => validateVenueList(venueAddresses), [venueAddresses]);
+  const venueValidation = useMemo(
+    () => validateVenueList(venueAddresses, verifiedVenues),
+    [venueAddresses, verifiedVenues],
+  );
   const venuesError = isCoach && venueAddresses.length > 0 && venueValidation.hasError;
 
   const primary = primarySport(sports);
