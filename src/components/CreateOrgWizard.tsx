@@ -244,6 +244,10 @@ export function CreateOrgWizard({ kind }: { kind: OrgKind }) {
       setSubmitError(overridesError.message);
       return;
     }
+    if (isCoach && rulesError) {
+      setSubmitError(rulesError.message);
+      return;
+    }
     if (venuesError) {
       setSubmitError(venueValidation.firstError ?? "Fix venue addresses");
       return;
