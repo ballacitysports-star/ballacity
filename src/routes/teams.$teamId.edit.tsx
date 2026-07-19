@@ -95,6 +95,7 @@ function EditOrg() {
   const [rate, setRate] = useState(org.ratePerHour ?? 75);
   type Slot = NonNullable<Org["availabilitySlots"]>[number];
   const [slots, setSlots] = useState<Slot[]>(org.availabilitySlots ?? []);
+  const slotsError = useMemo(() => validateSlots(slots), [slots]);
   // Branding
   const [accent, setAccent] = useState(org.accent);
   const [avatar, setAvatar] = useState(org.avatar);
