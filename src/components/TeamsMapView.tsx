@@ -29,6 +29,12 @@ export function TeamsMapView({ orgs, kind }: { orgs: Org[]; kind: OrgKind }) {
       pins={pins}
       noun={noun}
       emptyLabel={`No ${noun}s in this area.`}
+      getHref={(o) =>
+        o.kind === "coach"
+          ? { to: "/trainers/$trainerId", params: { trainerId: o.id } }
+          : { to: "/teams/$teamId", params: { teamId: o.id } }
+      }
+
       renderCard={(o) => (
         <Link
           to={o.kind === "coach" ? "/trainers/$trainerId" : "/teams/$teamId"}
