@@ -23,7 +23,7 @@ function publicClient() {
   });
 }
 
-const TeamInput = z.object({
+const TeamShape = z.object({
   id: z.string().min(1).max(200),
   kind: z.enum(["team", "coach"]),
   name: z.string().min(1).max(120),
@@ -56,7 +56,9 @@ const TeamInput = z.object({
   primary_venue: z.string().max(300).nullable().optional(),
   cadence: z.string().max(60).nullable().optional(),
   cadences: z.array(z.string().max(60)).default([]),
-  positions_needed: z.record(z.string(), z.record(z.string(), z.number().int().min(0).max(30))).default({}),
+  positions_needed: z
+    .record(z.string(), z.record(z.string(), z.number().int().min(0).max(30)))
+    .default({}),
   rating_system: z.enum(["NTRP", "DUPR", "UTR", "PACE", "SELF"]).nullable().optional(),
   rating_min: z.string().max(20).nullable().optional(),
   rating_max: z.string().max(20).nullable().optional(),
@@ -72,8 +74,15 @@ const TeamInput = z.object({
       }),
     )
     .default([]),
-}).superRefine((obj, ctx) => {
-  const { errors } = validateVenueList(obj.venue_addresses ?? [], obj.verified_venues ?? []);
+});
+
+function refineVenues(
+  obj: { venue_addresses?: string[]; verified_venues?: string[] },
+  ctx: z.RefinementCtx,
+) {
+  const list = obj.venue_addresses ?? [];
+  if (list.length === 0) return;
+  const { errors } = validateVenueList(list, obj.verified_venues ?? []);
   errors.forEach((err, i) => {
     if (err)
       ctx.addIssue({
@@ -82,9 +91,17 @@ const TeamInput = z.object({
         message: err,
       });
   });
-});
+}
 
-const TeamPatch = TeamInput.partial().extend({ id: z.string() });
+const TeamInput = TeamShape.superRefine(refineVenues);
+const TeamPatch = TeamShape.partial().extend({ id: z.string() }).superRefine(refineVenues);
+
+/** Strip fields that aren't real DB columns before writing to Supabase. */
+function stripNonDbFields<T extends { verified_venues?: unknown }>(input: T) {
+  const { verified_venues: _v, ...rest } = input;
+  void _v;
+  return rest;
+}
 
 export const listTeams = createServerFn({ method: "GET" }).handler(async () => {
   const sb = publicClient();
@@ -113,9 +130,10 @@ export const createTeam = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input) => TeamInput.parse(input))
   .handler(async ({ data, context }) => {
+    const clean = stripNonDbFields(data);
     const { data: row, error } = await context.supabase
       .from("teams")
-      .insert({ ...data, owner_id: context.userId })
+      .insert({ ...clean, owner_id: context.userId })
       .select("*")
       .single();
     if (error) throw new Error(error.message);
@@ -127,9 +145,10 @@ export const updateTeam = createServerFn({ method: "POST" })
   .inputValidator((input) => TeamPatch.parse(input))
   .handler(async ({ data, context }) => {
     const { id, ...patch } = data;
+    const clean = stripNonDbFields(patch);
     const { data: row, error } = await context.supabase
       .from("teams")
-      .update(patch)
+      .update(clean)
       .eq("id", id)
       .eq("owner_id", context.userId)
       .select("*")
