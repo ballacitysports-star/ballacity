@@ -12,6 +12,7 @@ import {
   ChevronDown,
   Trash2,
   ShieldAlert,
+  MapPin,
 } from "lucide-react";
 import { SPORTS, HERO_IMAGE, type Sport, type Org } from "@/lib/sample-data";
 import { getOrgById, ensureOrgById, updateOrg, deleteOrg, isMyOrg } from "@/lib/org-store";
@@ -37,6 +38,8 @@ import {
   getTrainerOrgForTrainer,
   leaveTrainerOrg,
 } from "@/lib/trainer-orgs.functions";
+import { autocompletePlaces, getPlaceDetails } from "@/lib/places.functions";
+import { useUserLocation } from "@/lib/geo";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/teams/$teamId/edit")({
@@ -106,7 +109,14 @@ function slugifyHandle(name: string) {
   return name.toLowerCase().replace(/[^a-z0-9_]+/g, "").slice(0, 20);
 }
 
-type OrgChoice = { mode: "existing" | "new" | null; orgId?: string; name?: string };
+type OrgChoice = {
+  mode: "existing" | "new" | null;
+  orgId?: string;
+  name?: string;
+  address?: string;
+  placeId?: string;
+  geo?: { lat: number; lng: number } | null;
+};
 
 function EditOrg() {
   const org = Route.useLoaderData() as Org;
@@ -193,6 +203,71 @@ export function EditOrgScreen({ org }: { org: Org }) {
     enabled: kind === "coach" && orgSearch.trim().length >= 2,
     staleTime: 15_000,
   });
+
+  // Google Places gym search, biased to the user's current location.
+  const placesAutocomplete = useServerFn(autocompletePlaces);
+  const placesDetails = useServerFn(getPlaceDetails);
+  const { coords: userCoords, status: geoStatus, request: requestUserLocation } = useUserLocation();
+  const [orgSearchDebounced, setOrgSearchDebounced] = useState("");
+  const [placesSessionToken, setPlacesSessionToken] = useState<string>(() =>
+    typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).slice(2),
+  );
+  useEffect(() => {
+    const t = window.setTimeout(() => setOrgSearchDebounced(orgSearch.trim()), 250);
+    return () => window.clearTimeout(t);
+  }, [orgSearch]);
+  useEffect(() => {
+    if (kind === "coach" && orgSearchDebounced.length >= 2 && geoStatus === "idle") {
+      requestUserLocation();
+    }
+  }, [kind, orgSearchDebounced, geoStatus, requestUserLocation]);
+  const placesResults = useQuery({
+    queryKey: [
+      "trainer-orgs-places-edit",
+      orgSearchDebounced,
+      placesSessionToken,
+      userCoords?.lat ?? null,
+      userCoords?.lng ?? null,
+    ],
+    queryFn: () =>
+      placesAutocomplete({
+        data: {
+          input: orgSearchDebounced,
+          sessionToken: placesSessionToken,
+          lat: userCoords?.lat ?? null,
+          lng: userCoords?.lng ?? null,
+        },
+      }),
+    enabled: kind === "coach" && orgSearchDebounced.length >= 2,
+    staleTime: 30_000,
+  });
+
+  const pickPlaceAsNewOrg = async (id: string, primary: string, secondary: string) => {
+    const optimisticAddress = secondary ? `${primary}, ${secondary}` : primary;
+    setOrgChoice({
+      mode: "new",
+      name: primary,
+      address: optimisticAddress,
+      placeId: id,
+      geo: null,
+    });
+    const tokenAtPick = placesSessionToken;
+    setPlacesSessionToken(
+      typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).slice(2),
+    );
+    try {
+      const details = await placesDetails({ data: { placeId: id, sessionToken: tokenAtPick } });
+      setOrgChoice({
+        mode: "new",
+        name: primary,
+        address: details.formattedAddress || optimisticAddress,
+        placeId: id,
+        geo: { lat: details.lat, lng: details.lng },
+      });
+    } catch (err) {
+      console.error("[edit-org] place details failed", err);
+    }
+  };
 
   const slotsError = useMemo(() => validateSlots(slots), [slots]);
   const overridesError = useMemo(
@@ -320,6 +395,9 @@ export function EditOrgScreen({ org }: { org: Org }) {
             handle: orgHandle,
             trainerId: org.id,
             city: city || undefined,
+            address: orgChoice.address,
+            placeId: orgChoice.placeId,
+            geo: orgChoice.geo ?? undefined,
           },
         });
       } else if (nextMode === null && currentId) {
@@ -751,7 +829,34 @@ export function EditOrgScreen({ org }: { org: Org }) {
                           </button>
                         ))}
                         {orgResults.data && orgResults.data.length === 0 && !orgResults.isLoading && (
-                          <div className="text-[11px] text-muted-foreground">No match.</div>
+                          <div className="text-[11px] text-muted-foreground">No match on OpenRun.</div>
+                        )}
+                        {placesResults.data?.suggestions && placesResults.data.suggestions.length > 0 && (
+                          <>
+                            <div className="pt-1 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                              From Google
+                            </div>
+                            {placesResults.data.suggestions.map((s) => (
+                              <button
+                                key={s.id}
+                                type="button"
+                                onClick={() => pickPlaceAsNewOrg(s.id, s.primary, s.secondary)}
+                                className="flex w-full items-start gap-2 rounded-2xl border border-border bg-surface px-3 py-2.5 text-left hover:border-lime"
+                              >
+                                <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-coral" />
+                                <div className="min-w-0 flex-1">
+                                  <div className="truncate text-sm font-bold">{s.primary}</div>
+                                  {s.secondary && (
+                                    <div className="truncate text-[11px] text-muted-foreground">{s.secondary}</div>
+                                  )}
+                                </div>
+                                <Plus className="h-4 w-4 text-lime shrink-0" />
+                              </button>
+                            ))}
+                          </>
+                        )}
+                        {placesResults.isLoading && (
+                          <div className="text-[11px] text-muted-foreground">Searching Google…</div>
                         )}
                         <button
                           type="button"
