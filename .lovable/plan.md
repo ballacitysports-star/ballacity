@@ -1,16 +1,24 @@
-## Problem
+## Add Gym under "My organizations" in Profile Edit
 
-On the trainer profile page (`src/routes/trainers.$trainerId.index.tsx` line 235), the avatar tile renders `{org.avatar}` as raw text. Since the create/edit flows now store a full URL (or `data:` preview) in `avatar`, the URL string is shown instead of the picture. Short initials still render fine because they're just text — that's why this only regressed after avatar uploads landed.
+The "My organizations" section (`src/routes/profile.edit.tsx` L651–701) currently only shows Team and Trainer add pills, and `useMyOrgs()` only reads the `teams` table. Gyms (rows in `trainer_orgs`, created via `/orgs/create`) never surface here.
 
-The cover image on line 203 already uses `<img>`, so it's unaffected.
+### Changes
 
-## Fix
+Scope: `src/routes/profile.edit.tsx` only.
 
-In the avatar tile, detect whether `org.avatar` is an image reference and render accordingly:
+1. **Header pills** — add a third pill next to Team/Trainer:
+   - `+ Gym` → `Link` to `/orgs/create`.
 
-- If `org.avatar` starts with `http`, `https`, `/`, or `data:` → render an `<img>` filling the tile with `object-cover` and `rounded-3xl`, keeping the accent gradient as a fallback background.
-- Otherwise → render the string (initials / emoji) as today.
+2. **Empty state** — change the two-button grid into a three-button grid and add a "Start a gym" CTA linking to `/orgs/create`.
 
-Also fall back to initials derived from `org.name` when `org.avatar` is empty, so tiles are never blank.
+3. **List the user's gyms** alongside teams/trainers:
+   - Add a TanStack Query fetch using `listTrainerOrgs` (or a small `listMyOrgs`-style filter on `owner_id = auth user`) plus `listMyTrainerOrgMemberships` to include gyms where the user is a member/admin.
+   - Filter to gyms owned by the current user (simplest cut) via the existing `owner_id` field returned by `listTrainerOrgs`.
+   - Render each gym in a lightweight card (avatar/cover, name, handle, city, "Gym" badge) that links to `/orgs/$orgId`. Use inline JSX rather than extending `OrgCard` (which is typed for the teams schema).
+   - Merge with `myOrgs` for the empty-state check: if any teams, trainer profiles, or gyms exist, show the lists instead of the empty state.
 
-Scope: only `src/routes/trainers.$trainerId.index.tsx`. No schema, DB, or upload-flow changes.
+### Out of scope
+
+- No schema changes; `trainer_orgs` and `/orgs/create` already exist.
+- `OrgCard` and the teams-based `useMyOrgs` stay as-is.
+- No changes to gym creation or edit flows.
