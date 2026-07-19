@@ -102,6 +102,7 @@ function initialDraft(): Draft {
     overrides: [],
     rules: [],
     timezone: defaultTimezone(),
+    orgChoice: { mode: null },
   };
 }
 
