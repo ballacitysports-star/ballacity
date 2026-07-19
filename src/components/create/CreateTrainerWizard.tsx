@@ -52,6 +52,7 @@ type Draft = {
   overrides: { date: string; closed?: boolean; windows?: { start: string; end: string; venue?: string }[] }[];
   rules: AvailabilityRule[];
   timezone: string;
+  orgChoice: { mode: "existing" | "new" | null; orgId?: string; name?: string };
 };
 
 const DRAFT_KEY = "openrun.trainer-wizard.draft.v1";
