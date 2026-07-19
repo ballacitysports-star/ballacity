@@ -31,6 +31,7 @@ import { getCurrentUser, useAuth } from "@/hooks/use-auth";
 import { LocationAutocomplete } from "@/components/LocationAutocomplete";
 import { LINK_TYPES, LinkIcon } from "@/components/ProfileLinks";
 import { ImageEditorDialog } from "@/components/ImageEditorDialog";
+import { ImageUploader } from "@/components/ImageUploader";
 import { uploadDataUrlToBucket } from "@/lib/image-upload";
 
 export const Route = createFileRoute("/profile/edit")({
@@ -411,72 +412,36 @@ function EditProfile() {
 
       <Section title="Basics">
         <Field label="Cover photo">
-          <div className="relative h-32 w-full overflow-hidden rounded-2xl border border-border bg-surface">
-            {coverUrl ? (
-              <img src={coverUrl} alt="Cover preview" className="h-full w-full object-cover" />
-            ) : (
-              <div className="grid h-full w-full place-items-center text-xs text-muted-foreground">
-                No cover yet
-              </div>
-            )}
-            <div className="absolute bottom-2 right-2 flex gap-2">
-              <label className="inline-flex cursor-pointer items-center gap-1 rounded-full border border-border bg-background/80 backdrop-blur px-3 py-1.5 text-xs font-semibold hover:border-lime/40">
-                <input
-                  type="file"
-                  accept="image/*"
-                  className="hidden"
-                  onChange={(e) => onPickCover(e.target.files?.[0] ?? null)}
-                />
-                {coverUrl ? "Change cover" : "Upload cover"}
-              </label>
-              {coverUrl && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    markDirty();
-                    setCoverUrl(undefined);
-                  }}
-                  className="rounded-full border border-border bg-background/80 backdrop-blur px-3 py-1.5 text-xs font-semibold text-coral"
-                >
-                  Remove
-                </button>
-              )}
-            </div>
-          </div>
+          <ImageUploader
+            kind="cover"
+            bucket="covers"
+            pathPrefix={profileUser?.id}
+            value={coverUrl ?? ""}
+            onChange={(url) => {
+              markDirty();
+              setCoverUrl(url);
+            }}
+            onClear={() => {
+              markDirty();
+              setCoverUrl(undefined);
+            }}
+          />
         </Field>
         <Field label="Photo">
-          <div className="flex items-center gap-3">
-            <div className="grid h-16 w-16 place-items-center overflow-hidden rounded-2xl border border-border bg-lime-gradient font-display text-lg font-bold text-primary-foreground">
-              {avatarUrl ? (
-                <img src={avatarUrl} alt="Avatar preview" className="h-full w-full object-cover" />
-              ) : (
-                (avatar || name.slice(0, 2) || "U").toUpperCase().slice(0, 3)
-              )}
-            </div>
-            <div className="flex flex-col gap-2">
-              <label className="inline-flex cursor-pointer items-center gap-1 rounded-full border border-border bg-surface px-3 py-1.5 text-xs font-semibold hover:border-lime/40">
-                <input
-                  type="file"
-                  accept="image/*"
-                  className="hidden"
-                  onChange={(e) => onPickAvatar(e.target.files?.[0] ?? null)}
-                />
-                {avatarUrl ? "Change photo" : "Upload photo"}
-              </label>
-              {avatarUrl && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    markDirty();
-                    setAvatarUrl(undefined);
-                  }}
-                  className="text-xs font-semibold text-coral text-left"
-                >
-                  Remove photo
-                </button>
-              )}
-            </div>
-          </div>
+          <ImageUploader
+            kind="avatar"
+            bucket="avatars"
+            pathPrefix={profileUser?.id}
+            value={avatarUrl ?? ""}
+            onChange={(url) => {
+              markDirty();
+              setAvatarUrl(url);
+            }}
+            onClear={() => {
+              markDirty();
+              setAvatarUrl(undefined);
+            }}
+          />
         </Field>
         <Field label="Display name">
           <Input
