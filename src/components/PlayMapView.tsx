@@ -1,5 +1,6 @@
-import { Link } from "@tanstack/react-router";
-import { type ReactNode, useMemo, useState } from "react";
+import { Link, useNavigate } from "@tanstack/react-router";
+import { type ReactNode, useMemo, useRef, useState } from "react";
+
 import { motion, AnimatePresence } from "framer-motion";
 import { MapPin, Navigation } from "lucide-react";
 import { GAMES, SPORTS } from "@/lib/sample-data";
