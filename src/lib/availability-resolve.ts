@@ -99,9 +99,7 @@ export function resolveDay(
     return applyVenueFilter(windows, venueFilter);
   }
 
-  // Tz-aware path — lazy import to keep the resolver dependency-light.
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const { wallTimeToInstant, instantToWall } = require("./tz") as typeof import("./tz");
+  // Tz-aware path — helpers imported statically at top of file.
   const dayStartViewer = new Date(date.getFullYear(), date.getMonth(), date.getDate());
   const dayEndViewer = new Date(dayStartViewer.getTime() + 24 * 3600_000);
 
