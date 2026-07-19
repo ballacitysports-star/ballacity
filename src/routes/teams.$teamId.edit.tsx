@@ -448,7 +448,7 @@ export function EditOrgScreen({ org }: { org: Org }) {
     if (!confirm(`Delete ${org.name}? This cannot be undone.`)) return;
     try {
       await deleteOrg(org.id);
-      nav({ to: "/teams" });
+      nav({ to: kind === "coach" ? "/trainers" : "/teams" });
     } catch (e) {
       alert(e instanceof Error ? e.message : "Failed to delete team.");
     }
