@@ -116,6 +116,7 @@ export function CreateOrgWizard({ kind }: { kind: OrgKind }) {
   type Slot = NonNullable<Org["availabilitySlots"]>[number];
   const [slots, setSlots] = useState<Slot[]>([]);
   const [overrides, setOverrides] = useState<DayOverride[]>([]);
+  const [rules, setRules] = useState<AvailabilityRule[]>([]);
   const [timezone, setTimezone] = useState<string>(() => {
     // Lazy import so SSR doesn't crash — `Intl` is universal but the helper is browser-tuned.
     try {
