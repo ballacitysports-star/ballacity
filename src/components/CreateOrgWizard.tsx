@@ -130,6 +130,10 @@ export function CreateOrgWizard({ kind }: { kind: OrgKind }) {
     () => validateOverrides(overrides, verifiedVenues),
     [overrides, verifiedVenues],
   );
+  const rulesError = useMemo(
+    () => validateRules(rules, verifiedVenues),
+    [rules, verifiedVenues],
+  );
   const venueValidation = useMemo(
     () => validateVenueList(venueAddresses, verifiedVenues),
     [venueAddresses, verifiedVenues],
