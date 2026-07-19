@@ -237,9 +237,8 @@ function TrainerPage() {
           <div className="mb-2 flex items-center gap-2">
             {canEdit && (
               <Link
-                to="/teams/$teamId/edit"
-                params={{ teamId: org.id }}
-                data-render="client-only"
+                to="/trainers/$trainerId/edit"
+                params={{ trainerId: org.id }}
                 className="rounded-full border border-border bg-surface px-4 py-2.5 text-sm font-bold inline-flex items-center gap-1.5 hover:border-lime/40"
               >
                 <Pencil className="h-3.5 w-3.5" /> Edit
