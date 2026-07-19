@@ -147,7 +147,7 @@ export function CreateTrainerWizard() {
 
   useEffect(() => {
     const stored = loadDraft<Draft>(DRAFT_KEY);
-    if (stored && (stored.name || stored.bio || stored.venue)) {
+    if (stored && (stored.name || stored.bio || (stored.venues && stored.venues.length > 0))) {
       setRestored(true);
     }
   }, []);
