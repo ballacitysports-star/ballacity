@@ -42,7 +42,8 @@ import {
 import { OrgCard } from "@/components/OrgCard";
 import { LocationAutocomplete } from "@/components/LocationAutocomplete";
 import { VenueMapPreview } from "@/components/VenueMapPreview";
-import { TeamCoverUploader } from "@/components/TeamCoverUploader";
+import { ImageUploader } from "@/components/ImageUploader";
+import { useAuth } from "@/hooks/use-auth";
 import { PositionsPicker, positionsCleanup, type PositionsNeeded } from "@/components/PositionsPicker";
 import {
   listTrainerOrgs,
