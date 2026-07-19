@@ -135,6 +135,10 @@ function rowToOrg(row: TeamRow): Org {
       kind === "coach" && Array.isArray(row.availability_overrides)
         ? (row.availability_overrides as Org["availabilityOverrides"])
         : [],
+    availabilityRules:
+      kind === "coach" && Array.isArray(row.availability_rules)
+        ? (row.availability_rules as Org["availabilityRules"])
+        : [],
     timezone: kind === "coach" ? row.timezone ?? undefined : undefined,
     upcoming: [],
     posts: [],
