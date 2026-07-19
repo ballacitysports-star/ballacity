@@ -1,33 +1,39 @@
 ## Goal
-Keep the selected venue filter sticky as I move between the trainers feed → trainer profile → booking sheet, so I don't have to re-pick it at each stop.
-
-## Current state (verified)
-- Feed (`src/routes/_tabs.trainers.tsx`) reads/writes `venue` in the URL via `validateSearch`.
-- Profile (`src/routes/trainers.$trainerId.tsx`) already has its own `venue` search param, but nothing hands the feed's `venue` to it — clicking a trainer card via `OrgCard` drops the selection.
-- Profile → booking: `BookSessionSheet` accepts `prefill.venue`, but the profile only passes it through explicit "Book" clicks; opening from the top-level Book button ignores the currently-selected venue chip.
-- `TrainerActions` (feed row action) opens `BookSessionSheet` with no prefill, so the feed's venue selection is lost when booking directly from the list.
-- `OrgCard` is shared with teams and currently has no way to forward search params.
+Add Vitest integration coverage proving the trainer venue filter narrows both (a) the trainers feed list and (b) the availability month resolver.
 
 ## Changes
-1. **Forward venue from feed → profile**
-   - `src/components/OrgCard.tsx`: accept optional `search` prop and pass it to the `<Link>`. Keep default behavior for teams.
-   - `src/routes/_tabs.trainers.tsx`: when rendering trainer `OrgCard`s, pass `search={venue ? { venue } : undefined}`. Only forward when the venue exists on that trainer's `venueAddresses` (avoid pre-selecting a venue the trainer doesn't offer).
 
-2. **Forward venue from feed → booking (list action)**
-   - `src/components/TrainerActions.tsx`: accept an optional `defaultVenue?: string | null` prop and pass it as `prefill={{ venue: defaultVenue }}` to `BookSessionSheet` (only if that trainer offers it).
-   - `_tabs.trainers.tsx`: pass `defaultVenue={venue || null}` to each `<TrainerActions>`.
+### 1. Extract a pure feed filter (small refactor)
+The current venue-filter logic lives inline inside a `useMemo` in `src/routes/_tabs.trainers.tsx` and can't be imported by tests. Extract it into a pure helper so it's testable without rendering the route.
 
-3. **Forward venue from profile → booking**
-   - `src/routes/trainers.$trainerId.tsx`: when opening the sheet from the main "Book" CTA (currently sets `bookPrefill` to null), seed it with `{ venue: selectedVenue || null }` if the trainer offers it. The existing "book from calendar / next-available" flows already merge venue and stay intact.
+- New: `src/lib/trainer-feed-filter.ts`
+  - `filterTrainersByVenue(orgs: Org[], venue: string): Org[]` — case-insensitive, trim-normalized match against `org.venueAddresses`, returns all `coach`-kind orgs when `venue` is empty (mirrors current inline behavior).
+- Update `src/routes/_tabs.trainers.tsx` to call the helper in place of the inline `.filter(...)` (behavior-preserving; no UI change).
 
-4. **Preserve venue on profile back-link**
-   - `src/routes/trainers.$trainerId.tsx`: the "Back to trainers" `<Link to="/trainers">` currently drops search. Change it to `search={selectedVenue ? { venue: selectedVenue } : undefined}` so returning to the feed keeps the same venue filter.
+### 2. New test files
 
-## Non-goals
-- No schema, DB, or booking-logic changes.
-- No changes to team navigation, only trainer surfaces.
-- Radius / other filters are out of scope for this pass.
+- `src/lib/trainer-feed-filter.test.ts`
+  - Empty venue → returns all coach orgs unchanged.
+  - Exact-match venue narrows to trainers offering that address.
+  - Case + whitespace insensitive.
+  - Non-coach orgs (teams) are excluded when filter is applied.
+  - Trainer with multiple venues matches on any of them.
+  - Unknown venue → empty result.
 
-## Verification
-- Typecheck.
-- Manually: select a venue chip on the trainers feed → tap a trainer card → profile shows that venue selected → tap Book → sheet is prefilled with that venue → back arrow returns to the feed with the venue chip still active.
+- `src/lib/availability-resolve.venue.test.ts`
+  - Weekly-only slots: `resolveDay` with `venueFilter` set returns only windows whose `venue` matches (case/whitespace-insensitive).
+  - Rules-tier slots: recurring rule with venue A vs B — filter keeps only A.
+  - Overrides tier: date override with per-venue windows — filter narrows correctly.
+  - Merged tiers (weekly + rule + override same day): filter applies across all sources; dedupe still respects venue.
+  - `venueFilter` = null/"" returns the full unfiltered set.
+  - Windows without a `venue` field are excluded when a filter is active.
+
+## Technical notes
+- Tests use existing Vitest setup (mirrors `notification-prefs.test.ts`, `distance.test.ts`); no new deps.
+- Fixtures are inline plain objects — no DB, no Supabase, no React rendering — keeping these as fast integration tests around pure logic.
+- Resolver tests import `resolveDay` from `src/lib/availability-resolve.ts` and exercise the exported public API only.
+- Feed tests import from the new `trainer-feed-filter.ts`; the route file only changes to call the helper.
+
+## Out of scope
+- E2E (Playwright) coverage of the feed URL param — already implicitly covered by sticky-filter work; can be added later if desired.
+- Distance/radius, sport, specialty filters (not part of this request).
