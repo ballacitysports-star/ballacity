@@ -162,28 +162,58 @@ export function resolveDay(
     typeof optsOrVenueFilter === "string" || optsOrVenueFilter === null || optsOrVenueFilter === undefined
       ? { venueFilter: optsOrVenueFilter ?? null }
       : optsOrVenueFilter;
-  const { venueFilter, trainerTz, viewerTz } = opts;
+  const { venueFilter, trainerTz, viewerTz, rules = [] } = opts;
 
   const useTz = !!(trainerTz && viewerTz && trainerTz !== viewerTz);
 
+  const rawFor = (
+    tDate: Date,
+  ): (OverrideWindow & { source: ResolvedWindow["source"]; ruleId?: string; ruleLabel?: string })[] => {
+    const tKey = toDateKey(tDate);
+    const override = overrides.find((o) => o.date === tKey);
+    if (override) {
+      if (override.closed) return [];
+      return (override.windows ?? []).map((w) => ({ ...w, source: "override" as const }));
+    }
+    const dow = weekdayOf(tDate);
+    const weeklyWins = weekly
+      .filter((s) => s.day === dow)
+      .map((s) => ({ start: s.start, end: s.end, venue: s.venue, source: "weekly" as const }));
+    const ruleWins = rules.flatMap((r) =>
+      expandRule(r, tDate).map((w) => ({
+        ...w,
+        source: "rule" as const,
+        ruleId: r.id,
+        ruleLabel: r.label,
+      })),
+    );
+    // Merge, dedupe by start+end+venue (prefer rule over weekly).
+    const merged: typeof weeklyWins = [];
+    const seen = new Set<string>();
+    for (const w of [...ruleWins, ...weeklyWins]) {
+      const k = `${w.start}|${w.end}|${(w.venue ?? "").trim().toLowerCase()}`;
+      if (seen.has(k)) continue;
+      seen.add(k);
+      merged.push(w as (typeof merged)[number]);
+    }
+    return merged;
+  };
+
   if (!useTz) {
-    const key = toDateKey(date);
-    const override = overrides.find((o) => o.date === key);
-    const windows: ResolvedWindow[] = override
-      ? override.closed
-        ? []
-        : (override.windows ?? []).map((w) => ({ ...w, source: "override" as const }))
-      : weekly
-          .filter((s) => s.day === weekdayOf(date))
-          .map((s) => ({ start: s.start, end: s.end, venue: s.venue, source: "weekly" as const }));
+    const windows: ResolvedWindow[] = rawFor(date).map((w) => ({
+      start: w.start,
+      end: w.end,
+      venue: w.venue,
+      source: w.source,
+      ruleId: w.ruleId,
+      ruleLabel: w.ruleLabel,
+    }));
     return applyVenueFilter(windows, venueFilter);
   }
 
-  // Tz-aware path — helpers imported statically at top of file.
+  // Tz-aware path — enumerate trainer-local dates that touch this viewer day.
   const dayStartViewer = new Date(date.getFullYear(), date.getMonth(), date.getDate());
   const dayEndViewer = new Date(dayStartViewer.getTime() + 24 * 3600_000);
-
-  // Determine which trainer-local dates could contribute windows overlapping this viewer day.
   const trainerAtStart = instantToWall(dayStartViewer, trainerTz!);
   const trainerAtEnd = instantToWall(new Date(dayEndViewer.getTime() - 1), trainerTz!);
   const candidateDates = new Set<string>([trainerAtStart.dateKey, trainerAtEnd.dateKey]);
@@ -191,25 +221,15 @@ export function resolveDay(
   const out: ResolvedWindow[] = [];
   for (const tKey of candidateDates) {
     const tDate = fromDateKey(tKey);
-    const override = overrides.find((o) => o.date === tKey);
-    const raw = override
-      ? override.closed
-        ? []
-        : (override.windows ?? []).map((w) => ({ ...w, source: "override" as const }))
-      : weekly
-          .filter((s) => s.day === weekdayOf(tDate))
-          .map((s) => ({ start: s.start, end: s.end, venue: s.venue, source: "weekly" as const }));
-
+    const raw = rawFor(tDate);
     for (const w of raw) {
       const startInst = wallTimeToInstant(tKey, w.start, trainerTz!);
       const endInst = wallTimeToInstant(tKey, w.end, trainerTz!);
-      // Clip to viewer day
       const s = new Date(Math.max(startInst.getTime(), dayStartViewer.getTime()));
       const e = new Date(Math.min(endInst.getTime(), dayEndViewer.getTime()));
       if (e.getTime() <= s.getTime()) continue;
       const sw = instantToWall(s, viewerTz!);
       const ew = instantToWall(e, viewerTz!);
-      // If end lands at exactly next midnight, show 24:00 as the last minute of the day.
       const endHHMM =
         ew.dateKey !== sw.dateKey && ew.hhmm === "00:00" ? "24:00" : ew.hhmm;
       out.push({
@@ -217,6 +237,8 @@ export function resolveDay(
         end: endHHMM,
         venue: w.venue,
         source: w.source,
+        ruleId: w.ruleId,
+        ruleLabel: w.ruleLabel,
         crossesDay: startInst < dayStartViewer || endInst > dayEndViewer,
         trainerStart: w.start,
         trainerEnd: w.end,
@@ -224,7 +246,6 @@ export function resolveDay(
     }
   }
 
-  // Sort by start time and dedupe identical windows (a weekly + override edge could double-list).
   out.sort((a, b) => a.start.localeCompare(b.start));
   const dedup: ResolvedWindow[] = [];
   for (const w of out) {
