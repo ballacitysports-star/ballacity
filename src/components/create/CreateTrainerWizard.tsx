@@ -58,6 +58,8 @@ type Draft = {
   rules: AvailabilityRule[];
   timezone: string;
   orgChoice: { mode: "existing" | "new" | null; orgId?: string; name?: string };
+  avatarUrl: string | null;
+  coverUrl: string | null;
 };
 
 
@@ -109,6 +111,8 @@ function initialDraft(): Draft {
     rules: [],
     timezone: defaultTimezone(),
     orgChoice: { mode: null },
+    avatarUrl: null,
+    coverUrl: null,
   };
 }
 
@@ -200,8 +204,8 @@ export function CreateTrainerWizard() {
     founded: new Date().getFullYear(),
     sports: sports.length ? sports : (["Basketball"] as Sport[]),
     verified: false,
-    cover: HERO_IMAGE,
-    avatar: initials(draft.name || "OR"),
+    cover: draft.coverUrl ?? HERO_IMAGE,
+    avatar: draft.avatarUrl ?? initials(draft.name || "OR"),
     accent: "#a3ff12",
     followers: 0,
     roster: 0,
