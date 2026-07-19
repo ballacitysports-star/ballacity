@@ -378,6 +378,46 @@ function TrainersPage() {
             );
           })()}
 
+          {venueOptions.length > 0 && (
+            <div className="-mx-4 overflow-x-auto px-4 mb-3">
+              <div className="flex gap-2 pb-1">
+                <span className="self-center text-[10px] font-bold uppercase tracking-wider text-muted-foreground pr-1">
+                  Venue
+                </span>
+                <button
+                  onClick={() => setVenue("")}
+                  className={`whitespace-nowrap rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors ${
+                    !venue
+                      ? "border-lime bg-lime text-primary-foreground"
+                      : "border-border bg-surface text-muted-foreground"
+                  }`}
+                >
+                  Any venue
+                </button>
+                {venueOptions.map((v) => {
+                  const active = venue.trim().toLowerCase() === v.addr.toLowerCase();
+                  const short = v.addr.split(",")[0];
+                  return (
+                    <button
+                      key={v.addr}
+                      onClick={() => setVenue(v.addr)}
+                      title={v.addr}
+                      className={`whitespace-nowrap rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors ${
+                        active
+                          ? "border-lime bg-lime text-primary-foreground"
+                          : "border-border bg-surface text-muted-foreground"
+                      }`}
+                    >
+                      {v.primary ? "★ " : ""}
+                      {short}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+
           <div className="-mx-4 overflow-x-auto px-4 mb-4">
             <div className="flex gap-2 pb-1">
               <span className="self-center text-[10px] font-bold uppercase tracking-wider text-muted-foreground pr-1">
