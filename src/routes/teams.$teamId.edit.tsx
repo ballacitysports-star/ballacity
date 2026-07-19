@@ -395,6 +395,9 @@ export function EditOrgScreen({ org }: { org: Org }) {
             handle: orgHandle,
             trainerId: org.id,
             city: city || undefined,
+            address: orgChoice.address,
+            placeId: orgChoice.placeId,
+            geo: orgChoice.geo ?? undefined,
           },
         });
       } else if (nextMode === null && currentId) {
