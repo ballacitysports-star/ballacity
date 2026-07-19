@@ -14,12 +14,15 @@ import { LocationAutocomplete } from "@/components/LocationAutocomplete";
 import { VenueMapPreview } from "@/components/VenueMapPreview";
 import { OrgCard } from "@/components/OrgCard";
 
-import { WeeklyQuickPick } from "@/components/create/WeeklyQuickPick";
-import { AvailabilityConfirm } from "@/components/create/AvailabilityConfirm";
+import { AvailabilityCalendar } from "@/components/AvailabilityCalendar";
+import { AvailabilityRulesEditor } from "@/components/AvailabilityRulesEditor";
+import type { AvailabilityRule } from "@/lib/availability-resolve";
 import { loadDraft, useDraftPersistence } from "@/components/create/useDraftPersistence";
 import { toast } from "sonner";
 
-const STEP_LABELS = ["Basics", "Expertise", "Where", "Availability", "Confirm"] as const;
+const STEP_LABELS = ["Basics", "Expertise", "Where", "Availability"] as const;
+const SKILL_LABELS = ["Beginner", "Recreational", "Intermediate", "Advanced", "Pro"] as const;
+
 const SKILL_LABELS = ["Beginner", "Recreational", "Intermediate", "Advanced", "Pro"] as const;
 
 type Slot = { day: "mon" | "tue" | "wed" | "thu" | "fri" | "sat" | "sun"; start: string; end: string; venue?: string };
