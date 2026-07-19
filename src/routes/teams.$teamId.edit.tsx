@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import { SPORTS, HERO_IMAGE, type Sport, type Org } from "@/lib/sample-data";
 import { getOrgById, updateOrg, deleteOrg, isMyOrg } from "@/lib/org-store";
+import { validateSlots } from "@/lib/availability-slots";
 import { OrgCard } from "@/components/OrgCard";
 import { LocationAutocomplete } from "@/components/LocationAutocomplete";
 import { TeamCoverUploader } from "@/components/TeamCoverUploader";
