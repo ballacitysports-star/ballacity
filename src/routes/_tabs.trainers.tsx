@@ -218,19 +218,41 @@ function TrainersPage() {
               .includes(q.toLowerCase())
           : true,
       );
-    const withDist = filtered.map((o) => ({
-      o,
-      dist: pseudoDistance(o.id),
-      score: availabilityScore(o),
-    }));
+    const withDist = filtered
+      .map((o) => {
+        let minKm: number | null = null;
+        if (coords && (o.venueGeo?.length ?? 0) > 0) {
+          for (const g of o.venueGeo ?? []) {
+            const d = haversineKm(coords, { lat: g.lat, lng: g.lng });
+            if (minKm == null || d < minKm) minKm = d;
+          }
+        }
+        return {
+          o,
+          dist: pseudoDistance(o.id),
+          score: availabilityScore(o),
+          minKm,
+        };
+      })
+      .filter((x) => {
+        if (radiusKm <= 0 || !coords) return true;
+        return x.minKm != null && x.minKm <= radiusKm;
+      });
     withDist.sort((a, b) => {
-      if (sortBy === "nearest") return a.dist - b.dist;
+      if (sortBy === "nearest") {
+        if (radiusKm > 0 && coords) {
+          const ax = a.minKm ?? Infinity;
+          const bx = b.minKm ?? Infinity;
+          if (ax !== bx) return ax - bx;
+        }
+        return a.dist - b.dist;
+      }
       if (sortBy === "soonest") return a.score - b.score || a.dist - b.dist;
       if (sortBy === "followers") return b.o.followers - a.o.followers;
       return a.o.name.localeCompare(b.o.name);
     });
     return withDist;
-  }, [orgs, sport, specialty, venue, q, sortBy, avail]);
+  }, [orgs, sport, specialty, venue, q, sortBy, avail, radiusKm, coords]);
 
   const venueOptions = useMemo(() => {
     const map = new Map<string, { addr: string; primary: boolean; count: number }>();
