@@ -22,6 +22,8 @@ import {
 } from "@/lib/trainer-requests";
 import { useAuth } from "@/hooks/use-auth";
 import { resolveDay, fromDateKey, maxHorizonDate, toDateKey } from "@/lib/availability-resolve";
+import { DEFAULT_TZ, getBrowserTz, tzShortName, wallTimeToInstant, instantToWall } from "@/lib/tz";
+import { Globe } from "lucide-react";
 
 type Mode = "form" | "existing" | "sent";
 
@@ -111,6 +113,23 @@ export function BookSessionSheet({
       cancelled = true;
     };
   }, [open, date, org.id, mode]);
+
+  const trainerTz = org.timezone || DEFAULT_TZ;
+  const viewerTz = useMemo(() => getBrowserTz(), []);
+  const differ = trainerTz !== viewerTz;
+
+  // Convert a trainer-local wall time on the selected date into the viewer's
+  // wall time. Returns null when either input is missing.
+  const toViewerLabel = (hhmm: string): string | null => {
+    if (!date || !hhmm) return null;
+    const inst = wallTimeToInstant(date, hhmm, trainerTz);
+    const w = instantToWall(inst, viewerTz);
+    const sameDay = w.dateKey === date;
+    const time = `${((Number(w.hhmm.split(":")[0]) % 12) || 12)}:${w.hhmm.split(":")[1]} ${Number(w.hhmm.split(":")[0]) < 12 ? "AM" : "PM"}`;
+    return sameDay ? time : `${time} (${w.dateKey})`;
+  };
+  const viewerTzShort = tzShortName(date ? fromDateKey(date) : new Date(), viewerTz);
+  const trainerTzShort = tzShortName(date ? fromDateKey(date) : new Date(), trainerTz);
 
   const availWindows = useMemo(() => {
     if (!date) return [];
