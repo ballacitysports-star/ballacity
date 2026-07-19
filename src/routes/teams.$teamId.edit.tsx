@@ -103,6 +103,7 @@ function EditOrg() {
   type Slot = NonNullable<Org["availabilitySlots"]>[number];
   const [slots, setSlots] = useState<Slot[]>(org.availabilitySlots ?? []);
   const [overrides, setOverrides] = useState<DayOverride[]>(org.availabilityOverrides ?? []);
+  const [rules, setRules] = useState<AvailabilityRule[]>(org.availabilityRules ?? []);
   const [timezone, setTimezone] = useState<string>(org.timezone || getBrowserTz());
   const [venueAddresses, setVenueAddresses] = useState<string[]>(org.venueAddresses ?? []);
   const [primaryVenue, setPrimaryVenue] = useState<string | null>(org.primaryVenue ?? null);
