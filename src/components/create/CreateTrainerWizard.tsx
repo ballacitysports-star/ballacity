@@ -128,6 +128,7 @@ export function CreateTrainerWizard() {
   });
 
   const [credInput, setCredInput] = useState("");
+  const [venueInput, setVenueInput] = useState("");
   const [orgSearch, setOrgSearch] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
