@@ -35,7 +35,7 @@ const TeamShape = z.object({
   bio: z.string().max(4000).default(""),
   achievements: z.array(z.string()).default([]),
   accent: z.string().max(20).default("#a3ff12"),
-  avatar: z.string().max(10).default(""),
+  avatar: z.string().max(2048).default(""),
   cover: z.string().max(2000).default(""),
   league: z.string().max(200).nullable().optional(),
   home_court: z.string().max(200).nullable().optional(),
