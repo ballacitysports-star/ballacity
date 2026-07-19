@@ -37,10 +37,17 @@ export function PlayMapView<T extends MapItemLike>(props?: {
   renderCard?: (item: T) => ReactNode;
   noun?: string;
   emptyLabel?: string;
+  /**
+   * If provided, tapping the same pin twice (or tapping an already-active
+   * pin) navigates to this destination. Filters on the current route stay in
+   * the URL, so the back button restores them.
+   */
+  getHref?: (item: T) => { to: string; params?: Record<string, string> } | null;
 }) {
   const { user } = useAuth();
   const profile = useMyProfile(user);
   const hosted = useHostedGames();
+  const navigate = useNavigate();
 
   // Default (games) behavior when caller supplies nothing.
   const defaultGames = useMemo(() => [...hosted, ...GAMES], [hosted]);
@@ -48,6 +55,7 @@ export function PlayMapView<T extends MapItemLike>(props?: {
   const noun = props?.noun ?? "game";
   const emptyLabel =
     props?.emptyLabel ?? `No ${noun}s in this area. Pan the map or reset.`;
+
 
   const pins: MapPinItem[] = useMemo(() => {
     if (props?.pins) return props.pins;
