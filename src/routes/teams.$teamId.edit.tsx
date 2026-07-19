@@ -45,8 +45,8 @@ export const Route = createFileRoute("/teams/$teamId/edit")({
       </Link>
     </div>
   ),
-  loader: ({ params }) => {
-    const org = getOrgById(params.teamId);
+  loader: async ({ params }) => {
+    const org = await ensureOrgById(params.teamId);
     if (!org) throw notFound();
     return org;
   },
