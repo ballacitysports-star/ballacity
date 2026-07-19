@@ -17,6 +17,8 @@ import { toast } from "sonner";
 import { SPORT_CONFIG, SESSION_TYPES } from "@/lib/sport-config";
 import { haversineKm, KM_PER_MI, MI_PER_KM, useUserLocation } from "@/lib/geo";
 import { filterTrainersByVenue } from "@/lib/trainer-feed-filter";
+import { useQuery } from "@tanstack/react-query";
+import { listTrainerIdsForOrg, listTrainerOrgs } from "@/lib/trainer-orgs.functions";
 
 import { Slider } from "@/components/ui/slider";
 
@@ -65,6 +67,7 @@ const trainersSearchSchema = z.object({
   sport: fallback(z.string(), "").default(""),
   specialty: fallback(z.string(), "").default(""),
   venue: fallback(z.string(), "").default(""),
+  orgId: fallback(z.string(), "").default(""),
   radius: fallback(z.coerce.number().min(0).max(200), 0).default(0),
   avail: fallback(z.string(), "any").default("any"),
   sort: fallback(z.string(), "nearest").default("nearest"),
@@ -101,6 +104,7 @@ function TrainersPage() {
   const sport: Sport | null = (search.sport || null) as Sport | null;
   const specialty: string = search.specialty || "";
   const venue: string = search.venue || "";
+  const orgId: string = search.orgId || "";
   const radius: number = Number(search.radius) || 0;
   const sortBy: SortBy =
     search.sort === "soonest" || search.sort === "followers" || search.sort === "name"
@@ -126,6 +130,18 @@ function TrainersPage() {
   const setSpecialty = (v: string) =>
     updateSearch({ specialty: specialty === v ? "" : v });
   const setVenue = (v: string) => updateSearch({ venue: venue === v ? "" : v });
+  const setOrgId = (v: string) => updateSearch({ orgId: orgId === v ? "" : v });
+
+  const orgsListQuery = useQuery({
+    queryKey: ["trainer-orgs-list"],
+    queryFn: () => listTrainerOrgs({ data: {} }),
+  });
+  const orgMembersQuery = useQuery({
+    queryKey: ["trainer-org-members", orgId],
+    queryFn: () => listTrainerIdsForOrg({ data: { orgId } }),
+    enabled: !!orgId,
+  });
+  const orgMemberIds = useMemo(() => new Set(orgMembersQuery.data ?? []), [orgMembersQuery.data]);
   const setRadius = (v: number) => updateSearch({ radius: v });
   const setSortBy = (v: SortBy) => updateSearch({ sort: v });
   const setAvail = (v: Avail) => updateSearch({ avail: v });
@@ -194,7 +210,8 @@ function TrainersPage() {
     };
     const specialtyLower = specialty.toLowerCase();
     const byVenue = filterTrainersByVenue(orgs, venue);
-    const filtered = byVenue
+    const byOrg = orgId ? byVenue.filter((o) => orgMemberIds.has(o.id)) : byVenue;
+    const filtered = byOrg
       .filter((o) => (sport ? o.sports.includes(sport) : true))
       .filter((o) => {
         if (!specialty) return true;
@@ -249,7 +266,7 @@ function TrainersPage() {
       return a.o.name.localeCompare(b.o.name);
     });
     return withDist;
-  }, [orgs, sport, specialty, venue, q, sortBy, avail, radiusKm, coords]);
+  }, [orgs, sport, specialty, venue, orgId, orgMemberIds, q, sortBy, avail, radiusKm, coords]);
 
   const venueOptions = useMemo(() => {
     const map = new Map<string, { addr: string; primary: boolean; count: number }>();
@@ -343,7 +360,7 @@ function TrainersPage() {
         </div>
         {(() => {
           const activeFilterCount =
-            (sport ? 1 : 0) + (specialty ? 1 : 0) + (venue ? 1 : 0) + (radius > 0 ? 1 : 0) + (avail !== "any" ? 1 : 0);
+            (sport ? 1 : 0) + (specialty ? 1 : 0) + (venue ? 1 : 0) + (orgId ? 1 : 0) + (radius > 0 ? 1 : 0) + (avail !== "any" ? 1 : 0);
 
           return (
             <button
@@ -439,6 +456,44 @@ function TrainersPage() {
                     >
                       {v.primary ? "★ " : ""}
                       {short}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {(orgsListQuery.data ?? []).length > 0 && (
+            <div className="-mx-4 overflow-x-auto px-4 mb-3">
+              <div className="flex gap-2 pb-1">
+                <span className="self-center text-[10px] font-bold uppercase tracking-wider text-muted-foreground pr-1">
+                  Org
+                </span>
+                <button
+                  onClick={() => setOrgId("")}
+                  className={`whitespace-nowrap rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors ${
+                    !orgId
+                      ? "border-lime bg-lime text-primary-foreground"
+                      : "border-border bg-surface text-muted-foreground"
+                  }`}
+                >
+                  Any org
+                </button>
+                {(orgsListQuery.data ?? []).map((o) => {
+                  const active = orgId === o.id;
+                  return (
+                    <button
+                      key={o.id}
+                      onClick={() => setOrgId(o.id)}
+                      title={o.name}
+                      className={`whitespace-nowrap rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors ${
+                        active
+                          ? "border-lime bg-lime text-primary-foreground"
+                          : "border-border bg-surface text-muted-foreground"
+                      }`}
+                    >
+                      {o.verified ? "✓ " : ""}
+                      {o.name}
                     </button>
                   );
                 })}

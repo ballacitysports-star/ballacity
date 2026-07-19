@@ -36,6 +36,10 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { useQuery } from "@tanstack/react-query";
+import { getTrainerOrgForTrainer } from "@/lib/trainer-orgs.functions";
+import { TrainerOrgSection } from "@/components/TrainerOrgSection";
+import { Building2 } from "lucide-react";
 
 export const Route = createFileRoute("/trainers/$trainerId")({
   validateSearch: zodValidator(
@@ -129,6 +133,12 @@ function TrainerPage() {
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
   const canEdit = mounted && isMyOrg(org.id);
+
+  const orgLinkQuery = useQuery({
+    queryKey: ["trainer-org-for-trainer", org.id],
+    queryFn: () => getTrainerOrgForTrainer({ data: { trainerId: org.id } }),
+  });
+  const linkedOrg = orgLinkQuery.data?.org ?? null;
 
   const orgReviews = useReviewsFor(org.id);
   const orgRep = useMemo(() => computeReputation(orgReviews, "trainer"), [orgReviews]);
@@ -261,6 +271,17 @@ function TrainerPage() {
             <span>Since {org.founded}</span>
           </div>
           <p className="mt-2 text-sm text-foreground/90">{org.tagline}</p>
+          {linkedOrg && (
+            <Link
+              to="/orgs/$orgId"
+              params={{ orgId: linkedOrg.id }}
+              className="mt-2 inline-flex items-center gap-1.5 rounded-full border border-border/60 bg-background px-3 py-1 text-xs font-medium text-foreground hover:border-lime/60 hover:text-lime"
+            >
+              <Building2 className="h-3.5 w-3.5" />
+              at {linkedOrg.name}
+              {linkedOrg.verified ? " ✓" : ""}
+            </Link>
+          )}
         </div>
 
         {/* Stats */}
@@ -314,6 +335,7 @@ function TrainerPage() {
         {/* About */}
         {tab === "about" && (
           <div className="mt-5 space-y-5">
+            {canEdit && <TrainerOrgSection trainerId={org.id} />}
             <Section title="Bio">
               <p className="text-sm text-foreground/90 leading-relaxed whitespace-pre-wrap">
                 {org.bio}

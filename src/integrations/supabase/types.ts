@@ -1306,6 +1306,195 @@ export type Database = {
         }
         Relationships: []
       }
+      trainer_org_invites: {
+        Row: {
+          created_at: string
+          id: string
+          invited_by: string
+          invited_trainer_id: string
+          invited_user_id: string
+          message: string | null
+          org_id: string
+          responded_at: string | null
+          role: Database["public"]["Enums"]["trainer_org_role"]
+          status: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          invited_by: string
+          invited_trainer_id: string
+          invited_user_id: string
+          message?: string | null
+          org_id: string
+          responded_at?: string | null
+          role?: Database["public"]["Enums"]["trainer_org_role"]
+          status?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          invited_by?: string
+          invited_trainer_id?: string
+          invited_user_id?: string
+          message?: string | null
+          org_id?: string
+          responded_at?: string | null
+          role?: Database["public"]["Enums"]["trainer_org_role"]
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "trainer_org_invites_invited_trainer_id_fkey"
+            columns: ["invited_trainer_id"]
+            isOneToOne: false
+            referencedRelation: "teams"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "trainer_org_invites_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "trainer_orgs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      trainer_org_join_requests: {
+        Row: {
+          created_at: string
+          id: string
+          message: string | null
+          org_id: string
+          requested_by: string
+          reviewed_at: string | null
+          reviewer_notes: string | null
+          status: string
+          trainer_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          message?: string | null
+          org_id: string
+          requested_by: string
+          reviewed_at?: string | null
+          reviewer_notes?: string | null
+          status?: string
+          trainer_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          message?: string | null
+          org_id?: string
+          requested_by?: string
+          reviewed_at?: string | null
+          reviewer_notes?: string | null
+          status?: string
+          trainer_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "trainer_org_join_requests_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "trainer_orgs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "trainer_org_join_requests_trainer_id_fkey"
+            columns: ["trainer_id"]
+            isOneToOne: false
+            referencedRelation: "teams"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      trainer_org_members: {
+        Row: {
+          id: string
+          joined_at: string
+          org_id: string
+          role: Database["public"]["Enums"]["trainer_org_role"]
+          trainer_id: string
+          user_id: string
+        }
+        Insert: {
+          id?: string
+          joined_at?: string
+          org_id: string
+          role?: Database["public"]["Enums"]["trainer_org_role"]
+          trainer_id: string
+          user_id: string
+        }
+        Update: {
+          id?: string
+          joined_at?: string
+          org_id?: string
+          role?: Database["public"]["Enums"]["trainer_org_role"]
+          trainer_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "trainer_org_members_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "trainer_orgs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "trainer_org_members_trainer_id_fkey"
+            columns: ["trainer_id"]
+            isOneToOne: false
+            referencedRelation: "teams"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      trainer_orgs: {
+        Row: {
+          avatar: string | null
+          bio: string | null
+          city: string | null
+          created_at: string
+          handle: string
+          id: string
+          name: string
+          owner_id: string
+          updated_at: string
+          verified: boolean
+          website: string | null
+        }
+        Insert: {
+          avatar?: string | null
+          bio?: string | null
+          city?: string | null
+          created_at?: string
+          handle: string
+          id?: string
+          name: string
+          owner_id: string
+          updated_at?: string
+          verified?: boolean
+          website?: string | null
+        }
+        Update: {
+          avatar?: string | null
+          bio?: string | null
+          city?: string | null
+          created_at?: string
+          handle?: string
+          id?: string
+          name?: string
+          owner_id?: string
+          updated_at?: string
+          verified?: boolean
+          website?: string | null
+        }
+        Relationships: []
+      }
       trainer_session_requests: {
         Row: {
           created_at: string
@@ -1440,12 +1629,26 @@ export type Database = {
     }
     Functions: {
       accept_conversation: { Args: { _conv: string }; Returns: undefined }
+      accept_trainer_org_invite: { Args: { _invite: string }; Returns: string }
+      approve_trainer_org_join: { Args: { _req: string }; Returns: string }
       can_notify: {
         Args: { _caller: string; _target: string }
         Returns: boolean
       }
       create_direct_conversation: {
         Args: { _game_id?: string; _other_user: string }
+        Returns: string
+      }
+      create_trainer_org_with_owner: {
+        Args: {
+          _avatar?: string
+          _bio?: string
+          _city?: string
+          _handle: string
+          _name: string
+          _trainer_id: string
+          _website?: string
+        }
         Returns: string
       }
       decline_conversation: { Args: { _conv: string }; Returns: undefined }
@@ -1500,6 +1703,14 @@ export type Database = {
         Args: { _game_id: string; _user_id: string }
         Returns: boolean
       }
+      is_trainer_org_admin: {
+        Args: { _org: string; _user: string }
+        Returns: boolean
+      }
+      is_trainer_org_member: {
+        Args: { _org: string; _user: string }
+        Returns: boolean
+      }
       list_trainer_booked_slots: {
         Args: { _date: string; _trainer_id: string }
         Returns: {
@@ -1512,6 +1723,7 @@ export type Database = {
     }
     Enums: {
       app_role: "admin" | "moderator"
+      trainer_org_role: "owner" | "admin" | "member"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -1640,6 +1852,7 @@ export const Constants = {
   public: {
     Enums: {
       app_role: ["admin", "moderator"],
+      trainer_org_role: ["owner", "admin", "member"],
     },
   },
 } as const
