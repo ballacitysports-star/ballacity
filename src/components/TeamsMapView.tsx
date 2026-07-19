@@ -35,6 +35,7 @@ export function TeamsMapView({ orgs, kind }: { orgs: Org[]; kind: OrgKind }) {
           : { to: "/teams/$teamId", params: { teamId: o.id } }
       }
 
+
       renderCard={(o) => (
         <Link
           to={o.kind === "coach" ? "/trainers/$trainerId" : "/teams/$teamId"}
