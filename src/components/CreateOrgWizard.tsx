@@ -238,6 +238,19 @@ export function CreateOrgWizard({ kind }: { kind: OrgKind }) {
     posts: [],
   };
 
+  // Trainer-only: organization affiliation choice
+  type OrgChoice =
+    | { mode: "independent" }
+    | { mode: "join"; orgId: string; orgName: string }
+    | { mode: "create"; name: string; handle: string; city: string; bio: string };
+  const [orgChoice, setOrgChoice] = useState<OrgChoice>({ mode: "independent" });
+  const [orgSearch, setOrgSearch] = useState("");
+  const orgSearchResults = useQuery({
+    queryKey: ["trainer-orgs-wizard-search", orgSearch],
+    queryFn: () => listTrainerOrgs({ data: { search: orgSearch } }),
+    enabled: isCoach && orgChoice.mode === "join",
+  });
+
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
 
