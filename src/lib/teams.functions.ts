@@ -60,6 +60,7 @@ const TeamInput = z.object({
         if (err) ctx.addIssue({ code: z.ZodIssueCode.custom, path: [i], message: err });
       });
     }),
+  primary_venue: z.string().max(300).nullable().optional(),
   cadence: z.string().max(60).nullable().optional(),
   cadences: z.array(z.string().max(60)).default([]),
   positions_needed: z.record(z.string(), z.record(z.string(), z.number().int().min(0).max(30))).default({}),
@@ -74,6 +75,7 @@ const TeamInput = z.object({
         day: z.enum(["mon", "tue", "wed", "thu", "fri", "sat", "sun"]),
         start: z.string().regex(/^\d{2}:\d{2}$/),
         end: z.string().regex(/^\d{2}:\d{2}$/),
+        venue: z.string().max(300).optional(),
       }),
     )
     .default([]),

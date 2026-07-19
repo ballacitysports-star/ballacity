@@ -38,6 +38,7 @@ type TeamRow = {
   formats: unknown;
   venues: string[] | null;
   venue_addresses: unknown;
+  primary_venue: string | null;
   cadence: string | null;
   cadences: unknown;
   positions_needed: unknown;
@@ -106,6 +107,7 @@ function rowToOrg(row: TeamRow): Org {
     venueAddresses: Array.isArray(row.venue_addresses)
       ? (row.venue_addresses as string[])
       : [],
+    primaryVenue: kind === "coach" ? row.primary_venue ?? undefined : undefined,
     cadence: row.cadence ?? undefined,
     cadences: Array.isArray(row.cadences)
       ? (row.cadences as string[])
@@ -155,6 +157,7 @@ function orgToInsert(org: Org) {
     formats: org.formats ?? (org.format ? [org.format] : []),
     venues: org.venues ?? [],
     venue_addresses: org.venueAddresses ?? [],
+    primary_venue: org.kind === "coach" ? org.primaryVenue ?? null : null,
     cadence: org.cadences?.[0] ?? org.cadence ?? null,
     cadences: org.cadences ?? (org.cadence ? [org.cadence] : []),
     positions_needed: org.positionsNeeded ?? {},
@@ -309,6 +312,7 @@ export async function updateOrg(
   }
   if (patch.venues !== undefined) mapped.venues = patch.venues ?? [];
   if (patch.venueAddresses !== undefined) mapped.venue_addresses = patch.venueAddresses ?? [];
+  if (patch.primaryVenue !== undefined) mapped.primary_venue = patch.primaryVenue ?? null;
   if (patch.cadence !== undefined) mapped.cadence = patch.cadence ?? null;
   if (patch.cadences !== undefined) {
     mapped.cadences = patch.cadences ?? [];
