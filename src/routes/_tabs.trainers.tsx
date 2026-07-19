@@ -99,6 +99,7 @@ function TrainersPage() {
   const sport: Sport | null = (search.sport || null) as Sport | null;
   const specialty: string = search.specialty || "";
   const venue: string = search.venue || "";
+  const radius: number = Number(search.radius) || 0;
   const sortBy: SortBy =
     search.sort === "soonest" || search.sort === "followers" || search.sort === "name"
       ? search.sort
@@ -113,11 +114,17 @@ function TrainersPage() {
   const viewMode: ViewMode = search.view === "map" ? "map" : "list";
   const density: Density = search.density === "grid" ? "grid" : "list";
 
+  const { distanceUnit } = useFeedPrefs();
+  const unitLabel = distanceUnit === "km" ? "km" : "mi";
+  const { coords, status: geoStatus, request: requestLocation } = useUserLocation();
+  const radiusKm = radius > 0 ? (distanceUnit === "km" ? radius : radius * KM_PER_MI) : 0;
+
   const setQ = (v: string) => updateSearch({ q: v });
   const setSport = (v: Sport | null) => updateSearch({ sport: v ?? "", specialty: "" });
   const setSpecialty = (v: string) =>
     updateSearch({ specialty: specialty === v ? "" : v });
   const setVenue = (v: string) => updateSearch({ venue: venue === v ? "" : v });
+  const setRadius = (v: number) => updateSearch({ radius: v });
   const setSortBy = (v: SortBy) => updateSearch({ sort: v });
   const setAvail = (v: Avail) => updateSearch({ avail: v });
 
