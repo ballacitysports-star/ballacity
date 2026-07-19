@@ -134,6 +134,12 @@ function TrainerPage() {
   useEffect(() => setMounted(true), []);
   const canEdit = mounted && isMyOrg(org.id);
 
+  const orgLinkQuery = useQuery({
+    queryKey: ["trainer-org-for-trainer", org.id],
+    queryFn: () => getTrainerOrgForTrainer({ data: { trainerId: org.id } }),
+  });
+  const linkedOrg = orgLinkQuery.data?.org ?? null;
+
   const orgReviews = useReviewsFor(org.id);
   const orgRep = useMemo(() => computeReputation(orgReviews, "trainer"), [orgReviews]);
 
