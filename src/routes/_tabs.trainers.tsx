@@ -95,6 +95,7 @@ function TrainersPage() {
   const q = search.q;
   const sport: Sport | null = (search.sport || null) as Sport | null;
   const specialty: string = search.specialty || "";
+  const venue: string = search.venue || "";
   const sortBy: SortBy =
     search.sort === "soonest" || search.sort === "followers" || search.sort === "name"
       ? search.sort
@@ -113,8 +114,10 @@ function TrainersPage() {
   const setSport = (v: Sport | null) => updateSearch({ sport: v ?? "", specialty: "" });
   const setSpecialty = (v: string) =>
     updateSearch({ specialty: specialty === v ? "" : v });
+  const setVenue = (v: string) => updateSearch({ venue: venue === v ? "" : v });
   const setSortBy = (v: SortBy) => updateSearch({ sort: v });
   const setAvail = (v: Avail) => updateSearch({ avail: v });
+
   const [filtersOpen, setFiltersOpen] = useState(false);
   const switchView = (v: ViewMode) => updateSearch({ view: v });
   const switchDensity = (d: Density) => updateSearch({ density: d });
