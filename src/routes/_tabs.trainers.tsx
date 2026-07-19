@@ -449,6 +449,59 @@ function TrainersPage() {
             </div>
           )}
 
+          <div className="mb-4 rounded-2xl border border-border bg-surface p-3">
+            <div className="flex items-center justify-between mb-2">
+              <div className="flex items-center gap-2">
+                <MapPin className="h-3.5 w-3.5 text-lime" />
+                <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                  Within
+                </span>
+                <span className="text-xs font-semibold">
+                  {radius > 0 ? `${radius} ${unitLabel}` : "Any distance"}
+                </span>
+              </div>
+              {radius > 0 && (
+                <button
+                  onClick={() => setRadius(0)}
+                  className="text-[11px] font-semibold text-muted-foreground hover:text-foreground"
+                >
+                  Clear
+                </button>
+              )}
+            </div>
+            <Slider
+              value={[radius]}
+              min={0}
+              max={100}
+              step={1}
+              onValueChange={(v) => {
+                const nv = Math.round(v[0] ?? 0);
+                setRadius(nv);
+                if (nv > 0 && geoStatus !== "granted" && geoStatus !== "prompting") {
+                  requestLocation();
+                }
+              }}
+              aria-label="Distance radius"
+            />
+            {radius > 0 && geoStatus !== "granted" && (
+              <div className="mt-2 flex items-center justify-between gap-2 text-[11px]">
+                <span className="text-muted-foreground">
+                  {geoStatus === "denied" || geoStatus === "unsupported"
+                    ? "Location unavailable — enable location to filter by distance."
+                    : "Share your location to filter by distance."}
+                </span>
+                <button
+                  onClick={requestLocation}
+                  className="whitespace-nowrap rounded-full border border-lime bg-lime/10 px-2.5 py-1 text-[11px] font-bold text-lime"
+                >
+                  {geoStatus === "prompting" ? "Locating…" : "Use my location"}
+                </button>
+              </div>
+            )}
+          </div>
+
+
+
 
           <div className="-mx-4 overflow-x-auto px-4 mb-4">
             <div className="flex gap-2 pb-1">
