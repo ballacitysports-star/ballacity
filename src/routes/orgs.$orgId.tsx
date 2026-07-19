@@ -12,7 +12,7 @@ import {
 
 export const Route = createFileRoute("/orgs/$orgId")({
   head: ({ loaderData }) => {
-    const o = (loaderData as Awaited<ReturnType<typeof getTrainerOrg>>) ?? null;
+    const o = (loaderData as Awaited<ReturnType<typeof getTrainerOrg>> | undefined) ?? null;
     if (!o?.org) {
       return { meta: [{ title: "Organization — OpenRun" }, { name: "robots", content: "noindex" }] };
     }
