@@ -227,6 +227,7 @@ function EditOrg() {
                     : undefined,
               }))
           : undefined,
+        availabilityOverrides: kind === "coach" ? overrides : undefined,
         venueAddresses: kind === "coach"
           ? venueAddresses.map((a) => a.trim()).filter((a) => a.length > 0)
           : undefined,
@@ -700,108 +701,22 @@ function EditOrg() {
                     </div>
                   </Section>
 
-                  <Section title="Weekly availability">
-                    <div className="space-y-2">
-                      {slots.length === 0 && (
-                        <p className="text-xs text-muted-foreground">
-                          Add the windows you're usually free — bookers see these on your profile.
-                        </p>
-                      )}
-                      {slots.map((slot, i) => {
-                        const rowError = slotsError?.index === i ? slotsError : null;
-                        return (
-                        <div key={i} className="space-y-1">
-                          <div className="flex items-center gap-2">
-                          <select
-                            value={slot.day}
-                            onChange={(e) =>
-                              setSlots((cur) =>
-                                cur.map((s, j) =>
-                                  j === i ? { ...s, day: e.target.value as Slot["day"] } : s,
-                                ),
-                              )
-                            }
-                            className={`rounded-2xl border bg-surface px-3 py-2 text-sm outline-none focus:border-lime ${rowError ? "border-red-500" : "border-border"}`}
-                          >
-                            <option value="mon">Mon</option>
-                            <option value="tue">Tue</option>
-                            <option value="wed">Wed</option>
-                            <option value="thu">Thu</option>
-                            <option value="fri">Fri</option>
-                            <option value="sat">Sat</option>
-                            <option value="sun">Sun</option>
-                          </select>
-                          <input
-                            type="time"
-                            value={slot.start}
-                            onChange={(e) =>
-                              setSlots((cur) =>
-                                cur.map((s, j) => (j === i ? { ...s, start: e.target.value } : s)),
-                              )
-                            }
-                            className={`flex-1 rounded-2xl border bg-surface px-3 py-2 text-sm outline-none focus:border-lime ${rowError ? "border-red-500" : "border-border"}`}
-                          />
-                          <span className="text-xs text-muted-foreground">–</span>
-                          <input
-                            type="time"
-                            value={slot.end}
-                            onChange={(e) =>
-                              setSlots((cur) =>
-                                cur.map((s, j) => (j === i ? { ...s, end: e.target.value } : s)),
-                              )
-                            }
-                            className={`flex-1 rounded-2xl border bg-surface px-3 py-2 text-sm outline-none focus:border-lime ${rowError ? "border-red-500" : "border-border"}`}
-                          />
-                          <button
-                            type="button"
-                            onClick={() => setSlots((cur) => cur.filter((_, j) => j !== i))}
-                            className="rounded-full p-2 text-muted-foreground hover:bg-surface"
-                            aria-label="Remove slot"
-                          >
-                            <X className="h-4 w-4" />
-                          </button>
-                          </div>
-                          {venueAddresses.some((v) => v.trim()) && (
-                            <select
-                              value={slot.venue ?? ""}
-                              onChange={(e) =>
-                                setSlots((cur) =>
-                                  cur.map((s, j) =>
-                                    j === i ? { ...s, venue: e.target.value || undefined } : s,
-                                  ),
-                                )
-                              }
-                              className="w-full rounded-2xl border border-border bg-surface px-3 py-2 text-xs outline-none focus:border-lime"
-                            >
-                              <option value="">Any venue</option>
-                              {venueAddresses
-                                .map((v) => v.trim())
-                                .filter((v, idx, arr) => v && arr.indexOf(v) === idx)
-                                .map((v) => (
-                                  <option key={v} value={v}>
-                                    {v === primaryVenue?.trim() ? "★ " : ""}{v}
-                                  </option>
-                                ))}
-                            </select>
-                          )}
-                          {rowError && (
-                            <p className="text-xs text-red-500">{rowError.message}</p>
-                          )}
-                        </div>
-                        );
-                      })}
-                      <button
-                        type="button"
-                        disabled={!!slotsError}
-                        onClick={() =>
-                          setSlots((cur) => [...cur, { day: "mon", start: "17:00", end: "19:00" }])
-                        }
-                        className="inline-flex items-center gap-1.5 rounded-2xl border border-dashed border-border bg-surface px-3 py-2 text-sm font-semibold text-foreground hover:border-lime disabled:cursor-not-allowed disabled:opacity-50"
-                      >
-                        <Plus className="h-4 w-4" /> Add time
-                      </button>
-                    </div>
+                  <Section title="Availability calendar">
+                    <p className="text-xs text-muted-foreground mb-2">
+                      Set weekly windows and tap any date up to 6 months out to override or close it.
+                    </p>
+                    <AvailabilityCalendar
+                      weekly={slots}
+                      overrides={overrides}
+                      venues={venueAddresses
+                        .map((v) => v.trim())
+                        .filter((v, idx, arr) => v && verifiedVenues.has(v.toLowerCase()) && arr.indexOf(v) === idx)}
+                      primaryVenue={primaryVenue}
+                      onWeeklyChange={setSlots}
+                      onOverridesChange={setOverrides}
+                    />
                   </Section>
+
 
                   <Section title="Session venues">
                     <div className="space-y-2">
