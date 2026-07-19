@@ -453,18 +453,24 @@ export function BookSessionSheet({
                   <div className="flex flex-wrap gap-1.5">
                     {suggestedTimes.map((t) => {
                       const active = startTime === t;
+                      const viewerLbl = differ ? toViewerLabel(t) : null;
                       return (
                         <button
                           key={t}
                           type="button"
                           onClick={() => setStartTime(t)}
-                          className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition-all ${
+                          className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition-all flex flex-col items-center leading-tight ${
                             active
                               ? "border-lime bg-lime/15 text-lime"
                               : "border-border bg-surface text-muted-foreground"
                           }`}
                         >
-                          {fmt12(t)}
+                          <span>{fmt12(t)}</span>
+                          {viewerLbl && (
+                            <span className="text-[9px] font-normal opacity-70">
+                              {viewerLbl} {viewerTzShort}
+                            </span>
+                          )}
                         </button>
                       );
                     })}
@@ -492,6 +498,11 @@ export function BookSessionSheet({
                     </button>
                   )}
                 </div>
+                {differ && startTime && toViewerLabel(startTime) && (
+                  <p className="mt-1.5 text-[11px] text-lime/90">
+                    In your time: <span className="font-semibold">{toViewerLabel(startTime)} {viewerTzShort}</span>
+                  </p>
+                )}
                 {bookings.length > 0 && (
                   <p className="mt-1.5 text-[11px] text-muted-foreground">
                     Already booked:{" "}
