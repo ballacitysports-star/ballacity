@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import { toast } from "sonner";
-import { Calendar, Clock, MessageSquare, CheckCircle2, XCircle, Loader2 } from "lucide-react";
+import { AlertTriangle, Calendar, Clock, MessageSquare, CheckCircle2, XCircle, Loader2 } from "lucide-react";
 import {
   Sheet,
   SheetContent,
@@ -16,12 +16,30 @@ import {
   createTrainerSessionRequest,
   cancelTrainerSessionRequest,
   getMyPendingRequestForTrainer,
+  listTrainerBookedSlots,
+  type TrainerBookedSlot,
   type TrainerSessionRequest,
 } from "@/lib/trainer-requests";
 import { useAuth } from "@/hooks/use-auth";
 import { resolveDay, fromDateKey, maxHorizonDate, toDateKey } from "@/lib/availability-resolve";
 
 type Mode = "form" | "existing" | "sent";
+
+const toMin = (hhmm: string) => {
+  const [h, m] = hhmm.split(":").map(Number);
+  return (h ?? 0) * 60 + (m ?? 0);
+};
+const fromMin = (n: number) => {
+  const h = Math.floor(n / 60);
+  const m = n % 60;
+  return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
+};
+const fmt12 = (hhmm: string) => {
+  const [h, m] = hhmm.split(":").map(Number);
+  const ampm = (h ?? 0) < 12 ? "AM" : "PM";
+  const hr = ((h ?? 0) % 12) || 12;
+  return `${hr}:${String(m ?? 0).padStart(2, "0")} ${ampm}`;
+};
 
 export function BookSessionSheet({
   org,
@@ -43,12 +61,14 @@ export function BookSessionSheet({
 
   const [sessionType, setSessionType] = useState(sessionTypes[0]);
   const [date, setDate] = useState("");
+  const [startTime, setStartTime] = useState<string>(""); // "HH:MM" or ""
   const [duration, setDuration] = useState<"30" | "60" | "90">("60");
   const [message, setMessage] = useState("");
   const [mode, setMode] = useState<Mode>("form");
   const [existing, setExisting] = useState<TrainerSessionRequest | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [bookings, setBookings] = useState<TrainerBookedSlot[]>([]);
 
   // On open, check for existing request
   useEffect(() => {
@@ -73,15 +93,98 @@ export function BookSessionSheet({
     };
   }, [open, user, org.id]);
 
+  // Load trainer's booked slots when the date changes
+  useEffect(() => {
+    if (!open || !date || mode !== "form") {
+      setBookings([]);
+      return;
+    }
+    let cancelled = false;
+    listTrainerBookedSlots(org.id, date)
+      .then((rows) => {
+        if (!cancelled) setBookings(rows);
+      })
+      .catch(() => {
+        if (!cancelled) setBookings([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [open, date, org.id, mode]);
+
+  const availWindows = useMemo(() => {
+    if (!date) return [];
+    return resolveDay(
+      fromDateKey(date),
+      org.availabilitySlots ?? [],
+      org.availabilityOverrides ?? [],
+    );
+  }, [date, org.availabilitySlots, org.availabilityOverrides]);
+
+  const durMin = Number(duration);
+  const selWindow = useMemo(() => {
+    if (!startTime) return null;
+    const s = toMin(startTime);
+    return { start: s, end: s + durMin };
+  }, [startTime, durMin]);
+
+  const offAvailability = useMemo(() => {
+    if (!selWindow || availWindows.length === 0) return false;
+    return !availWindows.some((w) => selWindow.start >= toMin(w.start) && selWindow.end <= toMin(w.end));
+  }, [selWindow, availWindows]);
+
+  const conflict = useMemo(() => {
+    if (!selWindow) return null;
+    return (
+      bookings.find((b) => {
+        const a = toMin(b.start);
+        const bEnd = toMin(b.end);
+        return selWindow.start < bEnd && selWindow.end > a;
+      }) ?? null
+    );
+  }, [selWindow, bookings]);
+
+  // Suggested chip times: 30-min steps inside availability that fit duration and don't conflict.
+  const suggestedTimes = useMemo(() => {
+    if (!date || availWindows.length === 0) return [] as string[];
+    const out: string[] = [];
+    const conflicts = bookings.map((b) => ({ a: toMin(b.start), b: toMin(b.end) }));
+    for (const w of availWindows) {
+      const ws = toMin(w.start);
+      const we = toMin(w.end);
+      for (let t = ws; t + durMin <= we; t += 30) {
+        const overlaps = conflicts.some((c) => t < c.b && t + durMin > c.a);
+        if (!overlaps) out.push(fromMin(t));
+      }
+    }
+    return Array.from(new Set(out)).slice(0, 12);
+  }, [date, availWindows, bookings, durMin]);
+
+  // If current start time is invalid after a duration change, keep the value but flag it (user sees the warning).
+  useEffect(() => {
+    // no-op: warnings handle invalid combos.
+  }, [duration]);
+
+  const pickSuggested = () => {
+    if (suggestedTimes[0]) setStartTime(suggestedTimes[0]);
+  };
+
   const reset = () => {
     setMode("form");
     setExisting(null);
     setMessage("");
     setDate("");
+    setStartTime("");
     setDuration("60");
     setSessionType(sessionTypes[0]);
+    setBookings([]);
     setSubmitting(false);
   };
+
+  const canSubmit = useMemo(() => {
+    if (!startTime) return true; // time is optional; only conflict-check when set
+    return !offAvailability && !conflict;
+  }, [startTime, offAvailability, conflict]);
 
   const submit = async () => {
     if (!user) {
@@ -89,6 +192,11 @@ export function BookSessionSheet({
       nav({ to: "/auth" });
       return;
     }
+    if (startTime && !date) {
+      toast.error("Pick a date for your preferred time.");
+      return;
+    }
+    if (!canSubmit) return;
     setSubmitting(true);
     try {
       const ownerId = await ensureOrgOwnerId(org.id);
@@ -98,7 +206,8 @@ export function BookSessionSheet({
         toUserId: ownerId,
         sessionType,
         preferredDate: date || null,
-        durationMinutes: Number(duration),
+        preferredStartTime: startTime || null,
+        durationMinutes: durMin,
         message,
       });
       setExisting(row);
@@ -143,6 +252,12 @@ export function BookSessionSheet({
     }
   };
 
+  const disabledReason = !canSubmit
+    ? conflict
+      ? "This time overlaps another session"
+      : "Trainer isn't available at this time"
+    : undefined;
+
   return (
     <Sheet
       open={open}
@@ -177,6 +292,56 @@ export function BookSessionSheet({
           <ExistingRequestView row={existing} statusMeta={statusMeta} />
         ) : (
           <div className="mt-5 space-y-4">
+            {/* Conflict / off-availability warning */}
+            {selWindow && (conflict || offAvailability) && (
+              <div
+                role="alert"
+                className="rounded-2xl border border-rose-500/50 bg-rose-500/10 p-3 text-sm flex gap-3"
+              >
+                <AlertTriangle className="h-5 w-5 text-rose-300 shrink-0 mt-0.5" />
+                <div className="flex-1 min-w-0">
+                  <div className="font-bold text-rose-200">
+                    {conflict ? "This time overlaps another session" : "Trainer isn't available at this time"}
+                  </div>
+                  <p className="mt-1 text-xs text-rose-100/80">
+                    You picked{" "}
+                    <span className="font-semibold">
+                      {fmt12(startTime)}–{fmt12(fromMin(selWindow.end))}
+                    </span>
+                    {conflict ? (
+                      <>
+                        {" "}but the trainer already has a{" "}
+                        <span className="font-semibold">{conflict.status}</span> booking from{" "}
+                        <span className="font-semibold">
+                          {fmt12(conflict.start)}–{fmt12(conflict.end)}
+                        </span>
+                        .
+                      </>
+                    ) : availWindows.length > 0 ? (
+                      <>
+                        {" "}but they're only free{" "}
+                        <span className="font-semibold">
+                          {availWindows.map((w) => `${fmt12(w.start)}–${fmt12(w.end)}`).join(", ")}
+                        </span>
+                        .
+                      </>
+                    ) : (
+                      <> and they have no availability this day.</>
+                    )}
+                  </p>
+                  {suggestedTimes.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={pickSuggested}
+                      className="mt-2 inline-flex items-center rounded-full border border-rose-400/60 bg-rose-500/15 px-3 py-1 text-xs font-semibold text-rose-100 hover:bg-rose-500/25"
+                    >
+                      Use next free slot: {fmt12(suggestedTimes[0])}
+                    </button>
+                  )}
+                </div>
+              </div>
+            )}
+
             <div>
               <div className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2">
                 Session type
@@ -208,28 +373,22 @@ export function BookSessionSheet({
                   value={date}
                   min={new Date().toISOString().slice(0, 10)}
                   max={toDateKey(maxHorizonDate())}
-                  onChange={(e) => setDate(e.target.value)}
+                  onChange={(e) => {
+                    setDate(e.target.value);
+                    setStartTime("");
+                  }}
                   className="w-full rounded-2xl border border-border bg-surface px-3 py-2.5 text-sm outline-none focus:border-lime"
                 />
-                {date && (() => {
-                  const windows = resolveDay(
-                    fromDateKey(date),
-                    org.availabilitySlots ?? [],
-                    org.availabilityOverrides ?? [],
-                  );
-                  if (windows.length === 0) {
-                    return (
-                      <p className="mt-1 text-[11px] text-rose-300">
-                        Trainer is not available this day — request anyway or pick another date.
-                      </p>
-                    );
-                  }
-                  return (
-                    <p className="mt-1 text-[11px] text-muted-foreground">
-                      Available: {windows.map((w) => `${w.start}–${w.end}`).join(", ")}
-                    </p>
-                  );
-                })()}
+                {date && availWindows.length === 0 && (
+                  <p className="mt-1 text-[11px] text-rose-300">
+                    Trainer is not available this day — request anyway or pick another date.
+                  </p>
+                )}
+                {date && availWindows.length > 0 && (
+                  <p className="mt-1 text-[11px] text-muted-foreground">
+                    Available: {availWindows.map((w) => `${w.start}–${w.end}`).join(", ")}
+                  </p>
+                )}
               </label>
               <div>
                 <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-1.5 flex items-center gap-1">
@@ -253,6 +412,66 @@ export function BookSessionSheet({
               </div>
             </div>
 
+            {/* Start time picker */}
+            {date && (
+              <div>
+                <div className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-1.5 flex items-center gap-1">
+                  <Clock className="h-3.5 w-3.5" /> Start time
+                </div>
+                {suggestedTimes.length > 0 ? (
+                  <div className="flex flex-wrap gap-1.5">
+                    {suggestedTimes.map((t) => {
+                      const active = startTime === t;
+                      return (
+                        <button
+                          key={t}
+                          type="button"
+                          onClick={() => setStartTime(t)}
+                          className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition-all ${
+                            active
+                              ? "border-lime bg-lime/15 text-lime"
+                              : "border-border bg-surface text-muted-foreground"
+                          }`}
+                        >
+                          {fmt12(t)}
+                        </button>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <p className="text-[11px] text-muted-foreground mb-1.5">
+                    No pre-computed slots — pick a custom time below.
+                  </p>
+                )}
+                <div className="mt-2 flex items-center gap-2">
+                  <input
+                    type="time"
+                    value={startTime}
+                    step={900}
+                    onChange={(e) => setStartTime(e.target.value)}
+                    className="flex-1 rounded-2xl border border-border bg-surface px-3 py-2 text-sm outline-none focus:border-lime"
+                  />
+                  {startTime && (
+                    <button
+                      type="button"
+                      onClick={() => setStartTime("")}
+                      className="text-xs font-semibold text-muted-foreground hover:text-foreground"
+                    >
+                      Clear
+                    </button>
+                  )}
+                </div>
+                {bookings.length > 0 && (
+                  <p className="mt-1.5 text-[11px] text-muted-foreground">
+                    Already booked:{" "}
+                    {bookings
+                      .map((b) => `${fmt12(b.start)}–${fmt12(b.end)}`)
+                      .join(", ")}
+                  </p>
+                )}
+              </div>
+            )}
+
             <label className="block">
               <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-1.5 flex items-center gap-1">
                 <MessageSquare className="h-3.5 w-3.5" /> Message
@@ -273,7 +492,7 @@ export function BookSessionSheet({
               <div className="rounded-2xl border border-border bg-surface p-3 text-sm">
                 Estimated cost:{" "}
                 <span className="font-bold text-foreground">
-                  ${Math.round((org.ratePerHour * Number(duration)) / 60)}
+                  ${Math.round((org.ratePerHour * durMin) / 60)}
                 </span>{" "}
                 <span className="text-muted-foreground">
                   (${org.ratePerHour}/hr · {duration} min)
@@ -340,10 +559,12 @@ export function BookSessionSheet({
               </button>
               <button
                 onClick={submit}
-                disabled={submitting}
-                className="flex-1 rounded-full bg-lime-gradient px-4 py-3 text-sm font-bold text-primary-foreground glow-lime disabled:opacity-60"
+                disabled={submitting || !canSubmit}
+                aria-disabled={submitting || !canSubmit}
+                title={disabledReason}
+                className="flex-1 rounded-full bg-lime-gradient px-4 py-3 text-sm font-bold text-primary-foreground glow-lime disabled:opacity-60 disabled:cursor-not-allowed"
               >
-                {submitting ? "Sending…" : "Send request"}
+                {submitting ? "Sending…" : !canSubmit ? "Pick another time" : "Send request"}
               </button>
             </>
           )}
@@ -365,6 +586,18 @@ function ExistingRequestView({
   };
 }) {
   const meta = statusMeta(row.status);
+  const dateLabel = row.preferred_date
+    ? new Date(row.preferred_date).toLocaleDateString(undefined, {
+        weekday: "short",
+        month: "short",
+        day: "numeric",
+      })
+    : null;
+  const timeLabel = row.preferred_start_time
+    ? `${fmt12(row.preferred_start_time.slice(0, 5))}–${fmt12(
+        fromMin(toMin(row.preferred_start_time.slice(0, 5)) + row.duration_minutes),
+      )}`
+    : null;
   return (
     <div className="mt-5 space-y-3">
       <div
@@ -376,14 +609,10 @@ function ExistingRequestView({
       <div className="rounded-2xl border border-border bg-surface p-4 space-y-2 text-sm">
         <Row label="Session" value={row.session_type} />
         <Row label="Duration" value={`${row.duration_minutes} min`} />
-        {row.preferred_date ? (
+        {dateLabel ? (
           <Row
             label="Preferred date"
-            value={new Date(row.preferred_date).toLocaleDateString(undefined, {
-              weekday: "short",
-              month: "short",
-              day: "numeric",
-            })}
+            value={timeLabel ? `${dateLabel} · ${timeLabel}` : dateLabel}
           />
         ) : null}
         {row.message ? <Row label="Your note" value={row.message} multiline /> : null}
