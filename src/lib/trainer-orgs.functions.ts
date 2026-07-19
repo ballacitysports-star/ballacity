@@ -533,3 +533,148 @@ export const deleteTrainerOrg = createServerFn({ method: "POST" })
     if (error) throw new Error(error.message);
     return { ok: true };
   });
+
+// ============================================================
+// Generic (non-trainer) org membership
+// ============================================================
+
+export const listOrgMembers = createServerFn({ method: "GET" })
+  .inputValidator((d: { orgId: string }) => z.object({ orgId: z.string().uuid() }).parse(d))
+  .handler(async ({ data }) => {
+    const sb = publicClient();
+    const { data: rows, error } = await sb
+      .from("org_members")
+      .select("id, org_id, user_id, role, created_at")
+      .eq("org_id", data.orgId)
+      .order("created_at", { ascending: true });
+    if (error) throw new Error(error.message);
+    const userIds = Array.from(new Set((rows ?? []).map((r) => r.user_id)));
+    let profiles: Array<{ id: string; display_name: string | null; avatar_initials: string | null; avatar_url: string | null }> = [];
+    if (userIds.length > 0) {
+      const { data: profs } = await sb
+        .from("profiles")
+        .select("id, display_name, avatar_initials, avatar_url")
+        .in("id", userIds);
+      profiles = profs ?? [];
+    }
+    const map = new Map(profiles.map((p) => [p.id, p]));
+    return (rows ?? []).map((r) => ({ ...r, profile: map.get(r.user_id) ?? null }));
+  });
+
+export const requestOrgMembership = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { orgId: string; message?: string }) =>
+    z.object({ orgId: z.string().uuid(), message: z.string().max(500).optional() }).parse(d),
+  )
+  .handler(async ({ data, context }) => {
+    const { data: row, error } = await context.supabase
+      .from("org_member_requests")
+      .insert({ org_id: data.orgId, user_id: context.userId, message: data.message ?? null })
+      .select("*")
+      .single();
+    if (error) throw new Error(error.message);
+    return row;
+  });
+
+export const withdrawOrgMemberRequest = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { id: string }) => z.object({ id: z.string().uuid() }).parse(d))
+  .handler(async ({ data, context }) => {
+    const { error } = await context.supabase
+      .from("org_member_requests")
+      .update({ status: "withdrawn" })
+      .eq("id", data.id)
+      .eq("user_id", context.userId);
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
+
+export const getMyOrgMemberRequest = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { orgId: string }) => z.object({ orgId: z.string().uuid() }).parse(d))
+  .handler(async ({ data, context }) => {
+    const { data: rows, error } = await context.supabase
+      .from("org_member_requests")
+      .select("*")
+      .eq("org_id", data.orgId)
+      .eq("user_id", context.userId)
+      .order("created_at", { ascending: false })
+      .limit(1);
+    if (error) throw new Error(error.message);
+    return rows?.[0] ?? null;
+  });
+
+export const listOrgMemberRequests = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { orgId: string }) => z.object({ orgId: z.string().uuid() }).parse(d))
+  .handler(async ({ data, context }) => {
+    const { data: rows, error } = await context.supabase
+      .from("org_member_requests")
+      .select("id, org_id, user_id, message, status, denial_reason, created_at")
+      .eq("org_id", data.orgId)
+      .eq("status", "pending")
+      .order("created_at", { ascending: true });
+    if (error) throw new Error(error.message);
+    const userIds = Array.from(new Set((rows ?? []).map((r) => r.user_id)));
+    let profiles: Array<{ id: string; display_name: string | null; avatar_initials: string | null; avatar_url: string | null }> = [];
+    if (userIds.length > 0) {
+      const { data: profs } = await context.supabase
+        .from("profiles")
+        .select("id, display_name, avatar_initials, avatar_url")
+        .in("id", userIds);
+      profiles = profs ?? [];
+    }
+    const map = new Map(profiles.map((p) => [p.id, p]));
+    return (rows ?? []).map((r) => ({ ...r, profile: map.get(r.user_id) ?? null }));
+  });
+
+export const approveOrgMemberRequest = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { id: string }) => z.object({ id: z.string().uuid() }).parse(d))
+  .handler(async ({ data, context }) => {
+    const { data: res, error } = await context.supabase.rpc("approve_org_member_request", { _req: data.id });
+    if (error) throw new Error(error.message);
+    return { memberId: res as unknown as string | null };
+  });
+
+export const denyOrgMemberRequest = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { id: string; reason?: string }) =>
+    z.object({ id: z.string().uuid(), reason: z.string().max(500).optional() }).parse(d),
+  )
+  .handler(async ({ data, context }) => {
+    const { error } = await context.supabase.rpc("deny_org_member_request", {
+      _req: data.id,
+      _reason: data.reason ?? "",
+    });
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
+
+export const removeOrgMember = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { orgId: string; userId: string }) =>
+    z.object({ orgId: z.string().uuid(), userId: z.string().uuid() }).parse(d),
+  )
+  .handler(async ({ data, context }) => {
+    const { error } = await context.supabase
+      .from("org_members")
+      .delete()
+      .eq("org_id", data.orgId)
+      .eq("user_id", data.userId);
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
+
+export const leaveOrgMembership = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { orgId: string }) => z.object({ orgId: z.string().uuid() }).parse(d))
+  .handler(async ({ data, context }) => {
+    const { error } = await context.supabase
+      .from("org_members")
+      .delete()
+      .eq("org_id", data.orgId)
+      .eq("user_id", context.userId);
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
