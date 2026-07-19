@@ -560,6 +560,24 @@ export function CreateTrainerWizard() {
               </Section>
             </div>
           )}
+
+          {step === 4 && (
+            <div className="space-y-5">
+              {draft.slots.length === 0 ? (
+                <div className="rounded-2xl border border-dashed border-border bg-surface/60 p-5 text-center text-sm text-muted-foreground">
+                  No weekly template yet. Go back and pick one, or skip — you can manage availability later.
+                </div>
+              ) : (
+                <AvailabilityConfirm
+                  slots={draft.slots}
+                  overrides={draft.overrides}
+                  timezone={draft.timezone}
+                  onChangeOverrides={(o) => setDraft((d) => ({ ...d, overrides: o }))}
+                  onChangeTimezone={(tz) => setDraft((d) => ({ ...d, timezone: tz }))}
+                />
+              )}
+            </div>
+          )}
         </motion.div>
       </AnimatePresence>
 
