@@ -266,7 +266,7 @@ function TrainersPage() {
       return a.o.name.localeCompare(b.o.name);
     });
     return withDist;
-  }, [orgs, sport, specialty, venue, q, sortBy, avail, radiusKm, coords]);
+  }, [orgs, sport, specialty, venue, orgId, orgMemberIds, q, sortBy, avail, radiusKm, coords]);
 
   const venueOptions = useMemo(() => {
     const map = new Map<string, { addr: string; primary: boolean; count: number }>();
