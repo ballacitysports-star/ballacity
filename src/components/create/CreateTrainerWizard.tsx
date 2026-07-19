@@ -190,6 +190,7 @@ export function CreateTrainerWizard() {
     primaryVenue: draft.venue || undefined,
     availabilitySlots: draft.slots,
     availabilityOverrides: draft.overrides,
+    availabilityRules: draft.rules,
     timezone: draft.timezone,
     upcoming: [],
     posts: [],
