@@ -226,14 +226,28 @@ function TrainerPage() {
             initial={{ scale: 0, rotate: -8 }}
             animate={{ scale: 1, rotate: 0 }}
             transition={{ type: "spring", stiffness: 220, damping: 16 }}
-            className="grid h-24 w-24 place-items-center rounded-3xl border-4 border-background font-display text-3xl font-bold text-primary-foreground"
+            className="relative grid h-24 w-24 place-items-center overflow-hidden rounded-3xl border-4 border-background font-display text-3xl font-bold text-primary-foreground"
             style={{
               background: `linear-gradient(135deg, ${org.accent}, ${org.accent}aa)`,
               boxShadow: `0 12px 40px -10px ${org.accent}88`,
             }}
           >
-            {org.avatar}
+            {(() => {
+              const av = (org.avatar ?? "").trim();
+              const isImg = /^(https?:\/\/|\/|data:)/i.test(av);
+              if (isImg) {
+                return (
+                  <img
+                    src={av}
+                    alt={org.name}
+                    className="absolute inset-0 h-full w-full object-cover"
+                  />
+                );
+              }
+              return av || (org.name?.slice(0, 2).toUpperCase() ?? "OR");
+            })()}
           </motion.div>
+
           <div className="mb-2 flex items-center gap-2">
             {canEdit && (
               <Link
