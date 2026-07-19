@@ -155,6 +155,7 @@ function EditOrg() {
     credentials: kind === "coach" ? credentials : undefined,
     ratePerHour: kind === "coach" ? rate : undefined,
     availabilitySlots: kind === "coach" ? slots : undefined,
+    venueAddresses: kind === "coach" ? venueAddresses.filter((a) => a.trim().length > 0) : undefined,
     league: kind === "team" ? league : undefined,
     record: kind === "team" ? { w: wins, l: losses } : undefined,
     homeCourt: kind === "team" ? homeCourt : undefined,
