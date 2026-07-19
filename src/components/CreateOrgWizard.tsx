@@ -37,6 +37,7 @@ import {
 } from "@/lib/sport-config";
 import { OrgCard } from "@/components/OrgCard";
 import { LocationAutocomplete } from "@/components/LocationAutocomplete";
+import { VenueMapPreview } from "@/components/VenueMapPreview";
 import { TeamCoverUploader } from "@/components/TeamCoverUploader";
 import { PositionsPicker, positionsCleanup, type PositionsNeeded } from "@/components/PositionsPicker";
 
@@ -594,6 +595,17 @@ export function CreateOrgWizard({ kind }: { kind: OrgKind }) {
                               <p className="text-[11px] text-coral">{rowError}</p>
                             )}
                           </div>
+                          {(() => {
+                            const geo = venueGeoMap[trimmed.toLowerCase()];
+                            return trimmed && geo && !rowError ? (
+                              <VenueMapPreview
+                                address={trimmed}
+                                lat={geo.lat}
+                                lng={geo.lng}
+                                placeId={geo.placeId}
+                              />
+                            ) : null;
+                          })()}
                         </div>
                       );
                     })}
