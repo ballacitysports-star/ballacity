@@ -20,7 +20,7 @@ import {
 import { addOrg } from "@/lib/org-store";
 import { validateSlots, validateOverrides, type DayOverride } from "@/lib/availability-slots";
 import { AvailabilityCalendar } from "@/components/AvailabilityCalendar";
-import { validateVenueList } from "@/lib/venue-address";
+import { validateVenueList, buildVenueGeo } from "@/lib/venue-address";
 import {
   SPORT_CONFIG,
   SESSION_TYPES,
