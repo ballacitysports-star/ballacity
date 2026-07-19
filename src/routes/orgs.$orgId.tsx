@@ -2,10 +2,19 @@ import { createFileRoute, Link, notFound } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { useAuth } from "@/hooks/use-auth";
-import { Building2, MapPin, Users, ShieldCheck, Check, X, LogIn, UserPlus, Clock, Crown } from "lucide-react";
+import { Building2, MapPin, Users, ShieldCheck, Check, X, LogIn, UserPlus, Clock, Crown, UserMinus } from "lucide-react";
 import { VenueMapPreview } from "@/components/VenueMapPreview";
 
 import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
 import { toast } from "sonner";
 import {
   getTrainerOrg,
@@ -17,6 +26,15 @@ import {
   requestToJoinTrainerOrg,
   respondToTrainerOrgInvite,
   leaveTrainerOrg,
+  listOrgMembers,
+  requestOrgMembership,
+  withdrawOrgMemberRequest,
+  getMyOrgMemberRequest,
+  listOrgMemberRequests,
+  approveOrgMemberRequest,
+  denyOrgMemberRequest,
+  removeOrgMember,
+  leaveOrgMembership,
 } from "@/lib/trainer-orgs.functions";
 
 export const Route = createFileRoute("/orgs/$orgId")({
