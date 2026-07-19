@@ -179,6 +179,7 @@ export function CreateOrgWizard({ kind }: { kind: OrgKind }) {
     venues,
     venueAddresses: isCoach ? venueAddresses.filter((v) => v.trim().length > 0) : undefined,
     verifiedVenues: isCoach ? Array.from(verifiedVenues) : undefined,
+    venueGeo: isCoach ? buildVenueGeo(venueAddresses, verifiedVenues, venueGeoMap) : undefined,
     primaryVenue: isCoach
       ? (primaryVenue && venueAddresses.map((v) => v.trim()).includes(primaryVenue.trim())
           ? primaryVenue.trim()
