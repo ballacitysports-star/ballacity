@@ -60,11 +60,13 @@ const trainersSearchSchema = z.object({
   q: fallback(z.string(), "").default(""),
   sport: fallback(z.string(), "").default(""),
   specialty: fallback(z.string(), "").default(""),
+  venue: fallback(z.string(), "").default(""),
   avail: fallback(z.string(), "any").default("any"),
   sort: fallback(z.string(), "nearest").default("nearest"),
   view: fallback(z.string(), "list").default("list"),
   density: fallback(z.string(), "list").default("list"),
 });
+
 
 export const Route = createFileRoute("/_tabs/trainers")({
   head: () => ({
