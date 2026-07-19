@@ -11,6 +11,8 @@ import {
   ChevronUp,
   ChevronDown,
   Trash2,
+  ShieldAlert,
+
 } from "lucide-react";
 import { SPORTS, HERO_IMAGE, type Sport, type Org } from "@/lib/sample-data";
 import { getOrgById, ensureOrgById, updateOrg, deleteOrg, isMyOrg } from "@/lib/org-store";
