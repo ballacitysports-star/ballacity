@@ -240,6 +240,7 @@ function EditOrg() {
           ? venueAddresses.map((a) => a.trim()).filter((a) => a.length > 0)
           : undefined,
         verifiedVenues: kind === "coach" ? Array.from(verifiedVenues) : undefined,
+        venueGeo: kind === "coach" ? buildVenueGeo(venueAddresses, verifiedVenues, venueGeoMap) : undefined,
         primaryVenue: kind === "coach"
           ? (primaryVenue && venueAddresses.map((v) => v.trim()).includes(primaryVenue.trim())
               ? primaryVenue.trim()
