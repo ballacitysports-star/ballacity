@@ -314,7 +314,8 @@ function TrainersPage() {
         </div>
         {(() => {
           const activeFilterCount =
-            (sport ? 1 : 0) + (specialty ? 1 : 0) + (avail !== "any" ? 1 : 0);
+            (sport ? 1 : 0) + (specialty ? 1 : 0) + (venue ? 1 : 0) + (avail !== "any" ? 1 : 0);
+
           return (
             <button
               onClick={() => setFiltersOpen((v) => !v)}
