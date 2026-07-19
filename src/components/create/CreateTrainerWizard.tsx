@@ -128,6 +128,7 @@ export function CreateTrainerWizard() {
   });
 
   const [credInput, setCredInput] = useState("");
+  const [venueInput, setVenueInput] = useState("");
   const [orgSearch, setOrgSearch] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
@@ -708,10 +709,11 @@ export function CreateTrainerWizard() {
                 <div className="space-y-2">
                   <label className="text-[11px] uppercase tracking-wider text-muted-foreground font-bold">Add a venue</label>
                   <LocationAutocomplete
-                    value=""
-                    onChange={() => { /* value is committed only via onPick */ }}
+                    value={venueInput}
+                    onChange={setVenueInput}
                     onPick={(full, placeId, geo) => {
                       if (!placeId) return;
+                      let added = false;
                       setDraft((d) => {
                         if (d.venues.some((x) => x.placeId === placeId)) {
                           toast.message("That venue is already added.");
@@ -722,10 +724,11 @@ export function CreateTrainerWizard() {
                           { address: full, placeId, geo: geo ? { lat: geo.lat, lng: geo.lng } : null },
                         ];
                         const nextVerifiedLen = nextVenues.filter((x) => x.address.trim() && x.placeId).length;
-                        // If this is the first verified venue, make it primary.
                         const nextIdx = nextVerifiedLen === 1 ? 0 : d.primaryVenueIdx;
+                        added = true;
                         return { ...d, venues: nextVenues, primaryVenueIdx: nextIdx };
                       });
+                      if (added) setVenueInput("");
                     }}
                     placeholder="Start typing then pick a Google suggestion"
                   />
