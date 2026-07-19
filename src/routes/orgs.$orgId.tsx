@@ -223,6 +223,10 @@ function OrgPage() {
         )}
       </section>
 
+      <MembersSection orgId={orgId} isAdmin={isAdmin} />
+
+      {isAdmin && <AdminMemberRequests orgId={orgId} />}
+
       {isAdmin && (
         <section className="rounded-2xl border border-border/60 bg-surface p-4">
           <h2 className="text-sm font-semibold mb-3">Pending join requests</h2>
