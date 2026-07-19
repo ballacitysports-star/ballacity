@@ -44,6 +44,13 @@ import { LocationAutocomplete } from "@/components/LocationAutocomplete";
 import { VenueMapPreview } from "@/components/VenueMapPreview";
 import { TeamCoverUploader } from "@/components/TeamCoverUploader";
 import { PositionsPicker, positionsCleanup, type PositionsNeeded } from "@/components/PositionsPicker";
+import {
+  listTrainerOrgs,
+  createTrainerOrg,
+  requestToJoinTrainerOrg,
+} from "@/lib/trainer-orgs.functions";
+import { useQuery } from "@tanstack/react-query";
+import { toast } from "sonner";
 
 const ACCENTS = [
   { name: "Lime", hex: "#a3ff12" },
@@ -231,6 +238,19 @@ export function CreateOrgWizard({ kind }: { kind: OrgKind }) {
     posts: [],
   };
 
+  // Trainer-only: organization affiliation choice
+  type OrgChoice =
+    | { mode: "independent" }
+    | { mode: "join"; orgId: string; orgName: string }
+    | { mode: "create"; name: string; handle: string; city: string; bio: string };
+  const [orgChoice, setOrgChoice] = useState<OrgChoice>({ mode: "independent" });
+  const [orgSearch, setOrgSearch] = useState("");
+  const orgSearchResults = useQuery({
+    queryKey: ["trainer-orgs-wizard-search", orgSearch],
+    queryFn: () => listTrainerOrgs({ data: { search: orgSearch } }),
+    enabled: isCoach && orgChoice.mode === "join",
+  });
+
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
 
@@ -266,6 +286,32 @@ export function CreateOrgWizard({ kind }: { kind: OrgKind }) {
     try {
       const saved = await addOrg(org);
       if (isCoach) {
+        // Best-effort org linkage — failures don't roll back the profile.
+        try {
+          if (orgChoice.mode === "create") {
+            await createTrainerOrg({
+              data: {
+                name: orgChoice.name.trim(),
+                handle: orgChoice.handle.trim(),
+                trainerId: saved.id,
+                city: orgChoice.city.trim() || undefined,
+                bio: orgChoice.bio.trim() || undefined,
+              },
+            });
+            toast.success("Organization created");
+          } else if (orgChoice.mode === "join") {
+            await requestToJoinTrainerOrg({
+              data: { orgId: orgChoice.orgId, trainerId: saved.id },
+            });
+            toast.success(`Join request sent to ${orgChoice.orgName}`);
+          }
+        } catch (e) {
+          toast.error(
+            e instanceof Error
+              ? `Profile created, but org link failed: ${e.message}`
+              : "Profile created, but org link failed.",
+          );
+        }
         nav({ to: "/trainers/$trainerId", params: { trainerId: saved.id } });
       } else {
         nav({ to: "/teams/$teamId", params: { teamId: saved.id } });
@@ -1141,7 +1187,135 @@ export function CreateOrgWizard({ kind }: { kind: OrgKind }) {
                 />
               </Section>
 
+              {isCoach && (
+                <Section title="Organization (optional)">
+                  <div className="flex gap-2">
+                    {(["independent", "join", "create"] as const).map((m) => {
+                      const active = orgChoice.mode === m;
+                      const label =
+                        m === "independent" ? "Independent" : m === "join" ? "Join existing" : "Create new";
+                      return (
+                        <button
+                          key={m}
+                          type="button"
+                          onClick={() => {
+                            if (m === "independent") setOrgChoice({ mode: "independent" });
+                            else if (m === "join")
+                              setOrgChoice({ mode: "join", orgId: "", orgName: "" });
+                            else setOrgChoice({ mode: "create", name: "", handle: "", city: "", bio: "" });
+                          }}
+                          className={`flex-1 rounded-2xl border px-3 py-2 text-xs font-semibold transition-colors ${
+                            active
+                              ? "border-lime bg-lime/10 text-lime"
+                              : "border-border bg-surface text-muted-foreground"
+                          }`}
+                        >
+                          {label}
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  {orgChoice.mode === "join" && (
+                    <div className="mt-2 space-y-2">
+                      <input
+                        value={orgSearch}
+                        onChange={(e) => setOrgSearch(e.target.value)}
+                        placeholder="Search organizations…"
+                        className="w-full rounded-2xl border border-border bg-surface px-4 py-3 text-sm outline-none focus:border-lime"
+                      />
+                      <div className="max-h-56 overflow-auto space-y-1">
+                        {(orgSearchResults.data ?? []).map((o) => {
+                          const selected = orgChoice.orgId === o.id;
+                          return (
+                            <button
+                              key={o.id}
+                              type="button"
+                              onClick={() =>
+                                setOrgChoice({ mode: "join", orgId: o.id, orgName: o.name })
+                              }
+                              className={`w-full flex items-center justify-between rounded-xl border px-3 py-2 text-left ${
+                                selected ? "border-lime bg-lime/10" : "border-border/50 bg-background"
+                              }`}
+                            >
+                              <div className="min-w-0">
+                                <div className="text-sm font-medium truncate">
+                                  {o.name}
+                                  {o.verified ? " ✓" : ""}
+                                </div>
+                                <div className="text-[11px] text-muted-foreground truncate">
+                                  @{o.handle}
+                                  {o.city ? ` · ${o.city}` : ""}
+                                </div>
+                              </div>
+                              {selected && <Check className="h-4 w-4 text-lime shrink-0" />}
+                            </button>
+                          );
+                        })}
+                        {orgSearchResults.data && orgSearchResults.data.length === 0 && (
+                          <div className="text-[11px] text-muted-foreground px-2 py-3">
+                            No orgs found. Try a different search or create a new one.
+                          </div>
+                        )}
+                      </div>
+                      <p className="text-[11px] text-muted-foreground">
+                        A join request will be sent to the org after your profile is published.
+                      </p>
+                    </div>
+                  )}
+
+                  {orgChoice.mode === "create" && (
+                    <div className="mt-2 space-y-2">
+                      <input
+                        value={orgChoice.name}
+                        onChange={(e) =>
+                          setOrgChoice({ ...orgChoice, name: e.target.value })
+                        }
+                        placeholder="Organization name"
+                        className="w-full rounded-2xl border border-border bg-surface px-4 py-3 text-sm outline-none focus:border-lime"
+                      />
+                      <div className="flex items-center gap-2 rounded-2xl border border-border bg-surface px-4 py-3 focus-within:border-lime">
+                        <span className="text-muted-foreground">@</span>
+                        <input
+                          value={orgChoice.handle}
+                          onChange={(e) =>
+                            setOrgChoice({
+                              ...orgChoice,
+                              handle: e.target.value
+                                .toLowerCase()
+                                .replace(/[^a-z0-9_-]/g, ""),
+                            })
+                          }
+                          placeholder="orghandle"
+                          className="flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
+                        />
+                      </div>
+                      <input
+                        value={orgChoice.city}
+                        onChange={(e) =>
+                          setOrgChoice({ ...orgChoice, city: e.target.value })
+                        }
+                        placeholder="City (optional)"
+                        className="w-full rounded-2xl border border-border bg-surface px-4 py-3 text-sm outline-none focus:border-lime"
+                      />
+                      <textarea
+                        value={orgChoice.bio}
+                        onChange={(e) =>
+                          setOrgChoice({ ...orgChoice, bio: e.target.value })
+                        }
+                        placeholder="Short bio (optional)"
+                        className="w-full min-h-16 rounded-2xl border border-border bg-surface px-4 py-3 text-sm outline-none focus:border-lime"
+                      />
+                      <p className="text-[11px] text-muted-foreground">
+                        You'll be the owner. Handle must be 3–40 chars (a–z, 0–9, _ or -).
+                      </p>
+                    </div>
+                  )}
+                </Section>
+              )}
+
               <Section title="Live preview">
+
                 <div className="rounded-3xl border border-lime/30 bg-surface/40 p-3">
                   <OrgCard org={handlePreview} />
                 </div>
