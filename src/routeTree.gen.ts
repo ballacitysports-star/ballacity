@@ -22,6 +22,7 @@ import { Route as AuthRouteImport } from './routes/auth'
 import { Route as AdminRouteImport } from './routes/admin'
 import { Route as TabsRouteImport } from './routes/_tabs'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as OrgsIndexRouteImport } from './routes/orgs.index'
 import { Route as MessagesIndexRouteImport } from './routes/messages.index'
 import { Route as TrainersCreateRouteImport } from './routes/trainers.create'
 import { Route as TeamsCreateRouteImport } from './routes/teams.create'
@@ -120,6 +121,11 @@ const TabsRoute = TabsRouteImport.update({
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const OrgsIndexRoute = OrgsIndexRouteImport.update({
+  id: '/orgs/',
+  path: '/orgs/',
   getParentRoute: () => rootRouteImport,
 } as any)
 const MessagesIndexRoute = MessagesIndexRouteImport.update({
@@ -339,6 +345,7 @@ export interface FileRoutesByFullPath {
   '/teams/create': typeof TeamsCreateRoute
   '/trainers/create': typeof TrainersCreateRoute
   '/messages/': typeof MessagesIndexRoute
+  '/orgs/': typeof OrgsIndexRoute
   '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
   '/.mcp/invoke-tool/$tool': typeof Char91DotmcpChar93InvokeToolToolRoute
   '/games/$gameId/pay': typeof GamesGameIdPayRoute
@@ -387,6 +394,7 @@ export interface FileRoutesByTo {
   '/teams/create': typeof TeamsCreateRoute
   '/trainers/create': typeof TrainersCreateRoute
   '/messages': typeof MessagesIndexRoute
+  '/orgs': typeof OrgsIndexRoute
   '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
   '/.mcp/invoke-tool/$tool': typeof Char91DotmcpChar93InvokeToolToolRoute
   '/games/$gameId/pay': typeof GamesGameIdPayRoute
@@ -438,6 +446,7 @@ export interface FileRoutesById {
   '/teams/create': typeof TeamsCreateRoute
   '/trainers/create': typeof TrainersCreateRoute
   '/messages/': typeof MessagesIndexRoute
+  '/orgs/': typeof OrgsIndexRoute
   '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
   '/.mcp/invoke-tool/$tool': typeof Char91DotmcpChar93InvokeToolToolRoute
   '/games/$gameId/pay': typeof GamesGameIdPayRoute
@@ -489,6 +498,7 @@ export interface FileRouteTypes {
     | '/teams/create'
     | '/trainers/create'
     | '/messages/'
+    | '/orgs/'
     | '/.lovable/oauth/consent'
     | '/.mcp/invoke-tool/$tool'
     | '/games/$gameId/pay'
@@ -537,6 +547,7 @@ export interface FileRouteTypes {
     | '/teams/create'
     | '/trainers/create'
     | '/messages'
+    | '/orgs'
     | '/.lovable/oauth/consent'
     | '/.mcp/invoke-tool/$tool'
     | '/games/$gameId/pay'
@@ -587,6 +598,7 @@ export interface FileRouteTypes {
     | '/teams/create'
     | '/trainers/create'
     | '/messages/'
+    | '/orgs/'
     | '/.lovable/oauth/consent'
     | '/.mcp/invoke-tool/$tool'
     | '/games/$gameId/pay'
@@ -628,6 +640,7 @@ export interface RootRouteChildren {
   TeamsCreateRoute: typeof TeamsCreateRoute
   TrainersCreateRoute: typeof TrainersCreateRoute
   MessagesIndexRoute: typeof MessagesIndexRoute
+  OrgsIndexRoute: typeof OrgsIndexRoute
   DotlovableOauthConsentRoute: typeof DotlovableOauthConsentRoute
   Char91DotmcpChar93InvokeToolToolRoute: typeof Char91DotmcpChar93InvokeToolToolRoute
   TeamsTeamIdEditRoute: typeof TeamsTeamIdEditRoute
@@ -729,6 +742,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/orgs/': {
+      id: '/orgs/'
+      path: '/orgs'
+      fullPath: '/orgs/'
+      preLoaderRoute: typeof OrgsIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/messages/': {
@@ -1060,6 +1080,7 @@ const rootRouteChildren: RootRouteChildren = {
   TeamsCreateRoute: TeamsCreateRoute,
   TrainersCreateRoute: TrainersCreateRoute,
   MessagesIndexRoute: MessagesIndexRoute,
+  OrgsIndexRoute: OrgsIndexRoute,
   DotlovableOauthConsentRoute: DotlovableOauthConsentRoute,
   Char91DotmcpChar93InvokeToolToolRoute: Char91DotmcpChar93InvokeToolToolRoute,
   TeamsTeamIdEditRoute: TeamsTeamIdEditRoute,
