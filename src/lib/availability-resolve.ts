@@ -15,11 +15,37 @@ export type DayOverride = {
   windows?: OverrideWindow[];
 };
 
+/**
+ * A recurring availability rule that expands into windows on matching dates.
+ * `freq`:
+ *  - "weekly"       — every N weeks (interval; default 1) on the listed weekdays.
+ *  - "biweekly"     — shorthand for weekly with interval = 2.
+ *  - "monthly-nth"  — the listed weekdays, but only on the given weeks-of-month (1..4 or "last").
+ */
+export type AvailabilityRule = {
+  id: string;
+  label?: string;
+  weekdays: Weekday[];
+  start: string; // HH:MM
+  end: string;   // HH:MM
+  venue?: string;
+  freq: "weekly" | "biweekly" | "monthly-nth";
+  interval?: number;
+  weekOfMonth?: (1 | 2 | 3 | 4 | "last")[];
+  /** Start of recurrence (YYYY-MM-DD). Also sets the bi-weekly phase. */
+  anchorDate: string;
+  /** Optional end (YYYY-MM-DD). Rule doesn't fire after this date. */
+  until?: string;
+};
+
 export type ResolvedWindow = {
   start: string;
   end: string;
   venue?: string;
-  source: "weekly" | "override";
+  source: "weekly" | "override" | "rule";
+  /** Rule id when source === "rule", for labelling. */
+  ruleId?: string;
+  ruleLabel?: string;
   /** True when the window (in the viewer's tz) wraps past midnight from a trainer-tz day. */
   crossesDay?: boolean;
   /** Trainer-tz wall time of the same window, for dual-labelling. */
@@ -54,11 +80,65 @@ export function maxHorizonDate(from: Date = new Date()): Date {
   return d;
 }
 
+/** Returns 1..5 — which occurrence of this weekday within the month `d` sits at. */
+function weekOfMonth(d: Date): number {
+  return Math.floor((d.getDate() - 1) / 7) + 1;
+}
+
+/** True when `d` is the *last* occurrence of its weekday in the month. */
+function isLastWeekOfMonth(d: Date): boolean {
+  const next = new Date(d.getFullYear(), d.getMonth(), d.getDate() + 7);
+  return next.getMonth() !== d.getMonth();
+}
+
+function withinRuleRange(dateKey: string, rule: AvailabilityRule): boolean {
+  if (dateKey < rule.anchorDate) return false;
+  if (rule.until && dateKey > rule.until) return false;
+  return true;
+}
+
+/** Returns the windows this rule contributes to the given trainer-local date (may be empty). */
+export function expandRule(
+  rule: AvailabilityRule,
+  date: Date,
+): { start: string; end: string; venue?: string }[] {
+  const key = toDateKey(date);
+  if (!withinRuleRange(key, rule)) return [];
+  const dow = weekdayOf(date);
+  if (!rule.weekdays.includes(dow)) return [];
+
+  if (rule.freq === "weekly" || rule.freq === "biweekly") {
+    const interval = rule.freq === "biweekly" ? 2 : Math.max(1, rule.interval ?? 1);
+    if (interval > 1) {
+      const anchor = fromDateKey(rule.anchorDate);
+      const anchorWeekStart = new Date(anchor);
+      anchorWeekStart.setDate(anchor.getDate() - anchor.getDay());
+      const thisWeekStart = new Date(date);
+      thisWeekStart.setDate(date.getDate() - date.getDay());
+      const weeks = Math.round(
+        (thisWeekStart.getTime() - anchorWeekStart.getTime()) / (7 * 86_400_000),
+      );
+      if (weeks < 0 || weeks % interval !== 0) return [];
+    }
+  } else if (rule.freq === "monthly-nth") {
+    const weeks = rule.weekOfMonth ?? [];
+    if (weeks.length === 0) return [];
+    const wom = weekOfMonth(date);
+    const isLast = isLastWeekOfMonth(date);
+    const matches = weeks.some((w) => (w === "last" ? isLast : w === wom));
+    if (!matches) return [];
+  }
+
+  return [{ start: rule.start, end: rule.end, venue: rule.venue }];
+}
+
 type ResolveOpts = {
   venueFilter?: string | null;
   /** When set, `date` is interpreted in `viewerTz` and windows are converted from `trainerTz`. */
   trainerTz?: string | null;
   viewerTz?: string | null;
+  /** Recurring rules layer. */
+  rules?: AvailabilityRule[];
 };
 
 /**
