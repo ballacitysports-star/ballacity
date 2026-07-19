@@ -463,6 +463,44 @@ function TrainersPage() {
             </div>
           )}
 
+          {(orgsListQuery.data ?? []).length > 0 && (
+            <div className="-mx-4 overflow-x-auto px-4 mb-3">
+              <div className="flex gap-2 pb-1">
+                <span className="self-center text-[10px] font-bold uppercase tracking-wider text-muted-foreground pr-1">
+                  Org
+                </span>
+                <button
+                  onClick={() => setOrgId("")}
+                  className={`whitespace-nowrap rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors ${
+                    !orgId
+                      ? "border-lime bg-lime text-primary-foreground"
+                      : "border-border bg-surface text-muted-foreground"
+                  }`}
+                >
+                  Any org
+                </button>
+                {(orgsListQuery.data ?? []).map((o) => {
+                  const active = orgId === o.id;
+                  return (
+                    <button
+                      key={o.id}
+                      onClick={() => setOrgId(o.id)}
+                      title={o.name}
+                      className={`whitespace-nowrap rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors ${
+                        active
+                          ? "border-lime bg-lime text-primary-foreground"
+                          : "border-border bg-surface text-muted-foreground"
+                      }`}
+                    >
+                      {o.verified ? "✓ " : ""}
+                      {o.name}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
           <div className="mb-4 rounded-2xl border border-border bg-surface p-3">
             <div className="flex items-center justify-between mb-2">
               <div className="flex items-center gap-2">
