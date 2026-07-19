@@ -225,6 +225,28 @@ export function CreateTrainerWizard() {
     };
     try {
       const saved = await addOrg(org);
+      // Best-effort org linking; never blocks publish success.
+      if (draft.orgChoice.mode === "existing" && draft.orgChoice.orgId) {
+        try {
+          await joinOrg({ data: { orgId: draft.orgChoice.orgId, trainerId: saved.id } });
+        } catch {
+          toast.message("Profile published — couldn't send org join request. Try again from your profile.");
+        }
+      } else if (draft.orgChoice.mode === "new" && draft.orgChoice.name) {
+        try {
+          const orgHandle = slugifyHandle(draft.orgChoice.name) || `org${Date.now().toString(36).slice(-4)}`;
+          await createOrg({
+            data: {
+              name: draft.orgChoice.name,
+              handle: orgHandle,
+              trainerId: saved.id,
+              city: draft.city || undefined,
+            },
+          });
+        } catch {
+          toast.message("Profile published — couldn't create the org. Add it from your profile.");
+        }
+      }
       clearDraft();
       toast.success("Trainer profile published");
       nav({ to: "/trainers/$trainerId", params: { trainerId: saved.id } });
