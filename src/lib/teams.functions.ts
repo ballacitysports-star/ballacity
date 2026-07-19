@@ -140,8 +140,8 @@ function refineVenues(
   });
 }
 
-const TeamInput = TeamShape.superRefine(refineVenues);
-const TeamPatch = TeamShape.partial().extend({ id: z.string() }).superRefine(refineVenues);
+export const TeamInput = TeamShape.superRefine(refineVenues);
+export const TeamPatch = TeamShape.partial().extend({ id: z.string() }).superRefine(refineVenues);
 
 /** Strip fields that aren't real DB columns before writing to Supabase. */
 function stripNonDbFields<T extends { verified_venues?: unknown }>(input: T) {
