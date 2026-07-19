@@ -385,6 +385,7 @@ export type Org = {
   formats?: string[];
   venues?: string[];
   venueAddresses?: string[];
+  verifiedVenues?: string[];
   primaryVenue?: string;
   cadence?: string;
   cadences?: string[];
