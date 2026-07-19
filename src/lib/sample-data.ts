@@ -397,6 +397,8 @@ export type Org = {
   ratingMax?: string;
   distances?: string[];
   sessionTypes?: string[];
+  /** IANA timezone the trainer's schedule is anchored to (e.g. "America/New_York"). */
+  timezone?: string;
   availabilitySlots?: { day: "mon" | "tue" | "wed" | "thu" | "fri" | "sat" | "sun"; start: string; end: string; venue?: string }[];
   availabilityOverrides?: { date: string; closed?: boolean; windows?: { start: string; end: string; venue?: string }[] }[];
   upcoming: string[]; // game ids
