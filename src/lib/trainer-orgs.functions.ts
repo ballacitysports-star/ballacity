@@ -86,10 +86,10 @@ export const createTrainerOrg = createServerFn({ method: "POST" })
       _name: data.name,
       _handle: data.handle,
       _trainer_id: data.trainerId,
-      _bio: data.bio ?? null,
-      _avatar: data.avatar ?? null,
-      _city: data.city ?? null,
-      _website: data.website ?? null,
+      _bio: data.bio ?? undefined,
+      _avatar: data.avatar ?? undefined,
+      _city: data.city ?? undefined,
+      _website: data.website ?? undefined,
     });
     if (error) throw new Error(error.message);
     return id as string;
