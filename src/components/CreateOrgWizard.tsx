@@ -44,6 +44,13 @@ import { LocationAutocomplete } from "@/components/LocationAutocomplete";
 import { VenueMapPreview } from "@/components/VenueMapPreview";
 import { TeamCoverUploader } from "@/components/TeamCoverUploader";
 import { PositionsPicker, positionsCleanup, type PositionsNeeded } from "@/components/PositionsPicker";
+import {
+  listTrainerOrgs,
+  createTrainerOrg,
+  requestToJoinTrainerOrg,
+} from "@/lib/trainer-orgs.functions";
+import { useQuery } from "@tanstack/react-query";
+import { toast } from "sonner";
 
 const ACCENTS = [
   { name: "Lime", hex: "#a3ff12" },
