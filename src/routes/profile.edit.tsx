@@ -27,10 +27,13 @@ import {
 } from "@/lib/user-prefs-store";
 import { useMyOrgs } from "@/lib/org-store";
 import { OrgCard } from "@/components/OrgCard";
+import { listTrainerOrgs } from "@/lib/trainer-orgs.functions";
+import { useQuery } from "@tanstack/react-query";
 import { getCurrentUser, useAuth } from "@/hooks/use-auth";
 import { LocationAutocomplete } from "@/components/LocationAutocomplete";
 import { LINK_TYPES, LinkIcon } from "@/components/ProfileLinks";
 import { ImageUploader } from "@/components/ImageUploader";
+import { Dumbbell } from "lucide-react";
 
 export const Route = createFileRoute("/profile/edit")({
   head: () => ({ meta: [{ title: "Edit profile — OpenRun" }] }),
