@@ -26,8 +26,9 @@ import { ReviewsSection } from "@/components/ReviewsSection";
 import { computeReputation, useReviewsFor } from "@/lib/reviews";
 import { ReputationBadge } from "@/components/ReputationBadge";
 import { useCanReview } from "@/lib/transactions";
-import { BookSessionSheet } from "@/components/BookSessionSheet";
+import { BookSessionSheet, type BookPrefill } from "@/components/BookSessionSheet";
 import { TrainerAvailabilityMonth } from "@/components/TrainerAvailabilityMonth";
+import { NextAvailableList } from "@/components/NextAvailableList";
 import {
   Dialog,
   DialogContent,
