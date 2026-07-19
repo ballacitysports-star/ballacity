@@ -308,9 +308,13 @@ export function CreateOrgWizard({ kind }: { kind: OrgKind }) {
                 trainerId: saved.id,
                 city: orgChoice.city.trim() || undefined,
                 bio: orgChoice.bio.trim() || undefined,
+                address: orgChoice.address?.trim() || undefined,
+                placeId: orgChoice.placeId || undefined,
+                geo: orgChoice.geo ?? undefined,
               },
             });
             toast.success("Organization created");
+
           } else if (orgChoice.mode === "join") {
             await requestToJoinTrainerOrg({
               data: { orgId: orgChoice.orgId, trainerId: saved.id },
