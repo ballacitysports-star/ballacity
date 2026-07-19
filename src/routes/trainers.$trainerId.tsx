@@ -411,6 +411,27 @@ function TrainerPage() {
               </Section>
             )}
 
+            {org.venueAddresses && org.venueAddresses.length > 0 && (
+              <Section
+                title={
+                  <>
+                    <MapPin className="h-4 w-4" /> Session venues
+                  </>
+                }
+              >
+                <ul className="space-y-1.5">
+                  {org.venueAddresses.map((addr, i) => (
+                    <li
+                      key={i}
+                      className="rounded-2xl border border-border bg-surface px-3 py-2 text-sm"
+                    >
+                      {addr}
+                    </li>
+                  ))}
+                </ul>
+              </Section>
+            )}
+
             {org.availabilitySlots && org.availabilitySlots.length > 0 && (
               <Section
                 title={
