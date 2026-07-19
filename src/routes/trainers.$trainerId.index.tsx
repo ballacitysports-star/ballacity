@@ -43,7 +43,7 @@ import { TrainerProfileChecklist } from "@/components/TrainerProfileChecklist";
 import { Building2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 
-export const Route = createFileRoute("/trainers/$trainerId")({
+export const Route = createFileRoute("/trainers/$trainerId/")({
   validateSearch: zodValidator(
     z.object({
       tab: fallback(z.string(), "").default(""),
