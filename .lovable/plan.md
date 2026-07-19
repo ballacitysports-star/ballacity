@@ -1,32 +1,55 @@
 ## Goal
-Gate the admin-only areas on `/orgs/:orgId` correctly and give unauthorized visitors a clear, correct CTA (view-only, sign-in, request to join, pending, or member/owner status).
 
-## Current state
-- `src/routes/orgs.$orgId.tsx` already hides the "Pending join requests" panel behind an `isAdmin` check (owner or member with role `owner`/`admin`), and RLS on `trainer_org_join_requests` enforces the same server-side.
-- However the page shows **no CTA for anyone else** — a signed-in trainer cannot request to join, a member sees no indication they're in, and signed-out users get no prompt. Join/leave UI only lives on the trainer's own profile via `TrainerOrgSection`.
+`CreateOrgWizard` is one 1,431-line component reused for both teams and trainers. The trainer path crams ~30 fields into 3 steps ("Identity", "Details", "Branding"), with only name/handle/sports/city gating step 1. Result: overwhelming forms, easy drop-off, blockers (venue verification, availability validation) surface only at submit, and the "Branding" step secretly hides critical things like organization affiliation and availability.
 
-## Changes (UI only, `src/routes/orgs.$orgId.tsx`)
+Optimize the trainer flow specifically — keep team flow intact — by restructuring into shorter, purpose-labeled steps, moving heavy configuration to "post-create" edit, and adding smart defaults.
 
-Add a `MembershipCta` block in the header, rendered based on the viewer's state:
+## New trainer wizard structure
 
-1. **Signed out** → "Sign in to join" button linking to `/auth?redirect=/orgs/<id>`.
-2. **Signed in, no trainer profile** → muted note: "Create a trainer profile to join this organization" with link to `/trainers/create`.
-3. **Signed in, owns trainer profile(s)** — fetch via `listMyTrainerOrgMemberships({})` and `listInvitesForTrainer` per owned trainer, plus their own trainer profiles from existing teams store/query:
-   - Already a **member of this org** → badge "Member · <role>" + Leave button (hidden for owner).
-   - Has a **pending invite** to this org → Accept / Decline buttons (reuse `respondToTrainerOrgInvite`).
-   - Has a **pending join request** to this org → disabled "Requested" pill (query `trainer_org_join_requests` filtered to `requested_by = me` + this org via a small new public server fn `getMyJoinRequestForOrg`).
-   - Otherwise → "Request to join" button opening a small trainer-picker (if the user owns >1 trainer profile) then calling `requestToJoinTrainerOrg`.
-4. **Owner/admin** → keep the existing pending-requests panel; also show a compact "You manage this org" badge in the header so the role is obvious.
+Reduce required steps from 3 (mixed) to 4 short, single-purpose ones. Each step gates only on what's essential to publish a usable profile; everything else is optional and can be edited later from the trainer profile edit page.
 
-Membership/approval-only elements (`Pending join requests` section, approve/reject buttons, manage badge) remain gated by the existing `isAdmin` boolean, which is derived from server-provided membership rows — no client-only trust.
+```text
+Step 1  Basics       name, handle (auto-suggested from name), primary sport
+                     (single-select; more added later), city
+Step 2  Expertise    bio (min 40 chars), credentials, rate/hr, session types,
+                     skill range
+Step 3  Where        one primary venue (Google Places, required); "Add more
+                     venues later" link. Timezone auto-detected.
+Step 4  Availability quick-pick weekly template ("Weekday evenings",
+                     "Weekends", "Custom") that pre-fills slots; rules and
+                     date overrides deferred to profile edit.
 
-## Server additions
-- New `getMyJoinRequestForOrg({ orgId })` in `src/lib/trainer-orgs.functions.ts` (auth-required) returning `{ status, trainer_id } | null` for the caller's own pending request. RLS already restricts rows to requester/admins, so no policy changes needed.
-- New helper to list the caller's owned trainer profiles: reuse existing `listMyTrainers` if present; otherwise add a thin `listMyTrainerProfiles` fn selecting `id,name` from `teams` where `owner_id = auth.uid()` and `kind = 'coach'`.
+Publish → land on trainer profile with a persistent "Complete your profile"
+checklist (cover photo, extra venues, org affiliation, availability rules,
+achievements, staff N/A).
+```
 
-## Verification
-- Verify RLS on `trainer_org_join_requests` and `trainer_org_members` already restricts SELECT to org admins/requesters before shipping (query with `supabase--read_query`); the UI gating mirrors that so a hostile client cannot see admin data even if they force-render the panel.
-- Manual: signed-out, non-trainer, non-member trainer, requester, invitee, member, admin, owner — each should see exactly one appropriate CTA/state and no admin controls unless admin/owner.
+Move out of the create flow (to profile edit only): additional venues beyond the first, availability rules, date overrides, organization affiliation, achievements, accent color, custom cover upload, positions-needed, distances (running), rating min/max, team-only blocks (league/record/home court/staff), founded year.
+
+## UX improvements
+
+- Auto-suggest `@handle` from the entered name; user can override. Live-validate uniqueness against existing orgs.
+- Auto-detect timezone from browser (already partially done) and hide the field unless the user expands "Advanced".
+- Detect the user's city via `useUserLocation` and prefill.
+- Show a live one-card preview beside the form on desktop (already exists — keep, but shrink on mobile to a collapsible "Preview" sheet so the form isn't squeezed).
+- Progress bar with step labels, not just dots; "Step 2 of 4 · Expertise".
+- Surface validation inline as the user types (venue verification, bio length, slot overlaps) instead of only at submit.
+- Save draft to `localStorage` under a per-user key so a refresh mid-wizard restores state; clear on successful publish.
+- "Skip for now" button on steps 2–4 so a trainer can publish a minimal profile in under a minute and finish setup from the profile.
+
+## Code changes
+
+- Split `CreateOrgWizard.tsx` into a shared shell + two thin flows:
+  - `src/components/create/CreateTrainerWizard.tsx` (new, 4 steps above)
+  - `src/components/create/CreateTeamWizard.tsx` (extracted from current wizard, unchanged behavior)
+  - `src/components/create/shared/` for the small reusable pieces (StepHeader, SportPicker, VenuePicker, WeeklyQuickPick, LivePreview, useHandleSuggestion, useDraftPersistence).
+- Update `src/routes/trainers.create.tsx` to render `CreateTrainerWizard` and `src/routes/teams.create.tsx` to render `CreateTeamWizard`. Keep the `/teams/create?kind=coach` redirect that already canonicalizes to `/trainers/create`.
+- Add `WeeklyQuickPick` presets that expand to `Slot[]` matching the existing `availability_slots` shape so nothing changes server-side.
+- Add a `TrainerProfileChecklist` card rendered at the top of `src/routes/trainers.$trainerId.tsx` when the viewer owns the profile and completeness < 100%. Each checklist item deep-links into the corresponding section of `teams.$teamId.edit.tsx`.
+- Draft persistence: `useDraftPersistence("trainer-wizard-draft", state)` — write on change (debounced 400ms), read on mount, clear on submit success.
 
 ## Out of scope
-No schema changes, no changes to `TrainerOrgSection` on the trainer profile.
+
+- No changes to team creation UX beyond extracting it into its own file.
+- No schema changes; all new UI writes into existing columns (`availability_slots`, `venue_addresses`, `verified_venues`, `venue_geo`, `primary_venue`, etc.).
+- No changes to org affiliation logic itself — it just moves to the profile edit page.
