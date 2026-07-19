@@ -192,6 +192,7 @@ function EditOrg() {
     ratePerHour: kind === "coach" ? rate : undefined,
     availabilitySlots: kind === "coach" ? slots : undefined,
     availabilityOverrides: kind === "coach" ? overrides : undefined,
+    availabilityRules: kind === "coach" ? rules : undefined,
     timezone: kind === "coach" ? timezone : undefined,
     venueAddresses: kind === "coach" ? venueAddresses.filter((a) => a.trim().length > 0) : undefined,
     primaryVenue: kind === "coach"
