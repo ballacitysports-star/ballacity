@@ -75,6 +75,7 @@ function initials(name: string) {
 function EditOrg() {
   const org = Route.useLoaderData() as Org;
   const nav = useNavigate();
+  const { user } = useAuth();
   const [step, setStep] = useState(1);
 
   // Pre-fill form state
@@ -974,13 +975,33 @@ function EditOrg() {
                 </p>
               </Section>
 
+              <Section title={org.kind === "coach" ? "Trainer photo" : "Team logo"}>
+                <ImageUploader
+                  kind="avatar"
+                  bucket={org.kind === "coach" ? "trainer-avatars" : "team-avatars"}
+                  pathPrefix={user?.id ?? org.id}
+                  value={avatar.startsWith("http") || avatar.startsWith("data:") ? avatar : ""}
+                  onChange={setAvatar}
+                  onClear={() => setAvatar("")}
+                />
+              </Section>
+
               <Section title="Cover image">
-                <TeamCoverUploader
-                  cover={cover}
-                  onCoverChange={setCover}
-                  isCustom={customCover}
-                  onCustomChange={setCustomCover}
-                  fallback={HERO_IMAGE}
+                <ImageUploader
+                  kind="cover"
+                  bucket="team-covers"
+                  pathPrefix={user?.id ?? org.id}
+                  value={customCover ? cover : ""}
+                  fallback={cover}
+                  onChange={(url) => {
+                    setCover(url);
+                    setCustomCover(true);
+                  }}
+                  onClear={() => {
+                    setCover(HERO_IMAGE);
+                    setCustomCover(false);
+                  }}
+                  presets={sports.length ? sports : undefined}
                 />
               </Section>
 
