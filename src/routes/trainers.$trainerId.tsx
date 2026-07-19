@@ -135,11 +135,37 @@ function TrainerPage() {
   useEffect(() => setMounted(true), []);
   const canEdit = mounted && isMyOrg(org.id);
 
+  const qc = useQueryClient();
   const orgLinkQuery = useQuery({
     queryKey: ["trainer-org-for-trainer", org.id],
     queryFn: () => getTrainerOrgForTrainer({ data: { trainerId: org.id } }),
   });
   const linkedOrg = orgLinkQuery.data?.org ?? null;
+
+  // Realtime: reflect newly-approved memberships or org changes immediately.
+  useEffect(() => {
+    const ch = supabase
+      .channel(`trainer-org-link:${org.id}`)
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "trainer_org_members", filter: `trainer_id=eq.${org.id}` },
+        () => {
+          qc.invalidateQueries({ queryKey: ["trainer-org-for-trainer", org.id] });
+          qc.invalidateQueries({ queryKey: ["trainer-org-memberships", org.id] });
+        },
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "trainer_org_join_requests", filter: `trainer_id=eq.${org.id}` },
+        () => {
+          qc.invalidateQueries({ queryKey: ["trainer-org-for-trainer", org.id] });
+        },
+      )
+      .subscribe();
+    return () => {
+      supabase.removeChannel(ch);
+    };
+  }, [org.id, qc]);
 
   const orgReviews = useReviewsFor(org.id);
   const orgRep = useMemo(() => computeReputation(orgReviews, "trainer"), [orgReviews]);
