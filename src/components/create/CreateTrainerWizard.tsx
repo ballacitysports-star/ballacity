@@ -210,20 +210,13 @@ export function CreateTrainerWizard() {
     ratePerHour: draft.rate,
     skillRange: { min: draft.skillMin, max: draft.skillMax },
     sessionTypes: draft.sessionTypes,
-    venueAddresses: draft.venue ? [draft.venue] : [],
-    verifiedVenues: draft.venue && draft.venuePlaceId ? [draft.venue.toLowerCase()] : [],
-    venueGeo:
-      draft.venue && draft.venuePlaceId && draft.venueGeo
-        ? [
-            {
-              address: draft.venue,
-              placeId: draft.venuePlaceId,
-              lat: draft.venueGeo.lat,
-              lng: draft.venueGeo.lng,
-            },
-          ]
-        : [],
-    primaryVenue: draft.venue || undefined,
+    venueAddresses: verifiedVenueAddresses,
+    verifiedVenues: verifiedVenueAddresses.map((a) => a.toLowerCase()),
+    venueGeo: verifiedVenues
+      .filter((v) => v.geo)
+      .map((v) => ({ address: v.address, placeId: v.placeId, lat: v.geo!.lat, lng: v.geo!.lng })),
+    primaryVenue: primaryVenue?.address,
+
     availabilitySlots: draft.slots,
     availabilityOverrides: draft.overrides,
     availabilityRules: draft.rules,
