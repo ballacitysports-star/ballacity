@@ -18,6 +18,9 @@ import { AvailabilityCalendar } from "@/components/AvailabilityCalendar";
 import { AvailabilityRulesEditor } from "@/components/AvailabilityRulesEditor";
 import type { AvailabilityRule } from "@/lib/availability-resolve";
 import { loadDraft, useDraftPersistence } from "@/components/create/useDraftPersistence";
+import { useQuery } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
+import { listTrainerOrgs, createTrainerOrg, requestToJoinTrainerOrg } from "@/lib/trainer-orgs.functions";
 import { toast } from "sonner";
 
 const STEP_LABELS = ["Basics", "Expertise", "Where", "Availability"] as const;
