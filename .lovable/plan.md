@@ -1,61 +1,87 @@
-## Problem
+## Goal
 
-Right now the trainer's monthly availability and every booking time are stored and rendered as "naive" wall-clock strings ("Mon 09:00", `preferred_date=2026-08-04`, `preferred_start_time=09:00`) with no timezone attached. That means:
+Give trainers a friendly "Recurring rules" editor (e.g. "Every Tue & Thu, 6–8 PM, at Riverside Park") that automatically populates the monthly calendar for up to 6 months, on top of the existing weekly slots and per-date overrides.
 
-- A trainer in New York who sets "Mon 9–11 AM" appears to a viewer in Los Angeles as "9–11 AM" — but the trainer is actually free 6–8 AM Pacific.
-- Overrides use `YYYY-MM-DD` computed against the viewer's local calendar, so a slot near midnight can jump one day between trainer and attendee.
-- The booking sheet's "already booked" list and conflict check operate on the same naive strings, so a request "conflict-free" for an East-Coast attendee can still collide with a real West-Coast booking.
-- `preferred_date` / `preferred_start_time` displayed on the request card show the trainer's raw string to attendees regardless of their own tz.
+## Why a new layer (not just weekly slots)
 
-The fix is to anchor everything to the trainer's IANA timezone and convert on the viewer side.
+The current model has two pieces:
+- `availabilitySlots` — plain weekly pattern, one row per weekday+window, infinite.
+- `availabilityOverrides` — per-date replacements/closures.
 
-## Plan
+That covers "every week forever" but not: bi-weekly, first/third Tuesday, a rule that only applies for a date range, or grouping several weekdays/venues into one editable rule. Trainers also can't see at a glance which calendar days came from which recurring intent.
 
-### 1. Data model
-- Add `timezone text` to `public.teams` (IANA name, e.g. `America/New_York`). Default to the browser tz on create; back-fill existing trainer rows with `America/New_York` and let them edit.
-- Keep `availability_slots` (weekly) and `availability_overrides` (date-keyed) as they are — but define them as **trainer-local wall-clock time**.
-- Keep `trainer_session_requests.preferred_date` + `preferred_start_time` as **trainer-local wall-clock** (so a slot the trainer set at 9 AM stays "9 AM their time" regardless of who books). Booking rows are always compared to the trainer's availability in the same frame.
+We add a third layer — `availabilityRules` — that expands into the same `ResolvedWindow` shape the calendar already renders. Existing weekly slots keep working unchanged.
 
-### 2. Shared timezone utilities (`src/lib/tz.ts`)
-- `getBrowserTz()` → `Intl.DateTimeFormat().resolvedOptions().timeZone`.
-- `wallTimeToInstant(dateKey, "HH:MM", tz)` → real `Date` using `Intl` offset math.
-- `instantToWall(date, tz)` → `{ dateKey, hhmm, weekday }`.
-- `formatInTz(date, tz, opts)` for labels + short tz code (e.g. `PDT`).
-- Curated tz picker list (America, Europe, Asia buckets).
+## Data model
 
-### 3. Availability resolver (`src/lib/availability-resolve.ts`)
-- `resolveDay(date, weekly, overrides, { trainerTz, viewerTz, venueFilter })`:
-  1. For each viewer-local date, compute the trainer-local dates it touches (a single viewer day can straddle two trainer days).
-  2. Pull weekly slots for those trainer weekdays + any date-override windows keyed by the trainer-local date.
-  3. Convert each window's `[start, end]` from trainer-local → UTC → viewer-local, clip to the viewer day, and return `ResolvedWindow` with `start`/`end` already in viewer-local `HH:MM`, plus `sourceTz` for display.
-- `hasAvailability` uses the same pipeline.
+New column on `public.teams`:
 
-### 4. Trainer-side editing (`AvailabilityCalendar.tsx`, `CreateOrgWizard.tsx`, `teams.$teamId.edit.tsx`)
-- Always edit in **trainer tz** (the profile's own tz). Header shows "Times shown in your timezone: America/New_York (EDT). Change tz".
-- Add a timezone picker to the Identity step and edit page; default to browser tz for new trainers.
-- Overlap validation (`availability-slots.ts`) is unchanged — it already runs in a single frame (trainer-local).
+- `availability_rules` (`jsonb`, default `'[]'`) — array of rules. Each rule:
 
-### 5. Viewer-side display (`TrainerAvailabilityMonth.tsx`, trainer profile venue rows)
-- Read `org.timezone`, compute a `viewerTz = getBrowserTz()`.
-- Pass both into `resolveDay`; render windows in viewer-local time with a subtle "· in your time" label and a toggle "Show trainer's time" (persisted in URL as `?tz=trainer|viewer`, default viewer).
-- Show a small chip: "Trainer is in EDT (3 hours ahead)".
+```text
+{
+  id: string,
+  label?: string,              // "Weekday evenings"
+  weekdays: ("sun".."sat")[],  // one or more
+  start: "HH:MM",
+  end:   "HH:MM",
+  venue?: string,              // must be in verified venues
+  freq: "weekly" | "biweekly" | "monthly-nth",
+  interval?: number,           // for weekly (1 = every week, 2 = every other)
+  weekOfMonth?: (1|2|3|4|"last")[],  // when freq = "monthly-nth"
+  anchorDate: "YYYY-MM-DD",    // start of recurrence (defines biweekly phase)
+  until?: "YYYY-MM-DD"         // optional end, capped at 6 months from today
+}
+```
 
-### 6. Booking sheet (`BookSessionSheet.tsx`)
-- `date` picker + suggested times run in the **viewer's** local frame (that's what the user picks).
-- On submit, convert `(viewerDateKey, viewerHHMM)` → UTC instant → trainer-local `(dateKey, HHMM)` and send those as `preferredDate` / `preferredStartTime`. This keeps DB rows aligned to the trainer's calendar.
-- Same conversion applied to `listTrainerBookedSlots` results before conflict-checking so the "already booked" chips render in viewer-local.
-- Warning banner text includes both times: "You picked 9:00 AM PDT (12:00 PM EDT trainer time)".
-- Existing-request card in the sheet shows both `time in your tz` and `(trainer's tz)`.
+Precedence when resolving a date:
+1. Per-date override (existing) — wins outright.
+2. Recurring rules that match that date — expanded into windows.
+3. Weekly slots (existing) — expanded for that weekday.
 
-### 7. Notifications / inbox
-- Any place that renders `preferred_date` + `preferred_start_time` (request cards, inbox threads) uses a shared `formatBookingTime(row, trainerTz, viewerTz)` helper so both parties see the same instant labelled in their own tz.
+Rules and weekly slots merge (multi-window days are fine); duplicates are deduped by `(start,end,venue)`. Overrides still fully replace the day.
 
-### 8. Migration
-- `ALTER TABLE public.teams ADD COLUMN timezone text NOT NULL DEFAULT 'America/New_York';` then relax default after backfill.
-- No schema change needed for `trainer_session_requests` — the semantics of existing columns are simply pinned to "trainer-local" and enforced in application code. (`list_trainer_booked_slots` RPC remains unchanged.)
+## UI
 
-### Technical notes
-- All conversions use `Intl.DateTimeFormat` with `timeZone` option — no external library needed; works in every modern browser and in the Worker runtime.
-- The `preferred_date` invariant to remember: **it is always the trainer-local calendar date**, so the conflict RPC keeps working with its current `WHERE preferred_date = _date` predicate.
-- URL param `?tz=trainer` lets a trainer share a link that shows their own hours; default remains viewer-local for attendees.
-- Historical `trainer_session_requests` rows created before this change are already effectively "browser-local at time of booking" — we treat them as trainer-local going forward; a one-line note in the request card ("Times shown in trainer's timezone") covers the small ambiguity for old rows.
+New "Recurring rules" section in the Availability step of `CreateOrgWizard` and in the trainer edit page, above the existing weekly + calendar editors:
+
+- **Rule cards** — each rule shown as a compact card with label, weekday chips, time range, venue, cadence badge ("Weekly", "Every 2 weeks", "1st & 3rd of month"), effective date range, and menu (edit / duplicate / delete).
+- **Add / edit rule sheet** — form with:
+  - Multi-select weekday chips
+  - Start / end time pickers (12h)
+  - Venue picker (verified venues only, "Any" allowed)
+  - Cadence radio: Weekly · Every other week · Specific weeks of month
+  - "Repeats until" date (max = today + 6 months, defaults to horizon)
+  - Live "next 3 occurrences" preview so the trainer sees dates before saving
+- Validation reuses `validateSlots` for the time window and `validateVenueList` for venue selection.
+
+On the monthly calendar (`AvailabilityCalendar` + `TrainerAvailabilityMonth`):
+- Days that light up because of a rule get the same lime dot as weekly slots.
+- The selected-day detail panel labels each window with its source badge: `Rule`, `Weekly`, or `Custom` (override).
+
+## Resolver changes
+
+`resolveDay` (in `src/lib/availability-resolve.ts`) gains an optional `rules` parameter. New `expandRule(rule, date)` helper returns the windows contributed by a single rule for a specific date (empty if the rule doesn't fire that day). The tz-aware path enumerates the same candidate trainer-local dates and calls `expandRule` alongside the existing weekly lookup.
+
+The 6-month cap is enforced two ways: `until` is clamped when the rule is saved, and the calendar already limits navigation to `maxHorizonDate`, so anything beyond 6 months is invisible even if a rule lacks `until`.
+
+## Wiring checklist
+
+1. `supabase--migration` — add `availability_rules jsonb not null default '[]'` to `public.teams`.
+2. `src/lib/availability-resolve.ts` — add `AvailabilityRule` type, `expandRule`, and thread `rules` through `resolveDay` / `hasAvailability`.
+3. `src/lib/availability-slots.ts` — add `validateRules` (weekday non-empty, valid times, venue verified, `until` within horizon).
+4. `src/lib/sample-data.ts` — add `availabilityRules?: AvailabilityRule[]` to `Org`.
+5. `src/lib/teams.functions.ts` — extend Zod `TeamShape` with `availability_rules`.
+6. `src/lib/org-store.ts` — map `availability_rules` in row → org and in patch → row.
+7. `src/components/AvailabilityRulesEditor.tsx` — new component: list of rule cards + add/edit sheet + occurrence preview.
+8. `src/components/AvailabilityCalendar.tsx` — accept `rules`, pass into `resolveDay`, show source badge on selected-day windows.
+9. `src/components/TrainerAvailabilityMonth.tsx` — accept `rules`, pass into `resolveDay`.
+10. `src/components/CreateOrgWizard.tsx` and `src/routes/teams.$teamId.edit.tsx` — `rules` state, integrate the new editor above weekly/calendar, save through to `updateOrg`/`addOrg`.
+11. `src/routes/trainers.$trainerId.tsx` — pass `org.availabilityRules` into `TrainerAvailabilityMonth`.
+12. `src/components/BookSessionSheet.tsx` — pass rules into `resolveDay` so suggested times include recurring windows.
+
+## Out of scope (call out, don't build)
+
+- iCal/RRULE export, ICS import.
+- Rules by month/day-of-month (e.g. "every 15th") — only weekday-based cadences.
+- Automatic notification when a rule creates a slot; existing calendar view is the surface.

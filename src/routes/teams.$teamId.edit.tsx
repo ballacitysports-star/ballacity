@@ -14,8 +14,10 @@ import {
 } from "lucide-react";
 import { SPORTS, HERO_IMAGE, type Sport, type Org } from "@/lib/sample-data";
 import { getOrgById, updateOrg, deleteOrg, isMyOrg } from "@/lib/org-store";
-import { validateSlots, validateOverrides, type DayOverride } from "@/lib/availability-slots";
+import { validateSlots, validateOverrides, validateRules, type DayOverride } from "@/lib/availability-slots";
+import type { AvailabilityRule } from "@/lib/availability-resolve";
 import { AvailabilityCalendar } from "@/components/AvailabilityCalendar";
+import { AvailabilityRulesEditor } from "@/components/AvailabilityRulesEditor";
 import { TimezoneSelect } from "@/components/TimezoneSelect";
 import { getBrowserTz } from "@/lib/tz";
 import { validateVenueList, buildVenueGeo } from "@/lib/venue-address";
@@ -101,6 +103,7 @@ function EditOrg() {
   type Slot = NonNullable<Org["availabilitySlots"]>[number];
   const [slots, setSlots] = useState<Slot[]>(org.availabilitySlots ?? []);
   const [overrides, setOverrides] = useState<DayOverride[]>(org.availabilityOverrides ?? []);
+  const [rules, setRules] = useState<AvailabilityRule[]>(org.availabilityRules ?? []);
   const [timezone, setTimezone] = useState<string>(org.timezone || getBrowserTz());
   const [venueAddresses, setVenueAddresses] = useState<string[]>(org.venueAddresses ?? []);
   const [primaryVenue, setPrimaryVenue] = useState<string | null>(org.primaryVenue ?? null);
@@ -120,6 +123,10 @@ function EditOrg() {
   const overridesError = useMemo(
     () => validateOverrides(overrides, verifiedVenues),
     [overrides, verifiedVenues],
+  );
+  const rulesError = useMemo(
+    () => validateRules(rules, verifiedVenues),
+    [rules, verifiedVenues],
   );
   const venueValidation = useMemo(
     () => validateVenueList(venueAddresses, verifiedVenues),
@@ -185,6 +192,7 @@ function EditOrg() {
     ratePerHour: kind === "coach" ? rate : undefined,
     availabilitySlots: kind === "coach" ? slots : undefined,
     availabilityOverrides: kind === "coach" ? overrides : undefined,
+    availabilityRules: kind === "coach" ? rules : undefined,
     timezone: kind === "coach" ? timezone : undefined,
     venueAddresses: kind === "coach" ? venueAddresses.filter((a) => a.trim().length > 0) : undefined,
     primaryVenue: kind === "coach"
@@ -205,6 +213,10 @@ function EditOrg() {
     }
     if (kind === "coach" && overridesError) {
       alert(overridesError.message);
+      return;
+    }
+    if (kind === "coach" && rulesError) {
+      alert(rulesError.message);
       return;
     }
     if (kind === "coach" && venuesError) {
@@ -241,6 +253,7 @@ function EditOrg() {
               }))
           : undefined,
         availabilityOverrides: kind === "coach" ? overrides : undefined,
+        availabilityRules: kind === "coach" ? rules : undefined,
         timezone: kind === "coach" ? timezone : undefined,
         venueAddresses: kind === "coach"
           ? venueAddresses.map((a) => a.trim()).filter((a) => a.length > 0)
@@ -735,6 +748,21 @@ function EditOrg() {
                       onWeeklyChange={setSlots}
                       onOverridesChange={setOverrides}
                     />
+                    <div className="mt-4 pt-4 border-t border-border">
+                      <div className="mb-2">
+                        <div className="text-sm font-semibold">Recurring rules</div>
+                        <p className="text-xs text-muted-foreground">
+                          Auto-populate the calendar with patterns like "Every Tue/Thu" or "1st & 3rd Monday".
+                        </p>
+                      </div>
+                      <AvailabilityRulesEditor
+                        value={rules}
+                        onChange={setRules}
+                        venues={venueAddresses
+                          .map((v) => v.trim())
+                          .filter((v, idx, arr) => v && verifiedVenues.has(v.toLowerCase()) && arr.indexOf(v) === idx)}
+                      />
+                    </div>
                   </Section>
 
 

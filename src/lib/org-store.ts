@@ -50,6 +50,7 @@ type TeamRow = {
   session_types: string[] | null;
   availability_slots: unknown;
   availability_overrides: unknown;
+  availability_rules: unknown;
   timezone: string | null;
 };
 
@@ -134,6 +135,10 @@ function rowToOrg(row: TeamRow): Org {
       kind === "coach" && Array.isArray(row.availability_overrides)
         ? (row.availability_overrides as Org["availabilityOverrides"])
         : [],
+    availabilityRules:
+      kind === "coach" && Array.isArray(row.availability_rules)
+        ? (row.availability_rules as Org["availabilityRules"])
+        : [],
     timezone: kind === "coach" ? row.timezone ?? undefined : undefined,
     upcoming: [],
     posts: [],
@@ -181,6 +186,7 @@ function orgToInsert(org: Org) {
     session_types: org.sessionTypes ?? [],
     availability_slots: org.kind === "coach" ? org.availabilitySlots ?? [] : [],
     availability_overrides: org.kind === "coach" ? org.availabilityOverrides ?? [] : [],
+    availability_rules: org.kind === "coach" ? org.availabilityRules ?? [] : [],
     timezone: org.kind === "coach" ? org.timezone ?? undefined : undefined,
   };
 }
@@ -345,6 +351,7 @@ export async function updateOrg(
   if (patch.sessionTypes !== undefined) mapped.session_types = patch.sessionTypes ?? [];
   if (patch.availabilitySlots !== undefined) mapped.availability_slots = patch.availabilitySlots ?? [];
   if (patch.availabilityOverrides !== undefined) mapped.availability_overrides = patch.availabilityOverrides ?? [];
+  if (patch.availabilityRules !== undefined) mapped.availability_rules = patch.availabilityRules ?? [];
   if (patch.timezone !== undefined) mapped.timezone = patch.timezone ?? null;
 
   try {

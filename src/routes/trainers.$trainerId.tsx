@@ -508,7 +508,9 @@ function TrainerPage() {
               </Section>
             )}
 
-            {((org.availabilitySlots?.length ?? 0) > 0 || (org.availabilityOverrides?.length ?? 0) > 0) && (
+            {((org.availabilitySlots?.length ?? 0) > 0 ||
+              (org.availabilityOverrides?.length ?? 0) > 0 ||
+              (org.availabilityRules?.length ?? 0) > 0) && (
               <Section
                 title={
                   <>
@@ -524,10 +526,12 @@ function TrainerPage() {
                 <TrainerAvailabilityMonth
                   weekly={org.availabilitySlots ?? []}
                   overrides={org.availabilityOverrides ?? []}
+                  rules={org.availabilityRules ?? []}
                   primaryVenue={org.primaryVenue ?? null}
                   venueFilter={selectedVenue || null}
                   trainerTz={org.timezone ?? null}
                 />
+
 
               </Section>
             )}

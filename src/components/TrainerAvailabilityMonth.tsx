@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { ChevronLeft, ChevronRight, MapPin, Globe } from "lucide-react";
 import type { Slot } from "@/lib/availability-slots";
 import {
+  type AvailabilityRule,
   type DayOverride,
   fromDateKey,
   maxHorizonDate,
@@ -31,12 +32,14 @@ function isSameMonth(a: Date, b: Date) {
 export function TrainerAvailabilityMonth({
   weekly,
   overrides,
+  rules,
   primaryVenue,
   venueFilter,
   trainerTz,
 }: {
   weekly: Slot[];
   overrides: DayOverride[];
+  rules?: AvailabilityRule[];
   primaryVenue?: string | null;
   venueFilter?: string | null;
   /** Trainer's IANA timezone. Availability windows are stored in this tz. */
@@ -57,8 +60,8 @@ export function TrainerAvailabilityMonth({
   const [showInTrainerTz, setShowInTrainerTz] = useState(false);
   const activeViewerTz = showInTrainerTz ? tTz : viewerTz;
   const resolverOpts = useMemo(
-    () => ({ venueFilter, trainerTz: tTz, viewerTz: activeViewerTz }),
-    [venueFilter, tTz, activeViewerTz],
+    () => ({ venueFilter, trainerTz: tTz, viewerTz: activeViewerTz, rules: rules ?? [] }),
+    [venueFilter, tTz, activeViewerTz, rules],
   );
 
   const monthStart = startOfMonth(cursor);

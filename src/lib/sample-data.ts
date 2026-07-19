@@ -401,6 +401,19 @@ export type Org = {
   timezone?: string;
   availabilitySlots?: { day: "mon" | "tue" | "wed" | "thu" | "fri" | "sat" | "sun"; start: string; end: string; venue?: string }[];
   availabilityOverrides?: { date: string; closed?: boolean; windows?: { start: string; end: string; venue?: string }[] }[];
+  availabilityRules?: {
+    id: string;
+    label?: string;
+    weekdays: ("mon" | "tue" | "wed" | "thu" | "fri" | "sat" | "sun")[];
+    start: string;
+    end: string;
+    venue?: string;
+    freq: "weekly" | "biweekly" | "monthly-nth";
+    interval?: number;
+    weekOfMonth?: (1 | 2 | 3 | 4 | "last")[];
+    anchorDate: string;
+    until?: string;
+  }[];
   upcoming: string[]; // game ids
   posts: OrgPost[];
 };

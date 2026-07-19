@@ -20,6 +20,9 @@ import {
 import { addOrg } from "@/lib/org-store";
 import { validateSlots, validateOverrides, type DayOverride } from "@/lib/availability-slots";
 import { AvailabilityCalendar } from "@/components/AvailabilityCalendar";
+import { AvailabilityRulesEditor } from "@/components/AvailabilityRulesEditor";
+import type { AvailabilityRule } from "@/lib/availability-resolve";
+import { validateRules } from "@/lib/availability-slots";
 import { TimezoneSelect } from "@/components/TimezoneSelect";
 import { validateVenueList, buildVenueGeo } from "@/lib/venue-address";
 import {
@@ -113,6 +116,7 @@ export function CreateOrgWizard({ kind }: { kind: OrgKind }) {
   type Slot = NonNullable<Org["availabilitySlots"]>[number];
   const [slots, setSlots] = useState<Slot[]>([]);
   const [overrides, setOverrides] = useState<DayOverride[]>([]);
+  const [rules, setRules] = useState<AvailabilityRule[]>([]);
   const [timezone, setTimezone] = useState<string>(() => {
     // Lazy import so SSR doesn't crash — `Intl` is universal but the helper is browser-tuned.
     try {
@@ -125,6 +129,10 @@ export function CreateOrgWizard({ kind }: { kind: OrgKind }) {
   const overridesError = useMemo(
     () => validateOverrides(overrides, verifiedVenues),
     [overrides, verifiedVenues],
+  );
+  const rulesError = useMemo(
+    () => validateRules(rules, verifiedVenues),
+    [rules, verifiedVenues],
   );
   const venueValidation = useMemo(
     () => validateVenueList(venueAddresses, verifiedVenues),
@@ -217,6 +225,7 @@ export function CreateOrgWizard({ kind }: { kind: OrgKind }) {
           }))
       : undefined,
     availabilityOverrides: isCoach ? overrides : undefined,
+    availabilityRules: isCoach ? rules : undefined,
     timezone: isCoach ? timezone : undefined,
     upcoming: [],
     posts: [],
@@ -233,6 +242,10 @@ export function CreateOrgWizard({ kind }: { kind: OrgKind }) {
     }
     if (isCoach && overridesError) {
       setSubmitError(overridesError.message);
+      return;
+    }
+    if (isCoach && rulesError) {
+      setSubmitError(rulesError.message);
       return;
     }
     if (venuesError) {
@@ -651,6 +664,21 @@ export function CreateOrgWizard({ kind }: { kind: OrgKind }) {
                     onWeeklyChange={setSlots}
                     onOverridesChange={setOverrides}
                   />
+                  <div className="mt-4 pt-4 border-t border-border">
+                    <div className="mb-2">
+                      <div className="text-sm font-semibold">Recurring rules</div>
+                      <p className="text-xs text-muted-foreground">
+                        Set patterns like "Every Tue/Thu" or "1st & 3rd Monday" — they auto-fill the calendar.
+                      </p>
+                    </div>
+                    <AvailabilityRulesEditor
+                      value={rules}
+                      onChange={setRules}
+                      venues={venueAddresses
+                        .map((v) => v.trim())
+                        .filter((v, idx, arr) => v && verifiedVenues.has(v.toLowerCase()) && arr.indexOf(v) === idx)}
+                    />
+                  </div>
                 </Section>
               )}
 
