@@ -167,6 +167,7 @@ function orgToInsert(org: Org) {
     venues: org.venues ?? [],
     venue_addresses: org.venueAddresses ?? [],
     verified_venues: org.verifiedVenues ?? (org.venueAddresses ?? []),
+    venue_geo: org.venueGeo ?? [],
     primary_venue: org.kind === "coach" ? org.primaryVenue ?? null : null,
     cadence: org.cadences?.[0] ?? org.cadence ?? null,
     cadences: org.cadences ?? (org.cadence ? [org.cadence] : []),
