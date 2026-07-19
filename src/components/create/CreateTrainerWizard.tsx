@@ -13,6 +13,8 @@ import { SESSION_TYPES } from "@/lib/sport-config";
 import { LocationAutocomplete } from "@/components/LocationAutocomplete";
 import { VenueMapPreview } from "@/components/VenueMapPreview";
 import { OrgCard } from "@/components/OrgCard";
+import { ImageUploader } from "@/components/ImageUploader";
+import { useAuth } from "@/hooks/use-auth";
 
 import { AvailabilityCalendar } from "@/components/AvailabilityCalendar";
 import { AvailabilityRulesEditor } from "@/components/AvailabilityRulesEditor";
