@@ -351,6 +351,7 @@ export async function updateOrg(
   if (patch.sessionTypes !== undefined) mapped.session_types = patch.sessionTypes ?? [];
   if (patch.availabilitySlots !== undefined) mapped.availability_slots = patch.availabilitySlots ?? [];
   if (patch.availabilityOverrides !== undefined) mapped.availability_overrides = patch.availabilityOverrides ?? [];
+  if (patch.availabilityRules !== undefined) mapped.availability_rules = patch.availabilityRules ?? [];
   if (patch.timezone !== undefined) mapped.timezone = patch.timezone ?? null;
 
   try {
