@@ -10,6 +10,9 @@ import {
   deleteTrainerOrg,
   setOrgMemberRole,
   removeOrgMember,
+  listOrgMembers,
+  setGenericOrgMemberRole,
+  removeGenericOrgMember,
 } from "@/lib/trainer-orgs.functions";
 import { OrgForm, type OrgFormValue } from "@/components/OrgForm";
 
@@ -45,6 +48,8 @@ function EditOrg() {
   const del = useServerFn(deleteTrainerOrg);
   const setRole = useServerFn(setOrgMemberRole);
   const remove = useServerFn(removeOrgMember);
+  const setGenericRole = useServerFn(setGenericOrgMemberRole);
+  const removeGeneric = useServerFn(removeGenericOrgMember);
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => setUserId(data.user?.id ?? null));
