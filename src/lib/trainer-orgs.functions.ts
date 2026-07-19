@@ -271,13 +271,13 @@ export const getTrainerOrgForTrainer = createServerFn({ method: "GET" })
   .inputValidator((d: { trainerId: string }) => z.object({ trainerId: z.string().min(1) }).parse(d))
   .handler(async ({ data }) => {
     const sb = publicClient();
-    const { data: row, error } = await sb
+    const { data: rows, error } = await sb
       .from("trainer_org_members")
       .select("role, org:org_id(id,name,handle,avatar,city,verified)")
       .eq("trainer_id", data.trainerId)
-      .maybeSingle();
+      .limit(1);
     if (error) throw new Error(error.message);
-    return row;
+    return rows?.[0] ?? null;
   });
 
 export const listTrainerIdsForOrg = createServerFn({ method: "GET" })
