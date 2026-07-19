@@ -13,7 +13,7 @@ import {
   Trash2,
 } from "lucide-react";
 import { SPORTS, HERO_IMAGE, type Sport, type Org } from "@/lib/sample-data";
-import { getOrgById, updateOrg, deleteOrg, isMyOrg } from "@/lib/org-store";
+import { getOrgById, ensureOrgById, updateOrg, deleteOrg, isMyOrg } from "@/lib/org-store";
 import { validateSlots, validateOverrides, validateRules, type DayOverride } from "@/lib/availability-slots";
 import type { AvailabilityRule } from "@/lib/availability-resolve";
 import { AvailabilityCalendar } from "@/components/AvailabilityCalendar";
