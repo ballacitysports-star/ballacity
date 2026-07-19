@@ -736,6 +736,100 @@ function TrainersPage() {
           )}
         </div>
       )}
-    </div>
+      </>
+    );
+  }
+}
+
+function GymsView({
+  gyms,
+  q,
+  onQ,
+  isLoading,
+}: {
+  gyms: Array<{
+    id: string;
+    name: string;
+    handle: string;
+    avatar: string | null;
+    city: string | null;
+    bio: string | null;
+    verified: boolean;
+  }>;
+  q: string;
+  onQ: (v: string) => void;
+  isLoading: boolean;
+}) {
+  return (
+    <>
+      <div className="flex gap-2 mb-4">
+        <div className="flex-1 flex items-center gap-2 rounded-full border border-border bg-surface px-4 py-2.5">
+          <Search className="h-4 w-4 text-muted-foreground" />
+          <input
+            value={q}
+            onChange={(e) => onQ(e.target.value)}
+            placeholder="Search gyms by name, handle, city"
+            className="flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
+          />
+        </div>
+        <Link
+          to="/trainers/create"
+          className="grid h-11 w-11 place-items-center rounded-full bg-lime-gradient text-primary-foreground glow-lime"
+          aria-label="Create a gym or organization"
+        >
+          <Plus className="h-5 w-5" strokeWidth={2.5} />
+        </Link>
+      </div>
+
+      {isLoading ? (
+        <div className="rounded-2xl border border-border bg-surface p-8 text-center text-sm text-muted-foreground">
+          Loading gyms…
+        </div>
+      ) : gyms.length === 0 ? (
+        <div className="rounded-2xl border border-border bg-surface p-8 text-center text-muted-foreground">
+          <div className="inline-flex items-center gap-2">
+            <Building2 className="h-4 w-4 text-lime" />
+            No gyms yet.
+          </div>
+        </div>
+      ) : (
+        <div className="space-y-3 pb-6">
+          {gyms.map((g) => (
+            <Link
+              key={g.id}
+              to="/orgs/$orgId"
+              params={{ orgId: g.id }}
+              className="flex items-center gap-3 rounded-2xl border border-border bg-surface p-3 transition-colors hover:border-lime/40"
+            >
+              <div className="grid h-14 w-14 shrink-0 place-items-center overflow-hidden rounded-2xl border border-border bg-lime-gradient font-display text-base font-bold text-primary-foreground">
+                {g.avatar && (g.avatar.startsWith("http") || g.avatar.startsWith("/")) ? (
+                  <img src={g.avatar} alt="" className="h-full w-full object-cover" />
+                ) : (
+                  (g.avatar || g.name.slice(0, 2)).toUpperCase().slice(0, 3)
+                )}
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-1.5">
+                  <span className="truncate font-display text-base font-bold">{g.name}</span>
+                  {g.verified && (
+                    <span className="rounded-full bg-lime/15 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-lime">
+                      ✓
+                    </span>
+                  )}
+                </div>
+                <div className="truncate text-xs text-muted-foreground">
+                  @{g.handle}
+                  {g.city ? <> · {g.city}</> : null}
+                </div>
+                {g.bio && (
+                  <div className="mt-0.5 line-clamp-1 text-xs text-muted-foreground/80">{g.bio}</div>
+                )}
+              </div>
+            </Link>
+          ))}
+        </div>
+      )}
+    </>
   );
 }
+
