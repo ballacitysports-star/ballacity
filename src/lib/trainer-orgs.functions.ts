@@ -266,3 +266,15 @@ export const getTrainerOrgForTrainer = createServerFn({ method: "GET" })
     if (error) throw new Error(error.message);
     return row;
   });
+
+export const listTrainerIdsForOrg = createServerFn({ method: "GET" })
+  .inputValidator((d: { orgId: string }) => z.object({ orgId: z.string().min(1) }).parse(d))
+  .handler(async ({ data }) => {
+    const sb = publicClient();
+    const { data: rows, error } = await sb
+      .from("trainer_org_members")
+      .select("trainer_id")
+      .eq("org_id", data.orgId);
+    if (error) throw new Error(error.message);
+    return (rows ?? []).map((r) => r.trainer_id as string);
+  });
