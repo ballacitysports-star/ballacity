@@ -106,24 +106,45 @@ export async function respondToTrainerSessionRequest(
   if (error) throw error;
 }
 
+type SharedSub = {
+  channel: ReturnType<typeof supabase.channel>;
+  listeners: Set<() => void>;
+};
+const sharedSubs = new Map<string, SharedSub>();
+
 export function subscribeToMyTrainerRequests(
   userId: string,
   onChange: () => void,
 ) {
-  const channel = supabase
-    .channel(`trainer-requests-${userId}`)
-    .on(
-      "postgres_changes",
-      { event: "*", schema: "public", table: TABLE, filter: `from_user_id=eq.${userId}` },
-      () => onChange(),
-    )
-    .on(
-      "postgres_changes",
-      { event: "*", schema: "public", table: TABLE, filter: `to_user_id=eq.${userId}` },
-      () => onChange(),
-    )
-    .subscribe();
+  let entry = sharedSubs.get(userId);
+  if (!entry) {
+    const listeners = new Set<() => void>();
+    const fanout = () => listeners.forEach((cb) => cb());
+    const channel = supabase
+      .channel(`trainer-requests-${userId}`)
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: TABLE, filter: `from_user_id=eq.${userId}` },
+        fanout,
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: TABLE, filter: `to_user_id=eq.${userId}` },
+        fanout,
+      )
+      .subscribe();
+    entry = { channel, listeners };
+    sharedSubs.set(userId, entry);
+  }
+  entry.listeners.add(onChange);
   return () => {
-    supabase.removeChannel(channel);
+    const current = sharedSubs.get(userId);
+    if (!current) return;
+    current.listeners.delete(onChange);
+    if (current.listeners.size === 0) {
+      supabase.removeChannel(current.channel);
+      sharedSubs.delete(userId);
+    }
   };
 }
+
