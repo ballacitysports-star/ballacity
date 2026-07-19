@@ -36,6 +36,10 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { useQuery } from "@tanstack/react-query";
+import { getTrainerOrgForTrainer } from "@/lib/trainer-orgs.functions";
+import { TrainerOrgSection } from "@/components/TrainerOrgSection";
+import { Building2 } from "lucide-react";
 
 export const Route = createFileRoute("/trainers/$trainerId")({
   validateSearch: zodValidator(
