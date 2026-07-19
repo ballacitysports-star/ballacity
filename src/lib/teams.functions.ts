@@ -53,6 +53,16 @@ const TeamShape = z.object({
   venues: z.array(z.string().max(60)).default([]),
   venue_addresses: z.array(z.string()).default([]),
   verified_venues: z.array(z.string()).default([]),
+  venue_geo: z
+    .array(
+      z.object({
+        address: z.string().max(400),
+        placeId: z.string().max(200),
+        lat: z.number().min(-90).max(90),
+        lng: z.number().min(-180).max(180),
+      }),
+    )
+    .default([]),
   primary_venue: z.string().max(300).nullable().optional(),
   cadence: z.string().max(60).nullable().optional(),
   cadences: z.array(z.string().max(60)).default([]),
