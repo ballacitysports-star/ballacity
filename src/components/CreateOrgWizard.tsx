@@ -225,6 +225,7 @@ export function CreateOrgWizard({ kind }: { kind: OrgKind }) {
           }))
       : undefined,
     availabilityOverrides: isCoach ? overrides : undefined,
+    availabilityRules: isCoach ? rules : undefined,
     timezone: isCoach ? timezone : undefined,
     upcoming: [],
     posts: [],
