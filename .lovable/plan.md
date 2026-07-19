@@ -1,45 +1,42 @@
 ## Goal
 
-One-click access to both direct messages and notifications from the bottom nav, and a cleaner nav bar without the elevated "+" host button.
+When a user picks a session date/time in `BookSessionSheet`, warn clearly and block the booking if the chosen window falls outside the trainer's availability or overlaps another pending/accepted session.
 
 ## Changes
 
-### 1. Unified Inbox (`/messages`)
+### 1. DB — add start time to session requests
 
-Turn `src/routes/messages.index.tsx` into a two-tab surface:
+Migration on `public.trainer_session_requests`:
+- Add `preferred_start_time TIME NULL` (nullable so legacy rows stay valid).
+- Add index `(trainer_id, preferred_date)` for fast per-day conflict lookup.
 
-- **Messages** tab — current conversation list (unchanged behavior).
-- **Alerts** tab — the notification feed currently rendered by `src/routes/_tabs.notifications.tsx`.
+### 2. Booking UI (`src/components/BookSessionSheet.tsx`)
 
-Implementation:
-- Extract the notification list body from `_tabs.notifications.tsx` into a reusable `<NotificationsPanel />` component (keeps its realtime subscription, push-permission banner, mark-as-read, and "Notification settings" link).
-- Extract the conversation list body from `messages.index.tsx` into `<ConversationsPanel />`.
-- In `messages.index.tsx`, render a shadcn `Tabs` header (`Messages` | `Alerts`) with unread-count badges pulled from the existing message/notification hooks.
-- Persist the active tab in the URL via `validateSearch` (`?tab=messages|alerts`) so refresh and deep links keep the view.
-- Header shows a single combined unread pill.
+- Add a **Start time** field beside Duration. Render 30-minute chips generated from `resolveDay(date, slots, overrides)` (each availability window split into slots long enough to fit the selected duration); include a free "Custom time" `<input type="time">` for anything else.
+- Introduce a `selectedWindow` = `{ startMin, endMin }` derived from start time + duration.
+- Load conflicts for the chosen date once (server function `listTrainerBookingsForDate({ trainerId, date })` in a new `src/lib/trainer-requests.functions.ts`) — returns `{ start, end, status }[]` for accepted + pending requests belonging to that trainer where `preferred_date = date` and `preferred_start_time IS NOT NULL`. Uses `requireSupabaseAuth`; RLS already lets participants read their own rows, so use `supabaseAdmin` inside after validating input to expose only start/end/status (no identifying data).
+- Compute two flags:
+  - `offAvailability`: chosen window is not fully covered by any available window for that day (via `resolveDay`).
+  - `overlapping`: chosen window intersects any loaded booking window.
+- Render a red banner at the top of the form when either flag is true:
+  - "Trainer isn't available at this time" (off-availability), listing today's available windows.
+  - "This time overlaps another session" (conflict), listing the conflicting window(s) and status.
+  - Provide a "Pick a suggested time" button that jumps to and selects the next free slot from `resolveDay` that fits the duration and doesn't overlap.
+- Disable the **Send request** button while either flag is true; keep the button label ("Send request") and add `aria-disabled` + a tooltip title explaining why.
+- Skip the check (and allow submit) only when no date is chosen — matches existing "date-optional" flow; if a time is picked, a date becomes required.
 
-### 2. Redirect old Alerts route
+### 3. Server-side hard block
 
-- Keep `/notifications` working by redirecting `_tabs.notifications.tsx` to `/messages?tab=alerts` (via `beforeLoad`), so existing links from Feed and Players cards, push deep-links, and account settings still land correctly.
-- Update the two in-app links (`src/routes/_tabs.feed.tsx:653`, `src/routes/_tabs.players.tsx:734`) to point at `/messages` with `search: { tab: "alerts" }`.
+- Update `createTrainerSessionRequest` in `src/lib/trainer-requests.ts` (or its `.functions` counterpart) to accept `preferredStartTime`, validate it with Zod, and — inside the handler — re-check for overlaps against the same trainer/date using the authenticated client. Throw a friendly `Error("This time just got booked — please pick another slot.")` on conflict so the client shows a toast even if the UI check was stale.
+- Return the new row shape including `preferred_start_time`.
 
-### 3. Bottom navigation cleanup (`src/components/BottomNav.tsx`)
+### 4. Types & display
 
-- Remove the center elevated Host FAB (`Plus` button linking to `/create`) and its wrapper.
-- Drop the `Plus` icon import and the `hostActive` variable.
-- Collapse the left/right groups into a single evenly-spaced flex row containing: Play, Players, Teams, Trainers, Inbox, You (6 tabs).
-- The Inbox tab label stays "Inbox"; its badge (already tracks unread messages) will now reflect messages + alerts combined via the shared unread hook.
-
-Users can still create a game from the existing "Create game" button on the Feed header (added earlier) and from the profile/host surfaces — no other entry points change.
-
-## Technical notes
-
-- Unread count for the Inbox tab badge: sum of `useUnreadMessages` and `useUnreadNotifications` (already available in `src/lib/messages.ts` and `src/lib/notifications.ts`).
-- Tabs state uses zod `validateSearch` with default `"messages"`, matching the URL-persistence pattern used elsewhere.
-- Push notification deep-links that currently target `/notifications` continue to work via the redirect.
-- No schema changes.
+- Extend `TrainerSessionRequest` type with `preferred_start_time: string | null`.
+- Show the start time in `ExistingRequestView`'s "Preferred date" row when present (formatted `Wed, Mar 5 · 6:00–7:00 PM`).
 
 ## Out of scope
 
-- Merging message and notification data models.
-- Changing notification preferences UI at `/account/notifications`.
+- Multi-day/recurring bookings.
+- Time-zone selection (uses trainer's local time, matching the existing availability model).
+- Blocking overlaps against the requesting user's *own* calendar (only trainer-side conflicts).

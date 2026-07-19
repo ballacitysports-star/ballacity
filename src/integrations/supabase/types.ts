@@ -1308,6 +1308,7 @@ export type Database = {
           id: string
           message: string | null
           preferred_date: string | null
+          preferred_start_time: string | null
           responder_note: string | null
           session_type: string
           status: string
@@ -1322,6 +1323,7 @@ export type Database = {
           id?: string
           message?: string | null
           preferred_date?: string | null
+          preferred_start_time?: string | null
           responder_note?: string | null
           session_type?: string
           status?: string
@@ -1336,6 +1338,7 @@ export type Database = {
           id?: string
           message?: string | null
           preferred_date?: string | null
+          preferred_start_time?: string | null
           responder_note?: string | null
           session_type?: string
           status?: string
