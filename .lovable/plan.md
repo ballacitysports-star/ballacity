@@ -1,58 +1,73 @@
-# Fix: Edit button on trainer profile leads to a blank page
+## Goal
 
-## Root cause
+The Edit button on a trainer profile currently opens a 3‑step editor (Identity / Details / Branding) that is missing several fields the create‑trainer wizard collects. Make edit show **everything** from the create flow so trainers can change any answer they gave at creation.
 
-The Edit button goes through `/trainers/$trainerId/edit`, which redirects to
-`/teams/$teamId/edit`. Both routes SSR by default, but the ownership check
-(`isMyOrg`) relies on `supabase.auth.getUser()`, which returns no session
-during server rendering.
+## What's missing today (coach kind)
 
-Result on server render:
-- `refreshCurrentUser()` sets `currentUserId = null`
-- `myOrgIds` stays empty
-- The trainer edit loader throws `ForbiddenError`, or the teams edit
-  component renders the "not allowed" screen
+Comparing `src/components/create/CreateTrainerWizard.tsx` (4 steps) to `src/routes/teams.$teamId.edit.tsx` (3 steps):
 
-The client then hydrates with a real session, tries to reconcile with the
-server HTML, hits a hydration mismatch, and the page ends up blank/stuck on
-a spinner — exactly what you're seeing.
+| Field | In create | In edit |
+| --- | --- | --- |
+| Name, handle, city, tagline | ✅ | ✅ |
+| Primary sport (single) + additional sports | ✅ primary sport | ✅ but only multi‑select, no "primary" |
+| Profile photo & cover on the basics step | ✅ | ❌ only on final Branding step |
+| Bio | ✅ | ✅ |
+| Session types (ChipPicker) | ✅ | ❌ |
+| Credentials | ✅ | ✅ |
+| Organization / Gym attach or create | ✅ | ❌ |
+| Hourly rate | ✅ | ✅ |
+| Skill range you work with | ✅ | ❌ |
+| Venues (Google‑verified, primary star, map) | ✅ | ✅ (already parity) |
+| Timezone | auto‑detect note | ✅ selector |
+| Availability calendar + recurring rules | ✅ calendar | ✅ calendar + rules |
+| Accent color, avatar initials | ❌ | ✅ (edit‑only branding) |
+| Delete profile | ❌ | ✅ (edit‑only) |
 
-## Fix
+## Plan
 
-Make the editor client-only and remove the unnecessary redirect hop.
+Rewrite `src/routes/teams.$teamId.edit.tsx` for the coach kind so its steps match the create wizard 1:1, then add the edit‑only extras (branding + delete) as a small final step. Team kind (`org.kind === "team"`) keeps today's 3‑step layout untouched.
 
-1. `src/routes/teams.$teamId.edit.tsx`
-   - Add `ssr: false` to the route so the loader and component only run in
-     the browser, where the Supabase session is available.
-   - Keep the async loader that awaits `ensureOrgById` (already hydrates the
-     org store before render).
-   - Add a small `pendingComponent` (spinner) so the transition isn't blank
-     while hydration finishes.
-   - Keep the improved "Editing not allowed" block with the trainer-aware
-     back link.
+### New coach step layout (5 steps)
 
-2. `src/routes/trainers.$trainerId.edit.tsx`
-   - Delete this file. It only added a redirect hop that also SSR-fails.
+```text
+Step 1  Basics          name, handle, primary sport, extra sports,
+                        city, tagline, year founded,
+                        profile photo (ImageUploader avatar),
+                        cover image (ImageUploader cover)
+Step 2  Expertise       bio, session types (ChipPicker),
+                        credentials, organization/gym picker,
+                        hourly rate, skill range
+Step 3  Venues          Google-verified venues list, primary star,
+                        map previews (reuse current UI, drop the
+                        "Session venues" section from Details step)
+Step 4  Availability    timezone select, AvailabilityCalendar,
+                        AvailabilityRulesEditor
+Step 5  Branding        accent color, avatar initials, live preview,
+                        delete-organization action
+```
 
-3. `src/routes/trainers.$trainerId.tsx`
-   - Point the Edit `<Link>` directly at `/teams/$teamId/edit` with
-     `params={{ teamId: org.id }}`. Ownership is still enforced inside that
-     route.
+Progress bar, Back/Continue/Save footer, and `canNext` rules mirror the create wizard's validators (name+handle+sport+city on step 1, `bio.length ≥ 40` on step 2, at least one verified venue on step 3, availability optional on step 4).
 
-## Why this works
+### Field wiring
 
-- With `ssr: false`, the editor only mounts after the client has a live
-  Supabase session, so `isMyOrg` returns `true` for your own trainer profile
-  and the editor renders normally.
-- Removing the intermediate redirect route eliminates the second SSR pass
-  that was producing the blank screen.
-- Server-side RLS on the teams table remains the authoritative permission
-  check for the actual save.
+- **Primary sport**: reuse the existing `sports: Sport[]` array; treat `sports[0]` as primary and add UI to reorder. No schema change needed.
+- **Session types**: hydrate from `org.sessionTypes`, save via existing `updateOrg({ sessionTypes })` (already mapped in `src/lib/org-store.ts`).
+- **Skill range**: hydrate from `org.skillRange`, save via existing `skillRange` mapping.
+- **Organization / Gym**: reuse the same search hook and `orgChoice` state shape from the create wizard. On save, call the existing `trainer-orgs.functions` join/create paths only when the choice changed vs. the current membership; otherwise no‑op. Show current membership status inline (owner / member / pending) so the trainer sees why the picker may be disabled.
+- **Profile photo & cover on Basics**: move the two `ImageUploader` blocks currently in Branding into Basics for coach kind; keep accent + initials + live preview + delete in Branding.
+- **Venues**: keep the current verified‑venue implementation (it already matches the create wizard's contract) and remove the duplicate "Session venues" block from the old Details step.
 
-## Verification
+### Files touched
 
-- Click Edit on your own trainer profile → editor loads (brief spinner ok).
-- Open `/teams/<someone-else-id>/edit` while signed in as a different user →
-  "Editing not allowed" screen with a Back to profile link.
-- Hard-refresh `/teams/<your-id>/edit` → editor still loads after auth
-  hydration.
+- `src/routes/teams.$teamId.edit.tsx` — split coach layout into 5 steps, add missing sections, adjust `STEPS`, `canNext`, and step‑switch UI.
+- Reuse existing components as‑is: `ImageUploader`, `LocationAutocomplete`, `VenueMapPreview`, `AvailabilityCalendar`, `AvailabilityRulesEditor`, `TimezoneSelect`, `ChipPicker` (extract or import from create wizard).
+- No DB schema changes. No changes to `org-store.ts` mapping (all target columns are already mapped).
+
+### Out of scope
+
+- Team‑kind editor stays as today (Identity / Details / Branding). If you want teams to also get a create‑style layout, that's a separate pass.
+- No changes to the create wizard itself.
+
+### Verification
+
+After the change, re‑run the earlier end‑to‑end check against `/teams/<coachId>/edit`: step through all 5 screens, edit one field per step, save, and confirm the trainer profile reflects every change (bio, session types, org membership, skill range, venues, availability, avatar/cover, accent).
