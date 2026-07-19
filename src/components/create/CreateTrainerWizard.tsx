@@ -170,7 +170,14 @@ export function CreateTrainerWizard() {
   );
 
   const bioOk = draft.bio.trim().length >= 40;
-  const venueOk = !!draft.venue.trim() && !!draft.venuePlaceId;
+  const verifiedVenues = useMemo(
+    () => draft.venues.filter((v) => v.address.trim() && v.placeId),
+    [draft.venues],
+  );
+  const primaryVenue: VenueEntry | null = verifiedVenues[Math.min(draft.primaryVenueIdx, Math.max(verifiedVenues.length - 1, 0))] ?? verifiedVenues[0] ?? null;
+  const verifiedVenueAddresses = verifiedVenues.map((v) => v.address);
+  const venueOk = verifiedVenues.length > 0;
+
 
   const canNext = useMemo(() => {
     if (step === 0)
