@@ -38,6 +38,7 @@ type TeamRow = {
   formats: unknown;
   venues: string[] | null;
   venue_addresses: unknown;
+  venue_geo: unknown;
   primary_venue: string | null;
   cadence: string | null;
   cadences: unknown;
