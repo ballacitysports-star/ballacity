@@ -878,6 +878,7 @@ export function CreateOrgWizard({ kind }: { kind: OrgKind }) {
                     />
                   </Section>
 
+                  {credentialPresets.length > 0 && (
                     <Section title="Suggested credentials">
                       <ChipPicker
                         options={credentialPresets}
