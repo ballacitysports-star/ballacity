@@ -16,6 +16,8 @@ import { SPORTS, HERO_IMAGE, type Sport, type Org } from "@/lib/sample-data";
 import { getOrgById, updateOrg, deleteOrg, isMyOrg } from "@/lib/org-store";
 import { validateSlots, validateOverrides, type DayOverride } from "@/lib/availability-slots";
 import { AvailabilityCalendar } from "@/components/AvailabilityCalendar";
+import { TimezoneSelect } from "@/components/TimezoneSelect";
+import { getBrowserTz } from "@/lib/tz";
 import { validateVenueList, buildVenueGeo } from "@/lib/venue-address";
 import { OrgCard } from "@/components/OrgCard";
 import { LocationAutocomplete } from "@/components/LocationAutocomplete";
@@ -99,6 +101,7 @@ function EditOrg() {
   type Slot = NonNullable<Org["availabilitySlots"]>[number];
   const [slots, setSlots] = useState<Slot[]>(org.availabilitySlots ?? []);
   const [overrides, setOverrides] = useState<DayOverride[]>(org.availabilityOverrides ?? []);
+  const [timezone, setTimezone] = useState<string>(org.timezone || getBrowserTz());
   const [venueAddresses, setVenueAddresses] = useState<string[]>(org.venueAddresses ?? []);
   const [primaryVenue, setPrimaryVenue] = useState<string | null>(org.primaryVenue ?? null);
   // Seed verified set with whatever addresses are already saved — existing entries remain valid.
@@ -182,6 +185,7 @@ function EditOrg() {
     ratePerHour: kind === "coach" ? rate : undefined,
     availabilitySlots: kind === "coach" ? slots : undefined,
     availabilityOverrides: kind === "coach" ? overrides : undefined,
+    timezone: kind === "coach" ? timezone : undefined,
     venueAddresses: kind === "coach" ? venueAddresses.filter((a) => a.trim().length > 0) : undefined,
     primaryVenue: kind === "coach"
       ? (primaryVenue && venueAddresses.map((v) => v.trim()).includes(primaryVenue.trim())
@@ -237,6 +241,7 @@ function EditOrg() {
               }))
           : undefined,
         availabilityOverrides: kind === "coach" ? overrides : undefined,
+        timezone: kind === "coach" ? timezone : undefined,
         venueAddresses: kind === "coach"
           ? venueAddresses.map((a) => a.trim()).filter((a) => a.length > 0)
           : undefined,
@@ -714,7 +719,11 @@ function EditOrg() {
                   <Section title="Availability calendar">
                     <p className="text-xs text-muted-foreground mb-2">
                       Set weekly windows and tap any date up to 6 months out to override or close it.
+                      Attendees see everything converted to their own timezone.
                     </p>
+                    <div className="mb-3">
+                      <TimezoneSelect value={timezone} onChange={setTimezone} />
+                    </div>
                     <AvailabilityCalendar
                       weekly={slots}
                       overrides={overrides}
@@ -722,10 +731,12 @@ function EditOrg() {
                         .map((v) => v.trim())
                         .filter((v, idx, arr) => v && verifiedVenues.has(v.toLowerCase()) && arr.indexOf(v) === idx)}
                       primaryVenue={primaryVenue}
+                      timezone={timezone}
                       onWeeklyChange={setSlots}
                       onOverridesChange={setOverrides}
                     />
                   </Section>
+
 
 
                   <Section title="Session venues">

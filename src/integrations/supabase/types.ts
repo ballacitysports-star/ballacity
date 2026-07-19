@@ -1201,6 +1201,7 @@ export type Database = {
           sports: string[]
           staff: Json
           tagline: string
+          timezone: string
           updated_at: string
           venue_addresses: Json
           venue_geo: Json
@@ -1246,6 +1247,7 @@ export type Database = {
           sports?: string[]
           staff?: Json
           tagline?: string
+          timezone?: string
           updated_at?: string
           venue_addresses?: Json
           venue_geo?: Json
@@ -1291,6 +1293,7 @@ export type Database = {
           sports?: string[]
           staff?: Json
           tagline?: string
+          timezone?: string
           updated_at?: string
           venue_addresses?: Json
           venue_geo?: Json

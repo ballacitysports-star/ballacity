@@ -74,6 +74,7 @@ const TeamShape = z.object({
   rating_max: z.string().max(20).nullable().optional(),
   distances: z.array(z.string().max(40)).default([]),
   session_types: z.array(z.string().max(40)).default([]),
+  timezone: z.string().max(60).optional(),
   availability_slots: z
     .array(
       z.object({

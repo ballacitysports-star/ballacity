@@ -50,6 +50,7 @@ type TeamRow = {
   session_types: string[] | null;
   availability_slots: unknown;
   availability_overrides: unknown;
+  timezone: string | null;
 };
 
 const myOrgIds = new Set<string>();
@@ -133,6 +134,7 @@ function rowToOrg(row: TeamRow): Org {
       kind === "coach" && Array.isArray(row.availability_overrides)
         ? (row.availability_overrides as Org["availabilityOverrides"])
         : [],
+    timezone: kind === "coach" ? row.timezone ?? undefined : undefined,
     upcoming: [],
     posts: [],
   };
@@ -179,6 +181,7 @@ function orgToInsert(org: Org) {
     session_types: org.sessionTypes ?? [],
     availability_slots: org.kind === "coach" ? org.availabilitySlots ?? [] : [],
     availability_overrides: org.kind === "coach" ? org.availabilityOverrides ?? [] : [],
+    timezone: org.kind === "coach" ? org.timezone ?? undefined : undefined,
   };
 }
 
@@ -342,6 +345,7 @@ export async function updateOrg(
   if (patch.sessionTypes !== undefined) mapped.session_types = patch.sessionTypes ?? [];
   if (patch.availabilitySlots !== undefined) mapped.availability_slots = patch.availabilitySlots ?? [];
   if (patch.availabilityOverrides !== undefined) mapped.availability_overrides = patch.availabilityOverrides ?? [];
+  if (patch.timezone !== undefined) mapped.timezone = patch.timezone ?? null;
 
   try {
     const row = (await updateTeam({ data: mapped as never })) as TeamRow;

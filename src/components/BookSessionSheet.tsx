@@ -22,6 +22,8 @@ import {
 } from "@/lib/trainer-requests";
 import { useAuth } from "@/hooks/use-auth";
 import { resolveDay, fromDateKey, maxHorizonDate, toDateKey } from "@/lib/availability-resolve";
+import { DEFAULT_TZ, getBrowserTz, tzShortName, wallTimeToInstant, instantToWall } from "@/lib/tz";
+import { Globe } from "lucide-react";
 
 type Mode = "form" | "existing" | "sent";
 
@@ -111,6 +113,23 @@ export function BookSessionSheet({
       cancelled = true;
     };
   }, [open, date, org.id, mode]);
+
+  const trainerTz = org.timezone || DEFAULT_TZ;
+  const viewerTz = useMemo(() => getBrowserTz(), []);
+  const differ = trainerTz !== viewerTz;
+
+  // Convert a trainer-local wall time on the selected date into the viewer's
+  // wall time. Returns null when either input is missing.
+  const toViewerLabel = (hhmm: string): string | null => {
+    if (!date || !hhmm) return null;
+    const inst = wallTimeToInstant(date, hhmm, trainerTz);
+    const w = instantToWall(inst, viewerTz);
+    const sameDay = w.dateKey === date;
+    const time = `${((Number(w.hhmm.split(":")[0]) % 12) || 12)}:${w.hhmm.split(":")[1]} ${Number(w.hhmm.split(":")[0]) < 12 ? "AM" : "PM"}`;
+    return sameDay ? time : `${time} (${w.dateKey})`;
+  };
+  const viewerTzShort = tzShortName(date ? fromDateKey(date) : new Date(), viewerTz);
+  const trainerTzShort = tzShortName(date ? fromDateKey(date) : new Date(), trainerTz);
 
   const availWindows = useMemo(() => {
     if (!date) return [];
@@ -292,6 +311,18 @@ export function BookSessionSheet({
           <ExistingRequestView row={existing} statusMeta={statusMeta} />
         ) : (
           <div className="mt-5 space-y-4">
+            {differ && (
+              <div className="rounded-2xl border border-lime/30 bg-lime/5 px-3 py-2 text-[11px] text-muted-foreground flex items-start gap-2">
+                <Globe className="h-3.5 w-3.5 text-lime shrink-0 mt-0.5" />
+                <span>
+                  Trainer's schedule is in{" "}
+                  <span className="font-semibold text-foreground">{trainerTz.replace(/_/g, " ")} ({trainerTzShort})</span>.
+                  Times below are shown in trainer time — we'll also show what that is in your local time
+                  ({viewerTzShort}).
+                </span>
+              </div>
+            )}
+
             {/* Conflict / off-availability warning */}
             {selWindow && (conflict || offAvailability) && (
               <div
@@ -386,7 +417,8 @@ export function BookSessionSheet({
                 )}
                 {date && availWindows.length > 0 && (
                   <p className="mt-1 text-[11px] text-muted-foreground">
-                    Available: {availWindows.map((w) => `${w.start}–${w.end}`).join(", ")}
+                    Available: {availWindows.map((w) => `${fmt12(w.start)}–${fmt12(w.end)}`).join(", ")}{" "}
+                    <span className="font-semibold text-foreground">{trainerTzShort}</span>
                   </p>
                 )}
               </label>
@@ -422,18 +454,24 @@ export function BookSessionSheet({
                   <div className="flex flex-wrap gap-1.5">
                     {suggestedTimes.map((t) => {
                       const active = startTime === t;
+                      const viewerLbl = differ ? toViewerLabel(t) : null;
                       return (
                         <button
                           key={t}
                           type="button"
                           onClick={() => setStartTime(t)}
-                          className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition-all ${
+                          className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition-all flex flex-col items-center leading-tight ${
                             active
                               ? "border-lime bg-lime/15 text-lime"
                               : "border-border bg-surface text-muted-foreground"
                           }`}
                         >
-                          {fmt12(t)}
+                          <span>{fmt12(t)}</span>
+                          {viewerLbl && (
+                            <span className="text-[9px] font-normal opacity-70">
+                              {viewerLbl} {viewerTzShort}
+                            </span>
+                          )}
                         </button>
                       );
                     })}
@@ -461,6 +499,11 @@ export function BookSessionSheet({
                     </button>
                   )}
                 </div>
+                {differ && startTime && toViewerLabel(startTime) && (
+                  <p className="mt-1.5 text-[11px] text-lime/90">
+                    In your time: <span className="font-semibold">{toViewerLabel(startTime)} {viewerTzShort}</span>
+                  </p>
+                )}
                 {bookings.length > 0 && (
                   <p className="mt-1.5 text-[11px] text-muted-foreground">
                     Already booked:{" "}

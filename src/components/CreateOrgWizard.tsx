@@ -20,6 +20,7 @@ import {
 import { addOrg } from "@/lib/org-store";
 import { validateSlots, validateOverrides, type DayOverride } from "@/lib/availability-slots";
 import { AvailabilityCalendar } from "@/components/AvailabilityCalendar";
+import { TimezoneSelect } from "@/components/TimezoneSelect";
 import { validateVenueList, buildVenueGeo } from "@/lib/venue-address";
 import {
   SPORT_CONFIG,
@@ -112,6 +113,14 @@ export function CreateOrgWizard({ kind }: { kind: OrgKind }) {
   type Slot = NonNullable<Org["availabilitySlots"]>[number];
   const [slots, setSlots] = useState<Slot[]>([]);
   const [overrides, setOverrides] = useState<DayOverride[]>([]);
+  const [timezone, setTimezone] = useState<string>(() => {
+    // Lazy import so SSR doesn't crash — `Intl` is universal but the helper is browser-tuned.
+    try {
+      return Intl.DateTimeFormat().resolvedOptions().timeZone || "America/New_York";
+    } catch {
+      return "America/New_York";
+    }
+  });
   const slotsError = useMemo(() => validateSlots(slots), [slots]);
   const overridesError = useMemo(
     () => validateOverrides(overrides, verifiedVenues),
@@ -208,6 +217,7 @@ export function CreateOrgWizard({ kind }: { kind: OrgKind }) {
           }))
       : undefined,
     availabilityOverrides: isCoach ? overrides : undefined,
+    timezone: isCoach ? timezone : undefined,
     upcoming: [],
     posts: [],
   };
@@ -624,8 +634,12 @@ export function CreateOrgWizard({ kind }: { kind: OrgKind }) {
                 <Section title="Availability calendar">
                   <p className="text-xs text-muted-foreground mb-2">
                     Set the times you're usually free (weekly pattern) and tap any date up to 6 months
-                    out to override or close it.
+                    out to override or close it. Attendees see these times automatically converted to
+                    their own timezone.
                   </p>
+                  <div className="mb-3">
+                    <TimezoneSelect value={timezone} onChange={setTimezone} />
+                  </div>
                   <AvailabilityCalendar
                     weekly={slots}
                     overrides={overrides}
@@ -633,11 +647,13 @@ export function CreateOrgWizard({ kind }: { kind: OrgKind }) {
                       .map((v) => v.trim())
                       .filter((v, idx, arr) => v && verifiedVenues.has(v.toLowerCase()) && arr.indexOf(v) === idx)}
                     primaryVenue={primaryVenue}
+                    timezone={timezone}
                     onWeeklyChange={setSlots}
                     onOverridesChange={setOverrides}
                   />
                 </Section>
               )}
+
 
 
               <Section title="Skill range">
