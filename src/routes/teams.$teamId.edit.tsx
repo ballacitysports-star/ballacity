@@ -14,7 +14,8 @@ import {
 } from "lucide-react";
 import { SPORTS, HERO_IMAGE, type Sport, type Org } from "@/lib/sample-data";
 import { getOrgById, updateOrg, deleteOrg, isMyOrg } from "@/lib/org-store";
-import { validateSlots } from "@/lib/availability-slots";
+import { validateSlots, validateOverrides, type DayOverride } from "@/lib/availability-slots";
+import { AvailabilityCalendar } from "@/components/AvailabilityCalendar";
 import { validateVenueList } from "@/lib/venue-address";
 import { OrgCard } from "@/components/OrgCard";
 import { LocationAutocomplete } from "@/components/LocationAutocomplete";
@@ -96,6 +97,7 @@ function EditOrg() {
   const [rate, setRate] = useState(org.ratePerHour ?? 75);
   type Slot = NonNullable<Org["availabilitySlots"]>[number];
   const [slots, setSlots] = useState<Slot[]>(org.availabilitySlots ?? []);
+  const [overrides, setOverrides] = useState<DayOverride[]>(org.availabilityOverrides ?? []);
   const [venueAddresses, setVenueAddresses] = useState<string[]>(org.venueAddresses ?? []);
   const [primaryVenue, setPrimaryVenue] = useState<string | null>(org.primaryVenue ?? null);
   // Seed verified set with whatever addresses are already saved — existing entries remain valid.
@@ -103,6 +105,10 @@ function EditOrg() {
     () => new Set((org.venueAddresses ?? []).map((v) => v.trim().toLowerCase()).filter(Boolean)),
   );
   const slotsError = useMemo(() => validateSlots(slots), [slots]);
+  const overridesError = useMemo(
+    () => validateOverrides(overrides, verifiedVenues),
+    [overrides, verifiedVenues],
+  );
   const venueValidation = useMemo(
     () => validateVenueList(venueAddresses, verifiedVenues),
     [venueAddresses, verifiedVenues],
@@ -166,6 +172,7 @@ function EditOrg() {
     credentials: kind === "coach" ? credentials : undefined,
     ratePerHour: kind === "coach" ? rate : undefined,
     availabilitySlots: kind === "coach" ? slots : undefined,
+    availabilityOverrides: kind === "coach" ? overrides : undefined,
     venueAddresses: kind === "coach" ? venueAddresses.filter((a) => a.trim().length > 0) : undefined,
     primaryVenue: kind === "coach"
       ? (primaryVenue && venueAddresses.map((v) => v.trim()).includes(primaryVenue.trim())
@@ -181,6 +188,10 @@ function EditOrg() {
   async function save() {
     if (kind === "coach" && slotsError) {
       alert(slotsError.message);
+      return;
+    }
+    if (kind === "coach" && overridesError) {
+      alert(overridesError.message);
       return;
     }
     if (kind === "coach" && venuesError) {
