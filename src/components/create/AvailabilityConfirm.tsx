@@ -32,6 +32,7 @@ export function AvailabilityConfirm({
   timezone,
   onChangeOverrides,
   onChangeTimezone,
+  onReset,
   weeks = 4,
 }: {
   slots: Slot[];
@@ -39,6 +40,7 @@ export function AvailabilityConfirm({
   timezone: Tz;
   onChangeOverrides: (o: Override[]) => void;
   onChangeTimezone: (tz: Tz) => void;
+  onReset?: () => void;
   weeks?: number;
 }) {
   const viewerTz = getBrowserTz();
@@ -91,6 +93,16 @@ export function AvailabilityConfirm({
     if (ov?.closed) return n;
     return n + base.length;
   }, 0);
+
+  const closedCount = days.reduce((n, d) => {
+    const key = dateKey(d);
+    const dayKey = jsToKey[d.getUTCDay()];
+    const base = slotsByDay[dayKey] ?? [];
+    if (base.length === 0) return n;
+    return overrideMap.get(key)?.closed ? n + 1 : n;
+  }, 0);
+
+  const hasOverrides = overrides.length > 0;
 
   const range = `${days[0].toLocaleDateString(undefined, { month: "short", day: "numeric" })} – ${days[6].toLocaleDateString(undefined, { month: "short", day: "numeric" })}`;
   const relLabel = tzRelativeLabel(tz, viewerTz);
@@ -151,6 +163,22 @@ export function AvailabilityConfirm({
           <ChevronRight className="h-4 w-4" />
         </button>
       </div>
+
+      {hasOverrides && (
+        <button
+          type="button"
+          onClick={() => onReset?.()}
+          className="flex w-full items-center justify-center gap-2 rounded-2xl border border-border bg-surface px-4 py-2.5 text-xs font-bold text-muted-foreground transition-colors hover:border-lime hover:text-lime"
+        >
+          <RotateCcw className="h-3.5 w-3.5" />
+          Reset to weekly template
+          {closedCount > 0 && (
+            <span className="rounded-full bg-coral/10 px-2 py-0.5 text-[10px] text-coral">
+              {closedCount} off
+            </span>
+          )}
+        </button>
+      )}
 
       <div className="grid gap-2">
         {days.map((d) => {
