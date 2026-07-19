@@ -215,6 +215,10 @@ function EditOrg() {
       alert(overridesError.message);
       return;
     }
+    if (kind === "coach" && rulesError) {
+      alert(rulesError.message);
+      return;
+    }
     if (kind === "coach" && venuesError) {
       alert(venueValidation.firstError ?? "Fix venue addresses");
       return;
