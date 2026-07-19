@@ -1,7 +1,13 @@
 import { useEffect, useSyncExternalStore } from "react";
 import { supabase } from "@/integrations/supabase/client";
 
-export type NotifCategory = "approvals" | "messages" | "joinRequests" | "follows" | "general";
+export type NotifCategory =
+  | "approvals"
+  | "messages"
+  | "joinRequests"
+  | "follows"
+  | "trainerAvailability"
+  | "general";
 export type NotifChannel = "inApp" | "push";
 
 export type NotifPrefs = Record<NotifCategory, Record<NotifChannel, boolean>>;
@@ -11,6 +17,7 @@ export const DEFAULT_NOTIF_PREFS: NotifPrefs = {
   messages: { inApp: true, push: true },
   joinRequests: { inApp: true, push: true },
   follows: { inApp: true, push: false },
+  trainerAvailability: { inApp: true, push: false },
   general: { inApp: true, push: false },
 };
 
@@ -25,6 +32,10 @@ export const CATEGORY_META: Record<NotifCategory, { label: string; description: 
     label: "Followers",
     description: "When someone follows or unfollows you.",
   },
+  trainerAvailability: {
+    label: "Trainer availability",
+    description: "When a trainer you booked or follow updates their availability.",
+  },
   general: { label: "General updates", description: "Payments, reminders, and other activity." },
 };
 
@@ -35,6 +46,7 @@ export function categoryFor(type: string): NotifCategory {
   if (type === "join_approved" || type === "join_declined") return "approvals";
   if (type === "message") return "messages";
   if (type === "follow" || type === "unfollow") return "follows";
+  if (type === "trainer_availability") return "trainerAvailability";
   return "general";
 }
 
@@ -45,6 +57,10 @@ function merge(partial: Partial<NotifPrefs> | null | undefined): NotifPrefs {
     messages: { ...DEFAULT_NOTIF_PREFS.messages, ...(p.messages ?? {}) },
     joinRequests: { ...DEFAULT_NOTIF_PREFS.joinRequests, ...(p.joinRequests ?? {}) },
     follows: { ...DEFAULT_NOTIF_PREFS.follows, ...(p.follows ?? {}) },
+    trainerAvailability: {
+      ...DEFAULT_NOTIF_PREFS.trainerAvailability,
+      ...(p.trainerAvailability ?? {}),
+    },
     general: { ...DEFAULT_NOTIF_PREFS.general, ...(p.general ?? {}) },
   };
 }
