@@ -269,7 +269,7 @@ export async function addOrg(org: Org): Promise<Org> {
 
 export async function updateOrg(
   id: string,
-  patch: Partial<Omit<Org, "id" | "kind" | "upcoming" | "posts">>,
+  patch: Partial<Omit<Org, "id" | "kind" | "upcoming" | "posts">> & { primaryVenue?: string | null },
 ): Promise<void> {
   // Snapshot for rollback + optimistic merge
   const idx = ORGS.findIndex((o) => o.id === id);
