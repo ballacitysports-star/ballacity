@@ -897,7 +897,7 @@ function EditOrg() {
               whileTap={{ scale: 0.98 }}
               type="button"
               onClick={save}
-              disabled={kind === "coach" && !!slotsError}
+              disabled={kind === "coach" && (!!slotsError || venuesError)}
               className="flex-1 inline-flex items-center justify-center gap-2 rounded-2xl bg-coral-gradient py-3.5 text-sm font-bold text-white glow-coral disabled:opacity-50"
             >
               <Sparkles className="h-4 w-4" /> Save changes
