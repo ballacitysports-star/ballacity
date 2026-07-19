@@ -1,8 +1,23 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
+import { Loader2, Search } from "lucide-react";
+import { useServerFn } from "@tanstack/react-start";
 import { LocationAutocomplete } from "@/components/LocationAutocomplete";
 import { VenueMapPreview } from "@/components/VenueMapPreview";
 import { ImageUploader } from "@/components/ImageUploader";
+import {
+  autocompletePlaces,
+  getPlaceDetails,
+  type PlaceSuggestion,
+} from "@/lib/places.functions";
+
+function randomToken(): string {
+  try {
+    return crypto.randomUUID();
+  } catch {
+    return Math.random().toString(36).slice(2) + Date.now().toString(36);
+  }
+}
 
 export type OrgFormValue = {
   name: string;
