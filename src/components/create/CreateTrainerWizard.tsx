@@ -117,9 +117,16 @@ export function CreateTrainerWizard() {
 
   const [draft, setDraft] = useState<Draft>(() => {
     if (typeof window === "undefined") return initialDraft();
-    const stored = loadDraft<Draft>(DRAFT_KEY);
-    return stored ? { ...initialDraft(), ...stored } : initialDraft();
+    const stored = loadDraft<Draft & { venue?: string; venuePlaceId?: string; venueGeo?: { lat: number; lng: number } | null }>(DRAFT_KEY);
+    if (!stored) return initialDraft();
+    // Migrate legacy single-venue drafts into the new venues[] shape.
+    let venues: VenueEntry[] = Array.isArray(stored.venues) ? stored.venues : [];
+    if (venues.length === 0 && stored.venue) {
+      venues = [{ address: stored.venue, placeId: stored.venuePlaceId ?? "", geo: stored.venueGeo ?? null }];
+    }
+    return { ...initialDraft(), ...stored, venues, primaryVenueIdx: stored.primaryVenueIdx ?? 0 };
   });
+
   const [credInput, setCredInput] = useState("");
   const [orgSearch, setOrgSearch] = useState("");
   const [submitting, setSubmitting] = useState(false);
