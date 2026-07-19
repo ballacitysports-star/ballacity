@@ -1456,8 +1456,10 @@ export type Database = {
       trainer_orgs: {
         Row: {
           avatar: string | null
+          avatar_url: string | null
           bio: string | null
           city: string | null
+          cover_url: string | null
           created_at: string
           handle: string
           id: string
@@ -1469,8 +1471,10 @@ export type Database = {
         }
         Insert: {
           avatar?: string | null
+          avatar_url?: string | null
           bio?: string | null
           city?: string | null
+          cover_url?: string | null
           created_at?: string
           handle: string
           id?: string
@@ -1482,8 +1486,10 @@ export type Database = {
         }
         Update: {
           avatar?: string | null
+          avatar_url?: string | null
           bio?: string | null
           city?: string | null
+          cover_url?: string | null
           created_at?: string
           handle?: string
           id?: string

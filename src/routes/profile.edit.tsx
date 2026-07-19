@@ -30,7 +30,8 @@ import { OrgCard } from "@/components/OrgCard";
 import { getCurrentUser, useAuth } from "@/hooks/use-auth";
 import { LocationAutocomplete } from "@/components/LocationAutocomplete";
 import { LINK_TYPES, LinkIcon } from "@/components/ProfileLinks";
-import { ImageCropperDialog } from "@/components/ImageCropperDialog";
+import { ImageEditorDialog } from "@/components/ImageEditorDialog";
+import { uploadDataUrlToBucket } from "@/lib/image-upload";
 
 export const Route = createFileRoute("/profile/edit")({
   head: () => ({ meta: [{ title: "Edit profile — OpenRun" }] }),
@@ -103,12 +104,25 @@ function EditProfile() {
     setCropTarget("cover");
   };
 
-  const onCropConfirm = (dataUrl: string) => {
-    markDirty();
-    if (cropTarget === "avatar") setAvatarUrl(dataUrl);
-    else if (cropTarget === "cover") setCoverUrl(dataUrl);
+  const [uploadingImg, setUploadingImg] = useState<null | "avatar" | "cover">(null);
+
+  const onCropConfirm = async (dataUrl: string) => {
+    const target = cropTarget;
     setCropTarget(null);
     setCropFile(null);
+    if (!target || !profileUser) return;
+    markDirty();
+    setUploadingImg(target);
+    try {
+      const bucket = target === "avatar" ? "avatars" : "covers";
+      const url = await uploadDataUrlToBucket(bucket, profileUser.id, dataUrl);
+      if (target === "avatar") setAvatarUrl(url);
+      else setCoverUrl(url);
+    } catch (e: any) {
+      toast.error(e?.message ?? "Upload failed");
+    } finally {
+      setUploadingImg(null);
+    }
   };
 
   const addLink = (type: ProfileLinkType) => {
@@ -365,13 +379,14 @@ function EditProfile() {
 
   return (
     <div className="mx-auto w-full max-w-md sm:max-w-2xl lg:max-w-4xl px-4 py-6 pb-32">
-      <ImageCropperDialog
+      <ImageEditorDialog
         open={cropTarget !== null}
         file={cropFile}
         aspect={cropTarget === "avatar" ? 1 : 16 / 9}
         outputMaxSize={cropTarget === "avatar" ? 512 : 1600}
         shape={cropTarget === "avatar" ? "circle" : "rect"}
-        title={cropTarget === "avatar" ? "Crop photo" : "Crop cover"}
+        title={cropTarget === "avatar" ? "Edit photo" : "Edit cover"}
+        allowBgRemoval={cropTarget === "avatar"}
         onCancel={() => {
           setCropTarget(null);
           setCropFile(null);
