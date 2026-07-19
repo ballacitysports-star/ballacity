@@ -773,7 +773,7 @@ function GymsView({
           />
         </div>
         <Link
-          to="/trainers/create"
+          to="/orgs/create"
           className="grid h-11 w-11 place-items-center rounded-full bg-lime-gradient text-primary-foreground glow-lime"
           aria-label="Create a gym or organization"
         >
