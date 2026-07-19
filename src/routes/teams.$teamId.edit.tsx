@@ -204,6 +204,71 @@ export function EditOrgScreen({ org }: { org: Org }) {
     staleTime: 15_000,
   });
 
+  // Google Places gym search, biased to the user's current location.
+  const placesAutocomplete = useServerFn(autocompletePlaces);
+  const placesDetails = useServerFn(getPlaceDetails);
+  const { coords: userCoords, status: geoStatus, request: requestUserLocation } = useUserLocation();
+  const [orgSearchDebounced, setOrgSearchDebounced] = useState("");
+  const [placesSessionToken, setPlacesSessionToken] = useState<string>(() =>
+    typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).slice(2),
+  );
+  useEffect(() => {
+    const t = window.setTimeout(() => setOrgSearchDebounced(orgSearch.trim()), 250);
+    return () => window.clearTimeout(t);
+  }, [orgSearch]);
+  useEffect(() => {
+    if (kind === "coach" && orgSearchDebounced.length >= 2 && geoStatus === "idle") {
+      requestUserLocation();
+    }
+  }, [kind, orgSearchDebounced, geoStatus, requestUserLocation]);
+  const placesResults = useQuery({
+    queryKey: [
+      "trainer-orgs-places-edit",
+      orgSearchDebounced,
+      placesSessionToken,
+      userCoords?.lat ?? null,
+      userCoords?.lng ?? null,
+    ],
+    queryFn: () =>
+      placesAutocomplete({
+        data: {
+          input: orgSearchDebounced,
+          sessionToken: placesSessionToken,
+          lat: userCoords?.lat ?? null,
+          lng: userCoords?.lng ?? null,
+        },
+      }),
+    enabled: kind === "coach" && orgSearchDebounced.length >= 2,
+    staleTime: 30_000,
+  });
+
+  const pickPlaceAsNewOrg = async (id: string, primary: string, secondary: string) => {
+    const optimisticAddress = secondary ? `${primary}, ${secondary}` : primary;
+    setOrgChoice({
+      mode: "new",
+      name: primary,
+      address: optimisticAddress,
+      placeId: id,
+      geo: null,
+    });
+    const tokenAtPick = placesSessionToken;
+    setPlacesSessionToken(
+      typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).slice(2),
+    );
+    try {
+      const details = await placesDetails({ data: { placeId: id, sessionToken: tokenAtPick } });
+      setOrgChoice({
+        mode: "new",
+        name: primary,
+        address: details.formattedAddress || optimisticAddress,
+        placeId: id,
+        geo: { lat: details.lat, lng: details.lng },
+      });
+    } catch (err) {
+      console.error("[edit-org] place details failed", err);
+    }
+  };
+
   const slotsError = useMemo(() => validateSlots(slots), [slots]);
   const overridesError = useMemo(
     () => validateOverrides(overrides, verifiedVenues),
