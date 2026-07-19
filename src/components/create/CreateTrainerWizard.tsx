@@ -751,8 +751,9 @@ export function CreateTrainerWizard() {
                 <AvailabilityCalendar
                   weekly={draft.slots}
                   overrides={draft.overrides}
-                  venues={draft.venue && draft.venuePlaceId ? [draft.venue] : []}
-                  primaryVenue={draft.venue || null}
+                  venues={verifiedVenueAddresses}
+                  primaryVenue={primaryVenue?.address ?? null}
+
                   timezone={draft.timezone}
                   onWeeklyChange={(slots) => setDraft((d) => ({ ...d, slots }))}
                   onOverridesChange={(overrides) => setDraft((d) => ({ ...d, overrides }))}
