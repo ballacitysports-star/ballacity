@@ -382,8 +382,11 @@ export type Org = {
   skillRange?: { min: number; max: number }; // 1=Beginner … 5=Pro
   // Sport-specific extensions (all optional)
   format?: string;
+  formats?: string[];
   venues?: string[];
+  venueAddresses?: string[];
   cadence?: string;
+  cadences?: string[];
   positionsNeeded?: Record<string, Record<string, number>>; // sport → position → count
   ratingSystem?: "NTRP" | "DUPR" | "UTR" | "PACE" | "SELF";
   ratingMin?: string;
