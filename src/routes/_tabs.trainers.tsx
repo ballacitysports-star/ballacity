@@ -17,6 +17,8 @@ import { toast } from "sonner";
 import { SPORT_CONFIG, SESSION_TYPES } from "@/lib/sport-config";
 import { haversineKm, KM_PER_MI, MI_PER_KM, useUserLocation } from "@/lib/geo";
 import { filterTrainersByVenue } from "@/lib/trainer-feed-filter";
+import { useQuery } from "@tanstack/react-query";
+import { listTrainerIdsForOrg, listTrainerOrgs } from "@/lib/trainer-orgs.functions";
 
 import { Slider } from "@/components/ui/slider";
 
