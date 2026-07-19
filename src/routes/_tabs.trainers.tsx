@@ -1,7 +1,7 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { motion } from "framer-motion";
-import { Search, Plus, Megaphone, GraduationCap, ArrowUpDown, MapPin, SlidersHorizontal } from "lucide-react";
+import { Search, Plus, Megaphone, GraduationCap, ArrowUpDown, MapPin, SlidersHorizontal, Building2 } from "lucide-react";
 import { zodValidator, fallback } from "@tanstack/zod-adapter";
 import { z } from "zod";
 import { type Sport } from "@/lib/sample-data";
@@ -63,6 +63,7 @@ function pseudoDistance(id: string): number {
 }
 
 const trainersSearchSchema = z.object({
+  mode: fallback(z.string(), "trainers").default("trainers"),
   q: fallback(z.string(), "").default(""),
   sport: fallback(z.string(), "").default(""),
   specialty: fallback(z.string(), "").default(""),
@@ -100,6 +101,7 @@ function TrainersPage() {
   const updateSearch = (patch: Partial<TrainersSearch>) =>
     navigate({ search: (prev: TrainersSearch) => ({ ...prev, ...patch }), replace: true });
 
+  const mode: "trainers" | "gyms" = search.mode === "gyms" ? "gyms" : "trainers";
   const q = search.q;
   const sport: Sport | null = (search.sport || null) as Sport | null;
   const specialty: string = search.specialty || "";
@@ -299,12 +301,32 @@ function TrainersPage() {
   const featured =
     orgs.find((o) => o.verified && o.kind === "coach") ?? orgs.find((o) => o.kind === "coach");
 
+  const gymsList = useMemo(() => {
+    const rows = orgsListQuery.data ?? [];
+    const ql = q.trim().toLowerCase();
+    const filtered = ql
+      ? rows.filter((o) =>
+          `${o.name ?? ""} ${o.handle ?? ""} ${o.city ?? ""} ${o.bio ?? ""}`
+            .toLowerCase()
+            .includes(ql),
+        )
+      : rows;
+    return [...filtered].sort((a, b) => (a.name ?? "").localeCompare(b.name ?? ""));
+  }, [orgsListQuery.data, q]);
+
   return (
     <div className="mx-auto w-full max-w-md sm:max-w-2xl lg:max-w-4xl px-4 pt-6">
       <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="mb-4">
-        <h1 className="font-display text-3xl font-bold leading-tight">Trainers & coaches.</h1>
+        <h1 className="font-display text-3xl font-bold leading-tight">
+          {mode === "gyms" ? "Gyms & organizations." : "Trainers & coaches."}
+        </h1>
         <p className="text-muted-foreground text-sm inline-flex items-center gap-1">
-          {profile?.city ? (
+          {mode === "gyms" ? (
+            <>
+              {gymsList.length} {gymsList.length === 1 ? "gym" : "gyms"}
+              {profile?.city ? <> · near {profile.city}</> : null}
+            </>
+          ) : profile?.city ? (
             <>
               <MapPin className="h-3.5 w-3.5 text-lime" /> Nearest to {profile.city} ·{" "}
               {list.length} {list.length === 1 ? "result" : "results"}
@@ -321,7 +343,40 @@ function TrainersPage() {
         </p>
       </motion.div>
 
-      {featured && (
+      {/* Trainers / Gyms tabs */}
+      <div className="mb-4 inline-flex rounded-full border border-border bg-surface p-1 text-xs font-bold">
+        {([
+          { id: "trainers", label: "Trainers", Icon: GraduationCap },
+          { id: "gyms", label: "Gyms", Icon: Building2 },
+        ] as const).map((t) => {
+          const active = mode === t.id;
+          return (
+            <button
+              key={t.id}
+              onClick={() =>
+                updateSearch({
+                  mode: t.id,
+                  // reset trainer-only filters when switching
+                  ...(t.id === "gyms"
+                    ? { sport: "", specialty: "", venue: "", orgId: "", avail: "any", radius: 0 }
+                    : {}),
+                })
+              }
+              className={`inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 transition-colors ${
+                active
+                  ? "bg-lime text-primary-foreground"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+              aria-pressed={active}
+            >
+              <t.Icon className="h-3.5 w-3.5" />
+              {t.label}
+            </button>
+          );
+        })}
+      </div>
+
+      {mode === "trainers" && featured && (
         <motion.div
           initial={{ opacity: 0, scale: 0.98 }}
           animate={{ opacity: 1, scale: 1 }}
@@ -340,6 +395,24 @@ function TrainersPage() {
           </div>
         </motion.div>
       )}
+
+      {mode === "gyms" ? (
+        <GymsView
+          gyms={gymsList}
+          q={q}
+          onQ={setQ}
+          isLoading={orgsListQuery.isLoading}
+        />
+      ) : (
+        <TrainersView />
+      )}
+    </div>
+  );
+
+  function TrainersView() {
+    return (
+      <>
+
 
       <ViewDensityToggle
         view={viewMode}
@@ -663,6 +736,100 @@ function TrainersPage() {
           )}
         </div>
       )}
-    </div>
+      </>
+    );
+  }
+}
+
+function GymsView({
+  gyms,
+  q,
+  onQ,
+  isLoading,
+}: {
+  gyms: Array<{
+    id: string;
+    name: string;
+    handle: string;
+    avatar: string | null;
+    city: string | null;
+    bio: string | null;
+    verified: boolean;
+  }>;
+  q: string;
+  onQ: (v: string) => void;
+  isLoading: boolean;
+}) {
+  return (
+    <>
+      <div className="flex gap-2 mb-4">
+        <div className="flex-1 flex items-center gap-2 rounded-full border border-border bg-surface px-4 py-2.5">
+          <Search className="h-4 w-4 text-muted-foreground" />
+          <input
+            value={q}
+            onChange={(e) => onQ(e.target.value)}
+            placeholder="Search gyms by name, handle, city"
+            className="flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
+          />
+        </div>
+        <Link
+          to="/trainers/create"
+          className="grid h-11 w-11 place-items-center rounded-full bg-lime-gradient text-primary-foreground glow-lime"
+          aria-label="Create a gym or organization"
+        >
+          <Plus className="h-5 w-5" strokeWidth={2.5} />
+        </Link>
+      </div>
+
+      {isLoading ? (
+        <div className="rounded-2xl border border-border bg-surface p-8 text-center text-sm text-muted-foreground">
+          Loading gyms…
+        </div>
+      ) : gyms.length === 0 ? (
+        <div className="rounded-2xl border border-border bg-surface p-8 text-center text-muted-foreground">
+          <div className="inline-flex items-center gap-2">
+            <Building2 className="h-4 w-4 text-lime" />
+            No gyms yet.
+          </div>
+        </div>
+      ) : (
+        <div className="space-y-3 pb-6">
+          {gyms.map((g) => (
+            <Link
+              key={g.id}
+              to="/orgs/$orgId"
+              params={{ orgId: g.id }}
+              className="flex items-center gap-3 rounded-2xl border border-border bg-surface p-3 transition-colors hover:border-lime/40"
+            >
+              <div className="grid h-14 w-14 shrink-0 place-items-center overflow-hidden rounded-2xl border border-border bg-lime-gradient font-display text-base font-bold text-primary-foreground">
+                {g.avatar && (g.avatar.startsWith("http") || g.avatar.startsWith("/")) ? (
+                  <img src={g.avatar} alt="" className="h-full w-full object-cover" />
+                ) : (
+                  (g.avatar || g.name.slice(0, 2)).toUpperCase().slice(0, 3)
+                )}
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-1.5">
+                  <span className="truncate font-display text-base font-bold">{g.name}</span>
+                  {g.verified && (
+                    <span className="rounded-full bg-lime/15 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-lime">
+                      ✓
+                    </span>
+                  )}
+                </div>
+                <div className="truncate text-xs text-muted-foreground">
+                  @{g.handle}
+                  {g.city ? <> · {g.city}</> : null}
+                </div>
+                {g.bio && (
+                  <div className="mt-0.5 line-clamp-1 text-xs text-muted-foreground/80">{g.bio}</div>
+                )}
+              </div>
+            </Link>
+          ))}
+        </div>
+      )}
+    </>
   );
 }
+
