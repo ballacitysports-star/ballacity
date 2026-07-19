@@ -24,7 +24,6 @@ import { Route as TabsRouteImport } from './routes/_tabs'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as MessagesIndexRouteImport } from './routes/messages.index'
 import { Route as TrainersCreateRouteImport } from './routes/trainers.create'
-import { Route as TrainersTrainerIdRouteImport } from './routes/trainers.$trainerId'
 import { Route as TeamsCreateRouteImport } from './routes/teams.create'
 import { Route as ReviewNewRouteImport } from './routes/review.new'
 import { Route as ProfileEditRouteImport } from './routes/profile.edit'
@@ -47,6 +46,7 @@ import { Route as TabsDiscoverRouteImport } from './routes/_tabs.discover'
 import { Route as TabsCreateRouteImport } from './routes/_tabs.create'
 import { Route as Char91DotwellKnownChar93OauthProtectedResourceRouteImport } from './routes/[.well-known]/oauth-protected-resource'
 import { Route as Char91DotmcpChar93ListToolsRouteImport } from './routes/[.mcp]/list-tools'
+import { Route as TrainersTrainerIdIndexRouteImport } from './routes/trainers.$trainerId.index'
 import { Route as TeamsTeamIdIndexRouteImport } from './routes/teams.$teamId.index'
 import { Route as GamesGameIdIndexRouteImport } from './routes/games.$gameId.index'
 import { Route as TrainersTrainerIdEditRouteImport } from './routes/trainers.$trainerId.edit'
@@ -130,11 +130,6 @@ const MessagesIndexRoute = MessagesIndexRouteImport.update({
 const TrainersCreateRoute = TrainersCreateRouteImport.update({
   id: '/trainers/create',
   path: '/trainers/create',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const TrainersTrainerIdRoute = TrainersTrainerIdRouteImport.update({
-  id: '/trainers/$trainerId',
-  path: '/trainers/$trainerId',
   getParentRoute: () => rootRouteImport,
 } as any)
 const TeamsCreateRoute = TeamsCreateRouteImport.update({
@@ -249,6 +244,11 @@ const Char91DotmcpChar93ListToolsRoute =
     path: '/.mcp/list-tools',
     getParentRoute: () => rootRouteImport,
   } as any)
+const TrainersTrainerIdIndexRoute = TrainersTrainerIdIndexRouteImport.update({
+  id: '/trainers/$trainerId/',
+  path: '/trainers/$trainerId/',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const TeamsTeamIdIndexRoute = TeamsTeamIdIndexRouteImport.update({
   id: '/teams/$teamId/',
   path: '/teams/$teamId/',
@@ -260,9 +260,9 @@ const GamesGameIdIndexRoute = GamesGameIdIndexRouteImport.update({
   getParentRoute: () => GamesGameIdRoute,
 } as any)
 const TrainersTrainerIdEditRoute = TrainersTrainerIdEditRouteImport.update({
-  id: '/edit',
-  path: '/edit',
-  getParentRoute: () => TrainersTrainerIdRoute,
+  id: '/trainers/$trainerId/edit',
+  path: '/trainers/$trainerId/edit',
+  getParentRoute: () => rootRouteImport,
 } as any)
 const TeamsTeamIdEditRoute = TeamsTeamIdEditRouteImport.update({
   id: '/teams/$teamId/edit',
@@ -337,7 +337,6 @@ export interface FileRoutesByFullPath {
   '/profile/edit': typeof ProfileEditRoute
   '/review/new': typeof ReviewNewRoute
   '/teams/create': typeof TeamsCreateRoute
-  '/trainers/$trainerId': typeof TrainersTrainerIdRouteWithChildren
   '/trainers/create': typeof TrainersCreateRoute
   '/messages/': typeof MessagesIndexRoute
   '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
@@ -348,6 +347,7 @@ export interface FileRoutesByFullPath {
   '/trainers/$trainerId/edit': typeof TrainersTrainerIdEditRoute
   '/games/$gameId/': typeof GamesGameIdIndexRoute
   '/teams/$teamId/': typeof TeamsTeamIdIndexRoute
+  '/trainers/$trainerId/': typeof TrainersTrainerIdIndexRoute
   '/api/public/payments/webhook': typeof ApiPublicPaymentsWebhookRoute
   '/api/public/reels/process': typeof ApiPublicReelsProcessRoute
 }
@@ -385,7 +385,6 @@ export interface FileRoutesByTo {
   '/profile/edit': typeof ProfileEditRoute
   '/review/new': typeof ReviewNewRoute
   '/teams/create': typeof TeamsCreateRoute
-  '/trainers/$trainerId': typeof TrainersTrainerIdRouteWithChildren
   '/trainers/create': typeof TrainersCreateRoute
   '/messages': typeof MessagesIndexRoute
   '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
@@ -396,6 +395,7 @@ export interface FileRoutesByTo {
   '/trainers/$trainerId/edit': typeof TrainersTrainerIdEditRoute
   '/games/$gameId': typeof GamesGameIdIndexRoute
   '/teams/$teamId': typeof TeamsTeamIdIndexRoute
+  '/trainers/$trainerId': typeof TrainersTrainerIdIndexRoute
   '/api/public/payments/webhook': typeof ApiPublicPaymentsWebhookRoute
   '/api/public/reels/process': typeof ApiPublicReelsProcessRoute
 }
@@ -436,7 +436,6 @@ export interface FileRoutesById {
   '/profile/edit': typeof ProfileEditRoute
   '/review/new': typeof ReviewNewRoute
   '/teams/create': typeof TeamsCreateRoute
-  '/trainers/$trainerId': typeof TrainersTrainerIdRouteWithChildren
   '/trainers/create': typeof TrainersCreateRoute
   '/messages/': typeof MessagesIndexRoute
   '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
@@ -447,6 +446,7 @@ export interface FileRoutesById {
   '/trainers/$trainerId/edit': typeof TrainersTrainerIdEditRoute
   '/games/$gameId/': typeof GamesGameIdIndexRoute
   '/teams/$teamId/': typeof TeamsTeamIdIndexRoute
+  '/trainers/$trainerId/': typeof TrainersTrainerIdIndexRoute
   '/api/public/payments/webhook': typeof ApiPublicPaymentsWebhookRoute
   '/api/public/reels/process': typeof ApiPublicReelsProcessRoute
 }
@@ -487,7 +487,6 @@ export interface FileRouteTypes {
     | '/profile/edit'
     | '/review/new'
     | '/teams/create'
-    | '/trainers/$trainerId'
     | '/trainers/create'
     | '/messages/'
     | '/.lovable/oauth/consent'
@@ -498,6 +497,7 @@ export interface FileRouteTypes {
     | '/trainers/$trainerId/edit'
     | '/games/$gameId/'
     | '/teams/$teamId/'
+    | '/trainers/$trainerId/'
     | '/api/public/payments/webhook'
     | '/api/public/reels/process'
   fileRoutesByTo: FileRoutesByTo
@@ -535,7 +535,6 @@ export interface FileRouteTypes {
     | '/profile/edit'
     | '/review/new'
     | '/teams/create'
-    | '/trainers/$trainerId'
     | '/trainers/create'
     | '/messages'
     | '/.lovable/oauth/consent'
@@ -546,6 +545,7 @@ export interface FileRouteTypes {
     | '/trainers/$trainerId/edit'
     | '/games/$gameId'
     | '/teams/$teamId'
+    | '/trainers/$trainerId'
     | '/api/public/payments/webhook'
     | '/api/public/reels/process'
   id:
@@ -585,7 +585,6 @@ export interface FileRouteTypes {
     | '/profile/edit'
     | '/review/new'
     | '/teams/create'
-    | '/trainers/$trainerId'
     | '/trainers/create'
     | '/messages/'
     | '/.lovable/oauth/consent'
@@ -596,6 +595,7 @@ export interface FileRouteTypes {
     | '/trainers/$trainerId/edit'
     | '/games/$gameId/'
     | '/teams/$teamId/'
+    | '/trainers/$trainerId/'
     | '/api/public/payments/webhook'
     | '/api/public/reels/process'
   fileRoutesById: FileRoutesById
@@ -626,13 +626,14 @@ export interface RootRouteChildren {
   ProfileEditRoute: typeof ProfileEditRoute
   ReviewNewRoute: typeof ReviewNewRoute
   TeamsCreateRoute: typeof TeamsCreateRoute
-  TrainersTrainerIdRoute: typeof TrainersTrainerIdRouteWithChildren
   TrainersCreateRoute: typeof TrainersCreateRoute
   MessagesIndexRoute: typeof MessagesIndexRoute
   DotlovableOauthConsentRoute: typeof DotlovableOauthConsentRoute
   Char91DotmcpChar93InvokeToolToolRoute: typeof Char91DotmcpChar93InvokeToolToolRoute
   TeamsTeamIdEditRoute: typeof TeamsTeamIdEditRoute
+  TrainersTrainerIdEditRoute: typeof TrainersTrainerIdEditRoute
   TeamsTeamIdIndexRoute: typeof TeamsTeamIdIndexRoute
+  TrainersTrainerIdIndexRoute: typeof TrainersTrainerIdIndexRoute
   ApiPublicPaymentsWebhookRoute: typeof ApiPublicPaymentsWebhookRoute
   ApiPublicReelsProcessRoute: typeof ApiPublicReelsProcessRoute
 }
@@ -742,13 +743,6 @@ declare module '@tanstack/react-router' {
       path: '/trainers/create'
       fullPath: '/trainers/create'
       preLoaderRoute: typeof TrainersCreateRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/trainers/$trainerId': {
-      id: '/trainers/$trainerId'
-      path: '/trainers/$trainerId'
-      fullPath: '/trainers/$trainerId'
-      preLoaderRoute: typeof TrainersTrainerIdRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/teams/create': {
@@ -905,6 +899,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof Char91DotmcpChar93ListToolsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/trainers/$trainerId/': {
+      id: '/trainers/$trainerId/'
+      path: '/trainers/$trainerId'
+      fullPath: '/trainers/$trainerId/'
+      preLoaderRoute: typeof TrainersTrainerIdIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/teams/$teamId/': {
       id: '/teams/$teamId/'
       path: '/teams/$teamId'
@@ -921,10 +922,10 @@ declare module '@tanstack/react-router' {
     }
     '/trainers/$trainerId/edit': {
       id: '/trainers/$trainerId/edit'
-      path: '/edit'
+      path: '/trainers/$trainerId/edit'
       fullPath: '/trainers/$trainerId/edit'
       preLoaderRoute: typeof TrainersTrainerIdEditRouteImport
-      parentRoute: typeof TrainersTrainerIdRoute
+      parentRoute: typeof rootRouteImport
     }
     '/teams/$teamId/edit': {
       id: '/teams/$teamId/edit'
@@ -1030,17 +1031,6 @@ const GamesGameIdRouteWithChildren = GamesGameIdRoute._addFileChildren(
   GamesGameIdRouteChildren,
 )
 
-interface TrainersTrainerIdRouteChildren {
-  TrainersTrainerIdEditRoute: typeof TrainersTrainerIdEditRoute
-}
-
-const TrainersTrainerIdRouteChildren: TrainersTrainerIdRouteChildren = {
-  TrainersTrainerIdEditRoute: TrainersTrainerIdEditRoute,
-}
-
-const TrainersTrainerIdRouteWithChildren =
-  TrainersTrainerIdRoute._addFileChildren(TrainersTrainerIdRouteChildren)
-
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   TabsRoute: TabsRouteWithChildren,
@@ -1068,13 +1058,14 @@ const rootRouteChildren: RootRouteChildren = {
   ProfileEditRoute: ProfileEditRoute,
   ReviewNewRoute: ReviewNewRoute,
   TeamsCreateRoute: TeamsCreateRoute,
-  TrainersTrainerIdRoute: TrainersTrainerIdRouteWithChildren,
   TrainersCreateRoute: TrainersCreateRoute,
   MessagesIndexRoute: MessagesIndexRoute,
   DotlovableOauthConsentRoute: DotlovableOauthConsentRoute,
   Char91DotmcpChar93InvokeToolToolRoute: Char91DotmcpChar93InvokeToolToolRoute,
   TeamsTeamIdEditRoute: TeamsTeamIdEditRoute,
+  TrainersTrainerIdEditRoute: TrainersTrainerIdEditRoute,
   TeamsTeamIdIndexRoute: TeamsTeamIdIndexRoute,
+  TrainersTrainerIdIndexRoute: TrainersTrainerIdIndexRoute,
   ApiPublicPaymentsWebhookRoute: ApiPublicPaymentsWebhookRoute,
   ApiPublicReelsProcessRoute: ApiPublicReelsProcessRoute,
 }
