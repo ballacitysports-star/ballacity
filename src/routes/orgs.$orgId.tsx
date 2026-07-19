@@ -223,7 +223,35 @@ function MembershipCta({
   const qc = useQueryClient();
   const signedIn = !!auth.user;
 
-  // Signed out
+  const myTrainers = useQuery({
+    queryKey: ["my-trainer-profiles"],
+    queryFn: () => listMyTrainerProfiles(),
+    enabled: signedIn,
+  });
+  const myRequests = useQuery({
+    queryKey: ["my-org-join-requests", orgId],
+    queryFn: () => getMyJoinRequestsForOrg({ data: { orgId } }),
+    enabled: signedIn,
+  });
+
+  const owned = myTrainers.data ?? [];
+  const ownedIds = new Set(owned.map((t) => t.id));
+
+  const myMember = signedIn
+    ? members.find((m) => m.user_id === auth.user!.id && ownedIds.has(m.trainer_id))
+    : undefined;
+
+  const invites = useQuery({
+    queryKey: ["my-invites-for-org", orgId, owned.map((t) => t.id).join(",")],
+    queryFn: async () => {
+      const results = await Promise.all(
+        owned.map((t) => listInvitesForTrainer({ data: { trainerId: t.id } })),
+      );
+      return results.flat().filter((inv) => inv.org_id === orgId);
+    },
+    enabled: signedIn && owned.length > 0 && !myMember,
+  });
+
   if (!signedIn) {
     return (
       <Link
@@ -235,30 +263,6 @@ function MembershipCta({
       </Link>
     );
   }
-
-  const myTrainers = useQuery({
-    queryKey: ["my-trainer-profiles"],
-    queryFn: () => listMyTrainerProfiles(),
-  });
-  const myRequests = useQuery({
-    queryKey: ["my-org-join-requests", orgId],
-    queryFn: () => getMyJoinRequestsForOrg({ data: { orgId } }),
-  });
-
-  const owned = myTrainers.data ?? [];
-  const ownedIds = new Set(owned.map((t) => t.id));
-
-  // My membership in this org (via any owned trainer)
-  const myMember = members.find((m) => m.user_id === auth.user!.id && ownedIds.has(m.trainer_id));
-  const invites = useQuery({
-    queryKey: ["my-invites-for-org", orgId, owned.map((t) => t.id).join(",")],
-    queryFn: async () => {
-      const results = await Promise.all(
-        owned.map((t) => listInvitesForTrainer({ data: { trainerId: t.id } })),
-      );
-      return results.flat().filter((inv) => inv.org_id === orgId);
-    },
-    enabled: owned.length > 0 && !myMember,
   });
 
   if (myTrainers.isLoading) {
