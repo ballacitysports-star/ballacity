@@ -96,6 +96,7 @@ function initialDraft(): Draft {
     venueGeo: null,
     slots: [],
     overrides: [],
+    rules: [],
     timezone: defaultTimezone(),
   };
 }
