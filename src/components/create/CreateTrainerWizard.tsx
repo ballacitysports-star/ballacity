@@ -640,48 +640,99 @@ export function CreateTrainerWizard() {
           {step === 2 && (
             <div className="space-y-5">
               <Section
-                title="Primary venue"
-                hint="Pick from Google suggestions so we can pin it on the map. Add more venues later from your profile."
+                title="Venues"
+                hint="Add every place where you train. Pick from Google suggestions so we can verify + map them. Star your default primary venue."
               >
-                <LocationAutocomplete
-                  value={draft.venue}
-                  onChange={(v) =>
-                    setDraft((d) => ({
-                      ...d,
-                      venue: v,
-                      // Invalidate verification when free-typed.
-                      venuePlaceId: v.trim().toLowerCase() === d.venue.trim().toLowerCase() ? d.venuePlaceId : "",
-                      venueGeo: v.trim().toLowerCase() === d.venue.trim().toLowerCase() ? d.venueGeo : null,
-                    }))
-                  }
-                  onPick={(full, placeId, geo) =>
-                    setDraft((d) => ({
-                      ...d,
-                      venue: full,
-                      venuePlaceId: placeId,
-                      venueGeo: geo ? { lat: geo.lat, lng: geo.lng } : null,
-                    }))
-                  }
-                  placeholder="Start typing then pick a Google suggestion"
-                />
-                {draft.venue && !draft.venuePlaceId && (
-                  <p className="text-[11px] text-coral">
-                    Pick a suggestion from the dropdown so we can verify the address.
-                  </p>
+                {verifiedVenues.length > 0 && (
+                  <ul className="space-y-2">
+                    {draft.venues.map((v, idx) => {
+                      const isPrimary = primaryVenue?.address === v.address && !!v.placeId;
+                      return (
+                        <li
+                          key={`${v.placeId || "unverified"}-${idx}`}
+                          className={`rounded-2xl border px-3 py-2.5 ${isPrimary ? "border-lime/50 bg-lime/10" : "border-border bg-surface"}`}
+                        >
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="min-w-0 flex-1">
+                              <div className="flex items-center gap-1.5">
+                                {isPrimary && (
+                                  <span className="text-[10px] uppercase tracking-wider text-lime font-bold">★ Primary</span>
+                                )}
+                                {!v.placeId && (
+                                  <span className="text-[10px] uppercase tracking-wider text-coral font-bold">Unverified</span>
+                                )}
+                              </div>
+                              <div className="truncate text-sm font-semibold">{v.address}</div>
+                            </div>
+                            <div className="flex items-center gap-1 shrink-0">
+                              {!isPrimary && v.placeId && (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const target = verifiedVenues.findIndex((x) => x.placeId === v.placeId);
+                                    if (target >= 0) setDraft((d) => ({ ...d, primaryVenueIdx: target }));
+                                  }}
+                                  className="rounded-full border border-border bg-background px-2 py-1 text-[10px] font-bold hover:border-lime"
+                                >
+                                  Make primary
+                                </button>
+                              )}
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  setDraft((d) => {
+                                    const nextVenues = d.venues.filter((_, i) => i !== idx);
+                                    const nextVerified = nextVenues.filter((x) => x.address.trim() && x.placeId);
+                                    const nextIdx = Math.min(d.primaryVenueIdx, Math.max(nextVerified.length - 1, 0));
+                                    return { ...d, venues: nextVenues, primaryVenueIdx: nextIdx };
+                                  })
+                                }
+                                className="rounded-full border border-border bg-background p-1.5"
+                                aria-label="Remove venue"
+                              >
+                                <X className="h-3.5 w-3.5" />
+                              </button>
+                            </div>
+                          </div>
+                          {v.placeId && v.geo && (
+                            <div className="mt-2">
+                              <VenueMapPreview address={v.address} lat={v.geo.lat} lng={v.geo.lng} placeId={v.placeId} />
+                            </div>
+                          )}
+                        </li>
+                      );
+                    })}
+                  </ul>
                 )}
-                {draft.venuePlaceId && (
-                  <div className="flex items-center gap-2 text-[11px] text-lime">
-                    <Check className="h-3 w-3" /> Verified
-                  </div>
-                )}
-                {draft.venue && draft.venuePlaceId && draft.venueGeo && (
-                  <VenueMapPreview
-                    address={draft.venue}
-                    lat={draft.venueGeo.lat}
-                    lng={draft.venueGeo.lng}
-                    placeId={draft.venuePlaceId}
+
+                <div className="space-y-2">
+                  <label className="text-[11px] uppercase tracking-wider text-muted-foreground font-bold">Add a venue</label>
+                  <LocationAutocomplete
+                    value=""
+                    onChange={() => { /* value is committed only via onPick */ }}
+                    onPick={(full, placeId, geo) => {
+                      if (!placeId) return;
+                      setDraft((d) => {
+                        if (d.venues.some((x) => x.placeId === placeId)) {
+                          toast.message("That venue is already added.");
+                          return d;
+                        }
+                        const nextVenues = [
+                          ...d.venues,
+                          { address: full, placeId, geo: geo ? { lat: geo.lat, lng: geo.lng } : null },
+                        ];
+                        const nextVerifiedLen = nextVenues.filter((x) => x.address.trim() && x.placeId).length;
+                        // If this is the first verified venue, make it primary.
+                        const nextIdx = nextVerifiedLen === 1 ? 0 : d.primaryVenueIdx;
+                        return { ...d, venues: nextVenues, primaryVenueIdx: nextIdx };
+                      });
+                    }}
+                    placeholder="Start typing then pick a Google suggestion"
                   />
-                )}
+                  <p className="text-[11px] text-muted-foreground">
+                    You can add multiple venues and pick a different one for each availability window in the next step.
+                  </p>
+                </div>
               </Section>
 
               <p className="text-[12px] text-muted-foreground">
@@ -689,6 +740,7 @@ export function CreateTrainerWizard() {
               </p>
             </div>
           )}
+
 
           {step === 3 && (
             <div className="space-y-5">
