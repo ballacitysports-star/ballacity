@@ -1,69 +1,68 @@
 
 ## Goal
 
-Give users, trainers, teams and organizations a consistent way to upload an **avatar** and a **cover image**, with an in-app advanced editor: crop/zoom (already exists), rotate & flip, free-rotate straighten, brightness/contrast/saturation adjustments + preset filters, and AI background removal (avatars).
+Replace every ad-hoc image picker in the create/edit wizards with the same advanced `ImageEditorDialog` (crop, transform, adjust, filters, AI bg-removal) plus a public-bucket upload, so avatars and covers behave identically for users, trainers, teams, gyms/orgs, and games.
 
-## Storage — separate buckets per entity
+## New shared component
 
-New Supabase Storage buckets (private, signed URLs via public read policy):
+`src/components/ImageUploader.tsx` — the single control every wizard uses.
 
-- `avatars/{user_id}/…` — personal avatars
-- `covers/{user_id}/…` — personal covers
-- `trainer-avatars/{trainer_id}/…`
-- `team-covers/…` — already exists, keep as-is for team covers
-- `team-avatars/{team_id}/…` — team/logo
-- `org-avatars/{org_id}/…` and `org-covers/{org_id}/…`
+Props:
+- `kind`: `"avatar" | "cover"` (drives shape/aspect/preset behavior)
+- `value`, `onChange(url)` — current URL
+- `bucket`, `pathPrefix` — where the file lands (e.g. `avatars` + `userId`)
+- `fallback` — placeholder shown when no value
+- `presets?: Sport[]` (covers only) — reuse `imageFor(sport)` chips
+- `allowBgRemoval?: boolean` (default true for avatar)
 
-RLS on `storage.objects`:
-- Public SELECT on all image buckets (needed for `<img src>`).
-- INSERT/UPDATE/DELETE restricted to the owner: for user-scoped buckets `auth.uid()::text = (storage.foldername(name))[1]`; for entity-scoped buckets, a helper checks `teams.created_by = auth.uid()` (and org owner/admin membership for org buckets).
-- 4 MB size cap, `image/jpeg|png|webp` mime allowlist enforced in the client + server function.
+Internally:
+- Circular preview + "Upload / Change / Remove" for avatar; 16:9 preview for cover
+- Opens `ImageEditorDialog` with aspect `1` or `16/9`, `shape` circle/rect, `outputMaxSize` 512 (avatar) / 1600 (cover)
+- On confirm → `uploadDataUrlToBucket(bucket, pathPrefix, dataUrl)` → `onChange(url)`
+- Inline upload progress + error state (same visual language as current `TeamCoverUploader`)
 
-Migration also adds `avatar_url` / `cover_url` columns where missing:
-- `profiles`: already has avatar; add `cover_url text`.
-- `teams`: already has `avatar_url`/`cover_url` (reused for trainer & team).
-- `trainer_orgs`: add `avatar_url text`, `cover_url text`.
+This replaces both `TeamCoverUploader` and the inline avatar pickers. `TeamCoverUploader` becomes a thin re-export for back-compat.
 
-## Advanced image editor
+## Wizard integrations
 
-Refactor `ImageCropperDialog` into a new `ImageEditorDialog` that keeps the current crop/zoom/pan and adds a bottom tab bar:
+Each wizard gets an **Avatar** + **Cover** control in its Branding step, wired to the appropriate bucket. `pathPrefix` uses the owner/entity id so RLS accepts the write.
 
-1. **Crop** — existing behavior (aspect enforced per surface: 1:1 avatar, 16:9 cover, circle mask for avatar).
-2. **Transform** — 90° rotate left/right, horizontal flip, vertical flip, and a **straighten slider** (−45° … +45°) with automatic inner-crop so no transparent corners remain.
-3. **Adjust** — sliders for brightness, contrast, saturation (CSS filter live preview, baked into the canvas on export).
-4. **Filters** — preset chips (Original, Mono, Warm, Cool, Vivid, Fade, Noir) implemented as `filter:` strings; also baked into export.
-5. **Background** (avatars only) — “Remove background” button. Calls a new `removeAvatarBackground` server function that uses Lovable AI Gateway `google/gemini-2.5-flash-image` (edit mode: input image + prompt "remove background, transparent PNG") and returns a base64 PNG. Shown as a toggleable layer over a checkerboard so the user can revert.
+| Wizard / route | Avatar bucket / prefix | Cover bucket / prefix | Field(s) written |
+|---|---|---|---|
+| `profile.edit.tsx` (user) — already done, refactor to `ImageUploader` | `avatars/{userId}` | `covers/{userId}` | `profiles.avatar_url`, `profiles.cover_url` |
+| `create/CreateTrainerWizard.tsx` (Branding step near line 200) | `trainer-avatars/{userId}` (temp id pre-create, moved on save) | `team-covers/{userId}` | `teams.avatar_url`, `teams.cover_url` (kind=coach) |
+| `teams.$teamId.edit.tsx` — trainer & team | `trainer-avatars` or `team-avatars` / `{teamId}` | `team-covers/{teamId}` | `teams.avatar_url`, `teams.cover_url` |
+| `CreateOrgWizard.tsx` — team & gym/org branding (line 1169/1181) | `team-avatars` (team) or `org-avatars` (org) / `{userId}` pre-create | `team-covers` / `org-covers` | `teams.*` or `trainer_orgs.avatar_url`, `trainer_orgs.cover_url` |
+| `orgs.$orgId.tsx` — add owner-only "Edit branding" sheet | `org-avatars/{orgId}` | `org-covers/{orgId}` | `trainer_orgs.*` |
+| `_tabs.create.tsx` (game creation) | — (games have no avatar) | `game-covers/{userId}` via `ImageUploader` (replaces inline file input at lines 56–370) | `hosted_games.cover_url` (already `image` field) |
 
-All transforms compose into a single export canvas at Done: rotation → straighten → crop rect → filter/adjust bake → JPEG (or PNG when bg-removed) at the chosen size/quality preset (existing S/M/L + Standard/High/Max controls stay).
+For pre-create wizards (Trainer/Org/Team/Game) the `pathPrefix` uses `auth.uid()` so RLS passes; after the row is inserted, no rename is needed — the URL is already public and stored on the row.
 
-Files:
-- `src/components/ImageEditorDialog.tsx` (new, replaces `ImageCropperDialog`; keep old file exporting a thin wrapper for backward compat).
-- `src/lib/image-filters.ts` (new): presets, filter string builder, `bakeFiltersToDataUrl(img, transform, filter, adjust, cropRect, output)`.
-- `src/lib/bg-remove.functions.ts` (new): `removeBackground({ dataUrl })` server fn using `LOVABLE_API_KEY`.
+## Bucket / RLS notes
 
-## Reusable uploader
-
-Generalize `TeamCoverUploader` → `ImageUploader` with props: `bucket`, `pathPrefix`, `shape` (`circle`|`rect`), `aspect`, `allowBgRemoval`, `presets?`. Under the hood it opens `ImageEditorDialog`, uploads the resulting Blob to the given bucket via `supabase.storage.from(bucket).upload(...)`, and returns the public URL.
-
-Wire two instances (avatar + cover) into:
-- `src/routes/profile.edit.tsx` (user)
-- `src/routes/trainers.$trainerId` edit path (`src/routes/teams.$teamId.edit.tsx` with `kind=trainer`)
-- `src/routes/teams.$teamId.edit.tsx` (team)
-- `src/routes/orgs.$orgId.tsx` owner-only settings panel (add a small “Edit branding” sheet if none exists)
-
-`CreateTrainerWizard` and `teams.create.tsx` get the same avatar + cover controls in their branding step (cover already there — swap for the new component; add avatar).
+All six buckets and RLS policies from the previous turn already exist. No new migration needed unless we add an owner-branding sheet for orgs that writes to `trainer_orgs` — that only needs the existing `is_trainer_org_admin` check on `org-avatars`/`org-covers` (already in place).
 
 ## Out of scope
 
-- No changes to messaging, reels, or post attachments.
-- No new AI features beyond background removal.
-- Video/GIF assets.
+- No new AI features beyond existing bg-removal.
+- No changes to games/roster/messaging.
+- Staff member avatars inside `CreateOrgWizard` (line 969) stay as-is (uses initials/dataurl paste flow).
 
-## Technical notes
+## Technical details
 
-- All uploads go through the browser Supabase client (signed-in user), no new server routes required except the AI bg-removal server function.
-- Straighten math: rotate source, then compute the largest axis-aligned rectangle fitting inside the rotated image bounds for a given aspect (standard `rotated inner rect` formula) before applying the user's crop.
-- Adjustments/filters are baked with an offscreen canvas + `ctx.filter = "..."` so the exported file matches the preview (Safari 16+ supports canvas `filter`).
-- BG-removal round-trip: send the cropped-but-un-baked image data URL to the server fn; response replaces the working image; export uses PNG when the alpha channel is present.
-- Reuse existing `loadNormalizedDataUrl` for EXIF orientation.
-- Keep the existing size (S/M/L) and quality presets on the export bar.
+- `ImageUploader` is a client component, imports `ImageEditorDialog` lazily to keep initial bundles small on wizards that only sometimes open it.
+- Reuse `loadNormalizedDataUrl` for EXIF orientation on the file input.
+- Public URL comes back from `supabase.storage.from(bucket).getPublicUrl(path).data.publicUrl`; no signed-URL bookkeeping.
+- All wizard state stays local until "Save"; only the storage upload is eager (needed to preview edited image). Removing/replacing before save leaves an orphan blob — acceptable for now, can be swept later.
+- Type: extend `CreateTrainerWizard` draft with `avatarUrl?: string | null; coverUrl?: string | null` and persist through `useDraftPersistence`.
+
+## Files touched
+
+- Add: `src/components/ImageUploader.tsx`
+- Edit: `src/components/TeamCoverUploader.tsx` (re-export wrapper)
+- Edit: `src/components/create/CreateTrainerWizard.tsx` (Branding step)
+- Edit: `src/components/CreateOrgWizard.tsx` (replace TeamCoverUploader + add avatar)
+- Edit: `src/routes/teams.$teamId.edit.tsx` (both trainer & team edit views)
+- Edit: `src/routes/orgs.$orgId.tsx` (add owner branding sheet)
+- Edit: `src/routes/_tabs.create.tsx` (game cover)
+- Edit: `src/routes/profile.edit.tsx` (swap direct ImageEditorDialog usage for ImageUploader for consistency)
