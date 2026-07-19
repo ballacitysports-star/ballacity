@@ -16,6 +16,7 @@ import {
   MailOpen,
   Settings,
   UserPlus,
+  CalendarClock,
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/hooks/use-auth";
