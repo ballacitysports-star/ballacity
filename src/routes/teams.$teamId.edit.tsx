@@ -19,6 +19,7 @@ import { AvailabilityCalendar } from "@/components/AvailabilityCalendar";
 import { validateVenueList, buildVenueGeo } from "@/lib/venue-address";
 import { OrgCard } from "@/components/OrgCard";
 import { LocationAutocomplete } from "@/components/LocationAutocomplete";
+import { VenueMapPreview } from "@/components/VenueMapPreview";
 import { TeamCoverUploader } from "@/components/TeamCoverUploader";
 
 
