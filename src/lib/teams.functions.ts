@@ -2,6 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { createClient } from "@supabase/supabase-js";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { validateVenueList } from "./venue-address";
 import type { Database } from "@/integrations/supabase/types";
 
 function publicClient() {
@@ -54,7 +55,6 @@ const TeamInput = z.object({
     .array(z.string())
     .default([])
     .superRefine((list, ctx) => {
-      const { validateVenueList } = require("./venue-address") as typeof import("./venue-address");
       const { errors } = validateVenueList(list);
       errors.forEach((err, i) => {
         if (err) ctx.addIssue({ code: z.ZodIssueCode.custom, path: [i], message: err });
