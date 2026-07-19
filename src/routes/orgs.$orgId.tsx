@@ -263,7 +263,6 @@ function MembershipCta({
       </Link>
     );
   }
-  });
 
   if (myTrainers.isLoading) {
     return <div className="text-xs text-muted-foreground">Loading…</div>;
