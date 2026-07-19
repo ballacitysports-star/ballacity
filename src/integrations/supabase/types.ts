@@ -1308,6 +1308,7 @@ export type Database = {
           id: string
           message: string | null
           preferred_date: string | null
+          preferred_start_time: string | null
           responder_note: string | null
           session_type: string
           status: string
@@ -1322,6 +1323,7 @@ export type Database = {
           id?: string
           message?: string | null
           preferred_date?: string | null
+          preferred_start_time?: string | null
           responder_note?: string | null
           session_type?: string
           status?: string
@@ -1336,6 +1338,7 @@ export type Database = {
           id?: string
           message?: string | null
           preferred_date?: string | null
+          preferred_start_time?: string | null
           responder_note?: string | null
           session_type?: string
           status?: string
@@ -1490,6 +1493,14 @@ export type Database = {
       is_game_participant: {
         Args: { _game_id: string; _user_id: string }
         Returns: boolean
+      }
+      list_trainer_booked_slots: {
+        Args: { _date: string; _trainer_id: string }
+        Returns: {
+          end_time: string
+          start_time: string
+          status: string
+        }[]
       }
       unsend_message: { Args: { _id: string }; Returns: undefined }
     }

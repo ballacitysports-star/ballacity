@@ -9,6 +9,7 @@ export type TrainerSessionRequest = {
   to_user_id: string;
   session_type: string;
   preferred_date: string | null;
+  preferred_start_time: string | null;
   duration_minutes: number;
   message: string | null;
   status: TrainerRequestStatus;
@@ -17,19 +18,65 @@ export type TrainerSessionRequest = {
   updated_at: string;
 };
 
+export type TrainerBookedSlot = {
+  start: string; // "HH:MM" 24h
+  end: string;   // "HH:MM" 24h
+  status: "pending" | "accepted";
+};
+
 const TABLE = "trainer_session_requests" as const;
+
+/** Convert a Postgres TIME string ("HH:MM:SS") to "HH:MM". */
+const trimSeconds = (t: string) => t.slice(0, 5);
+
+/**
+ * Read the trainer's booked slots (pending + accepted) for a given date.
+ * Backed by a SECURITY DEFINER RPC that returns only start/end/status —
+ * no participant identities are exposed.
+ */
+export async function listTrainerBookedSlots(
+  trainerId: string,
+  dateKey: string,
+): Promise<TrainerBookedSlot[]> {
+  const { data, error } = await supabase.rpc("list_trainer_booked_slots" as any, {
+    _trainer_id: trainerId,
+    _date: dateKey,
+  });
+  if (error) throw error;
+  return ((data ?? []) as any[]).map((r) => ({
+    start: trimSeconds(String(r.start_time)),
+    end: trimSeconds(String(r.end_time)),
+    status: r.status as "pending" | "accepted",
+  }));
+}
 
 export async function createTrainerSessionRequest(input: {
   trainerId: string;
   toUserId: string;
   sessionType: string;
   preferredDate: string | null;
+  preferredStartTime: string | null;
   durationMinutes: number;
   message: string | null;
 }): Promise<TrainerSessionRequest> {
   const { data: u } = await supabase.auth.getUser();
   if (!u.user) throw new Error("Please sign in to request a session.");
   if (u.user.id === input.toUserId) throw new Error("You can't request a session from yourself.");
+
+  // Server-side conflict re-check (guards against races between UI check + insert).
+  if (input.preferredDate && input.preferredStartTime) {
+    const slots = await listTrainerBookedSlots(input.trainerId, input.preferredDate);
+    const startMin = toMinutes(input.preferredStartTime);
+    const endMin = startMin + input.durationMinutes;
+    const overlap = slots.find((s) => {
+      const a = toMinutes(s.start);
+      const b = toMinutes(s.end);
+      return startMin < b && endMin > a;
+    });
+    if (overlap) {
+      throw new Error("This time just got booked — please pick another slot.");
+    }
+  }
 
   const { data, error } = await supabase
     .from(TABLE as any)
@@ -39,6 +86,7 @@ export async function createTrainerSessionRequest(input: {
       to_user_id: input.toUserId,
       session_type: input.sessionType,
       preferred_date: input.preferredDate,
+      preferred_start_time: input.preferredStartTime,
       duration_minutes: input.durationMinutes,
       message: input.message?.trim() || null,
     } as any)
@@ -53,6 +101,12 @@ export async function createTrainerSessionRequest(input: {
   }
   return data as unknown as TrainerSessionRequest;
 }
+
+function toMinutes(hhmm: string): number {
+  const [h, m] = hhmm.split(":").map(Number);
+  return (h ?? 0) * 60 + (m ?? 0);
+}
+
 
 export async function getMyPendingRequestForTrainer(
   trainerId: string,
