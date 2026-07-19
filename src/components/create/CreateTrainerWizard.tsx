@@ -1,7 +1,7 @@
 import { Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { ArrowLeft, ArrowRight, Check, Sparkles, X, Plus } from "lucide-react";
+import { ArrowLeft, ArrowRight, Check, Sparkles, X, Plus, MapPin } from "lucide-react";
 import {
   SPORTS,
   HERO_IMAGE,
@@ -23,6 +23,7 @@ import { loadDraft, useDraftPersistence } from "@/components/create/useDraftPers
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { listTrainerOrgs, createTrainerOrg, requestToJoinTrainerOrg } from "@/lib/trainer-orgs.functions";
+import { autocompletePlaces, getPlaceDetails } from "@/lib/places.functions";
 import { toast } from "sonner";
 
 const STEP_LABELS = ["Basics", "Expertise", "Where", "Availability"] as const;
@@ -155,12 +156,67 @@ export function CreateTrainerWizard() {
   const listOrgs = useServerFn(listTrainerOrgs);
   const createOrg = useServerFn(createTrainerOrg);
   const joinOrg = useServerFn(requestToJoinTrainerOrg);
+  const placesAutocomplete = useServerFn(autocompletePlaces);
+  const placesDetails = useServerFn(getPlaceDetails);
   const orgResults = useQuery({
     queryKey: ["trainer-orgs-search", orgSearch],
     queryFn: () => listOrgs({ data: { search: orgSearch } }),
     enabled: orgSearch.trim().length >= 2,
     staleTime: 15_000,
   });
+
+  // Debounced Google Places lookup for real-world gyms/academies.
+  const [orgSearchDebounced, setOrgSearchDebounced] = useState("");
+  const [placesSessionToken, setPlacesSessionToken] = useState<string>(() =>
+    typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).slice(2),
+  );
+  useEffect(() => {
+    const t = window.setTimeout(() => setOrgSearchDebounced(orgSearch.trim()), 250);
+    return () => window.clearTimeout(t);
+  }, [orgSearch]);
+  const placesResults = useQuery({
+    queryKey: ["trainer-orgs-places", orgSearchDebounced, placesSessionToken],
+    queryFn: () =>
+      placesAutocomplete({
+        data: { input: orgSearchDebounced, sessionToken: placesSessionToken },
+      }),
+    enabled: orgSearchDebounced.length >= 2,
+    staleTime: 30_000,
+  });
+
+  const pickPlaceAsNewOrg = async (id: string, primary: string, secondary: string) => {
+    const optimisticAddress = secondary ? `${primary}, ${secondary}` : primary;
+    setDraft((d) => ({
+      ...d,
+      orgChoice: {
+        mode: "new",
+        name: primary,
+        address: optimisticAddress,
+        placeId: id,
+        geo: null,
+      },
+    }));
+    const tokenAtPick = placesSessionToken;
+    setPlacesSessionToken(
+      typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).slice(2),
+    );
+    try {
+      const details = await placesDetails({ data: { placeId: id, sessionToken: tokenAtPick } });
+      setDraft((d) => ({
+        ...d,
+        orgChoice: {
+          ...d.orgChoice,
+          mode: "new",
+          name: primary,
+          address: details.formattedAddress || optimisticAddress,
+          placeId: id,
+          geo: { lat: details.lat, lng: details.lng },
+        },
+      }));
+    } catch (err) {
+      console.error("[trainer-wizard] place details failed", err);
+    }
+  };
 
   useEffect(() => {
     const stored = loadDraft<Draft>(DRAFT_KEY);
@@ -632,7 +688,34 @@ export function CreateTrainerWizard() {
                           </button>
                         ))}
                         {orgResults.data && orgResults.data.length === 0 && !orgResults.isLoading && (
-                          <div className="text-[11px] text-muted-foreground">No match.</div>
+                          <div className="text-[11px] text-muted-foreground">No match on OpenRun.</div>
+                        )}
+                        {placesResults.data?.suggestions && placesResults.data.suggestions.length > 0 && (
+                          <>
+                            <div className="pt-1 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                              From Google
+                            </div>
+                            {placesResults.data.suggestions.map((s) => (
+                              <button
+                                key={s.id}
+                                type="button"
+                                onClick={() => pickPlaceAsNewOrg(s.id, s.primary, s.secondary)}
+                                className="flex w-full items-start gap-2 rounded-2xl border border-border bg-surface px-3 py-2.5 text-left hover:border-lime"
+                              >
+                                <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-coral" />
+                                <div className="min-w-0 flex-1">
+                                  <div className="truncate text-sm font-bold">{s.primary}</div>
+                                  {s.secondary && (
+                                    <div className="truncate text-[11px] text-muted-foreground">{s.secondary}</div>
+                                  )}
+                                </div>
+                                <Plus className="h-4 w-4 text-lime shrink-0" />
+                              </button>
+                            ))}
+                          </>
+                        )}
+                        {placesResults.isLoading && (
+                          <div className="text-[11px] text-muted-foreground">Searching Google…</div>
                         )}
                         <button
                           type="button"
