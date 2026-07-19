@@ -37,6 +37,7 @@ import {
 } from "@/lib/sport-config";
 import { OrgCard } from "@/components/OrgCard";
 import { LocationAutocomplete } from "@/components/LocationAutocomplete";
+import { VenueMapPreview } from "@/components/VenueMapPreview";
 import { TeamCoverUploader } from "@/components/TeamCoverUploader";
 import { PositionsPicker, positionsCleanup, type PositionsNeeded } from "@/components/PositionsPicker";
 
