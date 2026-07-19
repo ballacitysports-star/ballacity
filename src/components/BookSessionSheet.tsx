@@ -311,6 +311,18 @@ export function BookSessionSheet({
           <ExistingRequestView row={existing} statusMeta={statusMeta} />
         ) : (
           <div className="mt-5 space-y-4">
+            {differ && (
+              <div className="rounded-2xl border border-lime/30 bg-lime/5 px-3 py-2 text-[11px] text-muted-foreground flex items-start gap-2">
+                <Globe className="h-3.5 w-3.5 text-lime shrink-0 mt-0.5" />
+                <span>
+                  Trainer's schedule is in{" "}
+                  <span className="font-semibold text-foreground">{trainerTz.replace(/_/g, " ")} ({trainerTzShort})</span>.
+                  Times below are shown in trainer time — we'll also show what that is in your local time
+                  ({viewerTzShort}).
+                </span>
+              </div>
+            )}
+
             {/* Conflict / off-availability warning */}
             {selWindow && (conflict || offAvailability) && (
               <div
