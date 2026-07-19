@@ -34,7 +34,7 @@ import {
 } from "@/components/ui/dialog";
 
 
-export const Route = createFileRoute("/teams/$teamId")({
+export const Route = createFileRoute("/teams/$teamId/")({
   head: ({ loaderData, params }) => {
     const o = loaderData ?? ORGS.find((x) => x.id === params.teamId);
     return { meta: [{ title: o ? `${(o as Org).name} — OpenRun` : "Team — OpenRun" }] };
