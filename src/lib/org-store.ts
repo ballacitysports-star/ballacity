@@ -275,7 +275,9 @@ export async function updateOrg(
   const idx = ORGS.findIndex((o) => o.id === id);
   const prev = idx === -1 ? null : ORGS[idx];
   if (idx !== -1 && prev) {
-    ORGS[idx] = { ...prev, ...patch } as Org;
+    const merged = { ...prev, ...patch } as Org;
+    if (patch.primaryVenue === null) merged.primaryVenue = undefined;
+    ORGS[idx] = merged;
     emit();
   }
 
