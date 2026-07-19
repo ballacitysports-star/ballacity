@@ -1170,6 +1170,7 @@ export type Database = {
           avatar: string
           bio: string
           cadence: string | null
+          cadences: Json
           city: string
           cover: string
           created_at: string
@@ -1177,6 +1178,7 @@ export type Database = {
           distances: string[]
           followers: number
           format: string | null
+          formats: Json
           founded: number | null
           handle: string
           home_court: string | null
@@ -1198,6 +1200,7 @@ export type Database = {
           staff: Json
           tagline: string
           updated_at: string
+          venue_addresses: Json
           venues: string[]
           verified: boolean
           wins: number
@@ -1209,6 +1212,7 @@ export type Database = {
           avatar?: string
           bio?: string
           cadence?: string | null
+          cadences?: Json
           city?: string
           cover?: string
           created_at?: string
@@ -1216,6 +1220,7 @@ export type Database = {
           distances?: string[]
           followers?: number
           format?: string | null
+          formats?: Json
           founded?: number | null
           handle: string
           home_court?: string | null
@@ -1237,6 +1242,7 @@ export type Database = {
           staff?: Json
           tagline?: string
           updated_at?: string
+          venue_addresses?: Json
           venues?: string[]
           verified?: boolean
           wins?: number
@@ -1248,6 +1254,7 @@ export type Database = {
           avatar?: string
           bio?: string
           cadence?: string | null
+          cadences?: Json
           city?: string
           cover?: string
           created_at?: string
@@ -1255,6 +1262,7 @@ export type Database = {
           distances?: string[]
           followers?: number
           format?: string | null
+          formats?: Json
           founded?: number | null
           handle?: string
           home_court?: string | null
@@ -1276,6 +1284,7 @@ export type Database = {
           staff?: Json
           tagline?: string
           updated_at?: string
+          venue_addresses?: Json
           venues?: string[]
           verified?: boolean
           wins?: number

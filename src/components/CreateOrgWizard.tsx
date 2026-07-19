@@ -94,9 +94,10 @@ export function CreateOrgWizard({ kind }: { kind: OrgKind }) {
   const [skillMin, setSkillMin] = useState(1);
   const [skillMax, setSkillMax] = useState(3);
 
-  const [format, setFormat] = useState<string>("");
+  const [formats, setFormats] = useState<string[]>([]);
   const [venues, setVenues] = useState<string[]>([]);
-  const [cadence, setCadence] = useState<string>("");
+  const [venueAddresses, setVenueAddresses] = useState<string[]>([]);
+  const [cadences, setCadences] = useState<string[]>([]);
   const [positionsBySport, setPositionsBySport] = useState<Record<string, PositionsNeeded>>({});
   const [ratingMin, setRatingMin] = useState<string>("");
   const [ratingMax, setRatingMax] = useState<string>("");
@@ -158,9 +159,12 @@ export function CreateOrgWizard({ kind }: { kind: OrgKind }) {
     homeCourt: isCoach ? undefined : homeCourt,
     staff: isCoach ? undefined : staff,
     skillRange: { min: skillMin, max: skillMax },
-    format: format || undefined,
+    format: formats[0],
+    formats,
     venues,
-    cadence: cadence || undefined,
+    venueAddresses: isCoach ? venueAddresses.filter((v) => v.trim().length > 0) : undefined,
+    cadence: cadences[0],
+    cadences,
     positionsNeeded: Object.fromEntries(
       Object.entries(positionsBySport).map(([k, v]) => [k, positionsCleanup(v)]),
     ),
@@ -368,12 +372,15 @@ export function CreateOrgWizard({ kind }: { kind: OrgKind }) {
               </Section>
 
               {sports.length > 0 && formatOptions.length > 0 && (
-                <Section title="Preferred format">
+                <Section title="Preferred formats">
                   <ChipPicker
                     options={formatOptions}
-                    selected={format ? [format] : []}
-                    onToggle={(v) => setFormat((cur) => (cur === v ? "" : v))}
-                    single
+                    selected={formats}
+                    onToggle={(v) =>
+                      setFormats((cur) =>
+                        cur.includes(v) ? cur.filter((x) => x !== v) : [...cur, v],
+                      )
+                    }
                   />
                 </Section>
               )}
@@ -396,10 +403,139 @@ export function CreateOrgWizard({ kind }: { kind: OrgKind }) {
                 <Section title="Meeting cadence">
                   <ChipPicker
                     options={cadenceOptions}
-                    selected={cadence ? [cadence] : []}
-                    onToggle={(v) => setCadence((cur) => (cur === v ? "" : v))}
-                    single
+                    selected={cadences}
+                    onToggle={(v) =>
+                      setCadences((cur) =>
+                        cur.includes(v) ? cur.filter((x) => x !== v) : [...cur, v],
+                      )
+                    }
                   />
+                </Section>
+              )}
+
+              {isCoach && (
+                <Section title="Session venues">
+                  <div className="space-y-2">
+                    {venueAddresses.length === 0 && (
+                      <p className="text-xs text-muted-foreground">
+                        Add one or more addresses where you hold sessions.
+                      </p>
+                    )}
+                    {venueAddresses.map((addr, i) => (
+                      <div key={i} className="flex items-start gap-2">
+                        <div className="flex-1">
+                          <LocationAutocomplete
+                            value={addr}
+                            onChange={(v) =>
+                              setVenueAddresses((cur) =>
+                                cur.map((a, j) => (j === i ? v : a)),
+                              )
+                            }
+                            placeholder="Gym, park, or full address"
+                          />
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setVenueAddresses((cur) => cur.filter((_, j) => j !== i))
+                          }
+                          className="mt-1 rounded-full p-2 text-muted-foreground hover:bg-surface"
+                          aria-label="Remove venue"
+                        >
+                          <X className="h-4 w-4" />
+                        </button>
+                      </div>
+                    ))}
+                    <button
+                      type="button"
+                      onClick={() => setVenueAddresses((cur) => [...cur, ""])}
+                      className="inline-flex items-center gap-1.5 rounded-2xl border border-dashed border-border bg-surface px-3 py-2 text-sm font-semibold text-foreground hover:border-lime"
+                    >
+                      <Plus className="h-4 w-4" /> Add venue
+                    </button>
+                  </div>
+                </Section>
+              )}
+
+              {isCoach && (
+                <Section title="Weekly availability">
+                  <div className="space-y-2">
+                    {slots.length === 0 && (
+                      <p className="text-xs text-muted-foreground">
+                        Add the windows you're usually free — bookers see these on your profile.
+                      </p>
+                    )}
+                    {slots.map((slot, i) => {
+                      const rowError = slotsError?.index === i ? slotsError : null;
+                      return (
+                        <div key={i} className="space-y-1">
+                          <div className="flex items-center gap-2">
+                            <select
+                              value={slot.day}
+                              onChange={(e) =>
+                                setSlots((cur) =>
+                                  cur.map((s, j) =>
+                                    j === i ? { ...s, day: e.target.value as Slot["day"] } : s,
+                                  ),
+                                )
+                              }
+                              className={`rounded-2xl border bg-surface px-3 py-2 text-sm outline-none focus:border-lime ${rowError ? "border-red-500" : "border-border"}`}
+                            >
+                              <option value="mon">Mon</option>
+                              <option value="tue">Tue</option>
+                              <option value="wed">Wed</option>
+                              <option value="thu">Thu</option>
+                              <option value="fri">Fri</option>
+                              <option value="sat">Sat</option>
+                              <option value="sun">Sun</option>
+                            </select>
+                            <input
+                              type="time"
+                              value={slot.start}
+                              onChange={(e) =>
+                                setSlots((cur) =>
+                                  cur.map((s, j) => (j === i ? { ...s, start: e.target.value } : s)),
+                                )
+                              }
+                              className={`flex-1 rounded-2xl border bg-surface px-3 py-2 text-sm outline-none focus:border-lime ${rowError ? "border-red-500" : "border-border"}`}
+                            />
+                            <span className="text-xs text-muted-foreground">–</span>
+                            <input
+                              type="time"
+                              value={slot.end}
+                              onChange={(e) =>
+                                setSlots((cur) =>
+                                  cur.map((s, j) => (j === i ? { ...s, end: e.target.value } : s)),
+                                )
+                              }
+                              className={`flex-1 rounded-2xl border bg-surface px-3 py-2 text-sm outline-none focus:border-lime ${rowError ? "border-red-500" : "border-border"}`}
+                            />
+                            <button
+                              type="button"
+                              onClick={() => setSlots((cur) => cur.filter((_, j) => j !== i))}
+                              className="rounded-full p-2 text-muted-foreground hover:bg-surface"
+                              aria-label="Remove slot"
+                            >
+                              <X className="h-4 w-4" />
+                            </button>
+                          </div>
+                          {rowError && (
+                            <p className="text-xs text-red-500">{rowError.message}</p>
+                          )}
+                        </div>
+                      );
+                    })}
+                    <button
+                      type="button"
+                      disabled={!!slotsError}
+                      onClick={() =>
+                        setSlots((cur) => [...cur, { day: "mon", start: "17:00", end: "19:00" }])
+                      }
+                      className="inline-flex items-center gap-1.5 rounded-2xl border border-dashed border-border bg-surface px-3 py-2 text-sm font-semibold text-foreground hover:border-lime disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      <Plus className="h-4 w-4" /> Add time
+                    </button>
+                  </div>
                 </Section>
               )}
 
@@ -741,87 +877,6 @@ export function CreateOrgWizard({ kind }: { kind: OrgKind }) {
                       }
                     />
                   </Section>
-
-                  <Section title="Weekly availability">
-                    <div className="space-y-2">
-                      {slots.length === 0 && (
-                        <p className="text-xs text-muted-foreground">
-                          Add the windows you're usually free — bookers see these on your profile.
-                        </p>
-                      )}
-                      {slots.map((slot, i) => {
-                        const rowError = slotsError?.index === i ? slotsError : null;
-                        return (
-                        <div key={i} className="space-y-1">
-                          <div className="flex items-center gap-2">
-                          <select
-                            value={slot.day}
-                            onChange={(e) =>
-                              setSlots((cur) =>
-                                cur.map((s, j) =>
-                                  j === i ? { ...s, day: e.target.value as Slot["day"] } : s,
-                                ),
-                              )
-                            }
-                            className={`rounded-2xl border bg-surface px-3 py-2 text-sm outline-none focus:border-lime ${rowError ? "border-red-500" : "border-border"}`}
-                          >
-                            <option value="mon">Mon</option>
-                            <option value="tue">Tue</option>
-                            <option value="wed">Wed</option>
-                            <option value="thu">Thu</option>
-                            <option value="fri">Fri</option>
-                            <option value="sat">Sat</option>
-                            <option value="sun">Sun</option>
-                          </select>
-                          <input
-                            type="time"
-                            value={slot.start}
-                            onChange={(e) =>
-                              setSlots((cur) =>
-                                cur.map((s, j) => (j === i ? { ...s, start: e.target.value } : s)),
-                              )
-                            }
-                            className={`flex-1 rounded-2xl border bg-surface px-3 py-2 text-sm outline-none focus:border-lime ${rowError ? "border-red-500" : "border-border"}`}
-                          />
-                          <span className="text-xs text-muted-foreground">–</span>
-                          <input
-                            type="time"
-                            value={slot.end}
-                            onChange={(e) =>
-                              setSlots((cur) =>
-                                cur.map((s, j) => (j === i ? { ...s, end: e.target.value } : s)),
-                              )
-                            }
-                            className={`flex-1 rounded-2xl border bg-surface px-3 py-2 text-sm outline-none focus:border-lime ${rowError ? "border-red-500" : "border-border"}`}
-                          />
-                          <button
-                            type="button"
-                            onClick={() => setSlots((cur) => cur.filter((_, j) => j !== i))}
-                            className="rounded-full p-2 text-muted-foreground hover:bg-surface"
-                            aria-label="Remove slot"
-                          >
-                            <X className="h-4 w-4" />
-                          </button>
-                          </div>
-                          {rowError && (
-                            <p className="text-xs text-red-500">{rowError.message}</p>
-                          )}
-                        </div>
-                        );
-                      })}
-                      <button
-                        type="button"
-                        disabled={!!slotsError}
-                        onClick={() =>
-                          setSlots((cur) => [...cur, { day: "mon", start: "17:00", end: "19:00" }])
-                        }
-                        className="inline-flex items-center gap-1.5 rounded-2xl border border-dashed border-border bg-surface px-3 py-2 text-sm font-semibold text-foreground hover:border-lime disabled:cursor-not-allowed disabled:opacity-50"
-                      >
-                        <Plus className="h-4 w-4" /> Add time
-                      </button>
-                    </div>
-                  </Section>
-
 
                   {credentialPresets.length > 0 && (
                     <Section title="Suggested credentials">

@@ -35,8 +35,11 @@ type TeamRow = {
   followers: number;
   verified: boolean;
   format: string | null;
+  formats: unknown;
   venues: string[] | null;
+  venue_addresses: unknown;
   cadence: string | null;
+  cadences: unknown;
   positions_needed: unknown;
   rating_system: string | null;
   rating_min: string | null;
@@ -94,8 +97,21 @@ function rowToOrg(row: TeamRow): Org {
     staff: kind === "team" ? staff : undefined,
     skillRange: { min: row.skill_min, max: row.skill_max },
     format: row.format ?? undefined,
+    formats: Array.isArray(row.formats)
+      ? (row.formats as string[])
+      : row.format
+        ? [row.format]
+        : [],
     venues: row.venues ?? [],
+    venueAddresses: Array.isArray(row.venue_addresses)
+      ? (row.venue_addresses as string[])
+      : [],
     cadence: row.cadence ?? undefined,
+    cadences: Array.isArray(row.cadences)
+      ? (row.cadences as string[])
+      : row.cadence
+        ? [row.cadence]
+        : [],
     positionsNeeded,
     ratingSystem: (row.rating_system as Org["ratingSystem"]) ?? undefined,
     ratingMin: row.rating_min ?? undefined,
@@ -135,9 +151,12 @@ function orgToInsert(org: Org) {
     rate_per_hour: org.ratePerHour ?? null,
     skill_min: org.skillRange?.min ?? 1,
     skill_max: org.skillRange?.max ?? 5,
-    format: org.format ?? null,
+    format: org.formats?.[0] ?? org.format ?? null,
+    formats: org.formats ?? (org.format ? [org.format] : []),
     venues: org.venues ?? [],
-    cadence: org.cadence ?? null,
+    venue_addresses: org.venueAddresses ?? [],
+    cadence: org.cadences?.[0] ?? org.cadence ?? null,
+    cadences: org.cadences ?? (org.cadence ? [org.cadence] : []),
     positions_needed: org.positionsNeeded ?? {},
     rating_system: org.ratingSystem ?? null,
     rating_min: org.ratingMin ?? null,
@@ -284,8 +303,17 @@ export async function updateOrg(
     mapped.skill_max = patch.skillRange?.max ?? 5;
   }
   if (patch.format !== undefined) mapped.format = patch.format ?? null;
+  if (patch.formats !== undefined) {
+    mapped.formats = patch.formats ?? [];
+    mapped.format = patch.formats?.[0] ?? null;
+  }
   if (patch.venues !== undefined) mapped.venues = patch.venues ?? [];
+  if (patch.venueAddresses !== undefined) mapped.venue_addresses = patch.venueAddresses ?? [];
   if (patch.cadence !== undefined) mapped.cadence = patch.cadence ?? null;
+  if (patch.cadences !== undefined) {
+    mapped.cadences = patch.cadences ?? [];
+    mapped.cadence = patch.cadences?.[0] ?? null;
+  }
   if (patch.positionsNeeded !== undefined) mapped.positions_needed = patch.positionsNeeded ?? {};
   if (patch.ratingSystem !== undefined) mapped.rating_system = patch.ratingSystem ?? null;
   if (patch.ratingMin !== undefined) mapped.rating_min = patch.ratingMin ?? null;
