@@ -97,8 +97,21 @@ function rowToOrg(row: TeamRow): Org {
     staff: kind === "team" ? staff : undefined,
     skillRange: { min: row.skill_min, max: row.skill_max },
     format: row.format ?? undefined,
+    formats: Array.isArray(row.formats)
+      ? (row.formats as string[])
+      : row.format
+        ? [row.format]
+        : [],
     venues: row.venues ?? [],
+    venueAddresses: Array.isArray(row.venue_addresses)
+      ? (row.venue_addresses as string[])
+      : [],
     cadence: row.cadence ?? undefined,
+    cadences: Array.isArray(row.cadences)
+      ? (row.cadences as string[])
+      : row.cadence
+        ? [row.cadence]
+        : [],
     positionsNeeded,
     ratingSystem: (row.rating_system as Org["ratingSystem"]) ?? undefined,
     ratingMin: row.rating_min ?? undefined,
