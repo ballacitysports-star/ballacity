@@ -156,12 +156,67 @@ export function CreateTrainerWizard() {
   const listOrgs = useServerFn(listTrainerOrgs);
   const createOrg = useServerFn(createTrainerOrg);
   const joinOrg = useServerFn(requestToJoinTrainerOrg);
+  const placesAutocomplete = useServerFn(autocompletePlaces);
+  const placesDetails = useServerFn(getPlaceDetails);
   const orgResults = useQuery({
     queryKey: ["trainer-orgs-search", orgSearch],
     queryFn: () => listOrgs({ data: { search: orgSearch } }),
     enabled: orgSearch.trim().length >= 2,
     staleTime: 15_000,
   });
+
+  // Debounced Google Places lookup for real-world gyms/academies.
+  const [orgSearchDebounced, setOrgSearchDebounced] = useState("");
+  const [placesSessionToken, setPlacesSessionToken] = useState<string>(() =>
+    typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).slice(2),
+  );
+  useEffect(() => {
+    const t = window.setTimeout(() => setOrgSearchDebounced(orgSearch.trim()), 250);
+    return () => window.clearTimeout(t);
+  }, [orgSearch]);
+  const placesResults = useQuery({
+    queryKey: ["trainer-orgs-places", orgSearchDebounced, placesSessionToken],
+    queryFn: () =>
+      placesAutocomplete({
+        data: { input: orgSearchDebounced, sessionToken: placesSessionToken },
+      }),
+    enabled: orgSearchDebounced.length >= 2,
+    staleTime: 30_000,
+  });
+
+  const pickPlaceAsNewOrg = async (id: string, primary: string, secondary: string) => {
+    const optimisticAddress = secondary ? `${primary}, ${secondary}` : primary;
+    setDraft((d) => ({
+      ...d,
+      orgChoice: {
+        mode: "new",
+        name: primary,
+        address: optimisticAddress,
+        placeId: id,
+        geo: null,
+      },
+    }));
+    const tokenAtPick = placesSessionToken;
+    setPlacesSessionToken(
+      typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).slice(2),
+    );
+    try {
+      const details = await placesDetails({ data: { placeId: id, sessionToken: tokenAtPick } });
+      setDraft((d) => ({
+        ...d,
+        orgChoice: {
+          ...d.orgChoice,
+          mode: "new",
+          name: primary,
+          address: details.formattedAddress || optimisticAddress,
+          placeId: id,
+          geo: { lat: details.lat, lng: details.lng },
+        },
+      }));
+    } catch (err) {
+      console.error("[trainer-wizard] place details failed", err);
+    }
+  };
 
   useEffect(() => {
     const stored = loadDraft<Draft>(DRAFT_KEY);
