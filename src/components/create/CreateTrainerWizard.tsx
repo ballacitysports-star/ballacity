@@ -43,6 +43,7 @@ type Draft = {
   venuePlaceId: string;
   venueGeo: { lat: number; lng: number } | null;
   slots: Slot[];
+  overrides: { date: string; closed?: boolean; windows?: { start: string; end: string; venue?: string }[] }[];
   timezone: string;
 };
 
