@@ -130,6 +130,8 @@ function sampleTypeFor(cat: NotifCategory): string {
       return "join_request";
     case "follows":
       return "follow";
+    case "trainerAvailability":
+      return "trainer_availability";
     case "general":
       return "payment_received";
   }

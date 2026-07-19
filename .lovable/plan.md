@@ -1,23 +1,43 @@
-## Next available windows on trainer profiles & booking
+## Notify interested players when trainer availability changes
 
-Add a compact "Next available" section that surfaces the soonest bookable windows for a trainer, shown on both the public trainer profile and the booking sheet.
+When a trainer updates their weekly slots, recurring rules, or date overrides, push an in-app notification to players who have a stake in that schedule.
 
-### Behavior
-- Scans forward from now up to 30 days, honoring the trainer's weekly + rules + overrides layers (already merged by `resolveDay`), the selected venue filter, and existing booked slots from `list_trainer_booked_slots`.
-- Returns the next 3 bookable windows (grouped: today / tomorrow / date label).
-- Skips days fully booked or with no windows; clips past-time from today.
-- Timezone-aware: displays in viewer tz with a small "(trainer 6pm PT)" secondary label when tz differs.
-- Each entry is tappable:
-  - On the profile: opens BookSessionSheet pre-filled with that date + start time + venue.
-  - Inside BookSessionSheet: sets date/start/venue directly.
+### Who gets notified
+For a trainer `T`, the interested set is the union of:
+1. **Past/current bookers** — distinct `from_user_id` from `trainer_session_requests` where `trainer_id = T` and `status IN ('pending','accepted','completed')`.
+2. **Followers** — `follower_id` from `follows` where `followee_id = T.owner_id` (trainers whose owner has followers). Followers are opt-in via existing "Follows" notification preference; bookers always get it (transactional).
 
-### Files
-- New `src/lib/next-available.ts`: `computeNextAvailable(org, { now, viewerTz, venueFilter, bookedSlotsByDate, limit })` returning `Array<{ dateKey, start, end, venue?, source, trainerStart?, trainerEnd? }>`.
-- New `src/components/NextAvailableList.tsx`: presentational list with skeleton + empty state + "See full calendar" link.
-- `src/routes/trainers.$trainerId.tsx`: render `NextAvailableList` above the Availability calendar section; wire click → open BookSessionSheet with prefilled state (lift `bookOpen` + add `prefill` state).
-- `src/components/BookSessionSheet.tsx`: accept optional `prefill` prop (date/start/venue); show `NextAvailableList` near the top when no date is picked yet.
-- `src/lib/trainer-requests.ts`: expose a helper to fetch booked slots for a date range (batched) if not already available; used to filter out conflicts.
+De-duplicate, exclude the trainer themself, and honor `user_blocks` and `notification_preferences` (new `trainer_availability` category, default on).
 
-### Notes
-- Purely presentational + read-side; no schema changes, no new server functions beyond reusing `list_trainer_booked_slots` across a date range.
-- Booked-slot lookup is throttled: fetch on demand for the ~30-day window once, cache in a `useQuery` keyed by trainerId + venueFilter + viewerTz.
+### Change detection
+Add a Postgres trigger on `public.teams` (AFTER UPDATE) that fires only when `kind = 'coach'` and any of these change:
+- `availability_slots`, `availability_rules`, `availability_overrides`, `primary_venue`, `venue_addresses`, `timezone`.
+
+The trigger computes a short human summary (e.g. "added Tue 6–8pm", "removed 2 windows", "updated recurring rule", "closed Mar 12") by diffing OLD vs NEW jsonb arrays with element-count and key-presence heuristics — no per-slot diff to keep it cheap. Falls back to "Availability updated" when the diff is ambiguous.
+
+### Notification payload
+Insert one row per recipient into `public.notifications`:
+- `type = 'trainer_availability'`
+- `title = "<Trainer name> updated their availability"`
+- `body  = <summary>` (e.g. "Added Tue 6–8pm in San Jose")
+- `link  = "/trainers/<team_id>"`
+
+### Throttling
+Avoid notification storms when a trainer edits repeatedly (wizard save button, batch edits). The trigger checks: if the last `trainer_availability` notification for the same trainer→recipient pair is < 30 minutes old, skip the insert (a single per-pair debounce, enforced in SQL).
+
+### Files & changes
+1. **Migration**
+   - Add `trainer_availability` to allowed values of `notification_preferences.category` (validation trigger already checks a list — extend it) and default = enabled.
+   - Create SECURITY DEFINER function `notify_trainer_availability_change()` and AFTER UPDATE trigger on `public.teams`.
+   - Include GRANTs / permissions review only for the function (`SECURITY DEFINER`, `SET search_path = public`).
+
+2. **Frontend**
+   - `src/routes/_tabs.settings.notifications.tsx` (or equivalent preferences page): add "Trainer availability updates" toggle to the Follows section — or a new "Trainers" section. Wire to `notification_preferences` via existing hook.
+   - `src/components/NotificationsPanel.tsx` (or the row renderer): add an icon/label mapping for `type === 'trainer_availability'` so it renders with a calendar icon and routes to the trainer page.
+
+3. **No server function needed** — everything runs from the DB trigger on `teams` updates already made by `updateOrg` in `src/lib/org-store.ts`.
+
+### Explicit non-goals
+- No email/push fan-out (existing `notifications` table + in-app inbox is the surface).
+- No per-slot precision in the summary (kept intentionally coarse).
+- Does not fire on new trainer creation, only updates.
