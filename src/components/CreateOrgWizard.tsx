@@ -94,9 +94,10 @@ export function CreateOrgWizard({ kind }: { kind: OrgKind }) {
   const [skillMin, setSkillMin] = useState(1);
   const [skillMax, setSkillMax] = useState(3);
 
-  const [format, setFormat] = useState<string>("");
+  const [formats, setFormats] = useState<string[]>([]);
   const [venues, setVenues] = useState<string[]>([]);
-  const [cadence, setCadence] = useState<string>("");
+  const [venueAddresses, setVenueAddresses] = useState<string[]>([]);
+  const [cadences, setCadences] = useState<string[]>([]);
   const [positionsBySport, setPositionsBySport] = useState<Record<string, PositionsNeeded>>({});
   const [ratingMin, setRatingMin] = useState<string>("");
   const [ratingMax, setRatingMax] = useState<string>("");
