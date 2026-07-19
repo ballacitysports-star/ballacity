@@ -1494,6 +1494,14 @@ export type Database = {
         Args: { _game_id: string; _user_id: string }
         Returns: boolean
       }
+      list_trainer_booked_slots: {
+        Args: { _date: string; _trainer_id: string }
+        Returns: {
+          end_time: string
+          start_time: string
+          status: string
+        }[]
+      }
       unsend_message: { Args: { _id: string }; Returns: undefined }
     }
     Enums: {
