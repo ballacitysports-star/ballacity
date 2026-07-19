@@ -1,43 +1,36 @@
-## Notify interested players when trainer availability changes
+## Distance slider for trainer venue filter
 
-When a trainer updates their weekly slots, recurring rules, or date overrides, push an in-app notification to players who have a stake in that schedule.
+Add a "Within X miles" slider next to the venue filter on `/trainers` that narrows results to trainers whose venues fall inside a radius from the user's current location. Respects existing `distanceUnit` pref (`mi`/`km`).
 
-### Who gets notified
-For a trainer `T`, the interested set is the union of:
-1. **Past/current bookers** — distinct `from_user_id` from `trainer_session_requests` where `trainer_id = T` and `status IN ('pending','accepted','completed')`.
-2. **Followers** — `follower_id` from `follows` where `followee_id = T.owner_id` (trainers whose owner has followers). Followers are opt-in via existing "Follows" notification preference; bookers always get it (transactional).
+### Behavior
+- Slider range 1–100 (unit from `useUserPrefs().distanceUnit`), default 25, step 1. `0` treated as "any distance" and hidden from the UI by using `Off` as the lowest label when the user clears it.
+- Filter applies to any trainer with at least one `venueGeo` entry inside the radius. Trainers without `venueGeo` are excluded ONLY when a radius is active (so the default view still shows everyone).
+- Requires user location. On first slider interaction, request `navigator.geolocation.getCurrentPosition`. On deny/error, show inline "Enable location to filter by distance" hint with a retry button and log via existing `location-denial-telemetry`.
+- Sort: when the slider is active and `sort=nearest`, sort by the min-distance to any venue. When inactive, keep existing `nearest` behavior unchanged.
+- Reveal per-card min-distance chip ("3.2 mi") on the trainer card when a radius is set.
 
-De-duplicate, exclude the trainer themself, and honor `user_blocks` and `notification_preferences` (new `trainer_availability` category, default on).
+### URL state
+Extend `trainersSearchSchema` in `src/routes/_tabs.trainers.tsx`:
+- `radius: fallback(z.coerce.number().min(0).max(200), 0).default(0)` (in the user's unit; 0 = off).
 
-### Change detection
-Add a Postgres trigger on `public.teams` (AFTER UPDATE) that fires only when `kind = 'coach'` and any of these change:
-- `availability_slots`, `availability_rules`, `availability_overrides`, `primary_venue`, `venue_addresses`, `timezone`.
+Included in the active-filter counter chip and cleared by "Reset filters".
 
-The trigger computes a short human summary (e.g. "added Tue 6–8pm", "removed 2 windows", "updated recurring rule", "closed Mar 12") by diffing OLD vs NEW jsonb arrays with element-count and key-presence heuristics — no per-slot diff to keep it cheap. Falls back to "Availability updated" when the diff is ambiguous.
+### Implementation
 
-### Notification payload
-Insert one row per recipient into `public.notifications`:
-- `type = 'trainer_availability'`
-- `title = "<Trainer name> updated their availability"`
-- `body  = <summary>` (e.g. "Added Tue 6–8pm in San Jose")
-- `link  = "/trainers/<team_id>"`
+1. **`src/lib/geo.ts` (new)** — small util:
+   - `haversineKm(a, b)` returning km.
+   - `useUserLocation()` hook: exposes `{ coords, status, request }` where `status ∈ 'idle'|'prompting'|'granted'|'denied'|'unsupported'`. Caches the last successful fix in `sessionStorage` for 10 minutes to avoid re-prompting on route re-mounts.
 
-### Throttling
-Avoid notification storms when a trainer edits repeatedly (wizard save button, batch edits). The trigger checks: if the last `trainer_availability` notification for the same trainer→recipient pair is < 30 minutes old, skip the insert (a single per-pair debounce, enforced in SQL).
+2. **`src/routes/_tabs.trainers.tsx`**
+   - Add `radius` to schema and derive `radiusUnitVal` from search.
+   - Convert to km using `distanceUnit`.
+   - In the filter memo, when `radiusKm > 0 && coords`, compute `minKm = min(haversine(coords, v))` across `o.venueGeo`; drop trainer if `minKm > radiusKm` or `venueGeo` empty.
+   - Stash `minKm` on the filtered items so cards can display it and sort can use it.
+   - Add slider UI inside the existing filter drawer, directly under the venue chips section. Include the unit label and a "Use my location" button when `status !== 'granted'`.
 
-### Files & changes
-1. **Migration**
-   - Add `trainer_availability` to allowed values of `notification_preferences.category` (validation trigger already checks a list — extend it) and default = enabled.
-   - Create SECURITY DEFINER function `notify_trainer_availability_change()` and AFTER UPDATE trigger on `public.teams`.
-   - Include GRANTs / permissions review only for the function (`SECURITY DEFINER`, `SET search_path = public`).
+3. **`src/components/TrainerCard.tsx`** (or wherever list rows render — check `_tabs.trainers.tsx` inline renderer first): accept optional `distanceLabel?: string` and render a small chip when provided.
 
-2. **Frontend**
-   - `src/routes/_tabs.settings.notifications.tsx` (or equivalent preferences page): add "Trainer availability updates" toggle to the Follows section — or a new "Trainers" section. Wire to `notification_preferences` via existing hook.
-   - `src/components/NotificationsPanel.tsx` (or the row renderer): add an icon/label mapping for `type === 'trainer_availability'` so it renders with a calendar icon and routes to the trainer page.
-
-3. **No server function needed** — everything runs from the DB trigger on `teams` updates already made by `updateOrg` in `src/lib/org-store.ts`.
-
-### Explicit non-goals
-- No email/push fan-out (existing `notifications` table + in-app inbox is the surface).
-- No per-slot precision in the summary (kept intentionally coarse).
-- Does not fire on new trainer creation, only updates.
+### Non-goals
+- No server-side filtering (client-side against already-loaded orgs is sufficient at current scale).
+- No map-view radius overlay (list/filter only for this pass).
+- No changes to the players/feed distance behavior.
