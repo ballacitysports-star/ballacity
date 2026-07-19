@@ -43,6 +43,7 @@ type TeamRow = {
   rating_max: string | null;
   distances: string[] | null;
   session_types: string[] | null;
+  availability_slots: unknown;
 };
 
 const myOrgIds = new Set<string>();
