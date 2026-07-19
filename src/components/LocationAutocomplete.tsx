@@ -2,8 +2,10 @@ import { useEffect, useRef, useState } from "react";
 import { Loader2, LocateFixed, MapPin } from "lucide-react";
 import { useServerFn } from "@tanstack/react-start";
 import { reverseGeocode } from "@/lib/geocode.functions";
-import { autocompletePlaces, type PlaceSuggestion } from "@/lib/places.functions";
+import { autocompletePlaces, getPlaceDetails, type PlaceSuggestion } from "@/lib/places.functions";
 import { toast } from "sonner";
+
+export type PickedPlaceGeo = { lat: number; lng: number; formattedAddress?: string };
 
 function randomToken(): string {
   try {
