@@ -20,6 +20,9 @@ import {
 import { addOrg } from "@/lib/org-store";
 import { validateSlots, validateOverrides, type DayOverride } from "@/lib/availability-slots";
 import { AvailabilityCalendar } from "@/components/AvailabilityCalendar";
+import { AvailabilityRulesEditor } from "@/components/AvailabilityRulesEditor";
+import type { AvailabilityRule } from "@/lib/availability-resolve";
+import { validateRules } from "@/lib/availability-slots";
 import { TimezoneSelect } from "@/components/TimezoneSelect";
 import { validateVenueList, buildVenueGeo } from "@/lib/venue-address";
 import {
