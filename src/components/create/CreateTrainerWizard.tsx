@@ -30,6 +30,12 @@ const SKILL_LABELS = ["Beginner", "Recreational", "Intermediate", "Advanced", "P
 
 type Slot = { day: "mon" | "tue" | "wed" | "thu" | "fri" | "sat" | "sun"; start: string; end: string; venue?: string };
 
+type VenueEntry = {
+  address: string;
+  placeId: string;
+  geo: { lat: number; lng: number } | null;
+};
+
 type Draft = {
   step: number;
   name: string;
@@ -45,15 +51,15 @@ type Draft = {
   skillMax: number;
   sessionTypes: string[];
   credentials: string[];
-  venue: string;
-  venuePlaceId: string;
-  venueGeo: { lat: number; lng: number } | null;
+  venues: VenueEntry[];
+  primaryVenueIdx: number;
   slots: Slot[];
   overrides: { date: string; closed?: boolean; windows?: { start: string; end: string; venue?: string }[] }[];
   rules: AvailabilityRule[];
   timezone: string;
   orgChoice: { mode: "existing" | "new" | null; orgId?: string; name?: string };
 };
+
 
 const DRAFT_KEY = "openrun.trainer-wizard.draft.v1";
 
@@ -95,9 +101,9 @@ function initialDraft(): Draft {
     skillMax: 3,
     sessionTypes: [],
     credentials: [],
-    venue: "",
-    venuePlaceId: "",
-    venueGeo: null,
+    venues: [],
+    primaryVenueIdx: 0,
+
     slots: [],
     overrides: [],
     rules: [],
@@ -111,9 +117,16 @@ export function CreateTrainerWizard() {
 
   const [draft, setDraft] = useState<Draft>(() => {
     if (typeof window === "undefined") return initialDraft();
-    const stored = loadDraft<Draft>(DRAFT_KEY);
-    return stored ? { ...initialDraft(), ...stored } : initialDraft();
+    const stored = loadDraft<Draft & { venue?: string; venuePlaceId?: string; venueGeo?: { lat: number; lng: number } | null }>(DRAFT_KEY);
+    if (!stored) return initialDraft();
+    // Migrate legacy single-venue drafts into the new venues[] shape.
+    let venues: VenueEntry[] = Array.isArray(stored.venues) ? stored.venues : [];
+    if (venues.length === 0 && stored.venue) {
+      venues = [{ address: stored.venue, placeId: stored.venuePlaceId ?? "", geo: stored.venueGeo ?? null }];
+    }
+    return { ...initialDraft(), ...stored, venues, primaryVenueIdx: stored.primaryVenueIdx ?? 0 };
   });
+
   const [credInput, setCredInput] = useState("");
   const [orgSearch, setOrgSearch] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -134,7 +147,7 @@ export function CreateTrainerWizard() {
 
   useEffect(() => {
     const stored = loadDraft<Draft>(DRAFT_KEY);
-    if (stored && (stored.name || stored.bio || stored.venue)) {
+    if (stored && (stored.name || stored.bio || (stored.venues && stored.venues.length > 0))) {
       setRestored(true);
     }
   }, []);
@@ -157,7 +170,14 @@ export function CreateTrainerWizard() {
   );
 
   const bioOk = draft.bio.trim().length >= 40;
-  const venueOk = !!draft.venue.trim() && !!draft.venuePlaceId;
+  const verifiedVenues = useMemo(
+    () => draft.venues.filter((v) => v.address.trim() && v.placeId),
+    [draft.venues],
+  );
+  const primaryVenue: VenueEntry | null = verifiedVenues[Math.min(draft.primaryVenueIdx, Math.max(verifiedVenues.length - 1, 0))] ?? verifiedVenues[0] ?? null;
+  const verifiedVenueAddresses = verifiedVenues.map((v) => v.address);
+  const venueOk = verifiedVenues.length > 0;
+
 
   const canNext = useMemo(() => {
     if (step === 0)
@@ -190,20 +210,13 @@ export function CreateTrainerWizard() {
     ratePerHour: draft.rate,
     skillRange: { min: draft.skillMin, max: draft.skillMax },
     sessionTypes: draft.sessionTypes,
-    venueAddresses: draft.venue ? [draft.venue] : [],
-    verifiedVenues: draft.venue && draft.venuePlaceId ? [draft.venue.toLowerCase()] : [],
-    venueGeo:
-      draft.venue && draft.venuePlaceId && draft.venueGeo
-        ? [
-            {
-              address: draft.venue,
-              placeId: draft.venuePlaceId,
-              lat: draft.venueGeo.lat,
-              lng: draft.venueGeo.lng,
-            },
-          ]
-        : [],
-    primaryVenue: draft.venue || undefined,
+    venueAddresses: verifiedVenueAddresses,
+    verifiedVenues: verifiedVenueAddresses.map((a) => a.toLowerCase()),
+    venueGeo: verifiedVenues
+      .filter((v) => v.geo)
+      .map((v) => ({ address: v.address, placeId: v.placeId, lat: v.geo!.lat, lng: v.geo!.lng })),
+    primaryVenue: primaryVenue?.address,
+
     availabilitySlots: draft.slots,
     availabilityOverrides: draft.overrides,
     availabilityRules: draft.rules,
@@ -627,48 +640,99 @@ export function CreateTrainerWizard() {
           {step === 2 && (
             <div className="space-y-5">
               <Section
-                title="Primary venue"
-                hint="Pick from Google suggestions so we can pin it on the map. Add more venues later from your profile."
+                title="Venues"
+                hint="Add every place where you train. Pick from Google suggestions so we can verify + map them. Star your default primary venue."
               >
-                <LocationAutocomplete
-                  value={draft.venue}
-                  onChange={(v) =>
-                    setDraft((d) => ({
-                      ...d,
-                      venue: v,
-                      // Invalidate verification when free-typed.
-                      venuePlaceId: v.trim().toLowerCase() === d.venue.trim().toLowerCase() ? d.venuePlaceId : "",
-                      venueGeo: v.trim().toLowerCase() === d.venue.trim().toLowerCase() ? d.venueGeo : null,
-                    }))
-                  }
-                  onPick={(full, placeId, geo) =>
-                    setDraft((d) => ({
-                      ...d,
-                      venue: full,
-                      venuePlaceId: placeId,
-                      venueGeo: geo ? { lat: geo.lat, lng: geo.lng } : null,
-                    }))
-                  }
-                  placeholder="Start typing then pick a Google suggestion"
-                />
-                {draft.venue && !draft.venuePlaceId && (
-                  <p className="text-[11px] text-coral">
-                    Pick a suggestion from the dropdown so we can verify the address.
-                  </p>
+                {verifiedVenues.length > 0 && (
+                  <ul className="space-y-2">
+                    {draft.venues.map((v, idx) => {
+                      const isPrimary = primaryVenue?.address === v.address && !!v.placeId;
+                      return (
+                        <li
+                          key={`${v.placeId || "unverified"}-${idx}`}
+                          className={`rounded-2xl border px-3 py-2.5 ${isPrimary ? "border-lime/50 bg-lime/10" : "border-border bg-surface"}`}
+                        >
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="min-w-0 flex-1">
+                              <div className="flex items-center gap-1.5">
+                                {isPrimary && (
+                                  <span className="text-[10px] uppercase tracking-wider text-lime font-bold">★ Primary</span>
+                                )}
+                                {!v.placeId && (
+                                  <span className="text-[10px] uppercase tracking-wider text-coral font-bold">Unverified</span>
+                                )}
+                              </div>
+                              <div className="truncate text-sm font-semibold">{v.address}</div>
+                            </div>
+                            <div className="flex items-center gap-1 shrink-0">
+                              {!isPrimary && v.placeId && (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const target = verifiedVenues.findIndex((x) => x.placeId === v.placeId);
+                                    if (target >= 0) setDraft((d) => ({ ...d, primaryVenueIdx: target }));
+                                  }}
+                                  className="rounded-full border border-border bg-background px-2 py-1 text-[10px] font-bold hover:border-lime"
+                                >
+                                  Make primary
+                                </button>
+                              )}
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  setDraft((d) => {
+                                    const nextVenues = d.venues.filter((_, i) => i !== idx);
+                                    const nextVerified = nextVenues.filter((x) => x.address.trim() && x.placeId);
+                                    const nextIdx = Math.min(d.primaryVenueIdx, Math.max(nextVerified.length - 1, 0));
+                                    return { ...d, venues: nextVenues, primaryVenueIdx: nextIdx };
+                                  })
+                                }
+                                className="rounded-full border border-border bg-background p-1.5"
+                                aria-label="Remove venue"
+                              >
+                                <X className="h-3.5 w-3.5" />
+                              </button>
+                            </div>
+                          </div>
+                          {v.placeId && v.geo && (
+                            <div className="mt-2">
+                              <VenueMapPreview address={v.address} lat={v.geo.lat} lng={v.geo.lng} placeId={v.placeId} />
+                            </div>
+                          )}
+                        </li>
+                      );
+                    })}
+                  </ul>
                 )}
-                {draft.venuePlaceId && (
-                  <div className="flex items-center gap-2 text-[11px] text-lime">
-                    <Check className="h-3 w-3" /> Verified
-                  </div>
-                )}
-                {draft.venue && draft.venuePlaceId && draft.venueGeo && (
-                  <VenueMapPreview
-                    address={draft.venue}
-                    lat={draft.venueGeo.lat}
-                    lng={draft.venueGeo.lng}
-                    placeId={draft.venuePlaceId}
+
+                <div className="space-y-2">
+                  <label className="text-[11px] uppercase tracking-wider text-muted-foreground font-bold">Add a venue</label>
+                  <LocationAutocomplete
+                    value=""
+                    onChange={() => { /* value is committed only via onPick */ }}
+                    onPick={(full, placeId, geo) => {
+                      if (!placeId) return;
+                      setDraft((d) => {
+                        if (d.venues.some((x) => x.placeId === placeId)) {
+                          toast.message("That venue is already added.");
+                          return d;
+                        }
+                        const nextVenues = [
+                          ...d.venues,
+                          { address: full, placeId, geo: geo ? { lat: geo.lat, lng: geo.lng } : null },
+                        ];
+                        const nextVerifiedLen = nextVenues.filter((x) => x.address.trim() && x.placeId).length;
+                        // If this is the first verified venue, make it primary.
+                        const nextIdx = nextVerifiedLen === 1 ? 0 : d.primaryVenueIdx;
+                        return { ...d, venues: nextVenues, primaryVenueIdx: nextIdx };
+                      });
+                    }}
+                    placeholder="Start typing then pick a Google suggestion"
                   />
-                )}
+                  <p className="text-[11px] text-muted-foreground">
+                    You can add multiple venues and pick a different one for each availability window in the next step.
+                  </p>
+                </div>
               </Section>
 
               <p className="text-[12px] text-muted-foreground">
@@ -676,6 +740,7 @@ export function CreateTrainerWizard() {
               </p>
             </div>
           )}
+
 
           {step === 3 && (
             <div className="space-y-5">
@@ -686,8 +751,9 @@ export function CreateTrainerWizard() {
                 <AvailabilityCalendar
                   weekly={draft.slots}
                   overrides={draft.overrides}
-                  venues={draft.venue && draft.venuePlaceId ? [draft.venue] : []}
-                  primaryVenue={draft.venue || null}
+                  venues={verifiedVenueAddresses}
+                  primaryVenue={primaryVenue?.address ?? null}
+
                   timezone={draft.timezone}
                   onWeeklyChange={(slots) => setDraft((d) => ({ ...d, slots }))}
                   onOverridesChange={(overrides) => setDraft((d) => ({ ...d, overrides }))}
@@ -698,7 +764,7 @@ export function CreateTrainerWizard() {
                 <AvailabilityRulesEditor
                   value={draft.rules}
                   onChange={(rules) => setDraft((d) => ({ ...d, rules }))}
-                  venues={draft.venue && draft.venuePlaceId ? [draft.venue] : []}
+                  venues={verifiedVenueAddresses}
                 />
               </Section>
 
