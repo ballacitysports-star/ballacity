@@ -97,6 +97,7 @@ function EditOrg() {
   type Slot = NonNullable<Org["availabilitySlots"]>[number];
   const [slots, setSlots] = useState<Slot[]>(org.availabilitySlots ?? []);
   const [venueAddresses, setVenueAddresses] = useState<string[]>(org.venueAddresses ?? []);
+  const [primaryVenue, setPrimaryVenue] = useState<string | null>(org.primaryVenue ?? null);
   const slotsError = useMemo(() => validateSlots(slots), [slots]);
   const venueValidation = useMemo(() => validateVenueList(venueAddresses), [venueAddresses]);
   const venuesError = org.kind === "coach" && venueAddresses.length > 0 && venueValidation.hasError;
@@ -159,6 +160,11 @@ function EditOrg() {
     ratePerHour: kind === "coach" ? rate : undefined,
     availabilitySlots: kind === "coach" ? slots : undefined,
     venueAddresses: kind === "coach" ? venueAddresses.filter((a) => a.trim().length > 0) : undefined,
+    primaryVenue: kind === "coach"
+      ? (primaryVenue && venueAddresses.map((v) => v.trim()).includes(primaryVenue.trim())
+          ? primaryVenue.trim()
+          : undefined)
+      : undefined,
     league: kind === "team" ? league : undefined,
     record: kind === "team" ? { w: wins, l: losses } : undefined,
     homeCourt: kind === "team" ? homeCourt : undefined,
@@ -193,10 +199,23 @@ function EditOrg() {
         credentials: kind === "coach" ? credentials : undefined,
         ratePerHour: kind === "coach" ? rate : undefined,
         availabilitySlots: kind === "coach"
-          ? slots.filter((s) => s.start && s.end && s.end > s.start)
+          ? slots
+              .filter((s) => s.start && s.end && s.end > s.start)
+              .map((s) => ({
+                ...s,
+                venue:
+                  s.venue && venueAddresses.map((v) => v.trim()).includes(s.venue.trim())
+                    ? s.venue.trim()
+                    : undefined,
+              }))
           : undefined,
         venueAddresses: kind === "coach"
           ? venueAddresses.map((a) => a.trim()).filter((a) => a.length > 0)
+          : undefined,
+        primaryVenue: kind === "coach"
+          ? (primaryVenue && venueAddresses.map((v) => v.trim()).includes(primaryVenue.trim())
+              ? primaryVenue.trim()
+              : null)
           : undefined,
         league: kind === "team" ? league : undefined,
         record: kind === "team" ? { w: wins, l: losses } : undefined,
