@@ -56,6 +56,15 @@ const TeamInput = z.object({
   rating_max: z.string().max(20).nullable().optional(),
   distances: z.array(z.string().max(40)).default([]),
   session_types: z.array(z.string().max(40)).default([]),
+  availability_slots: z
+    .array(
+      z.object({
+        day: z.enum(["mon", "tue", "wed", "thu", "fri", "sat", "sun"]),
+        start: z.string().regex(/^\d{2}:\d{2}$/),
+        end: z.string().regex(/^\d{2}:\d{2}$/),
+      }),
+    )
+    .default([]),
 });
 
 const TeamPatch = TeamInput.partial().extend({ id: z.string() });
