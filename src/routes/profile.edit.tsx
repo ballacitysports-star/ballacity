@@ -104,12 +104,25 @@ function EditProfile() {
     setCropTarget("cover");
   };
 
-  const onCropConfirm = (dataUrl: string) => {
-    markDirty();
-    if (cropTarget === "avatar") setAvatarUrl(dataUrl);
-    else if (cropTarget === "cover") setCoverUrl(dataUrl);
+  const [uploadingImg, setUploadingImg] = useState<null | "avatar" | "cover">(null);
+
+  const onCropConfirm = async (dataUrl: string) => {
+    const target = cropTarget;
     setCropTarget(null);
     setCropFile(null);
+    if (!target || !profileUser) return;
+    markDirty();
+    setUploadingImg(target);
+    try {
+      const bucket = target === "avatar" ? "avatars" : "covers";
+      const url = await uploadDataUrlToBucket(bucket, profileUser.id, dataUrl);
+      if (target === "avatar") setAvatarUrl(url);
+      else setCoverUrl(url);
+    } catch (e: any) {
+      toast.error(e?.message ?? "Upload failed");
+    } finally {
+      setUploadingImg(null);
+    }
   };
 
   const addLink = (type: ProfileLinkType) => {
