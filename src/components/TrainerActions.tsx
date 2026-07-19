@@ -153,6 +153,7 @@ export function TrainerActions({ org, defaultVenue = null }: { org: Org; default
         open={bookOpen}
         onOpenChange={setBookOpen}
         onStatusChange={refresh}
+        prefill={prefill}
       />
     </>
   );
