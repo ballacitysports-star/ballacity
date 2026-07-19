@@ -1,29 +1,26 @@
-## Goal
+## Problem
 
-Kill the legacy step‑0 type picker on `/teams/create` and make sure no link lands on it. Every entry point must arrive with a `kind` already chosen (`team` or `coach`) and open on step 1 (Identity).
+The Trainers page crashes to the error boundary ("This page didn't load"). Console shows:
 
-## Current link inventory
+> Error: cannot add `postgres_changes` callbacks for realtime:trainer-requests-<uid> after `subscribe()`.
+> at subscribeToMyTrainerRequests (src/lib/trainer-requests.ts:49)
+> at TrainerActions.tsx:36
 
-- `src/routes/_tabs.teams.tsx:260` — `+` button → `/teams/create` (no kind)
-- `src/routes/_tabs.trainers.tsx:241` — already passes `kind=coach` (verify search prop)
-- `src/routes/profile.edit.tsx:734` — “New” button in *My organizations* → `/teams/create` (no kind)
-- `src/routes/profile.edit.tsx:743` — empty‑state card → `/teams/create` (no kind)
+Root cause: `_tabs.trainers.tsx` renders one `<TrainerActions />` per trainer card. Each one calls `subscribeToMyTrainerRequests(user.id, …)`, which does `supabase.channel(\`trainer-requests-${userId}\`)`. Supabase-js reuses a channel with the same topic, so the second mount receives an already-subscribed channel; the follow-up `.on("postgres_changes", …)` throws, React unwinds, and the route boundary shows the error page.
 
-## Changes
+## Fix
 
-1. **`src/routes/_tabs.teams.tsx`** — add `search={{ kind: "team" }}` to the `+` link so the teams tab always creates a team.
-2. **`src/routes/_tabs.trainers.tsx`** — confirm the `+` link passes `search={{ kind: "coach" }}` (add if missing).
-3. **`src/routes/profile.edit.tsx`** — the “My organizations” section is generic, so replace each bare `/teams/create` link with a small two‑button chooser rendered inline (Team → `kind=team`, Trainer → `kind=coach`):
-   - The section header `right` slot: swap the single “+ New” link for two compact chips “+ Team” and “+ Trainer”.
-   - The empty‑state card: swap the single dashed link for a card containing two side‑by‑side CTAs (“Start a team” / “Start a trainer profile”), each linking to the correct `kind`.
-4. **`src/routes/teams.create.tsx`** — retire step 0:
-   - Drop `"Type"` from `STEPS` so the wizard is `["Identity", "Details", "Branding"]`.
-   - Default `kind` from the URL; when neither `team` nor `coach` is provided, default to `team` and immediately `nav({ to: "/teams/create", search: { kind: "team" }, replace: true })` so the URL stays canonical (no silent bare `/teams/create` state).
-   - Initial `step` becomes `0` (Identity) unconditionally; remove the `initialKind ? 1 : 0` branch and any Back/Cancel logic tied to the picker step.
-   - Delete the JSX + handlers that rendered the Type step and its picker cards.
-5. **Verification** — after edits: `rg "teams/create" src -g '!routeTree.gen.ts'` shows every remaining link carries a `search={{ kind: ... }}`, and manually opening `/teams/create` bare redirects to `?kind=team` on Identity.
+Share one realtime channel across all subscribers for the same user, in `src/lib/trainer-requests.ts`:
 
-## Out of scope
+- Keep a module-level map keyed by `userId` holding `{ channel, listeners: Set<() => void>, refCount }`.
+- On first subscribe for a user: create the channel, register both `.on("postgres_changes", …)` filters (from/to) that fan out to every listener, then `.subscribe()`.
+- On subsequent subscribes: just add the callback to `listeners` and bump refCount — no new `.on()` or `.subscribe()` calls.
+- Returned unsubscribe removes the listener and decrements refCount; when it hits 0, `supabase.removeChannel(channel)` and delete the map entry.
 
-- The `/create` (host a game) route — that's a separate, still‑used flow.
-- Any redesign of the wizard beyond removing step 0.
+This preserves the current public API (`subscribeToMyTrainerRequests(userId, onChange) => () => void`), so `TrainerActions.tsx` and the trainer detail route need no changes.
+
+## Verify
+
+- Load `/trainers` — page renders the trainer list without hitting the error boundary.
+- Console shows no "cannot add postgres_changes callbacks after subscribe()" errors.
+- Navigating to `/trainers/$trainerId` and back still works (channel is torn down after the last unmount).
