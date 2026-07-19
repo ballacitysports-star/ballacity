@@ -1,7 +1,7 @@
 import { Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { ArrowLeft, ArrowRight, Check, Sparkles, X, Plus } from "lucide-react";
+import { ArrowLeft, ArrowRight, Check, Sparkles, X, Plus, MapPin } from "lucide-react";
 import {
   SPORTS,
   HERO_IMAGE,
