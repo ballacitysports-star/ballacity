@@ -60,11 +60,13 @@ const trainersSearchSchema = z.object({
   q: fallback(z.string(), "").default(""),
   sport: fallback(z.string(), "").default(""),
   specialty: fallback(z.string(), "").default(""),
+  venue: fallback(z.string(), "").default(""),
   avail: fallback(z.string(), "any").default("any"),
   sort: fallback(z.string(), "nearest").default("nearest"),
   view: fallback(z.string(), "list").default("list"),
   density: fallback(z.string(), "list").default("list"),
 });
+
 
 export const Route = createFileRoute("/_tabs/trainers")({
   head: () => ({
@@ -93,6 +95,7 @@ function TrainersPage() {
   const q = search.q;
   const sport: Sport | null = (search.sport || null) as Sport | null;
   const specialty: string = search.specialty || "";
+  const venue: string = search.venue || "";
   const sortBy: SortBy =
     search.sort === "soonest" || search.sort === "followers" || search.sort === "name"
       ? search.sort
@@ -111,8 +114,10 @@ function TrainersPage() {
   const setSport = (v: Sport | null) => updateSearch({ sport: v ?? "", specialty: "" });
   const setSpecialty = (v: string) =>
     updateSearch({ specialty: specialty === v ? "" : v });
+  const setVenue = (v: string) => updateSearch({ venue: venue === v ? "" : v });
   const setSortBy = (v: SortBy) => updateSearch({ sort: v });
   const setAvail = (v: Avail) => updateSearch({ avail: v });
+
   const [filtersOpen, setFiltersOpen] = useState(false);
   const switchView = (v: ViewMode) => updateSearch({ view: v });
   const switchDensity = (d: Density) => updateSearch({ density: d });
@@ -176,6 +181,7 @@ function TrainersPage() {
       return /month|casual|occasion|pickup|drop/.test(c);
     };
     const specialtyLower = specialty.toLowerCase();
+    const venueLower = venue.trim().toLowerCase();
     const filtered = orgs
       .filter((o) => o.kind === "coach")
       .filter((o) => (sport ? o.sports.includes(sport) : true))
@@ -183,6 +189,11 @@ function TrainersPage() {
         if (!specialty) return true;
         const hay = `${o.tagline ?? ""} ${o.name ?? ""}`.toLowerCase();
         return hay.includes(specialtyLower);
+      })
+      .filter((o) => {
+        if (!venueLower) return true;
+        const venues = o.venueAddresses ?? [];
+        return venues.some((v) => v.trim().toLowerCase() === venueLower);
       })
       .filter((o) => {
         if (avail === "any") return true;
@@ -209,7 +220,35 @@ function TrainersPage() {
       return a.o.name.localeCompare(b.o.name);
     });
     return withDist;
-  }, [orgs, sport, specialty, q, sortBy, avail]);
+  }, [orgs, sport, specialty, venue, q, sortBy, avail]);
+
+  const venueOptions = useMemo(() => {
+    const map = new Map<string, { addr: string; primary: boolean; count: number }>();
+    orgs
+      .filter((o) => o.kind === "coach")
+      .forEach((o) => {
+        const primary = o.primaryVenue?.trim() ?? "";
+        (o.venueAddresses ?? []).forEach((a) => {
+          const trimmed = a.trim();
+          if (!trimmed) return;
+          const key = trimmed.toLowerCase();
+          const isPrimary = !!primary && primary === trimmed;
+          const cur = map.get(key);
+          if (cur) {
+            cur.count += 1;
+            cur.primary = cur.primary || isPrimary;
+          } else {
+            map.set(key, { addr: trimmed, primary: isPrimary, count: 1 });
+          }
+        });
+      });
+    return Array.from(map.values()).sort((a, b) => {
+      if (a.primary !== b.primary) return a.primary ? -1 : 1;
+      if (b.count !== a.count) return b.count - a.count;
+      return a.addr.localeCompare(b.addr);
+    });
+  }, [orgs]);
+
 
   const featured =
     orgs.find((o) => o.verified && o.kind === "coach") ?? orgs.find((o) => o.kind === "coach");
@@ -275,7 +314,8 @@ function TrainersPage() {
         </div>
         {(() => {
           const activeFilterCount =
-            (sport ? 1 : 0) + (specialty ? 1 : 0) + (avail !== "any" ? 1 : 0);
+            (sport ? 1 : 0) + (specialty ? 1 : 0) + (venue ? 1 : 0) + (avail !== "any" ? 1 : 0);
+
           return (
             <button
               onClick={() => setFiltersOpen((v) => !v)}
@@ -337,6 +377,46 @@ function TrainersPage() {
               </div>
             );
           })()}
+
+          {venueOptions.length > 0 && (
+            <div className="-mx-4 overflow-x-auto px-4 mb-3">
+              <div className="flex gap-2 pb-1">
+                <span className="self-center text-[10px] font-bold uppercase tracking-wider text-muted-foreground pr-1">
+                  Venue
+                </span>
+                <button
+                  onClick={() => setVenue("")}
+                  className={`whitespace-nowrap rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors ${
+                    !venue
+                      ? "border-lime bg-lime text-primary-foreground"
+                      : "border-border bg-surface text-muted-foreground"
+                  }`}
+                >
+                  Any venue
+                </button>
+                {venueOptions.map((v) => {
+                  const active = venue.trim().toLowerCase() === v.addr.toLowerCase();
+                  const short = v.addr.split(",")[0];
+                  return (
+                    <button
+                      key={v.addr}
+                      onClick={() => setVenue(v.addr)}
+                      title={v.addr}
+                      className={`whitespace-nowrap rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors ${
+                        active
+                          ? "border-lime bg-lime text-primary-foreground"
+                          : "border-border bg-surface text-muted-foreground"
+                      }`}
+                    >
+                      {v.primary ? "★ " : ""}
+                      {short}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
 
           <div className="-mx-4 overflow-x-auto px-4 mb-4">
             <div className="flex gap-2 pb-1">

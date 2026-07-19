@@ -41,8 +41,10 @@ export const Route = createFileRoute("/trainers/$trainerId")({
     z.object({
       tab: fallback(z.string(), "").default(""),
       modal: fallback(z.string(), "").default(""),
+      venue: fallback(z.string(), "").default(""),
     }),
   ),
+
   head: ({ loaderData }) => {
     const o = loaderData as Org | undefined;
     if (!o) {
@@ -111,10 +113,14 @@ function TrainerPage() {
   const tab: "about" | "experience" | "reviews" =
     search.tab === "experience" || search.tab === "reviews" ? search.tab : "about";
   const reviewsOpen = search.modal === "reviews";
+  const selectedVenue: string = search.venue || "";
   const setTab = (v: "about" | "experience" | "reviews") =>
     navigate({ search: (p: any) => ({ ...p, tab: v === "about" ? "" : v }), replace: true });
   const setReviewsOpen = (v: boolean) =>
     navigate({ search: (p: any) => ({ ...p, modal: v ? "reviews" : "" }), replace: true });
+  const setSelectedVenue = (v: string) =>
+    navigate({ search: (p: any) => ({ ...p, venue: selectedVenue === v ? "" : v }), replace: true });
+
 
   const [bookOpen, setBookOpen] = useState(false);
   const [following, setFollowing] = useState(false);
@@ -420,6 +426,51 @@ function TrainerPage() {
                   </>
                 }
               >
+                {org.venueAddresses.length > 1 && (
+                  <div className="-mx-1 mb-2 overflow-x-auto px-1">
+                    <div className="flex gap-2 pb-1">
+                      <button
+                        type="button"
+                        onClick={() => setSelectedVenue("")}
+                        className={`whitespace-nowrap rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors ${
+                          !selectedVenue
+                            ? "border-lime bg-lime text-primary-foreground"
+                            : "border-border bg-surface text-muted-foreground"
+                        }`}
+                      >
+                        All venues
+                      </button>
+                      {[...org.venueAddresses]
+                        .sort((a, b) => {
+                          const pv = org.primaryVenue?.trim();
+                          if (!pv) return 0;
+                          if (a.trim() === pv) return -1;
+                          if (b.trim() === pv) return 1;
+                          return 0;
+                        })
+                        .map((addr) => {
+                          const active = selectedVenue.trim().toLowerCase() === addr.trim().toLowerCase();
+                          const isPrimary = !!org.primaryVenue && addr.trim() === org.primaryVenue.trim();
+                          const short = addr.split(",")[0];
+                          return (
+                            <button
+                              key={addr}
+                              type="button"
+                              onClick={() => setSelectedVenue(addr)}
+                              className={`whitespace-nowrap rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors ${
+                                active
+                                  ? "border-lime bg-lime text-primary-foreground"
+                                  : "border-border bg-surface text-muted-foreground"
+                              }`}
+                            >
+                              {isPrimary ? "★ " : ""}
+                              {short}
+                            </button>
+                          );
+                        })}
+                    </div>
+                  </div>
+                )}
                 <ul className="space-y-1.5">
                   {[...org.venueAddresses]
                     .sort((a, b) => {
@@ -431,10 +482,18 @@ function TrainerPage() {
                     })
                     .map((addr, i) => {
                       const isPrimary = !!org.primaryVenue && addr.trim() === org.primaryVenue.trim();
+                      const dimmed =
+                        selectedVenue &&
+                        selectedVenue.trim().toLowerCase() !== addr.trim().toLowerCase();
+                      const focused =
+                        selectedVenue &&
+                        selectedVenue.trim().toLowerCase() === addr.trim().toLowerCase();
                       return (
                         <li
                           key={i}
-                          className="flex items-center justify-between gap-2 rounded-2xl border border-border bg-surface px-3 py-2 text-sm"
+                          className={`flex items-center justify-between gap-2 rounded-2xl border px-3 py-2 text-sm transition-opacity ${
+                            focused ? "border-lime bg-lime/10" : "border-border bg-surface"
+                          } ${dimmed ? "opacity-40" : ""}`}
                         >
                           <span className="min-w-0 truncate">{addr}</span>
                           {isPrimary && (
@@ -454,6 +513,11 @@ function TrainerPage() {
                 title={
                   <>
                     <Calendar className="h-4 w-4" /> Availability
+                    {selectedVenue && (
+                      <span className="ml-2 rounded-full border border-lime/50 bg-lime/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-lime">
+                        {selectedVenue.split(",")[0]}
+                      </span>
+                    )}
                   </>
                 }
               >
@@ -461,9 +525,11 @@ function TrainerPage() {
                   weekly={org.availabilitySlots ?? []}
                   overrides={org.availabilityOverrides ?? []}
                   primaryVenue={org.primaryVenue ?? null}
+                  venueFilter={selectedVenue || null}
                 />
               </Section>
             )}
+
 
 
             <Section
