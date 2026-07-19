@@ -11,7 +11,14 @@ const emojiBySport: Record<string, string> = Object.fromEntries(
 
 export function TeamsMapView({ orgs, kind }: { orgs: Org[]; kind: OrgKind }) {
   const pins: MapPinItem[] = orgs.map((o) => {
-    const { lat, lng } = pseudoLatLngFromId(o.id);
+    // Prefer real coordinates from the trainer's primary/first verified venue.
+    const primaryKey = o.primaryVenue?.trim().toLowerCase();
+    const geoList = o.venueGeo ?? [];
+    const primary = primaryKey ? geoList.find((g) => g.address.trim().toLowerCase() === primaryKey) : undefined;
+    const chosen = primary ?? geoList[0];
+    const { lat, lng } = chosen
+      ? { lat: chosen.lat, lng: chosen.lng }
+      : pseudoLatLngFromId(o.id);
     return {
       id: o.id,
       emoji: emojiBySport[o.sports?.[0] ?? ""] ?? (kind === "coach" ? "🎓" : "🛡️"),
