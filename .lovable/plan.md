@@ -1,26 +1,29 @@
-## Problem
+## Goal
+Move trainer creation out of the `/teams/create` route into its own `/trainers/create` route so the two flows are fully independent.
 
-The Trainers page crashes to the error boundary ("This page didn't load"). Console shows:
+## Changes
 
-> Error: cannot add `postgres_changes` callbacks for realtime:trainer-requests-<uid> after `subscribe()`.
-> at subscribeToMyTrainerRequests (src/lib/trainer-requests.ts:49)
-> at TrainerActions.tsx:36
+### 1. New route: `src/routes/trainers.create.tsx`
+- Copy `teams.create.tsx` as the starting point.
+- Hard-code `kind = "coach"` (trainer). Remove the `kind` search param, the `kindParam` canonicalization effect, and the `setKind` state.
+- Strip all `kind === "team"` branches: team name/league/record/home court/staff/roster fields and their wizard steps.
+- Keep trainer-only fields: trainer name, sports, specialties/positions, credentials, rate per hour, session types, bio, cover photo, location.
+- On submit, save with `kind: "coach"` and navigate to `/trainers` (or the new trainer's profile).
+- `createFileRoute("/trainers/create")`.
 
-Root cause: `_tabs.trainers.tsx` renders one `<TrainerActions />` per trainer card. Each one calls `subscribeToMyTrainerRequests(user.id, …)`, which does `supabase.channel(\`trainer-requests-${userId}\`)`. Supabase-js reuses a channel with the same topic, so the second mount receives an already-subscribed channel; the follow-up `.on("postgres_changes", …)` throws, React unwinds, and the route boundary shows the error page.
+### 2. Simplify `src/routes/teams.create.tsx`
+- Remove the `kind` search param and the `/teams/create?kind=coach` redirect.
+- Hard-code `kind = "team"` and delete all `kind === "coach"` branches (credentials, rate, session types, trainer copy).
+- Route stays at `/teams/create`, always renders the team-only wizard.
 
-## Fix
+### 3. Update entry points
+- `src/routes/_tabs.trainers.tsx` (line ~296): change `to="/teams/create"` (currently with `kind: "coach"`) → `to="/trainers/create"`.
+- `src/routes/profile.edit.tsx` (lines ~735, 742, 762, 769): trainer-related CTAs point to `/trainers/create`; team CTAs stay on `/teams/create` (no `kind` param).
+- `src/routes/_tabs.teams.tsx` (line 260): keep `/teams/create`, drop any `kind` search value.
 
-Share one realtime channel across all subscribers for the same user, in `src/lib/trainer-requests.ts`:
+### 4. Cleanup
+- Any lingering `?kind=team|coach` links removed.
+- `routeTree.gen.ts` regenerates automatically.
 
-- Keep a module-level map keyed by `userId` holding `{ channel, listeners: Set<() => void>, refCount }`.
-- On first subscribe for a user: create the channel, register both `.on("postgres_changes", …)` filters (from/to) that fan out to every listener, then `.subscribe()`.
-- On subsequent subscribes: just add the callback to `listeners` and bump refCount — no new `.on()` or `.subscribe()` calls.
-- Returned unsubscribe removes the listener and decrements refCount; when it hits 0, `supabase.removeChannel(channel)` and delete the map entry.
-
-This preserves the current public API (`subscribeToMyTrainerRequests(userId, onChange) => () => void`), so `TrainerActions.tsx` and the trainer detail route need no changes.
-
-## Verify
-
-- Load `/trainers` — page renders the trainer list without hitting the error boundary.
-- Console shows no "cannot add postgres_changes callbacks after subscribe()" errors.
-- Navigating to `/trainers/$trainerId` and back still works (channel is torn down after the last unmount).
+## Out of scope
+No changes to team/trainer data models, profile pages, or the shared `sport-config`/`org-store` helpers — only the creation route split and its call sites.
