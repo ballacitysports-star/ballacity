@@ -583,6 +583,29 @@ export function CreateOrgWizard({ kind }: { kind: OrgKind }) {
                               <X className="h-4 w-4" />
                             </button>
                           </div>
+                          {venueAddresses.some((v) => v.trim()) && (
+                            <select
+                              value={slot.venue ?? ""}
+                              onChange={(e) =>
+                                setSlots((cur) =>
+                                  cur.map((s, j) =>
+                                    j === i ? { ...s, venue: e.target.value || undefined } : s,
+                                  ),
+                                )
+                              }
+                              className="w-full rounded-2xl border border-border bg-surface px-3 py-2 text-xs outline-none focus:border-lime"
+                            >
+                              <option value="">Any venue</option>
+                              {venueAddresses
+                                .map((v) => v.trim())
+                                .filter((v, idx, arr) => v && arr.indexOf(v) === idx)
+                                .map((v) => (
+                                  <option key={v} value={v}>
+                                    {v === primaryVenue?.trim() ? "★ " : ""}{v}
+                                  </option>
+                                ))}
+                            </select>
+                          )}
                           {rowError && (
                             <p className="text-xs text-red-500">{rowError.message}</p>
                           )}
