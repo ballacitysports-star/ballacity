@@ -134,7 +134,7 @@ function TrainersPage() {
 
   const orgsListQuery = useQuery({
     queryKey: ["trainer-orgs-list"],
-    queryFn: () => listTrainerOrgs({ data: { limit: 50 } }),
+    queryFn: () => listTrainerOrgs({ data: {} }),
   });
   const orgMembersQuery = useQuery({
     queryKey: ["trainer-org-members", orgId],
