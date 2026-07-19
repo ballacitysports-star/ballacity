@@ -19,6 +19,7 @@ import {
 } from "@/lib/sample-data";
 import { addOrg } from "@/lib/org-store";
 import { validateSlots } from "@/lib/availability-slots";
+import { validateVenueList } from "@/lib/venue-address";
 import {
   SPORT_CONFIG,
   SESSION_TYPES,
@@ -106,6 +107,8 @@ export function CreateOrgWizard({ kind }: { kind: OrgKind }) {
   type Slot = NonNullable<Org["availabilitySlots"]>[number];
   const [slots, setSlots] = useState<Slot[]>([]);
   const slotsError = useMemo(() => validateSlots(slots), [slots]);
+  const venueValidation = useMemo(() => validateVenueList(venueAddresses), [venueAddresses]);
+  const venuesError = isCoach && venueAddresses.length > 0 && venueValidation.hasError;
 
   const primary = primarySport(sports);
   const ratingSystem = ratingSystemFor(primary);
