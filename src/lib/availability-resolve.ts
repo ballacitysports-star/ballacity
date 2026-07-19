@@ -1,4 +1,5 @@
 import type { Slot } from "./availability-slots";
+import { wallTimeToInstant, instantToWall } from "./tz";
 
 export type Weekday = Slot["day"];
 
