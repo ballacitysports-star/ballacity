@@ -13,6 +13,8 @@ import { SESSION_TYPES } from "@/lib/sport-config";
 import { LocationAutocomplete } from "@/components/LocationAutocomplete";
 import { VenueMapPreview } from "@/components/VenueMapPreview";
 import { OrgCard } from "@/components/OrgCard";
+import { ImageUploader } from "@/components/ImageUploader";
+import { useAuth } from "@/hooks/use-auth";
 
 import { AvailabilityCalendar } from "@/components/AvailabilityCalendar";
 import { AvailabilityRulesEditor } from "@/components/AvailabilityRulesEditor";
@@ -58,6 +60,8 @@ type Draft = {
   rules: AvailabilityRule[];
   timezone: string;
   orgChoice: { mode: "existing" | "new" | null; orgId?: string; name?: string };
+  avatarUrl: string | null;
+  coverUrl: string | null;
 };
 
 
@@ -109,11 +113,15 @@ function initialDraft(): Draft {
     rules: [],
     timezone: defaultTimezone(),
     orgChoice: { mode: null },
+    avatarUrl: null,
+    coverUrl: null,
   };
 }
 
 export function CreateTrainerWizard() {
   const nav = useNavigate();
+  const { user } = useAuth();
+
 
   const [draft, setDraft] = useState<Draft>(() => {
     if (typeof window === "undefined") return initialDraft();
@@ -200,8 +208,8 @@ export function CreateTrainerWizard() {
     founded: new Date().getFullYear(),
     sports: sports.length ? sports : (["Basketball"] as Sport[]),
     verified: false,
-    cover: HERO_IMAGE,
-    avatar: initials(draft.name || "OR"),
+    cover: draft.coverUrl ?? HERO_IMAGE,
+    avatar: draft.avatarUrl ?? initials(draft.name || "OR"),
     accent: "#a3ff12",
     followers: 0,
     roster: 0,
@@ -407,6 +415,30 @@ export function CreateTrainerWizard() {
                   maxLength={80}
                   placeholder="One line that sums you up"
                   className="w-full rounded-2xl border border-border bg-surface px-4 py-3 text-sm outline-none focus:border-lime"
+                />
+              </Section>
+
+              <Section title="Profile photo (optional)">
+                <ImageUploader
+                  kind="avatar"
+                  bucket="trainer-avatars"
+                  pathPrefix={user?.id}
+                  value={draft.avatarUrl ?? ""}
+                  onChange={(url) => setDraft((d) => ({ ...d, avatarUrl: url }))}
+                  onClear={() => setDraft((d) => ({ ...d, avatarUrl: null }))}
+                />
+              </Section>
+
+              <Section title="Cover image (optional)">
+                <ImageUploader
+                  kind="cover"
+                  bucket="team-covers"
+                  pathPrefix={user?.id}
+                  value={draft.coverUrl ?? ""}
+                  fallback={HERO_IMAGE}
+                  onChange={(url) => setDraft((d) => ({ ...d, coverUrl: url }))}
+                  onClear={() => setDraft((d) => ({ ...d, coverUrl: null }))}
+                  presets={draft.primarySport ? [draft.primarySport] : undefined}
                 />
               </Section>
             </div>

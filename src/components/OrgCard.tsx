@@ -38,12 +38,25 @@ export function OrgCard({
         </div>
 
         <div className="p-4 -mt-10 relative">
-          <div
-            className="grid h-16 w-16 place-items-center rounded-2xl border-4 border-surface font-display text-xl font-bold text-primary-foreground"
-            style={{ background: `linear-gradient(135deg, ${org.accent}, ${org.accent}aa)` }}
-          >
-            {org.avatar}
-          </div>
+          {(() => {
+            const a = org.avatar || "";
+            const isUrl = /^(https?:|data:|blob:)/.test(a);
+            if (isUrl) {
+              return (
+                <div className="h-16 w-16 overflow-hidden rounded-2xl border-4 border-surface bg-surface">
+                  <img src={a} alt="" className="h-full w-full object-cover" />
+                </div>
+              );
+            }
+            return (
+              <div
+                className="grid h-16 w-16 place-items-center rounded-2xl border-4 border-surface font-display text-xl font-bold text-primary-foreground"
+                style={{ background: `linear-gradient(135deg, ${org.accent}, ${org.accent}aa)` }}
+              >
+                {a}
+              </div>
+            );
+          })()}
 
           <div className="mt-3 flex items-start justify-between gap-2">
             <div className="min-w-0">
