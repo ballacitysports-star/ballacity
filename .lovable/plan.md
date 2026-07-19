@@ -1,29 +1,28 @@
 ## Goal
-Move trainer creation out of the `/teams/create` route into its own `/trainers/create` route so the two flows are fully independent.
+Let trainers set weekly availability windows during profile creation, so bookers can see when they're free.
 
-## Changes
+## Data
+Add a new JSONB column `availability_slots` on `public.teams` (nullable, default `'[]'`). Each entry: `{ day: "mon"|"tue"|...|"sun", start: "HH:MM", end: "HH:MM" }` (24h). Coach-only in practice; teams ignore it.
 
-### 1. New route: `src/routes/trainers.create.tsx`
-- Copy `teams.create.tsx` as the starting point.
-- Hard-code `kind = "coach"` (trainer). Remove the `kind` search param, the `kindParam` canonicalization effect, and the `setKind` state.
-- Strip all `kind === "team"` branches: team name/league/record/home court/staff/roster fields and their wizard steps.
-- Keep trainer-only fields: trainer name, sports, specialties/positions, credentials, rate per hour, session types, bio, cover photo, location.
-- On submit, save with `kind: "coach"` and navigate to `/trainers` (or the new trainer's profile).
-- `createFileRoute("/trainers/create")`.
+- Migration: `ALTER TABLE public.teams ADD COLUMN availability_slots jsonb NOT NULL DEFAULT '[]'::jsonb;`
+- Update `teams.functions.ts` Zod schema (`availability_slots: z.array(z.object({ day, start, end })).default([])`).
+- Update `org-store.ts` `Org` type (`availabilitySlots?: Slot[]`), row→Org mapping, Org→row mapping (coach only), and patch mapping.
 
-### 2. Simplify `src/routes/teams.create.tsx`
-- Remove the `kind` search param and the `/teams/create?kind=coach` redirect.
-- Hard-code `kind = "team"` and delete all `kind === "coach"` branches (credentials, rate, session types, trainer copy).
-- Route stays at `/teams/create`, always renders the team-only wizard.
+## Wizard UI (`src/components/CreateOrgWizard.tsx`, coach branch only)
+Add a new "Availability" section inside the existing rate/session-types step (near `Hourly rate` / `Session types` around line 725–790):
+- Local state `slots: Slot[]`.
+- Row editor: day dropdown (Mon–Sun), start time input, end time input, remove button.
+- "Add time" button appends a default row (`{ day: "mon", start: "17:00", end: "19:00" }`).
+- Validate `end > start`; skip invalid rows on submit.
+- Include `availabilitySlots: isCoach ? slots : undefined` in the create payload (line ~167 area).
 
-### 3. Update entry points
-- `src/routes/_tabs.trainers.tsx` (line ~296): change `to="/teams/create"` (currently with `kind: "coach"`) → `to="/trainers/create"`.
-- `src/routes/profile.edit.tsx` (lines ~735, 742, 762, 769): trainer-related CTAs point to `/trainers/create`; team CTAs stay on `/teams/create` (no `kind` param).
-- `src/routes/_tabs.teams.tsx` (line 260): keep `/teams/create`, drop any `kind` search value.
+Optional empty state hint: "Add the windows you're usually free — bookers see these on your profile."
 
-### 4. Cleanup
-- Any lingering `?kind=team|coach` links removed.
-- `routeTree.gen.ts` regenerates automatically.
+## Trainer profile (`src/routes/trainers.$trainerId.tsx`)
+Where the schedule empty state renders (line ~423), if `org.availabilitySlots?.length`, render a compact list grouped by day (e.g., "Mon 5:00–7:00 PM"). No behavior change beyond display.
 
 ## Out of scope
-No changes to team/trainer data models, profile pages, or the shared `sport-config`/`org-store` helpers — only the creation route split and its call sites.
+- Editing availability post-creation (existing edit flow untouched).
+- Booking calendar integration / conflict checks.
+- One-off (non-recurring) availability dates.
+- Timezone handling — stored as local wall time, matches how `cadence` is treated today.

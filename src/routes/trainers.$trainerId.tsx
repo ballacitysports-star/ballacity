@@ -411,6 +411,36 @@ function TrainerPage() {
               </Section>
             )}
 
+            {org.availabilitySlots && org.availabilitySlots.length > 0 && (
+              <Section
+                title={
+                  <>
+                    <Calendar className="h-4 w-4" /> Weekly availability
+                  </>
+                }
+              >
+                <ul className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  {org.availabilitySlots.map((s, i) => {
+                    const label: Record<string, string> = {
+                      mon: "Monday", tue: "Tuesday", wed: "Wednesday",
+                      thu: "Thursday", fri: "Friday", sat: "Saturday", sun: "Sunday",
+                    };
+                    return (
+                      <li
+                        key={i}
+                        className="flex items-center justify-between rounded-2xl border border-border bg-surface px-3 py-2 text-sm"
+                      >
+                        <span className="font-semibold">{label[s.day] ?? s.day}</span>
+                        <span className="text-muted-foreground">
+                          {s.start} – {s.end}
+                        </span>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </Section>
+            )}
+
             <Section
               title={
                 <>

@@ -1166,6 +1166,7 @@ export type Database = {
         Row: {
           accent: string
           achievements: string[]
+          availability_slots: Json
           avatar: string
           bio: string
           cadence: string | null
@@ -1204,6 +1205,7 @@ export type Database = {
         Insert: {
           accent?: string
           achievements?: string[]
+          availability_slots?: Json
           avatar?: string
           bio?: string
           cadence?: string | null
@@ -1242,6 +1244,7 @@ export type Database = {
         Update: {
           accent?: string
           achievements?: string[]
+          availability_slots?: Json
           avatar?: string
           bio?: string
           cadence?: string | null

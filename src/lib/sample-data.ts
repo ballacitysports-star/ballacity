@@ -390,6 +390,7 @@ export type Org = {
   ratingMax?: string;
   distances?: string[];
   sessionTypes?: string[];
+  availabilitySlots?: { day: "mon" | "tue" | "wed" | "thu" | "fri" | "sat" | "sun"; start: string; end: string }[];
   upcoming: string[]; // game ids
   posts: OrgPost[];
 };

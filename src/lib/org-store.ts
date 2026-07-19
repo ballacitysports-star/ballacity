@@ -43,6 +43,7 @@ type TeamRow = {
   rating_max: string | null;
   distances: string[] | null;
   session_types: string[] | null;
+  availability_slots: unknown;
 };
 
 const myOrgIds = new Set<string>();
@@ -101,6 +102,10 @@ function rowToOrg(row: TeamRow): Org {
     ratingMax: row.rating_max ?? undefined,
     distances: row.distances ?? [],
     sessionTypes: row.session_types ?? [],
+    availabilitySlots:
+      kind === "coach" && Array.isArray(row.availability_slots)
+        ? (row.availability_slots as Org["availabilitySlots"])
+        : [],
     upcoming: [],
     posts: [],
   };
@@ -139,6 +144,7 @@ function orgToInsert(org: Org) {
     rating_max: org.ratingMax ?? null,
     distances: org.distances ?? [],
     session_types: org.sessionTypes ?? [],
+    availability_slots: org.kind === "coach" ? org.availabilitySlots ?? [] : [],
   };
 }
 
@@ -286,6 +292,7 @@ export async function updateOrg(
   if (patch.ratingMax !== undefined) mapped.rating_max = patch.ratingMax ?? null;
   if (patch.distances !== undefined) mapped.distances = patch.distances ?? [];
   if (patch.sessionTypes !== undefined) mapped.session_types = patch.sessionTypes ?? [];
+  if (patch.availabilitySlots !== undefined) mapped.availability_slots = patch.availabilitySlots ?? [];
 
   try {
     const row = (await updateTeam({ data: mapped as never })) as TeamRow;
