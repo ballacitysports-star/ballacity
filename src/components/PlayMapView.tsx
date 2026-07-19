@@ -81,12 +81,27 @@ export function PlayMapView<T extends MapItemLike>(props?: {
     props?.renderCard ??
     ((item: T) => <DefaultGameCard game={item as unknown as ActiveGame} />);
 
+  const lastTapRef = useRef<{ id: string; at: number } | null>(null);
+  const handleSelect = (id: string) => {
+    const now = Date.now();
+    const last = lastTapRef.current;
+    const isRetap = last && last.id === id && now - last.at < 1500;
+    lastTapRef.current = { id, at: now };
+    setActive(id);
+    if (isRetap && props?.getHref) {
+      const item = items.find((it) => it.id === id);
+      const href = item ? props.getHref(item) : null;
+      if (href) navigate({ to: href.to, params: href.params });
+    }
+  };
+
   return (
     <div className="relative h-[calc(100dvh-11rem)] overflow-hidden rounded-3xl border border-border">
       <GamesMap
         pins={pins}
         activeId={active}
-        onSelect={setActive}
+        onSelect={handleSelect}
+
         defaultLocation={profile?.city}
         onVisibleChange={(ids) => {
           setVisibleIds(ids);
