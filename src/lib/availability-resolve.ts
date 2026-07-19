@@ -53,17 +53,20 @@ export function resolveDay(
   date: Date,
   weekly: Slot[] = [],
   overrides: DayOverride[] = [],
+  venueFilter?: string | null,
 ): ResolvedWindow[] {
   const key = toDateKey(date);
   const override = overrides.find((o) => o.date === key);
-  if (override) {
-    if (override.closed) return [];
-    return (override.windows ?? []).map((w) => ({ ...w, source: "override" as const }));
-  }
-  const dow = weekdayOf(date);
-  return weekly
-    .filter((s) => s.day === dow)
-    .map((s) => ({ start: s.start, end: s.end, venue: s.venue, source: "weekly" as const }));
+  const windows: ResolvedWindow[] = override
+    ? override.closed
+      ? []
+      : (override.windows ?? []).map((w) => ({ ...w, source: "override" as const }))
+    : weekly
+        .filter((s) => s.day === weekdayOf(date))
+        .map((s) => ({ start: s.start, end: s.end, venue: s.venue, source: "weekly" as const }));
+  if (!venueFilter) return windows;
+  const target = venueFilter.trim().toLowerCase();
+  return windows.filter((w) => (w.venue ?? "").trim().toLowerCase() === target);
 }
 
 /** True if the given date has any resolved availability window. */
@@ -71,6 +74,8 @@ export function hasAvailability(
   date: Date,
   weekly: Slot[] = [],
   overrides: DayOverride[] = [],
+  venueFilter?: string | null,
 ): boolean {
-  return resolveDay(date, weekly, overrides).length > 0;
+  return resolveDay(date, weekly, overrides, venueFilter).length > 0;
 }
+
