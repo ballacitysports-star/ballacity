@@ -244,8 +244,18 @@ export function CreateOrgWizard({ kind }: { kind: OrgKind }) {
   type OrgChoice =
     | { mode: "independent" }
     | { mode: "join"; orgId: string; orgName: string }
-    | { mode: "create"; name: string; handle: string; city: string; bio: string };
+    | {
+        mode: "create";
+        name: string;
+        handle: string;
+        city: string;
+        bio: string;
+        address?: string;
+        placeId?: string;
+        geo?: { lat: number; lng: number } | null;
+      };
   const [orgChoice, setOrgChoice] = useState<OrgChoice>({ mode: "independent" });
+
   const [orgSearch, setOrgSearch] = useState("");
   const orgSearchResults = useQuery({
     queryKey: ["trainer-orgs-wizard-search", orgSearch],
