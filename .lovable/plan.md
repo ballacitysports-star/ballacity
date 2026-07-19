@@ -1,24 +1,23 @@
-## Add Gym under "My organizations" in Profile Edit
+## Goal
+The selected "Name" input in `src/components/OrgForm.tsx` (line 77) is a plain text field. Turn it into a Google Places-powered gym/business search — the same pattern used in `CreateTrainerWizard` — so picking a suggestion auto-fills Name, Address, City, place ID, and geo coordinates in one step.
 
-The "My organizations" section (`src/routes/profile.edit.tsx` L651–701) currently only shows Team and Trainer add pills, and `useMyOrgs()` only reads the `teams` table. Gyms (rows in `trainer_orgs`, created via `/orgs/create`) never surface here.
+(City and Address fields already use `LocationAutocomplete` and are working; only Name is missing autocomplete.)
 
-### Changes
+## Changes
 
-Scope: `src/routes/profile.edit.tsx` only.
+1. **`src/components/OrgForm.tsx`**
+   - Replace the plain Name `<input>` with a Google Places-backed combobox using `autocompletePlaces` + `getPlaceDetails` server functions (already used by `LocationAutocomplete`).
+   - Free typing still works (user can create a brand-new org name that isn't a listed business).
+   - On suggestion pick:
+     - `name` ← business primary name
+     - `address` ← formatted address (from place details)
+     - `placeId` ← Google place id
+     - `geo` ← `{ lat, lng }`
+     - `city` ← derived from place details (only if currently empty, to avoid overwriting)
+   - Bias results to the user's current location (reuse the geolocation-bias pattern from `LocationAutocomplete`).
+   - Debounced 250ms queries, session-token rotation on pick (Places billing convention).
 
-1. **Header pills** — add a third pill next to Team/Trainer:
-   - `+ Gym` → `Link` to `/orgs/create`.
+2. No backend changes — `autocompletePlaces` / `getPlaceDetails` server functions already exist and route through the Google Maps connector gateway.
 
-2. **Empty state** — change the two-button grid into a three-button grid and add a "Start a gym" CTA linking to `/orgs/create`.
-
-3. **List the user's gyms** alongside teams/trainers:
-   - Add a TanStack Query fetch using `listTrainerOrgs` (or a small `listMyOrgs`-style filter on `owner_id = auth user`) plus `listMyTrainerOrgMemberships` to include gyms where the user is a member/admin.
-   - Filter to gyms owned by the current user (simplest cut) via the existing `owner_id` field returned by `listTrainerOrgs`.
-   - Render each gym in a lightweight card (avatar/cover, name, handle, city, "Gym" badge) that links to `/orgs/$orgId`. Use inline JSX rather than extending `OrgCard` (which is typed for the teams schema).
-   - Merge with `myOrgs` for the empty-state check: if any teams, trainer profiles, or gyms exist, show the lists instead of the empty state.
-
-### Out of scope
-
-- No schema changes; `trainer_orgs` and `/orgs/create` already exist.
-- `OrgCard` and the teams-based `useMyOrgs` stay as-is.
-- No changes to gym creation or edit flows.
+## Result
+Typing a gym name in the create/edit org flow (`/orgs/create`, `/orgs/$orgId/edit`) surfaces Google business suggestions; picking one fills the identity + location sections at once, while still allowing manual entry.
