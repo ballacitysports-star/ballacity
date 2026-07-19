@@ -376,7 +376,7 @@ function TrainersPage() {
         })}
       </div>
 
-      {featured && (
+      {mode === "trainers" && featured && (
         <motion.div
           initial={{ opacity: 0, scale: 0.98 }}
           animate={{ opacity: 1, scale: 1 }}
@@ -395,6 +395,24 @@ function TrainersPage() {
           </div>
         </motion.div>
       )}
+
+      {mode === "gyms" ? (
+        <GymsView
+          gyms={gymsList}
+          q={q}
+          onQ={setQ}
+          isLoading={orgsListQuery.isLoading}
+        />
+      ) : (
+        <TrainersView />
+      )}
+    </div>
+  );
+
+  function TrainersView() {
+    return (
+      <>
+
 
       <ViewDensityToggle
         view={viewMode}
