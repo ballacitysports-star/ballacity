@@ -547,20 +547,56 @@ export function CreateTrainerWizard() {
                     </button>
                   </div>
                 ) : draft.orgChoice.mode === "new" && draft.orgChoice.name ? (
-                  <div className="flex items-center justify-between rounded-2xl border border-coral/40 bg-coral/10 px-3 py-2.5">
-                    <div className="min-w-0">
-                      <div className="text-[10px] uppercase tracking-wider text-coral font-bold">You'll own this new org</div>
-                      <div className="truncate text-sm font-bold">{draft.orgChoice.name}</div>
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between rounded-2xl border border-coral/40 bg-coral/10 px-3 py-2.5">
+                      <div className="min-w-0">
+                        <div className="text-[10px] uppercase tracking-wider text-coral font-bold">You'll own this new org</div>
+                        <div className="truncate text-sm font-bold">{draft.orgChoice.name}</div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setDraft((d) => ({ ...d, orgChoice: { mode: null } }))}
+                        className="rounded-full border border-border bg-background p-1.5"
+                        aria-label="Clear organization"
+                      >
+                        <X className="h-3.5 w-3.5" />
+                      </button>
                     </div>
-                    <button
-                      type="button"
-                      onClick={() => setDraft((d) => ({ ...d, orgChoice: { mode: null } }))}
-                      className="rounded-full border border-border bg-background p-1.5"
-                      aria-label="Clear organization"
-                    >
-                      <X className="h-3.5 w-3.5" />
-                    </button>
+                    <LocationAutocomplete
+                      value={draft.orgChoice.address ?? ""}
+                      onChange={(v) =>
+                        setDraft((d) => ({
+                          ...d,
+                          orgChoice: { ...d.orgChoice, address: v, placeId: undefined, geo: null },
+                        }))
+                      }
+                      onPick={(v, placeId, geo) =>
+                        setDraft((d) => ({
+                          ...d,
+                          orgChoice: {
+                            ...d.orgChoice,
+                            address: v,
+                            placeId,
+                            geo: geo ? { lat: geo.lat, lng: geo.lng } : null,
+                          },
+                        }))
+                      }
+                      placeholder="Gym / org address (optional)"
+                      mode="place"
+                      showCurrentButton={false}
+                    />
+                    {draft.orgChoice.geo && draft.orgChoice.address && (
+                      <div className="overflow-hidden rounded-2xl border border-border">
+                        <VenueMapPreview
+                          address={draft.orgChoice.address}
+                          lat={draft.orgChoice.geo.lat}
+                          lng={draft.orgChoice.geo.lng}
+                          placeId={draft.orgChoice.placeId}
+                        />
+                      </div>
+                    )}
                   </div>
+
                 ) : (
                   <>
                     <input
