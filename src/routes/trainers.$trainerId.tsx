@@ -41,8 +41,10 @@ export const Route = createFileRoute("/trainers/$trainerId")({
     z.object({
       tab: fallback(z.string(), "").default(""),
       modal: fallback(z.string(), "").default(""),
+      venue: fallback(z.string(), "").default(""),
     }),
   ),
+
   head: ({ loaderData }) => {
     const o = loaderData as Org | undefined;
     if (!o) {
