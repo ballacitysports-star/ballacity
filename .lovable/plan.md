@@ -1,65 +1,61 @@
 ## Goal
 
-Ship a full standalone Gym/Org system on top of the existing `trainer_orgs` / `trainer_org_members` / `trainer_org_invites` / `trainer_org_join_requests` tables and `trainer-orgs.functions.ts`. Today an org can only be spawned as a side-effect of the trainer wizard; the public profile at `/orgs/$orgId` works but has no way to create, edit, or manage members.
+Let any signed-in user (no trainer profile required) request to join an org from `/orgs/$orgId`, and let owners/admins approve or deny with an optional reason. Keep the existing trainer-based flow intact and unchanged.
 
-## Current state (verified)
+## Database (new migration)
 
-- Tables + RPCs exist: `create_trainer_org_with_owner`, `approve_trainer_org_join`, `accept_trainer_org_invite`, `is_trainer_org_admin`.
-- Server fns exist: create, list, get, join/invite/leave, review requests.
-- `/orgs/$orgId` renders profile + roster + membership CTA + join-request review.
-- `CreateOrgWizard` currently only wired to `/teams/create` (kind="team"). No `/orgs/create`, no `/orgs` index, no `/orgs/$orgId/edit`, no member admin UI, no `updateTrainerOrg` / `removeMember` / `changeMemberRole` server fns.
-- Trainers tab already has a "Gyms" segment (`_tabs.trainers.tsx` mode=gyms) — reuse that as the org index and link cards to `/orgs/$id`.
+New table `public.org_member_requests` for generic user memberships:
 
-## Deliverables
+- Columns: `id`, `org_id → trainer_orgs`, `user_id → auth.users`, `message text`, `status text ('pending'|'approved'|'denied'|'withdrawn')`, `denial_reason text`, `reviewed_by uuid`, `reviewed_at`, `created_at`, `updated_at`.
+- Unique partial index on `(org_id, user_id) WHERE status = 'pending'` so a user has at most one open request per org.
+- GRANTs to `authenticated` and `service_role`; RLS enabled.
+- Policies:
+  - Requester can `SELECT`/`INSERT`/`UPDATE (withdraw)` their own rows.
+  - Org owners/admins (via existing `is_trainer_org_admin(org_id, auth.uid())`) can `SELECT`/`UPDATE` rows on their org.
+- Triggers: `updated_at` bumper; validation trigger to force `status='pending'` on insert, cap `message` length, and only allow legal status transitions.
 
-### 1. Migration: RLS + role-change RPCs
+New table `public.org_members` (generic membership, separate from `trainer_org_members`):
 
-New migration adds what's missing so admins can manage the org:
+- Columns: `id`, `org_id`, `user_id`, `role text default 'member'`, `created_at`; unique `(org_id, user_id)`.
+- GRANTs + RLS: anyone can `SELECT` (public roster on org page); owners/admins can `INSERT`/`DELETE`; members can `DELETE` their own row (leave).
 
-- `UPDATE`/`DELETE` policy on `public.trainer_orgs` gated by `public.is_trainer_org_admin(id, auth.uid())` (owner-only DELETE).
-- `UPDATE` policy on `public.trainer_org_members` (owner/admin can change `role`) and `DELETE` (owner/admin can remove others; a member can remove themselves — already covered by leaveTrainerOrg).
-- SECURITY DEFINER RPC `public.set_trainer_org_member_role(_org uuid, _trainer_id text, _role text)` — owner-only, forbids demoting the last owner.
-- SECURITY DEFINER RPC `public.remove_trainer_org_member(_org uuid, _trainer_id text)` — admin can remove non-owner; owner can remove anyone except the last owner.
-- Storage: existing `org-avatars` / `org-covers` policies already work via `is_trainer_org_admin` — no change needed. (User-scoped fallback added in previous migration also applies during create.)
+Security-definer RPCs (all `SET search_path=public`):
 
-### 2. Server functions (append to `src/lib/trainer-orgs.functions.ts`)
+- `approve_org_member_request(_req uuid)` — checks caller is admin; inserts into `org_members`; sets request `status='approved'`.
+- `deny_org_member_request(_req uuid, _reason text)` — checks caller is admin; sets `status='denied'`, `denial_reason`, `reviewed_at`, `reviewed_by`.
 
-- `updateTrainerOrg({ id, name?, handle?, bio?, city?, website?, avatar?, cover?, address?, placeId?, geo? })` — admin-gated via RLS, direct `UPDATE public.trainer_orgs`. Validate handle regex.
-- `setOrgMemberRole({ orgId, trainerId, role: "owner"|"admin"|"member" })` → RPC.
-- `removeOrgMember({ orgId, trainerId })` → RPC.
-- `listOrgAdmins({ orgId })` — for the manage view.
+Notifications: on approve/deny insert into `public.notifications` for the requester (title, body with reason if denied, link `/orgs/<id>`).
 
-### 3. New / updated routes
+## Server functions (`src/lib/trainer-orgs.functions.ts`)
 
-- `src/routes/orgs.index.tsx` → grid of all orgs (uses `listTrainerOrgs` with search), links to `/orgs/$orgId`. Also add a "Create gym" CTA.
-- `src/routes/orgs.create.tsx` → dedicated wizard (`OrgCreateWizard`) — mirrors the identity/branding/location steps of `CreateOrgWizard` but scoped to trainer_orgs schema (no formats/positions/skill). Fields: name, handle (validated + availability check), city, address+placeId+geo via `LocationAutocomplete`, bio, website, avatar/cover via `ImageUploader` (buckets `org-avatars` / `org-covers`, `pathPrefix={user.id}`). On save calls a new `createStandaloneOrg` (variant of `createTrainerOrg` without a `trainerId` — creates org row + inserts owner into `trainer_org_members` only when they have a trainer profile; otherwise creates just the org with `owner_id` set and no seed member). Redirects to `/orgs/$id`.
-- `src/routes/orgs.$orgId.edit.tsx` → admin-gated (throws `notFound()` if `!is_trainer_org_admin`). Same wizard component in edit mode: identity + branding + location, plus **Members** panel:
-  - Table of members with role dropdown (owner-only), remove button.
-  - "Invite trainer" — search by handle (reuse existing `inviteTrainerToOrg`).
-  - Pending join requests (already exists) surfaced here too.
-  - "Delete organization" (owner only, confirm dialog).
-- `src/routes/orgs.$orgId.tsx` → add an "Edit" button in the header for admins that links to `/orgs/$orgId/edit`, and surface admin/owner badges next to each member.
-- `_tabs.trainers.tsx` (Gyms mode) → make each gym card link to `/orgs/$id` instead of the trainer profile.
+Append (auth-required unless noted):
 
-### 4. Small server-fn split
+- `requestOrgMembership({ orgId, message? })` — inserts pending row.
+- `withdrawOrgMemberRequest({ id })` — sets `status='withdrawn'`.
+- `listMyOrgMemberRequest({ orgId })` — my current row for CTA state.
+- `listOrgMemberRequests({ orgId })` — admin-only list of pending, joined with `profiles` for display name/avatar.
+- `approveOrgMemberRequest({ id })` / `denyOrgMemberRequest({ id, reason })` — call the RPCs.
+- `listOrgMembers({ orgId })` — public list joined with `profiles`.
+- `removeOrgMember({ orgId, userId })` — admin removes; `leaveOrgMembership({ orgId })` — self-remove.
 
-Split `createTrainerOrg` into two variants that share the same validator:
-- `createTrainerOrgForTrainer` (existing behavior — used by trainer wizard, requires `trainerId`).
-- `createStandaloneOrg` (new — used by `/orgs/create`, no `trainerId`, inserts org + owner-role member only if caller has any trainer profile).
+## UI on `/orgs/$orgId`
 
-Keep existing name as alias to avoid breaking `CreateOrgWizard` and `CreateTrainerWizard`.
+- **New Members section** below existing Trainers section: grid of avatars + names linking to profile; admin can remove.
+- **MembershipCta additions** (works even when the user has no trainer profile):
+  - Not signed in → existing sign-in link.
+  - Not a trainer + not member + no pending → **"Request to join"** button opens a small dialog with optional message.
+  - Pending → "Requested — awaiting review" chip with **Withdraw** button.
+  - Denied → red chip with denial reason and **Request again** button.
+  - Member → "Member" chip with **Leave** button.
+  - Trainer-based join path stays as-is when the user owns a trainer profile.
+- **Admin panel additions**: new "Pending member requests" list next to the existing trainer requests. Each row shows requester name/avatar, message, Approve (green check) and Deny (opens dialog for reason). Toasts on success; realtime `qc.invalidateQueries` for `org-member-requests` and `org-members`.
+
+## Types & wiring
+
+- After migration, regenerated Supabase types feed the new functions and hooks.
+- Add queries `["org-members", orgId]`, `["org-member-requests", orgId]`, `["my-org-member-request", orgId]` and invalidate them together after each action.
 
 ## Out of scope
 
-- Payments/subscriptions per org.
-- Multi-owner audit log.
-- Redesigning the trainer wizard's inline gym-create flow (already works).
-
-## Verification
-
-1. Signed in with no trainer profile → `/orgs/create` succeeds, redirects to org page, I'm shown as Owner in the header.
-2. Sign in as a trainer → request to join, sign in as owner → approve → member appears in roster.
-3. Owner opens `/orgs/$id/edit` → change bio, upload new cover, promote a member to admin, remove another member — all persist; UI updates via query invalidation.
-4. Non-admin visiting `/orgs/$id/edit` → not-found screen.
-5. `/orgs` lists orgs, search filters by name, "Create gym" CTA visible.
-6. Gyms tab on Trainers page now navigates to `/orgs/$id`.
+- No change to trainer join flow, invites, roles, or the edit page.
+- No email delivery — only in-app notification rows.

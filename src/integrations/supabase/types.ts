@@ -760,6 +760,85 @@ export type Database = {
         }
         Relationships: []
       }
+      org_member_requests: {
+        Row: {
+          created_at: string
+          denial_reason: string | null
+          id: string
+          message: string | null
+          org_id: string
+          reviewed_at: string | null
+          reviewed_by: string | null
+          status: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          denial_reason?: string | null
+          id?: string
+          message?: string | null
+          org_id: string
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          denial_reason?: string | null
+          id?: string
+          message?: string | null
+          org_id?: string
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "org_member_requests_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "trainer_orgs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      org_members: {
+        Row: {
+          created_at: string
+          id: string
+          org_id: string
+          role: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          org_id: string
+          role?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          org_id?: string
+          role?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "org_members_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "trainer_orgs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       payment_submissions: {
         Row: {
           game_id: string
@@ -1645,6 +1724,7 @@ export type Database = {
     Functions: {
       accept_conversation: { Args: { _conv: string }; Returns: undefined }
       accept_trainer_org_invite: { Args: { _invite: string }; Returns: string }
+      approve_org_member_request: { Args: { _req: string }; Returns: string }
       approve_trainer_org_join: { Args: { _req: string }; Returns: string }
       can_notify: {
         Args: { _caller: string; _target: string }
@@ -1683,6 +1763,10 @@ export type Database = {
             Returns: string
           }
       decline_conversation: { Args: { _conv: string }; Returns: undefined }
+      deny_org_member_request: {
+        Args: { _reason: string; _req: string }
+        Returns: undefined
+      }
       free_reels_used: {
         Args: { check_env?: string; user_uuid: string }
         Returns: number
