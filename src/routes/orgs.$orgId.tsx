@@ -125,6 +125,22 @@ function OrgPage() {
               </span>
             </div>
             {org.bio && <p className="mt-3 text-sm text-foreground/90 whitespace-pre-wrap">{org.bio}</p>}
+            {(org as { address?: string | null }).address && (
+              <div className="mt-2 inline-flex items-center gap-1 text-xs text-muted-foreground">
+                <MapPin className="h-3.5 w-3.5" /> {(org as { address?: string }).address}
+              </div>
+            )}
+            {(() => {
+              const geo = (org as { geo?: { lat?: number; lng?: number } | null }).geo;
+              if (!geo || typeof geo.lat !== "number" || typeof geo.lng !== "number") return null;
+              const address = (org as { address?: string | null }).address ?? org.name;
+              const placeId = (org as { place_id?: string | null }).place_id ?? undefined;
+              return (
+                <div className="mt-3 overflow-hidden rounded-2xl border border-border">
+                  <VenueMapPreview address={address} lat={geo.lat} lng={geo.lng} placeId={placeId ?? undefined} />
+                </div>
+              );
+            })()}
             {org.website && (
               <a
                 href={org.website}
@@ -135,6 +151,7 @@ function OrgPage() {
                 {org.website}
               </a>
             )}
+
             <div className="mt-4">
               <MembershipCta orgId={orgId} members={members} />
             </div>
