@@ -18,6 +18,9 @@ import { AvailabilityCalendar } from "@/components/AvailabilityCalendar";
 import { AvailabilityRulesEditor } from "@/components/AvailabilityRulesEditor";
 import type { AvailabilityRule } from "@/lib/availability-resolve";
 import { loadDraft, useDraftPersistence } from "@/components/create/useDraftPersistence";
+import { useQuery } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
+import { listTrainerOrgs, createTrainerOrg, requestToJoinTrainerOrg } from "@/lib/trainer-orgs.functions";
 import { toast } from "sonner";
 
 const STEP_LABELS = ["Basics", "Expertise", "Where", "Availability"] as const;
@@ -49,6 +52,7 @@ type Draft = {
   overrides: { date: string; closed?: boolean; windows?: { start: string; end: string; venue?: string }[] }[];
   rules: AvailabilityRule[];
   timezone: string;
+  orgChoice: { mode: "existing" | "new" | null; orgId?: string; name?: string };
 };
 
 const DRAFT_KEY = "openrun.trainer-wizard.draft.v1";
@@ -98,6 +102,7 @@ function initialDraft(): Draft {
     overrides: [],
     rules: [],
     timezone: defaultTimezone(),
+    orgChoice: { mode: null },
   };
 }
 
@@ -110,11 +115,22 @@ export function CreateTrainerWizard() {
     return stored ? { ...initialDraft(), ...stored } : initialDraft();
   });
   const [credInput, setCredInput] = useState("");
+  const [orgSearch, setOrgSearch] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [restored, setRestored] = useState(false);
 
   const { clear: clearDraft } = useDraftPersistence(DRAFT_KEY, draft);
+
+  const listOrgs = useServerFn(listTrainerOrgs);
+  const createOrg = useServerFn(createTrainerOrg);
+  const joinOrg = useServerFn(requestToJoinTrainerOrg);
+  const orgResults = useQuery({
+    queryKey: ["trainer-orgs-search", orgSearch],
+    queryFn: () => listOrgs({ data: { search: orgSearch } }),
+    enabled: orgSearch.trim().length >= 2,
+    staleTime: 15_000,
+  });
 
   useEffect(() => {
     const stored = loadDraft<Draft>(DRAFT_KEY);
@@ -209,6 +225,28 @@ export function CreateTrainerWizard() {
     };
     try {
       const saved = await addOrg(org);
+      // Best-effort org linking; never blocks publish success.
+      if (draft.orgChoice.mode === "existing" && draft.orgChoice.orgId) {
+        try {
+          await joinOrg({ data: { orgId: draft.orgChoice.orgId, trainerId: saved.id } });
+        } catch {
+          toast.message("Profile published — couldn't send org join request. Try again from your profile.");
+        }
+      } else if (draft.orgChoice.mode === "new" && draft.orgChoice.name) {
+        try {
+          const orgHandle = slugifyHandle(draft.orgChoice.name) || `org${Date.now().toString(36).slice(-4)}`;
+          await createOrg({
+            data: {
+              name: draft.orgChoice.name,
+              handle: orgHandle,
+              trainerId: saved.id,
+              city: draft.city || undefined,
+            },
+          });
+        } catch {
+          toast.message("Profile published — couldn't create the org. Add it from your profile.");
+        }
+      }
       clearDraft();
       toast.success("Trainer profile published");
       nav({ to: "/trainers/$trainerId", params: { trainerId: saved.id } });
@@ -430,6 +468,98 @@ export function CreateTrainerWizard() {
                   </div>
                 )}
               </Section>
+
+              <Section
+                title="Organization / Gym (optional)"
+                hint="Attach a gym or academy. Pick one to request to join, or add a new one you own."
+              >
+                {draft.orgChoice.mode === "existing" && draft.orgChoice.orgId ? (
+                  <div className="flex items-center justify-between rounded-2xl border border-lime/40 bg-lime/10 px-3 py-2.5">
+                    <div className="min-w-0">
+                      <div className="text-[10px] uppercase tracking-wider text-lime font-bold">Join request on publish</div>
+                      <div className="truncate text-sm font-bold">{draft.orgChoice.name}</div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setDraft((d) => ({ ...d, orgChoice: { mode: null } }))}
+                      className="rounded-full border border-border bg-background p-1.5"
+                      aria-label="Clear organization"
+                    >
+                      <X className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                ) : draft.orgChoice.mode === "new" && draft.orgChoice.name ? (
+                  <div className="flex items-center justify-between rounded-2xl border border-coral/40 bg-coral/10 px-3 py-2.5">
+                    <div className="min-w-0">
+                      <div className="text-[10px] uppercase tracking-wider text-coral font-bold">You'll own this new org</div>
+                      <div className="truncate text-sm font-bold">{draft.orgChoice.name}</div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setDraft((d) => ({ ...d, orgChoice: { mode: null } }))}
+                      className="rounded-full border border-border bg-background p-1.5"
+                      aria-label="Clear organization"
+                    >
+                      <X className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                ) : (
+                  <>
+                    <input
+                      value={orgSearch}
+                      onChange={(e) => setOrgSearch(e.target.value)}
+                      placeholder="Search gyms / academies…"
+                      className="w-full rounded-2xl border border-border bg-surface px-4 py-3 text-sm outline-none focus:border-lime"
+                    />
+                    {orgSearch.trim().length >= 2 && (
+                      <div className="mt-2 space-y-1.5">
+                        {orgResults.isLoading && (
+                          <div className="text-[11px] text-muted-foreground">Searching…</div>
+                        )}
+                        {orgResults.data?.slice(0, 6).map((o) => (
+                          <button
+                            key={o.id}
+                            type="button"
+                            onClick={() =>
+                              setDraft((d) => ({
+                                ...d,
+                                orgChoice: { mode: "existing", orgId: o.id, name: o.name },
+                              }))
+                            }
+                            className="flex w-full items-center justify-between rounded-2xl border border-border bg-surface px-3 py-2.5 text-left hover:border-lime"
+                          >
+                            <div className="min-w-0">
+                              <div className="truncate text-sm font-bold">{o.name}</div>
+                              <div className="text-[11px] text-muted-foreground">
+                                @{o.handle}{o.city ? ` · ${o.city}` : ""}
+                              </div>
+                            </div>
+                            <Plus className="h-4 w-4 text-lime shrink-0" />
+                          </button>
+                        ))}
+                        {orgResults.data && orgResults.data.length === 0 && !orgResults.isLoading && (
+                          <div className="text-[11px] text-muted-foreground">No match.</div>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setDraft((d) => ({
+                              ...d,
+                              orgChoice: { mode: "new", name: orgSearch.trim() },
+                            }))
+                          }
+                          className="flex w-full items-center justify-center gap-1.5 rounded-2xl border border-dashed border-coral/40 bg-coral/5 px-3 py-2.5 text-xs font-bold text-coral hover:border-coral"
+                        >
+                          <Plus className="h-3.5 w-3.5" />
+                          Create new org "{orgSearch.trim()}"
+                        </button>
+                      </div>
+                    )}
+                  </>
+                )}
+              </Section>
+
+
 
               <Section title="Hourly rate">
                 <div className="rounded-2xl border border-border bg-surface p-4">
