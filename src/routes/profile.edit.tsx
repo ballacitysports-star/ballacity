@@ -733,14 +733,12 @@ function EditProfile() {
           <div className="flex items-center gap-1.5">
             <Link
               to="/teams/create"
-              search={{ kind: "team" }}
               className="inline-flex items-center gap-1 rounded-full border border-border bg-surface px-2.5 py-1 text-xs font-bold hover:border-lime/40"
             >
               <Plus className="h-3 w-3" /> Team
             </Link>
             <Link
-              to="/teams/create"
-              search={{ kind: "coach" }}
+              to="/trainers/create"
               className="inline-flex items-center gap-1 rounded-full border border-border bg-surface px-2.5 py-1 text-xs font-bold hover:border-lime/40"
             >
               <Plus className="h-3 w-3" /> Trainer
@@ -760,14 +758,12 @@ function EditProfile() {
             <div className="mt-4 grid grid-cols-2 gap-2">
               <Link
                 to="/teams/create"
-                search={{ kind: "team" }}
                 className="rounded-2xl bg-lime-gradient py-2.5 text-xs font-bold text-primary-foreground glow-lime"
               >
                 Start a team
               </Link>
               <Link
-                to="/teams/create"
-                search={{ kind: "coach" }}
+                to="/trainers/create"
                 className="rounded-2xl border border-border bg-surface py-2.5 text-xs font-bold hover:border-lime/40"
               >
                 Trainer profile
