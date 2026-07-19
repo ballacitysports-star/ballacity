@@ -23,6 +23,7 @@ import { loadDraft, useDraftPersistence } from "@/components/create/useDraftPers
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { listTrainerOrgs, createTrainerOrg, requestToJoinTrainerOrg } from "@/lib/trainer-orgs.functions";
+import { autocompletePlaces, getPlaceDetails } from "@/lib/places.functions";
 import { toast } from "sonner";
 
 const STEP_LABELS = ["Basics", "Expertise", "Where", "Availability"] as const;
