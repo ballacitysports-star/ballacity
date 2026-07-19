@@ -869,6 +869,17 @@ function EditOrg() {
                                 <p className="text-[11px] text-coral">{rowError}</p>
                               )}
                             </div>
+                            {(() => {
+                              const geo = venueGeoMap[trimmed.toLowerCase()];
+                              return trimmed && geo && !rowError ? (
+                                <VenueMapPreview
+                                  address={trimmed}
+                                  lat={geo.lat}
+                                  lng={geo.lng}
+                                  placeId={geo.placeId}
+                                />
+                              ) : null;
+                            })()}
                           </div>
                         );
                       })}
