@@ -104,6 +104,7 @@ function TrainersPage() {
   const sport: Sport | null = (search.sport || null) as Sport | null;
   const specialty: string = search.specialty || "";
   const venue: string = search.venue || "";
+  const orgId: string = search.orgId || "";
   const radius: number = Number(search.radius) || 0;
   const sortBy: SortBy =
     search.sort === "soonest" || search.sort === "followers" || search.sort === "name"
