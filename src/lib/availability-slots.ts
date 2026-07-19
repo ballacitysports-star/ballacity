@@ -112,3 +112,74 @@ export function validateOverrides(
 
 export type { DayOverride, OverrideWindow };
 
+import type { AvailabilityRule } from "./availability-resolve";
+
+/**
+ * Validate a list of recurring availability rules.
+ * - Each rule must have at least one weekday
+ * - Times must be HH:MM, end > start
+ * - anchorDate is YYYY-MM-DD; until (if set) must not exceed today+6 months
+ * - Venue (if set) must be in verified venues
+ * - monthly-nth rules must include at least one weekOfMonth
+ * - weekly interval must be 1..12
+ */
+export function validateRules(
+  rules: AvailabilityRule[],
+  verifiedVenues?: Set<string> | string[],
+): { index: number; message: string } | null {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const todayKey = toDateKey(today);
+  const horizon = toDateKey(maxHorizonDate(today));
+  const verified =
+    verifiedVenues instanceof Set
+      ? verifiedVenues
+      : new Set((verifiedVenues ?? []).map((v) => v.trim().toLowerCase()));
+
+  for (let i = 0; i < rules.length; i++) {
+    const r = rules[i];
+    if (!r.id) return { index: i, message: "Missing rule id." };
+    if (!Array.isArray(r.weekdays) || r.weekdays.length === 0) {
+      return { index: i, message: "Pick at least one weekday." };
+    }
+    if (!TIME_RE.test(r.start) || !TIME_RE.test(r.end)) {
+      return { index: i, message: "Enter a valid start and end time." };
+    }
+    if (toMinutes(r.end) <= toMinutes(r.start)) {
+      return { index: i, message: "End time must be after start time." };
+    }
+    if (!DATE_RE.test(r.anchorDate)) {
+      return { index: i, message: "Invalid start date." };
+    }
+    if (r.anchorDate < todayKey) {
+      return { index: i, message: "Start date is in the past." };
+    }
+    if (r.anchorDate > horizon) {
+      return { index: i, message: "Start date is beyond the 6-month horizon." };
+    }
+    if (r.until) {
+      if (!DATE_RE.test(r.until)) return { index: i, message: "Invalid end date." };
+      if (r.until < r.anchorDate) return { index: i, message: "End date is before the start date." };
+      if (r.until > horizon) return { index: i, message: "End date is beyond the 6-month horizon." };
+    }
+    if (r.freq === "weekly" && r.interval !== undefined) {
+      if (r.interval < 1 || r.interval > 12) {
+        return { index: i, message: "Interval must be between 1 and 12 weeks." };
+      }
+    }
+    if (r.freq === "monthly-nth") {
+      if (!Array.isArray(r.weekOfMonth) || r.weekOfMonth.length === 0) {
+        return { index: i, message: "Pick at least one week of the month." };
+      }
+    }
+    if (r.venue) {
+      const key = r.venue.trim().toLowerCase();
+      if (key && !verified.has(key)) {
+        return { index: i, message: "Pick a venue from your verified list." };
+      }
+    }
+  }
+  return null;
+}
+
+
