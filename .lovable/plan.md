@@ -1,49 +1,38 @@
-# Add location-biased Google Places to the trainer edit screen
+## Problem
 
-Mirror what the create wizard has: the "Search gyms / academies…" typeahead in `src/routes/teams.$teamId.edit.tsx` (the shared edit screen used by both `/teams/$teamId/edit` and `/trainers/$trainerId/edit`) currently searches only the OpenRun DB. Add Google Places suggestions biased to the user's location, and pipe the picked place's address + coordinates into the "create new org" path so a new gym gets a verified location on save.
+Uploading avatar/cover during trainer create and edit fails with `403 new row violates row-level security policy` on `POST /storage/v1/object/trainer-avatars/{userId}/...`.
 
-## Changes to `src/routes/teams.$teamId.edit.tsx`
+Root cause: the storage RLS policies (migration `20260719202354_...sql`) require the **first path segment to equal the team/org id** (looked up via `teams.owner_id = auth.uid()` or `is_trainer_org_admin`), but every uploader in the app uploads under `{auth.uid()}/...`:
 
-1. Imports
-   - Add `useUserLocation` from `@/lib/geo`.
-   - Add `autocompletePlaces`, `getPlaceDetails` from `@/lib/places.functions`.
-   - Add `MapPin` from `lucide-react`.
+- `CreateTrainerWizard.tsx`, `CreateOrgWizard.tsx`, `_tabs.create.tsx`, `profile.edit.tsx`, `teams.$teamId.edit.tsx` all pass `pathPrefix={user?.id}`.
+- During create the entity id doesn't exist yet, so user-scoped paths are the only workable choice.
 
-2. Extend `OrgChoice` (line 109):
-   ```ts
-   type OrgChoice = {
-     mode: "existing" | "new" | null;
-     orgId?: string;
-     name?: string;
-     address?: string;
-     placeId?: string;
-     geo?: { lat: number; lng: number } | null;
-   };
-   ```
+Only the `avatars` / `covers` policy allows `auth.uid()::text = folder[1]`, so those work. Everything else 403s, leaving the image blank in the wizard.
 
-3. Near the existing `orgResults` query (~line 190):
-   - Wire `useServerFn` for `autocompletePlaces` + `getPlaceDetails`.
-   - Read `useUserLocation()` for `coords`, `status`, `request`.
-   - Debounce `orgSearch` into `orgSearchDebounced` (250 ms).
-   - Trigger `request()` once when the user first types (status === "idle").
-   - Add a `placesResults` query keyed on `[debounced, sessionToken, lat, lng]` calling `placesAutocomplete({ data: { input, sessionToken, lat, lng } })`, enabled only when `kind === "coach"` and length ≥ 2.
-   - Add `pickPlaceAsNewOrg(id, primary, secondary)` that sets `OrgChoice` to `{ mode: "new", name: primary, address: primary+secondary, placeId, geo: null }`, rotates the session token, then enriches with `getPlaceDetails` to fill `address` (formatted) and `geo` (lat/lng).
+## Fix
 
-4. Dropdown (~line 752): after the "No match" line, render a "From Google" section listing `placesResults.data?.suggestions` with `MapPin` icon; each button calls `pickPlaceAsNewOrg`. Show a "Searching Google…" line while `placesResults.isLoading`.
+Add an RLS migration that lets any authenticated user write to `trainer-avatars`, `team-avatars`, `team-covers`, `org-avatars`, `org-covers` when the first path segment is their own `auth.uid()`, in addition to the existing owner/admin-scoped rule. Public read stays unchanged.
 
-5. In `applyOrgChoiceChange` (line 317), forward the extra fields when creating a new org:
-   ```ts
-   await createOrg({
-     data: {
-       name: orgChoice.name,
-       handle: orgHandle,
-       trainerId: org.id,
-       city: city || undefined,
-       address: orgChoice.address,
-       placeId: orgChoice.placeId,
-       geo: orgChoice.geo ?? undefined,
-     },
-   });
-   ```
+```sql
+-- New policy (kept alongside the existing owner/admin one)
+CREATE POLICY "Users write own scoped images"
+  ON storage.objects
+  FOR ALL TO authenticated
+  USING (
+    bucket_id IN ('trainer-avatars','team-avatars','team-covers','org-avatars','org-covers')
+    AND auth.uid()::text = (storage.foldername(name))[1]
+  )
+  WITH CHECK (
+    bucket_id IN ('trainer-avatars','team-avatars','team-covers','org-avatars','org-covers')
+    AND auth.uid()::text = (storage.foldername(name))[1]
+  );
+```
 
-No server or schema changes — `autocompletePlaces` already accepts `lat`/`lng` bias, and `createTrainerOrg` already accepts `address`/`placeId`/`geo`.
+No client code changes required — existing `pathPrefix={user?.id}` will now satisfy RLS in both create and edit flows.
+
+## Verification
+
+After migration:
+1. Create trainer wizard → upload avatar + cover → expect 200 on the storage POST and preview image renders.
+2. Edit existing trainer (`/trainers/c-nc-4kgo/edit`) → change avatar + cover → save → profile shows new images.
+3. Team wizard/edit and profile.edit avatar/cover upload continue to work.
