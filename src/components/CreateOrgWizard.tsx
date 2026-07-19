@@ -989,7 +989,10 @@ export function CreateOrgWizard({ kind }: { kind: OrgKind }) {
                 whileTap={{ scale: 0.98 }}
                 type="button"
                 onClick={submit}
-                disabled={submitting}
+                disabled={submitting || (isCoach && !!slotsError)}
+                className="w-full rounded-full bg-lime py-3 text-sm font-bold text-lime-foreground shadow-lg shadow-lime/20 hover:scale-[1.01] transition disabled:opacity-50"
+              >
+                {submitting ? "Publishing…" : "Publish profile"}
                 className="inline-flex items-center justify-center gap-2 rounded-2xl bg-coral-gradient py-3.5 text-sm font-bold text-white glow-coral disabled:opacity-60"
               >
                 <Sparkles className="h-4 w-4" />
