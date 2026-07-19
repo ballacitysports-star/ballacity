@@ -37,6 +37,8 @@ export type AvailabilityCalendarProps = {
   overrides: DayOverride[];
   venues: string[]; // verified venue addresses
   primaryVenue?: string | null;
+  /** IANA timezone this schedule is anchored to. Used only for a subtle header label. */
+  timezone?: string;
   onWeeklyChange: (next: Slot[]) => void;
   onOverridesChange: (next: DayOverride[]) => void;
 };
@@ -46,6 +48,7 @@ export function AvailabilityCalendar({
   overrides,
   venues,
   primaryVenue,
+  timezone,
   onWeeklyChange,
   onOverridesChange,
 }: AvailabilityCalendarProps) {
@@ -140,6 +143,13 @@ export function AvailabilityCalendar({
           <ChevronRight className="h-4 w-4" />
         </button>
       </div>
+
+      {timezone && (
+        <div className="px-1 text-[11px] text-muted-foreground">
+          Times shown in <span className="font-semibold text-foreground">{timezone.replace(/_/g, " ")}</span> —
+          this is the timezone attendees will see converted to their local time.
+        </div>
+      )}
 
       {/* Day-of-week header */}
       <div className="grid grid-cols-7 gap-1 px-1 text-center text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
