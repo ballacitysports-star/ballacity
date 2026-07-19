@@ -115,11 +115,22 @@ export function CreateTrainerWizard() {
     return stored ? { ...initialDraft(), ...stored } : initialDraft();
   });
   const [credInput, setCredInput] = useState("");
+  const [orgSearch, setOrgSearch] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [restored, setRestored] = useState(false);
 
   const { clear: clearDraft } = useDraftPersistence(DRAFT_KEY, draft);
+
+  const listOrgs = useServerFn(listTrainerOrgs);
+  const createOrg = useServerFn(createTrainerOrg);
+  const joinOrg = useServerFn(requestToJoinTrainerOrg);
+  const orgResults = useQuery({
+    queryKey: ["trainer-orgs-search", orgSearch],
+    queryFn: () => listOrgs({ data: { search: orgSearch } }),
+    enabled: orgSearch.trim().length >= 2,
+    staleTime: 15_000,
+  });
 
   useEffect(() => {
     const stored = loadDraft<Draft>(DRAFT_KEY);
