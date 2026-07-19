@@ -23,7 +23,7 @@ import { toast } from "sonner";
 const STEP_LABELS = ["Basics", "Expertise", "Where", "Availability"] as const;
 const SKILL_LABELS = ["Beginner", "Recreational", "Intermediate", "Advanced", "Pro"] as const;
 
-const SKILL_LABELS = ["Beginner", "Recreational", "Intermediate", "Advanced", "Pro"] as const;
+
 
 type Slot = { day: "mon" | "tue" | "wed" | "thu" | "fri" | "sat" | "sun"; start: string; end: string; venue?: string };
 
