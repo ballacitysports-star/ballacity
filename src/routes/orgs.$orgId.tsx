@@ -471,3 +471,321 @@ function RequestToJoin({
     </Button>
   );
 }
+
+function MembersSection({ orgId, isAdmin }: { orgId: string; isAdmin: boolean }) {
+  const qc = useQueryClient();
+  const auth = useAuth();
+  const { data } = useQuery({
+    queryKey: ["org-members", orgId],
+    queryFn: () => listOrgMembers({ data: { orgId } }),
+  });
+  const rows = data ?? [];
+
+  async function remove(userId: string) {
+    if (!confirm("Remove this member?")) return;
+    try {
+      await removeGenericOrgMember({ data: { orgId, userId } });
+      toast.success("Member removed");
+      qc.invalidateQueries({ queryKey: ["org-members", orgId] });
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Failed");
+    }
+  }
+
+  return (
+    <section className="rounded-2xl border border-border/60 bg-surface p-4">
+      <h2 className="text-sm font-semibold mb-3 flex items-center gap-2">
+        <Users className="h-4 w-4 text-lime" /> Members
+        <span className="text-xs font-normal text-muted-foreground">({rows.length})</span>
+      </h2>
+      {rows.length === 0 ? (
+        <p className="text-xs text-muted-foreground">No members yet.</p>
+      ) : (
+        <ul className="grid gap-2 sm:grid-cols-2">
+          {rows.map((m) => {
+            const name = m.profile?.display_name || "Member";
+            const initials = m.profile?.avatar_initials || name.slice(0, 2).toUpperCase();
+            return (
+              <li
+                key={m.id}
+                className="flex items-center gap-3 rounded-xl border border-border/50 bg-background px-3 py-2"
+              >
+                <Link
+                  to="/players/$userId"
+                  params={{ userId: m.user_id }}
+                  className="flex items-center gap-3 min-w-0 flex-1 hover:opacity-80"
+                >
+                  <div className="flex h-9 w-9 items-center justify-center rounded-full bg-lime/15 text-sm font-semibold overflow-hidden">
+                    {m.profile?.avatar_url ? (
+                      <img src={m.profile.avatar_url} alt="" className="h-full w-full object-cover" />
+                    ) : (
+                      initials
+                    )}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="text-sm font-medium truncate">{name}</div>
+                    <div className="text-[11px] text-muted-foreground truncate">{m.role}</div>
+                  </div>
+                </Link>
+                {isAdmin && auth.user?.id !== m.user_id && (
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => remove(m.user_id)}
+                    aria-label="Remove member"
+                  >
+                    <UserMinus className="h-3.5 w-3.5" />
+                  </Button>
+                )}
+              </li>
+            );
+          })}
+        </ul>
+      )}
+    </section>
+  );
+}
+
+function MemberJoinCta({ orgId }: { orgId: string }) {
+  const auth = useAuth();
+  const qc = useQueryClient();
+  const [open, setOpen] = useState(false);
+  const [message, setMessage] = useState("");
+  const [pending, setPending] = useState(false);
+
+  const members = useQuery({
+    queryKey: ["org-members", orgId],
+    queryFn: () => listOrgMembers({ data: { orgId } }),
+  });
+  const myReq = useQuery({
+    queryKey: ["my-org-member-request", orgId],
+    queryFn: () => getMyOrgMemberRequest({ data: { orgId } }),
+    enabled: !!auth.user,
+  });
+
+  if (!auth.user) return null;
+  const isMember = (members.data ?? []).some((m) => m.user_id === auth.user!.id);
+  if (isMember) {
+    return (
+      <div className="flex items-center gap-2">
+        <span className="inline-flex items-center gap-1 rounded-full bg-lime/15 px-3 py-1 text-xs font-bold text-lime">
+          <Check className="h-3 w-3" /> Member
+        </span>
+        <Button
+          size="sm"
+          variant="ghost"
+          onClick={async () => {
+            if (!confirm("Leave this organization?")) return;
+            try {
+              await leaveOrgMembership({ data: { orgId } });
+              toast.success("Left organization");
+              qc.invalidateQueries({ queryKey: ["org-members", orgId] });
+              qc.invalidateQueries({ queryKey: ["my-org-member-request", orgId] });
+            } catch (e) {
+              toast.error(e instanceof Error ? e.message : "Failed");
+            }
+          }}
+        >
+          Leave
+        </Button>
+      </div>
+    );
+  }
+
+  const req = myReq.data;
+
+  if (req?.status === "pending") {
+    return (
+      <div className="flex items-center gap-2 flex-wrap">
+        <span className="inline-flex items-center gap-1 rounded-full bg-muted px-3 py-1 text-xs font-semibold text-muted-foreground">
+          <Clock className="h-3 w-3" /> Requested — awaiting review
+        </span>
+        <Button
+          size="sm"
+          variant="ghost"
+          onClick={async () => {
+            try {
+              await withdrawOrgMemberRequest({ data: { id: req.id } });
+              toast.success("Withdrawn");
+              qc.invalidateQueries({ queryKey: ["my-org-member-request", orgId] });
+            } catch (e) {
+              toast.error(e instanceof Error ? e.message : "Failed");
+            }
+          }}
+        >
+          Withdraw
+        </Button>
+      </div>
+    );
+  }
+
+  const wasDenied = req?.status === "denied";
+
+  async function submit() {
+    setPending(true);
+    try {
+      await requestOrgMembership({ data: { orgId, message: message.trim() || undefined } });
+      toast.success("Request sent");
+      setOpen(false);
+      setMessage("");
+      qc.invalidateQueries({ queryKey: ["my-org-member-request", orgId] });
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Failed");
+    } finally {
+      setPending(false);
+    }
+  }
+
+  return (
+    <>
+      <div className="flex items-start gap-2 flex-wrap">
+        {wasDenied && req?.denial_reason && (
+          <span className="inline-flex items-center gap-1 rounded-full bg-destructive/10 px-3 py-1 text-xs font-semibold text-destructive">
+            Denied: {req.denial_reason}
+          </span>
+        )}
+        <Button size="sm" variant="secondary" onClick={() => setOpen(true)}>
+          <UserPlus className="h-3.5 w-3.5 mr-1" />
+          {wasDenied ? "Request again" : "Request to join as member"}
+        </Button>
+      </div>
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Request to join</DialogTitle>
+            <DialogDescription>
+              Add an optional note the admins will see with your request.
+            </DialogDescription>
+          </DialogHeader>
+          <Textarea
+            value={message}
+            onChange={(e) => setMessage(e.target.value)}
+            placeholder="Say hi and mention why you'd like to join…"
+            maxLength={500}
+            rows={4}
+          />
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setOpen(false)} disabled={pending}>
+              Cancel
+            </Button>
+            <Button onClick={submit} disabled={pending}>
+              Send request
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
+  );
+}
+
+function AdminMemberRequests({ orgId }: { orgId: string }) {
+  const qc = useQueryClient();
+  const { data } = useQuery({
+    queryKey: ["org-member-requests", orgId],
+    queryFn: () => listOrgMemberRequests({ data: { orgId } }),
+  });
+  const rows = data ?? [];
+  const [denyFor, setDenyFor] = useState<string | null>(null);
+  const [reason, setReason] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  function invalidate() {
+    qc.invalidateQueries({ queryKey: ["org-member-requests", orgId] });
+    qc.invalidateQueries({ queryKey: ["org-members", orgId] });
+  }
+
+  async function approve(id: string) {
+    try {
+      await approveOrgMemberRequest({ data: { id } });
+      toast.success("Approved");
+      invalidate();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Failed");
+    }
+  }
+
+  async function deny() {
+    if (!denyFor) return;
+    setBusy(true);
+    try {
+      await denyOrgMemberRequest({ data: { id: denyFor, reason: reason.trim() || undefined } });
+      toast.success("Denied");
+      setDenyFor(null);
+      setReason("");
+      invalidate();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Failed");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <section className="rounded-2xl border border-border/60 bg-surface p-4">
+      <h2 className="text-sm font-semibold mb-3">Pending member requests</h2>
+      {rows.length === 0 ? (
+        <p className="text-xs text-muted-foreground">No pending requests.</p>
+      ) : (
+        <ul className="space-y-2">
+          {rows.map((r) => {
+            const name = r.profile?.display_name || "User";
+            const initials = r.profile?.avatar_initials || name.slice(0, 2).toUpperCase();
+            return (
+              <li
+                key={r.id}
+                className="flex items-center justify-between gap-3 rounded-xl border border-border/50 bg-background px-3 py-2"
+              >
+                <div className="flex items-center gap-3 min-w-0 flex-1">
+                  <div className="flex h-9 w-9 items-center justify-center rounded-full bg-lime/15 text-sm font-semibold overflow-hidden">
+                    {r.profile?.avatar_url ? (
+                      <img src={r.profile.avatar_url} alt="" className="h-full w-full object-cover" />
+                    ) : (
+                      initials
+                    )}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="text-sm font-medium truncate">{name}</div>
+                    {r.message && (
+                      <div className="text-[11px] text-muted-foreground truncate">{r.message}</div>
+                    )}
+                  </div>
+                </div>
+                <div className="flex gap-1 shrink-0">
+                  <Button size="sm" variant="secondary" onClick={() => approve(r.id)}>
+                    <Check className="h-3.5 w-3.5" />
+                  </Button>
+                  <Button size="sm" variant="ghost" onClick={() => setDenyFor(r.id)}>
+                    <X className="h-3.5 w-3.5" />
+                  </Button>
+                </div>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+      <Dialog open={!!denyFor} onOpenChange={(o) => !o && setDenyFor(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Deny request</DialogTitle>
+            <DialogDescription>Optionally include a reason. The requester will see it.</DialogDescription>
+          </DialogHeader>
+          <Textarea
+            value={reason}
+            onChange={(e) => setReason(e.target.value)}
+            placeholder="Reason (optional)"
+            maxLength={500}
+            rows={3}
+          />
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setDenyFor(null)} disabled={busy}>
+              Cancel
+            </Button>
+            <Button variant="destructive" onClick={deny} disabled={busy}>
+              Deny
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </section>
+  );
+}
