@@ -11,10 +11,12 @@ import { SportChips } from "@/components/SportChips";
 import { ViewDensityToggle, type ViewMode, type Density } from "@/components/ViewDensityToggle";
 import { TeamsMapView } from "@/components/TeamsMapView";
 import { TrainerActions } from "@/components/TrainerActions";
-import { useMyProfile } from "@/lib/user-prefs-store";
+import { useMyProfile, useFeedPrefs } from "@/lib/user-prefs-store";
 import { useAuth } from "@/hooks/use-auth";
 import { toast } from "sonner";
 import { SPORT_CONFIG, SESSION_TYPES } from "@/lib/sport-config";
+import { haversineKm, KM_PER_MI, MI_PER_KM, useUserLocation } from "@/lib/geo";
+import { Slider } from "@/components/ui/slider";
 
 type SortBy = "nearest" | "soonest" | "followers" | "name";
 type Avail = "any" | "soon" | "recruiting" | "weekly" | "casual";
