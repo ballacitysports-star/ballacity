@@ -13,7 +13,7 @@ import { SESSION_TYPES } from "@/lib/sport-config";
 import { LocationAutocomplete } from "@/components/LocationAutocomplete";
 import { VenueMapPreview } from "@/components/VenueMapPreview";
 import { OrgCard } from "@/components/OrgCard";
-import { useUserLocation } from "@/lib/geo";
+
 import { WeeklyQuickPick } from "@/components/create/WeeklyQuickPick";
 import { loadDraft, useDraftPersistence } from "@/components/create/useDraftPersistence";
 import { toast } from "sonner";
@@ -95,7 +95,6 @@ function initialDraft(): Draft {
 
 export function CreateTrainerWizard() {
   const nav = useNavigate();
-  const userLoc = useUserLocation();
 
   const [draft, setDraft] = useState<Draft>(() => {
     if (typeof window === "undefined") return initialDraft();
@@ -115,13 +114,6 @@ export function CreateTrainerWizard() {
       setRestored(true);
     }
   }, []);
-
-  // Prefill city from user location if empty.
-  useEffect(() => {
-    if (draft.city) return;
-    const city = userLoc.data?.city;
-    if (city) setDraft((d) => ({ ...d, city }));
-  }, [userLoc.data?.city, draft.city]);
 
   // Auto-suggest handle from name until the user edits it directly.
   useEffect(() => {
