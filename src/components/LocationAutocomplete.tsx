@@ -29,7 +29,7 @@ export function LocationAutocomplete({
   /** "place" returns full venue address; "city" returns just city, region */
   mode?: "place" | "city";
   showCurrentButton?: boolean;
-  onPick?: (v: string, placeId: string) => void;
+  onPick?: (v: string, placeId: string, geo?: PickedPlaceGeo) => void;
 }) {
   const [suggestions, setSuggestions] = useState<PlaceSuggestion[]>([]);
   const [open, setOpen] = useState(false);
