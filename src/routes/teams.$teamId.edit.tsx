@@ -109,7 +109,14 @@ function slugifyHandle(name: string) {
   return name.toLowerCase().replace(/[^a-z0-9_]+/g, "").slice(0, 20);
 }
 
-type OrgChoice = { mode: "existing" | "new" | null; orgId?: string; name?: string };
+type OrgChoice = {
+  mode: "existing" | "new" | null;
+  orgId?: string;
+  name?: string;
+  address?: string;
+  placeId?: string;
+  geo?: { lat: number; lng: number } | null;
+};
 
 function EditOrg() {
   const org = Route.useLoaderData() as Org;
