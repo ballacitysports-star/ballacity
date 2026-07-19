@@ -385,6 +385,7 @@ export type Org = {
   formats?: string[];
   venues?: string[];
   venueAddresses?: string[];
+  primaryVenue?: string;
   cadence?: string;
   cadences?: string[];
   positionsNeeded?: Record<string, Record<string, number>>; // sport → position → count
@@ -393,7 +394,7 @@ export type Org = {
   ratingMax?: string;
   distances?: string[];
   sessionTypes?: string[];
-  availabilitySlots?: { day: "mon" | "tue" | "wed" | "thu" | "fri" | "sat" | "sun"; start: string; end: string }[];
+  availabilitySlots?: { day: "mon" | "tue" | "wed" | "thu" | "fri" | "sat" | "sun"; start: string; end: string; venue?: string }[];
   upcoming: string[]; // game ids
   posts: OrgPost[];
 };

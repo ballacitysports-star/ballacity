@@ -98,6 +98,7 @@ export function CreateOrgWizard({ kind }: { kind: OrgKind }) {
   const [formats, setFormats] = useState<string[]>([]);
   const [venues, setVenues] = useState<string[]>([]);
   const [venueAddresses, setVenueAddresses] = useState<string[]>([]);
+  const [primaryVenue, setPrimaryVenue] = useState<string | null>(null);
   const [cadences, setCadences] = useState<string[]>([]);
   const [positionsBySport, setPositionsBySport] = useState<Record<string, PositionsNeeded>>({});
   const [ratingMin, setRatingMin] = useState<string>("");
@@ -166,6 +167,11 @@ export function CreateOrgWizard({ kind }: { kind: OrgKind }) {
     formats,
     venues,
     venueAddresses: isCoach ? venueAddresses.filter((v) => v.trim().length > 0) : undefined,
+    primaryVenue: isCoach
+      ? (primaryVenue && venueAddresses.map((v) => v.trim()).includes(primaryVenue.trim())
+          ? primaryVenue.trim()
+          : undefined)
+      : undefined,
     cadence: cadences[0],
     cadences,
     positionsNeeded: Object.fromEntries(
@@ -177,7 +183,15 @@ export function CreateOrgWizard({ kind }: { kind: OrgKind }) {
     distances,
     sessionTypes: isCoach ? sessionTypes : undefined,
     availabilitySlots: isCoach
-      ? slots.filter((s) => s.start && s.end && s.end > s.start)
+      ? slots
+          .filter((s) => s.start && s.end && s.end > s.start)
+          .map((s) => ({
+            ...s,
+            venue:
+              s.venue && venueAddresses.map((v) => v.trim()).includes(s.venue.trim())
+                ? s.venue.trim()
+                : undefined,
+          }))
       : undefined,
     upcoming: [],
     posts: [],
@@ -430,34 +444,69 @@ export function CreateOrgWizard({ kind }: { kind: OrgKind }) {
                     )}
                     {venueAddresses.map((addr, i) => {
                       const rowError = venueValidation.errors[i];
+                      const trimmed = addr.trim();
+                      const isPrimary = !!trimmed && primaryVenue?.trim() === trimmed;
                       return (
                         <div key={i} className="space-y-1">
                           <div className="flex items-start gap-2">
                             <div className={`flex-1 ${rowError ? "rounded-2xl ring-1 ring-coral" : ""}`}>
                               <LocationAutocomplete
                                 value={addr}
-                                onChange={(v) =>
+                                onChange={(v) => {
+                                  const prevTrim = trimmed;
                                   setVenueAddresses((cur) =>
                                     cur.map((a, j) => (j === i ? v : a)),
-                                  )
-                                }
+                                  );
+                                  if (isPrimary) setPrimaryVenue(v.trim() || null);
+                                  if (prevTrim) {
+                                    setSlots((cur) =>
+                                      cur.map((s) =>
+                                        s.venue?.trim() === prevTrim
+                                          ? { ...s, venue: v.trim() || undefined }
+                                          : s,
+                                      ),
+                                    );
+                                  }
+                                }}
                                 placeholder="Gym, park, or full address"
                               />
                             </div>
                             <button
                               type="button"
-                              onClick={() =>
-                                setVenueAddresses((cur) => cur.filter((_, j) => j !== i))
-                              }
+                              onClick={() => {
+                                if (isPrimary) setPrimaryVenue(null);
+                                if (trimmed) {
+                                  setSlots((cur) =>
+                                    cur.map((s) =>
+                                      s.venue?.trim() === trimmed ? { ...s, venue: undefined } : s,
+                                    ),
+                                  );
+                                }
+                                setVenueAddresses((cur) => cur.filter((_, j) => j !== i));
+                              }}
                               className="mt-1 rounded-full p-2 text-muted-foreground hover:bg-surface"
                               aria-label="Remove venue"
                             >
                               <X className="h-4 w-4" />
                             </button>
                           </div>
-                          {rowError && (
-                            <p className="px-1 text-[11px] text-coral">{rowError}</p>
-                          )}
+                          <div className="flex items-center justify-between px-1">
+                            <button
+                              type="button"
+                              disabled={!trimmed || !!rowError}
+                              onClick={() => setPrimaryVenue(isPrimary ? null : trimmed)}
+                              className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-semibold transition ${
+                                isPrimary
+                                  ? "border-lime bg-lime/20 text-lime"
+                                  : "border-border bg-surface text-muted-foreground hover:border-lime hover:text-lime"
+                              } disabled:opacity-40 disabled:cursor-not-allowed`}
+                            >
+                              {isPrimary ? "★ Primary" : "Set as primary"}
+                            </button>
+                            {rowError && (
+                              <p className="text-[11px] text-coral">{rowError}</p>
+                            )}
+                          </div>
                         </div>
                       );
                     })}
@@ -534,6 +583,29 @@ export function CreateOrgWizard({ kind }: { kind: OrgKind }) {
                               <X className="h-4 w-4" />
                             </button>
                           </div>
+                          {venueAddresses.some((v) => v.trim()) && (
+                            <select
+                              value={slot.venue ?? ""}
+                              onChange={(e) =>
+                                setSlots((cur) =>
+                                  cur.map((s, j) =>
+                                    j === i ? { ...s, venue: e.target.value || undefined } : s,
+                                  ),
+                                )
+                              }
+                              className="w-full rounded-2xl border border-border bg-surface px-3 py-2 text-xs outline-none focus:border-lime"
+                            >
+                              <option value="">Any venue</option>
+                              {venueAddresses
+                                .map((v) => v.trim())
+                                .filter((v, idx, arr) => v && arr.indexOf(v) === idx)
+                                .map((v) => (
+                                  <option key={v} value={v}>
+                                    {v === primaryVenue?.trim() ? "★ " : ""}{v}
+                                  </option>
+                                ))}
+                            </select>
+                          )}
                           {rowError && (
                             <p className="text-xs text-red-500">{rowError.message}</p>
                           )}

@@ -1189,6 +1189,7 @@ export type Database = {
           name: string
           owner_id: string
           positions_needed: Json
+          primary_venue: string | null
           rate_per_hour: number | null
           rating_max: string | null
           rating_min: string | null
@@ -1231,6 +1232,7 @@ export type Database = {
           name: string
           owner_id: string
           positions_needed?: Json
+          primary_venue?: string | null
           rate_per_hour?: number | null
           rating_max?: string | null
           rating_min?: string | null
@@ -1273,6 +1275,7 @@ export type Database = {
           name?: string
           owner_id?: string
           positions_needed?: Json
+          primary_venue?: string | null
           rate_per_hour?: number | null
           rating_max?: string | null
           rating_min?: string | null
