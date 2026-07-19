@@ -1337,6 +1337,27 @@ export function CreateOrgWizard({ kind }: { kind: OrgKind }) {
                         placeholder="City (optional)"
                         className="w-full rounded-2xl border border-border bg-surface px-4 py-3 text-sm outline-none focus:border-lime"
                       />
+                      <LocationAutocomplete
+                        value={orgChoice.address ?? ""}
+                        onChange={(v) => setOrgChoice({ ...orgChoice, address: v, placeId: undefined, geo: null })}
+                        onPick={(v, placeId, geo) =>
+                          setOrgChoice({
+                            ...orgChoice,
+                            address: v,
+                            placeId,
+                            geo: geo ? { lat: geo.lat, lng: geo.lng } : null,
+                          })
+                        }
+                        placeholder="Street address (optional)"
+                        mode="place"
+                        showCurrentButton={false}
+                      />
+                      {orgChoice.geo && (
+                        <div className="overflow-hidden rounded-2xl border border-border">
+                          <VenueMapPreview lat={orgChoice.geo.lat} lng={orgChoice.geo.lng} label={orgChoice.address ?? orgChoice.name} />
+                        </div>
+                      )}
+
                       <textarea
                         value={orgChoice.bio}
                         onChange={(e) =>
