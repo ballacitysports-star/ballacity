@@ -482,8 +482,8 @@ export function AvailabilityCalendar({
                         const dow = weekdayOf(fromDateKey(editingDate));
                         const fromWeekly = weekly.find((s) => s.day === dow);
                         const nextWindow: OverrideWindow = fromWeekly
-                          ? { start: fromWeekly.start, end: fromWeekly.end, venue: fromWeekly.venue }
-                          : { start: "17:00", end: "19:00" };
+                          ? { start: fromWeekly.start, end: fromWeekly.end, venue: fromWeekly.venue ?? primaryVenue ?? undefined }
+                          : { start: "17:00", end: "19:00", venue: primaryVenue ?? undefined };
                         setEditingWindows([...editingWindows, nextWindow]);
                       }}
                       className="inline-flex items-center gap-1.5 rounded-2xl border border-dashed border-border bg-surface px-3 py-2 text-sm font-semibold text-foreground hover:border-lime"
