@@ -18,6 +18,7 @@ import {
   type OrgKind,
 } from "@/lib/sample-data";
 import { addOrg } from "@/lib/org-store";
+import { validateSlots } from "@/lib/availability-slots";
 import {
   SPORT_CONFIG,
   SESSION_TYPES,
@@ -103,6 +104,7 @@ export function CreateOrgWizard({ kind }: { kind: OrgKind }) {
   const [sessionTypes, setSessionTypes] = useState<string[]>([]);
   type Slot = NonNullable<Org["availabilitySlots"]>[number];
   const [slots, setSlots] = useState<Slot[]>([]);
+  const slotsError = useMemo(() => validateSlots(slots), [slots]);
 
   const primary = primarySport(sports);
   const ratingSystem = ratingSystemFor(primary);
@@ -179,6 +181,10 @@ export function CreateOrgWizard({ kind }: { kind: OrgKind }) {
 
   async function submit() {
     if (submitting) return;
+    if (isCoach && slotsError) {
+      setSubmitError(slotsError.message);
+      return;
+    }
     setSubmitError(null);
     setSubmitting(true);
     const id = `${isCoach ? "c" : "t"}-${(name || "org").toLowerCase().replace(/[^a-z0-9]+/g, "-")}-${Date.now().toString(36).slice(-4)}`;
@@ -743,8 +749,11 @@ export function CreateOrgWizard({ kind }: { kind: OrgKind }) {
                           Add the windows you're usually free — bookers see these on your profile.
                         </p>
                       )}
-                      {slots.map((slot, i) => (
-                        <div key={i} className="flex items-center gap-2">
+                      {slots.map((slot, i) => {
+                        const rowError = slotsError?.index === i ? slotsError : null;
+                        return (
+                        <div key={i} className="space-y-1">
+                          <div className="flex items-center gap-2">
                           <select
                             value={slot.day}
                             onChange={(e) =>
@@ -754,7 +763,7 @@ export function CreateOrgWizard({ kind }: { kind: OrgKind }) {
                                 ),
                               )
                             }
-                            className="rounded-2xl border border-border bg-surface px-3 py-2 text-sm outline-none focus:border-lime"
+                            className={`rounded-2xl border bg-surface px-3 py-2 text-sm outline-none focus:border-lime ${rowError ? "border-red-500" : "border-border"}`}
                           >
                             <option value="mon">Mon</option>
                             <option value="tue">Tue</option>
@@ -772,7 +781,7 @@ export function CreateOrgWizard({ kind }: { kind: OrgKind }) {
                                 cur.map((s, j) => (j === i ? { ...s, start: e.target.value } : s)),
                               )
                             }
-                            className="flex-1 rounded-2xl border border-border bg-surface px-3 py-2 text-sm outline-none focus:border-lime"
+                            className={`flex-1 rounded-2xl border bg-surface px-3 py-2 text-sm outline-none focus:border-lime ${rowError ? "border-red-500" : "border-border"}`}
                           />
                           <span className="text-xs text-muted-foreground">–</span>
                           <input
@@ -783,7 +792,7 @@ export function CreateOrgWizard({ kind }: { kind: OrgKind }) {
                                 cur.map((s, j) => (j === i ? { ...s, end: e.target.value } : s)),
                               )
                             }
-                            className="flex-1 rounded-2xl border border-border bg-surface px-3 py-2 text-sm outline-none focus:border-lime"
+                            className={`flex-1 rounded-2xl border bg-surface px-3 py-2 text-sm outline-none focus:border-lime ${rowError ? "border-red-500" : "border-border"}`}
                           />
                           <button
                             type="button"
@@ -793,14 +802,20 @@ export function CreateOrgWizard({ kind }: { kind: OrgKind }) {
                           >
                             <X className="h-4 w-4" />
                           </button>
+                          </div>
+                          {rowError && (
+                            <p className="text-xs text-red-500">{rowError.message}</p>
+                          )}
                         </div>
-                      ))}
+                        );
+                      })}
                       <button
                         type="button"
+                        disabled={!!slotsError}
                         onClick={() =>
                           setSlots((cur) => [...cur, { day: "mon", start: "17:00", end: "19:00" }])
                         }
-                        className="inline-flex items-center gap-1.5 rounded-2xl border border-dashed border-border bg-surface px-3 py-2 text-sm font-semibold text-foreground hover:border-lime"
+                        className="inline-flex items-center gap-1.5 rounded-2xl border border-dashed border-border bg-surface px-3 py-2 text-sm font-semibold text-foreground hover:border-lime disabled:cursor-not-allowed disabled:opacity-50"
                       >
                         <Plus className="h-4 w-4" /> Add time
                       </button>
@@ -974,7 +989,7 @@ export function CreateOrgWizard({ kind }: { kind: OrgKind }) {
                 whileTap={{ scale: 0.98 }}
                 type="button"
                 onClick={submit}
-                disabled={submitting}
+                disabled={submitting || (isCoach && !!slotsError)}
                 className="inline-flex items-center justify-center gap-2 rounded-2xl bg-coral-gradient py-3.5 text-sm font-bold text-white glow-coral disabled:opacity-60"
               >
                 <Sparkles className="h-4 w-4" />
