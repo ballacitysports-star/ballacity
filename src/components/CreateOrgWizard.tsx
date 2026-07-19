@@ -286,6 +286,32 @@ export function CreateOrgWizard({ kind }: { kind: OrgKind }) {
     try {
       const saved = await addOrg(org);
       if (isCoach) {
+        // Best-effort org linkage — failures don't roll back the profile.
+        try {
+          if (orgChoice.mode === "create") {
+            await createTrainerOrg({
+              data: {
+                name: orgChoice.name.trim(),
+                handle: orgChoice.handle.trim(),
+                trainerId: saved.id,
+                city: orgChoice.city.trim() || undefined,
+                bio: orgChoice.bio.trim() || undefined,
+              },
+            });
+            toast.success("Organization created");
+          } else if (orgChoice.mode === "join") {
+            await requestToJoinTrainerOrg({
+              data: { orgId: orgChoice.orgId, trainerId: saved.id },
+            });
+            toast.success(`Join request sent to ${orgChoice.orgName}`);
+          }
+        } catch (e) {
+          toast.error(
+            e instanceof Error
+              ? `Profile created, but org link failed: ${e.message}`
+              : "Profile created, but org link failed.",
+          );
+        }
         nav({ to: "/trainers/$trainerId", params: { trainerId: saved.id } });
       } else {
         nav({ to: "/teams/$teamId", params: { teamId: saved.id } });
