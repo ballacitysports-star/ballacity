@@ -77,9 +77,93 @@ export function OrgForm({
   const [touched, setTouched] = useState(false);
   const err = touched ? validateOrgForm(value) : null;
 
+  const autocomplete = useServerFn(autocompletePlaces);
+  const placeDetails = useServerFn(getPlaceDetails);
+  const [nameSuggestions, setNameSuggestions] = useState<PlaceSuggestion[]>([]);
+  const [nameOpen, setNameOpen] = useState(false);
+  const [nameLoading, setNameLoading] = useState(false);
+  const sessionTokenRef = useRef<string>(randomToken());
+  const biasRef = useRef<{ lat: number; lng: number } | null>(null);
+  const timerRef = useRef<number | null>(null);
+  const reqIdRef = useRef(0);
+
+  useEffect(() => {
+    if (typeof navigator === "undefined" || !navigator.geolocation) return;
+    const id = navigator.geolocation.watchPosition(
+      (pos) => {
+        biasRef.current = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+      },
+      () => {},
+      { enableHighAccuracy: true, maximumAge: 15000, timeout: 10000 },
+    );
+    return () => navigator.geolocation.clearWatch(id);
+  }, []);
+
   function patch(p: Partial<OrgFormValue>) {
     onChange({ ...value, ...p });
   }
+
+  const queryNameSuggestions = async (input: string) => {
+    if (input.trim().length < 2) {
+      setNameSuggestions([]);
+      setNameOpen(false);
+      return;
+    }
+    const reqId = ++reqIdRef.current;
+    setNameLoading(true);
+    try {
+      const { suggestions } = await autocomplete({
+        data: {
+          input,
+          lat: biasRef.current?.lat ?? null,
+          lng: biasRef.current?.lng ?? null,
+          sessionToken: sessionTokenRef.current,
+        },
+      });
+      if (reqId !== reqIdRef.current) return;
+      setNameSuggestions(suggestions);
+      setNameOpen(suggestions.length > 0);
+    } catch (e) {
+      if (reqId !== reqIdRef.current) return;
+      console.error("[OrgForm] name autocomplete failed:", e);
+      setNameSuggestions([]);
+      setNameOpen(false);
+    } finally {
+      if (reqId === reqIdRef.current) setNameLoading(false);
+    }
+  };
+
+  const handleNameChange = (v: string) => {
+    patch({ name: v });
+    if (timerRef.current) window.clearTimeout(timerRef.current);
+    timerRef.current = window.setTimeout(() => queryNameSuggestions(v), 250);
+  };
+
+  const pickNameSuggestion = (s: PlaceSuggestion) => {
+    const fallbackAddress = s.secondary ? `${s.primary}, ${s.secondary}` : s.primary;
+    patch({
+      name: s.primary,
+      address: fallbackAddress,
+      placeId: s.id,
+    });
+    setNameOpen(false);
+    setNameSuggestions([]);
+    const tokenAtPick = sessionTokenRef.current;
+    sessionTokenRef.current = randomToken();
+    placeDetails({ data: { placeId: s.id, sessionToken: tokenAtPick } })
+      .then((d) => {
+        onChange({
+          ...value,
+          name: s.primary,
+          address: d.formattedAddress || fallbackAddress,
+          placeId: s.id,
+          geo: { lat: d.lat, lng: d.lng },
+        });
+      })
+      .catch((e) => {
+        console.error("[OrgForm] place details failed:", e);
+      });
+  };
 
   return (
     <div className="space-y-5">
@@ -89,12 +173,48 @@ export function OrgForm({
         </h2>
         <label className="block space-y-1">
           <span className="text-xs font-semibold text-muted-foreground">Name</span>
-          <input
-            value={value.name}
-            onChange={(e) => patch({ name: e.target.value })}
-            placeholder="Peak Performance Gym"
-            className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm outline-none focus:border-lime/60"
-          />
+          <div className="relative">
+            <div className="flex items-center gap-2 rounded-xl border border-border bg-background px-3">
+              <Search className="h-4 w-4 text-muted-foreground shrink-0" />
+              <input
+                value={value.name}
+                onChange={(e) => handleNameChange(e.target.value)}
+                onFocus={() => nameSuggestions.length > 0 && setNameOpen(true)}
+                onBlur={() => setTimeout(() => setNameOpen(false), 150)}
+                placeholder="Search a gym or type a name"
+                className="flex-1 bg-transparent py-2 text-sm outline-none min-w-0"
+              />
+              {nameLoading && (
+                <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" />
+              )}
+            </div>
+            {nameOpen && nameSuggestions.length > 0 && (
+              <ul className="absolute z-20 mt-1 w-full overflow-hidden rounded-2xl border border-border bg-surface shadow-lg">
+                {nameSuggestions.map((s) => (
+                  <li key={s.id}>
+                    <button
+                      type="button"
+                      onMouseDown={(e) => {
+                        e.preventDefault();
+                        pickNameSuggestion(s);
+                      }}
+                      className="flex w-full items-start gap-2 px-4 py-2.5 text-left text-sm hover:bg-secondary"
+                    >
+                      <Search className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
+                      <span className="min-w-0">
+                        <span className="block truncate font-medium">{s.primary}</span>
+                        {s.secondary && (
+                          <span className="block truncate text-xs text-muted-foreground">
+                            {s.secondary}
+                          </span>
+                        )}
+                      </span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
         </label>
         <label className="block space-y-1">
           <span className="text-xs font-semibold text-muted-foreground">Handle</span>
