@@ -1,42 +1,61 @@
-## Goal
+## Problem
 
-When a user picks a session date/time in `BookSessionSheet`, warn clearly and block the booking if the chosen window falls outside the trainer's availability or overlaps another pending/accepted session.
+Right now the trainer's monthly availability and every booking time are stored and rendered as "naive" wall-clock strings ("Mon 09:00", `preferred_date=2026-08-04`, `preferred_start_time=09:00`) with no timezone attached. That means:
 
-## Changes
+- A trainer in New York who sets "Mon 9–11 AM" appears to a viewer in Los Angeles as "9–11 AM" — but the trainer is actually free 6–8 AM Pacific.
+- Overrides use `YYYY-MM-DD` computed against the viewer's local calendar, so a slot near midnight can jump one day between trainer and attendee.
+- The booking sheet's "already booked" list and conflict check operate on the same naive strings, so a request "conflict-free" for an East-Coast attendee can still collide with a real West-Coast booking.
+- `preferred_date` / `preferred_start_time` displayed on the request card show the trainer's raw string to attendees regardless of their own tz.
 
-### 1. DB — add start time to session requests
+The fix is to anchor everything to the trainer's IANA timezone and convert on the viewer side.
 
-Migration on `public.trainer_session_requests`:
-- Add `preferred_start_time TIME NULL` (nullable so legacy rows stay valid).
-- Add index `(trainer_id, preferred_date)` for fast per-day conflict lookup.
+## Plan
 
-### 2. Booking UI (`src/components/BookSessionSheet.tsx`)
+### 1. Data model
+- Add `timezone text` to `public.teams` (IANA name, e.g. `America/New_York`). Default to the browser tz on create; back-fill existing trainer rows with `America/New_York` and let them edit.
+- Keep `availability_slots` (weekly) and `availability_overrides` (date-keyed) as they are — but define them as **trainer-local wall-clock time**.
+- Keep `trainer_session_requests.preferred_date` + `preferred_start_time` as **trainer-local wall-clock** (so a slot the trainer set at 9 AM stays "9 AM their time" regardless of who books). Booking rows are always compared to the trainer's availability in the same frame.
 
-- Add a **Start time** field beside Duration. Render 30-minute chips generated from `resolveDay(date, slots, overrides)` (each availability window split into slots long enough to fit the selected duration); include a free "Custom time" `<input type="time">` for anything else.
-- Introduce a `selectedWindow` = `{ startMin, endMin }` derived from start time + duration.
-- Load conflicts for the chosen date once (server function `listTrainerBookingsForDate({ trainerId, date })` in a new `src/lib/trainer-requests.functions.ts`) — returns `{ start, end, status }[]` for accepted + pending requests belonging to that trainer where `preferred_date = date` and `preferred_start_time IS NOT NULL`. Uses `requireSupabaseAuth`; RLS already lets participants read their own rows, so use `supabaseAdmin` inside after validating input to expose only start/end/status (no identifying data).
-- Compute two flags:
-  - `offAvailability`: chosen window is not fully covered by any available window for that day (via `resolveDay`).
-  - `overlapping`: chosen window intersects any loaded booking window.
-- Render a red banner at the top of the form when either flag is true:
-  - "Trainer isn't available at this time" (off-availability), listing today's available windows.
-  - "This time overlaps another session" (conflict), listing the conflicting window(s) and status.
-  - Provide a "Pick a suggested time" button that jumps to and selects the next free slot from `resolveDay` that fits the duration and doesn't overlap.
-- Disable the **Send request** button while either flag is true; keep the button label ("Send request") and add `aria-disabled` + a tooltip title explaining why.
-- Skip the check (and allow submit) only when no date is chosen — matches existing "date-optional" flow; if a time is picked, a date becomes required.
+### 2. Shared timezone utilities (`src/lib/tz.ts`)
+- `getBrowserTz()` → `Intl.DateTimeFormat().resolvedOptions().timeZone`.
+- `wallTimeToInstant(dateKey, "HH:MM", tz)` → real `Date` using `Intl` offset math.
+- `instantToWall(date, tz)` → `{ dateKey, hhmm, weekday }`.
+- `formatInTz(date, tz, opts)` for labels + short tz code (e.g. `PDT`).
+- Curated tz picker list (America, Europe, Asia buckets).
 
-### 3. Server-side hard block
+### 3. Availability resolver (`src/lib/availability-resolve.ts`)
+- `resolveDay(date, weekly, overrides, { trainerTz, viewerTz, venueFilter })`:
+  1. For each viewer-local date, compute the trainer-local dates it touches (a single viewer day can straddle two trainer days).
+  2. Pull weekly slots for those trainer weekdays + any date-override windows keyed by the trainer-local date.
+  3. Convert each window's `[start, end]` from trainer-local → UTC → viewer-local, clip to the viewer day, and return `ResolvedWindow` with `start`/`end` already in viewer-local `HH:MM`, plus `sourceTz` for display.
+- `hasAvailability` uses the same pipeline.
 
-- Update `createTrainerSessionRequest` in `src/lib/trainer-requests.ts` (or its `.functions` counterpart) to accept `preferredStartTime`, validate it with Zod, and — inside the handler — re-check for overlaps against the same trainer/date using the authenticated client. Throw a friendly `Error("This time just got booked — please pick another slot.")` on conflict so the client shows a toast even if the UI check was stale.
-- Return the new row shape including `preferred_start_time`.
+### 4. Trainer-side editing (`AvailabilityCalendar.tsx`, `CreateOrgWizard.tsx`, `teams.$teamId.edit.tsx`)
+- Always edit in **trainer tz** (the profile's own tz). Header shows "Times shown in your timezone: America/New_York (EDT). Change tz".
+- Add a timezone picker to the Identity step and edit page; default to browser tz for new trainers.
+- Overlap validation (`availability-slots.ts`) is unchanged — it already runs in a single frame (trainer-local).
 
-### 4. Types & display
+### 5. Viewer-side display (`TrainerAvailabilityMonth.tsx`, trainer profile venue rows)
+- Read `org.timezone`, compute a `viewerTz = getBrowserTz()`.
+- Pass both into `resolveDay`; render windows in viewer-local time with a subtle "· in your time" label and a toggle "Show trainer's time" (persisted in URL as `?tz=trainer|viewer`, default viewer).
+- Show a small chip: "Trainer is in EDT (3 hours ahead)".
 
-- Extend `TrainerSessionRequest` type with `preferred_start_time: string | null`.
-- Show the start time in `ExistingRequestView`'s "Preferred date" row when present (formatted `Wed, Mar 5 · 6:00–7:00 PM`).
+### 6. Booking sheet (`BookSessionSheet.tsx`)
+- `date` picker + suggested times run in the **viewer's** local frame (that's what the user picks).
+- On submit, convert `(viewerDateKey, viewerHHMM)` → UTC instant → trainer-local `(dateKey, HHMM)` and send those as `preferredDate` / `preferredStartTime`. This keeps DB rows aligned to the trainer's calendar.
+- Same conversion applied to `listTrainerBookedSlots` results before conflict-checking so the "already booked" chips render in viewer-local.
+- Warning banner text includes both times: "You picked 9:00 AM PDT (12:00 PM EDT trainer time)".
+- Existing-request card in the sheet shows both `time in your tz` and `(trainer's tz)`.
 
-## Out of scope
+### 7. Notifications / inbox
+- Any place that renders `preferred_date` + `preferred_start_time` (request cards, inbox threads) uses a shared `formatBookingTime(row, trainerTz, viewerTz)` helper so both parties see the same instant labelled in their own tz.
 
-- Multi-day/recurring bookings.
-- Time-zone selection (uses trainer's local time, matching the existing availability model).
-- Blocking overlaps against the requesting user's *own* calendar (only trainer-side conflicts).
+### 8. Migration
+- `ALTER TABLE public.teams ADD COLUMN timezone text NOT NULL DEFAULT 'America/New_York';` then relax default after backfill.
+- No schema change needed for `trainer_session_requests` — the semantics of existing columns are simply pinned to "trainer-local" and enforced in application code. (`list_trainer_booked_slots` RPC remains unchanged.)
+
+### Technical notes
+- All conversions use `Intl.DateTimeFormat` with `timeZone` option — no external library needed; works in every modern browser and in the Worker runtime.
+- The `preferred_date` invariant to remember: **it is always the trainer-local calendar date**, so the conflict RPC keeps working with its current `WHERE preferred_date = _date` predicate.
+- URL param `?tz=trainer` lets a trainer share a link that shows their own hours; default remains viewer-local for attendees.
+- Historical `trainer_session_requests` rows created before this change are already effectively "browser-local at time of booking" — we treat them as trainer-local going forward; a one-line note in the request card ("Times shown in trainer's timezone") covers the small ambiguity for old rows.
