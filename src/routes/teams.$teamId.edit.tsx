@@ -31,11 +31,28 @@ import { useAuth } from "@/hooks/use-auth";
 
 
 export const Route = createFileRoute("/teams/$teamId/edit")({
+  ssr: false,
   head: ({ params }) => {
     const o = getOrgById(params.teamId);
-    return { meta: [{ title: o ? `Edit ${o.name} — OpenRun` : "Edit — OpenRun" }] };
+    return { meta: [{ title: o ? `Edit ${o.name} — OpenRun` : "Edit — OpenRun" }, { name: "robots", content: "noindex" }] };
   },
   component: EditOrg,
+  pendingComponent: () => (
+    <div className="mx-auto max-w-md px-6 pt-24 text-center text-muted-foreground">
+      Loading editor…
+    </div>
+  ),
+  errorComponent: ({ error }) => (
+    <div className="mx-auto max-w-md px-6 pt-24 text-center">
+      <p className="text-muted-foreground">{error instanceof Error ? error.message : "Couldn't open editor."}</p>
+      <Link
+        to="/teams"
+        className="mt-4 inline-block rounded-full bg-lime px-4 py-2 text-sm font-bold text-primary-foreground"
+      >
+        Back to Teams
+      </Link>
+    </div>
+  ),
   notFoundComponent: () => (
     <div className="mx-auto max-w-md px-6 pt-24 text-center">
       <p className="text-muted-foreground">Organization not found.</p>
