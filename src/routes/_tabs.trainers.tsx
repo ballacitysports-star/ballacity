@@ -11,10 +11,12 @@ import { SportChips } from "@/components/SportChips";
 import { ViewDensityToggle, type ViewMode, type Density } from "@/components/ViewDensityToggle";
 import { TeamsMapView } from "@/components/TeamsMapView";
 import { TrainerActions } from "@/components/TrainerActions";
-import { useMyProfile } from "@/lib/user-prefs-store";
+import { useMyProfile, useFeedPrefs } from "@/lib/user-prefs-store";
 import { useAuth } from "@/hooks/use-auth";
 import { toast } from "sonner";
 import { SPORT_CONFIG, SESSION_TYPES } from "@/lib/sport-config";
+import { haversineKm, KM_PER_MI, MI_PER_KM, useUserLocation } from "@/lib/geo";
+import { Slider } from "@/components/ui/slider";
 
 type SortBy = "nearest" | "soonest" | "followers" | "name";
 type Avail = "any" | "soon" | "recruiting" | "weekly" | "casual";
@@ -61,6 +63,7 @@ const trainersSearchSchema = z.object({
   sport: fallback(z.string(), "").default(""),
   specialty: fallback(z.string(), "").default(""),
   venue: fallback(z.string(), "").default(""),
+  radius: fallback(z.coerce.number().min(0).max(200), 0).default(0),
   avail: fallback(z.string(), "any").default("any"),
   sort: fallback(z.string(), "nearest").default("nearest"),
   view: fallback(z.string(), "list").default("list"),
@@ -96,6 +99,7 @@ function TrainersPage() {
   const sport: Sport | null = (search.sport || null) as Sport | null;
   const specialty: string = search.specialty || "";
   const venue: string = search.venue || "";
+  const radius: number = Number(search.radius) || 0;
   const sortBy: SortBy =
     search.sort === "soonest" || search.sort === "followers" || search.sort === "name"
       ? search.sort
@@ -110,11 +114,17 @@ function TrainersPage() {
   const viewMode: ViewMode = search.view === "map" ? "map" : "list";
   const density: Density = search.density === "grid" ? "grid" : "list";
 
+  const { distanceUnit } = useFeedPrefs();
+  const unitLabel = distanceUnit === "km" ? "km" : "mi";
+  const { coords, status: geoStatus, request: requestLocation } = useUserLocation();
+  const radiusKm = radius > 0 ? (distanceUnit === "km" ? radius : radius * KM_PER_MI) : 0;
+
   const setQ = (v: string) => updateSearch({ q: v });
   const setSport = (v: Sport | null) => updateSearch({ sport: v ?? "", specialty: "" });
   const setSpecialty = (v: string) =>
     updateSearch({ specialty: specialty === v ? "" : v });
   const setVenue = (v: string) => updateSearch({ venue: venue === v ? "" : v });
+  const setRadius = (v: number) => updateSearch({ radius: v });
   const setSortBy = (v: SortBy) => updateSearch({ sort: v });
   const setAvail = (v: Avail) => updateSearch({ avail: v });
 
@@ -208,19 +218,41 @@ function TrainersPage() {
               .includes(q.toLowerCase())
           : true,
       );
-    const withDist = filtered.map((o) => ({
-      o,
-      dist: pseudoDistance(o.id),
-      score: availabilityScore(o),
-    }));
+    const withDist = filtered
+      .map((o) => {
+        let minKm: number | null = null;
+        if (coords && (o.venueGeo?.length ?? 0) > 0) {
+          for (const g of o.venueGeo ?? []) {
+            const d = haversineKm(coords, { lat: g.lat, lng: g.lng });
+            if (minKm == null || d < minKm) minKm = d;
+          }
+        }
+        return {
+          o,
+          dist: pseudoDistance(o.id),
+          score: availabilityScore(o),
+          minKm,
+        };
+      })
+      .filter((x) => {
+        if (radiusKm <= 0 || !coords) return true;
+        return x.minKm != null && x.minKm <= radiusKm;
+      });
     withDist.sort((a, b) => {
-      if (sortBy === "nearest") return a.dist - b.dist;
+      if (sortBy === "nearest") {
+        if (radiusKm > 0 && coords) {
+          const ax = a.minKm ?? Infinity;
+          const bx = b.minKm ?? Infinity;
+          if (ax !== bx) return ax - bx;
+        }
+        return a.dist - b.dist;
+      }
       if (sortBy === "soonest") return a.score - b.score || a.dist - b.dist;
       if (sortBy === "followers") return b.o.followers - a.o.followers;
       return a.o.name.localeCompare(b.o.name);
     });
     return withDist;
-  }, [orgs, sport, specialty, venue, q, sortBy, avail]);
+  }, [orgs, sport, specialty, venue, q, sortBy, avail, radiusKm, coords]);
 
   const venueOptions = useMemo(() => {
     const map = new Map<string, { addr: string; primary: boolean; count: number }>();
@@ -314,7 +346,7 @@ function TrainersPage() {
         </div>
         {(() => {
           const activeFilterCount =
-            (sport ? 1 : 0) + (specialty ? 1 : 0) + (venue ? 1 : 0) + (avail !== "any" ? 1 : 0);
+            (sport ? 1 : 0) + (specialty ? 1 : 0) + (venue ? 1 : 0) + (radius > 0 ? 1 : 0) + (avail !== "any" ? 1 : 0);
 
           return (
             <button
@@ -417,6 +449,59 @@ function TrainersPage() {
             </div>
           )}
 
+          <div className="mb-4 rounded-2xl border border-border bg-surface p-3">
+            <div className="flex items-center justify-between mb-2">
+              <div className="flex items-center gap-2">
+                <MapPin className="h-3.5 w-3.5 text-lime" />
+                <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                  Within
+                </span>
+                <span className="text-xs font-semibold">
+                  {radius > 0 ? `${radius} ${unitLabel}` : "Any distance"}
+                </span>
+              </div>
+              {radius > 0 && (
+                <button
+                  onClick={() => setRadius(0)}
+                  className="text-[11px] font-semibold text-muted-foreground hover:text-foreground"
+                >
+                  Clear
+                </button>
+              )}
+            </div>
+            <Slider
+              value={[radius]}
+              min={0}
+              max={100}
+              step={1}
+              onValueChange={(v) => {
+                const nv = Math.round(v[0] ?? 0);
+                setRadius(nv);
+                if (nv > 0 && geoStatus !== "granted" && geoStatus !== "prompting") {
+                  requestLocation();
+                }
+              }}
+              aria-label="Distance radius"
+            />
+            {radius > 0 && geoStatus !== "granted" && (
+              <div className="mt-2 flex items-center justify-between gap-2 text-[11px]">
+                <span className="text-muted-foreground">
+                  {geoStatus === "denied" || geoStatus === "unsupported"
+                    ? "Location unavailable — enable location to filter by distance."
+                    : "Share your location to filter by distance."}
+                </span>
+                <button
+                  onClick={requestLocation}
+                  className="whitespace-nowrap rounded-full border border-lime bg-lime/10 px-2.5 py-1 text-[11px] font-bold text-lime"
+                >
+                  {geoStatus === "prompting" ? "Locating…" : "Use my location"}
+                </button>
+              </div>
+            )}
+          </div>
+
+
+
 
           <div className="-mx-4 overflow-x-auto px-4 mb-4">
             <div className="flex gap-2 pb-1">
@@ -480,28 +565,36 @@ function TrainersPage() {
               : "space-y-3 pb-6"
           }
         >
-          {list.map(({ o, dist, score }, i) => (
-            <div key={o.id} className="relative">
-              <OrgCard org={o} index={i} />
-              <div className="pointer-events-none absolute top-3 right-3 flex flex-col items-end gap-1">
-                <span className="rounded-full bg-background/70 backdrop-blur px-2 py-0.5 text-[10px] font-bold text-foreground">
-                  {dist} mi
-                </span>
-                <span
-                  className={`rounded-full backdrop-blur px-2 py-0.5 text-[10px] font-bold ${
-                    score === 0
-                      ? "bg-lime text-primary-foreground"
-                      : score <= 2
-                        ? "bg-lime/20 text-lime"
-                        : "bg-background/70 text-muted-foreground"
-                  }`}
-                >
-                  {availabilityLabel(score)}
-                </span>
+          {list.map(({ o, dist, score, minKm }, i) => {
+            const distLabel =
+              radiusKm > 0 && coords && minKm != null
+                ? distanceUnit === "km"
+                  ? `${minKm.toFixed(1)} km`
+                  : `${(minKm * MI_PER_KM).toFixed(1)} mi`
+                : `${dist} mi`;
+            return (
+              <div key={o.id} className="relative">
+                <OrgCard org={o} index={i} />
+                <div className="pointer-events-none absolute top-3 right-3 flex flex-col items-end gap-1">
+                  <span className="rounded-full bg-background/70 backdrop-blur px-2 py-0.5 text-[10px] font-bold text-foreground">
+                    {distLabel}
+                  </span>
+                  <span
+                    className={`rounded-full backdrop-blur px-2 py-0.5 text-[10px] font-bold ${
+                      score === 0
+                        ? "bg-lime text-primary-foreground"
+                        : score <= 2
+                          ? "bg-lime/20 text-lime"
+                          : "bg-background/70 text-muted-foreground"
+                    }`}
+                  >
+                    {availabilityLabel(score)}
+                  </span>
+                </div>
+                <TrainerActions org={o} />
               </div>
-              <TrainerActions org={o} />
-            </div>
-          ))}
+            );
+          })}
           {list.length === 0 && (
             <div className="rounded-2xl border border-border bg-surface p-8 text-center text-muted-foreground sm:col-span-2">
               <div className="inline-flex items-center gap-2">
