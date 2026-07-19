@@ -1354,7 +1354,7 @@ export function CreateOrgWizard({ kind }: { kind: OrgKind }) {
                       />
                       {orgChoice.geo && (
                         <div className="overflow-hidden rounded-2xl border border-border">
-                          <VenueMapPreview lat={orgChoice.geo.lat} lng={orgChoice.geo.lng} label={orgChoice.address ?? orgChoice.name} />
+                          <VenueMapPreview address={orgChoice.address ?? orgChoice.name} lat={orgChoice.geo.lat} lng={orgChoice.geo.lng} placeId={orgChoice.placeId} />
                         </div>
                       )}
 
