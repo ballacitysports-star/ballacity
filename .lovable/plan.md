@@ -1,36 +1,33 @@
-## Distance slider for trainer venue filter
+## Goal
+Keep the selected venue filter sticky as I move between the trainers feed → trainer profile → booking sheet, so I don't have to re-pick it at each stop.
 
-Add a "Within X miles" slider next to the venue filter on `/trainers` that narrows results to trainers whose venues fall inside a radius from the user's current location. Respects existing `distanceUnit` pref (`mi`/`km`).
+## Current state (verified)
+- Feed (`src/routes/_tabs.trainers.tsx`) reads/writes `venue` in the URL via `validateSearch`.
+- Profile (`src/routes/trainers.$trainerId.tsx`) already has its own `venue` search param, but nothing hands the feed's `venue` to it — clicking a trainer card via `OrgCard` drops the selection.
+- Profile → booking: `BookSessionSheet` accepts `prefill.venue`, but the profile only passes it through explicit "Book" clicks; opening from the top-level Book button ignores the currently-selected venue chip.
+- `TrainerActions` (feed row action) opens `BookSessionSheet` with no prefill, so the feed's venue selection is lost when booking directly from the list.
+- `OrgCard` is shared with teams and currently has no way to forward search params.
 
-### Behavior
-- Slider range 1–100 (unit from `useUserPrefs().distanceUnit`), default 25, step 1. `0` treated as "any distance" and hidden from the UI by using `Off` as the lowest label when the user clears it.
-- Filter applies to any trainer with at least one `venueGeo` entry inside the radius. Trainers without `venueGeo` are excluded ONLY when a radius is active (so the default view still shows everyone).
-- Requires user location. On first slider interaction, request `navigator.geolocation.getCurrentPosition`. On deny/error, show inline "Enable location to filter by distance" hint with a retry button and log via existing `location-denial-telemetry`.
-- Sort: when the slider is active and `sort=nearest`, sort by the min-distance to any venue. When inactive, keep existing `nearest` behavior unchanged.
-- Reveal per-card min-distance chip ("3.2 mi") on the trainer card when a radius is set.
+## Changes
+1. **Forward venue from feed → profile**
+   - `src/components/OrgCard.tsx`: accept optional `search` prop and pass it to the `<Link>`. Keep default behavior for teams.
+   - `src/routes/_tabs.trainers.tsx`: when rendering trainer `OrgCard`s, pass `search={venue ? { venue } : undefined}`. Only forward when the venue exists on that trainer's `venueAddresses` (avoid pre-selecting a venue the trainer doesn't offer).
 
-### URL state
-Extend `trainersSearchSchema` in `src/routes/_tabs.trainers.tsx`:
-- `radius: fallback(z.coerce.number().min(0).max(200), 0).default(0)` (in the user's unit; 0 = off).
+2. **Forward venue from feed → booking (list action)**
+   - `src/components/TrainerActions.tsx`: accept an optional `defaultVenue?: string | null` prop and pass it as `prefill={{ venue: defaultVenue }}` to `BookSessionSheet` (only if that trainer offers it).
+   - `_tabs.trainers.tsx`: pass `defaultVenue={venue || null}` to each `<TrainerActions>`.
 
-Included in the active-filter counter chip and cleared by "Reset filters".
+3. **Forward venue from profile → booking**
+   - `src/routes/trainers.$trainerId.tsx`: when opening the sheet from the main "Book" CTA (currently sets `bookPrefill` to null), seed it with `{ venue: selectedVenue || null }` if the trainer offers it. The existing "book from calendar / next-available" flows already merge venue and stay intact.
 
-### Implementation
+4. **Preserve venue on profile back-link**
+   - `src/routes/trainers.$trainerId.tsx`: the "Back to trainers" `<Link to="/trainers">` currently drops search. Change it to `search={selectedVenue ? { venue: selectedVenue } : undefined}` so returning to the feed keeps the same venue filter.
 
-1. **`src/lib/geo.ts` (new)** — small util:
-   - `haversineKm(a, b)` returning km.
-   - `useUserLocation()` hook: exposes `{ coords, status, request }` where `status ∈ 'idle'|'prompting'|'granted'|'denied'|'unsupported'`. Caches the last successful fix in `sessionStorage` for 10 minutes to avoid re-prompting on route re-mounts.
+## Non-goals
+- No schema, DB, or booking-logic changes.
+- No changes to team navigation, only trainer surfaces.
+- Radius / other filters are out of scope for this pass.
 
-2. **`src/routes/_tabs.trainers.tsx`**
-   - Add `radius` to schema and derive `radiusUnitVal` from search.
-   - Convert to km using `distanceUnit`.
-   - In the filter memo, when `radiusKm > 0 && coords`, compute `minKm = min(haversine(coords, v))` across `o.venueGeo`; drop trainer if `minKm > radiusKm` or `venueGeo` empty.
-   - Stash `minKm` on the filtered items so cards can display it and sort can use it.
-   - Add slider UI inside the existing filter drawer, directly under the venue chips section. Include the unit label and a "Use my location" button when `status !== 'granted'`.
-
-3. **`src/components/TrainerCard.tsx`** (or wherever list rows render — check `_tabs.trainers.tsx` inline renderer first): accept optional `distanceLabel?: string` and render a small chip when provided.
-
-### Non-goals
-- No server-side filtering (client-side against already-loaded orgs is sufficient at current scale).
-- No map-view radius overlay (list/filter only for this pass).
-- No changes to the players/feed distance behavior.
+## Verification
+- Typecheck.
+- Manually: select a venue chip on the trainers feed → tap a trainer card → profile shows that venue selected → tap Book → sheet is prefilled with that venue → back arrow returns to the feed with the venue chip still active.
