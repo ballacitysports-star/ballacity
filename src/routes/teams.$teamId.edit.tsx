@@ -16,7 +16,7 @@ import { SPORTS, HERO_IMAGE, type Sport, type Org } from "@/lib/sample-data";
 import { getOrgById, updateOrg, deleteOrg, isMyOrg } from "@/lib/org-store";
 import { validateSlots, validateOverrides, type DayOverride } from "@/lib/availability-slots";
 import { AvailabilityCalendar } from "@/components/AvailabilityCalendar";
-import { validateVenueList } from "@/lib/venue-address";
+import { validateVenueList, buildVenueGeo } from "@/lib/venue-address";
 import { OrgCard } from "@/components/OrgCard";
 import { LocationAutocomplete } from "@/components/LocationAutocomplete";
 import { TeamCoverUploader } from "@/components/TeamCoverUploader";
@@ -103,6 +103,14 @@ function EditOrg() {
   // Seed verified set with whatever addresses are already saved — existing entries remain valid.
   const [verifiedVenues, setVerifiedVenues] = useState<Set<string>>(
     () => new Set((org.venueAddresses ?? []).map((v) => v.trim().toLowerCase()).filter(Boolean)),
+  );
+  const [venueGeoMap, setVenueGeoMap] = useState<Record<string, { placeId: string; lat: number; lng: number }>>(
+    () => Object.fromEntries(
+      (org.venueGeo ?? []).map((g) => [
+        g.address.trim().toLowerCase(),
+        { placeId: g.placeId, lat: g.lat, lng: g.lng },
+      ]),
+    ),
   );
   const slotsError = useMemo(() => validateSlots(slots), [slots]);
   const overridesError = useMemo(
@@ -232,6 +240,7 @@ function EditOrg() {
           ? venueAddresses.map((a) => a.trim()).filter((a) => a.length > 0)
           : undefined,
         verifiedVenues: kind === "coach" ? Array.from(verifiedVenues) : undefined,
+        venueGeo: kind === "coach" ? buildVenueGeo(venueAddresses, verifiedVenues, venueGeoMap) : undefined,
         primaryVenue: kind === "coach"
           ? (primaryVenue && venueAddresses.map((v) => v.trim()).includes(primaryVenue.trim())
               ? primaryVenue.trim()
@@ -749,6 +758,12 @@ function EditOrg() {
                                         next.delete(prevKey);
                                         return next;
                                       });
+                                      setVenueGeoMap((cur) => {
+                                        if (!(prevKey in cur)) return cur;
+                                        const next = { ...cur };
+                                        delete next[prevKey];
+                                        return next;
+                                      });
                                     }
                                     if (isPrimary) setPrimaryVenue(v.trim() || null);
                                     if (prevTrim) {
@@ -761,7 +776,7 @@ function EditOrg() {
                                       );
                                     }
                                   }}
-                                  onPick={(full) => {
+                                  onPick={(full, placeId, geo) => {
                                     const key = full.trim().toLowerCase();
                                     const prevKey = trimmed.toLowerCase();
                                     setVenueAddresses((cur) =>
@@ -773,6 +788,14 @@ function EditOrg() {
                                       next.add(key);
                                       return next;
                                     });
+                                    if (geo) {
+                                      setVenueGeoMap((cur) => {
+                                        const next = { ...cur };
+                                        if (prevKey && prevKey !== key) delete next[prevKey];
+                                        next[key] = { placeId, lat: geo.lat, lng: geo.lng };
+                                        return next;
+                                      });
+                                    }
                                     if (isPrimary) setPrimaryVenue(full.trim());
                                     if (trimmed) {
                                       setSlots((cur) =>
@@ -804,6 +827,13 @@ function EditOrg() {
                                       if (!cur.has(key)) return cur;
                                       const next = new Set(cur);
                                       next.delete(key);
+                                      return next;
+                                    });
+                                    setVenueGeoMap((cur) => {
+                                      const key = trimmed.toLowerCase();
+                                      if (!(key in cur)) return cur;
+                                      const next = { ...cur };
+                                      delete next[key];
                                       return next;
                                     });
                                   }

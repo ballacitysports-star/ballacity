@@ -1,0 +1,1 @@
+ALTER TABLE public.teams ADD COLUMN IF NOT EXISTS venue_geo jsonb NOT NULL DEFAULT '[]'::jsonb;

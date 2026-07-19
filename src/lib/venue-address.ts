@@ -62,3 +62,31 @@ export function validateVenueList(
   const deduped = Array.from(seen.keys()).map((k) => list[seen.get(k)!].trim());
   return { errors, hasError: errors.some(Boolean), deduped, firstError };
 }
+
+/**
+ * Build the persistable `venueGeo` array from the current wizard state.
+ * Only addresses that are (a) present in `verified` AND (b) have resolved
+ * lat/lng in `geoMap` are included, so map pins never point at stale entries.
+ */
+export function buildVenueGeo(
+  addresses: string[],
+  verified: Set<string> | string[],
+  geoMap: Record<string, { placeId: string; lat: number; lng: number }>,
+): { address: string; placeId: string; lat: number; lng: number }[] {
+  const verifiedSet =
+    verified instanceof Set
+      ? verified
+      : new Set(verified.map((v) => v.trim().toLowerCase()));
+  const out: { address: string; placeId: string; lat: number; lng: number }[] = [];
+  const seen = new Set<string>();
+  for (const raw of addresses) {
+    const address = raw.trim();
+    const key = address.toLowerCase();
+    if (!address || seen.has(key) || !verifiedSet.has(key)) continue;
+    const geo = geoMap[key];
+    if (!geo) continue;
+    seen.add(key);
+    out.push({ address, placeId: geo.placeId, lat: geo.lat, lng: geo.lng });
+  }
+  return out;
+}

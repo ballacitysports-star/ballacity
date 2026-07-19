@@ -386,6 +386,8 @@ export type Org = {
   venues?: string[];
   venueAddresses?: string[];
   verifiedVenues?: string[];
+  /** Google Place details per verified venue address (place_id, lat, lng). */
+  venueGeo?: { address: string; placeId: string; lat: number; lng: number }[];
   primaryVenue?: string;
   cadence?: string;
   cadences?: string[];

@@ -2,8 +2,10 @@ import { useEffect, useRef, useState } from "react";
 import { Loader2, LocateFixed, MapPin } from "lucide-react";
 import { useServerFn } from "@tanstack/react-start";
 import { reverseGeocode } from "@/lib/geocode.functions";
-import { autocompletePlaces, type PlaceSuggestion } from "@/lib/places.functions";
+import { autocompletePlaces, getPlaceDetails, type PlaceSuggestion } from "@/lib/places.functions";
 import { toast } from "sonner";
+
+export type PickedPlaceGeo = { lat: number; lng: number; formattedAddress?: string };
 
 function randomToken(): string {
   try {
@@ -27,7 +29,7 @@ export function LocationAutocomplete({
   /** "place" returns full venue address; "city" returns just city, region */
   mode?: "place" | "city";
   showCurrentButton?: boolean;
-  onPick?: (v: string, placeId: string) => void;
+  onPick?: (v: string, placeId: string, geo?: PickedPlaceGeo) => void;
 }) {
   const [suggestions, setSuggestions] = useState<PlaceSuggestion[]>([]);
   const [open, setOpen] = useState(false);
@@ -35,6 +37,7 @@ export function LocationAutocomplete({
   const [searchError, setSearchError] = useState<string | null>(null);
   const reverse = useServerFn(reverseGeocode);
   const autocomplete = useServerFn(autocompletePlaces);
+  const placeDetails = useServerFn(getPlaceDetails);
   const sessionTokenRef = useRef<string>(randomToken());
   const timerRef = useRef<number | null>(null);
   const biasRef = useRef<{ lat: number; lng: number } | null>(null);
@@ -98,11 +101,23 @@ export function LocationAutocomplete({
   const pick = (s: PlaceSuggestion) => {
     const full = s.secondary ? `${s.primary}, ${s.secondary}` : s.primary;
     onChange(full);
+    // Fire optimistic pick without geo, then enrich with lat/lng once resolved.
     onPick?.(full, s.id);
     setOpen(false);
     setSuggestions([]);
+    const tokenAtPick = sessionTokenRef.current;
     // Rotate session token after a selection (Places billing convention).
     sessionTokenRef.current = randomToken();
+    placeDetails({ data: { placeId: s.id, sessionToken: tokenAtPick } })
+      .then((d) => {
+        const resolved = d.formattedAddress || full;
+        // Only replace the input text if the user hasn't kept editing.
+        if (d.formattedAddress && d.formattedAddress !== full) onChange(resolved);
+        onPick?.(resolved, s.id, { lat: d.lat, lng: d.lng, formattedAddress: d.formattedAddress });
+      })
+      .catch((err) => {
+        console.error("[LocationAutocomplete] place details failed:", err);
+      });
   };
 
   const useCurrentLocation = () => {

@@ -85,3 +85,61 @@ export const autocompletePlaces = createServerFn({ method: "POST" })
 
     return { suggestions };
   });
+
+export type PlaceDetails = {
+  placeId: string;
+  formattedAddress: string;
+  lat: number;
+  lng: number;
+};
+
+export const getPlaceDetails = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((data: { placeId: string; sessionToken?: string }) => {
+    const placeId = String(data?.placeId ?? "").trim();
+    if (!placeId || placeId.length > 200) throw new Error("invalid placeId");
+    const sessionToken =
+      typeof data?.sessionToken === "string" && data.sessionToken.length <= 80
+        ? data.sessionToken
+        : undefined;
+    return { placeId, sessionToken };
+  })
+  .handler(async ({ data }): Promise<PlaceDetails> => {
+    const lovableKey = process.env.LOVABLE_API_KEY;
+    const gKey = process.env.GOOGLE_MAPS_API_KEY;
+    if (!lovableKey || !gKey) throw new Error("Maps credentials missing");
+
+    const url = new URL(
+      `${GATEWAY_URL}/places/v1/places/${encodeURIComponent(data.placeId)}`,
+    );
+    if (data.sessionToken) url.searchParams.set("sessionToken", data.sessionToken);
+
+    const res = await fetch(url.toString(), {
+      method: "GET",
+      headers: {
+        Authorization: `Bearer ${lovableKey}`,
+        "X-Connection-Api-Key": gKey,
+        "X-Goog-FieldMask": "id,formattedAddress,location",
+      },
+    });
+    if (!res.ok) {
+      const text = await res.text().catch(() => "");
+      throw new Error(`Place details failed: ${res.status} ${text.slice(0, 200)}`);
+    }
+    const json = (await res.json()) as {
+      id?: string;
+      formattedAddress?: string;
+      location?: { latitude?: number; longitude?: number };
+    };
+    const lat = json.location?.latitude;
+    const lng = json.location?.longitude;
+    if (typeof lat !== "number" || typeof lng !== "number") {
+      throw new Error("Place details missing location");
+    }
+    return {
+      placeId: json.id ?? data.placeId,
+      formattedAddress: json.formattedAddress ?? "",
+      lat,
+      lng,
+    };
+  });

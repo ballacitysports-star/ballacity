@@ -38,6 +38,7 @@ type TeamRow = {
   formats: unknown;
   venues: string[] | null;
   venue_addresses: unknown;
+  venue_geo: unknown;
   primary_venue: string | null;
   cadence: string | null;
   cadences: unknown;
@@ -108,6 +109,9 @@ function rowToOrg(row: TeamRow): Org {
     venueAddresses: Array.isArray(row.venue_addresses)
       ? (row.venue_addresses as string[])
       : [],
+    venueGeo: Array.isArray(row.venue_geo)
+      ? (row.venue_geo as { address: string; placeId: string; lat: number; lng: number }[])
+      : [],
     primaryVenue: kind === "coach" ? row.primary_venue ?? undefined : undefined,
     cadence: row.cadence ?? undefined,
     cadences: Array.isArray(row.cadences)
@@ -163,6 +167,7 @@ function orgToInsert(org: Org) {
     venues: org.venues ?? [],
     venue_addresses: org.venueAddresses ?? [],
     verified_venues: org.verifiedVenues ?? (org.venueAddresses ?? []),
+    venue_geo: org.venueGeo ?? [],
     primary_venue: org.kind === "coach" ? org.primaryVenue ?? null : null,
     cadence: org.cadences?.[0] ?? org.cadence ?? null,
     cadences: org.cadences ?? (org.cadence ? [org.cadence] : []),
@@ -276,7 +281,7 @@ export async function addOrg(org: Org): Promise<Org> {
 
 export async function updateOrg(
   id: string,
-  patch: Partial<Omit<Org, "id" | "kind" | "upcoming" | "posts" | "primaryVenue">> & { primaryVenue?: string | null; verifiedVenues?: string[] },
+  patch: Partial<Omit<Org, "id" | "kind" | "upcoming" | "posts" | "primaryVenue">> & { primaryVenue?: string | null; verifiedVenues?: string[]; venueGeo?: { address: string; placeId: string; lat: number; lng: number }[] },
 ): Promise<void> {
   // Snapshot for rollback + optimistic merge
   const idx = ORGS.findIndex((o) => o.id === id);
@@ -322,6 +327,7 @@ export async function updateOrg(
   if (patch.venues !== undefined) mapped.venues = patch.venues ?? [];
   if (patch.venueAddresses !== undefined) mapped.venue_addresses = patch.venueAddresses ?? [];
   if (patch.verifiedVenues !== undefined) mapped.verified_venues = patch.verifiedVenues ?? [];
+  if (patch.venueGeo !== undefined) mapped.venue_geo = patch.venueGeo ?? [];
   if (patch.primaryVenue !== undefined) mapped.primary_venue = patch.primaryVenue ?? null;
   if (patch.cadence !== undefined) mapped.cadence = patch.cadence ?? null;
   if (patch.cadences !== undefined) {
