@@ -156,6 +156,15 @@ function OrgPage() {
               <MembershipCta orgId={orgId} members={members} />
             </div>
           </div>
+          {isAdmin && (
+            <Link
+              to="/orgs/$orgId/edit"
+              params={{ orgId }}
+              className="shrink-0 rounded-full border border-lime/40 bg-lime/10 px-3 py-1.5 text-xs font-bold text-lime hover:bg-lime/20"
+            >
+              Edit
+            </Link>
+          )}
         </div>
       </header>
 
