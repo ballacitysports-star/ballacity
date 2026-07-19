@@ -108,10 +108,21 @@ function OrgPage() {
 
   return (
     <div className="mx-auto w-full max-w-md sm:max-w-2xl lg:max-w-4xl p-4 pb-40 space-y-6">
-      <header className="rounded-2xl border border-border/60 bg-surface p-5">
-        <div className="flex items-start gap-3">
-          <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-lime/15 text-2xl">
-            {org.avatar || <Building2 className="h-6 w-6 text-lime" />}
+      <header className="overflow-hidden rounded-2xl border border-border/60 bg-surface">
+        {org.cover_url ? (
+          <div className="relative h-40 w-full sm:h-52">
+            <img src={org.cover_url} alt="" className="h-full w-full object-cover" />
+          </div>
+        ) : null}
+        <div className="flex items-start gap-3 p-5">
+          <div className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-lime/15 text-2xl">
+            {org.avatar_url ? (
+              <img src={org.avatar_url} alt="" className="h-full w-full object-cover" />
+            ) : org.avatar ? (
+              <span>{org.avatar}</span>
+            ) : (
+              <Building2 className="h-6 w-6 text-lime" />
+            )}
           </div>
           <div className="min-w-0 flex-1">
             <h1 className="font-display text-2xl font-bold flex items-center gap-2 flex-wrap">

@@ -30,7 +30,7 @@ export const listTrainerOrgs = createServerFn({ method: "GET" })
     const sb = publicClient();
     let q = sb
       .from("trainer_orgs")
-      .select("id,name,handle,avatar,city,bio,verified,owner_id")
+      .select("id,name,handle,avatar,avatar_url,cover_url,city,bio,verified,owner_id")
       .order("created_at", { ascending: false })
       .limit(100);
     if (data.search) q = q.ilike("name", `%${data.search}%`);
