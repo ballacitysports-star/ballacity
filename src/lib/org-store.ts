@@ -35,8 +35,11 @@ type TeamRow = {
   followers: number;
   verified: boolean;
   format: string | null;
+  formats: unknown;
   venues: string[] | null;
+  venue_addresses: unknown;
   cadence: string | null;
+  cadences: unknown;
   positions_needed: unknown;
   rating_system: string | null;
   rating_min: string | null;
