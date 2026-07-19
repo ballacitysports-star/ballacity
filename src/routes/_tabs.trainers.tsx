@@ -565,28 +565,36 @@ function TrainersPage() {
               : "space-y-3 pb-6"
           }
         >
-          {list.map(({ o, dist, score }, i) => (
-            <div key={o.id} className="relative">
-              <OrgCard org={o} index={i} />
-              <div className="pointer-events-none absolute top-3 right-3 flex flex-col items-end gap-1">
-                <span className="rounded-full bg-background/70 backdrop-blur px-2 py-0.5 text-[10px] font-bold text-foreground">
-                  {dist} mi
-                </span>
-                <span
-                  className={`rounded-full backdrop-blur px-2 py-0.5 text-[10px] font-bold ${
-                    score === 0
-                      ? "bg-lime text-primary-foreground"
-                      : score <= 2
-                        ? "bg-lime/20 text-lime"
-                        : "bg-background/70 text-muted-foreground"
-                  }`}
-                >
-                  {availabilityLabel(score)}
-                </span>
+          {list.map(({ o, dist, score, minKm }, i) => {
+            const distLabel =
+              radiusKm > 0 && coords && minKm != null
+                ? distanceUnit === "km"
+                  ? `${minKm.toFixed(1)} km`
+                  : `${(minKm * MI_PER_KM).toFixed(1)} mi`
+                : `${dist} mi`;
+            return (
+              <div key={o.id} className="relative">
+                <OrgCard org={o} index={i} />
+                <div className="pointer-events-none absolute top-3 right-3 flex flex-col items-end gap-1">
+                  <span className="rounded-full bg-background/70 backdrop-blur px-2 py-0.5 text-[10px] font-bold text-foreground">
+                    {distLabel}
+                  </span>
+                  <span
+                    className={`rounded-full backdrop-blur px-2 py-0.5 text-[10px] font-bold ${
+                      score === 0
+                        ? "bg-lime text-primary-foreground"
+                        : score <= 2
+                          ? "bg-lime/20 text-lime"
+                          : "bg-background/70 text-muted-foreground"
+                    }`}
+                  >
+                    {availabilityLabel(score)}
+                  </span>
+                </div>
+                <TrainerActions org={o} />
               </div>
-              <TrainerActions org={o} />
-            </div>
-          ))}
+            );
+          })}
           {list.length === 0 && (
             <div className="rounded-2xl border border-border bg-surface p-8 text-center text-muted-foreground sm:col-span-2">
               <div className="inline-flex items-center gap-2">
