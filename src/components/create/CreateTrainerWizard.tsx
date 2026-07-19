@@ -146,7 +146,7 @@ export function CreateTrainerWizard() {
     return true;
   }, [step, draft, bioOk, venueOk]);
 
-  const canSkip = step === 1 || step === 3; // Expertise and Availability are optional after step 2 constraints.
+  const canSkip = step === 1 || step === 3 || step === 4;
 
   const previewOrg: Org = {
     id: "preview",
