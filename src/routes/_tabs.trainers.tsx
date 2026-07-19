@@ -16,6 +16,8 @@ import { useAuth } from "@/hooks/use-auth";
 import { toast } from "sonner";
 import { SPORT_CONFIG, SESSION_TYPES } from "@/lib/sport-config";
 import { haversineKm, KM_PER_MI, MI_PER_KM, useUserLocation } from "@/lib/geo";
+import { filterTrainersByVenue } from "@/lib/trainer-feed-filter";
+
 import { Slider } from "@/components/ui/slider";
 
 type SortBy = "nearest" | "soonest" | "followers" | "name";
@@ -191,20 +193,15 @@ function TrainersPage() {
       return /month|casual|occasion|pickup|drop/.test(c);
     };
     const specialtyLower = specialty.toLowerCase();
-    const venueLower = venue.trim().toLowerCase();
-    const filtered = orgs
-      .filter((o) => o.kind === "coach")
+    const byVenue = filterTrainersByVenue(orgs, venue);
+    const filtered = byVenue
       .filter((o) => (sport ? o.sports.includes(sport) : true))
       .filter((o) => {
         if (!specialty) return true;
         const hay = `${o.tagline ?? ""} ${o.name ?? ""}`.toLowerCase();
         return hay.includes(specialtyLower);
       })
-      .filter((o) => {
-        if (!venueLower) return true;
-        const venues = o.venueAddresses ?? [];
-        return venues.some((v) => v.trim().toLowerCase() === venueLower);
-      })
+
       .filter((o) => {
         if (avail === "any") return true;
         if (avail === "recruiting") return isBooking(o);
