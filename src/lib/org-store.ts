@@ -327,6 +327,7 @@ export async function updateOrg(
   if (patch.venues !== undefined) mapped.venues = patch.venues ?? [];
   if (patch.venueAddresses !== undefined) mapped.venue_addresses = patch.venueAddresses ?? [];
   if (patch.verifiedVenues !== undefined) mapped.verified_venues = patch.verifiedVenues ?? [];
+  if (patch.venueGeo !== undefined) mapped.venue_geo = patch.venueGeo ?? [];
   if (patch.primaryVenue !== undefined) mapped.primary_venue = patch.primaryVenue ?? null;
   if (patch.cadence !== undefined) mapped.cadence = patch.cadence ?? null;
   if (patch.cadences !== undefined) {
