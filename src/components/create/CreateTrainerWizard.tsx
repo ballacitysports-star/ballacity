@@ -271,8 +271,12 @@ export function CreateTrainerWizard() {
               handle: orgHandle,
               trainerId: saved.id,
               city: draft.city || undefined,
+              address: draft.orgChoice.address?.trim() || undefined,
+              placeId: draft.orgChoice.placeId || undefined,
+              geo: draft.orgChoice.geo ?? undefined,
             },
           });
+
         } catch {
           toast.message("Profile published — couldn't create the org. Add it from your profile.");
         }
