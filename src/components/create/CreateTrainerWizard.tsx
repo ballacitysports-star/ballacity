@@ -15,10 +15,11 @@ import { VenueMapPreview } from "@/components/VenueMapPreview";
 import { OrgCard } from "@/components/OrgCard";
 
 import { WeeklyQuickPick } from "@/components/create/WeeklyQuickPick";
+import { AvailabilityConfirm } from "@/components/create/AvailabilityConfirm";
 import { loadDraft, useDraftPersistence } from "@/components/create/useDraftPersistence";
 import { toast } from "sonner";
 
-const STEP_LABELS = ["Basics", "Expertise", "Where", "Availability"] as const;
+const STEP_LABELS = ["Basics", "Expertise", "Where", "Availability", "Confirm"] as const;
 const SKILL_LABELS = ["Beginner", "Recreational", "Intermediate", "Advanced", "Pro"] as const;
 
 type Slot = { day: "mon" | "tue" | "wed" | "thu" | "fri" | "sat" | "sun"; start: string; end: string; venue?: string };
@@ -42,6 +43,7 @@ type Draft = {
   venuePlaceId: string;
   venueGeo: { lat: number; lng: number } | null;
   slots: Slot[];
+  overrides: { date: string; closed?: boolean; windows?: { start: string; end: string; venue?: string }[] }[];
   timezone: string;
 };
 
@@ -89,6 +91,7 @@ function initialDraft(): Draft {
     venuePlaceId: "",
     venueGeo: null,
     slots: [],
+    overrides: [],
     timezone: defaultTimezone(),
   };
 }
@@ -143,7 +146,7 @@ export function CreateTrainerWizard() {
     return true;
   }, [step, draft, bioOk, venueOk]);
 
-  const canSkip = step === 1 || step === 3; // Expertise and Availability are optional after step 2 constraints.
+  const canSkip = step === 1 || step === 3 || step === 4;
 
   const previewOrg: Org = {
     id: "preview",
@@ -181,6 +184,7 @@ export function CreateTrainerWizard() {
         : [],
     primaryVenue: draft.venue || undefined,
     availabilitySlots: draft.slots,
+    availabilityOverrides: draft.overrides,
     timezone: draft.timezone,
     upcoming: [],
     posts: [],
@@ -234,6 +238,7 @@ export function CreateTrainerWizard() {
             {step === 1 && "Your expertise"}
             {step === 2 && "Where you train"}
             {step === 3 && "When you're available"}
+            {step === 4 && "Confirm your schedule"}
           </h1>
         </div>
       </div>
@@ -553,6 +558,24 @@ export function CreateTrainerWizard() {
                   <Sparkles className="h-3 w-3 text-lime" /> This is how athletes will see you in feeds.
                 </div>
               </Section>
+            </div>
+          )}
+
+          {step === 4 && (
+            <div className="space-y-5">
+              {draft.slots.length === 0 ? (
+                <div className="rounded-2xl border border-dashed border-border bg-surface/60 p-5 text-center text-sm text-muted-foreground">
+                  No weekly template yet. Go back and pick one, or skip — you can manage availability later.
+                </div>
+              ) : (
+                <AvailabilityConfirm
+                  slots={draft.slots}
+                  overrides={draft.overrides}
+                  timezone={draft.timezone}
+                  onChangeOverrides={(o) => setDraft((d) => ({ ...d, overrides: o }))}
+                  onChangeTimezone={(tz) => setDraft((d) => ({ ...d, timezone: tz }))}
+                />
+              )}
             </div>
           )}
         </motion.div>
