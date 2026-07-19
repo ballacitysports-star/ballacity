@@ -110,6 +110,10 @@ type OrgChoice = { mode: "existing" | "new" | null; orgId?: string; name?: strin
 
 function EditOrg() {
   const org = Route.useLoaderData() as Org;
+  return <EditOrgScreen org={org} />;
+}
+
+export function EditOrgScreen({ org }: { org: Org }) {
   const nav = useNavigate();
   const { user } = useAuth();
   const kind = org.kind;
