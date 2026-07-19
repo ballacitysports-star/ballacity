@@ -18,7 +18,8 @@ import {
   type OrgKind,
 } from "@/lib/sample-data";
 import { addOrg } from "@/lib/org-store";
-import { validateSlots } from "@/lib/availability-slots";
+import { validateSlots, validateOverrides, type DayOverride } from "@/lib/availability-slots";
+import { AvailabilityCalendar } from "@/components/AvailabilityCalendar";
 import { validateVenueList } from "@/lib/venue-address";
 import {
   SPORT_CONFIG,
@@ -108,7 +109,12 @@ export function CreateOrgWizard({ kind }: { kind: OrgKind }) {
   const [sessionTypes, setSessionTypes] = useState<string[]>([]);
   type Slot = NonNullable<Org["availabilitySlots"]>[number];
   const [slots, setSlots] = useState<Slot[]>([]);
+  const [overrides, setOverrides] = useState<DayOverride[]>([]);
   const slotsError = useMemo(() => validateSlots(slots), [slots]);
+  const overridesError = useMemo(
+    () => validateOverrides(overrides, verifiedVenues),
+    [overrides, verifiedVenues],
+  );
   const venueValidation = useMemo(
     () => validateVenueList(venueAddresses, verifiedVenues),
     [venueAddresses, verifiedVenues],
@@ -198,6 +204,7 @@ export function CreateOrgWizard({ kind }: { kind: OrgKind }) {
                 : undefined,
           }))
       : undefined,
+    availabilityOverrides: isCoach ? overrides : undefined,
     upcoming: [],
     posts: [],
   };
@@ -209,6 +216,10 @@ export function CreateOrgWizard({ kind }: { kind: OrgKind }) {
     if (submitting) return;
     if (isCoach && slotsError) {
       setSubmitError(slotsError.message);
+      return;
+    }
+    if (isCoach && overridesError) {
+      setSubmitError(overridesError.message);
       return;
     }
     if (venuesError) {
