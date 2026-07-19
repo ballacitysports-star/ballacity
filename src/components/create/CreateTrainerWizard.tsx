@@ -30,6 +30,12 @@ const SKILL_LABELS = ["Beginner", "Recreational", "Intermediate", "Advanced", "P
 
 type Slot = { day: "mon" | "tue" | "wed" | "thu" | "fri" | "sat" | "sun"; start: string; end: string; venue?: string };
 
+type VenueEntry = {
+  address: string;
+  placeId: string;
+  geo: { lat: number; lng: number } | null;
+};
+
 type Draft = {
   step: number;
   name: string;
@@ -45,15 +51,15 @@ type Draft = {
   skillMax: number;
   sessionTypes: string[];
   credentials: string[];
-  venue: string;
-  venuePlaceId: string;
-  venueGeo: { lat: number; lng: number } | null;
+  venues: VenueEntry[];
+  primaryVenueIdx: number;
   slots: Slot[];
   overrides: { date: string; closed?: boolean; windows?: { start: string; end: string; venue?: string }[] }[];
   rules: AvailabilityRule[];
   timezone: string;
   orgChoice: { mode: "existing" | "new" | null; orgId?: string; name?: string };
 };
+
 
 const DRAFT_KEY = "openrun.trainer-wizard.draft.v1";
 
