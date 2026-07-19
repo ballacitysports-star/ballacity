@@ -48,7 +48,13 @@ function OrgPage() {
   });
 
   const org = data?.org;
-  const members = data?.members ?? [];
+  const members = (data?.members ?? []) as Array<{
+    id: string;
+    trainer_id: string;
+    user_id: string;
+    role: string;
+    teams?: { id: string; name: string; handle: string; avatar: string | null; city: string | null; sports: string[] | null } | null;
+  }>;
   const isAdmin =
     !!auth.user &&
     !!org &&
