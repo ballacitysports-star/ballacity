@@ -24,6 +24,14 @@ import { useAuth } from "@/hooks/use-auth";
 import { resolveDay, fromDateKey, maxHorizonDate, toDateKey } from "@/lib/availability-resolve";
 import { DEFAULT_TZ, getBrowserTz, tzShortName, wallTimeToInstant, instantToWall } from "@/lib/tz";
 import { Globe } from "lucide-react";
+import { NextAvailableList } from "@/components/NextAvailableList";
+
+export type BookPrefill = {
+  date?: string;
+  startTime?: string;
+  venue?: string | null;
+  duration?: "30" | "60" | "90";
+};
 
 type Mode = "form" | "existing" | "sent";
 
@@ -48,11 +56,13 @@ export function BookSessionSheet({
   open,
   onOpenChange,
   onStatusChange,
+  prefill,
 }: {
   org: Org;
   open: boolean;
   onOpenChange: (v: boolean) => void;
   onStatusChange?: () => void;
+  prefill?: BookPrefill | null;
 }) {
   const nav = useNavigate();
   const { user } = useAuth();
