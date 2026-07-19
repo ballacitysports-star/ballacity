@@ -181,6 +181,10 @@ export function CreateOrgWizard({ kind }: { kind: OrgKind }) {
 
   async function submit() {
     if (submitting) return;
+    if (isCoach && slotsError) {
+      setSubmitError(slotsError.message);
+      return;
+    }
     setSubmitError(null);
     setSubmitting(true);
     const id = `${isCoach ? "c" : "t"}-${(name || "org").toLowerCase().replace(/[^a-z0-9]+/g, "-")}-${Date.now().toString(36).slice(-4)}`;
