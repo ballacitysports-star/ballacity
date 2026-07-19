@@ -1,10 +1,8 @@
 import type { Org } from "./sample-data";
-import { toDateKey, maxHorizonDate } from "./availability-resolve";
 
 export type Slot = NonNullable<Org["availabilitySlots"]>[number];
 
 const TIME_RE = /^\d{2}:\d{2}$/;
-const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
 function toMinutes(t: string): number {
   const [h, m] = t.split(":").map(Number);
