@@ -181,6 +181,7 @@ function TrainersPage() {
       return /month|casual|occasion|pickup|drop/.test(c);
     };
     const specialtyLower = specialty.toLowerCase();
+    const venueLower = venue.trim().toLowerCase();
     const filtered = orgs
       .filter((o) => o.kind === "coach")
       .filter((o) => (sport ? o.sports.includes(sport) : true))
@@ -188,6 +189,11 @@ function TrainersPage() {
         if (!specialty) return true;
         const hay = `${o.tagline ?? ""} ${o.name ?? ""}`.toLowerCase();
         return hay.includes(specialtyLower);
+      })
+      .filter((o) => {
+        if (!venueLower) return true;
+        const venues = o.venueAddresses ?? [];
+        return venues.some((v) => v.trim().toLowerCase() === venueLower);
       })
       .filter((o) => {
         if (avail === "any") return true;
@@ -214,7 +220,35 @@ function TrainersPage() {
       return a.o.name.localeCompare(b.o.name);
     });
     return withDist;
-  }, [orgs, sport, specialty, q, sortBy, avail]);
+  }, [orgs, sport, specialty, venue, q, sortBy, avail]);
+
+  const venueOptions = useMemo(() => {
+    const map = new Map<string, { addr: string; primary: boolean; count: number }>();
+    orgs
+      .filter((o) => o.kind === "coach")
+      .forEach((o) => {
+        const primary = o.primaryVenue?.trim() ?? "";
+        (o.venueAddresses ?? []).forEach((a) => {
+          const trimmed = a.trim();
+          if (!trimmed) return;
+          const key = trimmed.toLowerCase();
+          const isPrimary = !!primary && primary === trimmed;
+          const cur = map.get(key);
+          if (cur) {
+            cur.count += 1;
+            cur.primary = cur.primary || isPrimary;
+          } else {
+            map.set(key, { addr: trimmed, primary: isPrimary, count: 1 });
+          }
+        });
+      });
+    return Array.from(map.values()).sort((a, b) => {
+      if (a.primary !== b.primary) return a.primary ? -1 : 1;
+      if (b.count !== a.count) return b.count - a.count;
+      return a.addr.localeCompare(b.addr);
+    });
+  }, [orgs]);
+
 
   const featured =
     orgs.find((o) => o.verified && o.kind === "coach") ?? orgs.find((o) => o.kind === "coach");
