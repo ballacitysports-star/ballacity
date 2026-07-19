@@ -335,6 +335,7 @@ function TrainerPage() {
         {/* About */}
         {tab === "about" && (
           <div className="mt-5 space-y-5">
+            {canEdit && <TrainerOrgSection trainerId={org.id} />}
             <Section title="Bio">
               <p className="text-sm text-foreground/90 leading-relaxed whitespace-pre-wrap">
                 {org.bio}
