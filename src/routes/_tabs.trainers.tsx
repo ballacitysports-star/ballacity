@@ -16,6 +16,8 @@ import { useAuth } from "@/hooks/use-auth";
 import { toast } from "sonner";
 import { SPORT_CONFIG, SESSION_TYPES } from "@/lib/sport-config";
 import { haversineKm, KM_PER_MI, MI_PER_KM, useUserLocation } from "@/lib/geo";
+import { filterTrainersByVenue } from "@/lib/trainer-feed-filter";
+
 import { Slider } from "@/components/ui/slider";
 
 type SortBy = "nearest" | "soonest" | "followers" | "name";
