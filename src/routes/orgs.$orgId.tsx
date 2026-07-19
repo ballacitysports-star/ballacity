@@ -33,7 +33,7 @@ import {
   listOrgMemberRequests,
   approveOrgMemberRequest,
   denyOrgMemberRequest,
-  removeOrgMember,
+  removeGenericOrgMember,
   leaveOrgMembership,
 } from "@/lib/trainer-orgs.functions";
 
