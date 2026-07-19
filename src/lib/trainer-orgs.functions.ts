@@ -432,7 +432,7 @@ export const updateTrainerOrg = createServerFn({ method: "POST" })
       .parse(d),
   )
   .handler(async ({ data, context }) => {
-    const patch: Record<string, unknown> = {};
+    const patch: Database["public"]["Tables"]["trainer_orgs"]["Update"] = {};
     if (data.name !== undefined) patch.name = data.name;
     if (data.handle !== undefined) patch.handle = data.handle;
     if (data.bio !== undefined) patch.bio = data.bio;
@@ -443,7 +443,7 @@ export const updateTrainerOrg = createServerFn({ method: "POST" })
     if (data.coverUrl !== undefined) patch.cover_url = data.coverUrl;
     if (data.address !== undefined) patch.address = data.address;
     if (data.placeId !== undefined) patch.place_id = data.placeId;
-    if (data.geo !== undefined) patch.geo = data.geo;
+    if (data.geo !== undefined) patch.geo = data.geo ?? null;
     const { error } = await context.supabase
       .from("trainer_orgs")
       .update(patch)
