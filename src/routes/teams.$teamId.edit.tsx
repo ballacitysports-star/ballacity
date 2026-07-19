@@ -110,6 +110,10 @@ type OrgChoice = { mode: "existing" | "new" | null; orgId?: string; name?: strin
 
 function EditOrg() {
   const org = Route.useLoaderData() as Org;
+  return <EditOrgScreen org={org} />;
+}
+
+export function EditOrgScreen({ org }: { org: Org }) {
   const nav = useNavigate();
   const { user } = useAuth();
   const kind = org.kind;
@@ -382,7 +386,11 @@ function EditOrg() {
         roster: kind === "team" ? staff.length : org.roster,
       });
       if (kind === "coach") await applyOrgChoiceChange();
-      nav({ to: "/teams/$teamId", params: { teamId: org.id } });
+      if (kind === "coach") {
+        nav({ to: "/trainers/$trainerId", params: { trainerId: org.id } });
+      } else {
+        nav({ to: "/teams/$teamId", params: { teamId: org.id } });
+      }
     } catch (e) {
       alert(e instanceof Error ? e.message : "Failed to save changes.");
     }
@@ -440,7 +448,7 @@ function EditOrg() {
     if (!confirm(`Delete ${org.name}? This cannot be undone.`)) return;
     try {
       await deleteOrg(org.id);
-      nav({ to: "/teams" });
+      nav({ to: kind === "coach" ? "/trainers" : "/teams" });
     } catch (e) {
       alert(e instanceof Error ? e.message : "Failed to delete team.");
     }

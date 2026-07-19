@@ -34,8 +34,8 @@ export function TrainerProfileChecklist({ org }: { org: Org }) {
           </div>
         </div>
         <Link
-          to="/teams/$teamId/edit"
-          params={{ teamId: org.id }}
+          to="/trainers/$trainerId/edit"
+          params={{ trainerId: org.id }}
           className="inline-flex items-center gap-1 text-xs font-bold text-lime hover:underline"
         >
           Continue <ChevronRight className="h-3 w-3" />
