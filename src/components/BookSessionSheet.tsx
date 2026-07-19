@@ -105,6 +105,14 @@ export function BookSessionSheet({
     };
   }, [open, user, org.id]);
 
+  // Apply prefill when the sheet opens (or prefill changes while open).
+  useEffect(() => {
+    if (!open || !prefill) return;
+    if (prefill.date) setDate(prefill.date);
+    if (prefill.startTime) setStartTime(prefill.startTime);
+    if (prefill.duration) setDuration(prefill.duration);
+  }, [open, prefill]);
+
   // Load trainer's booked slots when the date changes
   useEffect(() => {
     if (!open || !date || mode !== "form") {
