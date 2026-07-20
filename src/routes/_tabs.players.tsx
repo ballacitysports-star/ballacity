@@ -324,43 +324,49 @@ function PlayersPage() {
         onDensityChange={switchDensity}
       />
 
-      <div className="flex gap-2 mb-4">
-        <div className="flex-1 flex items-center gap-2 rounded-full border border-border bg-surface px-4 py-2.5">
-          <Search className="h-4 w-4 text-muted-foreground" />
-          <input
-            value={q}
-            onChange={(e) => setQ(e.target.value)}
-            placeholder="Search name, city, sport"
-            className="flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
+      <FilterBar
+        q={q}
+        onQChange={setQ}
+        searchPlaceholder="Search name, city, sport"
+        activeFilterCount={activeFilterCount}
+        sheetTitle="Filter players"
+        rightExtra={
+          <button
+            onClick={() =>
+              user ? setPostOpen(true) : toast.error("Sign in to post your availability.")
+            }
+            className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-lime-gradient text-primary-foreground glow-lime"
+            aria-label="Post availability"
+          >
+            <Plus className="h-5 w-5" strokeWidth={2.5} />
+          </button>
+        }
+        onReset={() => {
+          setSport("");
+          setSkill("");
+          setMaxDistance(0);
+          setAgeMin("");
+          setAgeMax("");
+          setIncludeUnknownAge(true);
+        }}
+        sheet={
+          <PlayersFilterBody
+            sport={sport}
+            setSport={setSport}
+            skill={skill}
+            setSkill={setSkill}
+            maxDistance={maxDistance}
+            setMaxDistance={setMaxDistance}
+            ageMin={ageMin}
+            setAgeMin={setAgeMin}
+            ageMax={ageMax}
+            setAgeMax={setAgeMax}
+            includeUnknownAge={includeUnknownAge}
+            setIncludeUnknownAge={setIncludeUnknownAge}
           />
-          {q && (
-            <button onClick={() => setQ("")} aria-label="Clear search">
-              <X className="h-4 w-4 text-muted-foreground" />
-            </button>
-          )}
-        </div>
-        <button
-          onClick={() => setFiltersOpen(true)}
-          className={`relative grid h-11 w-11 place-items-center rounded-full border bg-surface ${activeFilterCount ? "border-lime" : "border-border"}`}
-          aria-label="Filters"
-        >
-          <SlidersHorizontal className="h-4 w-4" />
-          {activeFilterCount > 0 && (
-            <span className="absolute -top-1 -right-1 grid h-4 w-4 place-items-center rounded-full bg-lime text-[10px] font-bold text-primary-foreground">
-              {activeFilterCount}
-            </span>
-          )}
-        </button>
-        <button
-          onClick={() =>
-            user ? setPostOpen(true) : toast.error("Sign in to post your availability.")
-          }
-          className="grid h-11 w-11 place-items-center rounded-full bg-lime-gradient text-primary-foreground glow-lime"
-          aria-label="Post availability"
-        >
-          <Plus className="h-5 w-5" strokeWidth={2.5} />
-        </button>
-      </div>
+        }
+      />
+
 
       {/* Sport filter chips */}
       <div className="mb-3">
