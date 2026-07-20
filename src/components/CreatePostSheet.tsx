@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
+import { toast } from "sonner";
 import {
   Dialog,
   DialogContent,
@@ -39,6 +40,7 @@ export function CreatePostSheet({
     mutationFn: createFn,
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["team-posts", teamId] });
+      toast.success("Post published");
       setTitle("");
       setBody("");
       setEventDate("");
@@ -48,7 +50,11 @@ export function CreatePostSheet({
       setErr(null);
       onOpenChange(false);
     },
-    onError: (e: any) => setErr(e?.message ?? "Failed to post."),
+    onError: (e: any) => {
+      const msg = e?.message ?? "Failed to post.";
+      setErr(msg);
+      toast.error(msg);
+    },
   });
 
   const isEvent = kind === "tryout" || kind === "pickup" || kind === "clinic";
