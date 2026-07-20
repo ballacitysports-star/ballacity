@@ -1,38 +1,29 @@
 import { Link, useLocation } from "@tanstack/react-router";
-import { Dribbble, Users, MessageCircle, Plus } from "lucide-react";
+import { Home, UserCheck, Users, Dribbble, MessageCircle, GraduationCap } from "lucide-react";
 import { motion } from "framer-motion";
 import { MyAvatar } from "@/components/UserAvatar";
 
 type NavItem = {
   to: string;
   label: string;
-  icon?: typeof Dribbble;
+  icon?: typeof Home;
   match?: (pathname: string) => boolean;
   render?: (active: boolean) => React.ReactNode;
 };
 
 /**
- * 5-tab layout with a raised center Create FAB.
- * Players / Teams / Trainers collapse into a single "Community" tab; the
- * three sub-surfaces are swapped via <CommunityTabs /> at the top of each.
- * Inbox continues to cover messages and alerts.
+ * Flat 6-tab layout. Inbox merges direct messages and alerts.
  */
-const leftItems: NavItem[] = [
+const items: NavItem[] = [
   {
     to: "/feed",
     icon: Dribbble,
     label: "Play",
-    match: (p) => p === "/feed" || p === "/discover" || p === "/pickup" || p === "/reels",
+    match: (p) => p === "/feed" || p === "/discover" || p === "/pickup",
   },
-  {
-    to: "/players",
-    icon: Users,
-    label: "Community",
-    match: (p) => p.startsWith("/players") || p.startsWith("/teams") || p.startsWith("/trainers") || p.startsWith("/orgs"),
-  },
-];
-
-const rightItems: NavItem[] = [
+  { to: "/players", icon: UserCheck, label: "Players", match: (p) => p.startsWith("/players") },
+  { to: "/teams", icon: Users, label: "Teams", match: (p) => p.startsWith("/teams") },
+  { to: "/trainers", icon: GraduationCap, label: "Trainers", match: (p) => p.startsWith("/trainers") },
   {
     to: "/messages",
     icon: MessageCircle,
@@ -61,10 +52,10 @@ export function BottomNav() {
       <Link
         key={it.to}
         to={it.to}
-        className="relative flex min-w-0 flex-1 flex-col items-center gap-1 px-0.5 py-2.5 text-[10px] font-medium transition-transform active:scale-95 sm:text-[11px]"
+        className="relative flex min-w-0 flex-col items-center gap-1 px-0.5 py-2.5 text-[10px] sm:text-[11px] font-medium transition-transform active:scale-95"
       >
         <span
-          className={`relative grid h-9 w-11 place-items-center rounded-2xl transition-colors sm:w-14 ${
+          className={`relative grid h-9 w-11 sm:w-14 place-items-center rounded-2xl transition-colors ${
             active
               ? "bg-primary-gradient text-primary-foreground shadow-[0_6px_18px_-8px_var(--primary)]"
               : "text-muted-foreground"
@@ -77,7 +68,7 @@ export function BottomNav() {
               : null}
         </span>
         <span
-          className={`max-w-full truncate tracking-wide ${
+          className={`truncate max-w-full tracking-wide ${
             active ? "text-foreground" : "text-muted-foreground"
           }`}
         >
@@ -93,31 +84,11 @@ export function BottomNav() {
     );
   };
 
-  const createActive = pathname.startsWith("/create");
-
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-40 px-3 pb-[max(env(safe-area-inset-bottom),0.5rem)] pt-2">
-      <div className="mx-auto max-w-md rounded-3xl border border-border bg-surface/85 shadow-2xl backdrop-blur-xl sm:max-w-xl lg:max-w-2xl">
+    <nav className="fixed bottom-0 left-0 right-0 z-40 pb-[max(env(safe-area-inset-bottom),0.5rem)] pt-2 px-3">
+      <div className="mx-auto max-w-md sm:max-w-xl lg:max-w-2xl rounded-3xl border border-border bg-surface/85 backdrop-blur-xl shadow-2xl">
         <div className="flex items-end justify-around" role="group" aria-label="Primary tabs">
-          {leftItems.map(renderTab)}
-
-          {/* Center Create FAB — raised above the bar */}
-          <div className="relative flex flex-1 flex-col items-center">
-            <Link
-              to="/create"
-              aria-label="Host a game"
-              className={`-mt-6 grid h-14 w-14 place-items-center rounded-full bg-lime-gradient text-primary-foreground shadow-[0_10px_30px_-8px_var(--primary)] ring-4 ring-background transition-transform active:scale-95 ${
-                createActive ? "scale-105" : ""
-              }`}
-            >
-              <Plus className="h-6 w-6" strokeWidth={2.75} />
-            </Link>
-            <span className="mt-1 text-[10px] font-semibold tracking-wide text-muted-foreground sm:text-[11px]">
-              Create
-            </span>
-          </div>
-
-          {rightItems.map(renderTab)}
+          {items.map(renderTab)}
         </div>
       </div>
     </nav>
