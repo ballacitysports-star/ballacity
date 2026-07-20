@@ -17,7 +17,7 @@ import {
   Plus,
   Pencil,
 } from "lucide-react";
-import { ORGS, GAMES, POST_KIND_META, type PostKind, type Org } from "@/lib/sample-data";
+import { ORGS, GAMES, POST_KIND_META, type PostKind, type Org, type OrgPost } from "@/lib/sample-data";
 import { isMyOrg, ensureOrgById } from "@/lib/org-store";
 import { PostCard } from "@/components/PostCard";
 import { GameCard } from "@/components/GameCard";
@@ -25,6 +25,11 @@ import { ReviewsSection } from "@/components/ReviewsSection";
 import { computeReputation, useReviewsFor } from "@/lib/reviews";
 import { ReputationBadge } from "@/components/ReputationBadge";
 import { useCanReview } from "@/lib/transactions";
+import { CreatePostSheet } from "@/components/CreatePostSheet";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
+import { listTeamPosts, deleteTeamPost } from "@/lib/team-posts.functions";
+import { Trash2 } from "lucide-react";
 import {
   Dialog,
   DialogContent,
