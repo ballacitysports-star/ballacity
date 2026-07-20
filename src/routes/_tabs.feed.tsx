@@ -707,8 +707,7 @@ function FeedFilterBody() {
       </FilterSection>
 
       <FilterSection
-        label={PLACEHOLDER_LBL}
-        hintless={
+        label={
           <span className="flex items-center justify-between">
             <span>
               Distance from you
@@ -732,6 +731,7 @@ function FeedFilterBody() {
           </span>
         }
       >
+
         {!hasCity && (
           <p className="text-xs text-muted-foreground mb-2">
             <Link to="/profile/edit" className="text-lime font-semibold">
