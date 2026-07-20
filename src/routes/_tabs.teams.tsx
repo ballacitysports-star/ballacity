@@ -14,6 +14,7 @@ import { FilterBar } from "@/components/FilterBar";
 import { FilterSection, ChipRow } from "@/components/FilterSheet";
 import { useMyProfile } from "@/lib/user-prefs-store";
 import { useAuth } from "@/hooks/use-auth";
+import { usePersistedSearch } from "@/hooks/use-persisted-search";
 
 
 type SortBy = "nearest" | "followers" | "name";
@@ -61,6 +62,9 @@ function TeamsPage() {
   const navigate = useNavigate({ from: "/teams" });
   const updateSearch = (patch: Partial<TeamsSearch>) =>
     navigate({ search: (prev: TeamsSearch) => ({ ...prev, ...patch }), replace: true });
+  usePersistedSearch("openrun:teams-search", search, "/teams", {
+    q: "", kind: "team", sport: "", avail: "any", sort: "nearest", view: "list", density: "list",
+  });
 
   // Legacy /teams?kind=coach → redirect to /trainers preserving other params.
   const redirectedRef = useRef(false);

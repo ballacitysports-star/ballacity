@@ -15,6 +15,7 @@ import { TeamsMapView } from "@/components/TeamsMapView";
 import { TrainerActions } from "@/components/TrainerActions";
 import { useMyProfile, useFeedPrefs } from "@/lib/user-prefs-store";
 import { useAuth } from "@/hooks/use-auth";
+import { usePersistedSearch } from "@/hooks/use-persisted-search";
 import { toast } from "sonner";
 import { SPORT_CONFIG, SESSION_TYPES } from "@/lib/sport-config";
 import { haversineKm, KM_PER_MI, MI_PER_KM, useUserLocation } from "@/lib/geo";
@@ -102,6 +103,10 @@ function TrainersPage() {
   const navigate = useNavigate({ from: "/trainers" });
   const updateSearch = (patch: Partial<TrainersSearch>) =>
     navigate({ search: (prev: TrainersSearch) => ({ ...prev, ...patch }), replace: true });
+  usePersistedSearch("openrun:trainers-search", search, "/trainers", {
+    q: "", mode: "trainers", sport: "", specialty: "", venue: "", orgId: "",
+    radius: 0, avail: "any", sort: "nearest", view: "list", density: "list",
+  });
 
   const mode: "trainers" | "gyms" = search.mode === "gyms" ? "gyms" : "trainers";
   const q = search.q;
