@@ -50,18 +50,17 @@ test("team-post composer publishes a post end-to-end", async ({ page }) => {
   const handle = `e2e-team-${suffix}`.slice(0, 32);
 
   // Seed a team owned by the fixture user (RLS: owner_id = auth.uid()).
-  const { data: team, error: teamErr } = await sb
+  const teamId = crypto.randomUUID();
+  const { error: teamErr } = await sb
     .from("teams")
     .insert({
+      id: teamId,
       owner_id: uid,
       kind: "team",
       name: `E2E Team ${suffix}`,
       handle,
-    } as any)
-    .select("id")
-    .single();
+    } as any);
   if (teamErr) throw new Error(`Failed to seed team: ${teamErr.message}`);
-  const teamId = (team as any).id as string;
 
   try {
     await restoreSession(page);
