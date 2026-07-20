@@ -17,6 +17,7 @@ import {
   Ticket,
 } from "lucide-react";
 import { ViewDensityToggle, type ViewMode, type Density } from "@/components/ViewDensityToggle";
+import { CommunityTabs } from "@/components/CommunityTabs";
 import { PlayersMapView } from "@/components/PlayersMapView";
 import { AnimatePresence } from "framer-motion";
 import { motion } from "framer-motion";

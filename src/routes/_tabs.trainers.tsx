@@ -10,6 +10,7 @@ import { OrgCard } from "@/components/OrgCard";
 import { SportChips } from "@/components/SportChips";
 import { ViewDensityToggle, type ViewMode, type Density } from "@/components/ViewDensityToggle";
 import { TeamsMapView } from "@/components/TeamsMapView";
+import { CommunityTabs } from "@/components/CommunityTabs";
 import { TrainerActions } from "@/components/TrainerActions";
 import { useMyProfile, useFeedPrefs } from "@/lib/user-prefs-store";
 import { useAuth } from "@/hooks/use-auth";
