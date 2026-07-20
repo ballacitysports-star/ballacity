@@ -61,6 +61,9 @@ function TeamsPage() {
   const navigate = useNavigate({ from: "/teams" });
   const updateSearch = (patch: Partial<TeamsSearch>) =>
     navigate({ search: (prev: TeamsSearch) => ({ ...prev, ...patch }), replace: true });
+  usePersistedSearch("openrun:teams-search", search, "/teams", {
+    q: "", kind: "team", sport: "", avail: "any", sort: "nearest", view: "list", density: "list",
+  });
 
   // Legacy /teams?kind=coach → redirect to /trainers preserving other params.
   const redirectedRef = useRef(false);
