@@ -526,6 +526,14 @@ function TeamPage() {
             </div>
           </DialogContent>
         </Dialog>
+
+        {canEdit && (
+          <CreatePostSheet
+            teamId={org.id}
+            open={composerOpen}
+            onOpenChange={setComposerOpen}
+          />
+        )}
       </div>
     </div>
   );
