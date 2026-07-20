@@ -479,8 +479,8 @@ function TrainerPage() {
           </div>
         )}
 
-        {/* Experience */}
-        {tab === "experience" && (
+        {/* Experience sections shown on About */}
+        {tab === "about" && (
           <div className="mt-5 space-y-5">
             {org.achievements && org.achievements.length > 0 && (
               <Section
