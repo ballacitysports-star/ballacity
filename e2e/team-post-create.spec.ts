@@ -41,6 +41,8 @@ async function restoreSession(page: Page) {
     ([k, v]) => window.localStorage.setItem(k!, v!),
     [STORAGE_KEY!, SESSION_JSON!],
   );
+  // Give the app a moment to pick up the injected session before we navigate away.
+  await page.waitForLoadState("networkidle").catch(() => {});
 }
 
 test("team-post composer publishes a post end-to-end", async ({ page }) => {
