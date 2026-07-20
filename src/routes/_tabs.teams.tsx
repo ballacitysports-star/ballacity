@@ -171,6 +171,7 @@ function TeamsPage() {
 
   return (
     <div className="mx-auto w-full max-w-md sm:max-w-2xl lg:max-w-4xl px-4 pt-6">
+      <CommunityTabs />
       <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="mb-4">
         <h1 className="font-display text-3xl font-bold leading-tight">Teams & clubs.</h1>
         <p className="text-muted-foreground text-sm inline-flex items-center gap-1">
