@@ -571,14 +571,6 @@ function Feed() {
       </>
       )}
 
-
-      {typeof document !== "undefined" &&
-        createPortal(
-          <AnimatePresence>
-            {filtersOpen && <FilterSheet onClose={() => setFiltersOpen(false)} />}
-          </AnimatePresence>,
-          document.body,
-        )}
     </div>
   );
 }
