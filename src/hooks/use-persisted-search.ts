@@ -39,18 +39,6 @@ export function usePersistedSearch<T extends Record<string, unknown>>(
     }
     return true;
   };
-  const hydratedRef = useRef(false);
-
-  const isAtDefaults = (obj: Record<string, unknown>) => {
-    for (const k of Object.keys(defaults)) {
-      const a = obj[k];
-      const b = (defaults as Record<string, unknown>)[k];
-      if (a === b) continue;
-      if (a == null && b == null) continue;
-      return false;
-    }
-    return true;
-  };
 
   useEffect(() => {
     if (hydratedRef.current) return;
