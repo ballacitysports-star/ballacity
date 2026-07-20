@@ -438,42 +438,26 @@ function Feed() {
         <PlayMapView />
       ) : (
       <>
-      <div className="flex gap-2 mb-4 relative">
-        <div className="flex-1 flex items-center gap-2 rounded-full border border-border bg-surface px-4 py-2.5">
-          <Search className="h-4 w-4 text-muted-foreground" />
-          <input
-            value={q}
-            onChange={(e) => setQ(e.target.value)}
-            placeholder="Search games, courts, players"
-            className="flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
-          />
-          {q && (
-            <button onClick={() => setQ("")} aria-label="Clear search">
-              <X className="h-4 w-4 text-muted-foreground" />
-            </button>
-          )}
-        </div>
-        <button
-          onClick={() => setFiltersOpen(true)}
-          className={`relative grid h-11 w-11 place-items-center rounded-full border bg-surface ${activeFilterCount ? "border-lime" : "border-border"}`}
-          aria-label="Filters"
-        >
-          <SlidersHorizontal className="h-4 w-4" />
-          {activeFilterCount > 0 && (
-            <span className="absolute -top-1 -right-1 grid h-4 w-4 place-items-center rounded-full bg-lime text-[10px] font-bold text-primary-foreground">
-              {activeFilterCount}
-            </span>
-          )}
-        </button>
-        <Link
-          to="/create"
-          className="grid h-11 w-11 place-items-center rounded-full bg-lime-gradient text-primary-foreground glow-lime"
-          aria-label="Create game"
-        >
-          <Plus className="h-5 w-5" strokeWidth={2.5} />
-        </Link>
+      <div className="relative mb-4">
+        <FilterBar
+          q={q}
+          onQChange={setQ}
+          searchPlaceholder="Search games, courts, players"
+          activeFilterCount={activeFilterCount}
+          create={{ to: "/create", label: "Create game" }}
+          sheetTitle="Feed filters"
+          sheet={<FeedFilterBody />}
+          onReset={() =>
+            setFeedPrefs({
+              ...prefs,
+              preferredSports: [],
+              sections: DEFAULT_PREFS.sections,
+              maxDistanceMi: null,
+            })
+          }
+        />
         {q && suggestions.length > 0 && (
-          <div className="absolute left-0 right-14 top-full mt-2 z-20 rounded-2xl border border-border bg-surface shadow-lg overflow-hidden">
+          <div className="absolute left-0 right-14 top-full mt-1 z-20 rounded-2xl border border-border bg-surface shadow-lg overflow-hidden">
             {suggestions.map((s, idx) => (
               <button
                 key={`${s.label}-${idx}`}
@@ -487,6 +471,7 @@ function Feed() {
           </div>
         )}
       </div>
+
 
       <div className="mb-5">
         <SportChips selected={chipSport} onSelect={setChipSport} />
