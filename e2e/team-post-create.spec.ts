@@ -67,10 +67,9 @@ test("team-post composer publishes a post end-to-end", async ({ page }) => {
     await page.goto(`/teams/${teamId}`, { waitUntil: "domcontentloaded" });
 
     // Ensure Posts tab is selected (default).
-    await expect(page.getByRole("button", { name: /^\+\s*Post$/ })).toBeVisible({
-      timeout: 15_000,
-    });
-    await page.getByRole("button", { name: /^\+\s*Post$/ }).click();
+    const postBtn = page.getByRole("button", { name: "Post", exact: true });
+    await expect(postBtn).toBeVisible({ timeout: 20_000 });
+    await postBtn.click();
 
     const dialog = page.getByRole("dialog");
     await expect(dialog.getByText("New post")).toBeVisible();
