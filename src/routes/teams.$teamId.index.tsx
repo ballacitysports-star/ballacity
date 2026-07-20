@@ -324,7 +324,7 @@ function TeamPage() {
               {t === "games"
                 ? `Games · ${upcomingGames.length}`
                 : t === "posts"
-                  ? `Posts · ${org.posts.length}`
+                  ? `Posts · ${allPosts.length}`
                   : "About"}
             </button>
           ))}
@@ -349,16 +349,42 @@ function TeamPage() {
                   </button>
                 ))}
               </div>
-              <button className="shrink-0 inline-flex items-center gap-1 rounded-full bg-coral-gradient px-3 py-2 text-xs font-bold text-white glow-coral">
-                <Plus className="h-3.5 w-3.5" /> Post
-              </button>
+              {canEdit && (
+                <button
+                  onClick={() => setComposerOpen(true)}
+                  className="shrink-0 inline-flex items-center gap-1 rounded-full bg-coral-gradient px-3 py-2 text-xs font-bold text-white glow-coral"
+                >
+                  <Plus className="h-3.5 w-3.5" /> Post
+                </button>
+              )}
             </div>
 
             <div className="mt-4 space-y-3">
-              {posts.map((p, i) => (
-                <PostCard key={p.id} post={p} index={i} />
-              ))}
-              {posts.length === 0 && (
+              {postsQuery.isLoading && (
+                <div className="rounded-2xl border border-border bg-surface p-8 text-center text-sm text-muted-foreground">
+                  Loading posts…
+                </div>
+              )}
+              {!postsQuery.isLoading &&
+                posts.map((p, i) => (
+                  <div key={p.id} className="relative">
+                    <PostCard post={p} index={i} />
+                    {canEdit && (
+                      <button
+                        onClick={() => {
+                          if (confirm("Delete this post?")) {
+                            deleteMutation.mutate({ data: { id: p.id } });
+                          }
+                        }}
+                        aria-label="Delete post"
+                        className="absolute top-3 right-3 grid h-8 w-8 place-items-center rounded-full border border-border bg-background/80 text-muted-foreground hover:text-coral"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </button>
+                    )}
+                  </div>
+                ))}
+              {!postsQuery.isLoading && posts.length === 0 && (
                 <div className="rounded-2xl border border-border bg-surface p-8 text-center text-sm text-muted-foreground">
                   No {POST_KIND_META[filter as PostKind]?.label.toLowerCase() ?? "posts"} yet.
                 </div>
