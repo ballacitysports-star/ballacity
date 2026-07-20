@@ -711,24 +711,19 @@ function GymsView({
 }) {
   return (
     <>
-      <div className="flex gap-2 mb-4">
-        <div className="flex-1 flex items-center gap-2 rounded-full border border-border bg-surface px-4 py-2.5">
-          <Search className="h-4 w-4 text-muted-foreground" />
-          <input
-            value={q}
-            onChange={(e) => onQ(e.target.value)}
-            placeholder="Search gyms by name, handle, city"
-            className="flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
-          />
-        </div>
-        <Link
-          to="/orgs/create"
-          className="grid h-11 w-11 place-items-center rounded-full bg-lime-gradient text-primary-foreground glow-lime"
-          aria-label="Create a gym or organization"
-        >
-          <Plus className="h-5 w-5" strokeWidth={2.5} />
-        </Link>
-      </div>
+      <FilterBar
+        q={q}
+        onQChange={onQ}
+        searchPlaceholder="Search gyms by name, handle, city"
+        create={{ to: "/orgs/create", label: "Create a gym or organization" }}
+        sheetTitle="Filter gyms"
+        sheet={
+          <div className="text-sm text-muted-foreground">
+            More gym filters coming soon.
+          </div>
+        }
+      />
+
 
       {isLoading ? (
         <div className="rounded-2xl border border-border bg-surface p-8 text-center text-sm text-muted-foreground">
