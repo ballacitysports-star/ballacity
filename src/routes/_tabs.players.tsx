@@ -17,6 +17,7 @@ import {
   Ticket,
 } from "lucide-react";
 import { ViewDensityToggle, type ViewMode, type Density } from "@/components/ViewDensityToggle";
+import { CommunityTabs } from "@/components/CommunityTabs";
 import { PlayersMapView } from "@/components/PlayersMapView";
 import { AnimatePresence } from "framer-motion";
 import { motion } from "framer-motion";
@@ -274,6 +275,9 @@ function PlayersPage() {
 
   return (
     <div className="mx-auto w-full max-w-md sm:max-w-2xl lg:max-w-4xl px-4 pt-6">
+      <CommunityTabs />
+
+
 
       <div className="flex items-center justify-between mb-5">
         <Logo />
