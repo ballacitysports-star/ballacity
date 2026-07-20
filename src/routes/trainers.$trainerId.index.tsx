@@ -356,21 +356,39 @@ function TrainerPage() {
 
         {/* Tabs */}
         <div className="mt-6 flex gap-1 rounded-full border border-border bg-surface p-1">
-          {(["about", "experience", "reviews"] as const).map((t) => (
-            <button
-              key={t}
-              onClick={() => setTab(t)}
-              className={`flex-1 rounded-full px-2 py-2 text-xs font-semibold capitalize transition-all ${
-                tab === t ? "bg-lime text-primary-foreground" : "text-muted-foreground"
-              }`}
-            >
-              {t === "experience"
-                ? `Experience · ${hostedGames.length}`
-                : t === "reviews"
-                  ? `Reviews · ${orgRep.count}`
-                  : "About"}
-            </button>
-          ))}
+          <button
+            onClick={() => setTab("about")}
+            className={`flex-1 rounded-full px-2 py-2 text-xs font-semibold capitalize transition-all ${
+              tab === "about" ? "bg-lime text-primary-foreground" : "text-muted-foreground"
+            }`}
+          >
+            About
+          </button>
+
+          <button
+            onClick={() => {
+              const venueOffered =
+                !!selectedVenue &&
+                (org.venueAddresses ?? []).some(
+                  (a) => a.trim().toLowerCase() === selectedVenue.trim().toLowerCase(),
+                );
+              setBookPrefill(venueOffered ? { venue: selectedVenue } : null);
+              setBookOpen(true);
+            }}
+            className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-full bg-lime-gradient px-2 py-2 text-xs font-bold text-primary-foreground glow-lime transition-all"
+          >
+            <Calendar className="h-3.5 w-3.5" />
+            Book
+          </button>
+
+          <button
+            onClick={() => setTab("reviews")}
+            className={`flex-1 rounded-full px-2 py-2 text-xs font-semibold capitalize transition-all ${
+              tab === "reviews" ? "bg-lime text-primary-foreground" : "text-muted-foreground"
+            }`}
+          >
+            Reviews · {orgRep.count}
+          </button>
         </div>
 
         {/* About */}
