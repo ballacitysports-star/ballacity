@@ -1241,6 +1241,65 @@ export type Database = {
         }
         Relationships: []
       }
+      team_posts: {
+        Row: {
+          author_id: string
+          body: string
+          created_at: string
+          event_date: string | null
+          id: string
+          kind: string
+          location: string | null
+          pinned: boolean
+          price: number | null
+          spots_max: number | null
+          spots_taken: number
+          team_id: string
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          author_id: string
+          body?: string
+          created_at?: string
+          event_date?: string | null
+          id?: string
+          kind: string
+          location?: string | null
+          pinned?: boolean
+          price?: number | null
+          spots_max?: number | null
+          spots_taken?: number
+          team_id: string
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          author_id?: string
+          body?: string
+          created_at?: string
+          event_date?: string | null
+          id?: string
+          kind?: string
+          location?: string | null
+          pinned?: boolean
+          price?: number | null
+          spots_max?: number | null
+          spots_taken?: number
+          team_id?: string
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "team_posts_team_id_fkey"
+            columns: ["team_id"]
+            isOneToOne: false
+            referencedRelation: "teams"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       teams: {
         Row: {
           accent: string

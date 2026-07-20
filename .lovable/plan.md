@@ -1,29 +1,35 @@
-## Root cause (verified)
+## Problem
 
-After creating a gym, `/orgs/$orgId` runs the `getTrainerOrg` loader which reads `trainer_orgs` through `publicClient()` (anonymous key). The current RLS on `trainer_orgs` has a single SELECT policy scoped to the `authenticated` role only:
+On the team/trainer/gym profile page (`src/routes/teams.$teamId.index.tsx`), the "+ Post" button in the Posts tab is a static UI element with no `onClick` handler. There is also no backend for posts — `org.posts` comes from sample data only and is hardcoded to `[]` for real orgs in `src/lib/org-store.ts` (line 144). So creating a post does nothing and no posts ever appear.
 
-```
-SELECT "orgs are viewable by authenticated" TO authenticated USING (true)
-```
+## Plan
 
-Under the anon key the query returns `null` → loader throws `notFound()` → the "Organization not found." UI renders, even though the row was just inserted successfully.
+Add a working post system backed by the database.
 
-The same anon-read pattern is used by other org queries in `src/lib/trainer-orgs.functions.ts` (list, members) so they'll silently return empty results for signed-out visitors too.
+### 1. Database (migration)
+- New table `public.team_posts` with columns: `id uuid pk`, `team_id text fk → teams.id`, `author_id uuid fk → auth.users`, `kind text` (tryout | pickup | clinic | announcement | recap), `title text`, `body text`, `event_date timestamptz null`, `location text null`, `price int null`, `spots_max int null`, `spots_taken int default 0`, `pinned bool default false`, `created_at timestamptz default now()`.
+- GRANT `SELECT` to `anon, authenticated`; `INSERT/UPDATE/DELETE` to `authenticated`; `ALL` to `service_role`.
+- Enable RLS. Policies:
+  - `SELECT`: public (anyone can read).
+  - `INSERT/UPDATE/DELETE`: only the team's `owner_id` (checked via `EXISTS (SELECT 1 FROM teams WHERE id = team_id AND owner_id = auth.uid())`).
 
-## Fix
+### 2. Server functions (`src/lib/team-posts.functions.ts`)
+- `listTeamPosts({ teamId })` — public read, returns posts newest first (pinned first).
+- `createTeamPost({ teamId, kind, title, body, eventDate?, location?, price?, spotsMax?, pinned? })` — auth-gated, verifies caller owns team via `context.supabase`.
+- `deleteTeamPost({ id })` — auth-gated owner-only.
 
-Add anon read access to org directory data via a migration:
+### 3. UI (`src/routes/teams.$teamId.index.tsx`)
+- Replace `org.posts` in the Posts tab with a `useQuery(listTeamPosts)` result mapped into the existing `OrgPost` shape so `PostCard` still renders unchanged.
+- Wire the "+ Post" button (owner-only) to open a new `CreatePostSheet` dialog with fields: kind (select), title, body, and — when kind is an event (tryout/pickup/clinic) — event date, location, price, spots. Submit calls `createTeamPost` and invalidates the query.
+- Show a delete action on each post for the owner.
+- Update the tab count (`Posts · N`) to use the fetched count.
 
-1. `GRANT SELECT ON public.trainer_orgs TO anon;`
-2. New RLS policy `"orgs are publicly viewable" ON public.trainer_orgs FOR SELECT TO anon USING (true);`
-3. Same for `public.trainer_org_members` (needed by `getTrainerOrg`'s members join) — `GRANT SELECT ... TO anon;` + `FOR SELECT TO anon USING (true)`.
+### 4. Out of scope
+- RSVP / Apply buttons on posts (existing static buttons stay static).
+- Realtime subscription (query invalidation on mutate is enough for now).
+- Editing existing posts (delete + repost only).
 
-Org directories are meant to be public browse pages (like team pages), so opening them to anon matches intent. Writes stay locked to authenticated owners/admins as before.
-
-No code changes needed — the loader already works; it's just being blocked by RLS.
-
-## Verification
-
-After the migration approves and runs:
-- Create a new gym → redirects to `/orgs/{id}` → page renders (not "not found").
-- Signed-out visitors can also open `/orgs/{id}` directly.
+## Technical notes
+- `team_posts.team_id` is `text` to match `teams.id`.
+- Owner check reuses the pattern already used by `updateTeam` in `src/lib/teams.functions.ts`.
+- New sheet component: `src/components/CreatePostSheet.tsx`.
