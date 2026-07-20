@@ -102,6 +102,10 @@ function TrainersPage() {
   const navigate = useNavigate({ from: "/trainers" });
   const updateSearch = (patch: Partial<TrainersSearch>) =>
     navigate({ search: (prev: TrainersSearch) => ({ ...prev, ...patch }), replace: true });
+  usePersistedSearch("openrun:trainers-search", search, "/trainers", {
+    q: "", mode: "trainers", sport: "", specialty: "", venue: "", orgId: "",
+    radius: 0, avail: "any", sort: "nearest", view: "list", density: "list",
+  });
 
   const mode: "trainers" | "gyms" = search.mode === "gyms" ? "gyms" : "trainers";
   const q = search.q;

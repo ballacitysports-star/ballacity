@@ -14,6 +14,7 @@ import { FilterBar } from "@/components/FilterBar";
 import { FilterSection, ChipRow } from "@/components/FilterSheet";
 import { useMyProfile } from "@/lib/user-prefs-store";
 import { useAuth } from "@/hooks/use-auth";
+import { usePersistedSearch } from "@/hooks/use-persisted-search";
 
 
 type SortBy = "nearest" | "followers" | "name";

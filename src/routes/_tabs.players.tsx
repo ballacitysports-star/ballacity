@@ -99,6 +99,10 @@ function PlayersPage() {
   const navigate = useNavigate({ from: "/players" });
   const updateSearch = (patch: Partial<PlayersSearch>) =>
     navigate({ search: (prev: PlayersSearch) => ({ ...prev, ...patch }), replace: true });
+  usePersistedSearch("openrun:players-search", search, "/players", {
+    q: "", sport: "", skill: "", dist: 0, unknownAge: true, when: "any",
+    view: "list", density: "list",
+  });
 
   const q = search.q;
   const sport = search.sport;
