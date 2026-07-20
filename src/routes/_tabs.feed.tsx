@@ -53,7 +53,7 @@ function Feed() {
   const search = Route.useSearch();
   const navigate = useNavigate({ from: "/feed" });
   const [q, setQ] = useState(search.q ?? "");
-  const [filtersOpen, setFiltersOpen] = useState(false);
+  
   const [viewMode, setViewMode] = useState<"list" | "map">(() => {
     if (search.view === "list" || search.view === "map") return search.view;
     if (typeof window === "undefined") return "list";
