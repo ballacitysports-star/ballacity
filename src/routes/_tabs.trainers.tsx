@@ -15,6 +15,7 @@ import { TeamsMapView } from "@/components/TeamsMapView";
 import { TrainerActions } from "@/components/TrainerActions";
 import { useMyProfile, useFeedPrefs } from "@/lib/user-prefs-store";
 import { useAuth } from "@/hooks/use-auth";
+import { usePersistedSearch } from "@/hooks/use-persisted-search";
 import { toast } from "sonner";
 import { SPORT_CONFIG, SESSION_TYPES } from "@/lib/sport-config";
 import { haversineKm, KM_PER_MI, MI_PER_KM, useUserLocation } from "@/lib/geo";

@@ -52,6 +52,7 @@ import { kmToMi, miToKm } from "@/lib/distance";
 import { useMyProfile } from "@/lib/user-prefs-store";
 import { FilterBar } from "@/components/FilterBar";
 import { FilterSection } from "@/components/FilterSheet";
+import { usePersistedSearch } from "@/hooks/use-persisted-search";
 
 // URL-persisted Players state. Refreshing or sharing the URL restores the
 // exact view: search text, sport chip, skill, distance cap, age range,
