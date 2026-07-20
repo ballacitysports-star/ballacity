@@ -643,7 +643,7 @@ function BellLink() {
   );
 }
 
-function FilterSheet({ onClose }: { onClose: () => void }) {
+function FeedFilterBody() {
   const prefs = useFeedPrefs();
   const profile = useMyProfile();
   const hasCity = Boolean(profile?.city?.trim());
@@ -669,44 +669,10 @@ function FilterSheet({ onClose }: { onClose: () => void }) {
   const setUnit = (u: "mi" | "km") => setFeedPrefs({ ...prefs, distanceUnit: u });
   const setMaxMi = (mi: number | null) => setFeedPrefs({ ...prefs, maxDistanceMi: mi });
 
-  const reset = () =>
-    setFeedPrefs({
-      ...prefs,
-      preferredSports: [],
-      sections: DEFAULT_PREFS.sections,
-      maxDistanceMi: null,
-    });
-
   return (
-    <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-      className="fixed inset-0 z-50 bg-background/70 backdrop-blur flex items-end justify-center"
-      onClick={onClose}
-    >
-      <motion.div
-        initial={{ y: "100%" }}
-        animate={{ y: 0 }}
-        exit={{ y: "100%" }}
-        transition={{ type: "spring", stiffness: 280, damping: 30 }}
-        onClick={(e) => e.stopPropagation()}
-        className="w-full max-w-md rounded-t-3xl border-t border-border bg-background p-5 max-h-[85vh] overflow-y-auto pb-10"
-      >
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="font-display text-lg font-bold">Feed filters</h2>
-          <button
-            onClick={onClose}
-            className="grid h-9 w-9 place-items-center rounded-full border border-border"
-          >
-            <X className="h-4 w-4" />
-          </button>
-        </div>
-
-        <div className="text-xs font-semibold text-muted-foreground mb-2 uppercase tracking-wider">
-          Sort by
-        </div>
-        <div className="flex gap-2 mb-5">
+    <>
+      <FilterSection title="Sort by">
+        <ChipRow>
           {(["nearest", "soonest"] as const).map((s) => {
             const active = prefs.sortBy === s;
             return (
@@ -719,12 +685,11 @@ function FilterSheet({ onClose }: { onClose: () => void }) {
               </button>
             );
           })}
-        </div>
+        </ChipRow>
+      </FilterSection>
 
-        <div className="text-xs font-semibold text-muted-foreground mb-2 uppercase tracking-wider">
-          Sport (Games)
-        </div>
-        <div className="flex flex-wrap gap-2 mb-5">
+      <FilterSection title="Sport (Games)">
+        <ChipRow>
           {SPORTS.map((s) => {
             const active = preferredSports.includes(s.name);
             return (
@@ -738,29 +703,34 @@ function FilterSheet({ onClose }: { onClose: () => void }) {
               </button>
             );
           })}
-        </div>
+        </ChipRow>
+      </FilterSection>
 
-        <div className="text-xs font-semibold text-muted-foreground mb-2 uppercase tracking-wider flex items-center justify-between">
-          <span>
-            Distance from you
-            {hasCity && profile?.city ? (
-              <span className="ml-2 normal-case tracking-normal text-muted-foreground/80">
-                · {profile.city}
-              </span>
-            ) : null}
+      <FilterSection
+        title={
+          <span className="flex items-center justify-between">
+            <span>
+              Distance from you
+              {hasCity && profile?.city ? (
+                <span className="ml-2 normal-case tracking-normal text-muted-foreground/80">
+                  · {profile.city}
+                </span>
+              ) : null}
+            </span>
+            <span className="inline-flex rounded-full border border-border bg-surface p-0.5">
+              {(["mi", "km"] as const).map((u) => (
+                <button
+                  key={u}
+                  onClick={() => setUnit(u)}
+                  className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase ${unit === u ? "bg-lime text-primary-foreground" : "text-muted-foreground"}`}
+                >
+                  {u}
+                </button>
+              ))}
+            </span>
           </span>
-          <span className="inline-flex rounded-full border border-border bg-surface p-0.5">
-            {(["mi", "km"] as const).map((u) => (
-              <button
-                key={u}
-                onClick={() => setUnit(u)}
-                className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase ${unit === u ? "bg-lime text-primary-foreground" : "text-muted-foreground"}`}
-              >
-                {u}
-              </button>
-            ))}
-          </span>
-        </div>
+        }
+      >
         {!hasCity && (
           <p className="text-xs text-muted-foreground mb-2">
             <Link to="/profile/edit" className="text-lime font-semibold">
@@ -769,7 +739,7 @@ function FilterSheet({ onClose }: { onClose: () => void }) {
             to filter by distance.
           </p>
         )}
-        <div className={`flex flex-wrap gap-2 mb-5 ${hasCity ? "" : "opacity-50 pointer-events-none"}`}>
+        <div className={`flex flex-wrap gap-2 ${hasCity ? "" : "opacity-50 pointer-events-none"}`}>
           <button
             onClick={() => setMaxMi(null)}
             className={`rounded-full border px-3 py-1.5 text-xs font-semibold ${prefs.maxDistanceMi == null ? "border-lime bg-lime text-primary-foreground" : "border-border bg-surface"}`}
@@ -790,11 +760,10 @@ function FilterSheet({ onClose }: { onClose: () => void }) {
             );
           })}
         </div>
+      </FilterSection>
 
-        <div className="text-xs font-semibold text-muted-foreground mb-2 uppercase tracking-wider">
-          Sections
-        </div>
-        <div className="space-y-2 mb-5">
+      <FilterSection title="Sections">
+        <div className="space-y-2">
           {(
             [
               ["showUrgent", "Needs players now"],
@@ -821,22 +790,8 @@ function FilterSheet({ onClose }: { onClose: () => void }) {
             </button>
           ))}
         </div>
-
-        <div className="flex gap-2">
-          <button
-            onClick={reset}
-            className="flex-1 rounded-full border border-border py-3 text-sm font-bold"
-          >
-            Reset
-          </button>
-          <button
-            onClick={onClose}
-            className="flex-1 rounded-full bg-lime-gradient py-3 text-sm font-bold text-primary-foreground"
-          >
-            Done
-          </button>
-        </div>
-      </motion.div>
-    </motion.div>
+      </FilterSection>
+    </>
   );
 }
+
