@@ -17,7 +17,7 @@ import {
   Plus,
   Pencil,
 } from "lucide-react";
-import { ORGS, GAMES, POST_KIND_META, type PostKind, type Org } from "@/lib/sample-data";
+import { ORGS, GAMES, POST_KIND_META, type PostKind, type Org, type OrgPost } from "@/lib/sample-data";
 import { isMyOrg, ensureOrgById } from "@/lib/org-store";
 import { PostCard } from "@/components/PostCard";
 import { GameCard } from "@/components/GameCard";
@@ -25,6 +25,11 @@ import { ReviewsSection } from "@/components/ReviewsSection";
 import { computeReputation, useReviewsFor } from "@/lib/reviews";
 import { ReputationBadge } from "@/components/ReputationBadge";
 import { useCanReview } from "@/lib/transactions";
+import { CreatePostSheet } from "@/components/CreatePostSheet";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
+import { listTeamPosts, deleteTeamPost } from "@/lib/team-posts.functions";
+import { Trash2 } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -107,6 +112,7 @@ function TeamPage() {
     navigate({ search: (p: any) => ({ ...p, modal: v ? "reviews" : "" }), replace: true });
   const [following, setFollowing] = useState(false);
   const [mounted, setMounted] = useState(false);
+  const [composerOpen, setComposerOpen] = useState(false);
   useEffect(() => setMounted(true), []);
   const canEdit = mounted && isMyOrg(org.id);
 
@@ -114,7 +120,37 @@ function TeamPage() {
   const orgKind: "trainer" | "team" = org.kind === "coach" ? "trainer" : "team";
   const orgRep = useMemo(() => computeReputation(orgReviews, orgKind), [orgReviews, orgKind]);
 
-  const posts = org.posts.filter((p) => (filter === "all" ? true : p.kind === filter));
+  const qc = useQueryClient();
+  const listFn = useServerFn(listTeamPosts);
+  const deleteFn = useServerFn(deleteTeamPost);
+  const postsQuery = useQuery({
+    queryKey: ["team-posts", org.id],
+    queryFn: () => listFn({ data: { teamId: org.id } }),
+  });
+  const deleteMutation = useMutation({
+    mutationFn: deleteFn,
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["team-posts", org.id] }),
+  });
+  const allPosts: OrgPost[] = useMemo(
+    () =>
+      (postsQuery.data ?? []).map((r: any) => ({
+        id: String(r.id),
+        kind: r.kind as PostKind,
+        title: r.title,
+        body: r.body ?? "",
+        date: r.event_date ?? r.created_at,
+        postedAt: r.created_at,
+        location: r.location ?? undefined,
+        price: r.price ?? undefined,
+        spots:
+          typeof r.spots_max === "number"
+            ? { taken: r.spots_taken ?? 0, max: r.spots_max }
+            : undefined,
+        pinned: !!r.pinned,
+      })),
+    [postsQuery.data],
+  );
+  const posts = allPosts.filter((p) => (filter === "all" ? true : p.kind === filter));
   const upcomingGames = GAMES.filter((g) => org.upcoming.includes(g.id));
 
   return (
@@ -288,7 +324,7 @@ function TeamPage() {
               {t === "games"
                 ? `Games · ${upcomingGames.length}`
                 : t === "posts"
-                  ? `Posts · ${org.posts.length}`
+                  ? `Posts · ${allPosts.length}`
                   : "About"}
             </button>
           ))}
@@ -313,16 +349,42 @@ function TeamPage() {
                   </button>
                 ))}
               </div>
-              <button className="shrink-0 inline-flex items-center gap-1 rounded-full bg-coral-gradient px-3 py-2 text-xs font-bold text-white glow-coral">
-                <Plus className="h-3.5 w-3.5" /> Post
-              </button>
+              {canEdit && (
+                <button
+                  onClick={() => setComposerOpen(true)}
+                  className="shrink-0 inline-flex items-center gap-1 rounded-full bg-coral-gradient px-3 py-2 text-xs font-bold text-white glow-coral"
+                >
+                  <Plus className="h-3.5 w-3.5" /> Post
+                </button>
+              )}
             </div>
 
             <div className="mt-4 space-y-3">
-              {posts.map((p, i) => (
-                <PostCard key={p.id} post={p} index={i} />
-              ))}
-              {posts.length === 0 && (
+              {postsQuery.isLoading && (
+                <div className="rounded-2xl border border-border bg-surface p-8 text-center text-sm text-muted-foreground">
+                  Loading posts…
+                </div>
+              )}
+              {!postsQuery.isLoading &&
+                posts.map((p, i) => (
+                  <div key={p.id} className="relative">
+                    <PostCard post={p} index={i} />
+                    {canEdit && (
+                      <button
+                        onClick={() => {
+                          if (confirm("Delete this post?")) {
+                            deleteMutation.mutate({ data: { id: p.id } });
+                          }
+                        }}
+                        aria-label="Delete post"
+                        className="absolute top-3 right-3 grid h-8 w-8 place-items-center rounded-full border border-border bg-background/80 text-muted-foreground hover:text-coral"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </button>
+                    )}
+                  </div>
+                ))}
+              {!postsQuery.isLoading && posts.length === 0 && (
                 <div className="rounded-2xl border border-border bg-surface p-8 text-center text-sm text-muted-foreground">
                   No {POST_KIND_META[filter as PostKind]?.label.toLowerCase() ?? "posts"} yet.
                 </div>
@@ -464,6 +526,14 @@ function TeamPage() {
             </div>
           </DialogContent>
         </Dialog>
+
+        {canEdit && (
+          <CreatePostSheet
+            teamId={org.id}
+            open={composerOpen}
+            onOpenChange={setComposerOpen}
+          />
+        )}
       </div>
     </div>
   );
