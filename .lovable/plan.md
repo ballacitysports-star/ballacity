@@ -1,35 +1,62 @@
-## Problem
+# Streamline OpenRun — Ideas
 
-On the team/trainer/gym profile page (`src/routes/teams.$teamId.index.tsx`), the "+ Post" button in the Posts tab is a static UI element with no `onClick` handler. There is also no backend for posts — `org.posts` comes from sample data only and is hardcoded to `[]` for real orgs in `src/lib/org-store.ts` (line 144). So creating a post does nothing and no posts ever appear.
+Goal: reduce cognitive load, cut taps, and unify patterns across the app while keeping every existing feature reachable.
 
-## Plan
+## 1. Consolidate the tab bar (7 → 5)
+Current tabs: Feed, Discover, Create, Notifications, Profile, Teams, Trainers, Reels, Players.
+- Merge into: **Play** (Feed+Discover+Map toggle), **Community** (Teams+Trainers+Players via segmented control), **Create** (center FAB), **Inbox** (Messages+Notifications, already unified), **Profile**.
+- Reels moves into Play as a top pill filter.
+- Benefit: one-thumb reach on mobile, less tab-switching.
 
-Add a working post system backed by the database.
+## 2. Universal Create FAB
+Replace the Create tab with a floating "+" that opens a bottom sheet with contextual actions based on current route (Game / Team / Trainer / Post / Reel). Uses the existing wizards; only the entry point changes.
 
-### 1. Database (migration)
-- New table `public.team_posts` with columns: `id uuid pk`, `team_id text fk → teams.id`, `author_id uuid fk → auth.users`, `kind text` (tryout | pickup | clinic | announcement | recap), `title text`, `body text`, `event_date timestamptz null`, `location text null`, `price int null`, `spots_max int null`, `spots_taken int default 0`, `pinned bool default false`, `created_at timestamptz default now()`.
-- GRANT `SELECT` to `anon, authenticated`; `INSERT/UPDATE/DELETE` to `authenticated`; `ALL` to `service_role`.
-- Enable RLS. Policies:
-  - `SELECT`: public (anyone can read).
-  - `INSERT/UPDATE/DELETE`: only the team's `owner_id` (checked via `EXISTS (SELECT 1 FROM teams WHERE id = team_id AND owner_id = auth.uid())`).
+## 3. Unified filter bar
+Feed, Teams, Players, Trainers each have their own filter UI today. Introduce a shared `<FilterBar>` component:
+- Sport chips + search + sort + density toggle in one sticky row.
+- Persists to URL (already implemented) and localStorage.
+- Removes duplicate code across four routes.
 
-### 2. Server functions (`src/lib/team-posts.functions.ts`)
-- `listTeamPosts({ teamId })` — public read, returns posts newest first (pinned first).
-- `createTeamPost({ teamId, kind, title, body, eventDate?, location?, price?, spotsMax?, pinned? })` — auth-gated, verifies caller owns team via `context.supabase`.
-- `deleteTeamPost({ id })` — auth-gated owner-only.
+## 4. Game detail: collapse the pay flow
+Today: Game → Pay → Payment-setup → Return. Combine into a single sheet with steps (approve → pay → confirm) so users never leave the game context. Deep-links still work.
 
-### 3. UI (`src/routes/teams.$teamId.index.tsx`)
-- Replace `org.posts` in the Posts tab with a `useQuery(listTeamPosts)` result mapped into the existing `OrgPost` shape so `PostCard` still renders unchanged.
-- Wire the "+ Post" button (owner-only) to open a new `CreatePostSheet` dialog with fields: kind (select), title, body, and — when kind is an event (tryout/pickup/clinic) — event date, location, price, spots. Submit calls `createTeamPost` and invalidates the query.
-- Show a delete action on each post for the owner.
-- Update the tab count (`Posts · N`) to use the fetched count.
+## 5. Profile section polish
+- Replace the color-coded Pending / Hosting / Pickup blocks with a single segmented control + one list. Same data, half the vertical space.
+- Move "My Teams / Gyms / Trainer profiles" under a collapsible "Organizations" accordion.
 
-### 4. Out of scope
-- RSVP / Apply buttons on posts (existing static buttons stay static).
-- Realtime subscription (query invalidation on mutate is enough for now).
-- Editing existing posts (delete + repost only).
+## 6. Inbox refinements
+- Single list with type icons (message, follow, join request, payment) instead of tab-switching.
+- Swipe-to-archive; long-press for actions.
+- Notification prefs moves into Settings (one less top-level surface).
 
-## Technical notes
-- `team_posts.team_id` is `text` to match `teams.id`.
-- Owner check reuses the pattern already used by `updateTeam` in `src/lib/teams.functions.ts`.
-- New sheet component: `src/components/CreatePostSheet.tsx`.
+## 7. Onboarding shortcut
+First-run: 3-question setup (sport, home area, skill) → drops user straight into a pre-filtered Play feed. Skippable.
+
+## 8. Trainer / Team / Org unification
+Trainer profile, Team profile, Org profile are 90% the same layout. Extract one `<OrgProfileView>` with role-based sections. Reduces bug surface (edit flow, avatar, cover, posts, members).
+
+## 9. Empty & loading states
+Standardize skeletons (already have `GameCardSkeleton`, `RequestGameCardSkeleton`) into a shared `<ListSkeleton kind="game|player|team|trainer" />`. One import everywhere.
+
+## 10. Command palette (desktop) / quick actions (mobile)
+`⌘K` on desktop, long-press logo on mobile → jump to any game, team, trainer, or action. Power-user shortcut, zero UI cost.
+
+## 11. Design token cleanup
+Audit remaining hardcoded colors (`text-white`, `bg-black` occurrences) and route them through semantic tokens so dark/light + future themes stay consistent.
+
+## 12. Micro-optimizations
+- Sticky "Join" CTA on game cards when scrolled past the hero.
+- Optimistic UI on follow, join, RSVP (mutation + rollback on error).
+- Reduce datetime inputs to a single native picker with quick chips (Tonight, Tomorrow, This weekend).
+
+---
+
+## Suggested rollout order
+1. Tab consolidation + universal Create FAB (biggest perceived simplification)
+2. Unified FilterBar + shared skeletons (code-debt win)
+3. Profile segmented control + Inbox merge polish
+4. Org/Team/Trainer view unification (refactor)
+5. Pay flow collapse + optimistic mutations
+6. Onboarding + command palette (delighters)
+
+Tell me which items to build (or reorder) and I'll produce an implementation plan for that slice.
