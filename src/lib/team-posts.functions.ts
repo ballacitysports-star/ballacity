@@ -68,17 +68,6 @@ export const createTeamPost = createServerFn({ method: "POST" })
         spots_max: data.spotsMax ?? null,
         pinned: data.pinned ?? false,
       } as any)
-        team_id: data.teamId,
-        author_id: context.userId,
-        kind: data.kind,
-        title: data.title,
-        body: data.body ?? "",
-        event_date: data.eventDate ?? null,
-        location: data.location ?? null,
-        price: data.price ?? null,
-        spots_max: data.spotsMax ?? null,
-        pinned: data.pinned ?? false,
-      } as any)
       .select("*")
       .single();
     if (error) throw new Error(error.message);
