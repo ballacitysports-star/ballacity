@@ -3,7 +3,6 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { zodValidator, fallback } from "@tanstack/zod-adapter";
 import { z } from "zod";
 import {
-  Search,
   X,
   Plus,
   MessageCircle,
@@ -13,12 +12,10 @@ import {
   Bell,
   Inbox,
   Loader2,
-  SlidersHorizontal,
   Ticket,
 } from "lucide-react";
 import { ViewDensityToggle, type ViewMode, type Density } from "@/components/ViewDensityToggle";
 import { PlayersMapView } from "@/components/PlayersMapView";
-import { AnimatePresence } from "framer-motion";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
 import { Logo } from "@/components/Logo";
