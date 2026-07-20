@@ -46,11 +46,18 @@ async function countCards(page: Page): Promise<number> {
   return await page.locator('a[href^="/games/"], a[href^="/players/"], a[href^="/teams/"], a[href^="/trainers/"], a[href^="/u/"]').count();
 }
 
-async function pickSport(page: Page) {
+async function pickSport(page: Page, route: string) {
+  // Feed and Players render SportChips inline; Teams and Trainers house
+  // them inside the Filters bottom sheet — open it first.
+  if (route === "/teams" || route === "/trainers") {
+    await page.getByRole("button", { name: "Filters" }).click();
+  }
   const chip = page.getByRole("button", { name: new RegExp(`\\b${SPORT}\\b`) }).first();
   await chip.waitFor({ state: "visible", timeout: 15_000 });
   await chip.click();
   await expect(page).toHaveURL(/[?&]sport=Basketball/, { timeout: 5_000 });
+  // Close the sheet if it's still open so it doesn't cover cards.
+  await page.keyboard.press("Escape").catch(() => {});
 }
 
 for (const route of ["/feed", "/players", "/teams", "/trainers"] as const) {
@@ -60,15 +67,20 @@ for (const route of ["/feed", "/players", "/teams", "/trainers"] as const) {
     await page.waitForLoadState("networkidle").catch(() => {});
     // Wait until the tab has rendered content (any anchor card) OR the
     // sport chip is visible — whichever proves the page mounted.
-    await page
-      .getByRole("button", { name: new RegExp(`\\b${SPORT}\\b`) })
-      .first()
-      .waitFor({ state: "visible", timeout: 15_000 });
+    // For inline SportChips tabs, wait until they render.
+    if (route === "/feed" || route === "/players") {
+      await page
+        .getByRole("button", { name: new RegExp(`\\b${SPORT}\\b`) })
+        .first()
+        .waitFor({ state: "visible", timeout: 15_000 });
+    } else {
+      await page.getByRole("button", { name: "Filters" }).waitFor({ state: "visible", timeout: 15_000 });
+    }
 
     const baseline = await countCards(page);
 
-    await pickSport(page);
-    await page.waitForTimeout(400);
+    await pickSport(page, route);
+    await page.waitForTimeout(500);
     const filtered = await countCards(page);
     expect(filtered, `${route}: filtered <= baseline`).toBeLessThanOrEqual(baseline);
 
