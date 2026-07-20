@@ -112,6 +112,7 @@ function TeamPage() {
     navigate({ search: (p: any) => ({ ...p, modal: v ? "reviews" : "" }), replace: true });
   const [following, setFollowing] = useState(false);
   const [mounted, setMounted] = useState(false);
+  const [composerOpen, setComposerOpen] = useState(false);
   useEffect(() => setMounted(true), []);
   const canEdit = mounted && isMyOrg(org.id);
 
@@ -119,7 +120,37 @@ function TeamPage() {
   const orgKind: "trainer" | "team" = org.kind === "coach" ? "trainer" : "team";
   const orgRep = useMemo(() => computeReputation(orgReviews, orgKind), [orgReviews, orgKind]);
 
-  const posts = org.posts.filter((p) => (filter === "all" ? true : p.kind === filter));
+  const qc = useQueryClient();
+  const listFn = useServerFn(listTeamPosts);
+  const deleteFn = useServerFn(deleteTeamPost);
+  const postsQuery = useQuery({
+    queryKey: ["team-posts", org.id],
+    queryFn: () => listFn({ data: { teamId: org.id } }),
+  });
+  const deleteMutation = useMutation({
+    mutationFn: deleteFn,
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["team-posts", org.id] }),
+  });
+  const allPosts: OrgPost[] = useMemo(
+    () =>
+      (postsQuery.data ?? []).map((r: any) => ({
+        id: String(r.id),
+        kind: r.kind as PostKind,
+        title: r.title,
+        body: r.body ?? "",
+        date: r.event_date ?? r.created_at,
+        postedAt: r.created_at,
+        location: r.location ?? undefined,
+        price: r.price ?? undefined,
+        spots:
+          typeof r.spots_max === "number"
+            ? { taken: r.spots_taken ?? 0, max: r.spots_max }
+            : undefined,
+        pinned: !!r.pinned,
+      })),
+    [postsQuery.data],
+  );
+  const posts = allPosts.filter((p) => (filter === "all" ? true : p.kind === filter));
   const upcomingGames = GAMES.filter((g) => org.upcoming.includes(g.id));
 
   return (
