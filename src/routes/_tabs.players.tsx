@@ -128,7 +128,7 @@ function PlayersPage() {
   const switchView = (v: ViewMode) => updateSearch({ view: v });
   const switchDensity = (d: Density) => updateSearch({ density: d });
 
-  const [filtersOpen, setFiltersOpen] = useState(false);
+  
   const [list, setList] = useState<AvailabilityWithAuthor[] | null>(null);
   const [postOpen, setPostOpen] = useState(false);
   const [contactFor, setContactFor] = useState<AvailabilityWithAuthor | null>(null);
