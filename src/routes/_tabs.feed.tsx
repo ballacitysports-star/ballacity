@@ -12,7 +12,7 @@ import { GameCard } from "@/components/GameCard";
 import { GameListRow } from "@/components/GameListRow";
 import { GameCardSkeleton, GameListRowSkeleton } from "@/components/GameCardSkeleton";
 import { FilterBar } from "@/components/FilterBar";
-import { FilterSection, ChipRow } from "@/components/FilterSheet";
+import { FilterSection } from "@/components/FilterSheet";
 import { GAMES, SPORTS, POSITIONS_BY_SPORT, type Sport } from "@/lib/sample-data";
 import { useHostedGames } from "@/lib/hosted-games-store";
 import { useJoinedGameIds } from "@/lib/games-store";
@@ -671,8 +671,8 @@ function FeedFilterBody() {
 
   return (
     <>
-      <FilterSection title="Sort by">
-        <ChipRow>
+      <FilterSection label="Sort by">
+        <div className="flex flex-wrap gap-2">
           {(["nearest", "soonest"] as const).map((s) => {
             const active = prefs.sortBy === s;
             return (
@@ -685,11 +685,11 @@ function FeedFilterBody() {
               </button>
             );
           })}
-        </ChipRow>
+        </div>
       </FilterSection>
 
-      <FilterSection title="Sport (Games)">
-        <ChipRow>
+      <FilterSection label="Sport (Games)">
+        <div className="flex flex-wrap gap-2">
           {SPORTS.map((s) => {
             const active = preferredSports.includes(s.name);
             return (
@@ -703,11 +703,12 @@ function FeedFilterBody() {
               </button>
             );
           })}
-        </ChipRow>
+        </div>
       </FilterSection>
 
       <FilterSection
-        title={
+        label={PLACEHOLDER_LBL}
+        hintless={
           <span className="flex items-center justify-between">
             <span>
               Distance from you
@@ -762,7 +763,7 @@ function FeedFilterBody() {
         </div>
       </FilterSection>
 
-      <FilterSection title="Sections">
+      <FilterSection label="Sections">
         <div className="space-y-2">
           {(
             [
