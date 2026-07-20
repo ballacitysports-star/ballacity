@@ -3,7 +3,6 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { zodValidator, fallback } from "@tanstack/zod-adapter";
 import { z } from "zod";
 import {
-  Search,
   X,
   Plus,
   MessageCircle,
@@ -13,12 +12,10 @@ import {
   Bell,
   Inbox,
   Loader2,
-  SlidersHorizontal,
   Ticket,
 } from "lucide-react";
 import { ViewDensityToggle, type ViewMode, type Density } from "@/components/ViewDensityToggle";
 import { PlayersMapView } from "@/components/PlayersMapView";
-import { AnimatePresence } from "framer-motion";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
 import { Logo } from "@/components/Logo";
@@ -53,6 +50,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { kmToMi, miToKm } from "@/lib/distance";
 import { useMyProfile } from "@/lib/user-prefs-store";
+import { FilterBar } from "@/components/FilterBar";
+import { FilterSection } from "@/components/FilterSheet";
 
 // URL-persisted Players state. Refreshing or sharing the URL restores the
 // exact view: search text, sport chip, skill, distance cap, age range,
@@ -126,7 +125,7 @@ function PlayersPage() {
   const switchView = (v: ViewMode) => updateSearch({ view: v });
   const switchDensity = (d: Density) => updateSearch({ density: d });
 
-  const [filtersOpen, setFiltersOpen] = useState(false);
+  
   const [list, setList] = useState<AvailabilityWithAuthor[] | null>(null);
   const [postOpen, setPostOpen] = useState(false);
   const [contactFor, setContactFor] = useState<AvailabilityWithAuthor | null>(null);
@@ -324,43 +323,49 @@ function PlayersPage() {
         onDensityChange={switchDensity}
       />
 
-      <div className="flex gap-2 mb-4">
-        <div className="flex-1 flex items-center gap-2 rounded-full border border-border bg-surface px-4 py-2.5">
-          <Search className="h-4 w-4 text-muted-foreground" />
-          <input
-            value={q}
-            onChange={(e) => setQ(e.target.value)}
-            placeholder="Search name, city, sport"
-            className="flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
+      <FilterBar
+        q={q}
+        onQChange={setQ}
+        searchPlaceholder="Search name, city, sport"
+        activeFilterCount={activeFilterCount}
+        sheetTitle="Filter players"
+        rightExtra={
+          <button
+            onClick={() =>
+              user ? setPostOpen(true) : toast.error("Sign in to post your availability.")
+            }
+            className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-lime-gradient text-primary-foreground glow-lime"
+            aria-label="Post availability"
+          >
+            <Plus className="h-5 w-5" strokeWidth={2.5} />
+          </button>
+        }
+        onReset={() => {
+          setSport("");
+          setSkill("");
+          setMaxDistance(0);
+          setAgeMin("");
+          setAgeMax("");
+          setIncludeUnknownAge(true);
+        }}
+        sheet={
+          <PlayersFilterBody
+            sport={sport}
+            setSport={setSport}
+            skill={skill}
+            setSkill={setSkill}
+            maxDistance={maxDistance}
+            setMaxDistance={setMaxDistance}
+            ageMin={ageMin}
+            setAgeMin={setAgeMin}
+            ageMax={ageMax}
+            setAgeMax={setAgeMax}
+            includeUnknownAge={includeUnknownAge}
+            setIncludeUnknownAge={setIncludeUnknownAge}
           />
-          {q && (
-            <button onClick={() => setQ("")} aria-label="Clear search">
-              <X className="h-4 w-4 text-muted-foreground" />
-            </button>
-          )}
-        </div>
-        <button
-          onClick={() => setFiltersOpen(true)}
-          className={`relative grid h-11 w-11 place-items-center rounded-full border bg-surface ${activeFilterCount ? "border-lime" : "border-border"}`}
-          aria-label="Filters"
-        >
-          <SlidersHorizontal className="h-4 w-4" />
-          {activeFilterCount > 0 && (
-            <span className="absolute -top-1 -right-1 grid h-4 w-4 place-items-center rounded-full bg-lime text-[10px] font-bold text-primary-foreground">
-              {activeFilterCount}
-            </span>
-          )}
-        </button>
-        <button
-          onClick={() =>
-            user ? setPostOpen(true) : toast.error("Sign in to post your availability.")
-          }
-          className="grid h-11 w-11 place-items-center rounded-full bg-lime-gradient text-primary-foreground glow-lime"
-          aria-label="Post availability"
-        >
-          <Plus className="h-5 w-5" strokeWidth={2.5} />
-        </button>
-      </div>
+        }
+      />
+
 
       {/* Sport filter chips */}
       <div className="mb-3">
@@ -474,38 +479,11 @@ function PlayersPage() {
         />
       )}
 
-      <AnimatePresence>
-        {filtersOpen && (
-          <PlayersFilterSheet
-            sport={sport}
-            setSport={setSport}
-            skill={skill}
-            setSkill={setSkill}
-            maxDistance={maxDistance}
-            setMaxDistance={setMaxDistance}
-            ageMin={ageMin}
-            setAgeMin={setAgeMin}
-            ageMax={ageMax}
-            setAgeMax={setAgeMax}
-            includeUnknownAge={includeUnknownAge}
-            setIncludeUnknownAge={setIncludeUnknownAge}
-            onClose={() => setFiltersOpen(false)}
-            onReset={() => {
-              setSport("");
-              setSkill("");
-              setMaxDistance(0);
-              setAgeMin("");
-              setAgeMax("");
-              setIncludeUnknownAge(true);
-            }}
-          />
-        )}
-      </AnimatePresence>
     </div>
   );
 }
 
-function PlayersFilterSheet({
+function PlayersFilterBody({
   sport,
   setSport,
   skill,
@@ -518,8 +496,6 @@ function PlayersFilterSheet({
   setAgeMax,
   includeUnknownAge,
   setIncludeUnknownAge,
-  onClose,
-  onReset,
 }: {
   sport: string;
   setSport: (v: string) => void;
@@ -533,42 +509,13 @@ function PlayersFilterSheet({
   setAgeMax: (v: number | "") => void;
   includeUnknownAge: boolean;
   setIncludeUnknownAge: (v: boolean) => void;
-  onClose: () => void;
-  onReset: () => void;
 }) {
   const SKILLS = ["All Levels", "Beginner", "Intermediate", "Advanced"];
   const DISTANCES = [0, 5, 10, 25, 50, 100];
   return (
-    <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-      className="fixed inset-0 z-50 bg-background/70 backdrop-blur flex items-end justify-center"
-      onClick={onClose}
-    >
-      <motion.div
-        initial={{ y: "100%" }}
-        animate={{ y: 0 }}
-        exit={{ y: "100%" }}
-        transition={{ type: "spring", stiffness: 280, damping: 30 }}
-        onClick={(e) => e.stopPropagation()}
-        className="w-full max-w-md rounded-t-3xl border-t border-border bg-background p-5 max-h-[85vh] overflow-y-auto pb-10"
-      >
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="font-display text-lg font-bold">Filter players</h2>
-          <button
-            onClick={onClose}
-            className="grid h-9 w-9 place-items-center rounded-full border border-border"
-            aria-label="Close"
-          >
-            <X className="h-4 w-4" />
-          </button>
-        </div>
-
-        <div className="text-xs font-semibold text-muted-foreground mb-2 uppercase tracking-wider">
-          Sport (Players)
-        </div>
-        <div className="flex flex-wrap gap-2 mb-5">
+    <>
+      <FilterSection label="Sport (Players)">
+        <div className="flex flex-wrap gap-2">
           <Chip active={!sport} onClick={() => setSport("")}>
             All sports
           </Chip>
@@ -579,11 +526,10 @@ function PlayersFilterSheet({
             </Chip>
           ))}
         </div>
+      </FilterSection>
 
-        <div className="text-xs font-semibold text-muted-foreground mb-2 uppercase tracking-wider">
-          Skill level
-        </div>
-        <div className="flex flex-wrap gap-2 mb-5">
+      <FilterSection label="Skill level">
+        <div className="flex flex-wrap gap-2">
           <Chip active={!skill} onClick={() => setSkill("")}>
             Any
           </Chip>
@@ -593,21 +539,19 @@ function PlayersFilterSheet({
             </Chip>
           ))}
         </div>
+      </FilterSection>
 
-        <div className="text-xs font-semibold text-muted-foreground mb-2 uppercase tracking-wider">
-          Max travel distance
-        </div>
-        <div className="flex flex-wrap gap-2 mb-5">
+      <FilterSection label="Max travel distance">
+        <div className="flex flex-wrap gap-2">
           {DISTANCES.map((d) => (
             <Chip key={d} active={maxDistance === d} onClick={() => setMaxDistance(d)}>
               {d === 0 ? "Any" : `≤ ${d} mi`}
             </Chip>
           ))}
         </div>
+      </FilterSection>
 
-        <div className="text-xs font-semibold text-muted-foreground mb-2 uppercase tracking-wider">
-          Age range
-        </div>
+      <FilterSection label="Age range">
         <div className="flex items-center gap-2 mb-2">
           <input
             type="number"
@@ -621,7 +565,7 @@ function PlayersFilterSheet({
               )
             }
             placeholder="Min"
-            className="flex-1 rounded-full border border-border bg-surface px-4 py-2 text-sm outline-none"
+            className="flex-1 rounded-full border border-border bg-background px-4 py-2 text-sm outline-none"
             aria-label="Minimum age"
           />
           <span className="text-muted-foreground text-sm">–</span>
@@ -637,11 +581,11 @@ function PlayersFilterSheet({
               )
             }
             placeholder="Max"
-            className="flex-1 rounded-full border border-border bg-surface px-4 py-2 text-sm outline-none"
+            className="flex-1 rounded-full border border-border bg-background px-4 py-2 text-sm outline-none"
             aria-label="Maximum age"
           />
         </div>
-        <div className="flex flex-wrap gap-2 mb-5">
+        <div className="flex flex-wrap gap-2">
           <Chip
             active={ageMin === "" && ageMax === ""}
             onClick={() => {
@@ -651,53 +595,13 @@ function PlayersFilterSheet({
           >
             Any age
           </Chip>
-          <Chip
-            active={ageMin === 13 && ageMax === 17}
-            onClick={() => {
-              setAgeMin(13);
-              setAgeMax(17);
-            }}
-          >
-            13–17
-          </Chip>
-          <Chip
-            active={ageMin === 18 && ageMax === 24}
-            onClick={() => {
-              setAgeMin(18);
-              setAgeMax(24);
-            }}
-          >
-            18–24
-          </Chip>
-          <Chip
-            active={ageMin === 25 && ageMax === 34}
-            onClick={() => {
-              setAgeMin(25);
-              setAgeMax(34);
-            }}
-          >
-            25–34
-          </Chip>
-          <Chip
-            active={ageMin === 35 && ageMax === 49}
-            onClick={() => {
-              setAgeMin(35);
-              setAgeMax(49);
-            }}
-          >
-            35–49
-          </Chip>
-          <Chip
-            active={ageMin === 50 && ageMax === ""}
-            onClick={() => {
-              setAgeMin(50);
-              setAgeMax("");
-            }}
-          >
-            50+
-          </Chip>
+          <Chip active={ageMin === 13 && ageMax === 17} onClick={() => { setAgeMin(13); setAgeMax(17); }}>13–17</Chip>
+          <Chip active={ageMin === 18 && ageMax === 24} onClick={() => { setAgeMin(18); setAgeMax(24); }}>18–24</Chip>
+          <Chip active={ageMin === 25 && ageMax === 34} onClick={() => { setAgeMin(25); setAgeMax(34); }}>25–34</Chip>
+          <Chip active={ageMin === 35 && ageMax === 49} onClick={() => { setAgeMin(35); setAgeMax(49); }}>35–49</Chip>
+          <Chip active={ageMin === 50 && ageMax === ""} onClick={() => { setAgeMin(50); setAgeMax(""); }}>50+</Chip>
         </div>
-        <label className="flex items-center gap-2 mb-5 -mt-2 text-xs text-muted-foreground cursor-pointer select-none">
+        <label className="flex items-center gap-2 mt-3 text-xs text-muted-foreground cursor-pointer select-none">
           <input
             type="checkbox"
             className="h-4 w-4 accent-lime"
@@ -707,25 +611,11 @@ function PlayersFilterSheet({
           />
           <span>Include players who haven't shared a birthday</span>
         </label>
-
-        <div className="flex gap-2">
-          <button
-            onClick={onReset}
-            className="flex-1 rounded-full border border-border py-3 text-sm font-bold"
-          >
-            Reset
-          </button>
-          <button
-            onClick={onClose}
-            className="flex-1 rounded-full bg-lime-gradient py-3 text-sm font-bold text-primary-foreground"
-          >
-            Done
-          </button>
-        </div>
-      </motion.div>
-    </motion.div>
+      </FilterSection>
+    </>
   );
 }
+
 
 function BellLink() {
   const unread = useUnreadNotificationCount();

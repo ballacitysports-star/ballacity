@@ -1,7 +1,9 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { motion } from "framer-motion";
-import { Search, Plus, Megaphone, GraduationCap, ArrowUpDown, MapPin, SlidersHorizontal, Building2 } from "lucide-react";
+import { Megaphone, GraduationCap, MapPin, Building2 } from "lucide-react";
+import { FilterBar } from "@/components/FilterBar";
+import { FilterSection, ChipRow } from "@/components/FilterSheet";
 import { zodValidator, fallback } from "@tanstack/zod-adapter";
 import { z } from "zod";
 import { type Sport } from "@/lib/sample-data";
@@ -421,264 +423,211 @@ function TrainersPage() {
         onDensityChange={switchDensity}
       />
 
-      <div className="flex gap-2 mb-4">
-        <div className="flex-1 flex items-center gap-2 rounded-full border border-border bg-surface px-4 py-2.5">
-          <Search className="h-4 w-4 text-muted-foreground" />
-          <input
-            value={q}
-            onChange={(e) => setQ(e.target.value)}
-            placeholder="Search trainers, sport, credential"
-            className="flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
-          />
-        </div>
-        {(() => {
-          const activeFilterCount =
-            (sport ? 1 : 0) + (specialty ? 1 : 0) + (venue ? 1 : 0) + (orgId ? 1 : 0) + (radius > 0 ? 1 : 0) + (avail !== "any" ? 1 : 0);
+      {(() => {
+        const activeFilterCount =
+          (sport ? 1 : 0) +
+          (specialty ? 1 : 0) +
+          (venue ? 1 : 0) +
+          (orgId ? 1 : 0) +
+          (radius > 0 ? 1 : 0) +
+          (avail !== "any" ? 1 : 0) +
+          (sortBy !== "nearest" ? 1 : 0);
+        const specialties = sport ? SPORT_CONFIG[sport].formats : SESSION_TYPES;
+        return (
+          <FilterBar
+            q={q}
+            onQChange={setQ}
+            searchPlaceholder="Search trainers, sport, credential"
+            activeFilterCount={activeFilterCount}
+            create={{ to: "/trainers/create", label: "Create trainer profile" }}
+            sheetTitle="Filter trainers"
+            onReset={() =>
+              updateSearch({
+                sport: "",
+                specialty: "",
+                venue: "",
+                orgId: "",
+                radius: 0,
+                avail: "any",
+                sort: "nearest",
+              })
+            }
+            resetDisabled={activeFilterCount === 0}
+            sheet={
+              <>
+                <FilterSection label="Sport">
+                  <SportChips
+                    selected={sport}
+                    onSelect={(s) => setSport(s as Sport | null)}
+                  />
+                </FilterSection>
 
-          return (
-            <button
-              onClick={() => setFiltersOpen((v) => !v)}
-              className={`relative grid h-11 w-11 place-items-center rounded-full border bg-surface ${activeFilterCount ? "border-lime" : "border-border"}`}
-              aria-label="Filters"
-              aria-expanded={filtersOpen}
-            >
-              <SlidersHorizontal className="h-4 w-4" />
-              {activeFilterCount > 0 && (
-                <span className="absolute -top-1 -right-1 grid h-4 w-4 place-items-center rounded-full bg-lime text-[10px] font-bold text-primary-foreground">
-                  {activeFilterCount}
-                </span>
-              )}
-            </button>
-          );
-        })()}
-        <Link
-          to="/trainers/create"
-          className="grid h-11 w-11 place-items-center rounded-full bg-lime-gradient text-primary-foreground glow-lime"
-          aria-label="Create trainer profile"
-        >
-          <Plus className="h-5 w-5" strokeWidth={2.5} />
-        </Link>
-      </div>
+                <FilterSection label="Specialty">
+                  <div className="flex flex-wrap gap-2">
+                    {specialties.map((s) => {
+                      const active = specialty === s;
+                      return (
+                        <button
+                          key={s}
+                          onClick={() => setSpecialty(s)}
+                          className={`whitespace-nowrap rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors ${
+                            active
+                              ? "border-lime bg-lime text-primary-foreground"
+                              : "border-border bg-background text-muted-foreground"
+                          }`}
+                        >
+                          {s}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </FilterSection>
 
-      {filtersOpen && (
-        <>
-          <div className="mb-3">
-            <SportChips selected={sport} onSelect={(s) => setSport(s as Sport | null)} />
-          </div>
-
-          {(() => {
-            const specialties = sport
-              ? SPORT_CONFIG[sport].formats
-              : SESSION_TYPES;
-            return (
-              <div className="-mx-4 overflow-x-auto px-4 mb-3">
-                <div className="flex gap-2 pb-1">
-                  <span className="self-center text-[10px] font-bold uppercase tracking-wider text-muted-foreground pr-1">
-                    Specialty
-                  </span>
-                  {specialties.map((s) => {
-                    const active = specialty === s;
-                    return (
+                {venueOptions.length > 0 && (
+                  <FilterSection label="Venue">
+                    <div className="flex flex-wrap gap-2">
                       <button
-                        key={s}
-                        onClick={() => setSpecialty(s)}
-                        className={`whitespace-nowrap rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors ${
-                          active
+                        onClick={() => setVenue("")}
+                        className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors ${
+                          !venue
                             ? "border-lime bg-lime text-primary-foreground"
-                            : "border-border bg-surface text-muted-foreground"
+                            : "border-border bg-background text-muted-foreground"
                         }`}
                       >
-                        {s}
+                        Any venue
                       </button>
-                    );
-                  })}
-                </div>
-              </div>
-            );
-          })()}
+                      {venueOptions.map((v) => {
+                        const active = venue.trim().toLowerCase() === v.addr.toLowerCase();
+                        const short = v.addr.split(",")[0];
+                        return (
+                          <button
+                            key={v.addr}
+                            onClick={() => setVenue(v.addr)}
+                            title={v.addr}
+                            className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors ${
+                              active
+                                ? "border-lime bg-lime text-primary-foreground"
+                                : "border-border bg-background text-muted-foreground"
+                            }`}
+                          >
+                            {v.primary ? "★ " : ""}
+                            {short}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </FilterSection>
+                )}
 
-          {venueOptions.length > 0 && (
-            <div className="-mx-4 overflow-x-auto px-4 mb-3">
-              <div className="flex gap-2 pb-1">
-                <span className="self-center text-[10px] font-bold uppercase tracking-wider text-muted-foreground pr-1">
-                  Venue
-                </span>
-                <button
-                  onClick={() => setVenue("")}
-                  className={`whitespace-nowrap rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors ${
-                    !venue
-                      ? "border-lime bg-lime text-primary-foreground"
-                      : "border-border bg-surface text-muted-foreground"
-                  }`}
+                {(orgsListQuery.data ?? []).length > 0 && (
+                  <FilterSection label="Organization">
+                    <div className="flex flex-wrap gap-2">
+                      <button
+                        onClick={() => setOrgId("")}
+                        className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors ${
+                          !orgId
+                            ? "border-lime bg-lime text-primary-foreground"
+                            : "border-border bg-background text-muted-foreground"
+                        }`}
+                      >
+                        Any org
+                      </button>
+                      {(orgsListQuery.data ?? []).map((o) => {
+                        const active = orgId === o.id;
+                        return (
+                          <button
+                            key={o.id}
+                            onClick={() => setOrgId(o.id)}
+                            title={o.name}
+                            className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors ${
+                              active
+                                ? "border-lime bg-lime text-primary-foreground"
+                                : "border-border bg-background text-muted-foreground"
+                            }`}
+                          >
+                            {o.verified ? "✓ " : ""}
+                            {o.name}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </FilterSection>
+                )}
+
+                <FilterSection
+                  label="Distance"
+                  hint={radius > 0 ? `Within ${radius} ${unitLabel}` : "Any distance"}
                 >
-                  Any venue
-                </button>
-                {venueOptions.map((v) => {
-                  const active = venue.trim().toLowerCase() === v.addr.toLowerCase();
-                  const short = v.addr.split(",")[0];
-                  return (
-                    <button
-                      key={v.addr}
-                      onClick={() => setVenue(v.addr)}
-                      title={v.addr}
-                      className={`whitespace-nowrap rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors ${
-                        active
-                          ? "border-lime bg-lime text-primary-foreground"
-                          : "border-border bg-surface text-muted-foreground"
-                      }`}
-                    >
-                      {v.primary ? "★ " : ""}
-                      {short}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          )}
+                  <Slider
+                    value={[radius]}
+                    min={0}
+                    max={100}
+                    step={1}
+                    onValueChange={(v) => {
+                      const nv = Math.round(v[0] ?? 0);
+                      setRadius(nv);
+                      if (nv > 0 && geoStatus !== "granted" && geoStatus !== "prompting") {
+                        requestLocation();
+                      }
+                    }}
+                    aria-label="Distance radius"
+                  />
+                  {radius > 0 && geoStatus !== "granted" && (
+                    <div className="mt-2 flex items-center justify-between gap-2 text-[11px]">
+                      <span className="text-muted-foreground">
+                        {geoStatus === "denied" || geoStatus === "unsupported"
+                          ? "Location unavailable — enable location to filter by distance."
+                          : "Share your location to filter by distance."}
+                      </span>
+                      <button
+                        onClick={requestLocation}
+                        className="whitespace-nowrap rounded-full border border-lime bg-lime/10 px-2.5 py-1 text-[11px] font-bold text-lime"
+                      >
+                        {geoStatus === "prompting" ? "Locating…" : "Use my location"}
+                      </button>
+                    </div>
+                  )}
+                </FilterSection>
 
-          {(orgsListQuery.data ?? []).length > 0 && (
-            <div className="-mx-4 overflow-x-auto px-4 mb-3">
-              <div className="flex gap-2 pb-1">
-                <span className="self-center text-[10px] font-bold uppercase tracking-wider text-muted-foreground pr-1">
-                  Org
-                </span>
-                <button
-                  onClick={() => setOrgId("")}
-                  className={`whitespace-nowrap rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors ${
-                    !orgId
-                      ? "border-lime bg-lime text-primary-foreground"
-                      : "border-border bg-surface text-muted-foreground"
-                  }`}
-                >
-                  Any org
-                </button>
-                {(orgsListQuery.data ?? []).map((o) => {
-                  const active = orgId === o.id;
-                  return (
-                    <button
-                      key={o.id}
-                      onClick={() => setOrgId(o.id)}
-                      title={o.name}
-                      className={`whitespace-nowrap rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors ${
-                        active
-                          ? "border-lime bg-lime text-primary-foreground"
-                          : "border-border bg-surface text-muted-foreground"
-                      }`}
-                    >
-                      {o.verified ? "✓ " : ""}
-                      {o.name}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          )}
+                <FilterSection label="Availability">
+                  <ChipRow
+                    value={avail}
+                    onChange={setAvail}
+                    options={[
+                      { value: "any", label: "Any time" },
+                      { value: "recruiting", label: "Booking now" },
+                      { value: "soon", label: "This week" },
+                      { value: "weekly", label: "Weekly+" },
+                      { value: "casual", label: "Casual" },
+                    ]}
+                  />
+                </FilterSection>
 
-          <div className="mb-4 rounded-2xl border border-border bg-surface p-3">
-            <div className="flex items-center justify-between mb-2">
-              <div className="flex items-center gap-2">
-                <MapPin className="h-3.5 w-3.5 text-lime" />
-                <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-                  Within
-                </span>
-                <span className="text-xs font-semibold">
-                  {radius > 0 ? `${radius} ${unitLabel}` : "Any distance"}
-                </span>
-              </div>
-              {radius > 0 && (
-                <button
-                  onClick={() => setRadius(0)}
-                  className="text-[11px] font-semibold text-muted-foreground hover:text-foreground"
-                >
-                  Clear
-                </button>
-              )}
-            </div>
-            <Slider
-              value={[radius]}
-              min={0}
-              max={100}
-              step={1}
-              onValueChange={(v) => {
-                const nv = Math.round(v[0] ?? 0);
-                setRadius(nv);
-                if (nv > 0 && geoStatus !== "granted" && geoStatus !== "prompting") {
-                  requestLocation();
-                }
-              }}
-              aria-label="Distance radius"
-            />
-            {radius > 0 && geoStatus !== "granted" && (
-              <div className="mt-2 flex items-center justify-between gap-2 text-[11px]">
-                <span className="text-muted-foreground">
-                  {geoStatus === "denied" || geoStatus === "unsupported"
-                    ? "Location unavailable — enable location to filter by distance."
-                    : "Share your location to filter by distance."}
-                </span>
-                <button
-                  onClick={requestLocation}
-                  className="whitespace-nowrap rounded-full border border-lime bg-lime/10 px-2.5 py-1 text-[11px] font-bold text-lime"
-                >
-                  {geoStatus === "prompting" ? "Locating…" : "Use my location"}
-                </button>
-              </div>
-            )}
-          </div>
+                <FilterSection label="Sort">
+                  <ChipRow
+                    value={sortBy}
+                    onChange={setSortBy}
+                    options={[
+                      { value: "nearest", label: "Nearest" },
+                      { value: "soonest", label: "Soonest available" },
+                      { value: "followers", label: "Most followers" },
+                      { value: "name", label: "Name A–Z" },
+                    ]}
+                  />
+                </FilterSection>
+              </>
+            }
+          />
+        );
+      })()}
 
-
-
-
-          <div className="-mx-4 overflow-x-auto px-4 mb-4">
-            <div className="flex gap-2 pb-1">
-              <span className="self-center text-[10px] font-bold uppercase tracking-wider text-muted-foreground pr-1">
-                Available
-              </span>
-              {([
-                { id: "any", label: "Any time" },
-                { id: "recruiting", label: "Booking now" },
-                { id: "soon", label: "This week" },
-                { id: "weekly", label: "Weekly+" },
-                { id: "casual", label: "Casual" },
-              ] as const).map((a) => {
-                const active = avail === a.id;
-                return (
-                  <button
-                    key={a.id}
-                    onClick={() => setAvail(a.id)}
-                    className={`whitespace-nowrap rounded-full border px-3.5 py-1.5 text-xs font-semibold transition-colors ${
-                      active
-                        ? "border-lime bg-lime text-primary-foreground"
-                        : "border-border bg-surface text-muted-foreground"
-                    }`}
-                  >
-                    {a.label}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-        </>
-      )}
-
-      <div className="mb-4 flex items-center justify-between gap-2">
-        <span className="text-xs text-muted-foreground">
+      <div className="mb-4 flex items-center justify-between gap-2 text-xs text-muted-foreground">
+        <span>
           {list.length} {list.length === 1 ? "result" : "results"}
         </span>
-        <label className="inline-flex items-center gap-2 rounded-full border border-border bg-surface px-3 py-1.5 text-xs font-semibold">
-          <ArrowUpDown className="h-3.5 w-3.5 text-muted-foreground" />
-          <select
-            value={sortBy}
-            onChange={(e) => setSortBy(e.target.value as SortBy)}
-            className="bg-transparent outline-none"
-            aria-label="Sort trainers"
-          >
-            <option value="nearest">Nearest</option>
-            <option value="soonest">Soonest available</option>
-            <option value="followers">Most followers</option>
-            <option value="name">Name A–Z</option>
-          </select>
-        </label>
+        <span>Sorted by {sortBy}</span>
       </div>
+
 
       {viewMode === "map" ? (
         <TeamsMapView orgs={list.map((x) => x.o)} kind="coach" />
@@ -762,24 +711,19 @@ function GymsView({
 }) {
   return (
     <>
-      <div className="flex gap-2 mb-4">
-        <div className="flex-1 flex items-center gap-2 rounded-full border border-border bg-surface px-4 py-2.5">
-          <Search className="h-4 w-4 text-muted-foreground" />
-          <input
-            value={q}
-            onChange={(e) => onQ(e.target.value)}
-            placeholder="Search gyms by name, handle, city"
-            className="flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
-          />
-        </div>
-        <Link
-          to="/orgs/create"
-          className="grid h-11 w-11 place-items-center rounded-full bg-lime-gradient text-primary-foreground glow-lime"
-          aria-label="Create a gym or organization"
-        >
-          <Plus className="h-5 w-5" strokeWidth={2.5} />
-        </Link>
-      </div>
+      <FilterBar
+        q={q}
+        onQChange={onQ}
+        searchPlaceholder="Search gyms by name, handle, city"
+        create={{ to: "/orgs/create", label: "Create a gym or organization" }}
+        sheetTitle="Filter gyms"
+        sheet={
+          <div className="text-sm text-muted-foreground">
+            More gym filters coming soon.
+          </div>
+        }
+      />
+
 
       {isLoading ? (
         <div className="rounded-2xl border border-border bg-surface p-8 text-center text-sm text-muted-foreground">

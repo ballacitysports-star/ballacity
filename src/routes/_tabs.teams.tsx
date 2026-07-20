@@ -1,7 +1,7 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { motion } from "framer-motion";
-import { Search, Plus, Megaphone, ArrowUpDown, MapPin, SlidersHorizontal } from "lucide-react";
+import { Megaphone, MapPin } from "lucide-react";
 import { zodValidator, fallback } from "@tanstack/zod-adapter";
 import { z } from "zod";
 import { type Sport } from "@/lib/sample-data";
@@ -10,6 +10,8 @@ import { OrgCard } from "@/components/OrgCard";
 import { SportChips } from "@/components/SportChips";
 import { ViewDensityToggle, type ViewMode, type Density } from "@/components/ViewDensityToggle";
 import { TeamsMapView } from "@/components/TeamsMapView";
+import { FilterBar } from "@/components/FilterBar";
+import { FilterSection, ChipRow } from "@/components/FilterSheet";
 import { useMyProfile } from "@/lib/user-prefs-store";
 import { useAuth } from "@/hooks/use-auth";
 
@@ -96,7 +98,6 @@ function TeamsPage() {
   const setSport = (v: Sport | null) => updateSearch({ sport: v ?? "" });
   const setSortBy = (v: SortBy) => updateSearch({ sort: v });
   const setAvail = (v: "any" | "recruiting" | "weekly" | "casual") => updateSearch({ avail: v });
-  const [filtersOpen, setFiltersOpen] = useState(false);
   const switchView = (v: ViewMode) => updateSearch({ view: v });
   const switchDensity = (d: Density) => updateSearch({ density: d });
 
@@ -228,95 +229,65 @@ function TeamsPage() {
         onDensityChange={switchDensity}
       />
 
-      <div className="flex gap-2 mb-4">
-        <div className="flex-1 flex items-center gap-2 rounded-full border border-border bg-surface px-4 py-2.5">
-          <Search className="h-4 w-4 text-muted-foreground" />
-          <input
-            value={q}
-            onChange={(e) => setQ(e.target.value)}
-            placeholder="Search teams, sport, city"
-            className="flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
+      {(() => {
+        const activeFilterCount =
+          (sport ? 1 : 0) + (avail !== "any" ? 1 : 0) + (sortBy !== "nearest" ? 1 : 0);
+        return (
+          <FilterBar
+            q={q}
+            onQChange={setQ}
+            searchPlaceholder="Search teams, sport, city"
+            activeFilterCount={activeFilterCount}
+            create={{ to: "/teams/create", label: "Create team" }}
+            sheetTitle="Filter teams"
+            onReset={() =>
+              updateSearch({ sport: "", avail: "any", sort: "nearest" })
+            }
+            resetDisabled={activeFilterCount === 0}
+            sheet={
+              <>
+                <FilterSection label="Sport">
+                  <SportChips
+                    selected={sport}
+                    onSelect={(s) => setSport(s as Sport | null)}
+                  />
+                </FilterSection>
+                <FilterSection label="Availability">
+                  <ChipRow
+                    value={avail}
+                    onChange={setAvail}
+                    options={[
+                      { value: "any", label: "Any" },
+                      { value: "recruiting", label: "Recruiting" },
+                      { value: "weekly", label: "Weekly+" },
+                      { value: "casual", label: "Casual" },
+                    ]}
+                  />
+                </FilterSection>
+                <FilterSection label="Sort">
+                  <ChipRow
+                    value={sortBy}
+                    onChange={setSortBy}
+                    options={[
+                      { value: "nearest", label: "Nearest" },
+                      { value: "followers", label: "Most followers" },
+                      { value: "name", label: "Name A–Z" },
+                    ]}
+                  />
+                </FilterSection>
+              </>
+            }
           />
-        </div>
-        {(() => {
-          const activeFilterCount = (sport ? 1 : 0) + (avail !== "any" ? 1 : 0);
-          return (
-            <button
-              onClick={() => setFiltersOpen((v) => !v)}
-              className={`relative grid h-11 w-11 place-items-center rounded-full border bg-surface ${activeFilterCount ? "border-lime" : "border-border"}`}
-              aria-label="Filters"
-              aria-expanded={filtersOpen}
-            >
-              <SlidersHorizontal className="h-4 w-4" />
-              {activeFilterCount > 0 && (
-                <span className="absolute -top-1 -right-1 grid h-4 w-4 place-items-center rounded-full bg-lime text-[10px] font-bold text-primary-foreground">
-                  {activeFilterCount}
-                </span>
-              )}
-            </button>
-          );
-        })()}
-        <Link
-          to="/teams/create"
-          className="grid h-11 w-11 place-items-center rounded-full bg-lime-gradient text-primary-foreground glow-lime"
-          aria-label="Create team"
-        >
-          <Plus className="h-5 w-5" strokeWidth={2.5} />
-        </Link>
-      </div>
+        );
+      })()}
 
-      {filtersOpen && (
-        <>
-          <div className="mb-3">
-            <SportChips selected={sport} onSelect={(s) => setSport(s as Sport | null)} />
-          </div>
-
-          <div className="-mx-4 overflow-x-auto px-4 mb-4">
-            <div className="flex gap-2 pb-1">
-              {([
-                { id: "any", label: "Any availability" },
-                { id: "recruiting", label: "Recruiting" },
-                { id: "weekly", label: "Weekly+" },
-                { id: "casual", label: "Casual" },
-              ] as const).map((a) => {
-                const active = avail === a.id;
-                return (
-                  <button
-                    key={a.id}
-                    onClick={() => setAvail(a.id)}
-                    className={`whitespace-nowrap rounded-full border px-3.5 py-1.5 text-xs font-semibold transition-colors ${
-                      active
-                        ? "border-lime bg-lime text-primary-foreground"
-                        : "border-border bg-surface text-muted-foreground"
-                    }`}
-                  >
-                    {a.label}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-        </>
-      )}
-
-      <div className="mb-4 flex items-center justify-between gap-2">
-        <span className="text-xs text-muted-foreground">
+      <div className="mb-4 flex items-center justify-between gap-2 text-xs text-muted-foreground">
+        <span>
           {list.length} {list.length === 1 ? "result" : "results"}
         </span>
-        <label className="inline-flex items-center gap-2 rounded-full border border-border bg-surface px-3 py-1.5 text-xs font-semibold">
-          <ArrowUpDown className="h-3.5 w-3.5 text-muted-foreground" />
-          <select
-            value={sortBy}
-            onChange={(e) => setSortBy(e.target.value as SortBy)}
-            className="bg-transparent outline-none"
-            aria-label="Sort teams"
-          >
-            <option value="nearest">Nearest</option>
-            <option value="followers">Most followers</option>
-            <option value="name">Name A–Z</option>
-          </select>
-        </label>
+        <span>Sorted by {sortBy === "nearest" ? "nearest" : sortBy === "followers" ? "followers" : "name"}</span>
       </div>
+
 
       {viewMode === "map" ? (
         <TeamsMapView orgs={list.map((x) => x.o)} kind="team" />

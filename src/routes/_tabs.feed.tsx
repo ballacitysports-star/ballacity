@@ -1,8 +1,7 @@
 import { createFileRoute, Link, useNavigate, useRouter } from "@tanstack/react-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { createPortal } from "react-dom";
 import { Loader2, RefreshCw } from "lucide-react";
-import { Search, SlidersHorizontal, Bell, MessageCircle, X, MapPin, Plus } from "lucide-react";
+import { Bell, MessageCircle, MapPin } from "lucide-react";
 import { ViewDensityToggle } from "@/components/ViewDensityToggle";
 import { PlayMapView } from "@/components/PlayMapView";
 import { useUnreadNotificationCount } from "@/lib/notifications";
@@ -12,13 +11,15 @@ import { SportChips } from "@/components/SportChips";
 import { GameCard } from "@/components/GameCard";
 import { GameListRow } from "@/components/GameListRow";
 import { GameCardSkeleton, GameListRowSkeleton } from "@/components/GameCardSkeleton";
+import { FilterBar } from "@/components/FilterBar";
+import { FilterSection } from "@/components/FilterSheet";
 import { GAMES, SPORTS, POSITIONS_BY_SPORT, type Sport } from "@/lib/sample-data";
 import { useHostedGames } from "@/lib/hosted-games-store";
 import { useJoinedGameIds } from "@/lib/games-store";
 import { useFeedPrefs, setFeedPrefs, DEFAULT_PREFS, useMyProfile } from "@/lib/user-prefs-store";
 import { miToKm } from "@/lib/distance";
 import { clearScrollRestore, useScrollRestore } from "@/hooks/use-scroll-restore";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion } from "framer-motion";
 import { zodValidator, fallback } from "@tanstack/zod-adapter";
 import { z } from "zod";
 
@@ -52,7 +53,7 @@ function Feed() {
   const search = Route.useSearch();
   const navigate = useNavigate({ from: "/feed" });
   const [q, setQ] = useState(search.q ?? "");
-  const [filtersOpen, setFiltersOpen] = useState(false);
+  
   const [viewMode, setViewMode] = useState<"list" | "map">(() => {
     if (search.view === "list" || search.view === "map") return search.view;
     if (typeof window === "undefined") return "list";
@@ -437,42 +438,26 @@ function Feed() {
         <PlayMapView />
       ) : (
       <>
-      <div className="flex gap-2 mb-4 relative">
-        <div className="flex-1 flex items-center gap-2 rounded-full border border-border bg-surface px-4 py-2.5">
-          <Search className="h-4 w-4 text-muted-foreground" />
-          <input
-            value={q}
-            onChange={(e) => setQ(e.target.value)}
-            placeholder="Search games, courts, players"
-            className="flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
-          />
-          {q && (
-            <button onClick={() => setQ("")} aria-label="Clear search">
-              <X className="h-4 w-4 text-muted-foreground" />
-            </button>
-          )}
-        </div>
-        <button
-          onClick={() => setFiltersOpen(true)}
-          className={`relative grid h-11 w-11 place-items-center rounded-full border bg-surface ${activeFilterCount ? "border-lime" : "border-border"}`}
-          aria-label="Filters"
-        >
-          <SlidersHorizontal className="h-4 w-4" />
-          {activeFilterCount > 0 && (
-            <span className="absolute -top-1 -right-1 grid h-4 w-4 place-items-center rounded-full bg-lime text-[10px] font-bold text-primary-foreground">
-              {activeFilterCount}
-            </span>
-          )}
-        </button>
-        <Link
-          to="/create"
-          className="grid h-11 w-11 place-items-center rounded-full bg-lime-gradient text-primary-foreground glow-lime"
-          aria-label="Create game"
-        >
-          <Plus className="h-5 w-5" strokeWidth={2.5} />
-        </Link>
+      <div className="relative mb-4">
+        <FilterBar
+          q={q}
+          onQChange={setQ}
+          searchPlaceholder="Search games, courts, players"
+          activeFilterCount={activeFilterCount}
+          create={{ to: "/create", label: "Create game" }}
+          sheetTitle="Feed filters"
+          sheet={<FeedFilterBody />}
+          onReset={() =>
+            setFeedPrefs({
+              ...prefs,
+              preferredSports: [],
+              sections: DEFAULT_PREFS.sections,
+              maxDistanceMi: null,
+            })
+          }
+        />
         {q && suggestions.length > 0 && (
-          <div className="absolute left-0 right-14 top-full mt-2 z-20 rounded-2xl border border-border bg-surface shadow-lg overflow-hidden">
+          <div className="absolute left-0 right-14 top-full mt-1 z-20 rounded-2xl border border-border bg-surface shadow-lg overflow-hidden">
             {suggestions.map((s, idx) => (
               <button
                 key={`${s.label}-${idx}`}
@@ -486,6 +471,7 @@ function Feed() {
           </div>
         )}
       </div>
+
 
       <div className="mb-5">
         <SportChips selected={chipSport} onSelect={setChipSport} />
@@ -585,14 +571,6 @@ function Feed() {
       </>
       )}
 
-
-      {typeof document !== "undefined" &&
-        createPortal(
-          <AnimatePresence>
-            {filtersOpen && <FilterSheet onClose={() => setFiltersOpen(false)} />}
-          </AnimatePresence>,
-          document.body,
-        )}
     </div>
   );
 }
@@ -665,7 +643,7 @@ function BellLink() {
   );
 }
 
-function FilterSheet({ onClose }: { onClose: () => void }) {
+function FeedFilterBody() {
   const prefs = useFeedPrefs();
   const profile = useMyProfile();
   const hasCity = Boolean(profile?.city?.trim());
@@ -691,44 +669,10 @@ function FilterSheet({ onClose }: { onClose: () => void }) {
   const setUnit = (u: "mi" | "km") => setFeedPrefs({ ...prefs, distanceUnit: u });
   const setMaxMi = (mi: number | null) => setFeedPrefs({ ...prefs, maxDistanceMi: mi });
 
-  const reset = () =>
-    setFeedPrefs({
-      ...prefs,
-      preferredSports: [],
-      sections: DEFAULT_PREFS.sections,
-      maxDistanceMi: null,
-    });
-
   return (
-    <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-      className="fixed inset-0 z-50 bg-background/70 backdrop-blur flex items-end justify-center"
-      onClick={onClose}
-    >
-      <motion.div
-        initial={{ y: "100%" }}
-        animate={{ y: 0 }}
-        exit={{ y: "100%" }}
-        transition={{ type: "spring", stiffness: 280, damping: 30 }}
-        onClick={(e) => e.stopPropagation()}
-        className="w-full max-w-md rounded-t-3xl border-t border-border bg-background p-5 max-h-[85vh] overflow-y-auto pb-10"
-      >
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="font-display text-lg font-bold">Feed filters</h2>
-          <button
-            onClick={onClose}
-            className="grid h-9 w-9 place-items-center rounded-full border border-border"
-          >
-            <X className="h-4 w-4" />
-          </button>
-        </div>
-
-        <div className="text-xs font-semibold text-muted-foreground mb-2 uppercase tracking-wider">
-          Sort by
-        </div>
-        <div className="flex gap-2 mb-5">
+    <>
+      <FilterSection label="Sort by">
+        <div className="flex flex-wrap gap-2">
           {(["nearest", "soonest"] as const).map((s) => {
             const active = prefs.sortBy === s;
             return (
@@ -742,11 +686,10 @@ function FilterSheet({ onClose }: { onClose: () => void }) {
             );
           })}
         </div>
+      </FilterSection>
 
-        <div className="text-xs font-semibold text-muted-foreground mb-2 uppercase tracking-wider">
-          Sport (Games)
-        </div>
-        <div className="flex flex-wrap gap-2 mb-5">
+      <FilterSection label="Sport (Games)">
+        <div className="flex flex-wrap gap-2">
           {SPORTS.map((s) => {
             const active = preferredSports.includes(s.name);
             return (
@@ -761,28 +704,34 @@ function FilterSheet({ onClose }: { onClose: () => void }) {
             );
           })}
         </div>
+      </FilterSection>
 
-        <div className="text-xs font-semibold text-muted-foreground mb-2 uppercase tracking-wider flex items-center justify-between">
-          <span>
-            Distance from you
-            {hasCity && profile?.city ? (
-              <span className="ml-2 normal-case tracking-normal text-muted-foreground/80">
-                · {profile.city}
-              </span>
-            ) : null}
+      <FilterSection
+        label={
+          <span className="flex items-center justify-between">
+            <span>
+              Distance from you
+              {hasCity && profile?.city ? (
+                <span className="ml-2 normal-case tracking-normal text-muted-foreground/80">
+                  · {profile.city}
+                </span>
+              ) : null}
+            </span>
+            <span className="inline-flex rounded-full border border-border bg-surface p-0.5">
+              {(["mi", "km"] as const).map((u) => (
+                <button
+                  key={u}
+                  onClick={() => setUnit(u)}
+                  className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase ${unit === u ? "bg-lime text-primary-foreground" : "text-muted-foreground"}`}
+                >
+                  {u}
+                </button>
+              ))}
+            </span>
           </span>
-          <span className="inline-flex rounded-full border border-border bg-surface p-0.5">
-            {(["mi", "km"] as const).map((u) => (
-              <button
-                key={u}
-                onClick={() => setUnit(u)}
-                className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase ${unit === u ? "bg-lime text-primary-foreground" : "text-muted-foreground"}`}
-              >
-                {u}
-              </button>
-            ))}
-          </span>
-        </div>
+        }
+      >
+
         {!hasCity && (
           <p className="text-xs text-muted-foreground mb-2">
             <Link to="/profile/edit" className="text-lime font-semibold">
@@ -791,7 +740,7 @@ function FilterSheet({ onClose }: { onClose: () => void }) {
             to filter by distance.
           </p>
         )}
-        <div className={`flex flex-wrap gap-2 mb-5 ${hasCity ? "" : "opacity-50 pointer-events-none"}`}>
+        <div className={`flex flex-wrap gap-2 ${hasCity ? "" : "opacity-50 pointer-events-none"}`}>
           <button
             onClick={() => setMaxMi(null)}
             className={`rounded-full border px-3 py-1.5 text-xs font-semibold ${prefs.maxDistanceMi == null ? "border-lime bg-lime text-primary-foreground" : "border-border bg-surface"}`}
@@ -812,11 +761,10 @@ function FilterSheet({ onClose }: { onClose: () => void }) {
             );
           })}
         </div>
+      </FilterSection>
 
-        <div className="text-xs font-semibold text-muted-foreground mb-2 uppercase tracking-wider">
-          Sections
-        </div>
-        <div className="space-y-2 mb-5">
+      <FilterSection label="Sections">
+        <div className="space-y-2">
           {(
             [
               ["showUrgent", "Needs players now"],
@@ -843,22 +791,8 @@ function FilterSheet({ onClose }: { onClose: () => void }) {
             </button>
           ))}
         </div>
-
-        <div className="flex gap-2">
-          <button
-            onClick={reset}
-            className="flex-1 rounded-full border border-border py-3 text-sm font-bold"
-          >
-            Reset
-          </button>
-          <button
-            onClick={onClose}
-            className="flex-1 rounded-full bg-lime-gradient py-3 text-sm font-bold text-primary-foreground"
-          >
-            Done
-          </button>
-        </div>
-      </motion.div>
-    </motion.div>
+      </FilterSection>
+    </>
   );
 }
+
