@@ -23,9 +23,22 @@ export function usePersistedSearch<T extends Record<string, unknown>>(
   storageKey: string,
   search: T,
   navigatePath: string,
-  defaults: T,
+  defaults: Partial<T>,
 ) {
   const navigate = useNavigate({ from: navigatePath as never });
+  const hydratedRef = useRef(false);
+
+  const isAtDefaults = (obj: Record<string, unknown>) => {
+    const d = defaults as Record<string, unknown>;
+    for (const k of Object.keys(d)) {
+      const a = obj[k];
+      const b = d[k];
+      if (a === b) continue;
+      if (a == null && b == null) continue;
+      return false;
+    }
+    return true;
+  };
   const hydratedRef = useRef(false);
 
   const isAtDefaults = (obj: Record<string, unknown>) => {
