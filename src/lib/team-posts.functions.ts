@@ -54,19 +54,20 @@ export const createTeamPost = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input) => CreateInput.parse(input))
   .handler(async ({ data, context }) => {
-    // Verify ownership via RLS-scoped client
-    const { data: team, error: teamErr } = await context.supabase
-      .from("teams")
-      .select("id, owner_id")
-      .eq("id", data.teamId)
-      .maybeSingle();
-    if (teamErr) throw new Error(teamErr.message);
-    if (!team || team.owner_id !== context.userId) {
-      throw new Error("Only the owner can post to this profile.");
-    }
     const { data: row, error } = await context.supabase
       .from("team_posts" as any)
       .insert({
+        team_id: data.teamId,
+        author_id: context.userId,
+        kind: data.kind,
+        title: data.title,
+        body: data.body ?? "",
+        event_date: data.eventDate ?? null,
+        location: data.location ?? null,
+        price: data.price ?? null,
+        spots_max: data.spotsMax ?? null,
+        pinned: data.pinned ?? false,
+      } as any)
         team_id: data.teamId,
         author_id: context.userId,
         kind: data.kind,
