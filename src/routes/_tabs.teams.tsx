@@ -1,7 +1,7 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { motion } from "framer-motion";
-import { Search, Plus, Megaphone, ArrowUpDown, MapPin, SlidersHorizontal } from "lucide-react";
+import { Megaphone, MapPin } from "lucide-react";
 import { zodValidator, fallback } from "@tanstack/zod-adapter";
 import { z } from "zod";
 import { type Sport } from "@/lib/sample-data";
@@ -10,6 +10,8 @@ import { OrgCard } from "@/components/OrgCard";
 import { SportChips } from "@/components/SportChips";
 import { ViewDensityToggle, type ViewMode, type Density } from "@/components/ViewDensityToggle";
 import { TeamsMapView } from "@/components/TeamsMapView";
+import { FilterBar } from "@/components/FilterBar";
+import { FilterSection, ChipRow } from "@/components/FilterSheet";
 import { useMyProfile } from "@/lib/user-prefs-store";
 import { useAuth } from "@/hooks/use-auth";
 
