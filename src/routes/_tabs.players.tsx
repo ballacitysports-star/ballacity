@@ -480,33 +480,6 @@ function PlayersPage() {
         />
       )}
 
-      <AnimatePresence>
-        {filtersOpen && (
-          <PlayersFilterSheet
-            sport={sport}
-            setSport={setSport}
-            skill={skill}
-            setSkill={setSkill}
-            maxDistance={maxDistance}
-            setMaxDistance={setMaxDistance}
-            ageMin={ageMin}
-            setAgeMin={setAgeMin}
-            ageMax={ageMax}
-            setAgeMax={setAgeMax}
-            includeUnknownAge={includeUnknownAge}
-            setIncludeUnknownAge={setIncludeUnknownAge}
-            onClose={() => setFiltersOpen(false)}
-            onReset={() => {
-              setSport("");
-              setSkill("");
-              setMaxDistance(0);
-              setAgeMin("");
-              setAgeMax("");
-              setIncludeUnknownAge(true);
-            }}
-          />
-        )}
-      </AnimatePresence>
     </div>
   );
 }
