@@ -481,8 +481,8 @@ function Feed() {
 
 
       <div className="mb-5">
-        <SportChips selected={chipSport} onSelect={setChipSport} />
-        {chipSport && POSITIONS_BY_SPORT[chipSport as Sport]?.length > 0 && (
+        <SportChips selected={chipSelected} onSelect={setChipSport} />
+        {chipSelected.length === 1 && POSITIONS_BY_SPORT[chipSelected[0] as Sport]?.length > 0 && (
           <div className="mt-2 flex gap-2 overflow-x-auto scrollbar-hide -mx-4 px-4 pb-1">
             <button
               onClick={() => setPositionFilter(null)}
@@ -494,7 +494,7 @@ function Feed() {
             >
               Any position
             </button>
-            {POSITIONS_BY_SPORT[chipSport as Sport].map((p) => {
+            {POSITIONS_BY_SPORT[chipSelected[0] as Sport].map((p) => {
               const active = positionFilter === p;
               return (
                 <button
