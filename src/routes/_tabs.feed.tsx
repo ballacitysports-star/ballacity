@@ -161,12 +161,19 @@ function Feed() {
     return hay.includes(userCityToken);
   };
 
-  // Quick chip = single-sport shortcut for preferredSports.
-  // null/empty = All sports. Multi-select still possible via the filter sheet.
-  const chipSport: string | null =
-    prefs.preferredSports.length === 1 ? prefs.preferredSports[0] : null;
+  // Chip row mirrors the multi-select made in the filter sheet. Tapping a
+  // chip toggles that sport in/out of preferredSports; "All sports" clears.
+  const chipSelected: string[] = prefs.preferredSports;
   const setChipSport = (s: string | null) => {
-    setFeedPrefs({ ...prefs, preferredSports: s ? [s as Sport] : [] });
+    if (s === null) {
+      setFeedPrefs({ ...prefs, preferredSports: [] });
+    } else {
+      const has = prefs.preferredSports.includes(s as Sport);
+      const next = has
+        ? prefs.preferredSports.filter((x) => x !== s)
+        : [...prefs.preferredSports, s as Sport];
+      setFeedPrefs({ ...prefs, preferredSports: next });
+    }
     setPositionFilter(null);
   };
 
