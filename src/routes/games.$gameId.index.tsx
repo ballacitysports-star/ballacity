@@ -2466,7 +2466,13 @@ function EditGameModal({
         image: finalImage,
         description,
         positionsNeeded: positionsCleanup(positionsNeeded),
-      }).catch((err: any) => {
+        ...(hasStarted
+          ? {}
+          : {
+              teamId: selectedAff?.source === "team" ? selectedAff.id : null,
+              orgId: selectedAff?.source === "org" ? selectedAff.id : null,
+            }),
+      } as Partial<Game>).catch((err: any) => {
         toast.error(err?.message ?? "Couldn't save changes.");
         return undefined;
       });
