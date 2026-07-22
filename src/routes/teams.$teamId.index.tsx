@@ -372,7 +372,7 @@ function TeamPage() {
               {!postsQuery.isLoading &&
                 posts.map((p, i) => (
                   <div key={p.id} className="relative">
-                    <PostCard post={p} index={i} />
+                    <PostCard post={p} index={i} onClick={() => setOpenPost(p)} />
                     {canEdit && (
                       <button
                         onClick={() => {
