@@ -4,6 +4,7 @@ import { POST_KIND_META, type OrgPost } from "@/lib/sample-data";
 import { formatWhen } from "@/lib/format";
 import { Link } from "@tanstack/react-router";
 import { toast } from "sonner";
+import { PostEngagement } from "@/components/PostEngagement";
 
 export type PostDetailsTeam = {
   id: string;
