@@ -20,6 +20,8 @@ import {
 import { ORGS, GAMES, POST_KIND_META, type PostKind, type Org, type OrgPost } from "@/lib/sample-data";
 import { isMyOrg, ensureOrgById } from "@/lib/org-store";
 import { PostCard } from "@/components/PostCard";
+import { PostDetailsDialog } from "@/components/PostDetailsDialog";
+
 import { GameCard } from "@/components/GameCard";
 import { ReviewsSection } from "@/components/ReviewsSection";
 import { computeReputation, useReviewsFor } from "@/lib/reviews";
