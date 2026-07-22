@@ -179,6 +179,7 @@ export function EditOrgScreen({ org }: { org: Org }) {
   // Org / Gym attachment (coach-only)
   const [orgChoice, setOrgChoice] = useState<OrgChoice>({ mode: null });
   const [initialOrgId, setInitialOrgId] = useState<string | null>(null);
+  const queryClient = useQueryClient();
   const [orgSearch, setOrgSearch] = useState("");
   const listOrgs = useServerFn(listTrainerOrgs);
   const getMembership = useServerFn(getTrainerOrgForTrainer);
