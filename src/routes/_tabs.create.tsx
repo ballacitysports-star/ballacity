@@ -214,7 +214,7 @@ function Create() {
   }
 
   // Gate: must have at least one team/club before hosting.
-  if (myTeamsQuery.isLoading) {
+  if (affiliationsLoading) {
     return (
       <div className="mx-auto w-full max-w-md sm:max-w-2xl lg:max-w-4xl px-4 pt-6">
         <div className="h-8 w-40 bg-surface rounded-lg animate-pulse mb-4" />
@@ -223,7 +223,7 @@ function Create() {
     );
   }
 
-  if (myTeams.length === 0) {
+  if (affiliations.length === 0) {
     return (
       <div className="mx-auto w-full max-w-md sm:max-w-2xl lg:max-w-4xl px-4 pt-6">
         <div className="flex items-center gap-3 mb-5">
@@ -248,7 +248,7 @@ function Create() {
               Create a team
             </Link>
             <Link
-              to="/trainers/create"
+              to="/orgs/create"
               className="rounded-2xl border border-border bg-background py-3 font-bold"
             >
               Create a club / gym
@@ -258,6 +258,7 @@ function Create() {
       </div>
     );
   }
+
 
   return (
     <div className="mx-auto w-full max-w-md sm:max-w-2xl lg:max-w-4xl px-4 pt-6">
