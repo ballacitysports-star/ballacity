@@ -282,7 +282,7 @@ function Create() {
             nav({ to: "/auth", search: { redirect: "/create" } as any });
             return;
           }
-          if (!selectedTeamId) {
+          if (!selectedAffiliation) {
             toast.error("Pick which team or club you're hosting as");
             hostAsRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
             hostAsRef.current?.querySelector<HTMLButtonElement>("button")?.focus();
