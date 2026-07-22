@@ -251,7 +251,12 @@ function Create() {
             nav({ to: "/auth", search: { redirect: "/create" } as any });
             return;
           }
+          if (!selectedTeamId) {
+            toast.error("Pick which team or club you're hosting as");
+            return;
+          }
           setPublishing(true);
+
           try {
             // Compute one or many ISO datetimes.
             let dates: string[];
