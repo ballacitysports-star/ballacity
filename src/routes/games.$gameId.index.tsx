@@ -76,6 +76,7 @@ import { useMyFlowStatus } from "@/lib/game-flow-status";
 import { PlayerFlowPill } from "@/components/PlayerFlowPill";
 import { PaymentRequiredBanner } from "@/components/PaymentRequiredBanner";
 import { HostPaymentsPanel, PlayerPaymentsPanel } from "@/components/GamePaymentsPanel";
+import { PostEngagement } from "@/components/PostEngagement";
 
 import { useHostedGames, fetchHostedGame, updateHostedGame, deleteHostedGame } from "@/lib/hosted-games-store";
 import type { Game } from "@/lib/sample-data";
@@ -1467,6 +1468,16 @@ function GameDetail() {
             </div>
           )}
         </div>
+
+        {/* Discussion */}
+        <div>
+          <h2 className="font-display text-sm font-bold uppercase tracking-wider text-muted-foreground mb-2">
+            Discussion
+          </h2>
+          <PostEngagement subjectType="game" subjectId={game.id} />
+        </div>
+
+
 
         {/* Payment settings summary */}
         {(settings?.payment_deadline || settings?.refund_policy || settings?.payment_instructions) && (
