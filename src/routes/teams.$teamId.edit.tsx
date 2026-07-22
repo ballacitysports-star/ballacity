@@ -29,7 +29,7 @@ import { VenueMapPreview } from "@/components/VenueMapPreview";
 import { ImageUploader } from "@/components/ImageUploader";
 import { useAuth } from "@/hooks/use-auth";
 import { SESSION_TYPES } from "@/lib/sport-config";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import {
   listTrainerOrgs,
