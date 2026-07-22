@@ -183,6 +183,52 @@ function Create() {
     );
   }
 
+  // Gate: must have at least one team/club before hosting.
+  if (myTeamsQuery.isLoading) {
+    return (
+      <div className="mx-auto w-full max-w-md sm:max-w-2xl lg:max-w-4xl px-4 pt-6">
+        <div className="h-8 w-40 bg-surface rounded-lg animate-pulse mb-4" />
+        <div className="h-32 bg-surface rounded-2xl animate-pulse" />
+      </div>
+    );
+  }
+
+  if (myTeams.length === 0) {
+    return (
+      <div className="mx-auto w-full max-w-md sm:max-w-2xl lg:max-w-4xl px-4 pt-6">
+        <div className="flex items-center gap-3 mb-5">
+          <Link to="/feed" className="grid h-10 w-10 place-items-center rounded-full border border-border bg-surface">
+            <ArrowLeft className="h-5 w-5" />
+          </Link>
+          <h1 className="font-display text-2xl font-bold">Host a game</h1>
+        </div>
+        <div className="rounded-2xl border border-border bg-surface p-6 text-center space-y-4">
+          <ShieldCheck className="h-8 w-8 mx-auto text-lime" />
+          <div>
+            <h2 className="font-display text-lg font-bold">Create a team or club first</h2>
+            <p className="text-sm text-muted-foreground mt-1">
+              Games are hosted under a team or club so players know who they're joining.
+            </p>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            <Link
+              to="/teams/create"
+              className="rounded-2xl bg-lime-gradient py-3 font-bold text-primary-foreground glow-lime"
+            >
+              Create a team
+            </Link>
+            <Link
+              to="/trainers/create"
+              className="rounded-2xl border border-border bg-background py-3 font-bold"
+            >
+              Create a club / gym
+            </Link>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="mx-auto w-full max-w-md sm:max-w-2xl lg:max-w-4xl px-4 pt-6">
       <div className="flex items-center gap-3 mb-5">
@@ -194,6 +240,7 @@ function Create() {
         </Link>
         <h1 className="font-display text-2xl font-bold">Host a game</h1>
       </div>
+
 
       <form
         onSubmit={async (e) => {
