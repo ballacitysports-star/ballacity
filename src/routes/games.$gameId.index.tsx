@@ -80,6 +80,11 @@ import { HostPaymentsPanel, PlayerPaymentsPanel } from "@/components/GamePayment
 import { useHostedGames, fetchHostedGame, updateHostedGame, deleteHostedGame } from "@/lib/hosted-games-store";
 import type { Game } from "@/lib/sample-data";
 import { PositionsPicker, positionsCleanup } from "@/components/PositionsPicker";
+import { listMyTeams } from "@/lib/teams.functions";
+import { listMyOrgs } from "@/lib/trainer-orgs.functions";
+import { useServerFn } from "@tanstack/react-start";
+import { useQuery } from "@tanstack/react-query";
+import { computeLiveStatus } from "@/lib/live-status";
 
 import { useAuth } from "@/hooks/use-auth";
 import { useMyProfile } from "@/lib/user-prefs-store";
@@ -2383,6 +2388,44 @@ function EditGameModal({
   const [saving, setSaving] = useState(false);
   const coverInputRef = useRef<HTMLInputElement>(null);
 
+  // Host-as (team/gym) — only editable before the game starts.
+  const hasStarted = computeLiveStatus(game) !== "scheduled";
+  const fetchMyTeams = useServerFn(listMyTeams);
+  const fetchMyOrgs = useServerFn(listMyOrgs);
+  const myTeamsQuery = useQuery({
+    queryKey: ["my-teams", user?.id ?? "anon"],
+    queryFn: () => fetchMyTeams(),
+    enabled: !!user && !hasStarted,
+    staleTime: 30_000,
+  });
+  const myOrgsQuery = useQuery({
+    queryKey: ["my-orgs", user?.id ?? "anon"],
+    queryFn: () => fetchMyOrgs(),
+    enabled: !!user && !hasStarted,
+    staleTime: 30_000,
+  });
+  type EditAffiliation = { source: "team" | "org"; id: string; name: string; kind?: "team" | "coach" };
+  const editAffiliations: EditAffiliation[] = [
+    ...(myTeamsQuery.data ?? []).map((t) => ({ source: "team" as const, id: t.id, name: t.name, kind: t.kind })),
+    ...(myOrgsQuery.data ?? []).map((o) => ({ source: "org" as const, id: o.id, name: o.name })),
+  ];
+  const affLabel = (a: EditAffiliation) =>
+    a.source === "org" ? "Gym" : a.kind === "coach" ? "Trainer" : "Team";
+  const initialAff: EditAffiliation | null = game.teamId
+    ? { source: "team", id: game.teamId, name: "", kind: "team" }
+    : game.orgId
+      ? { source: "org", id: game.orgId, name: "" }
+      : null;
+  const [selectedAff, setSelectedAff] = useState<EditAffiliation | null>(initialAff);
+  useEffect(() => {
+    if (!selectedAff) return;
+    const match = editAffiliations.find(
+      (a) => a.source === selectedAff.source && a.id === selectedAff.id,
+    );
+    if (match && match.name && !selectedAff.name) setSelectedAff(match);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editAffiliations.length]);
+
   useEffect(() => {
     let cancel = false;
     (async () => {
@@ -2423,7 +2466,13 @@ function EditGameModal({
         image: finalImage,
         description,
         positionsNeeded: positionsCleanup(positionsNeeded),
-      }).catch((err: any) => {
+        ...(hasStarted
+          ? {}
+          : {
+              teamId: selectedAff?.source === "team" ? selectedAff.id : null,
+              orgId: selectedAff?.source === "org" ? selectedAff.id : null,
+            }),
+      } as Partial<Game>).catch((err: any) => {
         toast.error(err?.message ?? "Couldn't save changes.");
         return undefined;
       });
@@ -2472,6 +2521,46 @@ function EditGameModal({
           </button>
         </div>
         <div className="mt-3 space-y-4">
+          {/* Host as (team/gym) — locked once the game starts */}
+          <Field label={hasStarted ? "Host as (locked — game has started)" : "Host as"}>
+            {hasStarted ? (
+              <div className="rounded-xl border border-border bg-background px-3 py-2 text-sm text-muted-foreground">
+                {game.teamId ? "Team" : game.orgId ? "Gym" : "Personal"} affiliation is locked after
+                the game starts.
+              </div>
+            ) : editAffiliations.length === 0 ? (
+              <div className="rounded-xl border border-border bg-background px-3 py-2 text-sm text-muted-foreground">
+                No teams or gyms available.
+              </div>
+            ) : (
+              <div className="flex gap-2 overflow-x-auto scrollbar-hide -mx-1 px-1">
+                {editAffiliations.map((a) => {
+                  const active = selectedAff?.source === a.source && selectedAff.id === a.id;
+                  return (
+                    <button
+                      type="button"
+                      key={`${a.source}:${a.id}`}
+                      onClick={() => setSelectedAff(a)}
+                      className={`shrink-0 flex items-center gap-2 rounded-full border px-3 py-2 text-sm font-semibold ${
+                        active
+                          ? "border-lime bg-lime/10 text-lime"
+                          : "border-border bg-background text-muted-foreground"
+                      }`}
+                    >
+                      <span className="grid h-6 w-6 place-items-center rounded-full bg-surface text-xs font-bold">
+                        {(a.name || "?").slice(0, 1).toUpperCase()}
+                      </span>
+                      <span className="truncate max-w-[10rem]">{a.name || "Loading…"}</span>
+                      <span className="text-[10px] uppercase tracking-wider opacity-70">
+                        {affLabel(a)}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </Field>
+
           {/* Sport grid */}
           <Field label="Sport">
             <div className="grid grid-cols-3 gap-2">

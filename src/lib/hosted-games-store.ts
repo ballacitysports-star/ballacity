@@ -384,6 +384,14 @@ export async function updateHostedGame(
   if (patch.positionsNeeded !== undefined) {
     dbPatch.positions_needed = patch.positionsNeeded as TablesUpdate<"hosted_games">["positions_needed"];
   }
+  if ((patch as { teamId?: string | null }).teamId !== undefined) {
+    const v = (patch as { teamId?: string | null }).teamId;
+    (dbPatch as TablesUpdate<"hosted_games"> & { team_id?: string | null }).team_id = v ?? null;
+  }
+  if ((patch as { orgId?: string | null }).orgId !== undefined) {
+    const v = (patch as { orgId?: string | null }).orgId;
+    (dbPatch as TablesUpdate<"hosted_games"> & { org_id?: string | null }).org_id = v ?? null;
+  }
   if (Object.keys(dbPatch).length > 0) {
     const { error } = await supabase.from("hosted_games").update(dbPatch).eq("id", id);
     if (error) throw error;
