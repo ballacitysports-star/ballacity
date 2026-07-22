@@ -554,7 +554,7 @@ function Feed() {
               See all
             </Link>
           </div>
-          <div className="flex gap-3 overflow-x-auto scrollbar-hide -mx-4 px-4 pb-1 snap-x">
+          <div className="flex flex-col gap-3">
             {teamPosts.map((p, i) => {
               const orgPost: OrgPost = {
                 id: p.id,
@@ -568,7 +568,7 @@ function Feed() {
                 pinned: p.pinned,
               };
               return (
-                <div key={p.id} className="w-[85%] max-w-sm shrink-0 snap-start">
+                <div key={p.id}>
                   <Link
                     to="/teams/$teamId"
                     params={{ teamId: p.teamId }}
@@ -587,7 +587,7 @@ function Feed() {
               );
             })}
             {teamPostsQuery.hasNextPage && (
-              <div className="flex w-40 shrink-0 items-center justify-center snap-start">
+              <div className="flex justify-center pt-1">
                 <button
                   type="button"
                   onClick={() => teamPostsQuery.fetchNextPage()}
@@ -603,6 +603,7 @@ function Feed() {
                   )}
                 </button>
               </div>
+
             )}
           </div>
         </section>
