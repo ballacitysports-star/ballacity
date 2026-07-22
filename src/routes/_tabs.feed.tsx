@@ -586,7 +586,17 @@ function Feed() {
                       <span className="text-muted-foreground">· {p.teamSports[0]}</span>
                     )}
                   </Link>
-                  <PostCard post={orgPost} index={i} />
+                  <PostCard
+                    post={orgPost}
+                    index={i}
+                    onClick={() =>
+                      setOpenPost({
+                        post: orgPost,
+                        team: { id: p.teamId, name: p.teamName ?? "", sport: p.teamSports?.[0] },
+                      })
+                    }
+                  />
+
                 </div>
               );
             })}
