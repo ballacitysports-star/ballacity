@@ -113,6 +113,17 @@ export function PostEngagement({ subjectType, subjectId }: Props) {
     onError: (e: any) => toast.error(e?.message ?? "Could not delete"),
   });
 
+  const updateMut = useMutation({
+    mutationFn: ({ id, body }: { id: string; body: string }) =>
+      updateCommentFn({ data: { id, body } }),
+    onSuccess: () => {
+      setEditingId(null);
+      setEditBody("");
+      qc.invalidateQueries({ queryKey: commentsKey });
+    },
+    onError: (e: any) => toast.error(e?.message ?? "Could not update"),
+  });
+
   const toggleMut = useMutation({
     mutationFn: (emoji: ReactionEmoji) =>
       toggleReactionFn({ data: { subjectType, subjectId, emoji } }),
