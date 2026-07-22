@@ -26,7 +26,9 @@ import { useServerFn } from "@tanstack/react-start";
 import { useQuery, useInfiniteQuery } from "@tanstack/react-query";
 import { listRecentTeamPosts } from "@/lib/team-posts.functions";
 import { PostCard } from "@/components/PostCard";
+import { PostDetailsDialog, type PostDetailsTeam } from "@/components/PostDetailsDialog";
 import type { OrgPost, PostKind } from "@/lib/sample-data";
+
 
 // URL-persisted feed state. Refreshing or sharing the URL preserves search
 // text, sport chip, sort, distance cap, position, view/density toggles, and
@@ -294,6 +296,8 @@ function Feed() {
   // viewport so tablets/desktops fill their wider grids in one batch.
   const PAGE_SIZE = 12;
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
+  const [openPost, setOpenPost] = useState<{ post: OrgPost; team: PostDetailsTeam | null } | null>(null);
+
   const sentinelRef = useRef<HTMLDivElement | null>(null);
   const filterKey = `${q}|${JSON.stringify(prefs)}|${hosted.length}`;
   // Locks: prevent overlapping refresh and pagination so the same cards
@@ -582,7 +586,17 @@ function Feed() {
                       <span className="text-muted-foreground">· {p.teamSports[0]}</span>
                     )}
                   </Link>
-                  <PostCard post={orgPost} index={i} />
+                  <PostCard
+                    post={orgPost}
+                    index={i}
+                    onClick={() =>
+                      setOpenPost({
+                        post: orgPost,
+                        team: { id: p.teamId, name: p.teamName ?? "", sport: p.teamSports?.[0] },
+                      })
+                    }
+                  />
+
                 </div>
               );
             })}
@@ -674,9 +688,16 @@ function Feed() {
       </>
       )}
 
+      <PostDetailsDialog
+        post={openPost?.post ?? null}
+        team={openPost?.team ?? null}
+        open={!!openPost}
+        onOpenChange={(o) => !o && setOpenPost(null)}
+      />
     </div>
   );
 }
+
 
 function PullIndicator({
   offset,

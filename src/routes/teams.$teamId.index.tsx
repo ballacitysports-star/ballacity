@@ -20,6 +20,8 @@ import {
 import { ORGS, GAMES, POST_KIND_META, type PostKind, type Org, type OrgPost } from "@/lib/sample-data";
 import { isMyOrg, ensureOrgById } from "@/lib/org-store";
 import { PostCard } from "@/components/PostCard";
+import { PostDetailsDialog } from "@/components/PostDetailsDialog";
+
 import { GameCard } from "@/components/GameCard";
 import { ReviewsSection } from "@/components/ReviewsSection";
 import { computeReputation, useReviewsFor } from "@/lib/reviews";
@@ -113,6 +115,8 @@ function TeamPage() {
   const [following, setFollowing] = useState(false);
   const [mounted, setMounted] = useState(false);
   const [composerOpen, setComposerOpen] = useState(false);
+  const [openPost, setOpenPost] = useState<OrgPost | null>(null);
+
   useEffect(() => setMounted(true), []);
   const canEdit = mounted && isMyOrg(org.id);
 
@@ -368,7 +372,7 @@ function TeamPage() {
               {!postsQuery.isLoading &&
                 posts.map((p, i) => (
                   <div key={p.id} className="relative">
-                    <PostCard post={p} index={i} />
+                    <PostCard post={p} index={i} onClick={() => setOpenPost(p)} />
                     {canEdit && (
                       <button
                         onClick={() => {
@@ -535,9 +539,16 @@ function TeamPage() {
           />
         )}
       </div>
+      <PostDetailsDialog
+        post={openPost}
+        team={{ id: org.id, name: org.name, sport: org.sports?.[0] }}
+        open={!!openPost}
+        onOpenChange={(o) => !o && setOpenPost(null)}
+      />
     </div>
   );
 }
+
 
 function Stat({ label, value, icon }: { label: string; value: string; icon: React.ReactNode }) {
   return (
