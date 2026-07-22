@@ -157,6 +157,8 @@ export function PostDetailsDialog({
               <Share2 className="h-4 w-4" /> Share
             </button>
           </div>
+
+          <PostEngagement subjectType="team_post" subjectId={post.id} />
         </div>
       </DialogContent>
     </Dialog>
