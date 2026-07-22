@@ -259,6 +259,7 @@ export type HostedGameInput = {
   image?: string; // optional custom cover URL
   positionsNeeded?: Record<string, number>;
   teamId?: string;
+  orgId?: string;
 
 };
 
