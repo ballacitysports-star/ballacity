@@ -1,41 +1,29 @@
 ## Goal
+Prevent game creation until the host has explicitly picked a team or club when they own more than one. Today the picker exists but nothing is pre-selected in the multi-team case, and the block only fires as a toast after the user taps Publish.
 
-Require every host to be affiliated with at least one team/club before they can create a game. When the host owns multiple teams/clubs, let them pick which one to host under from the Create screen.
+## Behavior changes (in `src/routes/_tabs.create.tsx`)
 
-## Behavior
+1. **Make "Host as" a required, visually obvious first step**
+   - Add a small red "Required" chip next to the "Host as" section title while `selectedTeamId` is null and `myTeams.length > 1`.
+   - Add helper copy under the pill row: "Pick who you're hosting as to continue."
+   - When invalid, outline the section container in `border-destructive/60` so it reads as a required field, not decoration.
 
-1. **Gate the Create screen** (`src/routes/_tabs.create.tsx`)
-   - Fetch the current user's owned teams/clubs (from `public.teams` where `owner_id = user.id`) via a new `listMyTeams` server function.
-   - If the user has **zero** teams/clubs, replace the form with an empty state:
-     - Title: "Create a team or club first"
-     - Body: short explanation ("Games are hosted under a team or club so players know who they're joining.")
-     - Two CTAs: "Create a team" → `/teams/create`, "Create a club/gym" → `/orgs/create` (or `teams.create` with `kind=coach`, matching the existing wizard).
-   - If the user has **one** team/club, auto-select it (show a small read-only chip: "Hosting as: {name}") and let them submit normally.
-   - If the user has **multiple**, add a required "Host as" selector at the top of the form (below the header) rendered as a horizontal pill list of their teams/clubs (avatar + name + kind badge). Selection persists in local component state; submit is blocked with a toast until one is chosen.
+2. **Disable the rest of the form until a team is picked**
+   - Wrap every section below "Host as" (Sport, Cover, Title, When, Location, Skill, Size, Price, toggles, Description, Publish) in a `<fieldset disabled={!selectedTeamId}>` with `aria-disabled` and a `pointer-events-none opacity-50` visual when disabled.
+   - This makes the requirement obvious instead of surfacing as a post-submit toast.
 
-2. **Attach the chosen team to the game**
-   - Extend `addHostedGame` (in `src/lib/hosted-games-store.ts`) to accept an optional `teamId` and persist it on the game (`hosted_games.team_id`, new nullable column). Include it in the row insert and in the in-memory snapshot returned to the UI.
-   - The multi-day repeat path passes the same `teamId` to every created game.
+3. **Keep and harden the submit guard**
+   - Keep the existing `if (!selectedTeamId)` guard in the submit handler as a safety net.
+   - On failed guard, additionally scroll the "Host as" section into view and focus the first pill so keyboard users land on it.
 
-3. **Show affiliation on the game**
-   - No new UI in this change beyond persisting `team_id`. A follow-up can render the team chip on the game detail card.
+4. **Publish button reflects state**
+   - Add `disabled={!selectedTeamId || publishing}` to the Publish button and swap its label to "Choose a team to continue" when `!selectedTeamId`, otherwise keep the current label.
 
-## Technical details
-
-- **Data**
-  - Add migration: `ALTER TABLE public.hosted_games ADD COLUMN team_id uuid REFERENCES public.teams(id) ON DELETE SET NULL;` plus an index on `team_id`. No RLS change needed (existing host-scoped policies still apply).
-- **Server functions** (`src/lib/teams.functions.ts`)
-  - Add `listMyTeams` (`requireSupabaseAuth`) returning `{ id, name, kind, avatar, handle }[]` for `owner_id = context.userId`, ordered by `created_at desc`.
-- **Client**
-  - In `_tabs.create.tsx`, call `listMyTeams` with `useQuery` after the existing sign-in guard. While loading, show a small skeleton. Based on count, render the three states above.
-  - Add a `selectedTeamId` state; auto-set when count === 1.
-  - Pass `teamId: selectedTeamId ?? undefined` into `addHostedGame` and the multi-day loop.
-- **Types**
-  - Extend the `addHostedGame` input type with `teamId?: string`.
-  - `HostedGame` snapshot gains an optional `teamId` field.
+5. **Single-team and zero-team paths unchanged**
+   - Zero teams: existing empty state with "Create a team / Create a club" CTAs stays.
+   - One team: auto-selected chip stays; form remains enabled.
 
 ## Out of scope
-
-- Rendering the team chip on game cards / detail pages (follow-up).
-- Migrating existing games without `team_id`.
-- Team-member (non-owner) hosting permissions — for now only the team's `owner_id` can host under it. Can be expanded later using `trainer_org_members` / a future `team_members` table.
+- No changes to `addHostedGame`, `listMyTeams`, migrations, or any other route.
+- No new "team members can host" permissions — still owner-only.
+- No visual redesign of the pill picker beyond the required-state affordances above.
