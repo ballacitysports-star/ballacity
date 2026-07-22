@@ -1,60 +1,25 @@
-# Comments & Reactions on Posts and Games
+## Problem
 
-Add lightweight discussion (threaded-flat comments) and emoji reactions to every user-facing post surface: team/club posts (via `PostDetailsDialog`) and hosted games (game details page).
+Comments exist in the database (4 rows) but don't render in the UI. Root cause: `listComments` in `src/lib/post-engagement.functions.ts` uses a PostgREST embed:
 
-## Data model (one migration)
+```
+.select("*, profiles:author_id(display_name, avatar_url, avatar_initials)")
+```
 
-Polymorphic target via `(subject_type, subject_id text)` so we cover `team_post` (uuid as text) and `game` (text id from `hosted_games`) without two parallel schemas.
+This embed requires a foreign key from `post_comments.author_id` to `public.profiles.id`. The actual FK points to `auth.users(id)`, so PostgREST returns an error and the query throws — the component then renders "Be the first to comment."
 
-**`public.post_comments`**
-- `id uuid pk`, `subject_type text check in ('team_post','game')`, `subject_id text not null`
-- `author_id uuid not null references auth.users`
-- `body text not null check (length(body) between 1 and 1000)`
-- `created_at`, `updated_at`, `deleted_at timestamptz`
-- Index `(subject_type, subject_id, created_at desc)`
+## Fix
 
-**`public.post_reactions`**
-- `id uuid pk`, `subject_type`, `subject_id`, `user_id`, `emoji text check in ('👍','❤️','🔥','😂','🎉','👏')`
-- Unique `(subject_type, subject_id, user_id, emoji)`
+Edit `src/lib/post-engagement.functions.ts` → `listComments` handler only:
 
-GRANTs: `authenticated` full CRUD, `anon` SELECT (comments/reactions are public reads on public posts), `service_role` ALL. RLS:
-- SELECT: anyone (matches current public read of team_posts / hosted_games).
-- INSERT: `auth.uid() = author_id / user_id`.
-- UPDATE/DELETE comment: author only (soft delete via `deleted_at`).
-- DELETE reaction: owner only.
-- Realtime: `ALTER PUBLICATION supabase_realtime ADD TABLE post_comments, post_reactions`.
+1. Select plain columns from `post_comments` (no embed).
+2. Collect the unique `author_id` set.
+3. Second query: `profiles.select('id, display_name, avatar_url, avatar_initials').in('id', ids)` using the same publishable client.
+4. Build a `Map<authorId, profile>` and merge into the returned `CommentRow[]` (same shape as today, so `PostEngagement.tsx` needs no change).
 
-## Server functions (`src/lib/post-engagement.functions.ts`)
+No migration, no schema change, no other files touched.
 
-Public reads via publishable server client; writes via `requireSupabaseAuth`.
-- `listComments({ subjectType, subjectId })` — joins `profiles` for display_name/avatar.
-- `createComment({ subjectType, subjectId, body })`
-- `deleteComment({ id })` (soft delete → shows "deleted")
-- `listReactions({ subjectType, subjectId })` → returns `{ emoji, count, mine: boolean }[]`.
-- `toggleReaction({ subjectType, subjectId, emoji })` — insert or delete row.
+## Verify
 
-## UI component (`src/components/PostEngagement.tsx`)
-
-Single shared block, props `{ subjectType, subjectId }`:
-- **Reactions row**: 6 emoji pills with counts; tapping toggles; picker "+" to add new emoji from the fixed set. Unauthed → toast "Sign in to react".
-- **Comments list**: avatar + name + relative time + body, own comment gets delete. Empty state "Be the first to comment."
-- **Composer**: textarea (1000 char), Post button, disabled when signed out (shows "Sign in to comment" CTA linking to `/auth`).
-- Data via TanStack Query keys `["comments", subjectType, subjectId]` and `["reactions", ...]`; mutations invalidate both.
-- Realtime: subscribe to `post_comments` + `post_reactions` filtered by `subject_id=eq.<id>`, invalidate on change (teardown on unmount per realtime rules).
-
-## Integration points
-
-1. **`src/components/PostDetailsDialog.tsx`** — mount `<PostEngagement subjectType="team_post" subjectId={post.id} />` below the action row. Used by Feed and team profile.
-2. **`src/routes/games.$gameId.index.tsx`** — add a "Discussion" section (near existing reviews/roster area) with `<PostEngagement subjectType="game" subjectId={gameId} />`. Reachable from every `GameCard` since cards already link to game details.
-
-No changes to card previews themselves; engagement lives inside the details surfaces.
-
-## Verification
-
-- Typecheck.
-- Manual: create comment + toggle reaction on a team post and a game while signed in; second browser sees updates via realtime.
-- RLS: unauthed user can read but insert fails.
-
-## Out of scope
-
-Threaded replies, @mentions, notifications on new comment (can follow if requested), moderation beyond author soft-delete.
+- Reload a team post modal / game details page and confirm existing comments appear with author name + avatar.
+- Post a new comment and confirm it shows up live via the existing realtime subscription.

@@ -50,24 +50,45 @@ export const listComments = createServerFn({ method: "GET" })
     const sb = publicClient();
     const { data: rows, error } = await sb
       .from("post_comments" as any)
-      .select("*, profiles:author_id(display_name, avatar_url, avatar_initials)")
+      .select("id, subject_type, subject_id, author_id, body, deleted_at, created_at")
       .eq("subject_type", data.subjectType)
       .eq("subject_id", data.subjectId)
       .order("created_at", { ascending: true });
     if (error) throw new Error(error.message);
-    return ((rows ?? []) as any[]).map((r) => ({
-      id: r.id,
-      subjectType: r.subject_type,
-      subjectId: r.subject_id,
-      authorId: r.author_id,
-      authorName: r.profiles?.display_name ?? null,
-      authorAvatar: r.profiles?.avatar_url ?? null,
-      authorInitials: r.profiles?.avatar_initials ?? null,
-      body: r.body,
-      deletedAt: r.deleted_at,
-      createdAt: r.created_at,
-    }));
+    const list = (rows ?? []) as any[];
+    const authorIds = Array.from(new Set(list.map((r) => r.author_id).filter(Boolean)));
+    let profileMap = new Map<string, { display_name: string | null; avatar_url: string | null; avatar_initials: string | null }>();
+    if (authorIds.length > 0) {
+      const { data: profs, error: pErr } = await sb
+        .from("profiles" as any)
+        .select("id, display_name, avatar_url, avatar_initials")
+        .in("id", authorIds);
+      if (pErr) throw new Error(pErr.message);
+      for (const p of (profs ?? []) as any[]) {
+        profileMap.set(p.id, {
+          display_name: p.display_name ?? null,
+          avatar_url: p.avatar_url ?? null,
+          avatar_initials: p.avatar_initials ?? null,
+        });
+      }
+    }
+    return list.map((r) => {
+      const p = profileMap.get(r.author_id);
+      return {
+        id: r.id,
+        subjectType: r.subject_type,
+        subjectId: r.subject_id,
+        authorId: r.author_id,
+        authorName: p?.display_name ?? null,
+        authorAvatar: p?.avatar_url ?? null,
+        authorInitials: p?.avatar_initials ?? null,
+        body: r.body,
+        deletedAt: r.deleted_at,
+        createdAt: r.created_at,
+      };
+    });
   });
+
 
 export const createComment = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
