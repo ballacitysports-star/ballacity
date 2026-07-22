@@ -158,11 +158,12 @@ export const toggleReaction = createServerFn({ method: "POST" })
       .eq("user_id", context.userId)
       .eq("emoji", data.emoji)
       .maybeSingle();
-    if (existing?.id) {
+    const existingId = (existing as { id?: string } | null)?.id;
+    if (existingId) {
       const { error } = await context.supabase
         .from("post_reactions" as any)
         .delete()
-        .eq("id", existing.id);
+        .eq("id", existingId);
       if (error) throw new Error(error.message);
       return { active: false };
     }
