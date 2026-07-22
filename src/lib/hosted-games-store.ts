@@ -159,7 +159,9 @@ function gameToInsertRow(g: Game): TablesInsert<"hosted_games"> {
     joins_closed: !!(g as { joinsClosed?: boolean }).joinsClosed,
     host_snapshot: (g.host ?? {}) as TablesInsert<"hosted_games">["host_snapshot"],
     positions_needed: (g.positionsNeeded ?? {}) as TablesInsert<"hosted_games">["positions_needed"],
-  };
+    ...(g.teamId ? { team_id: g.teamId } : {}),
+  } as TablesInsert<"hosted_games">;
+
 }
 
 // ---------- DB hydration + realtime ----------
