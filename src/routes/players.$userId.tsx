@@ -244,6 +244,11 @@ function PlayerProfilePage() {
           </div>
         )}
 
+        {/* Organizations (live) */}
+        <PlayerOrgsSection userId={userId} />
+
+
+
         {/* Action row — IG-style Follow / Message */}
         <div className="mt-4 flex items-center gap-2">
           <div className="grid flex-1 grid-cols-2 gap-2">
