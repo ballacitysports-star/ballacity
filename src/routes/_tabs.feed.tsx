@@ -586,6 +586,24 @@ function Feed() {
                 </div>
               );
             })}
+            {teamPostsQuery.hasNextPage && (
+              <div className="flex w-40 shrink-0 items-center justify-center snap-start">
+                <button
+                  type="button"
+                  onClick={() => teamPostsQuery.fetchNextPage()}
+                  disabled={teamPostsQuery.isFetchingNextPage}
+                  className="inline-flex items-center gap-2 rounded-full border border-border bg-surface px-4 py-2 text-sm font-semibold disabled:opacity-60"
+                >
+                  {teamPostsQuery.isFetchingNextPage ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin" /> Loading
+                    </>
+                  ) : (
+                    "Load more"
+                  )}
+                </button>
+              </div>
+            )}
           </div>
         </section>
       )}
