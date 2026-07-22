@@ -42,6 +42,7 @@ export function PostEngagement({ subjectType, subjectId }: Props) {
   const listMyReactionsFn = useServerFn(listMyReactions);
   const createCommentFn = useServerFn(createComment);
   const deleteCommentFn = useServerFn(deleteComment);
+  const updateCommentFn = useServerFn(updateComment);
   const toggleReactionFn = useServerFn(toggleReaction);
 
   const commentsKey = ["post-comments", subjectType, subjectId];
