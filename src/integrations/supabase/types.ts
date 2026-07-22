@@ -422,6 +422,7 @@ export type Database = {
           skill: string
           sport: string
           status: string | null
+          team_id: string | null
           title: string
           trending: boolean
           updated_at: string
@@ -452,6 +453,7 @@ export type Database = {
           skill?: string
           sport: string
           status?: string | null
+          team_id?: string | null
           title: string
           trending?: boolean
           updated_at?: string
@@ -482,12 +484,21 @@ export type Database = {
           skill?: string
           sport?: string
           status?: string | null
+          team_id?: string | null
           title?: string
           trending?: boolean
           updated_at?: string
           urgent?: boolean
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "hosted_games_team_id_fkey"
+            columns: ["team_id"]
+            isOneToOne: false
+            referencedRelation: "teams"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       join_requests: {
         Row: {
