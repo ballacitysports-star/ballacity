@@ -111,13 +111,20 @@ export function PostCard({
           )}
 
           <div className="flex gap-2 pt-1">
-            <button className="flex-1 rounded-full bg-lime-gradient py-2.5 text-sm font-bold text-primary-foreground glow-lime">
+            <button
+              onClick={(e) => e.stopPropagation()}
+              className="flex-1 rounded-full bg-lime-gradient py-2.5 text-sm font-bold text-primary-foreground glow-lime"
+            >
               {post.kind === "tryout" ? "Apply" : "RSVP"}
             </button>
-            <button className="rounded-full border border-border bg-surface px-4 py-2.5 text-sm font-semibold">
+            <button
+              onClick={(e) => e.stopPropagation()}
+              className="rounded-full border border-border bg-surface px-4 py-2.5 text-sm font-semibold"
+            >
               Share
             </button>
           </div>
+
         </div>
       )}
 
