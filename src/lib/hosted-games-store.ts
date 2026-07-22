@@ -162,6 +162,7 @@ function gameToInsertRow(g: Game): TablesInsert<"hosted_games"> {
     host_snapshot: (g.host ?? {}) as TablesInsert<"hosted_games">["host_snapshot"],
     positions_needed: (g.positionsNeeded ?? {}) as TablesInsert<"hosted_games">["positions_needed"],
     ...(g.teamId ? { team_id: g.teamId } : {}),
+    ...(g.orgId ? { org_id: g.orgId } : {}),
   } as TablesInsert<"hosted_games">;
 
 }
