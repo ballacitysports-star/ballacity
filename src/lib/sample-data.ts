@@ -72,6 +72,7 @@ export type Game = {
   joinsClosed?: boolean;
   positionsNeeded?: Record<string, number>;
   teamId?: string;
+  orgId?: string;
 
 };
 
