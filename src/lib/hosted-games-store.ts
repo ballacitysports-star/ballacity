@@ -298,6 +298,7 @@ export async function addHostedGame(input: HostedGameInput): Promise<Game> {
     equipment: [],
     positionsNeeded: input.positionsNeeded ?? {},
     teamId: input.teamId,
+    orgId: input.orgId,
   };
 
 
