@@ -1,24 +1,60 @@
+import { useMemo } from "react";
 import { Link } from "@tanstack/react-router";
 import { MapPin } from "lucide-react";
+import { useQueries } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
 import { PlayMapView, pseudoLatLngFromId } from "@/components/PlayMapView";
 import type { MapPinItem } from "@/components/GamesMap";
 import { UserAvatar } from "@/components/UserAvatar";
 import type { AvailabilityWithAuthor } from "@/lib/availability";
 import { SPORTS } from "@/lib/sample-data";
+import { geocodeAddress } from "@/lib/geocode.functions";
 
 const emojiBySport: Record<string, string> = Object.fromEntries(
   SPORTS.map((s) => [s.name, s.emoji]),
 );
 
 export function PlayersMapView({ players }: { players: AvailabilityWithAuthor[] }) {
+  const geocode = useServerFn(geocodeAddress);
+
+  // Collect unique city strings we need to resolve to lat/lng.
+  const uniqueCities = useMemo(() => {
+    const set = new Set<string>();
+    players.forEach((p) => {
+      const c = p.city?.trim();
+      if (c) set.add(c);
+    });
+    return Array.from(set);
+  }, [players]);
+
+  const cityQueries = useQueries({
+    queries: uniqueCities.map((city) => ({
+      queryKey: ["geocode-city", city.toLowerCase()],
+      queryFn: () => geocode({ data: { address: city } }),
+      staleTime: 24 * 60 * 60 * 1000,
+      gcTime: 24 * 60 * 60 * 1000,
+      retry: 1,
+    })),
+  });
+
+  const cityCoords = useMemo(() => {
+    const map = new Map<string, { lat: number; lng: number }>();
+    uniqueCities.forEach((city, i) => {
+      const q = cityQueries[i];
+      if (q?.data) map.set(city.toLowerCase(), { lat: q.data.lat, lng: q.data.lng });
+    });
+    return map;
+  }, [uniqueCities, cityQueries]);
+
   const pins: MapPinItem[] = players.map((p) => {
+    const emoji = emojiBySport[p.sports?.[0] ?? ""] ?? "🧑";
+    const cityKey = p.city?.trim().toLowerCase();
+    const real = cityKey ? cityCoords.get(cityKey) : undefined;
+    if (real) {
+      return { id: p.id, emoji, lat: real.lat, lng: real.lng, real: true };
+    }
     const { lat, lng } = pseudoLatLngFromId(p.user_id);
-    return {
-      id: p.id,
-      emoji: emojiBySport[p.sports?.[0] ?? ""] ?? "🧑",
-      lat,
-      lng,
-    };
+    return { id: p.id, emoji, lat, lng };
   });
 
   return (
