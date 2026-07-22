@@ -16,15 +16,12 @@ export function TeamsMapView({ orgs, kind }: { orgs: Org[]; kind: OrgKind }) {
     const geoList = o.venueGeo ?? [];
     const primary = primaryKey ? geoList.find((g) => g.address.trim().toLowerCase() === primaryKey) : undefined;
     const chosen = primary ?? geoList[0];
-    const { lat, lng } = chosen
-      ? { lat: chosen.lat, lng: chosen.lng }
-      : pseudoLatLngFromId(o.id);
-    return {
-      id: o.id,
-      emoji: emojiBySport[o.sports?.[0] ?? ""] ?? (kind === "coach" ? "🎓" : "🛡️"),
-      lat,
-      lng,
-    };
+    const emoji = emojiBySport[o.sports?.[0] ?? ""] ?? (kind === "coach" ? "🎓" : "🛡️");
+    if (chosen) {
+      return { id: o.id, emoji, lat: chosen.lat, lng: chosen.lng, real: true };
+    }
+    const { lat, lng } = pseudoLatLngFromId(o.id);
+    return { id: o.id, emoji, lat, lng };
   });
 
   const noun = kind === "coach" ? "trainer" : "team";
