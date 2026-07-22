@@ -128,6 +128,7 @@ function rowToGame(r: DbRow): Game {
     joinsClosed: !!r.joins_closed,
     positionsNeeded: (r.positions_needed ?? {}) as Record<string, number>,
     teamId: r.team_id ?? undefined,
+    orgId: r.org_id ?? undefined,
 
   } as Game;
 }
