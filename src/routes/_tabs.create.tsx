@@ -48,6 +48,7 @@ function Create() {
   });
   const myTeams = myTeamsQuery.data ?? [];
   const [selectedTeamId, setSelectedTeamId] = useState<string | null>(null);
+  const hostAsRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (myTeams.length === 1) setSelectedTeamId((cur) => cur ?? myTeams[0].id);
     if (myTeams.length === 0) setSelectedTeamId(null);
@@ -253,6 +254,8 @@ function Create() {
           }
           if (!selectedTeamId) {
             toast.error("Pick which team or club you're hosting as");
+            hostAsRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+            hostAsRef.current?.querySelector<HTMLButtonElement>("button")?.focus();
             return;
           }
           setPublishing(true);
@@ -355,7 +358,24 @@ function Create() {
         className="space-y-5"
       >
         {/* Host as (team/club) */}
-        <Section title="Host as">
+        <div
+          ref={hostAsRef}
+          className={`rounded-2xl ${
+            !selectedTeamId && myTeams.length > 1
+              ? "border border-destructive/60 bg-destructive/5 p-3"
+              : ""
+          }`}
+        >
+          <Section
+            title="Host as"
+            right={
+              !selectedTeamId && myTeams.length > 1 ? (
+                <span className="rounded-full bg-destructive/15 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-destructive">
+                  Required
+                </span>
+              ) : undefined
+            }
+          >
           {myTeams.length === 1 ? (
             <div className="flex items-center justify-between rounded-2xl border border-border bg-surface px-4 py-3">
               <div className="flex items-center gap-2 min-w-0">
@@ -372,35 +392,49 @@ function Create() {
               <span className="text-[11px] text-muted-foreground">Auto-selected</span>
             </div>
           ) : (
-            <div className="flex gap-2 overflow-x-auto scrollbar-hide -mx-1 px-1">
-              {myTeams.map((t) => {
-                const active = selectedTeamId === t.id;
-                return (
-                  <button
-                    type="button"
-                    key={t.id}
-                    onClick={() => setSelectedTeamId(t.id)}
-                    className={`shrink-0 flex items-center gap-2 rounded-full border px-3 py-2 text-sm font-semibold ${
-                      active
-                        ? "border-lime bg-lime/10 text-lime"
-                        : "border-border bg-surface text-muted-foreground"
-                    }`}
-                  >
-                    <span className="grid h-6 w-6 place-items-center rounded-full bg-background text-xs font-bold">
-                      {(t.name || "?").slice(0, 1).toUpperCase()}
-                    </span>
-                    <span className="truncate max-w-[10rem]">{t.name}</span>
-                    <span className="text-[10px] uppercase tracking-wider opacity-70">
-                      {t.kind === "coach" ? "Club" : "Team"}
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
+            <>
+              <div className="flex gap-2 overflow-x-auto scrollbar-hide -mx-1 px-1">
+                {myTeams.map((t) => {
+                  const active = selectedTeamId === t.id;
+                  return (
+                    <button
+                      type="button"
+                      key={t.id}
+                      onClick={() => setSelectedTeamId(t.id)}
+                      className={`shrink-0 flex items-center gap-2 rounded-full border px-3 py-2 text-sm font-semibold ${
+                        active
+                          ? "border-lime bg-lime/10 text-lime"
+                          : "border-border bg-surface text-muted-foreground"
+                      }`}
+                    >
+                      <span className="grid h-6 w-6 place-items-center rounded-full bg-background text-xs font-bold">
+                        {(t.name || "?").slice(0, 1).toUpperCase()}
+                      </span>
+                      <span className="truncate max-w-[10rem]">{t.name}</span>
+                      <span className="text-[10px] uppercase tracking-wider opacity-70">
+                        {t.kind === "coach" ? "Club" : "Team"}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+              {!selectedTeamId && (
+                <p className="mt-2 px-1 text-[11px] text-muted-foreground">
+                  Pick who you're hosting as to continue.
+                </p>
+              )}
+            </>
           )}
-        </Section>
+          </Section>
+        </div>
 
-        {/* Sport */}
+        <fieldset
+          disabled={!selectedTeamId}
+          className={`space-y-5 border-0 p-0 m-0 min-w-0 ${
+            !selectedTeamId ? "opacity-50 pointer-events-none" : ""
+          }`}
+        >
+
         <Section title="Sport">
 
           <div className="grid grid-cols-3 gap-2">
@@ -667,14 +701,20 @@ function Create() {
         <motion.button
           whileTap={{ scale: 0.98 }}
           type="submit"
-          disabled={publishing}
+          disabled={publishing || !selectedTeamId}
           className="w-full rounded-2xl bg-lime-gradient py-4 font-bold text-primary-foreground glow-lime disabled:opacity-60"
         >
-          {publishing ? "Publishing…" : "Publish game"}
+          {publishing
+            ? "Publishing…"
+            : !selectedTeamId
+              ? "Choose a team to continue"
+              : "Publish game"}
         </motion.button>
         <p className="text-center text-xs text-muted-foreground pb-6">
           Hosting is free. Pro hosts get unlimited games + analytics.
         </p>
+        </fieldset>
+
       </form>
     </div>
   );
@@ -683,10 +723,12 @@ function Create() {
 function Section({
   title,
   icon,
+  right,
   children,
 }: {
   title: string;
   icon?: React.ReactNode;
+  right?: React.ReactNode;
   children: React.ReactNode;
 }) {
   return (
@@ -694,11 +736,13 @@ function Section({
       <div className="mb-2 flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-muted-foreground">
         {icon}
         {title}
+        {right && <span className="ml-auto">{right}</span>}
       </div>
       <div className="space-y-2">{children}</div>
     </div>
   );
 }
+
 
 function Toggle({
   icon,
