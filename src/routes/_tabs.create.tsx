@@ -701,14 +701,20 @@ function Create() {
         <motion.button
           whileTap={{ scale: 0.98 }}
           type="submit"
-          disabled={publishing}
+          disabled={publishing || !selectedTeamId}
           className="w-full rounded-2xl bg-lime-gradient py-4 font-bold text-primary-foreground glow-lime disabled:opacity-60"
         >
-          {publishing ? "Publishing…" : "Publish game"}
+          {publishing
+            ? "Publishing…"
+            : !selectedTeamId
+              ? "Choose a team to continue"
+              : "Publish game"}
         </motion.button>
         <p className="text-center text-xs text-muted-foreground pb-6">
           Hosting is free. Pro hosts get unlimited games + analytics.
         </p>
+        </fieldset>
+
       </form>
     </div>
   );
