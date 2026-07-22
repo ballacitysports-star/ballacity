@@ -293,7 +293,9 @@ export async function addHostedGame(input: HostedGameInput): Promise<Game> {
     description: input.description || "",
     equipment: [],
     positionsNeeded: input.positionsNeeded ?? {},
+    teamId: input.teamId,
   };
+
 
 
   // Optimistic local insert.
