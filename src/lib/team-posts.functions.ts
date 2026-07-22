@@ -43,19 +43,21 @@ export const listRecentTeamPosts = createServerFn({ method: "GET" })
     z
       .object({
         limit: z.number().int().min(1).max(50).optional(),
+        offset: z.number().int().min(0).max(1000).optional(),
         sport: z.string().optional(),
       })
       .parse(input ?? {}),
   )
   .handler(async ({ data }) => {
     const sb = publicClient();
-    const limit = data.limit ?? 20;
+    const limit = data.limit ?? 10;
+    const offset = data.offset ?? 0;
     let query = sb
       .from("team_posts" as any)
       .select("*, teams!inner(id, name, sports, kind, avatar)")
       .order("pinned", { ascending: false })
       .order("created_at", { ascending: false })
-      .limit(limit);
+      .range(offset, offset + limit - 1);
     if (data.sport) {
       query = query.contains("teams.sports", [data.sport]);
     }
