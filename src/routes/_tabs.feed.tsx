@@ -169,6 +169,25 @@ function Feed() {
   // Chip row mirrors the multi-select made in the filter sheet. Tapping a
   // chip toggles that sport in/out of preferredSports; "All sports" clears.
   const chipSelected: string[] = prefs.preferredSports;
+
+  // Recent posts from teams & clubs (public read). Filtered by sport when the
+  // chip row has exactly one sport selected.
+  const fetchRecentTeamPosts = useServerFn(listRecentTeamPosts);
+  const teamPostsQuery = useQuery({
+    queryKey: [
+      "feed-team-posts",
+      chipSelected.length === 1 ? chipSelected[0] : "all",
+    ],
+    queryFn: () =>
+      fetchRecentTeamPosts({
+        data: {
+          limit: 10,
+          sport: chipSelected.length === 1 ? chipSelected[0] : undefined,
+        },
+      }),
+    staleTime: 30_000,
+  });
+  const teamPosts = teamPostsQuery.data ?? [];
   const setChipSport = (s: string | null) => {
     if (s === null) {
       setFeedPrefs({ ...prefs, preferredSports: [] });
