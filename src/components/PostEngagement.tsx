@@ -12,6 +12,7 @@ import {
   listMyReactions,
   listReactions,
   toggleReaction,
+  updateComment,
   type ReactionEmoji,
 } from "@/lib/post-engagement.functions";
 import { UserAvatar } from "@/components/UserAvatar";
