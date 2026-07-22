@@ -254,6 +254,8 @@ function Create() {
           }
           if (!selectedTeamId) {
             toast.error("Pick which team or club you're hosting as");
+            hostAsRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+            hostAsRef.current?.querySelector<HTMLButtonElement>("button")?.focus();
             return;
           }
           setPublishing(true);
