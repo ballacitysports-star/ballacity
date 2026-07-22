@@ -255,6 +255,8 @@ export type HostedGameInput = {
   hostUserId?: string;
   image?: string; // optional custom cover URL
   positionsNeeded?: Record<string, number>;
+  teamId?: string;
+
 };
 
 export async function addHostedGame(input: HostedGameInput): Promise<Game> {
