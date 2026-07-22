@@ -417,6 +417,7 @@ export type Database = {
           location: string
           max_players: number
           neighborhood: string
+          org_id: string | null
           positions_needed: Json
           price: number
           skill: string
@@ -448,6 +449,7 @@ export type Database = {
           location?: string
           max_players?: number
           neighborhood?: string
+          org_id?: string | null
           positions_needed?: Json
           price?: number
           skill?: string
@@ -479,6 +481,7 @@ export type Database = {
           location?: string
           max_players?: number
           neighborhood?: string
+          org_id?: string | null
           positions_needed?: Json
           price?: number
           skill?: string
@@ -491,6 +494,13 @@ export type Database = {
           urgent?: boolean
         }
         Relationships: [
+          {
+            foreignKeyName: "hosted_games_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "trainer_orgs"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "hosted_games_team_id_fkey"
             columns: ["team_id"]

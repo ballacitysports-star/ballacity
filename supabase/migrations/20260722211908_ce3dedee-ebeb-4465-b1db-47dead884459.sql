@@ -1,0 +1,2 @@
+ALTER TABLE public.hosted_games ADD COLUMN IF NOT EXISTS org_id uuid REFERENCES public.trainer_orgs(id) ON DELETE SET NULL;
+CREATE INDEX IF NOT EXISTS hosted_games_org_id_idx ON public.hosted_games (org_id);
