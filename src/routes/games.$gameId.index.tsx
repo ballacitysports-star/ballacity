@@ -80,6 +80,11 @@ import { HostPaymentsPanel, PlayerPaymentsPanel } from "@/components/GamePayment
 import { useHostedGames, fetchHostedGame, updateHostedGame, deleteHostedGame } from "@/lib/hosted-games-store";
 import type { Game } from "@/lib/sample-data";
 import { PositionsPicker, positionsCleanup } from "@/components/PositionsPicker";
+import { listMyTeams } from "@/lib/teams.functions";
+import { listMyOrgs } from "@/lib/trainer-orgs.functions";
+import { useServerFn } from "@tanstack/react-start";
+import { useQuery } from "@tanstack/react-query";
+import { computeLiveStatus } from "@/lib/live-status";
 
 import { useAuth } from "@/hooks/use-auth";
 import { useMyProfile } from "@/lib/user-prefs-store";
