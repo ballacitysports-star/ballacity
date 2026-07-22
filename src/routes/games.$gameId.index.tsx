@@ -2388,6 +2388,44 @@ function EditGameModal({
   const [saving, setSaving] = useState(false);
   const coverInputRef = useRef<HTMLInputElement>(null);
 
+  // Host-as (team/gym) — only editable before the game starts.
+  const hasStarted = computeLiveStatus(game) !== "scheduled";
+  const fetchMyTeams = useServerFn(listMyTeams);
+  const fetchMyOrgs = useServerFn(listMyOrgs);
+  const myTeamsQuery = useQuery({
+    queryKey: ["my-teams", user?.id ?? "anon"],
+    queryFn: () => fetchMyTeams(),
+    enabled: !!user && !hasStarted,
+    staleTime: 30_000,
+  });
+  const myOrgsQuery = useQuery({
+    queryKey: ["my-orgs", user?.id ?? "anon"],
+    queryFn: () => fetchMyOrgs(),
+    enabled: !!user && !hasStarted,
+    staleTime: 30_000,
+  });
+  type EditAffiliation = { source: "team" | "org"; id: string; name: string; kind?: "team" | "coach" };
+  const editAffiliations: EditAffiliation[] = [
+    ...(myTeamsQuery.data ?? []).map((t) => ({ source: "team" as const, id: t.id, name: t.name, kind: t.kind })),
+    ...(myOrgsQuery.data ?? []).map((o) => ({ source: "org" as const, id: o.id, name: o.name })),
+  ];
+  const affLabel = (a: EditAffiliation) =>
+    a.source === "org" ? "Gym" : a.kind === "coach" ? "Trainer" : "Team";
+  const initialAff: EditAffiliation | null = game.teamId
+    ? { source: "team", id: game.teamId, name: "", kind: "team" }
+    : game.orgId
+      ? { source: "org", id: game.orgId, name: "" }
+      : null;
+  const [selectedAff, setSelectedAff] = useState<EditAffiliation | null>(initialAff);
+  useEffect(() => {
+    if (!selectedAff) return;
+    const match = editAffiliations.find(
+      (a) => a.source === selectedAff.source && a.id === selectedAff.id,
+    );
+    if (match && match.name && !selectedAff.name) setSelectedAff(match);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editAffiliations.length]);
+
   useEffect(() => {
     let cancel = false;
     (async () => {
