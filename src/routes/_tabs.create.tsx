@@ -354,8 +354,55 @@ function Create() {
         }}
         className="space-y-5"
       >
+        {/* Host as (team/club) */}
+        <Section title="Host as">
+          {myTeams.length === 1 ? (
+            <div className="flex items-center justify-between rounded-2xl border border-border bg-surface px-4 py-3">
+              <div className="flex items-center gap-2 min-w-0">
+                <span className="grid h-8 w-8 place-items-center rounded-full bg-lime/10 text-lime text-sm font-bold shrink-0">
+                  {(myTeams[0].name || "?").slice(0, 1).toUpperCase()}
+                </span>
+                <div className="min-w-0">
+                  <div className="text-sm font-semibold truncate">{myTeams[0].name}</div>
+                  <div className="text-[11px] uppercase tracking-wider text-muted-foreground">
+                    {myTeams[0].kind === "coach" ? "Club / gym" : "Team"}
+                  </div>
+                </div>
+              </div>
+              <span className="text-[11px] text-muted-foreground">Auto-selected</span>
+            </div>
+          ) : (
+            <div className="flex gap-2 overflow-x-auto scrollbar-hide -mx-1 px-1">
+              {myTeams.map((t) => {
+                const active = selectedTeamId === t.id;
+                return (
+                  <button
+                    type="button"
+                    key={t.id}
+                    onClick={() => setSelectedTeamId(t.id)}
+                    className={`shrink-0 flex items-center gap-2 rounded-full border px-3 py-2 text-sm font-semibold ${
+                      active
+                        ? "border-lime bg-lime/10 text-lime"
+                        : "border-border bg-surface text-muted-foreground"
+                    }`}
+                  >
+                    <span className="grid h-6 w-6 place-items-center rounded-full bg-background text-xs font-bold">
+                      {(t.name || "?").slice(0, 1).toUpperCase()}
+                    </span>
+                    <span className="truncate max-w-[10rem]">{t.name}</span>
+                    <span className="text-[10px] uppercase tracking-wider opacity-70">
+                      {t.kind === "coach" ? "Club" : "Team"}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </Section>
+
         {/* Sport */}
         <Section title="Sport">
+
           <div className="grid grid-cols-3 gap-2">
             {SPORTS.map((s) => {
               const active = sport === s.name;
