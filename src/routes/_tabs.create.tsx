@@ -48,6 +48,7 @@ function Create() {
   });
   const myTeams = myTeamsQuery.data ?? [];
   const [selectedTeamId, setSelectedTeamId] = useState<string | null>(null);
+  const hostAsRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (myTeams.length === 1) setSelectedTeamId((cur) => cur ?? myTeams[0].id);
     if (myTeams.length === 0) setSelectedTeamId(null);
