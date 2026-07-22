@@ -688,9 +688,16 @@ function Feed() {
       </>
       )}
 
+      <PostDetailsDialog
+        post={openPost?.post ?? null}
+        team={openPost?.team ?? null}
+        open={!!openPost}
+        onOpenChange={(o) => !o && setOpenPost(null)}
+      />
     </div>
   );
 }
+
 
 function PullIndicator({
   offset,
