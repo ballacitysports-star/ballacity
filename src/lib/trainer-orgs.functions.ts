@@ -166,6 +166,32 @@ export const requestToJoinTrainerOrg = createServerFn({ method: "POST" })
       .parse(d),
   )
   .handler(async ({ data, context }) => {
+    // Idempotent: reuse or reopen an existing request instead of erroring on the unique constraint.
+    const { data: existing } = await context.supabase
+      .from("trainer_org_join_requests")
+      .select("id,status")
+      .eq("org_id", data.orgId)
+      .eq("trainer_id", data.trainerId)
+      .in("status", ["pending", "approved", "rejected"])
+      .limit(1)
+      .maybeSingle();
+
+    if (existing) {
+      if (existing.status === "pending") return { ok: true, status: "pending" as const };
+      if (existing.status === "approved") return { ok: true, status: "approved" as const };
+      const { error: updErr } = await context.supabase
+        .from("trainer_org_join_requests")
+        .update({
+          status: "pending",
+          message: data.message ?? null,
+          requested_by: context.userId,
+          reviewed_at: null,
+        })
+        .eq("id", existing.id);
+      if (updErr) throw new Error(updErr.message);
+      return { ok: true, status: "pending" as const };
+    }
+
     const { error } = await context.supabase.from("trainer_org_join_requests").insert({
       org_id: data.orgId,
       trainer_id: data.trainerId,
@@ -173,7 +199,7 @@ export const requestToJoinTrainerOrg = createServerFn({ method: "POST" })
       message: data.message ?? null,
     });
     if (error) throw new Error(error.message);
-    return { ok: true };
+    return { ok: true, status: "pending" as const };
   });
 
 export const listJoinRequestsForOrg = createServerFn({ method: "GET" })
