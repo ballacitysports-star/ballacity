@@ -88,6 +88,7 @@ type DbRow = {
   host_snapshot: { name?: string; username?: string; avatar?: string; rating?: number } | null;
   positions_needed?: Record<string, number> | null;
   team_id?: string | null;
+  org_id?: string | null;
 
 };
 
