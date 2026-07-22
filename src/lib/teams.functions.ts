@@ -160,6 +160,19 @@ export const listTeams = createServerFn({ method: "GET" }).handler(async () => {
   return data ?? [];
 });
 
+export const listMyTeams = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const { data, error } = await context.supabase
+      .from("teams")
+      .select("id, name, kind, handle, avatar")
+      .eq("owner_id", context.userId)
+      .order("created_at", { ascending: false });
+    if (error) throw new Error(error.message);
+    return (data ?? []) as { id: string; name: string; kind: "team" | "coach"; handle: string; avatar: string }[];
+  });
+
+
 export const getTeamById = createServerFn({ method: "GET" })
   .inputValidator((input) => z.object({ id: z.string() }).parse(input))
   .handler(async ({ data }) => {
