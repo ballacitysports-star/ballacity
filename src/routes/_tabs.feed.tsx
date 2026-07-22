@@ -26,7 +26,9 @@ import { useServerFn } from "@tanstack/react-start";
 import { useQuery, useInfiniteQuery } from "@tanstack/react-query";
 import { listRecentTeamPosts } from "@/lib/team-posts.functions";
 import { PostCard } from "@/components/PostCard";
+import { PostDetailsDialog, type PostDetailsTeam } from "@/components/PostDetailsDialog";
 import type { OrgPost, PostKind } from "@/lib/sample-data";
+
 
 // URL-persisted feed state. Refreshing or sharing the URL preserves search
 // text, sport chip, sort, distance cap, position, view/density toggles, and
