@@ -115,6 +115,8 @@ function TeamPage() {
   const [following, setFollowing] = useState(false);
   const [mounted, setMounted] = useState(false);
   const [composerOpen, setComposerOpen] = useState(false);
+  const [openPost, setOpenPost] = useState<OrgPost | null>(null);
+
   useEffect(() => setMounted(true), []);
   const canEdit = mounted && isMyOrg(org.id);
 
