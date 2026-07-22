@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { Link } from "@tanstack/react-router";
-import { Loader2, SmilePlus, Trash2 } from "lucide-react";
+import { Loader2, Pencil, SmilePlus, Trash2, X, Check } from "lucide-react";
 import { toast } from "sonner";
 import {
   REACTION_EMOJI,
@@ -12,6 +12,7 @@ import {
   listMyReactions,
   listReactions,
   toggleReaction,
+  updateComment,
   type ReactionEmoji,
 } from "@/lib/post-engagement.functions";
 import { UserAvatar } from "@/components/UserAvatar";
@@ -33,12 +34,15 @@ export function PostEngagement({ subjectType, subjectId }: Props) {
   const qc = useQueryClient();
   const { user } = useAuth();
   const [body, setBody] = useState("");
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editBody, setEditBody] = useState("");
 
   const listCommentsFn = useServerFn(listComments);
   const listReactionsFn = useServerFn(listReactions);
   const listMyReactionsFn = useServerFn(listMyReactions);
   const createCommentFn = useServerFn(createComment);
   const deleteCommentFn = useServerFn(deleteComment);
+  const updateCommentFn = useServerFn(updateComment);
   const toggleReactionFn = useServerFn(toggleReaction);
 
   const commentsKey = ["post-comments", subjectType, subjectId];
@@ -107,6 +111,17 @@ export function PostEngagement({ subjectType, subjectId }: Props) {
     mutationFn: (id: string) => deleteCommentFn({ data: { id } }),
     onSuccess: () => qc.invalidateQueries({ queryKey: commentsKey }),
     onError: (e: any) => toast.error(e?.message ?? "Could not delete"),
+  });
+
+  const updateMut = useMutation({
+    mutationFn: ({ id, body }: { id: string; body: string }) =>
+      updateCommentFn({ data: { id, body } }),
+    onSuccess: () => {
+      setEditingId(null);
+      setEditBody("");
+      qc.invalidateQueries({ queryKey: commentsKey });
+    },
+    onError: (e: any) => toast.error(e?.message ?? "Could not update"),
   });
 
   const toggleMut = useMutation({
@@ -257,23 +272,83 @@ export function PostEngagement({ subjectType, subjectId }: Props) {
                     <span className="text-[10px] text-muted-foreground">
                       {formatWhen(c.createdAt)}
                     </span>
-                    {isMine && !isDeleted && (
-                      <button
-                        onClick={() => deleteMut.mutate(c.id)}
-                        className="ml-auto rounded-full p-1 text-muted-foreground transition hover:bg-secondary hover:text-coral"
-                        aria-label="Delete comment"
-                      >
-                        <Trash2 className="h-3 w-3" />
-                      </button>
+                    {isMine && !isDeleted && editingId !== c.id && (
+                      <div className="ml-auto flex items-center gap-0.5">
+                        <button
+                          onClick={() => {
+                            setEditingId(c.id);
+                            setEditBody(c.body);
+                          }}
+                          className="rounded-full p-1 text-muted-foreground transition hover:bg-secondary hover:text-lime"
+                          aria-label="Edit comment"
+                        >
+                          <Pencil className="h-3 w-3" />
+                        </button>
+                        <button
+                          onClick={() => deleteMut.mutate(c.id)}
+                          className="rounded-full p-1 text-muted-foreground transition hover:bg-secondary hover:text-coral"
+                          aria-label="Delete comment"
+                        >
+                          <Trash2 className="h-3 w-3" />
+                        </button>
+                      </div>
                     )}
                   </div>
-                  <p
-                    className={`whitespace-pre-wrap break-words text-sm ${
-                      isDeleted ? "italic text-muted-foreground" : "text-foreground/90"
-                    }`}
-                  >
-                    {isDeleted ? "Comment deleted" : c.body}
-                  </p>
+                  {editingId === c.id ? (
+                    <div className="mt-1 rounded-xl border border-border bg-surface p-2">
+                      <textarea
+                        value={editBody}
+                        onChange={(e) => setEditBody(e.target.value.slice(0, 1000))}
+                        rows={2}
+                        className="w-full resize-none bg-transparent text-sm outline-none"
+                        autoFocus
+                      />
+                      <div className="mt-1 flex items-center justify-between">
+                        <span className="text-[10px] text-muted-foreground">
+                          {editBody.length}/1000
+                        </span>
+                        <div className="flex gap-1">
+                          <button
+                            onClick={() => {
+                              setEditingId(null);
+                              setEditBody("");
+                            }}
+                            className="inline-flex items-center gap-1 rounded-full border border-border px-2.5 py-1 text-[11px] font-semibold text-muted-foreground hover:bg-secondary"
+                          >
+                            <X className="h-3 w-3" /> Cancel
+                          </button>
+                          <button
+                            onClick={() => {
+                              const t = editBody.trim();
+                              if (!t || t === c.body) {
+                                setEditingId(null);
+                                setEditBody("");
+                                return;
+                              }
+                              updateMut.mutate({ id: c.id, body: t });
+                            }}
+                            disabled={updateMut.isPending || !editBody.trim()}
+                            className="inline-flex items-center gap-1 rounded-full bg-lime-gradient px-2.5 py-1 text-[11px] font-bold text-primary-foreground disabled:opacity-50"
+                          >
+                            {updateMut.isPending ? (
+                              <Loader2 className="h-3 w-3 animate-spin" />
+                            ) : (
+                              <Check className="h-3 w-3" />
+                            )}
+                            Save
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    <p
+                      className={`whitespace-pre-wrap break-words text-sm ${
+                        isDeleted ? "italic text-muted-foreground" : "text-foreground/90"
+                      }`}
+                    >
+                      {isDeleted ? "Comment deleted" : c.body}
+                    </p>
+                  )}
                 </div>
               </div>
             );
