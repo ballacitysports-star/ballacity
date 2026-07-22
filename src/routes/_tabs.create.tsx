@@ -41,19 +41,47 @@ function Create() {
   const { user } = useAuth();
   const profile = useMyProfile(user);
   const fetchMyTeams = useServerFn(listMyTeams);
+  const fetchMyOrgs = useServerFn(listMyOrgs);
   const myTeamsQuery = useQuery({
     queryKey: ["my-teams", user?.id ?? "anon"],
     queryFn: () => fetchMyTeams(),
     enabled: !!user,
     staleTime: 30_000,
   });
+  const myOrgsQuery = useQuery({
+    queryKey: ["my-orgs", user?.id ?? "anon"],
+    queryFn: () => fetchMyOrgs(),
+    enabled: !!user,
+    staleTime: 30_000,
+  });
   const myTeams = myTeamsQuery.data ?? [];
-  const [selectedTeamId, setSelectedTeamId] = useState<string | null>(null);
+  const myOrgs = myOrgsQuery.data ?? [];
+  type Affiliation = {
+    source: "team" | "org";
+    id: string;
+    name: string;
+    kind?: "team" | "coach";
+  };
+  const affiliations: Affiliation[] = [
+    ...myTeams.map((t) => ({ source: "team" as const, id: t.id, name: t.name, kind: t.kind })),
+    ...myOrgs.map((o) => ({ source: "org" as const, id: o.id, name: o.name })),
+  ];
+  const affiliationsLoading = myTeamsQuery.isLoading || myOrgsQuery.isLoading;
+  const [selectedAffiliation, setSelectedAffiliation] = useState<Affiliation | null>(null);
   const hostAsRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
-    if (myTeams.length === 1) setSelectedTeamId((cur) => cur ?? myTeams[0].id);
-    if (myTeams.length === 0) setSelectedTeamId(null);
-  }, [myTeams]);
+    if (affiliationsLoading) return;
+    if (affiliations.length === 1) {
+      setSelectedAffiliation((cur) => cur ?? affiliations[0]);
+    } else if (affiliations.length === 0) {
+      setSelectedAffiliation(null);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [affiliations.length, affiliationsLoading]);
+  const affiliationLabel = (a: Affiliation) =>
+    a.source === "org" ? "Club / gym" : a.kind === "coach" ? "Trainer" : "Team";
+  const affiliationShortLabel = (a: Affiliation) =>
+    a.source === "org" ? "Club" : a.kind === "coach" ? "Trainer" : "Team";
   const [sport, setSport] = useState<Sport>("Basketball");
 
   const [title, setTitle] = useState("");
