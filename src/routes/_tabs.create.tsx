@@ -316,7 +316,9 @@ function Create() {
                 host: hostSnap,
                 image: coverUrl ?? undefined,
                 positionsNeeded: cleanPositions,
+                teamId: selectedTeamId ?? undefined,
               });
+
               if (!firstGameId) firstGameId = game.id;
 
               // Persist host ownership + approval/fee preferences so the host & players see them on the detail page
