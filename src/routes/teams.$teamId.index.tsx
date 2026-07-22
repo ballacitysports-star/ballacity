@@ -539,9 +539,16 @@ function TeamPage() {
           />
         )}
       </div>
+      <PostDetailsDialog
+        post={openPost}
+        team={{ id: org.id, name: org.name, sport: org.sports?.[0] }}
+        open={!!openPost}
+        onOpenChange={(o) => !o && setOpenPost(null)}
+      />
     </div>
   );
 }
+
 
 function Stat({ label, value, icon }: { label: string; value: string; icon: React.ReactNode }) {
   return (
