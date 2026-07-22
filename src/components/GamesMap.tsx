@@ -371,7 +371,14 @@ export function GamesMap({
     const center = pinCenterRef.current || userPosRef.current || { lat: 40.7281, lng: -73.9842 };
     pins.forEach((p) => {
       const m = pinMarkersRef.current.get(p.id);
-      if (m) m.setPosition(toLatLng(p.lng, p.lat, center));
+      if (!m) return;
+      // Real coordinates stay pinned to their true location — don't offset
+      // them when the viewer's center changes.
+      if (p.real) {
+        m.setPosition({ lat: p.lat, lng: p.lng });
+      } else {
+        m.setPosition(toLatLng(p.lng, p.lat, center));
+      }
     });
   };
 
