@@ -296,6 +296,8 @@ function Feed() {
   // viewport so tablets/desktops fill their wider grids in one batch.
   const PAGE_SIZE = 12;
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
+  const [openPost, setOpenPost] = useState<{ post: OrgPost; team: PostDetailsTeam | null } | null>(null);
+
   const sentinelRef = useRef<HTMLDivElement | null>(null);
   const filterKey = `${q}|${JSON.stringify(prefs)}|${hosted.length}`;
   // Locks: prevent overlapping refresh and pagination so the same cards
