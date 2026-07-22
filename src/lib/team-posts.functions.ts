@@ -38,6 +38,48 @@ export const listTeamPosts = createServerFn({ method: "GET" })
     return (rows ?? []) as any[];
   });
 
+export const listRecentTeamPosts = createServerFn({ method: "GET" })
+  .inputValidator((input) =>
+    z
+      .object({
+        limit: z.number().int().min(1).max(50).optional(),
+        sport: z.string().optional(),
+      })
+      .parse(input ?? {}),
+  )
+  .handler(async ({ data }) => {
+    const sb = publicClient();
+    const limit = data.limit ?? 20;
+    let query = sb
+      .from("team_posts" as any)
+      .select("*, teams!inner(id, name, sports, kind, avatar)")
+      .order("pinned", { ascending: false })
+      .order("created_at", { ascending: false })
+      .limit(limit);
+    if (data.sport) {
+      query = query.contains("teams.sports", [data.sport]);
+    }
+    const { data: rows, error } = await query;
+    if (error) throw new Error(error.message);
+    return ((rows ?? []) as any[]).map((r) => ({
+      id: r.id as string,
+      teamId: r.team_id as string,
+      teamName: (r.teams?.name ?? "Team") as string,
+      teamSports: (r.teams?.sports ?? []) as string[],
+      teamKind: (r.teams?.kind ?? "team") as string,
+      teamAvatar: (r.teams?.avatar ?? null) as string | null,
+      kind: r.kind as string,
+      title: r.title as string,
+      body: (r.body ?? "") as string,
+      eventDate: (r.event_date ?? null) as string | null,
+      location: (r.location ?? null) as string | null,
+      price: (r.price ?? null) as number | null,
+      spotsMax: (r.spots_max ?? null) as number | null,
+      pinned: !!r.pinned,
+      createdAt: r.created_at as string,
+    }));
+  });
+
 const CreateInput = z.object({
   teamId: z.string().min(1),
   kind: PostKind,
