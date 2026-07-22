@@ -89,6 +89,22 @@ export const createComment = createServerFn({ method: "POST" })
     return row;
   });
 
+export const updateComment = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input) =>
+    z.object({ id: z.string().uuid(), body: z.string().trim().min(1).max(1000) }).parse(input),
+  )
+  .handler(async ({ data, context }) => {
+    const { error } = await context.supabase
+      .from("post_comments" as any)
+      .update({ body: data.body } as any)
+      .eq("id", data.id)
+      .eq("author_id", context.userId)
+      .is("deleted_at", null);
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
+
 export const deleteComment = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input) => z.object({ id: z.string().uuid() }).parse(input))
