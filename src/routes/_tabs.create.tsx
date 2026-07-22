@@ -392,7 +392,7 @@ function Create() {
         <div
           ref={hostAsRef}
           className={`rounded-2xl ${
-            !selectedTeamId && myTeams.length > 1
+            !selectedAffiliation && affiliations.length > 1
               ? "border border-destructive/60 bg-destructive/5 p-3"
               : ""
           }`}
@@ -400,23 +400,23 @@ function Create() {
           <Section
             title="Host as"
             right={
-              !selectedTeamId && myTeams.length > 1 ? (
+              !selectedAffiliation && affiliations.length > 1 ? (
                 <span className="rounded-full bg-destructive/15 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-destructive">
                   Required
                 </span>
               ) : undefined
             }
           >
-          {myTeams.length === 1 ? (
+          {affiliations.length === 1 ? (
             <div className="flex items-center justify-between rounded-2xl border border-border bg-surface px-4 py-3">
               <div className="flex items-center gap-2 min-w-0">
                 <span className="grid h-8 w-8 place-items-center rounded-full bg-lime/10 text-lime text-sm font-bold shrink-0">
-                  {(myTeams[0].name || "?").slice(0, 1).toUpperCase()}
+                  {(affiliations[0].name || "?").slice(0, 1).toUpperCase()}
                 </span>
                 <div className="min-w-0">
-                  <div className="text-sm font-semibold truncate">{myTeams[0].name}</div>
+                  <div className="text-sm font-semibold truncate">{affiliations[0].name}</div>
                   <div className="text-[11px] uppercase tracking-wider text-muted-foreground">
-                    {myTeams[0].kind === "coach" ? "Club / gym" : "Team"}
+                    {affiliationLabel(affiliations[0])}
                   </div>
                 </div>
               </div>
@@ -425,13 +425,14 @@ function Create() {
           ) : (
             <>
               <div className="flex gap-2 overflow-x-auto scrollbar-hide -mx-1 px-1">
-                {myTeams.map((t) => {
-                  const active = selectedTeamId === t.id;
+                {affiliations.map((a) => {
+                  const active =
+                    selectedAffiliation?.source === a.source && selectedAffiliation.id === a.id;
                   return (
                     <button
                       type="button"
-                      key={t.id}
-                      onClick={() => setSelectedTeamId(t.id)}
+                      key={`${a.source}:${a.id}`}
+                      onClick={() => setSelectedAffiliation(a)}
                       className={`shrink-0 flex items-center gap-2 rounded-full border px-3 py-2 text-sm font-semibold ${
                         active
                           ? "border-lime bg-lime/10 text-lime"
@@ -439,17 +440,17 @@ function Create() {
                       }`}
                     >
                       <span className="grid h-6 w-6 place-items-center rounded-full bg-background text-xs font-bold">
-                        {(t.name || "?").slice(0, 1).toUpperCase()}
+                        {(a.name || "?").slice(0, 1).toUpperCase()}
                       </span>
-                      <span className="truncate max-w-[10rem]">{t.name}</span>
+                      <span className="truncate max-w-[10rem]">{a.name}</span>
                       <span className="text-[10px] uppercase tracking-wider opacity-70">
-                        {t.kind === "coach" ? "Club" : "Team"}
+                        {affiliationShortLabel(a)}
                       </span>
                     </button>
                   );
                 })}
               </div>
-              {!selectedTeamId && (
+              {!selectedAffiliation && (
                 <p className="mt-2 px-1 text-[11px] text-muted-foreground">
                   Pick who you're hosting as to continue.
                 </p>
@@ -460,11 +461,12 @@ function Create() {
         </div>
 
         <fieldset
-          disabled={!selectedTeamId}
+          disabled={!selectedAffiliation}
           className={`space-y-5 border-0 p-0 m-0 min-w-0 ${
-            !selectedTeamId ? "opacity-50 pointer-events-none" : ""
+            !selectedAffiliation ? "opacity-50 pointer-events-none" : ""
           }`}
         >
+
 
         <Section title="Sport">
 
