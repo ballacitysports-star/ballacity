@@ -34,6 +34,8 @@ export function PostEngagement({ subjectType, subjectId }: Props) {
   const qc = useQueryClient();
   const { user } = useAuth();
   const [body, setBody] = useState("");
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editBody, setEditBody] = useState("");
 
   const listCommentsFn = useServerFn(listComments);
   const listReactionsFn = useServerFn(listReactions);
