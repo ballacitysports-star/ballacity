@@ -23,7 +23,7 @@ import { motion } from "framer-motion";
 import { zodValidator, fallback } from "@tanstack/zod-adapter";
 import { z } from "zod";
 import { useServerFn } from "@tanstack/react-start";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useInfiniteQuery } from "@tanstack/react-query";
 import { listRecentTeamPosts } from "@/lib/team-posts.functions";
 import { PostCard } from "@/components/PostCard";
 import type { OrgPost, PostKind } from "@/lib/sample-data";
@@ -173,21 +173,27 @@ function Feed() {
   // Recent posts from teams & clubs (public read). Filtered by sport when the
   // chip row has exactly one sport selected.
   const fetchRecentTeamPosts = useServerFn(listRecentTeamPosts);
-  const teamPostsQuery = useQuery({
-    queryKey: [
-      "feed-team-posts",
-      chipSelected.length === 1 ? chipSelected[0] : "all",
-    ],
-    queryFn: () =>
+  const TEAM_POSTS_PAGE = 10;
+  const teamPostsSport = chipSelected.length === 1 ? chipSelected[0] : undefined;
+  const teamPostsQuery = useInfiniteQuery({
+    queryKey: ["feed-team-posts", teamPostsSport ?? "all"],
+    queryFn: ({ pageParam = 0 }) =>
       fetchRecentTeamPosts({
         data: {
-          limit: 10,
-          sport: chipSelected.length === 1 ? chipSelected[0] : undefined,
+          limit: TEAM_POSTS_PAGE,
+          offset: pageParam as number,
+          sport: teamPostsSport,
         },
       }),
+    initialPageParam: 0,
+    getNextPageParam: (lastPage, allPages) =>
+      lastPage.length < TEAM_POSTS_PAGE ? undefined : allPages.length * TEAM_POSTS_PAGE,
     staleTime: 30_000,
   });
-  const teamPosts = teamPostsQuery.data ?? [];
+  const teamPosts = useMemo(
+    () => (teamPostsQuery.data?.pages ?? []).flat(),
+    [teamPostsQuery.data],
+  );
   const setChipSport = (s: string | null) => {
     if (s === null) {
       setFeedPrefs({ ...prefs, preferredSports: [] });
@@ -580,6 +586,24 @@ function Feed() {
                 </div>
               );
             })}
+            {teamPostsQuery.hasNextPage && (
+              <div className="flex w-40 shrink-0 items-center justify-center snap-start">
+                <button
+                  type="button"
+                  onClick={() => teamPostsQuery.fetchNextPage()}
+                  disabled={teamPostsQuery.isFetchingNextPage}
+                  className="inline-flex items-center gap-2 rounded-full border border-border bg-surface px-4 py-2 text-sm font-semibold disabled:opacity-60"
+                >
+                  {teamPostsQuery.isFetchingNextPage ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin" /> Loading
+                    </>
+                  ) : (
+                    "Load more"
+                  )}
+                </button>
+              </div>
+            )}
           </div>
         </section>
       )}
