@@ -71,6 +71,8 @@ export type Game = {
   status?: "scheduled" | "in_progress" | "completed";
   joinsClosed?: boolean;
   positionsNeeded?: Record<string, number>;
+  teamId?: string;
+
 };
 
 

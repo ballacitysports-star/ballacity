@@ -16,6 +16,8 @@ import { SPORTS, type Sport, imageFor } from "@/lib/sample-data";
 import { addHostedGame } from "@/lib/hosted-games-store";
 import { useServerFn } from "@tanstack/react-start";
 import { reverseGeocode } from "@/lib/geocode.functions";
+import { listMyTeams } from "@/lib/teams.functions";
+import { useQuery } from "@tanstack/react-query";
 
 import { toast } from "sonner";
 import { LocationAutocomplete } from "@/components/LocationAutocomplete";
@@ -24,6 +26,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { upsertGamePaymentSettings } from "@/lib/payments";
 import { ImageUploader } from "@/components/ImageUploader";
 import { PositionsPicker, positionsCleanup, type PositionsNeeded } from "@/components/PositionsPicker";
+
 
 
 
@@ -36,7 +39,21 @@ function Create() {
   const nav = useNavigate();
   const { user } = useAuth();
   const profile = useMyProfile(user);
+  const fetchMyTeams = useServerFn(listMyTeams);
+  const myTeamsQuery = useQuery({
+    queryKey: ["my-teams", user?.id ?? "anon"],
+    queryFn: () => fetchMyTeams(),
+    enabled: !!user,
+    staleTime: 30_000,
+  });
+  const myTeams = myTeamsQuery.data ?? [];
+  const [selectedTeamId, setSelectedTeamId] = useState<string | null>(null);
+  useEffect(() => {
+    if (myTeams.length === 1) setSelectedTeamId((cur) => cur ?? myTeams[0].id);
+    if (myTeams.length === 0) setSelectedTeamId(null);
+  }, [myTeams]);
   const [sport, setSport] = useState<Sport>("Basketball");
+
   const [title, setTitle] = useState("");
   const [when, setWhen] = useState("");
   const [location, setLocation] = useState(profile?.city ?? "");
@@ -166,6 +183,52 @@ function Create() {
     );
   }
 
+  // Gate: must have at least one team/club before hosting.
+  if (myTeamsQuery.isLoading) {
+    return (
+      <div className="mx-auto w-full max-w-md sm:max-w-2xl lg:max-w-4xl px-4 pt-6">
+        <div className="h-8 w-40 bg-surface rounded-lg animate-pulse mb-4" />
+        <div className="h-32 bg-surface rounded-2xl animate-pulse" />
+      </div>
+    );
+  }
+
+  if (myTeams.length === 0) {
+    return (
+      <div className="mx-auto w-full max-w-md sm:max-w-2xl lg:max-w-4xl px-4 pt-6">
+        <div className="flex items-center gap-3 mb-5">
+          <Link to="/feed" className="grid h-10 w-10 place-items-center rounded-full border border-border bg-surface">
+            <ArrowLeft className="h-5 w-5" />
+          </Link>
+          <h1 className="font-display text-2xl font-bold">Host a game</h1>
+        </div>
+        <div className="rounded-2xl border border-border bg-surface p-6 text-center space-y-4">
+          <ShieldCheck className="h-8 w-8 mx-auto text-lime" />
+          <div>
+            <h2 className="font-display text-lg font-bold">Create a team or club first</h2>
+            <p className="text-sm text-muted-foreground mt-1">
+              Games are hosted under a team or club so players know who they're joining.
+            </p>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            <Link
+              to="/teams/create"
+              className="rounded-2xl bg-lime-gradient py-3 font-bold text-primary-foreground glow-lime"
+            >
+              Create a team
+            </Link>
+            <Link
+              to="/trainers/create"
+              className="rounded-2xl border border-border bg-background py-3 font-bold"
+            >
+              Create a club / gym
+            </Link>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="mx-auto w-full max-w-md sm:max-w-2xl lg:max-w-4xl px-4 pt-6">
       <div className="flex items-center gap-3 mb-5">
@@ -178,6 +241,7 @@ function Create() {
         <h1 className="font-display text-2xl font-bold">Host a game</h1>
       </div>
 
+
       <form
         onSubmit={async (e) => {
           e.preventDefault();
@@ -187,7 +251,12 @@ function Create() {
             nav({ to: "/auth", search: { redirect: "/create" } as any });
             return;
           }
+          if (!selectedTeamId) {
+            toast.error("Pick which team or club you're hosting as");
+            return;
+          }
           setPublishing(true);
+
           try {
             // Compute one or many ISO datetimes.
             let dates: string[];
@@ -252,7 +321,9 @@ function Create() {
                 host: hostSnap,
                 image: coverUrl ?? undefined,
                 positionsNeeded: cleanPositions,
+                teamId: selectedTeamId ?? undefined,
               });
+
               if (!firstGameId) firstGameId = game.id;
 
               // Persist host ownership + approval/fee preferences so the host & players see them on the detail page
@@ -283,8 +354,55 @@ function Create() {
         }}
         className="space-y-5"
       >
+        {/* Host as (team/club) */}
+        <Section title="Host as">
+          {myTeams.length === 1 ? (
+            <div className="flex items-center justify-between rounded-2xl border border-border bg-surface px-4 py-3">
+              <div className="flex items-center gap-2 min-w-0">
+                <span className="grid h-8 w-8 place-items-center rounded-full bg-lime/10 text-lime text-sm font-bold shrink-0">
+                  {(myTeams[0].name || "?").slice(0, 1).toUpperCase()}
+                </span>
+                <div className="min-w-0">
+                  <div className="text-sm font-semibold truncate">{myTeams[0].name}</div>
+                  <div className="text-[11px] uppercase tracking-wider text-muted-foreground">
+                    {myTeams[0].kind === "coach" ? "Club / gym" : "Team"}
+                  </div>
+                </div>
+              </div>
+              <span className="text-[11px] text-muted-foreground">Auto-selected</span>
+            </div>
+          ) : (
+            <div className="flex gap-2 overflow-x-auto scrollbar-hide -mx-1 px-1">
+              {myTeams.map((t) => {
+                const active = selectedTeamId === t.id;
+                return (
+                  <button
+                    type="button"
+                    key={t.id}
+                    onClick={() => setSelectedTeamId(t.id)}
+                    className={`shrink-0 flex items-center gap-2 rounded-full border px-3 py-2 text-sm font-semibold ${
+                      active
+                        ? "border-lime bg-lime/10 text-lime"
+                        : "border-border bg-surface text-muted-foreground"
+                    }`}
+                  >
+                    <span className="grid h-6 w-6 place-items-center rounded-full bg-background text-xs font-bold">
+                      {(t.name || "?").slice(0, 1).toUpperCase()}
+                    </span>
+                    <span className="truncate max-w-[10rem]">{t.name}</span>
+                    <span className="text-[10px] uppercase tracking-wider opacity-70">
+                      {t.kind === "coach" ? "Club" : "Team"}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </Section>
+
         {/* Sport */}
         <Section title="Sport">
+
           <div className="grid grid-cols-3 gap-2">
             {SPORTS.map((s) => {
               const active = sport === s.name;

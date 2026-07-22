@@ -87,6 +87,8 @@ type DbRow = {
   joins_closed: boolean;
   host_snapshot: { name?: string; username?: string; avatar?: string; rating?: number } | null;
   positions_needed?: Record<string, number> | null;
+  team_id?: string | null;
+
 };
 
 
@@ -124,6 +126,8 @@ function rowToGame(r: DbRow): Game {
     status: (r.status as Game["status"]) ?? undefined,
     joinsClosed: !!r.joins_closed,
     positionsNeeded: (r.positions_needed ?? {}) as Record<string, number>,
+    teamId: r.team_id ?? undefined,
+
   } as Game;
 }
 
@@ -155,7 +159,9 @@ function gameToInsertRow(g: Game): TablesInsert<"hosted_games"> {
     joins_closed: !!(g as { joinsClosed?: boolean }).joinsClosed,
     host_snapshot: (g.host ?? {}) as TablesInsert<"hosted_games">["host_snapshot"],
     positions_needed: (g.positionsNeeded ?? {}) as TablesInsert<"hosted_games">["positions_needed"],
-  };
+    ...(g.teamId ? { team_id: g.teamId } : {}),
+  } as TablesInsert<"hosted_games">;
+
 }
 
 // ---------- DB hydration + realtime ----------
@@ -249,6 +255,8 @@ export type HostedGameInput = {
   hostUserId?: string;
   image?: string; // optional custom cover URL
   positionsNeeded?: Record<string, number>;
+  teamId?: string;
+
 };
 
 export async function addHostedGame(input: HostedGameInput): Promise<Game> {
@@ -285,7 +293,9 @@ export async function addHostedGame(input: HostedGameInput): Promise<Game> {
     description: input.description || "",
     equipment: [],
     positionsNeeded: input.positionsNeeded ?? {},
+    teamId: input.teamId,
   };
+
 
 
   // Optimistic local insert.
