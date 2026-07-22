@@ -1469,6 +1469,16 @@ function GameDetail() {
           )}
         </div>
 
+        {/* Discussion */}
+        <div>
+          <h2 className="font-display text-sm font-bold uppercase tracking-wider text-muted-foreground mb-2">
+            Discussion
+          </h2>
+          <PostEngagement subjectType="game" subjectId={game.id} />
+        </div>
+
+
+
         {/* Payment settings summary */}
         {(settings?.payment_deadline || settings?.refund_policy || settings?.payment_instructions) && (
           <div className="rounded-3xl border border-border bg-surface p-4">
