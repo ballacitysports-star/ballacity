@@ -383,14 +383,24 @@ export function EditOrgScreen({ org }: { org: Org }) {
     try {
       const currentId = initialOrgId;
       const nextMode = orgChoice.mode;
+      let newId: string | null = currentId;
+
       if (nextMode === "existing" && orgChoice.orgId && orgChoice.orgId !== currentId) {
         if (currentId) {
-          try { await leaveOrg({ data: { orgId: currentId, trainerId: org.id } }); } catch { /* ignore */ }
+          try { await leaveOrg({ data: { orgId: currentId, trainerId: org.id } }); }
+          catch (e) { console.warn("[edit-org] leave failed", e); }
         }
         await joinOrg({ data: { orgId: orgChoice.orgId, trainerId: org.id } });
-      } else if (nextMode === "new" && orgChoice.name && !currentId) {
-        const orgHandle = slugifyHandle(orgChoice.name) || `org${Date.now().toString(36).slice(-4)}`;
-        await createOrg({
+        newId = orgChoice.orgId;
+      } else if (nextMode === "new" && orgChoice.name) {
+        if (currentId) {
+          try { await leaveOrg({ data: { orgId: currentId, trainerId: org.id } }); }
+          catch (e) { console.warn("[edit-org] leave failed", e); }
+        }
+        const baseSlug = slugifyHandle(orgChoice.name);
+        const suffix = Date.now().toString(36).slice(-4);
+        const orgHandle = baseSlug.length >= 3 ? baseSlug : `org-${suffix}`;
+        const created = await createOrg({
           data: {
             name: orgChoice.name,
             handle: orgHandle,
@@ -401,13 +411,22 @@ export function EditOrgScreen({ org }: { org: Org }) {
             geo: orgChoice.geo ?? undefined,
           },
         });
+        newId = typeof created === "string" ? created : null;
+        toast.success(`Created ${orgChoice.name}`);
       } else if (nextMode === null && currentId) {
         await leaveOrg({ data: { orgId: currentId, trainerId: org.id } });
+        newId = null;
+      }
+
+      if (newId !== currentId) {
+        setInitialOrgId(newId);
+        await queryClient.invalidateQueries({ queryKey: ["trainer-org-membership", org.id] });
       }
     } catch (e) {
       toast.message(e instanceof Error ? e.message : "Couldn't update organization link.");
     }
   }
+
 
   async function save() {
     if (kind === "coach" && slotsError) { alert(slotsError.message); return; }
