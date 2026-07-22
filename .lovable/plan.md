@@ -1,30 +1,41 @@
-## Root cause
+## Goal
 
-In `applyOrgChoiceChange` (src/routes/teams.$teamId.edit.tsx around line 380), the `"new"` branch only runs when there is **no** current membership:
+Require every host to be affiliated with at least one team/club before they can create a game. When the host owns multiple teams/clubs, let them pick which one to host under from the Create screen.
 
-```ts
-} else if (nextMode === "new" && orgChoice.name && !currentId) {
-  await createOrg(...)
-}
-```
+## Behavior
 
-If the trainer is already linked to any org (`initialOrgId` set), picking a new gym silently does nothing — no create, no leave, no toast. There is also no query invalidation after a successful create, so even a fresh trainer's UI doesn't reflect the new gym without a manual reload. A short slug from `slugifyHandle` (< 3 chars) additionally fails the `handle` Zod regex and is swallowed by the catch-all toast.
+1. **Gate the Create screen** (`src/routes/_tabs.create.tsx`)
+   - Fetch the current user's owned teams/clubs (from `public.teams` where `owner_id = user.id`) via a new `listMyTeams` server function.
+   - If the user has **zero** teams/clubs, replace the form with an empty state:
+     - Title: "Create a team or club first"
+     - Body: short explanation ("Games are hosted under a team or club so players know who they're joining.")
+     - Two CTAs: "Create a team" → `/teams/create`, "Create a club/gym" → `/orgs/create` (or `teams.create` with `kind=coach`, matching the existing wizard).
+   - If the user has **one** team/club, auto-select it (show a small read-only chip: "Hosting as: {name}") and let them submit normally.
+   - If the user has **multiple**, add a required "Host as" selector at the top of the form (below the header) rendered as a horizontal pill list of their teams/clubs (avatar + name + kind badge). Selection persists in local component state; submit is blocked with a toast until one is chosen.
 
-## Fix
+2. **Attach the chosen team to the game**
+   - Extend `addHostedGame` (in `src/lib/hosted-games-store.ts`) to accept an optional `teamId` and persist it on the game (`hosted_games.team_id`, new nullable column). Include it in the row insert and in the in-memory snapshot returned to the UI.
+   - The multi-day repeat path passes the same `teamId` to every created game.
 
-1. In `applyOrgChoiceChange`:
-   - When `nextMode === "new"` and `currentId` exists, `leaveOrg` first (best-effort), then `createOrg`.
-   - Guarantee `orgHandle` is ≥ 3 chars by padding the fallback (`org${…}` already is, but `slugifyHandle("AB")` → "ab" fails — pad with the timestamp suffix if slug < 3).
-   - After a successful create/join/leave, invalidate the `["trainer-org-membership", org.id]` query and update `initialOrgId` locally so the UI reflects the new gym.
-2. Surface real errors: replace the silent `catch { /* ignore */ }` around `leaveOrg` with a debug log, and let the outer `catch` continue to toast create/join errors (already does).
+3. **Show affiliation on the game**
+   - No new UI in this change beyond persisting `team_id`. A follow-up can render the team chip on the game detail card.
 
 ## Technical details
 
-- File: `src/routes/teams.$teamId.edit.tsx`
-- Function: `applyOrgChoiceChange` (~lines 380–409)
-- Also call `queryClient.invalidateQueries({ queryKey: ["trainer-org-membership", org.id] })` after the branch and `setInitialOrgId(newId ?? null)`.
-- No schema or server changes needed; `create_trainer_org_with_owner` RPC already inserts the owner membership.
+- **Data**
+  - Add migration: `ALTER TABLE public.hosted_games ADD COLUMN team_id uuid REFERENCES public.teams(id) ON DELETE SET NULL;` plus an index on `team_id`. No RLS change needed (existing host-scoped policies still apply).
+- **Server functions** (`src/lib/teams.functions.ts`)
+  - Add `listMyTeams` (`requireSupabaseAuth`) returning `{ id, name, kind, avatar, handle }[]` for `owner_id = context.userId`, ordered by `created_at desc`.
+- **Client**
+  - In `_tabs.create.tsx`, call `listMyTeams` with `useQuery` after the existing sign-in guard. While loading, show a small skeleton. Based on count, render the three states above.
+  - Add a `selectedTeamId` state; auto-set when count === 1.
+  - Pass `teamId: selectedTeamId ?? undefined` into `addHostedGame` and the multi-day loop.
+- **Types**
+  - Extend the `addHostedGame` input type with `teamId?: string`.
+  - `HostedGame` snapshot gains an optional `teamId` field.
 
 ## Out of scope
 
-- No changes to the org creation RPC, RLS, or the OrgForm UI.
+- Rendering the team chip on game cards / detail pages (follow-up).
+- Migrating existing games without `team_id`.
+- Team-member (non-owner) hosting permissions — for now only the team's `owner_id` can host under it. Can be expanded later using `trainer_org_members` / a future `team_members` table.
