@@ -76,6 +76,7 @@ import { useMyFlowStatus } from "@/lib/game-flow-status";
 import { PlayerFlowPill } from "@/components/PlayerFlowPill";
 import { PaymentRequiredBanner } from "@/components/PaymentRequiredBanner";
 import { HostPaymentsPanel, PlayerPaymentsPanel } from "@/components/GamePaymentsPanel";
+import { PostEngagement } from "@/components/PostEngagement";
 
 import { useHostedGames, fetchHostedGame, updateHostedGame, deleteHostedGame } from "@/lib/hosted-games-store";
 import type { Game } from "@/lib/sample-data";
