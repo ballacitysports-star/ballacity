@@ -39,7 +39,21 @@ function Create() {
   const nav = useNavigate();
   const { user } = useAuth();
   const profile = useMyProfile(user);
+  const fetchMyTeams = useServerFn(listMyTeams);
+  const myTeamsQuery = useQuery({
+    queryKey: ["my-teams", user?.id ?? "anon"],
+    queryFn: () => fetchMyTeams(),
+    enabled: !!user,
+    staleTime: 30_000,
+  });
+  const myTeams = myTeamsQuery.data ?? [];
+  const [selectedTeamId, setSelectedTeamId] = useState<string | null>(null);
+  useEffect(() => {
+    if (myTeams.length === 1) setSelectedTeamId((cur) => cur ?? myTeams[0].id);
+    if (myTeams.length === 0) setSelectedTeamId(null);
+  }, [myTeams]);
   const [sport, setSport] = useState<Sport>("Basketball");
+
   const [title, setTitle] = useState("");
   const [when, setWhen] = useState("");
   const [location, setLocation] = useState(profile?.city ?? "");
