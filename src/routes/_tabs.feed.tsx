@@ -22,6 +22,11 @@ import { clearScrollRestore, useScrollRestore } from "@/hooks/use-scroll-restore
 import { motion } from "framer-motion";
 import { zodValidator, fallback } from "@tanstack/zod-adapter";
 import { z } from "zod";
+import { useServerFn } from "@tanstack/react-start";
+import { useQuery } from "@tanstack/react-query";
+import { listRecentTeamPosts } from "@/lib/team-posts.functions";
+import { PostCard } from "@/components/PostCard";
+import type { OrgPost, PostKind } from "@/lib/sample-data";
 
 // URL-persisted feed state. Refreshing or sharing the URL preserves search
 // text, sport chip, sort, distance cap, position, view/density toggles, and
