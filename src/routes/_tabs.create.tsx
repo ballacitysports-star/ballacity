@@ -79,9 +79,9 @@ function Create() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [affiliations.length, affiliationsLoading]);
   const affiliationLabel = (a: Affiliation) =>
-    a.source === "org" ? "Club / gym" : a.kind === "coach" ? "Trainer" : "Team";
+    a.source === "org" ? "Gym" : a.kind === "coach" ? "Trainer" : "Team";
   const affiliationShortLabel = (a: Affiliation) =>
-    a.source === "org" ? "Club" : a.kind === "coach" ? "Trainer" : "Team";
+    a.source === "org" ? "Gym" : a.kind === "coach" ? "Trainer" : "Team";
   const [sport, setSport] = useState<Sport>("Basketball");
 
   const [title, setTitle] = useState("");
