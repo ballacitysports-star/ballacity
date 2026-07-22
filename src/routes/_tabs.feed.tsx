@@ -173,21 +173,27 @@ function Feed() {
   // Recent posts from teams & clubs (public read). Filtered by sport when the
   // chip row has exactly one sport selected.
   const fetchRecentTeamPosts = useServerFn(listRecentTeamPosts);
-  const teamPostsQuery = useQuery({
-    queryKey: [
-      "feed-team-posts",
-      chipSelected.length === 1 ? chipSelected[0] : "all",
-    ],
-    queryFn: () =>
+  const TEAM_POSTS_PAGE = 10;
+  const teamPostsSport = chipSelected.length === 1 ? chipSelected[0] : undefined;
+  const teamPostsQuery = useInfiniteQuery({
+    queryKey: ["feed-team-posts", teamPostsSport ?? "all"],
+    queryFn: ({ pageParam = 0 }) =>
       fetchRecentTeamPosts({
         data: {
-          limit: 10,
-          sport: chipSelected.length === 1 ? chipSelected[0] : undefined,
+          limit: TEAM_POSTS_PAGE,
+          offset: pageParam as number,
+          sport: teamPostsSport,
         },
       }),
+    initialPageParam: 0,
+    getNextPageParam: (lastPage, allPages) =>
+      lastPage.length < TEAM_POSTS_PAGE ? undefined : allPages.length * TEAM_POSTS_PAGE,
     staleTime: 30_000,
   });
-  const teamPosts = teamPostsQuery.data ?? [];
+  const teamPosts = useMemo(
+    () => (teamPostsQuery.data?.pages ?? []).flat(),
+    [teamPostsQuery.data],
+  );
   const setChipSport = (s: string | null) => {
     if (s === null) {
       setFeedPrefs({ ...prefs, preferredSports: [] });
