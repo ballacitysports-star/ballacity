@@ -354,7 +354,8 @@ function Create() {
                 host: hostSnap,
                 image: coverUrl ?? undefined,
                 positionsNeeded: cleanPositions,
-                teamId: selectedTeamId ?? undefined,
+                teamId: selectedAffiliation?.source === "team" ? selectedAffiliation.id : undefined,
+                orgId: selectedAffiliation?.source === "org" ? selectedAffiliation.id : undefined,
               });
 
               if (!firstGameId) firstGameId = game.id;
