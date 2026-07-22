@@ -3,7 +3,15 @@ import { Calendar, MapPin, Users, DollarSign, Pin } from "lucide-react";
 import { POST_KIND_META, type OrgPost } from "@/lib/sample-data";
 import { formatWhen } from "@/lib/format";
 
-export function PostCard({ post, index = 0 }: { post: OrgPost; index?: number }) {
+export function PostCard({
+  post,
+  index = 0,
+  onClick,
+}: {
+  post: OrgPost;
+  index?: number;
+  onClick?: () => void;
+}) {
   const meta = POST_KIND_META[post.kind];
   const isEvent = post.kind === "tryout" || post.kind === "pickup" || post.kind === "clinic";
   const accent =
@@ -21,8 +29,22 @@ export function PostCard({ post, index = 0 }: { post: OrgPost; index?: number })
       initial={{ opacity: 0, y: 12 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: index * 0.04 }}
-      className="relative rounded-3xl border border-border bg-surface p-4"
+      onClick={onClick}
+      role={onClick ? "button" : undefined}
+      tabIndex={onClick ? 0 : undefined}
+      onKeyDown={
+        onClick
+          ? (e) => {
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                onClick();
+              }
+            }
+          : undefined
+      }
+      className={`relative rounded-3xl border border-border bg-surface p-4 ${onClick ? "cursor-pointer transition hover:border-lime/40 focus:outline-none focus:ring-2 focus:ring-lime/40" : ""}`}
     >
+
       {post.pinned && (
         <span className="absolute -top-2 left-4 inline-flex items-center gap-1 rounded-full bg-lime px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-primary-foreground">
           <Pin className="h-3 w-3" /> Pinned
