@@ -723,10 +723,12 @@ function Create() {
 function Section({
   title,
   icon,
+  right,
   children,
 }: {
   title: string;
   icon?: React.ReactNode;
+  right?: React.ReactNode;
   children: React.ReactNode;
 }) {
   return (
@@ -734,11 +736,13 @@ function Section({
       <div className="mb-2 flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-muted-foreground">
         {icon}
         {title}
+        {right && <span className="ml-auto">{right}</span>}
       </div>
       <div className="space-y-2">{children}</div>
     </div>
   );
 }
+
 
 function Toggle({
   icon,
