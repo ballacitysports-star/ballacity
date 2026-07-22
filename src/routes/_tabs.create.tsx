@@ -17,6 +17,7 @@ import { addHostedGame } from "@/lib/hosted-games-store";
 import { useServerFn } from "@tanstack/react-start";
 import { reverseGeocode } from "@/lib/geocode.functions";
 import { listMyTeams } from "@/lib/teams.functions";
+import { listMyOrgs } from "@/lib/trainer-orgs.functions";
 import { useQuery } from "@tanstack/react-query";
 
 import { toast } from "sonner";
@@ -40,19 +41,47 @@ function Create() {
   const { user } = useAuth();
   const profile = useMyProfile(user);
   const fetchMyTeams = useServerFn(listMyTeams);
+  const fetchMyOrgs = useServerFn(listMyOrgs);
   const myTeamsQuery = useQuery({
     queryKey: ["my-teams", user?.id ?? "anon"],
     queryFn: () => fetchMyTeams(),
     enabled: !!user,
     staleTime: 30_000,
   });
+  const myOrgsQuery = useQuery({
+    queryKey: ["my-orgs", user?.id ?? "anon"],
+    queryFn: () => fetchMyOrgs(),
+    enabled: !!user,
+    staleTime: 30_000,
+  });
   const myTeams = myTeamsQuery.data ?? [];
-  const [selectedTeamId, setSelectedTeamId] = useState<string | null>(null);
+  const myOrgs = myOrgsQuery.data ?? [];
+  type Affiliation = {
+    source: "team" | "org";
+    id: string;
+    name: string;
+    kind?: "team" | "coach";
+  };
+  const affiliations: Affiliation[] = [
+    ...myTeams.map((t) => ({ source: "team" as const, id: t.id, name: t.name, kind: t.kind })),
+    ...myOrgs.map((o) => ({ source: "org" as const, id: o.id, name: o.name })),
+  ];
+  const affiliationsLoading = myTeamsQuery.isLoading || myOrgsQuery.isLoading;
+  const [selectedAffiliation, setSelectedAffiliation] = useState<Affiliation | null>(null);
   const hostAsRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
-    if (myTeams.length === 1) setSelectedTeamId((cur) => cur ?? myTeams[0].id);
-    if (myTeams.length === 0) setSelectedTeamId(null);
-  }, [myTeams]);
+    if (affiliationsLoading) return;
+    if (affiliations.length === 1) {
+      setSelectedAffiliation((cur) => cur ?? affiliations[0]);
+    } else if (affiliations.length === 0) {
+      setSelectedAffiliation(null);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [affiliations.length, affiliationsLoading]);
+  const affiliationLabel = (a: Affiliation) =>
+    a.source === "org" ? "Club / gym" : a.kind === "coach" ? "Trainer" : "Team";
+  const affiliationShortLabel = (a: Affiliation) =>
+    a.source === "org" ? "Club" : a.kind === "coach" ? "Trainer" : "Team";
   const [sport, setSport] = useState<Sport>("Basketball");
 
   const [title, setTitle] = useState("");
@@ -185,7 +214,7 @@ function Create() {
   }
 
   // Gate: must have at least one team/club before hosting.
-  if (myTeamsQuery.isLoading) {
+  if (affiliationsLoading) {
     return (
       <div className="mx-auto w-full max-w-md sm:max-w-2xl lg:max-w-4xl px-4 pt-6">
         <div className="h-8 w-40 bg-surface rounded-lg animate-pulse mb-4" />
@@ -194,7 +223,7 @@ function Create() {
     );
   }
 
-  if (myTeams.length === 0) {
+  if (affiliations.length === 0) {
     return (
       <div className="mx-auto w-full max-w-md sm:max-w-2xl lg:max-w-4xl px-4 pt-6">
         <div className="flex items-center gap-3 mb-5">
@@ -219,7 +248,7 @@ function Create() {
               Create a team
             </Link>
             <Link
-              to="/trainers/create"
+              to="/orgs/create"
               className="rounded-2xl border border-border bg-background py-3 font-bold"
             >
               Create a club / gym
@@ -229,6 +258,7 @@ function Create() {
       </div>
     );
   }
+
 
   return (
     <div className="mx-auto w-full max-w-md sm:max-w-2xl lg:max-w-4xl px-4 pt-6">
@@ -252,7 +282,7 @@ function Create() {
             nav({ to: "/auth", search: { redirect: "/create" } as any });
             return;
           }
-          if (!selectedTeamId) {
+          if (!selectedAffiliation) {
             toast.error("Pick which team or club you're hosting as");
             hostAsRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
             hostAsRef.current?.querySelector<HTMLButtonElement>("button")?.focus();
@@ -324,7 +354,8 @@ function Create() {
                 host: hostSnap,
                 image: coverUrl ?? undefined,
                 positionsNeeded: cleanPositions,
-                teamId: selectedTeamId ?? undefined,
+                teamId: selectedAffiliation?.source === "team" ? selectedAffiliation.id : undefined,
+                orgId: selectedAffiliation?.source === "org" ? selectedAffiliation.id : undefined,
               });
 
               if (!firstGameId) firstGameId = game.id;
@@ -361,7 +392,7 @@ function Create() {
         <div
           ref={hostAsRef}
           className={`rounded-2xl ${
-            !selectedTeamId && myTeams.length > 1
+            !selectedAffiliation && affiliations.length > 1
               ? "border border-destructive/60 bg-destructive/5 p-3"
               : ""
           }`}
@@ -369,23 +400,23 @@ function Create() {
           <Section
             title="Host as"
             right={
-              !selectedTeamId && myTeams.length > 1 ? (
+              !selectedAffiliation && affiliations.length > 1 ? (
                 <span className="rounded-full bg-destructive/15 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-destructive">
                   Required
                 </span>
               ) : undefined
             }
           >
-          {myTeams.length === 1 ? (
+          {affiliations.length === 1 ? (
             <div className="flex items-center justify-between rounded-2xl border border-border bg-surface px-4 py-3">
               <div className="flex items-center gap-2 min-w-0">
                 <span className="grid h-8 w-8 place-items-center rounded-full bg-lime/10 text-lime text-sm font-bold shrink-0">
-                  {(myTeams[0].name || "?").slice(0, 1).toUpperCase()}
+                  {(affiliations[0].name || "?").slice(0, 1).toUpperCase()}
                 </span>
                 <div className="min-w-0">
-                  <div className="text-sm font-semibold truncate">{myTeams[0].name}</div>
+                  <div className="text-sm font-semibold truncate">{affiliations[0].name}</div>
                   <div className="text-[11px] uppercase tracking-wider text-muted-foreground">
-                    {myTeams[0].kind === "coach" ? "Club / gym" : "Team"}
+                    {affiliationLabel(affiliations[0])}
                   </div>
                 </div>
               </div>
@@ -394,13 +425,14 @@ function Create() {
           ) : (
             <>
               <div className="flex gap-2 overflow-x-auto scrollbar-hide -mx-1 px-1">
-                {myTeams.map((t) => {
-                  const active = selectedTeamId === t.id;
+                {affiliations.map((a) => {
+                  const active =
+                    selectedAffiliation?.source === a.source && selectedAffiliation.id === a.id;
                   return (
                     <button
                       type="button"
-                      key={t.id}
-                      onClick={() => setSelectedTeamId(t.id)}
+                      key={`${a.source}:${a.id}`}
+                      onClick={() => setSelectedAffiliation(a)}
                       className={`shrink-0 flex items-center gap-2 rounded-full border px-3 py-2 text-sm font-semibold ${
                         active
                           ? "border-lime bg-lime/10 text-lime"
@@ -408,17 +440,17 @@ function Create() {
                       }`}
                     >
                       <span className="grid h-6 w-6 place-items-center rounded-full bg-background text-xs font-bold">
-                        {(t.name || "?").slice(0, 1).toUpperCase()}
+                        {(a.name || "?").slice(0, 1).toUpperCase()}
                       </span>
-                      <span className="truncate max-w-[10rem]">{t.name}</span>
+                      <span className="truncate max-w-[10rem]">{a.name}</span>
                       <span className="text-[10px] uppercase tracking-wider opacity-70">
-                        {t.kind === "coach" ? "Club" : "Team"}
+                        {affiliationShortLabel(a)}
                       </span>
                     </button>
                   );
                 })}
               </div>
-              {!selectedTeamId && (
+              {!selectedAffiliation && (
                 <p className="mt-2 px-1 text-[11px] text-muted-foreground">
                   Pick who you're hosting as to continue.
                 </p>
@@ -429,11 +461,12 @@ function Create() {
         </div>
 
         <fieldset
-          disabled={!selectedTeamId}
+          disabled={!selectedAffiliation}
           className={`space-y-5 border-0 p-0 m-0 min-w-0 ${
-            !selectedTeamId ? "opacity-50 pointer-events-none" : ""
+            !selectedAffiliation ? "opacity-50 pointer-events-none" : ""
           }`}
         >
+
 
         <Section title="Sport">
 
@@ -701,13 +734,13 @@ function Create() {
         <motion.button
           whileTap={{ scale: 0.98 }}
           type="submit"
-          disabled={publishing || !selectedTeamId}
+          disabled={publishing || !selectedAffiliation}
           className="w-full rounded-2xl bg-lime-gradient py-4 font-bold text-primary-foreground glow-lime disabled:opacity-60"
         >
           {publishing
             ? "Publishing…"
-            : !selectedTeamId
-              ? "Choose a team to continue"
+            : !selectedAffiliation
+              ? "Choose a team or club to continue"
               : "Publish game"}
         </motion.button>
         <p className="text-center text-xs text-muted-foreground pb-6">

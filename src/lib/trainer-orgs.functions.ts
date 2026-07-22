@@ -39,6 +39,18 @@ export const listTrainerOrgs = createServerFn({ method: "GET" })
     return rows ?? [];
   });
 
+export const listMyOrgs = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const { data, error } = await context.supabase
+      .from("trainer_orgs")
+      .select("id, name, handle, avatar")
+      .eq("owner_id", context.userId)
+      .order("created_at", { ascending: false });
+    if (error) throw new Error(error.message);
+    return (data ?? []) as { id: string; name: string; handle: string; avatar: string | null }[];
+  });
+
 export const getTrainerOrg = createServerFn({ method: "GET" })
   .inputValidator((d: { id: string }) => z.object({ id: z.string().uuid() }).parse(d))
   .handler(async ({ data }) => {

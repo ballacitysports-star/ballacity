@@ -88,6 +88,7 @@ type DbRow = {
   host_snapshot: { name?: string; username?: string; avatar?: string; rating?: number } | null;
   positions_needed?: Record<string, number> | null;
   team_id?: string | null;
+  org_id?: string | null;
 
 };
 
@@ -127,6 +128,7 @@ function rowToGame(r: DbRow): Game {
     joinsClosed: !!r.joins_closed,
     positionsNeeded: (r.positions_needed ?? {}) as Record<string, number>,
     teamId: r.team_id ?? undefined,
+    orgId: r.org_id ?? undefined,
 
   } as Game;
 }
@@ -160,6 +162,7 @@ function gameToInsertRow(g: Game): TablesInsert<"hosted_games"> {
     host_snapshot: (g.host ?? {}) as TablesInsert<"hosted_games">["host_snapshot"],
     positions_needed: (g.positionsNeeded ?? {}) as TablesInsert<"hosted_games">["positions_needed"],
     ...(g.teamId ? { team_id: g.teamId } : {}),
+    ...(g.orgId ? { org_id: g.orgId } : {}),
   } as TablesInsert<"hosted_games">;
 
 }
@@ -256,6 +259,7 @@ export type HostedGameInput = {
   image?: string; // optional custom cover URL
   positionsNeeded?: Record<string, number>;
   teamId?: string;
+  orgId?: string;
 
 };
 
@@ -294,6 +298,7 @@ export async function addHostedGame(input: HostedGameInput): Promise<Game> {
     equipment: [],
     positionsNeeded: input.positionsNeeded ?? {},
     teamId: input.teamId,
+    orgId: input.orgId,
   };
 
 
