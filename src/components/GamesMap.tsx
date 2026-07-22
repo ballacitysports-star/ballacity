@@ -52,10 +52,12 @@ const DARK_STYLE = [
 export type MapPinItem = {
   id: string;
   emoji: string;
-  /** pseudo coord 0-100 from sample data (lat = y, lng = x) */
+  /** When `real` is true, lat/lng are real WGS84 degrees. Otherwise they are
+   *  0-100 pseudo coords scattered around the current map center. */
   lat: number;
   lng: number;
   urgent?: boolean;
+  real?: boolean;
 };
 
 export function GamesMap({
@@ -369,7 +371,14 @@ export function GamesMap({
     const center = pinCenterRef.current || userPosRef.current || { lat: 40.7281, lng: -73.9842 };
     pins.forEach((p) => {
       const m = pinMarkersRef.current.get(p.id);
-      if (m) m.setPosition(toLatLng(p.lng, p.lat, center));
+      if (!m) return;
+      // Real coordinates stay pinned to their true location — don't offset
+      // them when the viewer's center changes.
+      if (p.real) {
+        m.setPosition({ lat: p.lat, lng: p.lng });
+      } else {
+        m.setPosition(toLatLng(p.lng, p.lat, center));
+      }
     });
   };
 
@@ -381,8 +390,11 @@ export function GamesMap({
 
     pins.forEach((p) => {
       if (existing.has(p.id)) return;
+      const position = p.real
+        ? { lat: p.lat, lng: p.lng }
+        : toLatLng(p.lng, p.lat, center);
       const marker = new window.google.maps.Marker({
-        position: toLatLng(p.lng, p.lat, center),
+        position,
         map: mapRef.current,
         icon: makePinIcon(p.emoji, p.id === activeId, !!p.urgent),
       });
