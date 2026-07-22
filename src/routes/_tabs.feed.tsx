@@ -22,6 +22,11 @@ import { clearScrollRestore, useScrollRestore } from "@/hooks/use-scroll-restore
 import { motion } from "framer-motion";
 import { zodValidator, fallback } from "@tanstack/zod-adapter";
 import { z } from "zod";
+import { useServerFn } from "@tanstack/react-start";
+import { useQuery } from "@tanstack/react-query";
+import { listRecentTeamPosts } from "@/lib/team-posts.functions";
+import { PostCard } from "@/components/PostCard";
+import type { OrgPost, PostKind } from "@/lib/sample-data";
 
 // URL-persisted feed state. Refreshing or sharing the URL preserves search
 // text, sport chip, sort, distance cap, position, view/density toggles, and
@@ -164,6 +169,25 @@ function Feed() {
   // Chip row mirrors the multi-select made in the filter sheet. Tapping a
   // chip toggles that sport in/out of preferredSports; "All sports" clears.
   const chipSelected: string[] = prefs.preferredSports;
+
+  // Recent posts from teams & clubs (public read). Filtered by sport when the
+  // chip row has exactly one sport selected.
+  const fetchRecentTeamPosts = useServerFn(listRecentTeamPosts);
+  const teamPostsQuery = useQuery({
+    queryKey: [
+      "feed-team-posts",
+      chipSelected.length === 1 ? chipSelected[0] : "all",
+    ],
+    queryFn: () =>
+      fetchRecentTeamPosts({
+        data: {
+          limit: 10,
+          sport: chipSelected.length === 1 ? chipSelected[0] : undefined,
+        },
+      }),
+    staleTime: 30_000,
+  });
+  const teamPosts = teamPostsQuery.data ?? [];
   const setChipSport = (s: string | null) => {
     if (s === null) {
       setFeedPrefs({ ...prefs, preferredSports: [] });
@@ -514,7 +538,54 @@ function Feed() {
         )}
       </div>
 
+      {teamPosts.length > 0 && (
+        <section className="mb-6">
+          <div className="flex items-center justify-between mb-2">
+            <h2 className="font-display text-sm font-bold uppercase tracking-wider text-muted-foreground">
+              From teams &amp; clubs
+            </h2>
+            <Link to="/teams" className="text-xs font-semibold text-lime">
+              See all
+            </Link>
+          </div>
+          <div className="flex gap-3 overflow-x-auto scrollbar-hide -mx-4 px-4 pb-1 snap-x">
+            {teamPosts.map((p, i) => {
+              const orgPost: OrgPost = {
+                id: p.id,
+                kind: p.kind as PostKind,
+                title: p.title,
+                body: p.body,
+                date: p.eventDate ?? p.createdAt,
+                postedAt: p.createdAt,
+                location: p.location ?? undefined,
+                price: p.price ?? undefined,
+                pinned: p.pinned,
+              };
+              return (
+                <div key={p.id} className="w-[85%] max-w-sm shrink-0 snap-start">
+                  <Link
+                    to="/teams/$teamId"
+                    params={{ teamId: p.teamId }}
+                    className="mb-1 flex items-center gap-2 text-xs font-semibold"
+                  >
+                    <span className="grid h-6 w-6 place-items-center rounded-full bg-lime/10 text-lime text-[10px] font-bold">
+                      {(p.teamName || "?").slice(0, 1).toUpperCase()}
+                    </span>
+                    <span className="truncate">{p.teamName}</span>
+                    {p.teamSports?.[0] && (
+                      <span className="text-muted-foreground">· {p.teamSports[0]}</span>
+                    )}
+                  </Link>
+                  <PostCard post={orgPost} index={i} />
+                </div>
+              );
+            })}
+          </div>
+        </section>
+      )}
+
       {q ? (
+
         <>
           <h2 className="font-display text-sm font-bold uppercase tracking-wider text-muted-foreground mb-2">
             {filtered.length} result{filtered.length === 1 ? "" : "s"} for "{q}"
