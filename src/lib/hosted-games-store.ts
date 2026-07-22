@@ -87,6 +87,8 @@ type DbRow = {
   joins_closed: boolean;
   host_snapshot: { name?: string; username?: string; avatar?: string; rating?: number } | null;
   positions_needed?: Record<string, number> | null;
+  team_id?: string | null;
+
 };
 
 
