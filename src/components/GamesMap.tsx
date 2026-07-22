@@ -52,10 +52,12 @@ const DARK_STYLE = [
 export type MapPinItem = {
   id: string;
   emoji: string;
-  /** pseudo coord 0-100 from sample data (lat = y, lng = x) */
+  /** When `real` is true, lat/lng are real WGS84 degrees. Otherwise they are
+   *  0-100 pseudo coords scattered around the current map center. */
   lat: number;
   lng: number;
   urgent?: boolean;
+  real?: boolean;
 };
 
 export function GamesMap({
