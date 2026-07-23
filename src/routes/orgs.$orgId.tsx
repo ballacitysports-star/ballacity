@@ -187,13 +187,22 @@ function OrgPage() {
             </div>
           </div>
           {isAdmin && (
-            <Link
-              to="/orgs/$orgId/edit"
-              params={{ orgId }}
-              className="shrink-0 rounded-full border border-lime/40 bg-lime/10 px-3 py-1.5 text-xs font-bold text-lime hover:bg-lime/20"
-            >
-              Edit
-            </Link>
+            <div className="flex shrink-0 flex-col gap-2">
+              <Link
+                to="/orgs/$orgId/edit"
+                params={{ orgId }}
+                className="rounded-full border border-lime/40 bg-lime/10 px-3 py-1.5 text-center text-xs font-bold text-lime hover:bg-lime/20"
+              >
+                Edit
+              </Link>
+              <Link
+                to="/orgs/$orgId/members"
+                params={{ orgId }}
+                className="rounded-full border border-border bg-surface px-3 py-1.5 text-center text-xs font-semibold hover:bg-secondary/60"
+              >
+                Manage members
+              </Link>
+            </div>
           )}
         </div>
       </header>
