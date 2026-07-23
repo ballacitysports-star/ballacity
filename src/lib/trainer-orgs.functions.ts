@@ -773,7 +773,9 @@ export const addOrgMemberDirect = createServerFn({ method: "POST" })
     }).parse(d),
   )
   .handler(async ({ data, context }) => {
-    await assertOrgAdmin(context.supabase, data.orgId, context.userId);
+    const { data: isAdmin, error: adminErr } = await context.supabase.rpc("is_trainer_org_admin", { _org: data.orgId, _user: context.userId });
+    if (adminErr) throw new Error(adminErr.message);
+    if (!isAdmin) throw new Error("Only owners or admins can perform this action.");
 
     const { error } = await context.supabase
       .from("org_members")
