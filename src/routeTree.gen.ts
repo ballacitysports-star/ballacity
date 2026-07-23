@@ -53,6 +53,7 @@ import { Route as TeamsTeamIdIndexRouteImport } from './routes/teams.$teamId.ind
 import { Route as GamesGameIdIndexRouteImport } from './routes/games.$gameId.index'
 import { Route as TrainersTrainerIdEditRouteImport } from './routes/trainers.$trainerId.edit'
 import { Route as TeamsTeamIdEditRouteImport } from './routes/teams.$teamId.edit'
+import { Route as OrgsOrgIdMembersRouteImport } from './routes/orgs.$orgId.members'
 import { Route as OrgsOrgIdEditRouteImport } from './routes/orgs.$orgId.edit'
 import { Route as GamesGameIdPaymentSetupRouteImport } from './routes/games.$gameId.payment-setup'
 import { Route as GamesGameIdPayRouteImport } from './routes/games.$gameId.pay'
@@ -282,6 +283,11 @@ const TeamsTeamIdEditRoute = TeamsTeamIdEditRouteImport.update({
   path: '/teams/$teamId/edit',
   getParentRoute: () => rootRouteImport,
 } as any)
+const OrgsOrgIdMembersRoute = OrgsOrgIdMembersRouteImport.update({
+  id: '/members',
+  path: '/members',
+  getParentRoute: () => OrgsOrgIdRoute,
+} as any)
 const OrgsOrgIdEditRoute = OrgsOrgIdEditRouteImport.update({
   id: '/edit',
   path: '/edit',
@@ -364,6 +370,7 @@ export interface FileRoutesByFullPath {
   '/games/$gameId/pay': typeof GamesGameIdPayRoute
   '/games/$gameId/payment-setup': typeof GamesGameIdPaymentSetupRoute
   '/orgs/$orgId/edit': typeof OrgsOrgIdEditRoute
+  '/orgs/$orgId/members': typeof OrgsOrgIdMembersRoute
   '/teams/$teamId/edit': typeof TeamsTeamIdEditRoute
   '/trainers/$trainerId/edit': typeof TrainersTrainerIdEditRoute
   '/games/$gameId/': typeof GamesGameIdIndexRoute
@@ -415,6 +422,7 @@ export interface FileRoutesByTo {
   '/games/$gameId/pay': typeof GamesGameIdPayRoute
   '/games/$gameId/payment-setup': typeof GamesGameIdPaymentSetupRoute
   '/orgs/$orgId/edit': typeof OrgsOrgIdEditRoute
+  '/orgs/$orgId/members': typeof OrgsOrgIdMembersRoute
   '/teams/$teamId/edit': typeof TeamsTeamIdEditRoute
   '/trainers/$trainerId/edit': typeof TrainersTrainerIdEditRoute
   '/games/$gameId': typeof GamesGameIdIndexRoute
@@ -469,6 +477,7 @@ export interface FileRoutesById {
   '/games/$gameId/pay': typeof GamesGameIdPayRoute
   '/games/$gameId/payment-setup': typeof GamesGameIdPaymentSetupRoute
   '/orgs/$orgId/edit': typeof OrgsOrgIdEditRoute
+  '/orgs/$orgId/members': typeof OrgsOrgIdMembersRoute
   '/teams/$teamId/edit': typeof TeamsTeamIdEditRoute
   '/trainers/$trainerId/edit': typeof TrainersTrainerIdEditRoute
   '/games/$gameId/': typeof GamesGameIdIndexRoute
@@ -523,6 +532,7 @@ export interface FileRouteTypes {
     | '/games/$gameId/pay'
     | '/games/$gameId/payment-setup'
     | '/orgs/$orgId/edit'
+    | '/orgs/$orgId/members'
     | '/teams/$teamId/edit'
     | '/trainers/$trainerId/edit'
     | '/games/$gameId/'
@@ -574,6 +584,7 @@ export interface FileRouteTypes {
     | '/games/$gameId/pay'
     | '/games/$gameId/payment-setup'
     | '/orgs/$orgId/edit'
+    | '/orgs/$orgId/members'
     | '/teams/$teamId/edit'
     | '/trainers/$trainerId/edit'
     | '/games/$gameId'
@@ -627,6 +638,7 @@ export interface FileRouteTypes {
     | '/games/$gameId/pay'
     | '/games/$gameId/payment-setup'
     | '/orgs/$orgId/edit'
+    | '/orgs/$orgId/members'
     | '/teams/$teamId/edit'
     | '/trainers/$trainerId/edit'
     | '/games/$gameId/'
@@ -986,6 +998,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof TeamsTeamIdEditRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/orgs/$orgId/members': {
+      id: '/orgs/$orgId/members'
+      path: '/members'
+      fullPath: '/orgs/$orgId/members'
+      preLoaderRoute: typeof OrgsOrgIdMembersRouteImport
+      parentRoute: typeof OrgsOrgIdRoute
+    }
     '/orgs/$orgId/edit': {
       id: '/orgs/$orgId/edit'
       path: '/edit'
@@ -1092,10 +1111,12 @@ const GamesGameIdRouteWithChildren = GamesGameIdRoute._addFileChildren(
 
 interface OrgsOrgIdRouteChildren {
   OrgsOrgIdEditRoute: typeof OrgsOrgIdEditRoute
+  OrgsOrgIdMembersRoute: typeof OrgsOrgIdMembersRoute
 }
 
 const OrgsOrgIdRouteChildren: OrgsOrgIdRouteChildren = {
   OrgsOrgIdEditRoute: OrgsOrgIdEditRoute,
+  OrgsOrgIdMembersRoute: OrgsOrgIdMembersRoute,
 }
 
 const OrgsOrgIdRouteWithChildren = OrgsOrgIdRoute._addFileChildren(
