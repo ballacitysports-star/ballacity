@@ -735,3 +735,67 @@ export const leaveOrgMembership = createServerFn({ method: "POST" })
     if (error) throw new Error(error.message);
     return { ok: true };
   });
+
+async function assertOrgAdmin(supabase: Awaited<ReturnType<typeof requireSupabaseAuth.server>>["context"]["supabase"], orgId: string, userId: string) {
+  const { data, error } = await supabase.rpc("is_trainer_org_admin", { _org: orgId, _user: userId });
+  if (error) throw new Error(error.message);
+  if (!data) throw new Error("Only owners or admins can perform this action.");
+}
+
+export const searchProfilesForInvite = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { orgId: string; q: string }) =>
+    z.object({ orgId: z.string().uuid(), q: z.string().min(1).max(80) }).parse(d),
+  )
+  .handler(async ({ data, context }) => {
+    await assertOrgAdmin(context.supabase, data.orgId, context.userId);
+
+    const { data: existing, error: memErr } = await context.supabase
+      .from("org_members")
+      .select("user_id")
+      .eq("org_id", data.orgId);
+    if (memErr) throw new Error(memErr.message);
+    const exclude = new Set<string>([context.userId, ...(existing ?? []).map((m) => m.user_id)]);
+
+    const { data: rows, error } = await context.supabase
+      .from("profiles")
+      .select("id, display_name, avatar_initials, avatar_url")
+      .ilike("display_name", `%${data.q}%`)
+      .limit(20);
+    if (error) throw new Error(error.message);
+    return (rows ?? []).filter((r) => !exclude.has(r.id));
+  });
+
+export const addOrgMemberDirect = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { orgId: string; userId: string; role?: "admin" | "member" }) =>
+    z.object({
+      orgId: z.string().uuid(),
+      userId: z.string().uuid(),
+      role: z.enum(["admin", "member"]).default("member"),
+    }).parse(d),
+  )
+  .handler(async ({ data, context }) => {
+    await assertOrgAdmin(context.supabase, data.orgId, context.userId);
+
+    const { error } = await context.supabase
+      .from("org_members")
+      .insert({ org_id: data.orgId, user_id: data.userId, role: data.role });
+    if (error && !/duplicate key|unique/i.test(error.message)) throw new Error(error.message);
+
+    const { data: org } = await context.supabase
+      .from("trainer_orgs")
+      .select("name")
+      .eq("id", data.orgId)
+      .maybeSingle();
+
+    await context.supabase.from("notifications").insert({
+      user_id: data.userId,
+      type: "org_membership",
+      title: `You were added to ${org?.name ?? "an organization"}`,
+      body: "An admin added you as a member.",
+      link: `/orgs/${data.orgId}`,
+    });
+
+    return { ok: true };
+  });
