@@ -183,6 +183,7 @@ function SettingsHubPage() {
           </div>
         </section>
 
+        <MyOrgsSection />
 
         {SECTIONS.map((section) => (
           <section key={section.title}>
