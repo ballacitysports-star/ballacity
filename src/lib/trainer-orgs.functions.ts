@@ -736,7 +736,11 @@ export const leaveOrgMembership = createServerFn({ method: "POST" })
     return { ok: true };
   });
 
-async function assertOrgAdmin(supabase: Awaited<ReturnType<typeof requireSupabaseAuth.server>>["context"]["supabase"], orgId: string, userId: string) {
+async function assertOrgAdmin(
+  supabase: { rpc: (fn: string, params: Record<string, unknown>) => Promise<{ data: unknown; error: { message: string } | null }> },
+  orgId: string,
+  userId: string,
+) {
   const { data, error } = await supabase.rpc("is_trainer_org_admin", { _org: orgId, _user: userId });
   if (error) throw new Error(error.message);
   if (!data) throw new Error("Only owners or admins can perform this action.");
