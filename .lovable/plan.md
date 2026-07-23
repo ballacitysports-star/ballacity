@@ -1,25 +1,20 @@
-## Problem
+## Goal
+Let a user edit and delete their organizations from Settings.
 
-Comments exist in the database (4 rows) but don't render in the UI. Root cause: `listComments` in `src/lib/post-engagement.functions.ts` uses a PostgREST embed:
+## Where
+Add a new "My organizations" section in `src/routes/settings.tsx` (under Account), rendered only when signed in and only if the user has orgs. No new route needed — Edit reuses `/orgs/$orgId/edit`.
 
-```
-.select("*, profiles:author_id(display_name, avatar_url, avatar_initials)")
-```
+## UI
+- Card list of orgs the current user belongs to via `listMyOrgs` (already exists in `src/lib/trainer-orgs.functions.ts`).
+- Each row: org avatar + name + role chip, plus:
+  - "Edit" button → `<Link to="/orgs/$orgId/edit" params={{ orgId }}>` (owner or admin only; hidden for plain members).
+  - "Delete" button → owner-only. Opens an AlertDialog confirming permanent deletion; on confirm calls `deleteTrainerOrg({ data: { id } })`, toasts result, and invalidates `["my-orgs"]` / `["trainer-org-memberships"]` / `["trainer-org"]` query keys.
+- Empty state hidden entirely (section only renders when there is at least one org).
 
-This embed requires a foreign key from `post_comments.author_id` to `public.profiles.id`. The actual FK points to `auth.users(id)`, so PostgREST returns an error and the query throws — the component then renders "Be the first to comment."
+## Data
+- Query: `useQuery({ queryKey: ["my-orgs"], queryFn: () => listMyOrgs() })`.
+- Mutation: `useMutation` wrapping `deleteTrainerOrg`; on success invalidate related keys and remove the row optimistically.
+- No schema changes. `deleteTrainerOrg` server fn already exists and RLS restricts deletes to the owner, so non-owners will get a rejected mutation — we still gate the button client-side by role for UX.
 
-## Fix
-
-Edit `src/lib/post-engagement.functions.ts` → `listComments` handler only:
-
-1. Select plain columns from `post_comments` (no embed).
-2. Collect the unique `author_id` set.
-3. Second query: `profiles.select('id, display_name, avatar_url, avatar_initials').in('id', ids)` using the same publishable client.
-4. Build a `Map<authorId, profile>` and merge into the returned `CommentRow[]` (same shape as today, so `PostEngagement.tsx` needs no change).
-
-No migration, no schema change, no other files touched.
-
-## Verify
-
-- Reload a team post modal / game details page and confirm existing comments appear with author name + avatar.
-- Post a new comment and confirm it shows up live via the existing realtime subscription.
+## Out of scope
+No changes to org creation, member management, or the org detail/edit screens themselves.
