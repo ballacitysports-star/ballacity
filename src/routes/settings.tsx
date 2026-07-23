@@ -1,7 +1,9 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
 import {
   ArrowLeft,
   Bell,
+  Building2,
   ChevronRight,
   CreditCard,
   IdCard,
@@ -9,8 +11,10 @@ import {
   Lock,
   Monitor,
   Moon,
+  Pencil,
   Shield,
   Sun,
+  Trash2,
   UserCog,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
@@ -18,6 +22,18 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { Switch } from "@/components/ui/switch";
 import { useTheme } from "@/lib/theme";
+import { listMyOrgs, deleteTrainerOrg } from "@/lib/trainer-orgs.functions";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 
 export const Route = createFileRoute("/settings")({
   component: SettingsHubPage,
