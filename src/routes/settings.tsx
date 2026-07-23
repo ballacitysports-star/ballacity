@@ -231,3 +231,88 @@ function SettingsHubPage() {
     </div>
   );
 }
+
+function MyOrgsSection() {
+  const qc = useQueryClient();
+  const { data: orgs } = useQuery({
+    queryKey: ["my-orgs"],
+    queryFn: () => listMyOrgs(),
+  });
+
+  const del = useMutation({
+    mutationFn: (id: string) => deleteTrainerOrg({ data: { id } }),
+    onSuccess: () => {
+      toast.success("Organization deleted");
+      qc.invalidateQueries({ queryKey: ["my-orgs"] });
+      qc.invalidateQueries({ queryKey: ["trainer-org-memberships"] });
+      qc.invalidateQueries({ queryKey: ["trainer-org"] });
+      qc.invalidateQueries({ queryKey: ["orgs-index"] });
+    },
+    onError: (e) => toast.error(e instanceof Error ? e.message : "Failed to delete"),
+  });
+
+  if (!orgs || orgs.length === 0) return null;
+
+  return (
+    <section>
+      <h2 className="px-1 pb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+        My organizations
+      </h2>
+      <ul className="overflow-hidden rounded-xl border bg-card divide-y">
+        {orgs.map((o) => (
+          <li key={o.id} className="flex items-center gap-3 px-4 py-3">
+            <span className="grid h-9 w-9 shrink-0 place-items-center overflow-hidden rounded-lg bg-muted">
+              {o.avatar ? (
+                <img src={o.avatar} alt="" className="h-full w-full object-cover" />
+              ) : (
+                <Building2 className="h-4 w-4" />
+              )}
+            </span>
+            <span className="min-w-0 flex-1">
+              <span className="block truncate text-sm font-medium">{o.name}</span>
+              <span className="block truncate text-xs text-muted-foreground">@{o.handle}</span>
+            </span>
+            <Link
+              to="/orgs/$orgId/edit"
+              params={{ orgId: o.id }}
+              aria-label={`Edit ${o.name}`}
+              className="rounded-md p-2 text-muted-foreground hover:bg-muted hover:text-foreground"
+            >
+              <Pencil className="h-4 w-4" />
+            </Link>
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <button
+                  type="button"
+                  aria-label={`Delete ${o.name}`}
+                  className="rounded-md p-2 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Delete {o.name}?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    This permanently removes the organization and its memberships. This action
+                    cannot be undone.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                  <AlertDialogAction
+                    disabled={del.isPending}
+                    onClick={() => del.mutate(o.id)}
+                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                  >
+                    {del.isPending ? "Deleting…" : "Delete"}
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
