@@ -330,9 +330,9 @@ function Profile() {
             </Link>
           )}
           <Link
-            to="/profile/edit"
+            to="/settings"
             className="grid h-10 w-10 place-items-center rounded-full border border-border bg-background/70 backdrop-blur"
-            aria-label="Edit profile"
+            aria-label="Settings"
           >
             <Settings className="h-4 w-4" />
           </Link>
