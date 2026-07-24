@@ -26,6 +26,7 @@ import {
   isAccountType,
   readPendingAccountType,
 } from "@/lib/account-type";
+import { getOnboardingStatus } from "@/lib/onboarding.functions";
 
 function NotFoundComponent() {
   return (
