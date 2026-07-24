@@ -120,44 +120,46 @@ function PlayerWelcome() {
   const [sport, setSport] = useState<Sport | null>(null);
   const [level, setLevel] = useState<string | null>(null);
   const [radius, setRadius] = useState<number>(15);
-  const [busy, setBusy] = useState(false);
+  const [status, setStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
 
   const levels = useMemo(() => (sport ? SPORT_CONFIG[sport]?.ratingLevels ?? [] : []), [sport]);
 
-  const save = async () => {
-    if (!user || busy) return;
-    setBusy(true);
-    try {
-      const patch: { sport?: string; skill_levels?: Record<string, string> } = {};
-      if (sport) patch.sport = sport;
-      if (sport && level) patch.skill_levels = { [sport]: level };
-      if (Object.keys(patch).length) {
-        const { error } = await supabase.from("profiles").update(patch).eq("id", user.id);
-        if (error) throw error;
-      }
-      // Persist radius as a lightweight local preference used by discovery filters.
+  // Auto-save whenever sport / level / radius changes (debounced).
+  useEffect(() => {
+    if (!user) return;
+    if (!sport && level === null && radius === 15) return;
+    const t = setTimeout(async () => {
+      setStatus("saving");
       try {
-        localStorage.setItem("openrun.default_radius_km", String(radius));
-      } catch {
-        /* ignore */
+        const patch: { sport?: string; skill_levels?: Record<string, string> } = {};
+        if (sport) patch.sport = sport;
+        if (sport && level) patch.skill_levels = { [sport]: level };
+        if (Object.keys(patch).length) {
+          const { error } = await supabase.from("profiles").update(patch).eq("id", user.id);
+          if (error) throw error;
+        }
+        try {
+          localStorage.setItem("openrun.default_radius_km", String(radius));
+        } catch {
+          /* ignore */
+        }
+        setStatus("saved");
+      } catch (err) {
+        setStatus("error");
+        toast.error(err instanceof Error ? err.message : "Could not save your preferences");
       }
-      toast.success("You're all set.");
-      nav({ to: "/feed" });
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Could not save your preferences");
-    } finally {
-      setBusy(false);
-    }
-  };
+    }, 500);
+    return () => clearTimeout(t);
+  }, [user, sport, level, radius]);
 
-  const skip = () => nav({ to: "/feed" });
+  const cont = () => nav({ to: "/feed" });
 
   return (
     <div className="mx-auto flex min-h-dvh w-full max-w-md flex-col px-4 py-8">
       <div>
         <div className="font-display text-2xl font-bold">A few quick things</div>
         <p className="mt-1 text-sm text-muted-foreground">
-          Personalize your feed. You can change these anytime.
+          Personalize your feed. Changes save automatically.
         </p>
       </div>
 
@@ -227,18 +229,18 @@ function PlayerWelcome() {
         />
       </section>
 
+      <div className="mt-4 h-4 text-xs text-muted-foreground" aria-live="polite">
+        {status === "saving" && "Saving…"}
+        {status === "saved" && "Saved"}
+        {status === "error" && "Couldn't save — try again"}
+      </div>
+
       <button
-        onClick={save}
-        disabled={busy}
-        className="mt-8 w-full rounded-full bg-lime-gradient px-4 py-3 text-sm font-bold text-primary-foreground disabled:opacity-50"
+        onClick={cont}
+        disabled={status === "saving"}
+        className="mt-4 w-full rounded-full bg-lime-gradient px-4 py-3 text-sm font-bold text-primary-foreground disabled:opacity-50"
       >
-        {busy ? "Saving…" : "Continue"}
-      </button>
-      <button
-        onClick={skip}
-        className="mt-2 w-full rounded-full px-4 py-2 text-xs text-muted-foreground"
-      >
-        Skip for now
+        Continue to feed
       </button>
     </div>
   );
