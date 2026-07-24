@@ -12,7 +12,13 @@ import {
   Star,
   Crown,
   Users,
+  Grid3x3,
+  Bookmark,
+  Inbox,
+  UserSquare2,
 } from "lucide-react";
+import { useFollow } from "@/lib/follows";
+import { FollowSheet } from "@/components/FollowSheet";
 import { ME, GAMES, type Game } from "@/lib/sample-data";
 import { GameCard } from "@/components/GameCard";
 import { RequestGameCard } from "@/components/RequestGameCard";
@@ -63,8 +69,11 @@ function Profile() {
   const { user, loading } = useAuth();
   const [confirmedUser, setConfirmedUser] = useState<User | null>(null);
   const [reviewsOpen, setReviewsOpen] = useState(false);
+  const [followList, setFollowList] = useState<null | "followers" | "following">(null);
+  const [activeTab, setActiveTab] = useState<"games" | "hosting" | "requests" | "reviews">("games");
   const profileUser = user ?? confirmedUser;
   const me = useMyProfile(profileUser);
+  const follow = useFollow(profileUser?.id ?? "");
   const joinedGameIds = useJoinedGameIds();
   const hosted = useHostedGames();
   const upcomingGroups = useMemo(() => {
@@ -328,52 +337,76 @@ function Profile() {
         </div>
       </div>
 
-      {/* Identity */}
+      {/* Identity — IG-style */}
       <div className="px-4 -mt-12 relative">
-        <motion.div
-          initial={{ scale: 0, rotate: -10 }}
-          animate={{ scale: 1, rotate: 0 }}
-          transition={{ type: "spring", stiffness: 220, damping: 16 }}
-          className="grid h-24 w-24 place-items-center overflow-hidden rounded-3xl border-4 border-background bg-lime-gradient font-display text-3xl font-bold text-primary-foreground glow-lime"
-        >
-          {me.avatarUrl ? (
-            <img src={me.avatarUrl} alt={me.name} className="h-full w-full object-cover" />
-          ) : (
-            me.avatar
-          )}
-        </motion.div>
-        <div className="mt-3 flex items-start justify-between">
-          <div>
-            <h1 className="font-display text-2xl font-bold flex items-center gap-2">
-              {me.name}
-              {me.birthday &&
-                (() => {
-                  const a = ageFrom(me.birthday);
-                  return a != null ? (
-                    <span className="text-sm font-normal text-muted-foreground">· {a}</span>
-                  ) : null;
-                })()}
-              <span className="inline-flex items-center gap-1 rounded-full bg-lime/15 px-2 py-0.5 text-xs font-bold text-lime">
-                <Shield className="h-3 w-3" /> Verified
-              </span>
-            </h1>
-            <div className="text-sm text-muted-foreground">
-              {me.username} · {me.city}
-            </div>
-            {(me.birthday || me.graduatingClass) && (
-              <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-muted-foreground">
-                {me.birthday && (
-                  <span>
-                    🎂 {formatBirthday(me.birthday)}
-                    {ageFrom(me.birthday) != null ? ` · ${ageFrom(me.birthday)} yrs` : ""}
-                  </span>
-                )}
-                {me.graduatingClass && <span>🎓 Class of {me.graduatingClass}</span>}
-              </div>
+        <div className="flex items-center gap-5">
+          <motion.div
+            initial={{ scale: 0, rotate: -10 }}
+            animate={{ scale: 1, rotate: 0 }}
+            transition={{ type: "spring", stiffness: 220, damping: 16 }}
+            className="grid h-24 w-24 shrink-0 place-items-center overflow-hidden rounded-full border-4 border-background bg-lime-gradient font-display text-3xl font-bold text-primary-foreground glow-lime"
+          >
+            {me.avatarUrl ? (
+              <img src={me.avatarUrl} alt={me.name} className="h-full w-full object-cover" />
+            ) : (
+              me.avatar
             )}
+          </motion.div>
+          {/* IG stat row */}
+          <div className="mt-10 flex flex-1 items-center justify-around text-center">
+            <div className="px-1">
+              <div className="font-display text-lg font-bold leading-tight">
+                {upcomingGroups.total}
+              </div>
+              <div className="text-[11px] text-muted-foreground">games</div>
+            </div>
+            <button
+              type="button"
+              onClick={() => setFollowList("followers")}
+              className="min-w-[56px] rounded-lg px-1 transition-colors hover:bg-surface"
+            >
+              <div className="font-display text-lg font-bold leading-tight">
+                {follow.followers}
+              </div>
+              <div className="text-[11px] text-muted-foreground">followers</div>
+            </button>
+            <button
+              type="button"
+              onClick={() => setFollowList("following")}
+              className="min-w-[56px] rounded-lg px-1 transition-colors hover:bg-surface"
+            >
+              <div className="font-display text-lg font-bold leading-tight">
+                {follow.following}
+              </div>
+              <div className="text-[11px] text-muted-foreground">following</div>
+            </button>
           </div>
         </div>
-        <p className="mt-3 text-sm text-foreground/90">{me.bio}</p>
+
+        {/* Name + meta */}
+        <div className="mt-3">
+          <h1 className="font-display text-xl font-bold flex flex-wrap items-center gap-x-2 gap-y-1">
+            <span className="truncate">{me.name}</span>
+            {me.birthday &&
+              (() => {
+                const a = ageFrom(me.birthday);
+                return a != null ? (
+                  <span className="text-sm font-normal text-muted-foreground">· {a}</span>
+                ) : null;
+              })()}
+            <span className="inline-flex items-center gap-1 rounded-full bg-lime/15 px-2 py-0.5 text-[10px] font-bold text-lime">
+              <Shield className="h-3 w-3" /> Verified
+            </span>
+          </h1>
+          <div className="text-sm text-muted-foreground">
+            {me.username} · {me.city}
+          </div>
+          {me.graduatingClass && (
+            <div className="mt-0.5 text-xs text-muted-foreground">🎓 Class of {me.graduatingClass}</div>
+          )}
+        </div>
+
+        {me.bio && <p className="mt-2 text-sm text-foreground/90 whitespace-pre-wrap">{me.bio}</p>}
 
         {me.links && me.links.length > 0 && (
           <div className="mt-3">
@@ -381,39 +414,83 @@ function Profile() {
           </div>
         )}
 
-        {/* Stats */}
-        <div className="mt-5 grid grid-cols-5 gap-2">
+        {/* Action row */}
+        <div className="mt-4 grid grid-cols-2 gap-2">
+          <Link
+            to="/profile/edit"
+            className="inline-flex items-center justify-center rounded-lg border border-border bg-surface px-3 py-1.5 text-sm font-semibold"
+          >
+            Edit profile
+          </Link>
+          <button
+            type="button"
+            onClick={() => setReviewsOpen(true)}
+            className="inline-flex items-center justify-center gap-1 rounded-lg border border-border bg-surface px-3 py-1.5 text-sm font-semibold"
+          >
+            <Star className="h-3.5 w-3.5" /> Reviews · {myRep.count}
+          </button>
+        </div>
+
+        {/* Secondary stats — compact */}
+        <div className="mt-4 grid grid-cols-3 gap-2">
           {[
-            { k: me.stats.played, v: "Games" },
             { k: me.stats.reliability + "%", v: "Reliable" },
             { k: me.stats.sportsmanship, v: "Sport" },
             { k: me.stats.friends, v: "Crew" },
-            { k: myRep.count, v: "Reviews" },
-          ].map((s, i) => (
-            <button
+          ].map((s) => (
+            <div
               key={s.v}
-              type="button"
-              onClick={s.v === "Reviews" ? () => setReviewsOpen(true) : undefined}
-              className={`rounded-2xl border border-border bg-surface p-3 text-center transition-all hover:border-lime/40 ${
-                s.v === "Reviews" ? "cursor-pointer" : ""
-              }`}
+              className="rounded-xl border border-border bg-surface p-2 text-center"
             >
-              <div className="font-display text-lg font-bold">{s.k}</div>
-              <div className="text-[10px] uppercase tracking-wider text-muted-foreground flex items-center justify-center gap-1">
-                {s.v === "Reviews" && <Star className="h-3 w-3" />}
+              <div className="font-display text-sm font-bold">{s.k}</div>
+              <div className="text-[10px] uppercase tracking-wider text-muted-foreground">
                 {s.v}
               </div>
-            </button>
+            </div>
           ))}
         </div>
+
 
         {/* Reputation badge (above the fold) */}
         <div className="mt-4">
           <ReputationBadge rep={myRep} onClick={() => setReviewsOpen(true)} />
         </div>
 
+        {/* IG-style icon tab bar */}
+        <div className="mt-6 -mx-4 border-y border-border bg-background/60 sticky top-0 z-10 backdrop-blur">
+          <div className="grid grid-cols-4">
+            {[
+              { k: "games", icon: Grid3x3, label: "Games" },
+              { k: "hosting", icon: Bookmark, label: "Hosting" },
+              { k: "requests", icon: Inbox, label: "Requests" },
+              { k: "reviews", icon: UserSquare2, label: "Reviews" },
+            ].map((t) => {
+              const Icon = t.icon;
+              const active = activeTab === t.k;
+              return (
+                <button
+                  key={t.k}
+                  type="button"
+                  onClick={() => setActiveTab(t.k as any)}
+                  aria-label={t.label}
+                  aria-selected={active}
+                  className={`relative grid place-items-center py-3 text-xs font-semibold transition-colors ${
+                    active ? "text-foreground" : "text-muted-foreground"
+                  }`}
+                >
+                  <Icon className="h-5 w-5" />
+                  {active && (
+                    <span className="absolute -top-px left-0 right-0 h-0.5 bg-foreground" />
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
         {/* Pending approvals */}
-        <section className="mt-8 rounded-3xl border border-border bg-surface p-4 shadow-card">
+
+        <section className={`mt-8 rounded-3xl border border-border bg-surface p-4 shadow-card ${activeTab === "requests" ? "" : "hidden"}`}>
           <div className="mb-3 flex items-center justify-between gap-3">
             <div className="flex items-center gap-2">
               <span className="grid h-8 w-8 place-items-center rounded-2xl border border-coral/30 bg-coral/10 text-coral">
@@ -548,7 +625,7 @@ function Profile() {
         </section>
 
         {/* Hosting */}
-        <section className="mt-8 rounded-3xl border border-border bg-surface p-4 shadow-card">
+        <section className={`mt-8 rounded-3xl border border-border bg-surface p-4 shadow-card ${activeTab === "hosting" ? "" : "hidden"}`}>
           <div className="mb-3 flex items-center justify-between gap-3">
             <div className="flex items-center gap-2">
               <span className="grid h-8 w-8 place-items-center rounded-2xl border border-lime/30 bg-lime/10 text-lime">
@@ -585,7 +662,7 @@ function Profile() {
         </section>
 
         {/* Pickup / Playing */}
-        <section className="mt-8 rounded-3xl border border-border bg-surface p-4 shadow-card">
+        <section className={`mt-8 rounded-3xl border border-border bg-surface p-4 shadow-card ${activeTab === "games" ? "" : "hidden"}`}>
           <div className="mb-3 flex items-center justify-between gap-3">
             <div className="flex items-center gap-2">
               <span className="grid h-8 w-8 place-items-center rounded-2xl border border-lime/30 bg-lime/10 text-lime">
@@ -623,7 +700,7 @@ function Profile() {
 
 
         {/* Sports & skill */}
-        <div className="mt-8">
+        <div className={`mt-8 ${activeTab === "games" ? "" : "hidden"}`}>
           <h2 className="font-display text-sm font-bold uppercase tracking-wider text-muted-foreground mb-2">
             Sports
           </h2>
@@ -660,7 +737,7 @@ function Profile() {
         </div>
 
         {/* Badges */}
-        <div className="mt-8">
+        <div className={`mt-8 ${activeTab === "games" ? "" : "hidden"}`}>
           <h2 className="font-display text-sm font-bold uppercase tracking-wider text-muted-foreground mb-2 flex items-center gap-1.5">
             <Trophy className="h-4 w-4" /> Badges
           </h2>
@@ -675,6 +752,26 @@ function Profile() {
             ))}
           </div>
         </div>
+
+        {/* Reviews tab — inline */}
+        <div className={`mt-6 ${activeTab === "reviews" ? "" : "hidden"}`}>
+          <ReviewsSection
+            revieweeId="me"
+            revieweeKind="player"
+            revieweeName={me.name}
+            isOwner
+          />
+        </div>
+
+        {/* Follow list sheet */}
+        <FollowSheet
+          open={followList !== null}
+          onOpenChange={(v: boolean) => !v && setFollowList(null)}
+          userId={profileUser.id}
+          displayName={me.name}
+          initialTab={followList ?? "followers"}
+        />
+
 
         {/* Reviews popup */}
         <Dialog open={reviewsOpen} onOpenChange={setReviewsOpen}>
