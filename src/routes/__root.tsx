@@ -485,33 +485,39 @@ function RootComponent() {
       }
       if ((event === "SIGNED_IN" || event === "USER_UPDATED") && session?.user) {
         runLegacyHostMigration(session.user.id);
-        // If the user picked an account type before OAuth (Google signup),
-        // persist it now that a session exists. Only set when profile is
-        // still empty to avoid overwriting an existing choice.
+        // Reconcile account_type after any sign-in (Google, Apple, email).
+        // If the user picked a type before OAuth we persist it; otherwise if
+        // the profile still has no account_type we route to the onboarding
+        // picker so social sign-ins can never land on the feed as a default.
         const pending = readPendingAccountType();
-        if (pending) {
-          const uid = session.user.id;
-          void supabase
-            .from("profiles")
-            .select("account_type")
-            .eq("id", uid)
-            .maybeSingle()
-            .then(({ data }) => {
-              const existing = (data as { account_type?: string } | null)?.account_type;
-              if (!isAccountType(existing)) {
-                void supabase
-                  .from("profiles")
-                  .update({ account_type: pending })
-                  .eq("id", uid)
-                  .then(() => {
-                    clearPendingAccountType();
-                    router.invalidate();
-                  });
-              } else {
-                clearPendingAccountType();
-              }
-            });
-        }
+        const uid = session.user.id;
+        void supabase
+          .from("profiles")
+          .select("account_type")
+          .eq("id", uid)
+          .maybeSingle()
+          .then(({ data }) => {
+            const existing = (data as { account_type?: string } | null)?.account_type;
+            if (isAccountType(existing)) {
+              if (pending) clearPendingAccountType();
+              return;
+            }
+            if (pending) {
+              void supabase
+                .from("profiles")
+                .update({ account_type: pending })
+                .eq("id", uid)
+                .then(() => {
+                  clearPendingAccountType();
+                  router.invalidate();
+                });
+              return;
+            }
+            // No pending choice and no stored type → force the picker.
+            if (router.state.location.pathname !== "/onboarding/account-type") {
+              router.navigate({ to: "/onboarding/account-type", replace: true });
+            }
+          });
       }
     });
     return () => {
