@@ -2,6 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { createClient } from "@supabase/supabase-js";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { requireAccountType } from "./account-type-guard";
 import type { Database } from "@/integrations/supabase/types";
 
 function publicClient() {
@@ -103,6 +104,7 @@ export const createTrainerOrg = createServerFn({ method: "POST" })
       .parse(d),
   )
   .handler(async ({ data, context }) => {
+    await requireAccountType(context.supabase, context.userId, "gym");
     const { data: id, error } = await context.supabase.rpc("create_trainer_org_with_owner", {
       _name: data.name,
       _handle: data.handle,
@@ -397,6 +399,7 @@ export const createStandaloneOrg = createServerFn({ method: "POST" })
       .parse(d),
   )
   .handler(async ({ data, context }) => {
+    await requireAccountType(context.supabase, context.userId, "gym");
     const { data: row, error } = await context.supabase
       .from("trainer_orgs")
       .insert({

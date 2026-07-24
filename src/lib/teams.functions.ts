@@ -3,6 +3,7 @@ import { createClient } from "@supabase/supabase-js";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { validateVenueList } from "./venue-address";
+import { requireAccountType } from "./account-type-guard";
 import type { Database } from "@/integrations/supabase/types";
 
 function publicClient() {
@@ -190,6 +191,11 @@ export const createTeam = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input) => TeamInput.parse(input))
   .handler(async ({ data, context }) => {
+    await requireAccountType(
+      context.supabase,
+      context.userId,
+      data.kind === "coach" ? "trainer" : "team",
+    );
     const clean = stripNonDbFields(data);
     const { data: row, error } = await context.supabase
       .from("teams")
