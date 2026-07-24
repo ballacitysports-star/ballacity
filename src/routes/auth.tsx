@@ -165,7 +165,8 @@ function AuthPage() {
     }
   };
 
-  const google = (opts: { isRetry?: boolean } = {}) => {
+  const oauth = (provider: "google" | "apple", opts: { isRetry?: boolean } = {}) => {
+    const providerLabel = provider === "apple" ? "Apple" : "Google";
     // CRITICAL: call signInWithOAuth SYNCHRONOUSLY as the first statement
     // in the click handler. iOS Chrome only treats popup.open() as a
     // trusted user gesture if no awaits / state updates happen first.
