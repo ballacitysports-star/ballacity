@@ -187,27 +187,29 @@ function AuthPage() {
   };
 
   const oauth = (provider: "google" | "apple", opts: { isRetry?: boolean } = {}) => {
-    const providerLabel = provider === "apple" ? "Apple" : "Google";
-    // CRITICAL: call signInWithOAuth SYNCHRONOUSLY as the first statement
-    // in the click handler. iOS Chrome only treats popup.open() as a
-    // trusted user gesture if no awaits / state updates happen first.
-    if (mode === "signup" && accountType) {
-      setPendingAccountType(accountType);
-    }
-    // Stash the intended destination so we can navigate to it AFTER the
-    // Supabase session is confirmed. `redirect_uri` MUST be a public
-    // same-origin URL — passing a protected route (e.g. /feed?...) is
-    // rejected by the vendor with "failed to sign in with vendor".
-    try {
-      if (next) window.sessionStorage.setItem("openrun:oauth-next", next);
-      else window.sessionStorage.removeItem("openrun:oauth-next");
-    } catch {
-      /* sessionStorage may be unavailable in private mode */
-    }
+    // CRITICAL: start the OAuth helper before storage writes, state updates,
+    // telemetry, or toasts. Mobile Safari/Chrome can reject the vendor popup if
+    // anything meaningful runs before the helper consumes the tap gesture.
     const promise = lovable.auth.signInWithOAuth(provider, {
       redirect_uri: window.location.origin,
       ...(provider === "google" ? { extraParams: { prompt: "select_account" } } : {}),
     });
+
+    const providerLabel = provider === "apple" ? "Apple" : "Google";
+    if (mode === "signup" && accountType) {
+      setPendingAccountType(accountType);
+    }
+    // Stash the intended destination so we can navigate to it AFTER the
+    // session is confirmed. `redirect_uri` MUST stay a public same-origin URL —
+    // passing protected routes to Google/Apple causes vendor rejection.
+    try {
+      const safeNext = sanitizeNextPath(next);
+      if (safeNext) window.sessionStorage.setItem("openrun:oauth-next", safeNext);
+      else window.sessionStorage.removeItem("openrun:oauth-next");
+      window.sessionStorage.setItem("openrun:oauth-provider", provider);
+    } catch {
+      /* sessionStorage may be unavailable in private mode */
+    }
 
     setBusy(true);
     trackSigninEvent(opts.isRetry ? "retry_clicked" : "attempt");
@@ -261,7 +263,12 @@ function AuthPage() {
       if (/vendor|provider|external_provider|oauth/i.test(raw)) {
         toast.error(`${providerLabel} sign-in was rejected by the provider`, {
           description:
-            "Please try again. If it keeps failing, sign in with your email and password instead.",
+            "Please retry from this screen. Your account setup choice is still saved.",
+          action: {
+            label: "Retry",
+            onClick: () => oauth(provider, { isRetry: true }),
+          },
+          duration: 10000,
         });
       } else {
         toast.error(raw || `${providerLabel} sign-in failed`);
@@ -283,7 +290,9 @@ function AuthPage() {
           // (notably the Lovable Android app) where onAuthStateChange
           // fires but the client-side navigate never leaves /auth.
           trackSigninEvent("success");
-          window.location.replace(next ?? "/profile");
+          void supabase.auth.getSession().then(({ data }) => {
+            void goPostAuth(data.session?.user ?? user);
+          });
         } else {
           trackSigninEvent("success");
         }
