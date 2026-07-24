@@ -1,22 +1,39 @@
-Plan to fix the new-user Google/Apple sign-in flow:
+## Plan: fix Google/Apple sign-in rejection for new users
 
-1. **Reconfigure managed social sign-in**
-   - Enable/refresh the Lovable Cloud Google and Apple sign-in provider setup so the auth broker and backend agree on allowed providers and redirect origins.
-   - Keep using the existing Lovable auth helper; do not replace it with raw provider calls.
+### Goal
+Make Google and Apple sign-in work reliably for brand-new users and route them to `/onboarding/account-type` instead of showing a provider/vendor rejection or falling back to the landing page.
 
-2. **Harden the `/auth` OAuth handler**
-   - Keep `redirect_uri` as the public same-origin app origin.
-   - Preserve the intended destination in session storage instead of sending protected routes to Google/Apple.
-   - Improve vendor-rejection handling so users get a clear retry path and new-user onboarding state is not lost.
+### What I verified
+- The auth page currently calls the managed Google/Apple helper with `redirect_uri: window.location.origin`, which is the correct public callback shape.
+- New social users are intended to have `profiles.account_type = null`, then get redirected to `/onboarding/account-type`.
+- The root auth listener already tries to send Google/Apple users without an account type to onboarding.
+- There are no fresh browser console logs for the OAuth rejection, so I will treat this as a flow hardening task rather than claiming a single confirmed root cause.
 
-3. **Guarantee new social users go to onboarding**
-   - Ensure Google/Apple sign-ins with no saved `account_type` always route to `/onboarding/account-type` after the session is established.
-   - Preserve any saved `next` route so onboarding can return the user to the right app screen afterward.
+### Changes to make
+1. **Reconfigure managed Google and Apple sign-in**
+   - Refresh the managed provider settings for both Google and Apple so the backend auth broker and current app origins are aligned.
 
-4. **Add/adjust E2E coverage**
-   - Cover Google and Apple provider rejection from new-user signup.
-   - Cover successful mocked Google/Apple returns for brand-new users and confirm they land on `/onboarding/account-type`, not the landing page.
+2. **Make OAuth start safer for mobile/new-user signup**
+   - Ensure Google/Apple sign-in is started directly from the button click with no pre-work that can break popup/web-message handling.
+   - Preserve onboarding intent and account type state in `sessionStorage` around the OAuth attempt.
+   - Keep `redirect_uri` public and same-origin, never pointing to a protected route.
 
-Technical details:
-- Files likely involved: `src/routes/auth.tsx`, `src/routes/__root.tsx`, and the existing OAuth E2E specs.
-- Backend/auth configuration will be updated through the managed auth provider tool, not by editing generated integration files.
+3. **Harden post-OAuth routing**
+   - After any social sign-in, re-check the signed-in user profile.
+   - If `account_type` is missing, force `/onboarding/account-type`.
+   - If `account_type` exists, continue to the saved destination or `/feed`.
+   - Avoid the landing page winning the race during OAuth returns.
+
+4. **Improve user-facing failure behavior**
+   - If Google/Apple still returns a vendor/provider rejection, show an actionable retry toast and keep the user’s onboarding state saved.
+   - Keep lightweight diagnostic logging for the raw OAuth failure reason.
+
+5. **Verify with existing E2E coverage**
+   - Run the OAuth vendor rejection test.
+   - Run the new-user Google/Apple onboarding redirect test.
+   - Adjust tests only if they are flaky because they inherit an already-signed-in E2E session.
+
+### Technical notes
+- No database schema changes are planned.
+- No new secrets are needed; existing auth/provider setup will be reused.
+- I will only touch the auth flow files and related E2E tests if needed.
