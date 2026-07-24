@@ -308,3 +308,11 @@ export function useFeedPrefs(): FeedPrefs {
 export function setFeedPrefs(next: FeedPrefs) {
   prefsStore.set(next);
 }
+
+export function getFeedPrefsSnapshot(): FeedPrefs {
+  try {
+    return JSON.parse(prefsStore.getSnapshot()) as FeedPrefs;
+  } catch {
+    return DEFAULT_PREFS;
+  }
+}
