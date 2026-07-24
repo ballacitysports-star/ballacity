@@ -315,6 +315,24 @@ function PlayerWelcome() {
         const signature = `${sport ?? ""}|${level ?? ""}|${radius}`;
         if (signature !== lastRefreshRef.current) {
           lastRefreshRef.current = signature;
+
+          // Sync the client-side feed prefs so the feed's sport chip + distance
+          // filter immediately reflect the onboarding selection on arrival.
+          try {
+            const current = getFeedPrefsSnapshot();
+            const radiusInPrefUnit =
+              current.distanceUnit === "km" ? radius : Math.round(radius * 0.621371);
+            setFeedPrefs({
+              ...current,
+              preferredSports: sport
+                ? Array.from(new Set([sport, ...current.preferredSports]))
+                : current.preferredSports,
+              maxDistanceMi: radiusInPrefUnit,
+            });
+          } catch {
+            /* ignore */
+          }
+
           // Invalidate any Query cache keyed by feed/games/profile so the feed
           // refetches with the new sport / level / radius on arrival.
           await Promise.all([
