@@ -386,13 +386,21 @@ function AuthGate({ children }: { children: React.ReactNode }) {
     };
   }, [loading, user, isPublic, router, pathname, verifying]);
 
+  // Onboarding completion guard: block rendering of protected routes until we
+  // confirm the user has picked an account type. Fresh Google sign-ins would
+  // otherwise flash the feed for a moment before the redirect fires.
+  const [typeStatus, setTypeStatus] = useState<"unknown" | "ok" | "missing">("unknown");
+  const skipTypeCheck =
+    isPublic || pathname === "/onboarding/account-type";
+
   useEffect(() => {
     if (loading || !user) return;
-    if (isPublic) return;
-    // The account-type picker itself is where users go to resolve a missing
-    // type — don't check-and-redirect while we're already there.
-    if (pathname === "/onboarding/account-type") return;
+    if (skipTypeCheck) {
+      setTypeStatus("ok");
+      return;
+    }
     let cancelled = false;
+    setTypeStatus("unknown");
     (async () => {
       const { data } = await supabase
         .from("profiles")
@@ -401,16 +409,17 @@ function AuthGate({ children }: { children: React.ReactNode }) {
         .maybeSingle();
       if (cancelled) return;
       const t = (data as { account_type?: string } | null)?.account_type;
-      if (!isAccountType(t)) {
-        // No account type yet (fresh Google sign-in, or legacy account):
-        // send to the account-type wizard.
+      if (isAccountType(t)) {
+        setTypeStatus("ok");
+      } else {
+        setTypeStatus("missing");
         router.navigate({ to: "/onboarding/account-type", replace: true });
       }
     })();
     return () => {
       cancelled = true;
     };
-  }, [user, loading, isPublic, pathname, router]);
+  }, [user, loading, skipTypeCheck, pathname, router]);
 
   useEffect(() => {
     if (user && !isPublic && !isTab) {
@@ -426,6 +435,10 @@ function AuthGate({ children }: { children: React.ReactNode }) {
   if (isPublic) return <>{children}</>;
   if (loading || verifying || !user) {
     return <AuthLoadingFallback pending={loading || verifying} />;
+  }
+  // Hold rendering until the account-type check completes (or redirects).
+  if (!skipTypeCheck && typeStatus !== "ok") {
+    return <AuthLoadingFallback pending={true} />;
   }
   return (
     <>
