@@ -21,6 +21,11 @@ import { useNotificationPush } from "@/lib/notifications";
 import { useOneSignal } from "@/lib/onesignal";
 import { logAuthGateDecision, readStoredSupabaseSession } from "@/lib/authgate-log";
 import { clearLastVisited, rememberLastVisited } from "@/lib/last-visited";
+import {
+  clearPendingAccountType,
+  isAccountType,
+  readPendingAccountType,
+} from "@/lib/account-type";
 
 function NotFoundComponent() {
   return (
@@ -172,6 +177,7 @@ const TAB_PATHS = [
   "/notifications",
   "/reels",
 ];
+const ACCOUNT_TYPE_BYPASS = ["/onboarding/account-type"];
 
 /**
  * Same-origin, safe next-path filter used by both the auth redirect
@@ -381,6 +387,28 @@ function AuthGate({ children }: { children: React.ReactNode }) {
   }, [loading, user, isPublic, router, pathname, verifying]);
 
   useEffect(() => {
+    if (loading || !user) return;
+    if (isPublic) return;
+    if (ACCOUNT_TYPE_BYPASS.includes(pathname)) return;
+    let cancelled = false;
+    (async () => {
+      const { data } = await supabase
+        .from("profiles")
+        .select("account_type")
+        .eq("id", user.id)
+        .maybeSingle();
+      if (cancelled) return;
+      const t = (data as { account_type?: string } | null)?.account_type;
+      if (!isAccountType(t)) {
+        router.navigate({ to: "/onboarding/account-type", replace: true });
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [user, loading, isPublic, pathname, router]);
+
+  useEffect(() => {
     if (user && !isPublic && !isTab) {
       document.body.style.paddingBottom = "calc(env(safe-area-inset-bottom) + 6rem)";
     } else {
@@ -440,6 +468,33 @@ function RootComponent() {
       }
       if ((event === "SIGNED_IN" || event === "USER_UPDATED") && session?.user) {
         runLegacyHostMigration(session.user.id);
+        // If the user picked an account type before OAuth (Google signup),
+        // persist it now that a session exists. Only set when profile is
+        // still empty to avoid overwriting an existing choice.
+        const pending = readPendingAccountType();
+        if (pending) {
+          const uid = session.user.id;
+          void supabase
+            .from("profiles")
+            .select("account_type")
+            .eq("id", uid)
+            .maybeSingle()
+            .then(({ data }) => {
+              const existing = (data as { account_type?: string } | null)?.account_type;
+              if (!isAccountType(existing)) {
+                void supabase
+                  .from("profiles")
+                  .update({ account_type: pending })
+                  .eq("id", uid)
+                  .then(() => {
+                    clearPendingAccountType();
+                    router.invalidate();
+                  });
+              } else {
+                clearPendingAccountType();
+              }
+            });
+        }
       }
     });
     return () => {

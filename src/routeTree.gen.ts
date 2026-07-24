@@ -31,6 +31,7 @@ import { Route as ProfileEditRouteImport } from './routes/profile.edit'
 import { Route as PlayersUserIdRouteImport } from './routes/players.$userId'
 import { Route as OrgsCreateRouteImport } from './routes/orgs.create'
 import { Route as OrgsOrgIdRouteImport } from './routes/orgs.$orgId'
+import { Route as OnboardingAccountTypeRouteImport } from './routes/onboarding.account-type'
 import { Route as MessagesConversationIdRouteImport } from './routes/messages.$conversationId'
 import { Route as GamesGameIdRouteImport } from './routes/games.$gameId'
 import { Route as CheckoutReturnRouteImport } from './routes/checkout.return'
@@ -169,6 +170,11 @@ const OrgsCreateRoute = OrgsCreateRouteImport.update({
 const OrgsOrgIdRoute = OrgsOrgIdRouteImport.update({
   id: '/orgs/$orgId',
   path: '/orgs/$orgId',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const OnboardingAccountTypeRoute = OnboardingAccountTypeRouteImport.update({
+  id: '/onboarding/account-type',
+  path: '/onboarding/account-type',
   getParentRoute: () => rootRouteImport,
 } as any)
 const MessagesConversationIdRoute = MessagesConversationIdRouteImport.update({
@@ -356,6 +362,7 @@ export interface FileRoutesByFullPath {
   '/checkout/return': typeof CheckoutReturnRoute
   '/games/$gameId': typeof GamesGameIdRouteWithChildren
   '/messages/$conversationId': typeof MessagesConversationIdRoute
+  '/onboarding/account-type': typeof OnboardingAccountTypeRoute
   '/orgs/$orgId': typeof OrgsOrgIdRouteWithChildren
   '/orgs/create': typeof OrgsCreateRoute
   '/players/$userId': typeof PlayersUserIdRoute
@@ -408,6 +415,7 @@ export interface FileRoutesByTo {
   '/admin/location-analytics': typeof AdminLocationAnalyticsRoute
   '/checkout/return': typeof CheckoutReturnRoute
   '/messages/$conversationId': typeof MessagesConversationIdRoute
+  '/onboarding/account-type': typeof OnboardingAccountTypeRoute
   '/orgs/$orgId': typeof OrgsOrgIdRouteWithChildren
   '/orgs/create': typeof OrgsCreateRoute
   '/players/$userId': typeof PlayersUserIdRoute
@@ -463,6 +471,7 @@ export interface FileRoutesById {
   '/checkout/return': typeof CheckoutReturnRoute
   '/games/$gameId': typeof GamesGameIdRouteWithChildren
   '/messages/$conversationId': typeof MessagesConversationIdRoute
+  '/onboarding/account-type': typeof OnboardingAccountTypeRoute
   '/orgs/$orgId': typeof OrgsOrgIdRouteWithChildren
   '/orgs/create': typeof OrgsCreateRoute
   '/players/$userId': typeof PlayersUserIdRoute
@@ -518,6 +527,7 @@ export interface FileRouteTypes {
     | '/checkout/return'
     | '/games/$gameId'
     | '/messages/$conversationId'
+    | '/onboarding/account-type'
     | '/orgs/$orgId'
     | '/orgs/create'
     | '/players/$userId'
@@ -570,6 +580,7 @@ export interface FileRouteTypes {
     | '/admin/location-analytics'
     | '/checkout/return'
     | '/messages/$conversationId'
+    | '/onboarding/account-type'
     | '/orgs/$orgId'
     | '/orgs/create'
     | '/players/$userId'
@@ -624,6 +635,7 @@ export interface FileRouteTypes {
     | '/checkout/return'
     | '/games/$gameId'
     | '/messages/$conversationId'
+    | '/onboarding/account-type'
     | '/orgs/$orgId'
     | '/orgs/create'
     | '/players/$userId'
@@ -669,6 +681,7 @@ export interface RootRouteChildren {
   CheckoutReturnRoute: typeof CheckoutReturnRoute
   GamesGameIdRoute: typeof GamesGameIdRouteWithChildren
   MessagesConversationIdRoute: typeof MessagesConversationIdRoute
+  OnboardingAccountTypeRoute: typeof OnboardingAccountTypeRoute
   OrgsOrgIdRoute: typeof OrgsOrgIdRouteWithChildren
   OrgsCreateRoute: typeof OrgsCreateRoute
   PlayersUserIdRoute: typeof PlayersUserIdRoute
@@ -842,6 +855,13 @@ declare module '@tanstack/react-router' {
       path: '/orgs/$orgId'
       fullPath: '/orgs/$orgId'
       preLoaderRoute: typeof OrgsOrgIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/onboarding/account-type': {
+      id: '/onboarding/account-type'
+      path: '/onboarding/account-type'
+      fullPath: '/onboarding/account-type'
+      preLoaderRoute: typeof OnboardingAccountTypeRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/messages/$conversationId': {
@@ -1145,6 +1165,7 @@ const rootRouteChildren: RootRouteChildren = {
   CheckoutReturnRoute: CheckoutReturnRoute,
   GamesGameIdRoute: GamesGameIdRouteWithChildren,
   MessagesConversationIdRoute: MessagesConversationIdRoute,
+  OnboardingAccountTypeRoute: OnboardingAccountTypeRoute,
   OrgsOrgIdRoute: OrgsOrgIdRouteWithChildren,
   OrgsCreateRoute: OrgsCreateRoute,
   PlayersUserIdRoute: PlayersUserIdRoute,
