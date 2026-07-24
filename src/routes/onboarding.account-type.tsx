@@ -95,9 +95,8 @@ function OnboardingAccountTypePage() {
       </div>
       {current && current !== pick && current !== "player" ? (
         <p className="mt-4 rounded-2xl border border-amber-500/40 bg-amber-500/10 p-3 text-xs text-amber-200">
-          Heads up: your account currently owns a {current}. Switching to {pick} will hide those from
-          your profile — they'll remain in the database but you won't be able to manage them from
-          this account.
+          Heads up: your account currently owns a {current}. Switching to {pick} will permanently
+          delete your existing {current} profile and any data linked to it. This can't be undone.
         </p>
       ) : null}
       <button
