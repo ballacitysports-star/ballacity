@@ -208,7 +208,93 @@ function PlayerWelcome() {
   const [radius, setRadius] = useState<number>(15);
   const [status, setStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
 
+  // Location permission state
+  type GeoState =
+    | { kind: "idle" }
+    | { kind: "requesting" }
+    | { kind: "granted"; lat: number; lng: number; accuracy: number }
+    | { kind: "denied"; message: string; canRetry: boolean }
+    | { kind: "unavailable"; message: string };
+  const [geo, setGeo] = useState<GeoState>({ kind: "idle" });
+  const [attempt, setAttempt] = useState(0);
+
   const levels = useMemo(() => (sport ? SPORT_CONFIG[sport]?.ratingLevels ?? [] : []), [sport]);
+
+  const requestLocation = () => {
+    if (typeof navigator === "undefined" || !navigator.geolocation) {
+      setGeo({
+        kind: "unavailable",
+        message: "Your browser doesn't support location. You can still set your radius manually below.",
+      });
+      return;
+    }
+    setGeo({ kind: "requesting" });
+    setAttempt((a) => a + 1);
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        setGeo({
+          kind: "granted",
+          lat: pos.coords.latitude,
+          lng: pos.coords.longitude,
+          accuracy: pos.coords.accuracy,
+        });
+        toast.success("Location set");
+      },
+      (err) => {
+        // 1 = PERMISSION_DENIED, 2 = POSITION_UNAVAILABLE, 3 = TIMEOUT
+        if (err.code === 1) {
+          setGeo({
+            kind: "denied",
+            message:
+              "Location is blocked. Open your browser's site settings for OpenRun, allow Location, then try again — or skip and set a radius manually below.",
+            canRetry: true,
+          });
+        } else if (err.code === 2) {
+          setGeo({
+            kind: "denied",
+            message: "We couldn't determine your position. Check your connection or GPS and try again.",
+            canRetry: true,
+          });
+        } else if (err.code === 3) {
+          setGeo({
+            kind: "denied",
+            message: "The location request timed out. Try again from a spot with a better signal.",
+            canRetry: true,
+          });
+        } else {
+          setGeo({
+            kind: "denied",
+            message: err.message || "Something went wrong requesting your location.",
+            canRetry: true,
+          });
+        }
+      },
+      { enableHighAccuracy: false, timeout: 8000, maximumAge: 60_000 },
+    );
+  };
+
+  // Persist location coordinates when granted.
+  useEffect(() => {
+    if (geo.kind !== "granted" || !user) return;
+    (async () => {
+      try {
+        await supabase
+          .from("profiles")
+          .update({ home_lat: geo.lat, home_lng: geo.lng })
+          .eq("id", user.id);
+        try {
+          localStorage.setItem(
+            "openrun.home_coords",
+            JSON.stringify({ lat: geo.lat, lng: geo.lng }),
+          );
+        } catch {
+          /* ignore */
+        }
+      } catch {
+        // Non-fatal: keep the granted state; profile columns may not exist yet.
+      }
+    })();
+  }, [geo, user]);
 
   // Auto-save whenever sport / level / radius changes (debounced).
   useEffect(() => {
@@ -240,9 +326,11 @@ function PlayerWelcome() {
 
   const cont = () => nav({ to: "/feed" });
 
+  const locationDone = geo.kind === "granted" || geo.kind === "unavailable" || geo.kind === "denied";
   const steps = [
     { key: "sport", label: "Sport", done: !!sport },
     { key: "level", label: "Level", done: !!level },
+    { key: "location", label: "Location", done: locationDone },
     { key: "radius", label: "Radius", done: true },
   ];
   const completed = steps.filter((s) => s.done).length;
