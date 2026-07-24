@@ -1,42 +1,54 @@
-## Problem
+# Fix Google sign-in "failed to sign in with vendor" error
 
-When a new user signs in with Google from the "Sign in" tab (or the "Sign up" tab without first picking a type), no `pendingAccountType` is stashed before the OAuth redirect. On return, the `handle_new_user` DB trigger creates the profile with `account_type = 'player'` by default, so the app treats them as an existing player and never shows the account-type picker.
+## What's happening
 
-Root cause (verified in `src/routes/auth.tsx` L172-174 and the `handle_new_user` function in db-functions): the picker only runs pre-OAuth in signup mode with an explicit selection; the trigger silently defaults everyone else to `player`.
+"Failed to sign in with vendor" is the error the Lovable Cloud auth helper surfaces when the Google OAuth round-trip is rejected. Two likely causes in this project — both worth addressing in one pass:
+
+1. **Non-public `redirect_uri`.** In `src/routes/auth.tsx` the Google click handler passes
+   `redirect_uri: next ? ${window.location.origin}${next} : window.location.origin`.
+   When someone lands on `/auth?next=/feed?...`, the redirect URI becomes a full protected app URL with query params. Lovable's guidance is that `redirect_uri` must be a plain same-origin public URL (`window.location.origin` or `/auth/callback`) — never a protected route with search params. A protected `redirect_uri` is a common trigger for the vendor to reject the callback, and even when it succeeds it lands the browser on `/feed` before the session is set, causing intermittent bounces.
+
+2. **Managed Google provider state.** The OAuth server itself is enabled (verified), but the managed Google provider on this project may not currently be active. We should re-run the social-auth configuration to make sure Google is enabled with Lovable-managed credentials.
 
 ## Fix
 
-Make account type "unset until the user picks it" and gate the app on that.
+### 1. Sanitize `redirect_uri` (frontend)
 
-### 1. DB migration
-- Update `handle_new_user()` so `account_type` is set only when `raw_user_meta_data->>'account_type'` is one of `player|team|trainer|gym`; otherwise insert `NULL`.
-- Keep the `enforce_account_type_lock` trigger — still valid (nothing linked yet when null).
-- No changes to grants/RLS.
+In `src/routes/auth.tsx`:
 
-### 2. New route `src/routes/onboarding.account-type.tsx`
-- Public-ish route reachable only when authenticated with a null `account_type`.
-- Renders the existing `AccountTypePicker` (same 4-card UI used in signup).
-- On confirm: `UPDATE profiles SET account_type = <choice> WHERE id = auth.uid()`, then navigate:
-  - `player` → `/onboarding/welcome`
-  - `team` → `/teams/create`
-  - `trainer` → `/trainers/create`
-  - `gym` → `/orgs/create`
-- Cannot be dismissed; no back-to-app link. Sign-out button available.
+- Always pass `redirect_uri: window.location.origin` to `lovable.auth.signInWithOAuth("google", …)`.
+- Before starting OAuth, store the sanitized `next` path in `sessionStorage` (e.g. key `openrun:oauth-next`) so it survives the round-trip.
+- Do the same for the email/password `emailRedirectTo` on line 103 — keep it at `window.location.origin`.
 
-### 3. `src/routes/__root.tsx` gate change (L389-411)
-Replace the "sign out on missing type" branch with:
-- If `account_type` is null/invalid AND current path is not `/onboarding/account-type` → `router.navigate({ to: "/onboarding/account-type", replace: true })`.
-- Leave the existing pending-type persistence path (L476-499) intact so users who did pick a type pre-OAuth skip the picker automatically.
+### 2. Consume the saved destination after the session lands
 
-### 4. Add `/onboarding/account-type` to the auth-gate allow list
-The route must render for signed-in users but not require an existing `account_type`. Add it to whatever guard exposes `isPublic` / gate skip list in `__root.tsx` so the null-type redirect doesn't loop.
+In `src/routes/__root.tsx`, inside the existing `onAuthStateChange` `SIGNED_IN` branch (which already reconciles `account_type`):
 
-## Result
-- Existing users with a real `account_type` are unaffected.
-- New Google sign-ins land on the account-type wizard, then the correct create/onboarding screen.
-- Email signups still pre-select the type (pending key path) and skip the wizard.
+- After confirming `account_type` is present (or after routing to onboarding when it isn't), read `openrun:oauth-next` from `sessionStorage`, validate it with the existing `sanitizeNextPath` helper, clear the key, and `router.navigate({ to: dest, replace: true })` if a valid path is present.
+- If `account_type` is missing, the redirect to `/onboarding/account-type` still wins; the saved `next` stays in `sessionStorage` and is consumed after onboarding completes (already navigates on completion — we'll pick it up there too, or just clear it).
+
+### 3. Re-enable the managed Google provider
+
+Call `supabase--configure_social_auth` with `providers: ["google", "apple"]` (keep email enabled — no `disable_providers`) to make sure both Google and Apple are active with Lovable-managed credentials. This is a no-op if they're already correctly enabled and repairs the config if not.
+
+### 4. Better error surfacing
+
+Where `promise.then((result) => { if (result?.error) … })` currently shows `msg || "Google sign-in failed"`, add a specific branch:
+
+- If `msg` contains `vendor` or the error code indicates a provider failure, show:
+  "Google sign-in was rejected by the provider. Please try again — if it keeps failing, sign in with email/password instead."
+- Log `result.error` to the console so future occurrences leave a diagnosable trail.
+
+## Verification
+
+- Reproduce: sign in with Google from `/auth?next=/feed`. Confirm the popup completes and the app lands on `/feed` without the vendor error.
+- Deep-link path: open `/auth` directly, click Google — should land on `/profile`.
+- New-user path: sign up as a new Google user, confirm `/onboarding/account-type` still gates before any saved `next` is consumed.
+- Signed-out redirect allow-list is unchanged; no auth-config migration needed.
 
 ## Files touched
-- New: Supabase migration updating `handle_new_user`.
-- New: `src/routes/onboarding.account-type.tsx`.
-- Edit: `src/routes/__root.tsx` (redirect instead of sign-out; allow the new route through the gate).
+
+- `src/routes/auth.tsx` — `redirect_uri`, `emailRedirectTo`, saved-`next` write, error message.
+- `src/routes/__root.tsx` — read/consume saved-`next` in the SIGNED_IN branch.
+- No new tables, no migration.
+- One tool call: `supabase--configure_social_auth` for Google + Apple.
