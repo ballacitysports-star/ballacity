@@ -387,6 +387,28 @@ function AuthGate({ children }: { children: React.ReactNode }) {
   }, [loading, user, isPublic, router, pathname, verifying]);
 
   useEffect(() => {
+    if (loading || !user) return;
+    if (isPublic) return;
+    if (ACCOUNT_TYPE_BYPASS.includes(pathname)) return;
+    let cancelled = false;
+    (async () => {
+      const { data } = await supabase
+        .from("profiles")
+        .select("account_type")
+        .eq("id", user.id)
+        .maybeSingle();
+      if (cancelled) return;
+      const t = (data as { account_type?: string } | null)?.account_type;
+      if (!isAccountType(t)) {
+        router.navigate({ to: "/onboarding/account-type", replace: true });
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [user, loading, isPublic, pathname, router]);
+
+  useEffect(() => {
     if (user && !isPublic && !isTab) {
       document.body.style.paddingBottom = "calc(env(safe-area-inset-bottom) + 6rem)";
     } else {
