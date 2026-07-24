@@ -1,54 +1,58 @@
-# Fix Google sign-in "failed to sign in with vendor" error
+## Goal
 
-## What's happening
+Add `e2e/google-vendor-rejection.spec.ts` that reproduces the "failed to sign in with vendor" case, verifies the actionable toast shows, and asserts the user lands back in the correct auth/onboarding state so they can retry.
 
-"Failed to sign in with vendor" is the error the Lovable Cloud auth helper surfaces when the Google OAuth round-trip is rejected. Two likely causes in this project — both worth addressing in one pass:
+Because a vendor rejection in the current code does NOT navigate (by design — the user stays on `/auth` to retry or switch to email/password), "back into the correct onboarding flow" is interpreted as: the auth screen retains the right mode (signin vs. signup), `next` is preserved, and the pending account-type stash is intact so a subsequent successful sign-in still lands in the correct onboarding step.
 
-1. **Non-public `redirect_uri`.** In `src/routes/auth.tsx` the Google click handler passes
-   `redirect_uri: next ? ${window.location.origin}${next} : window.location.origin`.
-   When someone lands on `/auth?next=/feed?...`, the redirect URI becomes a full protected app URL with query params. Lovable's guidance is that `redirect_uri` must be a plain same-origin public URL (`window.location.origin` or `/auth/callback`) — never a protected route with search params. A protected `redirect_uri` is a common trigger for the vendor to reject the callback, and even when it succeeds it lands the browser on `/feed` before the session is set, causing intermittent bounces.
+## Scenarios
 
-2. **Managed Google provider state.** The OAuth server itself is enabled (verified), but the managed Google provider on this project may not currently be active. We should re-run the social-auth configuration to make sure Google is enabled with Lovable-managed credentials.
+1. **Signin path — vendor rejection surfaces actionable toast**
+   - Visit `/auth?next=/feed`.
+   - Stub `lovable.auth.signInWithOAuth` to resolve with `{ error: { message: "failed to sign in with vendor" }, redirected: false }`.
+   - Click **Continue with Google**.
+   - Assert the sonner toast title *"Google sign-in was rejected by the provider"* appears with description containing *"sign in with your email and password"*.
+   - Assert URL still matches `/auth?next=%2Ffeed` (no bounce).
+   - Assert `sessionStorage["openrun:oauth-next"] === "/feed"` (stashed so a retry keeps the destination).
+   - Assert the Google button is re-enabled.
 
-## Fix
+2. **Signup path — account type preserved for onboarding**
+   - Visit `/auth`, switch to **Create account**, pick `player`, advance to the form step.
+   - Stub the same vendor error.
+   - Click **Continue with Google**.
+   - Assert the same actionable toast.
+   - Assert page is still on `/auth`, still in signup/form step (email field visible).
+   - Assert `localStorage["openrun:pending-account-type"] === "player"` — a successful email/password retry will still land in the player onboarding step.
 
-### 1. Sanitize `redirect_uri` (frontend)
+3. **Negative control — non-vendor error uses plain toast**
+   - Stub the helper with `{ error: { message: "network unreachable" } }`.
+   - Click Google.
+   - Assert a toast containing `network unreachable` shows and the vendor-specific description does NOT appear. Confirms the branch is scoped to vendor/provider/oauth wording.
 
-In `src/routes/auth.tsx`:
+## Test wiring
 
-- Always pass `redirect_uri: window.location.origin` to `lovable.auth.signInWithOAuth("google", …)`.
-- Before starting OAuth, store the sanitized `next` path in `sessionStorage` (e.g. key `openrun:oauth-next`) so it survives the round-trip.
-- Do the same for the email/password `emailRedirectTo` on line 103 — keep it at `window.location.origin`.
-
-### 2. Consume the saved destination after the session lands
-
-In `src/routes/__root.tsx`, inside the existing `onAuthStateChange` `SIGNED_IN` branch (which already reconciles `account_type`):
-
-- After confirming `account_type` is present (or after routing to onboarding when it isn't), read `openrun:oauth-next` from `sessionStorage`, validate it with the existing `sanitizeNextPath` helper, clear the key, and `router.navigate({ to: dest, replace: true })` if a valid path is present.
-- If `account_type` is missing, the redirect to `/onboarding/account-type` still wins; the saved `next` stays in `sessionStorage` and is consumed after onboarding completes (already navigates on completion — we'll pick it up there too, or just clear it).
-
-### 3. Re-enable the managed Google provider
-
-Call `supabase--configure_social_auth` with `providers: ["google", "apple"]` (keep email enabled — no `disable_providers`) to make sure both Google and Apple are active with Lovable-managed credentials. This is a no-op if they're already correctly enabled and repairs the config if not.
-
-### 4. Better error surfacing
-
-Where `promise.then((result) => { if (result?.error) … })` currently shows `msg || "Google sign-in failed"`, add a specific branch:
-
-- If `msg` contains `vendor` or the error code indicates a provider failure, show:
-  "Google sign-in was rejected by the provider. Please try again — if it keeps failing, sign in with email/password instead."
-- Log `result.error` to the console so future occurrences leave a diagnosable trail.
-
-## Verification
-
-- Reproduce: sign in with Google from `/auth?next=/feed`. Confirm the popup completes and the app lands on `/feed` without the vendor error.
-- Deep-link path: open `/auth` directly, click Google — should land on `/profile`.
-- New-user path: sign up as a new Google user, confirm `/onboarding/account-type` still gates before any saved `next` is consumed.
-- Signed-out redirect allow-list is unchanged; no auth-config migration needed.
+- No Supabase session required — the spec exercises pre-auth state and does not read `LOVABLE_BROWSER_SUPABASE_*` env vars.
+- Stub the OAuth helper by importing the module inside the page and overwriting the method:
+  ```ts
+  await page.evaluate(async (result) => {
+    const mod = await import("/src/integrations/lovable/index.ts");
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (mod as any).lovable.auth.signInWithOAuth = async () => result;
+  }, { error: { message: "failed to sign in with vendor" }, redirected: false });
+  ```
+  This runs after the page loads but before the button is clicked, so the synchronous call inside `google()` picks up the stub.
+- Selectors:
+  - Google button: `getByRole("button", { name: /google/i })`.
+  - Toast title: `getByText(/rejected by the provider/i)`.
+  - Toast description: `getByText(/sign in with your email and password/i)`.
+- Read storage back with `page.evaluate` and assert equalities.
 
 ## Files touched
 
-- `src/routes/auth.tsx` — `redirect_uri`, `emailRedirectTo`, saved-`next` write, error message.
-- `src/routes/__root.tsx` — read/consume saved-`next` in the SIGNED_IN branch.
-- No new tables, no migration.
-- One tool call: `supabase--configure_social_auth` for Google + Apple.
+- **Create** `e2e/google-vendor-rejection.spec.ts` (~120 lines).
+- No production changes — `src/routes/auth.tsx` already implements the branching under test.
+
+## Out of scope
+
+- Real Google OAuth vendor failures (require live provider conditions).
+- Verifying the successful email/password retry path (already covered by existing auth specs).
+- Changing runtime behaviour to push users to `/onboarding/account-type` on vendor failure — that would require a code change beyond the requested test.
