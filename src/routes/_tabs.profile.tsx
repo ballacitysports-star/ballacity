@@ -687,11 +687,14 @@ function Profile() {
             )}
           </div>
           {upcomingGroups.playing.length > 0 ? (
-            <div className="space-y-3">
-              {upcomingGroups.playing.map((g, i) => (
-                <GameCard key={g.id} game={g} index={i} />
-              ))}
-            </div>
+            <InfiniteList
+              items={upcomingGroups.playing}
+              pageSize={6}
+              keyFor={(g) => g.id}
+              renderItem={(g, i) => <GameCard game={g} index={i} />}
+              renderSkeleton={() => <GameCardSkeleton />}
+              resetKey="playing"
+            />
           ) : (
             <Link
               to="/feed"
