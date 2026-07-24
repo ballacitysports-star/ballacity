@@ -84,16 +84,8 @@ function LinkedProfileWelcome({ type }: { type: Exclude<AccountType, "player"> }
     setExpanded((e) => ({ ...e, [i]: !e[i] }));
   };
 
-  const goBack = () => nav({ to: "/onboarding/account-type" });
-
   return (
     <div className="mx-auto flex min-h-dvh w-full max-w-md flex-col px-4 py-8">
-      <button
-        onClick={goBack}
-        className="mb-3 self-start text-xs text-muted-foreground hover:text-foreground"
-      >
-        ← Change account type
-      </button>
       <div>
         <div className="font-display text-2xl font-bold">{cfg.title}</div>
         <p className="mt-1 text-sm text-muted-foreground">

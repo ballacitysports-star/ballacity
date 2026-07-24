@@ -177,7 +177,7 @@ const TAB_PATHS = [
   "/notifications",
   "/reels",
 ];
-const ACCOUNT_TYPE_BYPASS = ["/onboarding/account-type"];
+
 
 /**
  * Same-origin, safe next-path filter used by both the auth redirect
@@ -389,7 +389,6 @@ function AuthGate({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (loading || !user) return;
     if (isPublic) return;
-    if (ACCOUNT_TYPE_BYPASS.includes(pathname)) return;
     let cancelled = false;
     (async () => {
       const { data } = await supabase
@@ -400,7 +399,10 @@ function AuthGate({ children }: { children: React.ReactNode }) {
       if (cancelled) return;
       const t = (data as { account_type?: string } | null)?.account_type;
       if (!isAccountType(t)) {
-        router.navigate({ to: "/onboarding/account-type", replace: true });
+        // Legacy accounts without an account_type: sign out. Type is
+        // permanent and set at signup; there is no in-app switcher.
+        await supabase.auth.signOut();
+        router.navigate({ to: "/auth", replace: true });
       }
     })();
     return () => {

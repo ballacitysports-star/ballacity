@@ -283,6 +283,9 @@ function AuthPage() {
         {mode === "signup" && signupStep === "type" ? (
           <>
             <AccountTypePicker value={accountType} onChange={setAccountType} />
+            <p className="text-center text-xs text-muted-foreground">
+              This is permanent. To use a different account type, sign up with a different email.
+            </p>
             <button
               onClick={() => {
                 if (!accountType) {
