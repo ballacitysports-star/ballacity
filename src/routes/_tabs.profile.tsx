@@ -456,7 +456,41 @@ function Profile() {
           <ReputationBadge rep={myRep} onClick={() => setReviewsOpen(true)} />
         </div>
 
+        {/* IG-style icon tab bar */}
+        <div className="mt-6 -mx-4 border-y border-border bg-background/60 sticky top-0 z-10 backdrop-blur">
+          <div className="grid grid-cols-4">
+            {[
+              { k: "games", icon: Grid3x3, label: "Games" },
+              { k: "hosting", icon: Bookmark, label: "Hosting" },
+              { k: "requests", icon: Inbox, label: "Requests" },
+              { k: "reviews", icon: UserSquare2, label: "Reviews" },
+            ].map((t) => {
+              const Icon = t.icon;
+              const active = activeTab === t.k;
+              return (
+                <button
+                  key={t.k}
+                  type="button"
+                  onClick={() => setActiveTab(t.k as any)}
+                  aria-label={t.label}
+                  aria-selected={active}
+                  className={`relative grid place-items-center py-3 text-xs font-semibold transition-colors ${
+                    active ? "text-foreground" : "text-muted-foreground"
+                  }`}
+                >
+                  <Icon className="h-5 w-5" />
+                  {active && (
+                    <span className="absolute -top-px left-0 right-0 h-0.5 bg-foreground" />
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {activeTab === "requests" && (
         {/* Pending approvals */}
+
         <section className="mt-8 rounded-3xl border border-border bg-surface p-4 shadow-card">
           <div className="mb-3 flex items-center justify-between gap-3">
             <div className="flex items-center gap-2">
