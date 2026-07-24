@@ -436,6 +436,10 @@ function AuthGate({ children }: { children: React.ReactNode }) {
   if (loading || verifying || !user) {
     return <AuthLoadingFallback pending={loading || verifying} />;
   }
+  // Hold rendering until the account-type check completes (or redirects).
+  if (!skipTypeCheck && typeStatus !== "ok") {
+    return <AuthLoadingFallback pending={true} />;
+  }
   return (
     <>
       {children}
