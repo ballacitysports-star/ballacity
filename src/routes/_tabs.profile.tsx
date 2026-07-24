@@ -700,7 +700,7 @@ function Profile() {
 
 
         {/* Sports & skill */}
-        <div className="mt-8">
+        <div className={`mt-8 ${activeTab === "games" ? "" : "hidden"}`}>
           <h2 className="font-display text-sm font-bold uppercase tracking-wider text-muted-foreground mb-2">
             Sports
           </h2>
