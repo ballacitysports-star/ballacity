@@ -21,6 +21,11 @@ import { useNotificationPush } from "@/lib/notifications";
 import { useOneSignal } from "@/lib/onesignal";
 import { logAuthGateDecision, readStoredSupabaseSession } from "@/lib/authgate-log";
 import { clearLastVisited, rememberLastVisited } from "@/lib/last-visited";
+import {
+  clearPendingAccountType,
+  isAccountType,
+  readPendingAccountType,
+} from "@/lib/account-type";
 
 function NotFoundComponent() {
   return (
