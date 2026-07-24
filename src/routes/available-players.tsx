@@ -17,8 +17,10 @@ import {
   Heart,
   Bookmark,
   MoreHorizontal,
+  SlidersHorizontal,
 } from "lucide-react";
 import { InfiniteList } from "@/components/InfiniteList";
+import { FilterSheet, FilterSection, ChipRow } from "@/components/FilterSheet";
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/use-auth";
 import { SPORTS, type Game } from "@/lib/sample-data";
@@ -91,6 +93,8 @@ function AvailablePlayersPage() {
   const [window, setWindow] = useState<"any" | "week" | "month" | "custom">("any");
   const [customFrom, setCustomFrom] = useState("");
   const [customTo, setCustomTo] = useState("");
+  const [maxDistance, setMaxDistance] = useState<number>(0); // miles; 0 = any
+  const [filtersOpen, setFiltersOpen] = useState(false);
   const [list, setList] = useState<AvailabilityWithAuthor[] | null>(null);
   const [postOpen, setPostOpen] = useState(false);
   const [editingPost, setEditingPost] = useState<PlayerAvailability | null>(null);
@@ -157,6 +161,19 @@ function AvailablePlayersPage() {
   useEffect(() => {
     setList(null);
   }, [sport, city, includeAnywhere, skill, fromISO, toISO]);
+
+  const activeFilterCount =
+    (skill !== "All Levels" ? 1 : 0) +
+    (window !== "any" ? 1 : 0) +
+    (city.trim() ? 1 : 0) +
+    (maxDistance > 0 ? 1 : 0);
+
+  const filteredList = useMemo(() => {
+    if (!list) return null;
+    if (maxDistance <= 0) return list;
+    const km = miToKm(maxDistance);
+    return list.filter((a) => (a.travel_radius_km ?? 0) <= km);
+  }, [list, maxDistance]);
 
   useEffect(() => {
     let cancelled = false;
@@ -234,91 +251,102 @@ function AvailablePlayersPage() {
 
       {tab === "browse" ? (
         <>
-          <div className="mb-3 space-y-2">
-            <div className="-mx-4 overflow-x-auto px-4">
-              <div className="flex gap-2 pb-1">
-                <Chip active={!sport} onClick={() => setSport("")}>
-                  All sports
+          {/* Sport quick strip */}
+          <div className="-mx-4 overflow-x-auto px-4 mb-2">
+            <div className="flex gap-2 pb-1">
+              <Chip active={!sport} onClick={() => setSport("")}>
+                All sports
+              </Chip>
+              {SPORTS.map((s) => (
+                <Chip key={s.name} active={sport === s.name} onClick={() => setSport(s.name)}>
+                  <span className="mr-1">{s.emoji}</span>
+                  {s.name}
                 </Chip>
-                {SPORTS.map((s) => (
-                  <Chip key={s.name} active={sport === s.name} onClick={() => setSport(s.name)}>
-                    <span className="mr-1">{s.emoji}</span>
-                    {s.name}
-                  </Chip>
-                ))}
-              </div>
+              ))}
             </div>
-            <div className="-mx-4 overflow-x-auto px-4">
-              <div className="flex gap-2 pb-1">
-                {SKILLS.map((s) => (
-                  <Chip key={s} active={skill === s} onClick={() => setSkill(s)}>
-                    {s}
-                  </Chip>
-                ))}
-              </div>
-            </div>
-            <div className="-mx-4 overflow-x-auto px-4">
-              <div className="flex gap-2 pb-1">
-                {(
-                  [
-                    ["any", "Any time"],
-                    ["week", "Next 7 days"],
-                    ["month", "Next 30 days"],
-                    ["custom", "Custom…"],
-                  ] as const
-                ).map(([v, label]) => (
-                  <Chip key={v} active={window === v} onClick={() => setWindow(v)}>
-                    {label}
-                  </Chip>
-                ))}
-              </div>
-            </div>
-            {window === "custom" && (
-              <div className="flex gap-2">
-                <Input
-                  type="date"
-                  value={customFrom}
-                  onChange={(e) => setCustomFrom(e.target.value)}
-                  className="h-10"
-                  aria-label="From date"
-                />
-                <Input
-                  type="date"
-                  value={customTo}
-                  onChange={(e) => setCustomTo(e.target.value)}
-                  className="h-10"
-                  aria-label="To date"
-                />
-              </div>
+          </div>
+
+          {/* Filter bar */}
+          <div className="mb-3 flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setFiltersOpen(true)}
+              className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors ${
+                activeFilterCount > 0
+                  ? "border-lime bg-lime/15 text-foreground"
+                  : "border-border bg-surface text-muted-foreground"
+              }`}
+            >
+              <SlidersHorizontal className="h-3.5 w-3.5" />
+              Filters
+              {activeFilterCount > 0 && (
+                <span className="grid h-4 min-w-4 place-items-center rounded-full bg-lime px-1 text-[10px] font-bold text-primary-foreground">
+                  {activeFilterCount}
+                </span>
+              )}
+            </button>
+            {skill !== "All Levels" && (
+              <ActiveChip label={skill} onClear={() => setSkill("All Levels")} />
             )}
-            <Input
-              value={city}
-              onChange={(e) => setCity(e.target.value)}
-              placeholder="Filter by city"
-              className="h-10"
-            />
+            {window !== "any" && (
+              <ActiveChip
+                label={
+                  window === "week"
+                    ? "Next 7 days"
+                    : window === "month"
+                      ? "Next 30 days"
+                      : `${customFrom || "…"} → ${customTo || "…"}`
+                }
+                onClear={() => {
+                  setWindow("any");
+                  setCustomFrom("");
+                  setCustomTo("");
+                }}
+              />
+            )}
             {city.trim() && (
-              <label className="flex items-center gap-2 text-xs text-muted-foreground">
-                <input
-                  type="checkbox"
-                  checked={includeAnywhere}
-                  onChange={(e) => setIncludeAnywhere(e.target.checked)}
-                  className="h-4 w-4 rounded border-border"
-                />
-                Include players open to anywhere
-              </label>
+              <ActiveChip label={city.trim()} onClear={() => setCity("")} />
+            )}
+            {maxDistance > 0 && (
+              <ActiveChip
+                label={`≤ ${maxDistance} mi`}
+                onClear={() => setMaxDistance(0)}
+              />
             )}
           </div>
 
 
+
+
           {list === null ? (
             <LoadingRows />
-          ) : list.length === 0 ? (
+          ) : (filteredList ?? []).length === 0 ? (
             <EmptyState
-              title="No one's posted yet"
-              body="Be the first — share when you're free and where you'll travel."
+              title={activeFilterCount > 0 ? "No matches" : "No one's posted yet"}
+              body={
+                activeFilterCount > 0
+                  ? "Try loosening a filter or clearing them all."
+                  : "Be the first — share when you're free and where you'll travel."
+              }
               cta={
-                user ? (
+                activeFilterCount > 0 ? (
+                  <Button
+                    variant="outline"
+                    className="rounded-full"
+                    onClick={() => {
+                      setSport("");
+                      setSkill("All Levels");
+                      setWindow("any");
+                      setCustomFrom("");
+                      setCustomTo("");
+                      setCity("");
+                      setIncludeAnywhere(true);
+                      setMaxDistance(0);
+                    }}
+                  >
+                    Clear filters
+                  </Button>
+                ) : user ? (
                   <Button onClick={() => setPostOpen(true)} className="rounded-full">
                     Post availability
                   </Button>
@@ -334,7 +362,7 @@ function AvailablePlayersPage() {
             />
           ) : (
             <InfiniteList
-              items={list}
+              items={filteredList ?? []}
               pageSize={6}
               keyFor={(a) => a.id}
               className="-mx-4 divide-y divide-border border-y border-border bg-background"
@@ -357,6 +385,127 @@ function AvailablePlayersPage() {
       ) : (
         <MineTab user={user} onEdit={(m) => setEditingPost(m)} refreshKey={refreshKey} />
       )}
+
+      <FilterSheet
+        open={filtersOpen}
+        onClose={() => setFiltersOpen(false)}
+        title="Filter players"
+        onReset={() => {
+          setSport("");
+          setSkill("All Levels");
+          setWindow("any");
+          setCustomFrom("");
+          setCustomTo("");
+          setCity("");
+          setIncludeAnywhere(true);
+          setMaxDistance(0);
+        }}
+        resetDisabled={activeFilterCount === 0 && !sport}
+      >
+        <FilterSection label="Sport">
+          <div className="flex flex-wrap gap-2">
+            <Chip active={!sport} onClick={() => setSport("")}>
+              All sports
+            </Chip>
+            {SPORTS.map((s) => (
+              <Chip key={s.name} active={sport === s.name} onClick={() => setSport(s.name)}>
+                <span className="mr-1">{s.emoji}</span>
+                {s.name}
+              </Chip>
+            ))}
+          </div>
+        </FilterSection>
+
+        <FilterSection label="Skill level">
+          <ChipRow
+            value={skill}
+            onChange={(v) => setSkill(v)}
+            options={SKILLS.map((s) => ({ value: s, label: s }))}
+          />
+        </FilterSection>
+
+        <FilterSection label="Availability window">
+          <ChipRow
+            value={window}
+            onChange={(v) => setWindow(v)}
+            options={[
+              { value: "any", label: "Any time" },
+              { value: "week", label: "Next 7 days" },
+              { value: "month", label: "Next 30 days" },
+              { value: "custom", label: "Custom…" },
+            ]}
+          />
+          {window === "custom" && (
+            <div className="mt-2 flex gap-2">
+              <div className="flex-1">
+                <Label htmlFor="from-date" className="text-[10px] uppercase tracking-wider text-muted-foreground">
+                  From
+                </Label>
+                <Input
+                  id="from-date"
+                  type="date"
+                  value={customFrom}
+                  onChange={(e) => setCustomFrom(e.target.value)}
+                  className="h-10"
+                />
+              </div>
+              <div className="flex-1">
+                <Label htmlFor="to-date" className="text-[10px] uppercase tracking-wider text-muted-foreground">
+                  Until
+                </Label>
+                <Input
+                  id="to-date"
+                  type="date"
+                  value={customTo}
+                  onChange={(e) => setCustomTo(e.target.value)}
+                  className="h-10"
+                />
+              </div>
+            </div>
+          )}
+        </FilterSection>
+
+        <FilterSection label="Location">
+          <Input
+            value={city}
+            onChange={(e) => setCity(e.target.value)}
+            placeholder="City (e.g. Austin)"
+            className="h-10"
+          />
+          {city.trim() && (
+            <label className="flex items-center gap-2 pt-2 text-xs text-muted-foreground">
+              <input
+                type="checkbox"
+                checked={includeAnywhere}
+                onChange={(e) => setIncludeAnywhere(e.target.checked)}
+                className="h-4 w-4 rounded border-border"
+              />
+              Include players open to anywhere
+            </label>
+          )}
+        </FilterSection>
+
+        <FilterSection
+          label="Max travel distance"
+          hint={maxDistance > 0 ? `${maxDistance} mi` : "Any"}
+        >
+          <input
+            type="range"
+            min={0}
+            max={100}
+            step={5}
+            value={maxDistance}
+            onChange={(e) => setMaxDistance(Number(e.target.value))}
+            className="w-full accent-lime"
+            aria-label="Max travel distance in miles"
+          />
+          <div className="flex justify-between text-[10px] uppercase tracking-wider text-muted-foreground">
+            <span>Any</span>
+            <span>100 mi</span>
+          </div>
+        </FilterSection>
+      </FilterSheet>
+
 
       {(postOpen || editingPost) && (
         <PostAvailabilityDialog
