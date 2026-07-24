@@ -433,8 +433,73 @@ function PlayerWelcome() {
       ) : null}
 
       <section className="mt-6">
+        <div className="text-sm font-semibold">3. Location</div>
+        <p className="mt-1 text-xs text-muted-foreground">
+          We use your location to show nearby games. You can also skip and set a radius manually.
+        </p>
+
+        {geo.kind === "granted" ? (
+          <div className="mt-3 rounded-xl border border-border/60 bg-surface p-3">
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2 text-sm">
+                <span className="flex h-6 w-6 items-center justify-center rounded-full bg-lime-gradient text-[11px] font-bold text-primary-foreground">
+                  ✓
+                </span>
+                <div>
+                  <div className="font-medium text-foreground">Location shared</div>
+                  <div className="text-xs text-muted-foreground">
+                    Accurate to ~{Math.round(geo.accuracy)} m
+                  </div>
+                </div>
+              </div>
+              <button
+                onClick={requestLocation}
+                className="rounded-full border border-border/60 px-3 py-1.5 text-xs font-medium"
+              >
+                Refresh
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div className="mt-3 space-y-2">
+            <button
+              onClick={requestLocation}
+              disabled={geo.kind === "requesting"}
+              className="w-full rounded-full border border-border/60 bg-surface px-4 py-2.5 text-sm font-medium disabled:opacity-60"
+            >
+              {geo.kind === "requesting"
+                ? "Requesting location…"
+                : attempt === 0
+                  ? "Use my location"
+                  : "Try again"}
+            </button>
+
+            {geo.kind === "denied" || geo.kind === "unavailable" ? (
+              <div className="rounded-xl border border-destructive/40 bg-destructive/5 p-3 text-xs">
+                <div className="font-semibold text-destructive">Location unavailable</div>
+                <p className="mt-1 text-muted-foreground">{geo.message}</p>
+                {geo.kind === "denied" && geo.canRetry ? (
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    <button
+                      onClick={requestLocation}
+                      className="rounded-full border border-border/60 bg-background px-3 py-1 text-xs font-medium"
+                    >
+                      Retry
+                    </button>
+                    <span className="self-center text-[11px] text-muted-foreground">
+                      or adjust the radius below to browse a wider area
+                    </span>
+                  </div>
+                ) : null}
+              </div>
+            ) : null}
+          </div>
+        )}
+      </section>
+
+      <section className="mt-6">
         <div className="flex items-center justify-between text-sm font-semibold">
-          <span>3. Search radius</span>
+          <span>4. Search radius</span>
           <span className="text-muted-foreground">{radius} km</span>
         </div>
         <input
@@ -445,8 +510,20 @@ function PlayerWelcome() {
           value={radius}
           onChange={(e) => setRadius(Number(e.target.value))}
           className="mt-2 w-full accent-primary"
+          aria-label="Search radius in kilometers"
         />
+        <div className="mt-1 flex justify-between text-[11px] text-muted-foreground">
+          <span>1 km</span>
+          <span>50 km</span>
+          <span>100 km</span>
+        </div>
+        {geo.kind !== "granted" ? (
+          <p className="mt-2 text-xs text-muted-foreground">
+            Without location, we'll use your saved city and this radius to find games.
+          </p>
+        ) : null}
       </section>
+
 
       <div className="mt-4 h-4 text-xs text-muted-foreground" aria-live="polite">
         {status === "saving" && "Saving…"}
