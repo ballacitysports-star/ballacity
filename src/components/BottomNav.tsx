@@ -24,10 +24,11 @@ const items: NavItem[] = [
     match: (p) => p === "/feed" || p === "/" || p === "/pickup",
   },
   {
-    to: "/discover",
-    icon: Search,
-    label: "Search",
+    to: "/available-players",
+    icon: Users,
+    label: "Available Players",
     match: (p) =>
+      p.startsWith("/available-players") ||
       p.startsWith("/discover") ||
       p.startsWith("/players") ||
       p.startsWith("/teams") ||
