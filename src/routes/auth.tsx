@@ -1,4 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
+import type { User } from "@supabase/supabase-js";
 import { useEffect, useState } from "react";
 import { ArrowLeft } from "lucide-react";
 import { toast } from "sonner";
@@ -12,6 +13,7 @@ import { AccountTypePicker } from "@/components/AccountTypePicker";
 import {
   ACCOUNT_TYPE_META,
   type AccountType,
+  isAccountType,
   setPendingAccountType,
 } from "@/lib/account-type";
 
@@ -36,7 +38,26 @@ function AuthPage() {
   const [displayName, setDisplayName] = useState("");
   const [busy, setBusy] = useState(false);
 
-  const goPostAuth = () => {
+  const needsAccountType = async (currentUser: User | null | undefined) => {
+    if (!currentUser) return false;
+    const { data, error } = await supabase
+      .from("profiles")
+      .select("account_type")
+      .eq("id", currentUser.id)
+      .maybeSingle();
+    if (error) {
+      console.warn("[auth] account type check failed", error.message);
+      return false;
+    }
+    const t = (data as { account_type?: string } | null)?.account_type;
+    return !isAccountType(t);
+  };
+
+  const goPostAuth = async (currentUser: User | null | undefined = user) => {
+    if (await needsAccountType(currentUser)) {
+      window.location.replace("/onboarding/account-type");
+      return;
+    }
     let dest = sanitizeNextPath(next);
     if (!dest) dest = readLastVisited() ?? undefined;
     if (!dest) {
@@ -63,18 +84,18 @@ function AuthPage() {
   };
 
   useEffect(() => {
-    if (!loading && user) goPostAuth();
+    if (!loading && user) void goPostAuth(user);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loading, user]);
 
   useEffect(() => {
     let cancelled = false;
     supabase.auth.getSession().then(({ data }) => {
-      if (!cancelled && data.session) goPostAuth();
+      if (!cancelled && data.session) void goPostAuth(data.session.user);
     });
     const { data: sub } = supabase.auth.onAuthStateChange((event, session) => {
       if (session && (event === "SIGNED_IN" || event === "INITIAL_SESSION" || event === "TOKEN_REFRESHED")) {
-        goPostAuth();
+        void goPostAuth(session.user);
       }
     });
     return () => {

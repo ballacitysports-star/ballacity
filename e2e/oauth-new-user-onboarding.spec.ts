@@ -44,7 +44,7 @@ async function stubNullAccountType(page: Page) {
       });
       return;
     }
-    await route.continue();
+    await route.fallback();
   });
 }
 
@@ -74,6 +74,16 @@ test.describe("OAuth new-user onboarding gate", () => {
         await primeStorage(page);
 
         // Simulate the provider callback returning to the app origin.
+        await page.goto("/", { waitUntil: "domcontentloaded" });
+
+        // The landing page itself is public, so this verifies the real
+        // regression path: a hydrated OAuth session on `/` with no account
+        // type must be sent to onboarding instead of staying on marketing or
+        // restoring `/feed` from last-visited state.
+        await expect(page).toHaveURL(/\/onboarding\/account-type(?:[?#/].*)?$/, {
+          timeout: 15_000,
+        });
+
         await page.goto("/", { waitUntil: "domcontentloaded" });
 
         // Force the SIGNED_IN reconcile with the correct app_metadata.provider
