@@ -165,7 +165,8 @@ function AuthPage() {
     }
   };
 
-  const google = (opts: { isRetry?: boolean } = {}) => {
+  const oauth = (provider: "google" | "apple", opts: { isRetry?: boolean } = {}) => {
+    const providerLabel = provider === "apple" ? "Apple" : "Google";
     // CRITICAL: call signInWithOAuth SYNCHRONOUSLY as the first statement
     // in the click handler. iOS Chrome only treats popup.open() as a
     // trusted user gesture if no awaits / state updates happen first.
@@ -182,9 +183,9 @@ function AuthPage() {
     } catch {
       /* sessionStorage may be unavailable in private mode */
     }
-    const promise = lovable.auth.signInWithOAuth("google", {
+    const promise = lovable.auth.signInWithOAuth(provider, {
       redirect_uri: window.location.origin,
-      extraParams: { prompt: "select_account" },
+      ...(provider === "google" ? { extraParams: { prompt: "select_account" } } : {}),
     });
 
     setBusy(true);
@@ -209,11 +210,11 @@ function AuthPage() {
         blockedReported = true;
         trackSigninEvent("popup_blocked", { errorMessage: errorMessage ?? null });
       }
-      toast.error("Google sign-in popup was blocked", {
+      toast.error(`${providerLabel} sign-in popup was blocked`, {
         description: browserGuidance,
         action: {
           label: "Retry",
-          onClick: () => google({ isRetry: true }),
+          onClick: () => oauth(provider, { isRetry: true }),
         },
         cancel: {
           label: "Copy link",
@@ -234,15 +235,15 @@ function AuthPage() {
     // popup couldn't open. onAuthStateChange handles the success redirect.
     const reportVendorFailure = (raw: string) => {
       // Log the raw error so recurrences leave a diagnosable trail.
-      console.error("[auth] google sign-in failed:", raw);
+      console.error(`[auth] ${provider} sign-in failed:`, raw);
       trackSigninEvent("failure", { errorMessage: raw });
       if (/vendor|provider|external_provider|oauth/i.test(raw)) {
-        toast.error("Google sign-in was rejected by the provider", {
+        toast.error(`${providerLabel} sign-in was rejected by the provider`, {
           description:
             "Please try again. If it keeps failing, sign in with your email and password instead.",
         });
       } else {
-        toast.error(raw || "Google sign-in failed");
+        toast.error(raw || `${providerLabel} sign-in failed`);
       }
     };
 
@@ -348,7 +349,7 @@ function AuthPage() {
             ) : null}
 
             <button
-              onClick={() => google()}
+              onClick={() => oauth("google")}
               disabled={busy}
               className="w-full rounded-full border border-border bg-surface px-4 py-3 text-sm font-bold flex items-center justify-center gap-2 disabled:opacity-50"
             >
@@ -371,6 +372,17 @@ function AuthPage() {
                 />
               </svg>
               Continue with Google
+            </button>
+
+            <button
+              onClick={() => oauth("apple")}
+              disabled={busy}
+              className="w-full rounded-full border border-border bg-foreground px-4 py-3 text-sm font-bold text-background flex items-center justify-center gap-2 disabled:opacity-50"
+            >
+              <svg className="h-4 w-4" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
+                <path d="M16.365 1.43c0 1.14-.42 2.22-1.19 3.02-.83.87-2.14 1.54-3.24 1.45-.14-1.09.42-2.24 1.16-3.02.82-.87 2.22-1.51 3.27-1.45zM20.5 17.36c-.55 1.27-.82 1.84-1.53 2.96-.99 1.56-2.39 3.5-4.12 3.51-1.54.02-1.94-1-4.03-.99-2.09.01-2.53 1.01-4.07.99-1.73-.02-3.06-1.77-4.05-3.33C.1 16.24-.63 11.05 1.03 8.16c1.18-2.05 3.05-3.25 4.81-3.25 1.79 0 2.92 1 4.4 1 1.44 0 2.32-1 4.39-1 1.57 0 3.23.86 4.42 2.35-3.88 2.13-3.25 7.67 1.45 10.1z" />
+              </svg>
+              Continue with Apple
             </button>
 
             <div className="flex items-center gap-3 text-[10px] uppercase tracking-wider text-muted-foreground">
