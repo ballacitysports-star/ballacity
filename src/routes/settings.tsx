@@ -330,13 +330,23 @@ function MyOrgsSection() {
 function DeleteAccountButton() {
   const navigate = useNavigate();
   const del = useServerFn(deleteMyAccount);
+  const { user } = useAuth();
   const [open, setOpen] = useState(false);
   const [confirm, setConfirm] = useState("");
+  const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
+
+  const hasPassword = !!user?.identities?.some((i) => i.provider === "email");
+  const email = user?.email ?? "";
 
   const onDelete = async () => {
     setBusy(true);
     try {
+      if (hasPassword) {
+        if (!password) throw new Error("Please enter your password to confirm.");
+        const { error } = await supabase.auth.signInWithPassword({ email, password });
+        if (error) throw new Error("Incorrect password. Please try again.");
+      }
       await del();
       await supabase.auth.signOut();
       toast.success("Your account has been deleted.");
@@ -348,7 +358,7 @@ function DeleteAccountButton() {
   };
 
   return (
-    <AlertDialog open={open} onOpenChange={(v) => { setOpen(v); if (!v) setConfirm(""); }}>
+    <AlertDialog open={open} onOpenChange={(v) => { setOpen(v); if (!v) { setConfirm(""); setPassword(""); } }}>
       <AlertDialogTrigger asChild>
         <button
           type="button"
@@ -378,6 +388,24 @@ function DeleteAccountButton() {
             <li className="flex gap-2"><span aria-hidden>•</span><span>Login credentials and all connected sign-in methods</span></li>
           </ul>
         </div>
+        {hasPassword ? (
+          <div className="space-y-2">
+            <label className="text-xs text-muted-foreground">
+              Re-enter your password for <span className="font-semibold text-foreground">{email}</span>
+            </label>
+            <Input
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="Your password"
+              autoComplete="current-password"
+            />
+          </div>
+        ) : (
+          <p className="text-xs text-muted-foreground">
+            Signed in via a social provider. Type DELETE below to confirm.
+          </p>
+        )}
         <div className="space-y-2">
           <label className="text-xs text-muted-foreground">
             Type <span className="font-semibold text-foreground">DELETE</span> to confirm
@@ -392,7 +420,7 @@ function DeleteAccountButton() {
         <AlertDialogFooter>
           <AlertDialogCancel disabled={busy}>Cancel</AlertDialogCancel>
           <AlertDialogAction
-            disabled={busy || confirm !== "DELETE"}
+            disabled={busy || confirm !== "DELETE" || (hasPassword && !password)}
             onClick={(e) => { e.preventDefault(); onDelete(); }}
             className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
           >
@@ -403,4 +431,5 @@ function DeleteAccountButton() {
     </AlertDialog>
   );
 }
+
 
