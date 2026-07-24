@@ -38,7 +38,7 @@ function Landing() {
   useEffect(() => {
     if (loading || !user) return;
     const dest = readLastVisited() ?? "/feed";
-    router.navigate({ href: dest, replace: true });
+    router.navigate({ to: dest, replace: true });
   }, [loading, user, router]);
 
   // Signed-in users (or those with a persisted session still hydrating)
