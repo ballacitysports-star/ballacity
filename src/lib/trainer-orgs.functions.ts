@@ -104,6 +104,7 @@ export const createTrainerOrg = createServerFn({ method: "POST" })
       .parse(d),
   )
   .handler(async ({ data, context }) => {
+    await requireAccountType(context.supabase, context.userId, "gym");
     const { data: id, error } = await context.supabase.rpc("create_trainer_org_with_owner", {
       _name: data.name,
       _handle: data.handle,
