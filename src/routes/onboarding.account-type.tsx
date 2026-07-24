@@ -49,8 +49,13 @@ function OnboardingAccountTypePage() {
     if (!pick || busy) return;
     setBusy(true);
     try {
-      await setAccountTypeForCurrentUser(pick);
-      toast.success("Account type saved.");
+      const { error } = await supabase.rpc("change_account_type", { _new_type: pick });
+      if (error) throw error;
+      if (current && current !== pick && current !== "player") {
+        toast.success("Account type changed. Previously linked profiles were removed.");
+      } else {
+        toast.success("Account type saved.");
+      }
       // Route to the correct linked-profile creation flow for non-player types.
       // Player accounts already have their linked row (public.profiles) from the
       // handle_new_user trigger, so they go straight to the feed.
