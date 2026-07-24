@@ -44,7 +44,7 @@ async function stubNullAccountType(page: Page) {
       });
       return;
     }
-    await route.continue();
+    await route.fallback();
   });
 }
 
