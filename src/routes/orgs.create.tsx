@@ -6,23 +6,19 @@ import { supabase } from "@/integrations/supabase/client";
 import { useEffect } from "react";
 import { createStandaloneOrg } from "@/lib/trainer-orgs.functions";
 import { OrgForm, emptyOrgForm, type OrgFormValue } from "@/components/OrgForm";
+import { AccountTypeGate } from "@/components/AccountTypeGate";
 
 export const Route = createFileRoute("/orgs/create")({
   ssr: false,
   head: () => ({
     meta: [{ title: "Create gym — OpenRun" }],
   }),
-  component: GateOrgCreate,
-});
-
-import { AccountTypeGate } from "@/components/AccountTypeGate";
-function GateOrgCreate() {
-  return (
+  component: () => (
     <AccountTypeGate requires="gym">
       <CreateOrg />
     </AccountTypeGate>
-  );
-}
+  ),
+});
 
 function CreateOrg() {
   const navigate = useNavigate();
