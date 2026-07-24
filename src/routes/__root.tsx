@@ -468,6 +468,33 @@ function RootComponent() {
       }
       if ((event === "SIGNED_IN" || event === "USER_UPDATED") && session?.user) {
         runLegacyHostMigration(session.user.id);
+        // If the user picked an account type before OAuth (Google signup),
+        // persist it now that a session exists. Only set when profile is
+        // still empty to avoid overwriting an existing choice.
+        const pending = readPendingAccountType();
+        if (pending) {
+          const uid = session.user.id;
+          void supabase
+            .from("profiles")
+            .select("account_type")
+            .eq("id", uid)
+            .maybeSingle()
+            .then(({ data }) => {
+              const existing = (data as { account_type?: string } | null)?.account_type;
+              if (!isAccountType(existing)) {
+                void supabase
+                  .from("profiles")
+                  .update({ account_type: pending })
+                  .eq("id", uid)
+                  .then(() => {
+                    clearPendingAccountType();
+                    router.invalidate();
+                  });
+              } else {
+                clearPendingAccountType();
+              }
+            });
+        }
       }
     });
     return () => {
