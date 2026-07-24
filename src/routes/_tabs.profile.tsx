@@ -23,6 +23,8 @@ import { ME, GAMES, type Game } from "@/lib/sample-data";
 import { GameCard } from "@/components/GameCard";
 import { RequestGameCard } from "@/components/RequestGameCard";
 import { RequestGameCardSkeleton } from "@/components/RequestGameCardSkeleton";
+import { GameCardSkeleton } from "@/components/GameCardSkeleton";
+import { InfiniteList } from "@/components/InfiniteList";
 import { EmptyRequestsState } from "@/components/EmptyRequestsState";
 import { ReviewsSection } from "@/components/ReviewsSection";
 import { HERO_IMAGE } from "@/lib/sample-data";
