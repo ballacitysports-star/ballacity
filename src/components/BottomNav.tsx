@@ -1,6 +1,5 @@
 import { Link, useLocation } from "@tanstack/react-router";
-import { Home, UserCheck, Users, Dribbble, MessageCircle, GraduationCap } from "lucide-react";
-import { motion } from "framer-motion";
+import { Home, Search, PlusSquare, Heart } from "lucide-react";
 import { MyAvatar } from "@/components/UserAvatar";
 
 type NavItem = {
@@ -9,30 +8,47 @@ type NavItem = {
   icon?: typeof Home;
   match?: (pathname: string) => boolean;
   render?: (active: boolean) => React.ReactNode;
+  gradient?: boolean;
 };
 
 /**
- * Flat 6-tab layout. Inbox merges direct messages and alerts.
+ * Instagram-style 5-tab bottom bar: Home, Search, Create, Notifications, Profile.
+ * Messages moves to the top-right of the Home header (IG pattern); Players /
+ * Teams / Trainers stay reachable through the Search tab and existing links.
  */
 const items: NavItem[] = [
   {
     to: "/feed",
-    icon: Dribbble,
-    label: "Play",
-    match: (p) => p === "/feed" || p === "/discover" || p === "/pickup",
+    icon: Home,
+    label: "Home",
+    match: (p) => p === "/feed" || p === "/" || p === "/pickup",
   },
-  { to: "/players", icon: UserCheck, label: "Players", match: (p) => p.startsWith("/players") },
-  { to: "/teams", icon: Users, label: "Teams", match: (p) => p.startsWith("/teams") },
-  { to: "/trainers", icon: GraduationCap, label: "Trainers", match: (p) => p.startsWith("/trainers") },
   {
-    to: "/messages",
-    icon: MessageCircle,
-    label: "Inbox",
-    match: (p) => p.startsWith("/messages") || p.startsWith("/notifications"),
+    to: "/discover",
+    icon: Search,
+    label: "Search",
+    match: (p) =>
+      p.startsWith("/discover") ||
+      p.startsWith("/players") ||
+      p.startsWith("/teams") ||
+      p.startsWith("/trainers"),
+  },
+  {
+    to: "/create",
+    icon: PlusSquare,
+    label: "Create",
+    match: (p) => p.startsWith("/create"),
+    gradient: true,
+  },
+  {
+    to: "/notifications",
+    icon: Heart,
+    label: "Activity",
+    match: (p) => p.startsWith("/notifications") || p.startsWith("/messages"),
   },
   {
     to: "/profile",
-    label: "You",
+    label: "Profile",
     match: (p) => p.startsWith("/profile"),
     render: (active) => <MyAvatar ringWhenActive active={active} />,
   },
@@ -48,48 +64,56 @@ export function BottomNav() {
   const renderTab = (it: NavItem) => {
     const active = it.match ? it.match(pathname) : pathname === it.to;
     const Icon = it.icon;
+    const iconStroke = active ? 2.4 : 1.8;
     return (
       <Link
         key={it.to}
         to={it.to}
-        className="relative flex min-w-0 flex-col items-center gap-1 px-0.5 py-2.5 text-[10px] sm:text-[11px] font-medium transition-transform active:scale-95"
+        aria-label={it.label}
+        className="relative flex min-w-11 min-h-11 flex-1 items-center justify-center py-2.5 transition-transform active:scale-95"
       >
-        <span
-          className={`relative grid h-9 w-11 sm:w-14 place-items-center rounded-2xl transition-colors ${
-            active
-              ? "bg-primary-gradient text-primary-foreground shadow-[0_6px_18px_-8px_var(--primary)]"
-              : "text-muted-foreground"
-          }`}
-        >
-          {it.render
-            ? it.render(active)
-            : Icon
-              ? <Icon className="h-5 w-5" strokeWidth={active ? 2.5 : 2} />
-              : null}
-        </span>
-        <span
-          className={`truncate max-w-full tracking-wide ${
-            active ? "text-foreground" : "text-muted-foreground"
-          }`}
-        >
-          {it.label}
-        </span>
-        {active && (
-          <motion.span
-            layoutId="nav-dot"
-            className="absolute -bottom-0.5 h-[3px] w-6 rounded-full bg-primary-gradient"
-          />
-        )}
+        {it.render
+          ? it.render(active)
+          : Icon ? (
+              <Icon
+                className={`h-6 w-6 ${
+                  it.gradient
+                    ? active
+                      ? "text-transparent [stroke:url(#ig-grad)]"
+                      : "text-foreground"
+                    : active
+                      ? "text-foreground"
+                      : "text-muted-foreground"
+                }`}
+                strokeWidth={iconStroke}
+                fill={active && !it.gradient && it.label !== "Search" ? "currentColor" : "none"}
+              />
+            ) : null}
+        <span className="sr-only">{it.label}</span>
       </Link>
     );
   };
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-40 pb-[max(env(safe-area-inset-bottom),0.5rem)] pt-2 px-3">
-      <div className="mx-auto max-w-md sm:max-w-xl lg:max-w-2xl rounded-3xl border border-border bg-surface/85 backdrop-blur-xl shadow-2xl">
-        <div className="flex items-end justify-around" role="group" aria-label="Primary tabs">
-          {items.map(renderTab)}
-        </div>
+    <nav className="fixed bottom-0 left-0 right-0 z-40 border-t border-border bg-background/95 backdrop-blur-xl pb-[max(env(safe-area-inset-bottom),0px)]">
+      {/* SVG gradient stroke definition, used by the Create tab icon. */}
+      <svg width="0" height="0" className="absolute" aria-hidden>
+        <defs>
+          <linearGradient id="ig-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stopColor="#f09433" />
+            <stop offset="25%" stopColor="#e6683c" />
+            <stop offset="50%" stopColor="#dc2743" />
+            <stop offset="75%" stopColor="#cc2366" />
+            <stop offset="100%" stopColor="#bc1888" />
+          </linearGradient>
+        </defs>
+      </svg>
+      <div
+        className="mx-auto flex max-w-md sm:max-w-xl items-center justify-around"
+        role="group"
+        aria-label="Primary tabs"
+      >
+        {items.map(renderTab)}
       </div>
     </nav>
   );

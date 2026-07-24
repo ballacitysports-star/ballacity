@@ -47,68 +47,76 @@
 }
 
 :root {
-  --radius: 1.25rem; /* 20px card radius — PS-app rounded shells */
+  --radius: 1rem; /* 16px — IG-style rounded cards */
 
-  /* PS Blue on Ink — near-black layered surfaces + electric PlayStation blue */
-  --background: oklch(0.14 0.02 260);           /* #0a0e17 ink */
-  --foreground: oklch(0.98 0.005 250);
-  --surface: oklch(0.19 0.025 260);             /* #141b29 card */
-  --surface-2: oklch(0.26 0.04 260);            /* #1f2b44 elevated */
+  /* Instagram-inspired dark palette (true-black backgrounds, hairline borders). */
+  --background: oklch(0 0 0);                   /* #000 */
+  --foreground: oklch(0.98 0 0);                /* near-white */
+  --surface: oklch(0.16 0 0);                   /* #1a1a1a card */
+  --surface-2: oklch(0.22 0 0);                 /* #262626 elevated */
 
-  --card: oklch(0.19 0.025 260);
-  --card-foreground: oklch(0.98 0.005 250);
-  --popover: oklch(0.19 0.025 260);
-  --popover-foreground: oklch(0.98 0.005 250);
+  --card: oklch(0.16 0 0);
+  --card-foreground: oklch(0.98 0 0);
+  --popover: oklch(0.16 0 0);
+  --popover-foreground: oklch(0.98 0 0);
 
-  --primary: oklch(0.62 0.22 258);              /* #0070f3 PS Blue */
-  --primary-foreground: oklch(0.99 0.005 250);
-  --primary-glow: oklch(0.74 0.16 245);         /* #4aa8ff */
-  --secondary: oklch(0.26 0.04 260);
-  --secondary-foreground: oklch(0.98 0.005 250);
+  --primary: oklch(0.98 0 0);                   /* IG uses near-white as primary action on dark */
+  --primary-foreground: oklch(0.12 0 0);
+  --primary-glow: oklch(0.74 0.16 245);
+  --secondary: oklch(0.22 0 0);
+  --secondary-foreground: oklch(0.98 0 0);
 
-  --muted: oklch(0.24 0.03 260);
-  --muted-foreground: oklch(0.70 0.02 255);
+  --muted: oklch(0.20 0 0);
+  --muted-foreground: oklch(0.68 0 0);          /* IG secondary text #a8a8a8 */
 
-  --accent: oklch(0.74 0.16 245);               /* PS Blue glow accent */
-  --accent-foreground: oklch(0.14 0.02 260);
+  --accent: oklch(0.65 0.19 260);               /* interactive blue #0095f6 */
+  --accent-foreground: oklch(0.99 0 0);
 
-  --destructive: oklch(0.66 0.22 22);
-  --destructive-foreground: oklch(0.99 0.005 250);
+  --destructive: oklch(0.62 0.24 25);           /* IG heart red */
+  --destructive-foreground: oklch(0.99 0 0);
 
   --success: oklch(0.72 0.17 155);
-  --success-foreground: oklch(0.14 0.02 260);
+  --success-foreground: oklch(0.14 0 0);
   --warning: oklch(0.82 0.14 82);
-  --warning-foreground: oklch(0.14 0.02 260);
-  --info: oklch(0.74 0.16 245);
-  --info-foreground: oklch(0.14 0.02 260);
+  --warning-foreground: oklch(0.14 0 0);
+  --info: oklch(0.65 0.19 260);
+  --info-foreground: oklch(0.99 0 0);
 
-  --border: oklch(1 0 0 / 8%);
+  --border: oklch(1 0 0 / 12%);                 /* #262626 hairline */
   --input: oklch(1 0 0 / 10%);
-  --ring: oklch(0.62 0.22 258);
+  --ring: oklch(0.65 0.19 260);
 
-  /* Back-compat aliases — repoint legacy `lime`/`coral` to the PS palette so
-     every existing `bg-lime`, `text-coral`, `.bg-lime-gradient` re-skins. */
-  --lime: oklch(0.62 0.22 258);
-  --coral: oklch(0.74 0.16 245);
+  /* Legacy accent tokens repointed to IG blue + heart red so any existing
+     `bg-lime` / `text-coral` inherits the new palette. */
+  --lime: oklch(0.65 0.19 260);
+  --coral: oklch(0.62 0.24 25);
+
+  /* Signature IG gradient — used sparingly for Create tab, story ring, active bar. */
+  --gradient-ig: linear-gradient(
+    45deg,
+    #f09433 0%,
+    #e6683c 25%,
+    #dc2743 50%,
+    #cc2366 75%,
+    #bc1888 100%
+  );
 
   --gradient-hero:
-    radial-gradient(120% 80% at 80% 0%, oklch(0.62 0.22 258 / 0.28), transparent 60%),
-    radial-gradient(100% 80% at 0% 100%, oklch(0.74 0.16 245 / 0.18), transparent 55%),
-    linear-gradient(180deg, oklch(0.14 0.02 260), oklch(0.10 0.015 260));
-  --gradient-primary: linear-gradient(135deg, oklch(0.62 0.22 258), oklch(0.74 0.16 245));
-  --gradient-secondary: linear-gradient(135deg, oklch(0.74 0.16 245), oklch(0.62 0.22 258));
-  --gradient-lime: var(--gradient-primary);
+    radial-gradient(120% 80% at 80% 0%, oklch(0.65 0.19 260 / 0.22), transparent 60%),
+    linear-gradient(180deg, oklch(0.10 0 0), oklch(0.04 0 0));
+  --gradient-primary: var(--gradient-ig);
+  --gradient-secondary: linear-gradient(135deg, oklch(0.62 0.24 25), oklch(0.74 0.18 30));
+  --gradient-lime: var(--gradient-ig);
   --gradient-coral: var(--gradient-secondary);
 
-  --shadow-glow-primary: 0 12px 40px -12px oklch(0.62 0.22 258 / 0.65);
-  --shadow-glow-secondary: 0 12px 40px -12px oklch(0.74 0.16 245 / 0.55);
+  --shadow-glow-primary: 0 12px 40px -12px oklch(0.65 0.19 260 / 0.55);
+  --shadow-glow-secondary: 0 12px 40px -12px oklch(0.62 0.24 25 / 0.5);
   --shadow-glow-lime: var(--shadow-glow-primary);
   --shadow-glow-coral: var(--shadow-glow-secondary);
 
-  --shadow-card:
-    0 1px 0 0 oklch(1 0 0 / 0.06) inset,
-    0 12px 30px -18px oklch(0 0 0 / 0.7);
+  --shadow-card: 0 1px 0 0 oklch(1 0 0 / 0.04) inset;
 }
+
 
 /* Light theme intentionally shadowed to keep the PS aesthetic dark-only in
    this pass. `html.light` inherits `:root` so any user with an old `light`
@@ -167,6 +175,7 @@ html.light {
   .bg-coral-gradient { background: var(--gradient-secondary); }
   .bg-primary-gradient { background: var(--gradient-primary); }
   .bg-secondary-gradient { background: var(--gradient-secondary); }
+  .bg-ig-gradient { background: var(--gradient-ig); }
   .text-lime { color: var(--lime); }
   .text-coral { color: var(--coral); }
   .ring-lime { --tw-ring-color: var(--lime); }
@@ -177,6 +186,18 @@ html.light {
     border-radius: var(--radius);
     box-shadow: var(--shadow-card);
   }
+  /* Instagram-style circular story ring — apply to a wrapping element around
+     an avatar; uses a small transparent inner ring for the white gap. */
+  .story-ring {
+    padding: 2px;
+    border-radius: 9999px;
+    background: var(--gradient-ig);
+  }
+  .story-ring > * {
+    border: 2px solid var(--background);
+    border-radius: 9999px;
+    display: block;
+  }
   .grid-noise {
     background-image:
       linear-gradient(to right, oklch(1 0 0 / 0.04) 1px, transparent 1px),
@@ -186,6 +207,7 @@ html.light {
   .scrollbar-hide::-webkit-scrollbar { display: none; }
   .scrollbar-hide { scrollbar-width: none; }
 }
+
 
 /* Debug mode — highlight SSR vs client render boundaries. */
 html[data-debug="1"] [data-render="client-only"] {
