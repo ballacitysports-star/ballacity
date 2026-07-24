@@ -183,9 +183,9 @@ function AuthPage() {
     } catch {
       /* sessionStorage may be unavailable in private mode */
     }
-    const promise = lovable.auth.signInWithOAuth("google", {
+    const promise = lovable.auth.signInWithOAuth(provider, {
       redirect_uri: window.location.origin,
-      extraParams: { prompt: "select_account" },
+      ...(provider === "google" ? { extraParams: { prompt: "select_account" } } : {}),
     });
 
     setBusy(true);
