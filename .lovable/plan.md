@@ -1,47 +1,29 @@
-## Goal
-For any user signing in with Google or Apple whose `profiles.account_type` is still empty, unconditionally redirect them to `/onboarding/account-type` — even if a "pending" choice was stashed before the OAuth handoff. Email sign-ins and returning users are unaffected.
+## Root cause
 
-## Current behavior (verified)
-`src/routes/__root.tsx` (auth-state effect, ~L503–539):
-1. On any `SIGNED_IN` event, read `profiles.account_type`.
-2. If it exists → done.
-3. If it's missing but `readPendingAccountType()` has a value → silently write it into the profile and continue to the saved `next` path.
-4. Otherwise → navigate to `/onboarding/account-type`.
+New Google/Apple users end up on marketing `/` because two bugs compose:
 
-Because branch 3 auto-applies a locally stashed choice, a first-time Google/Apple user can bypass the account-type screen (e.g. if a stale `pending` value exists, or if the flow ever pre-selects one).
+1. **`goPostAuth` in `src/routes/auth.tsx` treats `/` as a valid destination.** With no `next` and no `lastVisited`, it falls back to `document.referrer`, which for users who came to `/auth` from the landing is `/`. `sanitizeNextPath` allows `/`. It then hard-reloads to `/`.
+2. **`src/routes/index.tsx` uses an invalid navigate option.** `router.navigate({ href: dest, replace: true })` — TanStack Router's `NavigateOptions` uses `to`, not `href`. The call silently no-ops, so signed-in users never leave the marketing page. This also breaks the "signed-in user visits `/`" case in general (bookmarks, refresh at `/`).
 
-## Change
-In `src/routes/__root.tsx`, for OAuth (Google/Apple) sign-ins with no existing `account_type`, skip the pending auto-apply and always navigate to `/onboarding/account-type`. The pending value (and the saved `next` path) stay in storage so the picker/wizard can consume them after the user confirms their type.
+Additionally, `__root.tsx`'s SIGNED_IN reconcile that would send new OAuth users to `/onboarding/account-type` runs in the pre-reload page — after `window.location.replace("/")` reloads, only `INITIAL_SESSION` fires and is filtered out, so the reconcile never gets a second chance.
 
-Detection: use `session.user.app_metadata.provider` (values `"google"` / `"apple"`). Email/password sign-ins keep today's behavior (still redirected to the picker when type is missing, since branch 4 already handles it; branch 3 only matters when a `pending` value exists, which for email is set on the same device moments earlier).
+## Fix
 
-### Pseudocode
-```ts
-const provider = session.user.app_metadata?.provider;
-const isOAuth = provider === "google" || provider === "apple";
+### 1. `src/routes/auth.tsx` — never land on `/` after sign-in
+- In `goPostAuth`, after computing `dest` (from `next`, `lastVisited`, and referrer), treat `/` as "no destination" and fall through to `/feed`.
+- Same treatment for the `oauth()` success branch at line 265 (`window.location.replace(next ?? "/profile")`) — if `next === "/"`, use `/feed` instead.
+- This is a UI/presentation-layer fix; no business logic changes.
 
-// existing profile lookup...
-if (isAccountType(existing)) { /* unchanged */ return; }
+### 2. `src/routes/index.tsx` — actually navigate signed-in users away
+- Replace `router.navigate({ href: dest, replace: true })` with `router.navigate({ to: dest, replace: true })`.
+- Keep the skeleton fallback so marketing never flashes.
 
-if (isOAuth) {
-  // Always force the picker for new social sign-ins.
-  if (router.state.location.pathname !== "/onboarding/account-type") {
-    router.navigate({ to: "/onboarding/account-type", replace: true });
-  }
-  return;
-}
+### 3. Optional hardening in `sanitizeNextPath` (`src/routes/__root.tsx`)
+- Add `/` to the excluded paths so no future caller can pick the landing as a post-auth destination. Landing is not a sensible "return here after sign-in" target for an authenticated user in this app.
 
-// Non-OAuth: keep current pending-apply behavior.
-if (pending) { /* update profile, consume next */ return; }
-router.navigate({ to: "/onboarding/account-type", replace: true });
-```
+Result: new OAuth users hard-reload to `/feed`, `AuthGate` sees `account_type` is null, and routes them to `/onboarding/account-type` — the intended flow. Users who refresh on `/` while signed in also correctly bounce to their last visited page (or `/feed`) instead of being stuck on marketing.
 
-The existing `AuthGate` type-check guard (L389–422) already blocks protected routes when `account_type` is missing, so this is a belt-and-suspenders redirect that guarantees the picker screen appears immediately after OAuth callback rather than after a route flash.
+## Verification
 
-## Files touched
-- `src/routes/__root.tsx` — adjust the `SIGNED_IN` reconcile block only.
-
-## Out of scope
-- No DB / RLS / auth-provider changes.
-- No changes to `/onboarding/account-type` UI or to `onboarding.welcome.tsx`.
-- Email sign-in flow unchanged.
+- Manual: sign in with a brand-new Google account from `/auth` (from marketing referrer and from a direct visit) → lands on `/onboarding/account-type`. Same for Apple.
+- Add a small assertion to `e2e/oauth-new-user-onboarding.spec.ts` (or a sibling spec) covering the "referrer is `/`" case so this regression can't sneak back.
