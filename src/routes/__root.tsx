@@ -389,6 +389,9 @@ function AuthGate({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (loading || !user) return;
     if (isPublic) return;
+    // The account-type picker itself is where users go to resolve a missing
+    // type — don't check-and-redirect while we're already there.
+    if (pathname === "/onboarding/account-type") return;
     let cancelled = false;
     (async () => {
       const { data } = await supabase
@@ -399,10 +402,9 @@ function AuthGate({ children }: { children: React.ReactNode }) {
       if (cancelled) return;
       const t = (data as { account_type?: string } | null)?.account_type;
       if (!isAccountType(t)) {
-        // Legacy accounts without an account_type: sign out. Type is
-        // permanent and set at signup; there is no in-app switcher.
-        await supabase.auth.signOut();
-        router.navigate({ to: "/auth", replace: true });
+        // No account type yet (fresh Google sign-in, or legacy account):
+        // send to the account-type wizard.
+        router.navigate({ to: "/onboarding/account-type", replace: true });
       }
     })();
     return () => {
