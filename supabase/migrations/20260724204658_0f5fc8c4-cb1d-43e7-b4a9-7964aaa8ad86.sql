@@ -1,0 +1,1 @@
+DROP FUNCTION IF EXISTS public.change_account_type(text);

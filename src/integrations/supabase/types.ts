@@ -1873,7 +1873,6 @@ export type Database = {
         Args: { _caller: string; _target: string }
         Returns: boolean
       }
-      change_account_type: { Args: { _new_type: string }; Returns: undefined }
       create_direct_conversation: {
         Args: { _game_id?: string; _other_user: string }
         Returns: string
