@@ -273,28 +273,18 @@ function PlayerWelcome() {
     );
   };
 
-  // Persist location coordinates when granted.
+  // Persist location coordinates locally when granted.
   useEffect(() => {
-    if (geo.kind !== "granted" || !user) return;
-    (async () => {
-      try {
-        await supabase
-          .from("profiles")
-          .update({ home_lat: geo.lat, home_lng: geo.lng })
-          .eq("id", user.id);
-        try {
-          localStorage.setItem(
-            "openrun.home_coords",
-            JSON.stringify({ lat: geo.lat, lng: geo.lng }),
-          );
-        } catch {
-          /* ignore */
-        }
-      } catch {
-        // Non-fatal: keep the granted state; profile columns may not exist yet.
-      }
-    })();
-  }, [geo, user]);
+    if (geo.kind !== "granted") return;
+    try {
+      localStorage.setItem(
+        "openrun.home_coords",
+        JSON.stringify({ lat: geo.lat, lng: geo.lng }),
+      );
+    } catch {
+      /* ignore */
+    }
+  }, [geo]);
 
   // Auto-save whenever sport / level / radius changes (debounced).
   useEffect(() => {
