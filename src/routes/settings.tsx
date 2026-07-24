@@ -323,3 +323,69 @@ function MyOrgsSection() {
     </section>
   );
 }
+
+function DeleteAccountButton() {
+  const navigate = useNavigate();
+  const del = useServerFn(deleteMyAccount);
+  const [open, setOpen] = useState(false);
+  const [confirm, setConfirm] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  const onDelete = async () => {
+    setBusy(true);
+    try {
+      await del();
+      await supabase.auth.signOut();
+      toast.success("Your account has been deleted.");
+      navigate({ to: "/" });
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Failed to delete account");
+      setBusy(false);
+    }
+  };
+
+  return (
+    <AlertDialog open={open} onOpenChange={(v) => { setOpen(v); if (!v) setConfirm(""); }}>
+      <AlertDialogTrigger asChild>
+        <button
+          type="button"
+          className="flex w-full items-center justify-center gap-2 rounded-xl border border-destructive/40 bg-card px-4 py-3 text-sm font-medium text-destructive hover:bg-destructive/10"
+        >
+          <Trash2 className="h-4 w-4" />
+          Delete account
+        </button>
+      </AlertDialogTrigger>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Delete your account?</AlertDialogTitle>
+          <AlertDialogDescription>
+            This permanently deletes your account and all associated data — profile, teams,
+            trainer/gym pages, games, messages, and follows. This action cannot be undone.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <div className="space-y-2">
+          <label className="text-xs text-muted-foreground">
+            Type <span className="font-semibold text-foreground">DELETE</span> to confirm
+          </label>
+          <Input
+            value={confirm}
+            onChange={(e) => setConfirm(e.target.value)}
+            placeholder="DELETE"
+            autoComplete="off"
+          />
+        </div>
+        <AlertDialogFooter>
+          <AlertDialogCancel disabled={busy}>Cancel</AlertDialogCancel>
+          <AlertDialogAction
+            disabled={busy || confirm !== "DELETE"}
+            onClick={(e) => { e.preventDefault(); onDelete(); }}
+            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+          >
+            {busy ? "Deleting…" : "Delete account"}
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+  );
+}
+
