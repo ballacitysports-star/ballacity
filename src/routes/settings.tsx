@@ -222,7 +222,7 @@ function SettingsHubPage() {
           </section>
         ))}
 
-        <section>
+        <section className="space-y-2">
           <button
             type="button"
             onClick={handleSignOut}
@@ -231,7 +231,9 @@ function SettingsHubPage() {
             <LogOut className="h-4 w-4" />
             Sign out
           </button>
+          <DeleteAccountButton />
         </section>
+
       </main>
     </div>
   );
