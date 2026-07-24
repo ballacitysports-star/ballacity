@@ -87,7 +87,7 @@ export function BottomNav() {
                       : "text-muted-foreground"
                 }`}
                 strokeWidth={iconStroke}
-                fill={active && !it.gradient && it.label !== "Search" ? "currentColor" : "none"}
+                fill={active && !it.gradient ? "currentColor" : "none"}
               />
             ) : null}
         <span className="sr-only">{it.label}</span>
