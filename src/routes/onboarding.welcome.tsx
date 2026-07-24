@@ -8,6 +8,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { useAccountType, type AccountType } from "@/lib/account-type";
 import { SPORTS, type Sport } from "@/lib/sample-data";
 import { SPORT_CONFIG } from "@/lib/sport-config";
+import { getFeedPrefsSnapshot, setFeedPrefs } from "@/lib/user-prefs-store";
 
 const searchSchema = z.object({
   type: z.enum(["player", "team", "trainer", "gym"]).optional(),
