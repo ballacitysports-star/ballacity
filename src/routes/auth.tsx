@@ -8,6 +8,12 @@ import { useAuth } from "@/hooks/use-auth";
 import { trackSigninEvent } from "@/lib/auth-signin-telemetry";
 import { sanitizeNextPath } from "@/routes/__root";
 import { readLastVisited } from "@/lib/last-visited";
+import { AccountTypePicker } from "@/components/AccountTypePicker";
+import {
+  ACCOUNT_TYPE_META,
+  type AccountType,
+  setPendingAccountType,
+} from "@/lib/account-type";
 
 export const Route = createFileRoute("/auth")({
   head: () => ({ meta: [{ title: "Sign in — OpenRun" }] }),
