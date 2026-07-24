@@ -431,13 +431,16 @@ function DeleteAccountButton() {
         <AlertDialogFooter>
           <AlertDialogCancel disabled={busy}>Cancel</AlertDialogCancel>
           <AlertDialogAction
-            disabled={busy || confirm !== "DELETE" || (hasPassword && !password)}
+            disabled={!canDelete}
             onClick={(e) => { e.preventDefault(); onDelete(); }}
             className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
           >
             {busy ? "Deleting…" : "Permanently delete account"}
           </AlertDialogAction>
         </AlertDialogFooter>
+        {blockerHint ? (
+          <p className="mt-2 text-right text-xs text-muted-foreground">{blockerHint}</p>
+        ) : null}
       </AlertDialogContent>
     </AlertDialog>
   );
