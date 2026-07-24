@@ -1,5 +1,5 @@
 import { Link, useLocation } from "@tanstack/react-router";
-import { Home, Search, PlusSquare, Heart } from "lucide-react";
+import { Home, Users, PlusSquare, Heart } from "lucide-react";
 import { MyAvatar } from "@/components/UserAvatar";
 
 type NavItem = {
