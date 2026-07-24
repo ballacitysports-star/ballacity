@@ -12,8 +12,17 @@ export const Route = createFileRoute("/orgs/create")({
   head: () => ({
     meta: [{ title: "Create gym — OpenRun" }],
   }),
-  component: CreateOrg,
+  component: GateOrgCreate,
 });
+
+import { AccountTypeGate } from "@/components/AccountTypeGate";
+function GateOrgCreate() {
+  return (
+    <AccountTypeGate requires="gym">
+      <CreateOrg />
+    </AccountTypeGate>
+  );
+}
 
 function CreateOrg() {
   const navigate = useNavigate();
