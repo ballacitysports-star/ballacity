@@ -235,15 +235,15 @@ function AuthPage() {
     // popup couldn't open. onAuthStateChange handles the success redirect.
     const reportVendorFailure = (raw: string) => {
       // Log the raw error so recurrences leave a diagnosable trail.
-      console.error("[auth] google sign-in failed:", raw);
+      console.error(`[auth] ${provider} sign-in failed:`, raw);
       trackSigninEvent("failure", { errorMessage: raw });
       if (/vendor|provider|external_provider|oauth/i.test(raw)) {
-        toast.error("Google sign-in was rejected by the provider", {
+        toast.error(`${providerLabel} sign-in was rejected by the provider`, {
           description:
             "Please try again. If it keeps failing, sign in with your email and password instead.",
         });
       } else {
-        toast.error(raw || "Google sign-in failed");
+        toast.error(raw || `${providerLabel} sign-in failed`);
       }
     };
 
