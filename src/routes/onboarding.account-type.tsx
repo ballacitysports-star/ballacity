@@ -4,11 +4,7 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
 import { AccountTypePicker } from "@/components/AccountTypePicker";
-import {
-  type AccountType,
-  isAccountType,
-  setAccountTypeForCurrentUser,
-} from "@/lib/account-type";
+import { type AccountType, isAccountType } from "@/lib/account-type";
 
 export const Route = createFileRoute("/onboarding/account-type")({
   head: () => ({ meta: [{ title: "Choose account type — OpenRun" }] }),
@@ -53,8 +49,13 @@ function OnboardingAccountTypePage() {
     if (!pick || busy) return;
     setBusy(true);
     try {
-      await setAccountTypeForCurrentUser(pick);
-      toast.success("Account type saved.");
+      const { error } = await supabase.rpc("change_account_type", { _new_type: pick });
+      if (error) throw error;
+      if (current && current !== pick && current !== "player") {
+        toast.success("Account type changed. Previously linked profiles were removed.");
+      } else {
+        toast.success("Account type saved.");
+      }
       // Route to the correct linked-profile creation flow for non-player types.
       // Player accounts already have their linked row (public.profiles) from the
       // handle_new_user trigger, so they go straight to the feed.
@@ -94,9 +95,8 @@ function OnboardingAccountTypePage() {
       </div>
       {current && current !== pick && current !== "player" ? (
         <p className="mt-4 rounded-2xl border border-amber-500/40 bg-amber-500/10 p-3 text-xs text-amber-200">
-          Heads up: your account currently owns a {current}. Switching to {pick} will hide those from
-          your profile — they'll remain in the database but you won't be able to manage them from
-          this account.
+          Heads up: your account currently owns a {current}. Switching to {pick} will permanently
+          delete your existing {current} profile and any data linked to it. This can't be undone.
         </p>
       ) : null}
       <button
