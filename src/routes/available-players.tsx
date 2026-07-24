@@ -14,7 +14,11 @@ import {
   Ticket,
   Search,
   Share2,
+  Heart,
+  Bookmark,
+  MoreHorizontal,
 } from "lucide-react";
+import { InfiniteList } from "@/components/InfiniteList";
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/use-auth";
 import { SPORTS, type Game } from "@/lib/sample-data";
@@ -329,10 +333,14 @@ function AvailablePlayersPage() {
               }
             />
           ) : (
-            <ul className="space-y-3">
-              {list.map((a) => (
+            <InfiniteList
+              items={list}
+              pageSize={6}
+              keyFor={(a) => a.id}
+              className="-mx-4 divide-y divide-border border-y border-border bg-background"
+              renderSkeleton={() => <AvailabilityCardSkeleton />}
+              renderItem={(a) => (
                 <AvailabilityCard
-                  key={a.id}
                   a={a}
                   isMine={user?.id === a.user_id}
                   onContact={() =>
@@ -342,8 +350,8 @@ function AvailablePlayersPage() {
                   }
                   onEdit={() => setEditingPost(a)}
                 />
-              ))}
-            </ul>
+              )}
+            />
           )}
         </>
       ) : (
