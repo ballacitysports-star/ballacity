@@ -381,7 +381,7 @@ function PlayerWelcome() {
         disabled={status === "saving"}
         className="mt-4 w-full rounded-full bg-lime-gradient px-4 py-3 text-sm font-bold text-primary-foreground disabled:opacity-50"
       >
-        Continue to feed
+        {allDone ? "Continue to feed" : `Continue (${completed}/${steps.length})`}
       </button>
     </div>
   );
