@@ -14,7 +14,11 @@ import {
   Ticket,
   Search,
   Share2,
+  Heart,
+  Bookmark,
+  MoreHorizontal,
 } from "lucide-react";
+import { InfiniteList } from "@/components/InfiniteList";
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/use-auth";
 import { SPORTS, type Game } from "@/lib/sample-data";
@@ -329,10 +333,14 @@ function AvailablePlayersPage() {
               }
             />
           ) : (
-            <ul className="space-y-3">
-              {list.map((a) => (
+            <InfiniteList
+              items={list}
+              pageSize={6}
+              keyFor={(a) => a.id}
+              className="-mx-4 divide-y divide-border border-y border-border bg-background"
+              renderSkeleton={() => <AvailabilityCardSkeleton />}
+              renderItem={(a) => (
                 <AvailabilityCard
-                  key={a.id}
                   a={a}
                   isMine={user?.id === a.user_id}
                   onContact={() =>
@@ -342,8 +350,8 @@ function AvailablePlayersPage() {
                   }
                   onEdit={() => setEditingPost(a)}
                 />
-              ))}
-            </ul>
+              )}
+            />
           )}
         </>
       ) : (
@@ -481,6 +489,12 @@ function AvailabilityCard({
   const navigate = useNavigate();
   const router = useRouter();
   const when = formatWindow(a);
+  const primarySport = a.sports[0];
+  const primaryEmoji = primarySport
+    ? (SPORTS.find((s) => s.name === primarySport)?.emoji ?? "🎯")
+    : "🎯";
+  const [liked, setLiked] = useState(false);
+  const [saved, setSaved] = useState(false);
 
   const handleMessage = async () => {
     try {
@@ -504,8 +518,9 @@ function AvailabilityCard({
   };
 
   return (
-    <li className="rounded-2xl border border-border bg-surface p-4">
-      <div className="flex items-start gap-3">
+    <article className="bg-background">
+      {/* Header */}
+      <header className="flex items-center gap-3 px-4 py-2.5">
         <Link
           to="/players/$userId"
           params={{ userId: a.user_id }}
@@ -516,34 +531,52 @@ function AvailabilityCard({
             avatarUrl={a.author_avatar_url}
             initials={a.author_initials}
             name={a.author_name}
-            size="lg"
-            rounded="square"
+            size="md"
+            rounded="full"
           />
         </Link>
+        <div className="min-w-0 flex-1 leading-tight">
+          <Link
+            to="/players/$userId"
+            params={{ userId: a.user_id }}
+            className="block truncate text-sm font-semibold hover:underline"
+          >
+            {a.author_name}
+          </Link>
+          <span className="text-[11px] text-muted-foreground">
+            {a.city || "Anywhere"} · up to {kmToMi(a.travel_radius_km)} mi
+          </span>
+        </div>
+        <span className="shrink-0 rounded-full bg-lime/15 px-2 py-0.5 text-[10px] font-bold text-lime">
+          {a.skill_level}
+        </span>
+        <button
+          type="button"
+          aria-label="More options"
+          className="grid h-8 w-8 place-items-center rounded-full text-muted-foreground hover:text-foreground"
+        >
+          <MoreHorizontal className="h-5 w-5" />
+        </button>
+      </header>
 
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center justify-between gap-2">
-            <Link
-              to="/players/$userId"
-              params={{ userId: a.user_id }}
-              className="font-semibold truncate hover:underline"
-            >
-              {a.author_name}
-            </Link>
-            <span className="shrink-0 rounded-full bg-lime/15 px-2 py-0.5 text-[10px] font-bold text-lime">
-              {a.skill_level}
-            </span>
-          </div>
-          <div className="mt-1 flex flex-wrap gap-1">
+      {/* Hero */}
+      <div className="relative aspect-square w-full overflow-hidden bg-ig-gradient">
+        <div className="absolute inset-0 grid place-items-center">
+          <span className="text-[9rem] leading-none drop-shadow-lg">{primaryEmoji}</span>
+        </div>
+        <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/70 via-black/30 to-transparent p-4">
+          <div className="flex flex-wrap gap-1.5">
             {a.sports.length === 0 ? (
-              <span className="text-xs text-muted-foreground">Any sport</span>
+              <span className="rounded-full bg-white/15 px-2.5 py-1 text-[11px] font-semibold text-white backdrop-blur">
+                Any sport
+              </span>
             ) : (
               a.sports.map((s) => {
                 const emoji = SPORTS.find((sp) => sp.name === s)?.emoji ?? "🎯";
                 return (
                   <span
                     key={s}
-                    className="rounded-full border border-border px-2 py-0.5 text-[10px] font-semibold"
+                    className="rounded-full bg-white/15 px-2.5 py-1 text-[11px] font-semibold text-white backdrop-blur"
                   >
                     {emoji} {s}
                   </span>
@@ -551,47 +584,121 @@ function AvailabilityCard({
               })
             )}
           </div>
-          {when && (
-            <p className="mt-2 flex items-center gap-1 text-xs text-muted-foreground">
-              <Calendar className="h-3.5 w-3.5" /> {when}
-            </p>
-          )}
-          {(a.city || a.travel_radius_km) && (
-            <p className="mt-1 flex items-center gap-1 text-xs text-muted-foreground">
-              <MapPin className="h-3.5 w-3.5" />
-              {a.city || "Anywhere"} · up to {kmToMi(a.travel_radius_km)} mi
-            </p>
-          )}
-          {a.note && <p className="mt-2 text-sm leading-snug">{a.note}</p>}
         </div>
       </div>
 
-      <div className="mt-3 flex gap-2">
-        {isMine ? (
+      {/* Action row */}
+      <div className="flex items-center gap-1 px-3 pt-2">
+        <button
+          type="button"
+          onClick={() => setLiked((v) => !v)}
+          aria-label="Like"
+          className="grid h-9 w-9 place-items-center rounded-full hover:bg-muted"
+        >
+          <Heart className={`h-6 w-6 ${liked ? "fill-red-500 text-red-500" : ""}`} />
+        </button>
+        {!isMine && (
           <>
-            <Button variant="outline" size="sm" className="rounded-full" onClick={onEdit}>
-              <Pencil className="h-4 w-4 mr-1" /> Edit
-            </Button>
-            <Button variant="outline" size="sm" className="rounded-full" onClick={handleDelete}>
-              <X className="h-4 w-4 mr-1" /> Remove
-            </Button>
-          </>
-        ) : (
-          <>
-            <Button
-              size="sm"
+            <button
+              type="button"
               onClick={handleMessage}
-              className="rounded-full flex-1 bg-lime-gradient text-primary-foreground"
+              aria-label="Message"
+              className="grid h-9 w-9 place-items-center rounded-full hover:bg-muted"
             >
-              <MessageCircle className="h-4 w-4 mr-1" /> Message
-            </Button>
-            <Button size="sm" variant="outline" onClick={onContact} className="rounded-full flex-1">
-              <Send className="h-4 w-4 mr-1" /> Contact request
-            </Button>
+              <MessageCircle className="h-6 w-6" />
+            </button>
+            <button
+              type="button"
+              onClick={onContact}
+              aria-label="Contact request"
+              className="grid h-9 w-9 place-items-center rounded-full hover:bg-muted"
+            >
+              <Send className="h-6 w-6" />
+            </button>
           </>
         )}
+        <div className="flex-1" />
+        {isMine ? (
+          <>
+            <button
+              type="button"
+              onClick={onEdit}
+              aria-label="Edit"
+              className="grid h-9 w-9 place-items-center rounded-full hover:bg-muted"
+            >
+              <Pencil className="h-5 w-5" />
+            </button>
+            <button
+              type="button"
+              onClick={handleDelete}
+              aria-label="Remove"
+              className="grid h-9 w-9 place-items-center rounded-full hover:bg-muted"
+            >
+              <X className="h-5 w-5" />
+            </button>
+          </>
+        ) : (
+          <button
+            type="button"
+            onClick={() => setSaved((v) => !v)}
+            aria-label="Save"
+            className="grid h-9 w-9 place-items-center rounded-full hover:bg-muted"
+          >
+            <Bookmark className={`h-6 w-6 ${saved ? "fill-foreground" : ""}`} />
+          </button>
+        )}
       </div>
-    </li>
+
+      {/* Caption */}
+      <div className="px-4 pb-4 pt-1 space-y-1">
+        {when && (
+          <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
+            <Calendar className="h-3.5 w-3.5" /> {when}
+          </p>
+        )}
+        <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
+          <MapPin className="h-3.5 w-3.5" />
+          {a.city || "Anywhere"} · up to {kmToMi(a.travel_radius_km)} mi
+        </p>
+        {a.note && (
+          <p className="pt-1 text-sm leading-snug">
+            <Link
+              to="/players/$userId"
+              params={{ userId: a.user_id }}
+              className="font-semibold hover:underline"
+            >
+              {a.author_name}
+            </Link>{" "}
+            {a.note}
+          </p>
+        )}
+      </div>
+    </article>
+  );
+}
+
+function AvailabilityCardSkeleton() {
+  return (
+    <article className="bg-background animate-pulse">
+      <div className="flex items-center gap-3 px-4 py-2.5">
+        <div className="h-10 w-10 rounded-full bg-secondary/60" />
+        <div className="flex-1 space-y-1.5">
+          <div className="h-3 w-32 rounded bg-secondary/60" />
+          <div className="h-2.5 w-24 rounded bg-secondary/60" />
+        </div>
+        <div className="h-5 w-12 rounded-full bg-secondary/60" />
+      </div>
+      <div className="aspect-square w-full bg-secondary/40" />
+      <div className="flex items-center gap-2 px-3 py-2">
+        <div className="h-6 w-6 rounded-full bg-secondary/60" />
+        <div className="h-6 w-6 rounded-full bg-secondary/60" />
+        <div className="h-6 w-6 rounded-full bg-secondary/60" />
+      </div>
+      <div className="space-y-1.5 px-4 pb-4">
+        <div className="h-3 w-40 rounded bg-secondary/60" />
+        <div className="h-3 w-2/3 rounded bg-secondary/60" />
+      </div>
+    </article>
   );
 }
 
