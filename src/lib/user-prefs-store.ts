@@ -195,7 +195,7 @@ function defaultsFromUser(user: User): MyProfile {
     avatar: initialsFrom(name),
     bio: "",
     city: "",
-    stats: { played: 0, reliability: 100, sportsmanship: 5, friends: 0 },
+    stats: { played: 0, reliability: 100, sportsmanship: 5, friends: 0, hosted: 0, endorsements: 0 },
     sports: [],
     badges: [],
     links: [],
