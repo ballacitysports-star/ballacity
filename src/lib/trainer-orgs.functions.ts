@@ -399,6 +399,7 @@ export const createStandaloneOrg = createServerFn({ method: "POST" })
       .parse(d),
   )
   .handler(async ({ data, context }) => {
+    await requireAccountType(context.supabase, context.userId, "gym");
     const { data: row, error } = await context.supabase
       .from("trainer_orgs")
       .insert({
