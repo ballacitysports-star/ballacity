@@ -647,11 +647,14 @@ function Profile() {
             )}
           </div>
           {upcomingGroups.hosting.length > 0 ? (
-            <div className="space-y-3">
-              {upcomingGroups.hosting.map((g, i) => (
-                <GameCard key={g.id} game={g} index={i} />
-              ))}
-            </div>
+            <InfiniteList
+              items={upcomingGroups.hosting}
+              pageSize={6}
+              keyFor={(g) => g.id}
+              renderItem={(g, i) => <GameCard game={g} index={i} />}
+              renderSkeleton={() => <GameCardSkeleton />}
+              resetKey="hosting"
+            />
           ) : (
             <Link
               to="/create"
