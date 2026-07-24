@@ -241,9 +241,11 @@ function SettingsHubPage() {
 
 function MyOrgsSection() {
   const qc = useQueryClient();
+  const { user } = useAuth();
   const { data: orgs } = useQuery({
-    queryKey: ["my-orgs"],
+    queryKey: ["my-orgs", user?.id ?? "anon"],
     queryFn: () => listMyOrgs(),
+    enabled: !!user,
   });
 
   const del = useMutation({
