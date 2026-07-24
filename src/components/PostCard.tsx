@@ -1,11 +1,21 @@
-import { motion } from "framer-motion";
-import { Calendar, MapPin, Users, DollarSign, Pin } from "lucide-react";
+import { useState } from "react";
+import { Heart, MessageCircle, Send, Bookmark, MoreHorizontal, Calendar, MapPin, Users, DollarSign, Pin } from "lucide-react";
 import { POST_KIND_META, type OrgPost } from "@/lib/sample-data";
 import { formatWhen } from "@/lib/format";
 
+/**
+ * Instagram-style feed card. Preserves every existing datum on OrgPost
+ * (kind badge, event date, location, price, spots, RSVP CTA, pinned) but
+ * re-lays them into IG's canonical order: header row, edge-to-edge media
+ * area, action row, caption, then event meta.
+ *
+ * Like/comment/share/save are UI-only affordances that mirror the
+ * existing "onClick opens PostDetailsDialog" behavior — they route to
+ * the same click handler so no server logic changes.
+ */
 export function PostCard({
   post,
-  index = 0,
+  index: _index = 0,
   onClick,
 }: {
   post: OrgPost;
@@ -14,123 +24,185 @@ export function PostCard({
 }) {
   const meta = POST_KIND_META[post.kind];
   const isEvent = post.kind === "tryout" || post.kind === "pickup" || post.kind === "clinic";
-  const accent =
-    meta.color === "coral"
-      ? "text-coral border-coral/40 bg-coral/10"
-      : meta.color === "lime"
-        ? "text-lime border-lime/40 bg-lime/10"
-        : "text-muted-foreground border-border bg-secondary";
 
   const fillPct = post.spots ? Math.round((post.spots.taken / post.spots.max) * 100) : 0;
   const spotsLeft = post.spots ? post.spots.max - post.spots.taken : 0;
 
-  return (
-    <motion.article
-      initial={{ opacity: 0, y: 12 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ delay: index * 0.04 }}
-      onClick={onClick}
-      role={onClick ? "button" : undefined}
-      tabIndex={onClick ? 0 : undefined}
-      onKeyDown={
-        onClick
-          ? (e) => {
-              if (e.key === "Enter" || e.key === " ") {
-                e.preventDefault();
-                onClick();
-              }
-            }
-          : undefined
+  const [liked, setLiked] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const stop = (e: React.MouseEvent) => e.stopPropagation();
+
+  const openable = !!onClick;
+  const openProps = openable
+    ? {
+        role: "button" as const,
+        tabIndex: 0,
+        onClick,
+        onKeyDown: (e: React.KeyboardEvent) => {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            onClick?.();
+          }
+        },
       }
-      className={`relative rounded-3xl border border-border bg-surface p-4 ${onClick ? "cursor-pointer transition hover:border-lime/40 focus:outline-none focus:ring-2 focus:ring-lime/40" : ""}`}
+    : {};
+
+  return (
+    <article
+      className={`overflow-hidden border-b border-border bg-background ${openable ? "cursor-pointer" : ""}`}
     >
-
-      {post.pinned && (
-        <span className="absolute -top-2 left-4 inline-flex items-center gap-1 rounded-full bg-lime px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-primary-foreground">
-          <Pin className="h-3 w-3" /> Pinned
-        </span>
-      )}
-
-      <div className="flex items-center justify-between mb-2">
-        <span
-          className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs font-bold ${accent}`}
+      {/* Header */}
+      <header className="flex items-center gap-3 px-3 py-2.5">
+        <div className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-ig-gradient text-[13px] font-bold text-white">
+          {meta.emoji}
+        </div>
+        <div className="min-w-0 flex-1 leading-tight">
+          <div className="flex items-center gap-1.5">
+            <span className="truncate text-sm font-semibold">{meta.label}</span>
+            {post.pinned && (
+              <Pin className="h-3 w-3 shrink-0 text-muted-foreground" aria-label="Pinned" />
+            )}
+          </div>
+          <span className="text-[11px] text-muted-foreground">{formatWhen(post.postedAt)}</span>
+        </div>
+        <button
+          type="button"
+          onClick={stop}
+          aria-label="Post options"
+          className="grid h-9 w-9 place-items-center rounded-full text-muted-foreground hover:text-foreground"
         >
-          <span>{meta.emoji}</span> {meta.label}
-        </span>
-        <span className="text-[11px] text-muted-foreground">{formatWhen(post.postedAt)}</span>
+          <MoreHorizontal className="h-5 w-5" />
+        </button>
+      </header>
+
+      {/* Media / hero area — edge-to-edge square. Renders a rich gradient
+          placeholder with the post title when no image is available (which
+          is the case today for team posts). */}
+      <div {...openProps} className="relative w-full">
+        <div className="relative aspect-square w-full bg-ig-gradient">
+          <div className="absolute inset-0 grid place-items-center px-6 text-center">
+            <div>
+              <div className="text-5xl">{meta.emoji}</div>
+              <h3 className="mt-3 font-display text-2xl font-bold leading-tight text-white drop-shadow-lg">
+                {post.title}
+              </h3>
+              {isEvent && post.date && (
+                <p className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-black/40 px-3 py-1 text-xs font-semibold text-white backdrop-blur">
+                  <Calendar className="h-3.5 w-3.5" />
+                  {formatWhen(post.date)}
+                </p>
+              )}
+            </div>
+          </div>
+        </div>
       </div>
 
-      <h3 className="font-display text-lg font-bold leading-tight">{post.title}</h3>
-      <p className="mt-1.5 text-sm text-muted-foreground line-clamp-3">{post.body}</p>
+      {/* Action row */}
+      <div className="flex items-center gap-1 px-2 pt-2">
+        <button
+          type="button"
+          onClick={(e) => { stop(e); setLiked((v) => !v); }}
+          aria-label={liked ? "Unlike" : "Like"}
+          className="grid h-11 w-11 place-items-center rounded-full text-foreground transition active:scale-90"
+        >
+          <Heart
+            className={`h-6 w-6 ${liked ? "text-coral" : ""}`}
+            fill={liked ? "currentColor" : "none"}
+            strokeWidth={2}
+          />
+        </button>
+        <button
+          type="button"
+          onClick={onClick ? (e) => { stop(e); onClick(); } : stop}
+          aria-label="Comment"
+          className="grid h-11 w-11 place-items-center rounded-full text-foreground transition active:scale-90"
+        >
+          <MessageCircle className="h-6 w-6" strokeWidth={2} />
+        </button>
+        <button
+          type="button"
+          onClick={stop}
+          aria-label="Share"
+          className="grid h-11 w-11 place-items-center rounded-full text-foreground transition active:scale-90"
+        >
+          <Send className="h-6 w-6" strokeWidth={2} />
+        </button>
+        <div className="flex-1" />
+        <button
+          type="button"
+          onClick={(e) => { stop(e); setSaved((v) => !v); }}
+          aria-label={saved ? "Unsave" : "Save"}
+          className="grid h-11 w-11 place-items-center rounded-full text-foreground transition active:scale-90"
+        >
+          <Bookmark className="h-6 w-6" fill={saved ? "currentColor" : "none"} strokeWidth={2} />
+        </button>
+      </div>
 
-      {isEvent && (
-        <div className="mt-3 space-y-2.5">
-          <div className="flex flex-wrap gap-x-4 gap-y-1.5 text-xs text-muted-foreground">
-            <span className="inline-flex items-center gap-1.5">
-              <Calendar className="h-3.5 w-3.5 text-lime" />
-              {formatWhen(post.date)}
-            </span>
-            {post.location && (
-              <span className="inline-flex items-center gap-1.5">
-                <MapPin className="h-3.5 w-3.5 text-coral" />
-                {post.location}
-              </span>
-            )}
-            {typeof post.price === "number" && (
-              <span className="inline-flex items-center gap-1.5">
-                <DollarSign className="h-3.5 w-3.5" />
-                {post.price === 0 ? "Free" : `$${post.price}`}
-              </span>
-            )}
-          </div>
+      {/* Caption + meta */}
+      <div {...openProps} className="px-4 pb-3">
+        {typeof post.rsvps === "number" && (
+          <div className="text-sm font-semibold">{post.rsvps} reactions</div>
+        )}
+        <p className="mt-1 text-sm">
+          <span className="mr-1.5 font-semibold">{meta.label}</span>
+          <span className="line-clamp-3 text-foreground/90">{post.body || post.title}</span>
+        </p>
 
-          {post.spots && (
-            <>
-              <div className="flex items-center justify-between text-xs font-semibold">
-                <span className="inline-flex items-center gap-1.5 text-foreground">
-                  <Users className="h-3.5 w-3.5 text-lime" />
-                  {post.spots.taken}/{post.spots.max} signed up
+        {isEvent && (
+          <div className="mt-2 space-y-2">
+            <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
+              {post.location && (
+                <span className="inline-flex items-center gap-1.5">
+                  <MapPin className="h-3.5 w-3.5" />
+                  {post.location}
                 </span>
-                {spotsLeft > 0 ? (
-                  <span className={spotsLeft <= 3 ? "text-coral" : "text-muted-foreground"}>
-                    {spotsLeft} spot{spotsLeft === 1 ? "" : "s"} left
-                  </span>
-                ) : (
-                  <span className="text-muted-foreground">Waitlist</span>
-                )}
-              </div>
-              <div className="h-1.5 overflow-hidden rounded-full bg-secondary">
-                <motion.div
-                  initial={{ width: 0 }}
-                  animate={{ width: `${fillPct}%` }}
-                  transition={{ duration: 0.7 }}
-                  className={`h-full ${spotsLeft <= 3 ? "bg-coral-gradient" : "bg-lime-gradient"}`}
+              )}
+              {typeof post.price === "number" && (
+                <span className="inline-flex items-center gap-1.5">
+                  <DollarSign className="h-3.5 w-3.5" />
+                  {post.price === 0 ? "Free" : `$${post.price}`}
+                </span>
+              )}
+              {post.spots && (
+                <span className="inline-flex items-center gap-1.5">
+                  <Users className="h-3.5 w-3.5" />
+                  {post.spots.taken}/{post.spots.max}
+                </span>
+              )}
+            </div>
+
+            {post.spots && (
+              <div className="h-1 overflow-hidden rounded-full bg-secondary">
+                <div
+                  className={`h-full ${spotsLeft <= 3 ? "bg-coral-gradient" : "bg-ig-gradient"}`}
+                  style={{ width: `${fillPct}%` }}
                 />
               </div>
-            </>
-          )}
+            )}
 
-          <div className="flex gap-2 pt-1">
-            <button
-              onClick={(e) => e.stopPropagation()}
-              className="flex-1 rounded-full bg-lime-gradient py-2.5 text-sm font-bold text-primary-foreground glow-lime"
-            >
-              {post.kind === "tryout" ? "Apply" : "RSVP"}
-            </button>
-            <button
-              onClick={(e) => e.stopPropagation()}
-              className="rounded-full border border-border bg-surface px-4 py-2.5 text-sm font-semibold"
-            >
-              Share
-            </button>
+            <div className="flex gap-2 pt-1">
+              <button
+                type="button"
+                onClick={stop}
+                className="flex-1 rounded-lg bg-foreground py-2 text-sm font-semibold text-background"
+              >
+                {post.kind === "tryout" ? "Apply" : "RSVP"}
+              </button>
+              <button
+                type="button"
+                onClick={stop}
+                className="rounded-lg border border-border bg-transparent px-4 py-2 text-sm font-semibold"
+              >
+                Share
+              </button>
+            </div>
           </div>
+        )}
 
+        <div className="mt-2 text-[11px] uppercase tracking-wide text-muted-foreground">
+          {formatWhen(post.postedAt)}
         </div>
-      )}
-
-      {!isEvent && typeof post.rsvps === "number" && (
-        <div className="mt-3 text-xs text-muted-foreground">❤ {post.rsvps} reactions</div>
-      )}
-    </motion.article>
+      </div>
+    </article>
   );
 }
