@@ -4,11 +4,7 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
 import { AccountTypePicker } from "@/components/AccountTypePicker";
-import {
-  type AccountType,
-  isAccountType,
-  setAccountTypeForCurrentUser,
-} from "@/lib/account-type";
+import { type AccountType, isAccountType } from "@/lib/account-type";
 
 export const Route = createFileRoute("/onboarding/account-type")({
   head: () => ({ meta: [{ title: "Choose account type — OpenRun" }] }),
