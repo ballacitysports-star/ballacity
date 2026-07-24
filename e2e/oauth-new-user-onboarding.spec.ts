@@ -25,7 +25,7 @@ const PROVIDER_KEY = "openrun:oauth-provider";
 const NEXT_PATH = "/feed?src=oauth-e2e";
 
 async function stubNullAccountType(page: Page) {
-  await page.route(/\/rest\/v1\/profiles\?[^ ]*select=account_type/, async (route) => {
+  await page.route(/\/rest\/v1\/profiles\?.*select=account_type/, async (route) => {
     await route.fulfill({
       status: 200,
       contentType: "application/json",
@@ -36,7 +36,7 @@ async function stubNullAccountType(page: Page) {
 
   // Fail loudly if the fix regresses: an OAuth new-user path must NEVER write
   // an account_type into the profile from the client-side pending stash.
-  await page.route(/\/rest\/v1\/profiles\?[^ ]*id=eq\./, async (route) => {
+  await page.route(/\/rest\/v1\/profiles\?.*id=eq\./, async (route) => {
     if (route.request().method() === "PATCH") {
       await route.fulfill({
         status: 500,
@@ -144,7 +144,7 @@ test.describe("OAuth new-user onboarding gate", () => {
     try {
       await stubNullAccountType(page);
       await primeStorage(page, "google");
-      await page.goto("/feed", { waitUntil: "domcontentloaded" });
+      await page.goto("/", { waitUntil: "domcontentloaded" });
 
       await page.evaluate(async () => {
         const mod = await import("/src/integrations/supabase/client.ts");
