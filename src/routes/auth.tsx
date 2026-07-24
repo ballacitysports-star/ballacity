@@ -29,6 +29,8 @@ function AuthPage() {
   const { next } = Route.useSearch();
   const { user, loading } = useAuth();
   const [mode, setMode] = useState<"signin" | "signup">("signin");
+  const [signupStep, setSignupStep] = useState<"type" | "form">("type");
+  const [accountType, setAccountType] = useState<AccountType | null>(null);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [displayName, setDisplayName] = useState("");
