@@ -266,54 +266,81 @@ function AvailablePlayersPage() {
             </div>
           </div>
 
-          {/* Filter bar */}
-          <div className="mb-3 flex flex-wrap items-center gap-2">
-            <button
-              type="button"
-              onClick={() => setFiltersOpen(true)}
-              className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors ${
-                activeFilterCount > 0
-                  ? "border-lime bg-lime/15 text-foreground"
-                  : "border-border bg-surface text-muted-foreground"
-              }`}
-            >
-              <SlidersHorizontal className="h-3.5 w-3.5" />
-              Filters
+          {/* Active filters bar */}
+          <div className="-mx-4 mb-3 overflow-x-auto px-4">
+            <div className="flex items-center gap-2 pb-1">
+              <button
+                type="button"
+                onClick={() => setFiltersOpen(true)}
+                className={`inline-flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors ${
+                  activeFilterCount > 0
+                    ? "border-lime bg-lime/15 text-foreground"
+                    : "border-border bg-surface text-muted-foreground"
+                }`}
+                aria-label="Open filters"
+              >
+                <SlidersHorizontal className="h-3.5 w-3.5" />
+                Filters
+                {activeFilterCount > 0 && (
+                  <span className="grid h-4 min-w-4 place-items-center rounded-full bg-lime px-1 text-[10px] font-bold text-primary-foreground">
+                    {activeFilterCount}
+                  </span>
+                )}
+              </button>
+
               {activeFilterCount > 0 && (
-                <span className="grid h-4 min-w-4 place-items-center rounded-full bg-lime px-1 text-[10px] font-bold text-primary-foreground">
-                  {activeFilterCount}
-                </span>
+                <span aria-hidden className="h-5 w-px shrink-0 bg-border" />
               )}
-            </button>
-            {skill !== "All Levels" && (
-              <ActiveChip label={skill} onClear={() => setSkill("All Levels")} />
-            )}
-            {window !== "any" && (
-              <ActiveChip
-                label={
-                  window === "week"
-                    ? "Next 7 days"
-                    : window === "month"
-                      ? "Next 30 days"
-                      : `${customFrom || "…"} → ${customTo || "…"}`
-                }
-                onClear={() => {
-                  setWindow("any");
-                  setCustomFrom("");
-                  setCustomTo("");
-                }}
-              />
-            )}
-            {city.trim() && (
-              <ActiveChip label={city.trim()} onClear={() => setCity("")} />
-            )}
-            {maxDistance > 0 && (
-              <ActiveChip
-                label={`≤ ${maxDistance} mi`}
-                onClear={() => setMaxDistance(0)}
-              />
-            )}
+
+              {skill !== "All Levels" && (
+                <ActiveChip label={skill} onClear={() => setSkill("All Levels")} />
+              )}
+              {window !== "any" && (
+                <ActiveChip
+                  label={
+                    window === "week"
+                      ? "Next 7 days"
+                      : window === "month"
+                        ? "Next 30 days"
+                        : `${customFrom || "…"} → ${customTo || "…"}`
+                  }
+                  onClear={() => {
+                    setWindow("any");
+                    setCustomFrom("");
+                    setCustomTo("");
+                  }}
+                />
+              )}
+              {city.trim() && (
+                <ActiveChip label={city.trim()} onClear={() => setCity("")} />
+              )}
+              {maxDistance > 0 && (
+                <ActiveChip
+                  label={`≤ ${maxDistance} mi`}
+                  onClear={() => setMaxDistance(0)}
+                />
+              )}
+
+              {activeFilterCount > 0 && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSkill("All Levels");
+                    setWindow("any");
+                    setCustomFrom("");
+                    setCustomTo("");
+                    setCity("");
+                    setIncludeAnywhere(true);
+                    setMaxDistance(0);
+                  }}
+                  className="ml-1 shrink-0 rounded-full px-2 py-1 text-[11px] font-semibold text-muted-foreground hover:text-foreground"
+                >
+                  Clear all
+                </button>
+              )}
+            </div>
           </div>
+
 
 
 
