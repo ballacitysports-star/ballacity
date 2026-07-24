@@ -581,6 +581,22 @@ function TabBtn({
   );
 }
 
+function ActiveChip({ label, onClear }: { label: string; onClear: () => void }) {
+  return (
+    <span className="inline-flex items-center gap-1 rounded-full border border-lime bg-lime/15 px-2.5 py-1 text-[11px] font-semibold text-foreground">
+      {label}
+      <button
+        type="button"
+        onClick={onClear}
+        aria-label={`Clear ${label}`}
+        className="grid h-4 w-4 place-items-center rounded-full text-muted-foreground hover:text-foreground"
+      >
+        <X className="h-3 w-3" />
+      </button>
+    </span>
+  );
+}
+
 function Chip({
   active,
   onClick,
