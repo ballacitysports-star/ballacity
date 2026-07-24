@@ -753,6 +753,26 @@ function Profile() {
           </div>
         </div>
 
+        {/* Reviews tab — inline */}
+        <div className={`mt-6 ${activeTab === "reviews" ? "" : "hidden"}`}>
+          <ReviewsSection
+            revieweeId="me"
+            revieweeKind="player"
+            revieweeName={me.name}
+            isOwner
+          />
+        </div>
+
+        {/* Follow list sheet */}
+        <FollowSheet
+          open={followList !== null}
+          onOpenChange={(v: boolean) => !v && setFollowList(null)}
+          userId={profileUser.id}
+          displayName={me.name}
+          initialTab={followList ?? "followers"}
+        />
+
+
         {/* Reviews popup */}
         <Dialog open={reviewsOpen} onOpenChange={setReviewsOpen}>
           <DialogContent className="max-h-[90dvh] overflow-y-auto p-0 sm:max-w-xl">
