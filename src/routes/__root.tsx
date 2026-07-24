@@ -542,24 +542,26 @@ function RootComponent() {
         // picker so social sign-ins can never land on the feed as a default.
         const pending = readPendingAccountType();
         const uid = session.user.id;
-        const provider = session.user.app_metadata?.provider;
+        const clientProvider = session.user.app_metadata?.provider;
         const savedProvider = readSavedOAuthProvider();
-        const isOAuth = provider === "google" || provider === "apple" || !!savedProvider;
-        void supabase
-          .from("profiles")
-          .select("account_type")
-          .eq("id", uid)
-          .maybeSingle()
-          .then(({ data }) => {
-            const existing = (data as { account_type?: string } | null)?.account_type;
-            if (isAccountType(existing)) {
+        const clientIsOAuth =
+          clientProvider === "google" ||
+          clientProvider === "apple" ||
+          !!savedProvider;
+        // Backend guard: authoritative check via getOnboardingStatus. Even if
+        // provider metadata was stripped from the session, the server inspects
+        // linked identities and can still classify the user as social.
+        void getOnboardingStatus()
+          .then((status) => {
+            const isOAuth = clientIsOAuth || status.isSocial;
+            if (!status.needsOnboarding) {
               if (pending) clearPendingAccountType();
               if (isOAuth) clearSavedOAuthProvider();
               consumeSavedNext();
               return;
             }
-            // New Google/Apple sign-ins must always go through the account
-            // type picker — never auto-apply a stashed pending choice.
+            // New Google/Apple sign-ins must always go through the picker —
+            // never auto-apply a stashed pending choice.
             if (isOAuth) {
               if (router.state.location.pathname !== "/onboarding/account-type") {
                 router.navigate({ to: "/onboarding/account-type", replace: true });
@@ -579,10 +581,14 @@ function RootComponent() {
                 });
               return;
             }
-            // No pending choice and no stored type → force the picker.
-            // The saved next stays in sessionStorage; onboarding consumes it
-            // after the user picks a type.
             if (router.state.location.pathname !== "/onboarding/account-type") {
+              router.navigate({ to: "/onboarding/account-type", replace: true });
+            }
+          })
+          .catch(() => {
+            // Server guard unavailable: fall back to forcing the picker for any
+            // signed-in user without a persisted account type.
+            if (clientIsOAuth && router.state.location.pathname !== "/onboarding/account-type") {
               router.navigate({ to: "/onboarding/account-type", replace: true });
             }
           });
