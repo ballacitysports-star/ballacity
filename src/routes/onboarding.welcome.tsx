@@ -240,6 +240,17 @@ function PlayerWelcome() {
 
   const cont = () => nav({ to: "/feed" });
 
+  const steps = [
+    { key: "sport", label: "Sport", done: !!sport },
+    { key: "level", label: "Level", done: !!level },
+    { key: "radius", label: "Radius", done: true },
+  ];
+  const completed = steps.filter((s) => s.done).length;
+  const currentIdx = steps.findIndex((s) => !s.done);
+  const activeIdx = currentIdx === -1 ? steps.length - 1 : currentIdx;
+  const pct = Math.round((completed / steps.length) * 100);
+  const allDone = completed === steps.length;
+
   return (
     <div className="mx-auto flex min-h-dvh w-full max-w-md flex-col px-4 py-8">
       <div>
@@ -249,8 +260,52 @@ function PlayerWelcome() {
         </p>
       </div>
 
+      {/* Step-by-step progress */}
+      <div className="mt-5">
+        <div className="flex items-center justify-between text-xs font-medium text-muted-foreground">
+          <span>
+            Step {Math.min(activeIdx + 1, steps.length)} of {steps.length}
+          </span>
+          <span>{pct}%</span>
+        </div>
+        <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-surface">
+          <div
+            className="h-full bg-lime-gradient transition-all duration-300"
+            style={{ width: `${pct}%` }}
+          />
+        </div>
+        <ol className="mt-3 flex items-center justify-between gap-2">
+          {steps.map((s, i) => {
+            const isActive = i === activeIdx;
+            return (
+              <li key={s.key} className="flex flex-1 items-center gap-2">
+                <span
+                  className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[11px] font-bold ${
+                    s.done
+                      ? "bg-lime-gradient text-primary-foreground"
+                      : isActive
+                        ? "border border-foreground bg-background text-foreground"
+                        : "border border-border/60 bg-surface text-muted-foreground"
+                  }`}
+                  aria-current={isActive ? "step" : undefined}
+                >
+                  {s.done ? "✓" : i + 1}
+                </span>
+                <span
+                  className={`truncate text-xs ${
+                    isActive || s.done ? "text-foreground" : "text-muted-foreground"
+                  }`}
+                >
+                  {s.label}
+                </span>
+              </li>
+            );
+          })}
+        </ol>
+      </div>
+
       <section className="mt-6">
-        <div className="text-sm font-semibold">Primary sport</div>
+        <div className="text-sm font-semibold">1. Primary sport</div>
         <div className="mt-2 flex flex-wrap gap-2">
           {SPORTS.map((s) => {
             const active = sport === s.name;
@@ -277,7 +332,7 @@ function PlayerWelcome() {
 
       {sport && levels.length > 0 ? (
         <section className="mt-6">
-          <div className="text-sm font-semibold">Your level ({SPORT_CONFIG[sport].ratingSystem})</div>
+          <div className="text-sm font-semibold">2. Your level ({SPORT_CONFIG[sport].ratingSystem})</div>
           <div className="mt-2 flex flex-wrap gap-2">
             {levels.map((lv) => {
               const active = level === lv;
@@ -301,7 +356,7 @@ function PlayerWelcome() {
 
       <section className="mt-6">
         <div className="flex items-center justify-between text-sm font-semibold">
-          <span>Search radius</span>
+          <span>3. Search radius</span>
           <span className="text-muted-foreground">{radius} km</span>
         </div>
         <input
@@ -326,7 +381,7 @@ function PlayerWelcome() {
         disabled={status === "saving"}
         className="mt-4 w-full rounded-full bg-lime-gradient px-4 py-3 text-sm font-bold text-primary-foreground disabled:opacity-50"
       >
-        Continue to feed
+        {allDone ? "Continue to feed" : `Continue (${completed}/${steps.length})`}
       </button>
     </div>
   );
