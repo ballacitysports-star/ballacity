@@ -177,7 +177,7 @@ const TAB_PATHS = [
   "/notifications",
   "/reels",
 ];
-const ACCOUNT_TYPE_BYPASS = ["/onboarding/account-type"];
+
 
 /**
  * Same-origin, safe next-path filter used by both the auth redirect
