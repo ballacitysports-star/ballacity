@@ -23,6 +23,8 @@ import { ME, GAMES, type Game } from "@/lib/sample-data";
 import { GameCard } from "@/components/GameCard";
 import { RequestGameCard } from "@/components/RequestGameCard";
 import { RequestGameCardSkeleton } from "@/components/RequestGameCardSkeleton";
+import { GameCardSkeleton } from "@/components/GameCardSkeleton";
+import { InfiniteList } from "@/components/InfiniteList";
 import { EmptyRequestsState } from "@/components/EmptyRequestsState";
 import { ReviewsSection } from "@/components/ReviewsSection";
 import { HERO_IMAGE } from "@/lib/sample-data";
@@ -537,20 +539,27 @@ function Profile() {
               </TabsList>
             </Tabs>
           )}
-          <div className="space-y-3">
-            {requestsLoading ? (
-              <>
-                <RequestGameCardSkeleton />
-                <RequestGameCardSkeleton />
-              </>
-            ) : pendingWithGame.length > 0 || reviewedWithGame.length > 0 ? (
-              <>
-                {pendingWithGame.map((r, i) => {
-                  const g = gameLookup.get(r.game_id)!;
-                  const isHost = r.host_id === profileUser?.id;
+          {requestsLoading ? (
+            <div className="space-y-3">
+              <RequestGameCardSkeleton />
+              <RequestGameCardSkeleton />
+            </div>
+          ) : pendingWithGame.length > 0 || reviewedWithGame.length > 0 ? (
+            <InfiniteList
+              items={[
+                ...pendingWithGame.map((r) => ({ r, phase: "pending" as const })),
+                ...reviewedWithGame.map((r) => ({ r, phase: "reviewed" as const })),
+              ]}
+              pageSize={6}
+              keyFor={({ r }) => r.id}
+              renderSkeleton={() => <RequestGameCardSkeleton />}
+              resetKey={`req-${requestFilter}-${pendingWithGame.length}-${reviewedWithGame.length}`}
+              renderItem={({ r, phase }, i) => {
+                const g = gameLookup.get(r.game_id)!;
+                const isHost = r.host_id === profileUser?.id;
+                if (phase === "pending") {
                   return (
                     <RequestGameCard
-                      key={r.id}
                       game={g}
                       request={r}
                       index={i}
@@ -588,40 +597,34 @@ function Profile() {
                           toast.error(e.message ?? "Could not decline.");
                         }
                       } : undefined}
-
                     />
                   );
-                })}
-                {reviewedWithGame.map((r, i) => {
-                  const g = gameLookup.get(r.game_id)!;
-                  const isHost = r.host_id === profileUser?.id;
-                  return (
-                    <RequestGameCard
-                      key={r.id}
-                      game={g}
-                      request={r}
-                      index={pendingWithGame.length + i}
-                      isHost={isHost}
-                      onWithdraw={isHost || r.status !== "approved" ? undefined : async () => {
-                        const prev = myRequests;
-                        setMyRequests((rs) => rs.filter((x) => x.id !== r.id));
-                        try {
-                          await withdrawMyApprovedJoinRequest(r.game_id);
-                          leaveGame(r.game_id);
-                          toast("You withdrew from the game.");
-                        } catch (e: any) {
-                          setMyRequests(prev);
-                          toast.error(e.message ?? "Could not withdraw.");
-                        }
-                      }}
-                    />
-                  );
-                })}
-              </>
-            ) : (
-              <EmptyRequestsState filter={requestFilter} />
-            )}
-          </div>
+                }
+                return (
+                  <RequestGameCard
+                    game={g}
+                    request={r}
+                    index={i}
+                    isHost={isHost}
+                    onWithdraw={isHost || r.status !== "approved" ? undefined : async () => {
+                      const prev = myRequests;
+                      setMyRequests((rs) => rs.filter((x) => x.id !== r.id));
+                      try {
+                        await withdrawMyApprovedJoinRequest(r.game_id);
+                        leaveGame(r.game_id);
+                        toast("You withdrew from the game.");
+                      } catch (e: any) {
+                        setMyRequests(prev);
+                        toast.error(e.message ?? "Could not withdraw.");
+                      }
+                    }}
+                  />
+                );
+              }}
+            />
+          ) : (
+            <EmptyRequestsState filter={requestFilter} />
+          )}
         </section>
 
         {/* Hosting */}
@@ -645,11 +648,14 @@ function Profile() {
             )}
           </div>
           {upcomingGroups.hosting.length > 0 ? (
-            <div className="space-y-3">
-              {upcomingGroups.hosting.map((g, i) => (
-                <GameCard key={g.id} game={g} index={i} />
-              ))}
-            </div>
+            <InfiniteList
+              items={upcomingGroups.hosting}
+              pageSize={6}
+              keyFor={(g) => g.id}
+              renderItem={(g, i) => <GameCard game={g} index={i} />}
+              renderSkeleton={() => <GameCardSkeleton />}
+              resetKey="hosting"
+            />
           ) : (
             <Link
               to="/create"
@@ -682,11 +688,14 @@ function Profile() {
             )}
           </div>
           {upcomingGroups.playing.length > 0 ? (
-            <div className="space-y-3">
-              {upcomingGroups.playing.map((g, i) => (
-                <GameCard key={g.id} game={g} index={i} />
-              ))}
-            </div>
+            <InfiniteList
+              items={upcomingGroups.playing}
+              pageSize={6}
+              keyFor={(g) => g.id}
+              renderItem={(g, i) => <GameCard game={g} index={i} />}
+              renderSkeleton={() => <GameCardSkeleton />}
+              resetKey="playing"
+            />
           ) : (
             <Link
               to="/feed"
