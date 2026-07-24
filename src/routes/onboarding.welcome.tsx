@@ -356,7 +356,7 @@ function PlayerWelcome() {
 
       <section className="mt-6">
         <div className="flex items-center justify-between text-sm font-semibold">
-          <span>Search radius</span>
+          <span>3. Search radius</span>
           <span className="text-muted-foreground">{radius} km</span>
         </div>
         <input
