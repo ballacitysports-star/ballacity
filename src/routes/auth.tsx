@@ -169,6 +169,9 @@ function AuthPage() {
     // CRITICAL: call signInWithOAuth SYNCHRONOUSLY as the first statement
     // in the click handler. iOS Chrome only treats popup.open() as a
     // trusted user gesture if no awaits / state updates happen first.
+    if (mode === "signup" && accountType) {
+      setPendingAccountType(accountType);
+    }
     const promise = lovable.auth.signInWithOAuth("google", {
       redirect_uri: next ? `${window.location.origin}${next}` : window.location.origin,
       extraParams: { prompt: "select_account" },
