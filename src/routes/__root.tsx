@@ -189,6 +189,7 @@ export function sanitizeNextPath(raw: unknown): string | undefined {
   if (typeof raw !== "string" || raw.length === 0) return undefined;
   if (!raw.startsWith("/") || raw.startsWith("//")) return undefined;
   const pathOnly = raw.split(/[?#]/)[0] ?? "";
+  if (pathOnly === "/") return undefined;
   if (pathOnly === "/auth" || pathOnly.startsWith("/auth/")) return undefined;
   if (pathOnly === "/reset-password" || pathOnly.startsWith("/reset-password/")) return undefined;
   return raw;
