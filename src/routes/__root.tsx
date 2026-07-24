@@ -422,6 +422,22 @@ function AuthGate({ children }: { children: React.ReactNode }) {
     let cancelled = false;
     setTypeStatus("unknown");
     (async () => {
+      // Authoritative server-side guard: inspects auth identities via admin
+      // so a social user with stripped provider metadata is still classified
+      // correctly. Falls back to the client query if the server fn fails.
+      try {
+        const status = await getOnboardingStatus();
+        if (cancelled) return;
+        if (status.needsOnboarding) {
+          setTypeStatus("missing");
+          router.navigate({ to: "/onboarding/account-type", replace: true });
+        } else {
+          setTypeStatus("ok");
+        }
+        return;
+      } catch {
+        /* fall through to client check */
+      }
       const { data } = await supabase
         .from("profiles")
         .select("account_type")
