@@ -332,7 +332,7 @@ function PlayerWelcome() {
 
       {sport && levels.length > 0 ? (
         <section className="mt-6">
-          <div className="text-sm font-semibold">Your level ({SPORT_CONFIG[sport].ratingSystem})</div>
+          <div className="text-sm font-semibold">2. Your level ({SPORT_CONFIG[sport].ratingSystem})</div>
           <div className="mt-2 flex flex-wrap gap-2">
             {levels.map((lv) => {
               const active = level === lv;
