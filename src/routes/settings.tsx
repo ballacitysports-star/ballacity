@@ -23,6 +23,11 @@ import { supabase } from "@/integrations/supabase/client";
 import { Switch } from "@/components/ui/switch";
 import { useTheme } from "@/lib/theme";
 import { listMyOrgs, deleteTrainerOrg } from "@/lib/trainer-orgs.functions";
+import { deleteMyAccount } from "@/lib/account.functions";
+import { useServerFn } from "@tanstack/react-start";
+import { useNavigate } from "@tanstack/react-router";
+import { useState } from "react";
+import { Input } from "@/components/ui/input";
 import {
   AlertDialog,
   AlertDialogAction,
