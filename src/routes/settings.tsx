@@ -336,8 +336,19 @@ function DeleteAccountButton() {
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
 
-  const hasPassword = !!user?.identities?.some((i) => i.provider === "email");
+  const primaryProvider = (user?.app_metadata as { provider?: string } | undefined)?.provider;
+  const hasPassword = primaryProvider
+    ? primaryProvider === "email"
+    : !!user?.identities?.some((i) => i.provider === "email");
   const email = user?.email ?? "";
+  const confirmOk = confirm.trim().toUpperCase() === "DELETE";
+  const passwordOk = !hasPassword || !!password;
+  const canDelete = confirmOk && passwordOk && !busy;
+  const blockerHint = !confirmOk
+    ? 'Type "DELETE" to confirm'
+    : !passwordOk
+    ? "Enter your password to confirm"
+    : "";
 
   const onDelete = async () => {
     setBusy(true);
@@ -420,13 +431,16 @@ function DeleteAccountButton() {
         <AlertDialogFooter>
           <AlertDialogCancel disabled={busy}>Cancel</AlertDialogCancel>
           <AlertDialogAction
-            disabled={busy || confirm !== "DELETE" || (hasPassword && !password)}
+            disabled={!canDelete}
             onClick={(e) => { e.preventDefault(); onDelete(); }}
             className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
           >
             {busy ? "Deleting…" : "Permanently delete account"}
           </AlertDialogAction>
         </AlertDialogFooter>
+        {blockerHint ? (
+          <p className="mt-2 text-right text-xs text-muted-foreground">{blockerHint}</p>
+        ) : null}
       </AlertDialogContent>
     </AlertDialog>
   );
