@@ -21,6 +21,7 @@ const PROVIDERS = ["google", "apple"] as const;
 
 const PENDING_KEY = "openrun.pending_account_type";
 const NEXT_KEY = "openrun:oauth-next";
+const PROVIDER_KEY = "openrun:oauth-provider";
 const NEXT_PATH = "/feed?src=oauth-e2e";
 
 async function stubNullAccountType(page: Page) {
@@ -48,17 +49,18 @@ async function stubNullAccountType(page: Page) {
   });
 }
 
-async function primeStorage(page: Page) {
+async function primeStorage(page: Page, provider?: "google" | "apple") {
   await page.goto("/", { waitUntil: "domcontentloaded" });
   await page.evaluate(
-    ([sbKey, sbValue, pendingKey, nextKey, nextPath]) => {
+    ([sbKey, sbValue, pendingKey, nextKey, nextPath, providerKey, providerId]) => {
       window.localStorage.setItem(sbKey!, sbValue!);
       // Stash a pending account type as if the user had picked one on /auth
       // before OAuth. Under the new rule this MUST be ignored for Google/Apple.
       window.sessionStorage.setItem(pendingKey!, "player");
       window.sessionStorage.setItem(nextKey!, nextPath!);
+      if (providerId) window.sessionStorage.setItem(providerKey!, providerId);
     },
-    [STORAGE_KEY!, SESSION_JSON!, PENDING_KEY, NEXT_KEY, NEXT_PATH] as const,
+    [STORAGE_KEY!, SESSION_JSON!, PENDING_KEY, NEXT_KEY, NEXT_PATH, PROVIDER_KEY, provider ?? null] as const,
   );
 }
 
@@ -71,7 +73,7 @@ test.describe("OAuth new-user onboarding gate", () => {
       const page = await context.newPage();
       try {
         await stubNullAccountType(page);
-        await primeStorage(page);
+        await primeStorage(page, provider);
 
         // Simulate the provider callback returning to the app origin.
         await page.goto("/", { waitUntil: "domcontentloaded" });
@@ -133,4 +135,58 @@ test.describe("OAuth new-user onboarding gate", () => {
       }
     });
   }
+
+  test("saved provider marker routes new OAuth user to onboarding even if session metadata is missing", async ({
+    browser,
+  }) => {
+    const context = await browser.newContext();
+    const page = await context.newPage();
+    try {
+      await stubNullAccountType(page);
+      await primeStorage(page, "google");
+      await page.goto("/feed", { waitUntil: "domcontentloaded" });
+
+      await page.evaluate(async () => {
+        const mod = await import("/src/integrations/supabase/client.ts");
+        const supabase = (mod as { supabase: import("@supabase/supabase-js").SupabaseClient })
+          .supabase;
+        const { data } = await supabase.auth.getSession();
+        const session = data.session;
+        if (!session) throw new Error("no session in test context");
+        const patched = {
+          ...session,
+          user: {
+            ...session.user,
+            app_metadata: { ...(session.user.app_metadata ?? {}), provider: undefined },
+          },
+        };
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const authAny = supabase.auth as any;
+        authAny.getSession = async () => ({ data: { session: patched }, error: null });
+        const emit = authAny._notifyAllSubscribers ?? authAny.notifyAllSubscribers;
+        if (typeof emit !== "function") {
+          throw new Error("Supabase auth emit hook missing");
+        }
+        await emit.call(supabase.auth, "SIGNED_IN", patched, false);
+      });
+
+      await expect(page).toHaveURL(/\/onboarding\/account-type(?:[?#/].*)?$/, {
+        timeout: 15_000,
+      });
+
+      const state = await page.evaluate(
+        ([pendingKey, nextKey, providerKey]) => ({
+          pending: window.sessionStorage.getItem(pendingKey!),
+          next: window.sessionStorage.getItem(nextKey!),
+          provider: window.sessionStorage.getItem(providerKey!),
+        }),
+        [PENDING_KEY, NEXT_KEY, PROVIDER_KEY] as const,
+      );
+      expect(state.pending).toBe("player");
+      expect(state.next).toBe(NEXT_PATH);
+      expect(state.provider).toBe("google");
+    } finally {
+      await context.close();
+    }
+  });
 });
