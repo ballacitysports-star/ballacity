@@ -625,7 +625,7 @@ function Profile() {
         </section>
 
         {/* Hosting */}
-        <section className="mt-8 rounded-3xl border border-border bg-surface p-4 shadow-card">
+        <section className={`mt-8 rounded-3xl border border-border bg-surface p-4 shadow-card ${activeTab === "hosting" ? "" : "hidden"}`}>
           <div className="mb-3 flex items-center justify-between gap-3">
             <div className="flex items-center gap-2">
               <span className="grid h-8 w-8 place-items-center rounded-2xl border border-lime/30 bg-lime/10 text-lime">
