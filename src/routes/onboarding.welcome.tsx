@@ -204,10 +204,12 @@ function LinkedProfileWelcome({ type }: { type: Exclude<AccountType, "player"> }
 function PlayerWelcome() {
   const nav = useNavigate();
   const { user } = useAuth();
+  const queryClient = useQueryClient();
   const [sport, setSport] = useState<Sport | null>(null);
   const [level, setLevel] = useState<string | null>(null);
   const [radius, setRadius] = useState<number>(15);
   const [status, setStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
+  const lastRefreshRef = useRef<string>("");
 
   // Location permission state
   type GeoState =
