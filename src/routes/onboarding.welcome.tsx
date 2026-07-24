@@ -309,6 +309,36 @@ function PlayerWelcome() {
           /* ignore */
         }
         setStatus("saved");
+
+        // Refresh the home feed with the newly-saved preferences.
+        const signature = `${sport ?? ""}|${level ?? ""}|${radius}`;
+        if (signature !== lastRefreshRef.current) {
+          lastRefreshRef.current = signature;
+          // Invalidate any Query cache keyed by feed/games/profile so the feed
+          // refetches with the new sport / level / radius on arrival.
+          await Promise.all([
+            queryClient.invalidateQueries({ queryKey: ["feed-team-posts"] }),
+            queryClient.invalidateQueries({
+              predicate: (q) => {
+                const k = q.queryKey?.[0];
+                return (
+                  typeof k === "string" &&
+                  (k.startsWith("feed") || k.startsWith("games") || k === "profile" || k === "me")
+                );
+              },
+            }),
+          ]);
+          // Broadcast for non-Query subscribers (Zustand stores, custom hooks).
+          try {
+            window.dispatchEvent(
+              new CustomEvent("openrun:prefs-updated", {
+                detail: { sport, level, radiusKm: radius },
+              }),
+            );
+          } catch {
+            /* ignore */
+          }
+        }
       } catch (err) {
         setStatus("error");
         toast.error(err instanceof Error ? err.message : "Could not save your preferences");
