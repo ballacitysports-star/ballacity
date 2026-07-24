@@ -140,6 +140,24 @@ function RootShell({ children }: { children: React.ReactNode }) {
 }
 
 const CHUNK_RELOAD_KEY = "__openrun_chunk_reloaded_at";
+const OAUTH_PROVIDER_KEY = "openrun:oauth-provider";
+
+function readSavedOAuthProvider(): "google" | "apple" | null {
+  try {
+    const provider = window.sessionStorage.getItem(OAUTH_PROVIDER_KEY);
+    return provider === "google" || provider === "apple" ? provider : null;
+  } catch {
+    return null;
+  }
+}
+
+function clearSavedOAuthProvider() {
+  try {
+    window.sessionStorage.removeItem(OAUTH_PROVIDER_KEY);
+  } catch {
+    /* sessionStorage unavailable */
+  }
+}
 
 function isChunkLoadError(reason: unknown): boolean {
   const msg =
@@ -508,7 +526,8 @@ function RootComponent() {
         const pending = readPendingAccountType();
         const uid = session.user.id;
         const provider = session.user.app_metadata?.provider;
-        const isOAuth = provider === "google" || provider === "apple";
+        const savedProvider = readSavedOAuthProvider();
+        const isOAuth = provider === "google" || provider === "apple" || !!savedProvider;
         void supabase
           .from("profiles")
           .select("account_type")
@@ -518,6 +537,7 @@ function RootComponent() {
             const existing = (data as { account_type?: string } | null)?.account_type;
             if (isAccountType(existing)) {
               if (pending) clearPendingAccountType();
+              if (isOAuth) clearSavedOAuthProvider();
               consumeSavedNext();
               return;
             }
@@ -536,6 +556,7 @@ function RootComponent() {
                 .eq("id", uid)
                 .then(() => {
                   clearPendingAccountType();
+                  clearSavedOAuthProvider();
                   router.invalidate();
                   consumeSavedNext();
                 });
