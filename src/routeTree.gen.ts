@@ -9,109 +9,68 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
-import { Route as ShopRouteImport } from './routes/shop'
-import { Route as SettingsRouteImport } from './routes/settings'
-import { Route as ReviewsRouteImport } from './routes/reviews'
-import { Route as ResetPasswordRouteImport } from './routes/reset-password'
-import { Route as PlansRouteImport } from './routes/plans'
-import { Route as PickupRouteImport } from './routes/pickup'
-import { Route as PaymentsRouteImport } from './routes/payments'
-import { Route as McpRouteImport } from './routes/mcp'
-import { Route as AvailablePlayersRouteImport } from './routes/available-players'
-import { Route as AuthRouteImport } from './routes/auth'
-import { Route as AdminRouteImport } from './routes/admin'
-import { Route as TabsRouteImport } from './routes/_tabs'
 import { Route as IndexRouteImport } from './routes/index'
-import { Route as OrgsIndexRouteImport } from './routes/orgs.index'
-import { Route as MessagesIndexRouteImport } from './routes/messages.index'
-import { Route as TrainersCreateRouteImport } from './routes/trainers.create'
-import { Route as TeamsCreateRouteImport } from './routes/teams.create'
-import { Route as ReviewNewRouteImport } from './routes/review.new'
-import { Route as ProfileEditRouteImport } from './routes/profile.edit'
-import { Route as PlayersUserIdRouteImport } from './routes/players.$userId'
-import { Route as OrgsCreateRouteImport } from './routes/orgs.create'
-import { Route as OrgsOrgIdRouteImport } from './routes/orgs.$orgId'
-import { Route as OnboardingWelcomeRouteImport } from './routes/onboarding.welcome'
-import { Route as OnboardingAccountTypeRouteImport } from './routes/onboarding.account-type'
-import { Route as MessagesConversationIdRouteImport } from './routes/messages.$conversationId'
-import { Route as GamesGameIdRouteImport } from './routes/games.$gameId'
-import { Route as CheckoutReturnRouteImport } from './routes/checkout.return'
-import { Route as AdminLocationAnalyticsRouteImport } from './routes/admin.location-analytics'
-import { Route as AccountSecurityRouteImport } from './routes/account.security'
-import { Route as AccountNotificationsRouteImport } from './routes/account.notifications'
-import { Route as TabsTrainersRouteImport } from './routes/_tabs.trainers'
-import { Route as TabsTeamsRouteImport } from './routes/_tabs.teams'
-import { Route as TabsReelsRouteImport } from './routes/_tabs.reels'
-import { Route as TabsProfileRouteImport } from './routes/_tabs.profile'
-import { Route as TabsPlayersRouteImport } from './routes/_tabs.players'
-import { Route as TabsNotificationsRouteImport } from './routes/_tabs.notifications'
-import { Route as TabsFeedRouteImport } from './routes/_tabs.feed'
-import { Route as TabsDiscoverRouteImport } from './routes/_tabs.discover'
-import { Route as TabsCreateRouteImport } from './routes/_tabs.create'
-import { Route as Char91DotwellKnownChar93OauthProtectedResourceRouteImport } from './routes/[.well-known]/oauth-protected-resource'
+import { Route as TabsRouteImport } from './routes/_tabs'
+import { Route as AdminRouteImport } from './routes/admin'
+import { Route as AuthRouteImport } from './routes/auth'
+import { Route as AvailablePlayersRouteImport } from './routes/available-players'
+import { Route as McpRouteImport } from './routes/mcp'
+import { Route as PaymentsRouteImport } from './routes/payments'
+import { Route as PickupRouteImport } from './routes/pickup'
+import { Route as PlansRouteImport } from './routes/plans'
+import { Route as ResetPasswordRouteImport } from './routes/reset-password'
+import { Route as ReviewsRouteImport } from './routes/reviews'
+import { Route as SettingsRouteImport } from './routes/settings'
+import { Route as ShopRouteImport } from './routes/shop'
 import { Route as Char91DotmcpChar93ListToolsRouteImport } from './routes/[.mcp]/list-tools'
-import { Route as TrainersTrainerIdIndexRouteImport } from './routes/trainers.$trainerId.index'
-import { Route as TeamsTeamIdIndexRouteImport } from './routes/teams.$teamId.index'
-import { Route as GamesGameIdIndexRouteImport } from './routes/games.$gameId.index'
-import { Route as TrainersTrainerIdEditRouteImport } from './routes/trainers.$trainerId.edit'
-import { Route as TeamsTeamIdEditRouteImport } from './routes/teams.$teamId.edit'
-import { Route as OrgsOrgIdMembersRouteImport } from './routes/orgs.$orgId.members'
-import { Route as OrgsOrgIdEditRouteImport } from './routes/orgs.$orgId.edit'
-import { Route as GamesGameIdPaymentSetupRouteImport } from './routes/games.$gameId.payment-setup'
-import { Route as GamesGameIdPayRouteImport } from './routes/games.$gameId.pay'
-import { Route as Char91DotmcpChar93InvokeToolToolRouteImport } from './routes/[.mcp]/invoke-tool/$tool'
+import { Route as Char91DotwellKnownChar93OauthProtectedResourceRouteImport } from './routes/[.well-known]/oauth-protected-resource'
+import { Route as TabsCreateRouteImport } from './routes/_tabs.create'
+import { Route as TabsDiscoverRouteImport } from './routes/_tabs.discover'
+import { Route as TabsFeedRouteImport } from './routes/_tabs.feed'
+import { Route as TabsNotificationsRouteImport } from './routes/_tabs.notifications'
+import { Route as TabsPlayersRouteImport } from './routes/_tabs.players'
+import { Route as TabsProfileRouteImport } from './routes/_tabs.profile'
+import { Route as TabsReelsRouteImport } from './routes/_tabs.reels'
+import { Route as TabsTeamsRouteImport } from './routes/_tabs.teams'
+import { Route as TabsTrainersRouteImport } from './routes/_tabs.trainers'
+import { Route as AccountNotificationsRouteImport } from './routes/account.notifications'
+import { Route as AccountSecurityRouteImport } from './routes/account.security'
+import { Route as AdminLocationAnalyticsRouteImport } from './routes/admin.location-analytics'
+import { Route as CheckoutReturnRouteImport } from './routes/checkout.return'
+import { Route as GamesGameIdRouteImport } from './routes/games.$gameId'
+import { Route as MessagesIndexRouteImport } from './routes/messages.index'
+import { Route as MessagesConversationIdRouteImport } from './routes/messages.$conversationId'
+import { Route as OnboardingAccountTypeRouteImport } from './routes/onboarding.account-type'
+import { Route as OnboardingWelcomeRouteImport } from './routes/onboarding.welcome'
+import { Route as OrgsIndexRouteImport } from './routes/orgs.index'
+import { Route as OrgsOrgIdRouteImport } from './routes/orgs.$orgId'
+import { Route as OrgsCreateRouteImport } from './routes/orgs.create'
+import { Route as PlayersUserIdRouteImport } from './routes/players.$userId'
+import { Route as ProfileEditRouteImport } from './routes/profile.edit'
+import { Route as ReviewNewRouteImport } from './routes/review.new'
+import { Route as TeamsCreateRouteImport } from './routes/teams.create'
+import { Route as TrainersCreateRouteImport } from './routes/trainers.create'
 import { Route as DotlovableOauthConsentRouteImport } from './routes/[.]lovable.oauth.consent'
-import { Route as ApiPublicReelsProcessRouteImport } from './routes/api/public/reels/process'
+import { Route as Char91DotmcpChar93InvokeToolToolRouteImport } from './routes/[.mcp]/invoke-tool/$tool'
+import { Route as GamesGameIdIndexRouteImport } from './routes/games.$gameId.index'
+import { Route as GamesGameIdPayRouteImport } from './routes/games.$gameId.pay'
+import { Route as GamesGameIdPaymentSetupRouteImport } from './routes/games.$gameId.payment-setup'
+import { Route as OrgsOrgIdEditRouteImport } from './routes/orgs.$orgId.edit'
+import { Route as OrgsOrgIdMembersRouteImport } from './routes/orgs.$orgId.members'
+import { Route as TeamsTeamIdIndexRouteImport } from './routes/teams.$teamId.index'
+import { Route as TeamsTeamIdEditRouteImport } from './routes/teams.$teamId.edit'
+import { Route as TrainersTrainerIdIndexRouteImport } from './routes/trainers.$trainerId.index'
+import { Route as TrainersTrainerIdEditRouteImport } from './routes/trainers.$trainerId.edit'
 import { Route as ApiPublicPaymentsWebhookRouteImport } from './routes/api/public/payments/webhook'
+import { Route as ApiPublicReelsProcessRouteImport } from './routes/api/public/reels/process'
 
-const ShopRoute = ShopRouteImport.update({
-  id: '/shop',
-  path: '/shop',
+const IndexRoute = IndexRouteImport.update({
+  id: '/',
+  path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
-const SettingsRoute = SettingsRouteImport.update({
-  id: '/settings',
-  path: '/settings',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ReviewsRoute = ReviewsRouteImport.update({
-  id: '/reviews',
-  path: '/reviews',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ResetPasswordRoute = ResetPasswordRouteImport.update({
-  id: '/reset-password',
-  path: '/reset-password',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const PlansRoute = PlansRouteImport.update({
-  id: '/plans',
-  path: '/plans',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const PickupRoute = PickupRouteImport.update({
-  id: '/pickup',
-  path: '/pickup',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const PaymentsRoute = PaymentsRouteImport.update({
-  id: '/payments',
-  path: '/payments',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const McpRoute = McpRouteImport.update({
-  id: '/mcp',
-  path: '/mcp',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const AvailablePlayersRoute = AvailablePlayersRouteImport.update({
-  id: '/available-players',
-  path: '/available-players',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const AuthRoute = AuthRouteImport.update({
-  id: '/auth',
-  path: '/auth',
+const TabsRoute = TabsRouteImport.update({
+  id: '/_tabs',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AdminRoute = AdminRouteImport.update({
@@ -119,133 +78,71 @@ const AdminRoute = AdminRouteImport.update({
   path: '/admin',
   getParentRoute: () => rootRouteImport,
 } as any)
-const TabsRoute = TabsRouteImport.update({
-  id: '/_tabs',
+const AuthRoute = AuthRouteImport.update({
+  id: '/auth',
+  path: '/auth',
   getParentRoute: () => rootRouteImport,
 } as any)
-const IndexRoute = IndexRouteImport.update({
-  id: '/',
-  path: '/',
+const AvailablePlayersRoute = AvailablePlayersRouteImport.update({
+  id: '/available-players',
+  path: '/available-players',
   getParentRoute: () => rootRouteImport,
 } as any)
-const OrgsIndexRoute = OrgsIndexRouteImport.update({
-  id: '/orgs/',
-  path: '/orgs/',
+const McpRoute = McpRouteImport.update({
+  id: '/mcp',
+  path: '/mcp',
   getParentRoute: () => rootRouteImport,
 } as any)
-const MessagesIndexRoute = MessagesIndexRouteImport.update({
-  id: '/messages/',
-  path: '/messages/',
+const PaymentsRoute = PaymentsRouteImport.update({
+  id: '/payments',
+  path: '/payments',
   getParentRoute: () => rootRouteImport,
 } as any)
-const TrainersCreateRoute = TrainersCreateRouteImport.update({
-  id: '/trainers/create',
-  path: '/trainers/create',
+const PickupRoute = PickupRouteImport.update({
+  id: '/pickup',
+  path: '/pickup',
   getParentRoute: () => rootRouteImport,
 } as any)
-const TeamsCreateRoute = TeamsCreateRouteImport.update({
-  id: '/teams/create',
-  path: '/teams/create',
+const PlansRoute = PlansRouteImport.update({
+  id: '/plans',
+  path: '/plans',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ReviewNewRoute = ReviewNewRouteImport.update({
-  id: '/review/new',
-  path: '/review/new',
+const ResetPasswordRoute = ResetPasswordRouteImport.update({
+  id: '/reset-password',
+  path: '/reset-password',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ProfileEditRoute = ProfileEditRouteImport.update({
-  id: '/profile/edit',
-  path: '/profile/edit',
+const ReviewsRoute = ReviewsRouteImport.update({
+  id: '/reviews',
+  path: '/reviews',
   getParentRoute: () => rootRouteImport,
 } as any)
-const PlayersUserIdRoute = PlayersUserIdRouteImport.update({
-  id: '/players/$userId',
-  path: '/players/$userId',
+const SettingsRoute = SettingsRouteImport.update({
+  id: '/settings',
+  path: '/settings',
   getParentRoute: () => rootRouteImport,
 } as any)
-const OrgsCreateRoute = OrgsCreateRouteImport.update({
-  id: '/orgs/create',
-  path: '/orgs/create',
+const ShopRoute = ShopRouteImport.update({
+  id: '/shop',
+  path: '/shop',
   getParentRoute: () => rootRouteImport,
 } as any)
-const OrgsOrgIdRoute = OrgsOrgIdRouteImport.update({
-  id: '/orgs/$orgId',
-  path: '/orgs/$orgId',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const OnboardingWelcomeRoute = OnboardingWelcomeRouteImport.update({
-  id: '/onboarding/welcome',
-  path: '/onboarding/welcome',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const OnboardingAccountTypeRoute = OnboardingAccountTypeRouteImport.update({
-  id: '/onboarding/account-type',
-  path: '/onboarding/account-type',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const MessagesConversationIdRoute = MessagesConversationIdRouteImport.update({
-  id: '/messages/$conversationId',
-  path: '/messages/$conversationId',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const GamesGameIdRoute = GamesGameIdRouteImport.update({
-  id: '/games/$gameId',
-  path: '/games/$gameId',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const CheckoutReturnRoute = CheckoutReturnRouteImport.update({
-  id: '/checkout/return',
-  path: '/checkout/return',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const AdminLocationAnalyticsRoute = AdminLocationAnalyticsRouteImport.update({
-  id: '/location-analytics',
-  path: '/location-analytics',
-  getParentRoute: () => AdminRoute,
-} as any)
-const AccountSecurityRoute = AccountSecurityRouteImport.update({
-  id: '/account/security',
-  path: '/account/security',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const AccountNotificationsRoute = AccountNotificationsRouteImport.update({
-  id: '/account/notifications',
-  path: '/account/notifications',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const TabsTrainersRoute = TabsTrainersRouteImport.update({
-  id: '/trainers',
-  path: '/trainers',
-  getParentRoute: () => TabsRoute,
-} as any)
-const TabsTeamsRoute = TabsTeamsRouteImport.update({
-  id: '/teams',
-  path: '/teams',
-  getParentRoute: () => TabsRoute,
-} as any)
-const TabsReelsRoute = TabsReelsRouteImport.update({
-  id: '/reels',
-  path: '/reels',
-  getParentRoute: () => TabsRoute,
-} as any)
-const TabsProfileRoute = TabsProfileRouteImport.update({
-  id: '/profile',
-  path: '/profile',
-  getParentRoute: () => TabsRoute,
-} as any)
-const TabsPlayersRoute = TabsPlayersRouteImport.update({
-  id: '/players',
-  path: '/players',
-  getParentRoute: () => TabsRoute,
-} as any)
-const TabsNotificationsRoute = TabsNotificationsRouteImport.update({
-  id: '/notifications',
-  path: '/notifications',
-  getParentRoute: () => TabsRoute,
-} as any)
-const TabsFeedRoute = TabsFeedRouteImport.update({
-  id: '/feed',
-  path: '/feed',
+const Char91DotmcpChar93ListToolsRoute =
+  Char91DotmcpChar93ListToolsRouteImport.update({
+    id: '/.mcp/list-tools',
+    path: '/.mcp/list-tools',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const Char91DotwellKnownChar93OauthProtectedResourceRoute =
+  Char91DotwellKnownChar93OauthProtectedResourceRouteImport.update({
+    id: '/.well-known/oauth-protected-resource',
+    path: '/.well-known/oauth-protected-resource',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const TabsCreateRoute = TabsCreateRouteImport.update({
+  id: '/create',
+  path: '/create',
   getParentRoute: () => TabsRoute,
 } as any)
 const TabsDiscoverRoute = TabsDiscoverRouteImport.update({
@@ -253,67 +150,130 @@ const TabsDiscoverRoute = TabsDiscoverRouteImport.update({
   path: '/discover',
   getParentRoute: () => TabsRoute,
 } as any)
-const TabsCreateRoute = TabsCreateRouteImport.update({
-  id: '/create',
-  path: '/create',
+const TabsFeedRoute = TabsFeedRouteImport.update({
+  id: '/feed',
+  path: '/feed',
   getParentRoute: () => TabsRoute,
 } as any)
-const Char91DotwellKnownChar93OauthProtectedResourceRoute =
-  Char91DotwellKnownChar93OauthProtectedResourceRouteImport.update({
-    id: '/.well-known/oauth-protected-resource',
-    path: '/.well-known/oauth-protected-resource',
-    getParentRoute: () => rootRouteImport,
-  } as any)
-const Char91DotmcpChar93ListToolsRoute =
-  Char91DotmcpChar93ListToolsRouteImport.update({
-    id: '/.mcp/list-tools',
-    path: '/.mcp/list-tools',
-    getParentRoute: () => rootRouteImport,
-  } as any)
-const TrainersTrainerIdIndexRoute = TrainersTrainerIdIndexRouteImport.update({
-  id: '/trainers/$trainerId/',
-  path: '/trainers/$trainerId/',
+const TabsNotificationsRoute = TabsNotificationsRouteImport.update({
+  id: '/notifications',
+  path: '/notifications',
+  getParentRoute: () => TabsRoute,
+} as any)
+const TabsPlayersRoute = TabsPlayersRouteImport.update({
+  id: '/players',
+  path: '/players',
+  getParentRoute: () => TabsRoute,
+} as any)
+const TabsProfileRoute = TabsProfileRouteImport.update({
+  id: '/profile',
+  path: '/profile',
+  getParentRoute: () => TabsRoute,
+} as any)
+const TabsReelsRoute = TabsReelsRouteImport.update({
+  id: '/reels',
+  path: '/reels',
+  getParentRoute: () => TabsRoute,
+} as any)
+const TabsTeamsRoute = TabsTeamsRouteImport.update({
+  id: '/teams',
+  path: '/teams',
+  getParentRoute: () => TabsRoute,
+} as any)
+const TabsTrainersRoute = TabsTrainersRouteImport.update({
+  id: '/trainers',
+  path: '/trainers',
+  getParentRoute: () => TabsRoute,
+} as any)
+const AccountNotificationsRoute = AccountNotificationsRouteImport.update({
+  id: '/account/notifications',
+  path: '/account/notifications',
   getParentRoute: () => rootRouteImport,
 } as any)
-const TeamsTeamIdIndexRoute = TeamsTeamIdIndexRouteImport.update({
-  id: '/teams/$teamId/',
-  path: '/teams/$teamId/',
+const AccountSecurityRoute = AccountSecurityRouteImport.update({
+  id: '/account/security',
+  path: '/account/security',
   getParentRoute: () => rootRouteImport,
 } as any)
-const GamesGameIdIndexRoute = GamesGameIdIndexRouteImport.update({
-  id: '/',
-  path: '/',
-  getParentRoute: () => GamesGameIdRoute,
+const AdminLocationAnalyticsRoute = AdminLocationAnalyticsRouteImport.update({
+  id: '/location-analytics',
+  path: '/location-analytics',
+  getParentRoute: () => AdminRoute,
 } as any)
-const TrainersTrainerIdEditRoute = TrainersTrainerIdEditRouteImport.update({
-  id: '/trainers/$trainerId/edit',
-  path: '/trainers/$trainerId/edit',
+const CheckoutReturnRoute = CheckoutReturnRouteImport.update({
+  id: '/checkout/return',
+  path: '/checkout/return',
   getParentRoute: () => rootRouteImport,
 } as any)
-const TeamsTeamIdEditRoute = TeamsTeamIdEditRouteImport.update({
-  id: '/teams/$teamId/edit',
-  path: '/teams/$teamId/edit',
+const GamesGameIdRoute = GamesGameIdRouteImport.update({
+  id: '/games/$gameId',
+  path: '/games/$gameId',
   getParentRoute: () => rootRouteImport,
 } as any)
-const OrgsOrgIdMembersRoute = OrgsOrgIdMembersRouteImport.update({
-  id: '/members',
-  path: '/members',
-  getParentRoute: () => OrgsOrgIdRoute,
+const MessagesIndexRoute = MessagesIndexRouteImport.update({
+  id: '/messages/',
+  path: '/messages/',
+  getParentRoute: () => rootRouteImport,
 } as any)
-const OrgsOrgIdEditRoute = OrgsOrgIdEditRouteImport.update({
-  id: '/edit',
-  path: '/edit',
-  getParentRoute: () => OrgsOrgIdRoute,
+const MessagesConversationIdRoute = MessagesConversationIdRouteImport.update({
+  id: '/messages/$conversationId',
+  path: '/messages/$conversationId',
+  getParentRoute: () => rootRouteImport,
 } as any)
-const GamesGameIdPaymentSetupRoute = GamesGameIdPaymentSetupRouteImport.update({
-  id: '/payment-setup',
-  path: '/payment-setup',
-  getParentRoute: () => GamesGameIdRoute,
+const OnboardingAccountTypeRoute = OnboardingAccountTypeRouteImport.update({
+  id: '/onboarding/account-type',
+  path: '/onboarding/account-type',
+  getParentRoute: () => rootRouteImport,
 } as any)
-const GamesGameIdPayRoute = GamesGameIdPayRouteImport.update({
-  id: '/pay',
-  path: '/pay',
-  getParentRoute: () => GamesGameIdRoute,
+const OnboardingWelcomeRoute = OnboardingWelcomeRouteImport.update({
+  id: '/onboarding/welcome',
+  path: '/onboarding/welcome',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const OrgsIndexRoute = OrgsIndexRouteImport.update({
+  id: '/orgs/',
+  path: '/orgs/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const OrgsOrgIdRoute = OrgsOrgIdRouteImport.update({
+  id: '/orgs/$orgId',
+  path: '/orgs/$orgId',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const OrgsCreateRoute = OrgsCreateRouteImport.update({
+  id: '/orgs/create',
+  path: '/orgs/create',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PlayersUserIdRoute = PlayersUserIdRouteImport.update({
+  id: '/players/$userId',
+  path: '/players/$userId',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ProfileEditRoute = ProfileEditRouteImport.update({
+  id: '/profile/edit',
+  path: '/profile/edit',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ReviewNewRoute = ReviewNewRouteImport.update({
+  id: '/review/new',
+  path: '/review/new',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const TeamsCreateRoute = TeamsCreateRouteImport.update({
+  id: '/teams/create',
+  path: '/teams/create',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const TrainersCreateRoute = TrainersCreateRouteImport.update({
+  id: '/trainers/create',
+  path: '/trainers/create',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DotlovableOauthConsentRoute = DotlovableOauthConsentRouteImport.update({
+  id: '/.lovable/oauth/consent',
+  path: '/.lovable/oauth/consent',
+  getParentRoute: () => rootRouteImport,
 } as any)
 const Char91DotmcpChar93InvokeToolToolRoute =
   Char91DotmcpChar93InvokeToolToolRouteImport.update({
@@ -321,14 +281,49 @@ const Char91DotmcpChar93InvokeToolToolRoute =
     path: '/.mcp/invoke-tool/$tool',
     getParentRoute: () => rootRouteImport,
   } as any)
-const DotlovableOauthConsentRoute = DotlovableOauthConsentRouteImport.update({
-  id: '/.lovable/oauth/consent',
-  path: '/.lovable/oauth/consent',
+const GamesGameIdIndexRoute = GamesGameIdIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => GamesGameIdRoute,
+} as any)
+const GamesGameIdPayRoute = GamesGameIdPayRouteImport.update({
+  id: '/pay',
+  path: '/pay',
+  getParentRoute: () => GamesGameIdRoute,
+} as any)
+const GamesGameIdPaymentSetupRoute = GamesGameIdPaymentSetupRouteImport.update({
+  id: '/payment-setup',
+  path: '/payment-setup',
+  getParentRoute: () => GamesGameIdRoute,
+} as any)
+const OrgsOrgIdEditRoute = OrgsOrgIdEditRouteImport.update({
+  id: '/edit',
+  path: '/edit',
+  getParentRoute: () => OrgsOrgIdRoute,
+} as any)
+const OrgsOrgIdMembersRoute = OrgsOrgIdMembersRouteImport.update({
+  id: '/members',
+  path: '/members',
+  getParentRoute: () => OrgsOrgIdRoute,
+} as any)
+const TeamsTeamIdIndexRoute = TeamsTeamIdIndexRouteImport.update({
+  id: '/teams/$teamId/',
+  path: '/teams/$teamId/',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ApiPublicReelsProcessRoute = ApiPublicReelsProcessRouteImport.update({
-  id: '/api/public/reels/process',
-  path: '/api/public/reels/process',
+const TeamsTeamIdEditRoute = TeamsTeamIdEditRouteImport.update({
+  id: '/teams/$teamId/edit',
+  path: '/teams/$teamId/edit',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const TrainersTrainerIdIndexRoute = TrainersTrainerIdIndexRouteImport.update({
+  id: '/trainers/$trainerId/',
+  path: '/trainers/$trainerId/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const TrainersTrainerIdEditRoute = TrainersTrainerIdEditRouteImport.update({
+  id: '/trainers/$trainerId/edit',
+  path: '/trainers/$trainerId/edit',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiPublicPaymentsWebhookRoute =
@@ -337,6 +332,11 @@ const ApiPublicPaymentsWebhookRoute =
     path: '/api/public/payments/webhook',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiPublicReelsProcessRoute = ApiPublicReelsProcessRouteImport.update({
+  id: '/api/public/reels/process',
+  path: '/api/public/reels/process',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -716,81 +716,11 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/shop': {
-      id: '/shop'
-      path: '/shop'
-      fullPath: '/shop'
-      preLoaderRoute: typeof ShopRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/settings': {
-      id: '/settings'
-      path: '/settings'
-      fullPath: '/settings'
-      preLoaderRoute: typeof SettingsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/reviews': {
-      id: '/reviews'
-      path: '/reviews'
-      fullPath: '/reviews'
-      preLoaderRoute: typeof ReviewsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/reset-password': {
-      id: '/reset-password'
-      path: '/reset-password'
-      fullPath: '/reset-password'
-      preLoaderRoute: typeof ResetPasswordRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/plans': {
-      id: '/plans'
-      path: '/plans'
-      fullPath: '/plans'
-      preLoaderRoute: typeof PlansRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/pickup': {
-      id: '/pickup'
-      path: '/pickup'
-      fullPath: '/pickup'
-      preLoaderRoute: typeof PickupRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/payments': {
-      id: '/payments'
-      path: '/payments'
-      fullPath: '/payments'
-      preLoaderRoute: typeof PaymentsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/mcp': {
-      id: '/mcp'
-      path: '/mcp'
-      fullPath: '/mcp'
-      preLoaderRoute: typeof McpRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/available-players': {
-      id: '/available-players'
-      path: '/available-players'
-      fullPath: '/available-players'
-      preLoaderRoute: typeof AvailablePlayersRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/auth': {
-      id: '/auth'
-      path: '/auth'
-      fullPath: '/auth'
-      preLoaderRoute: typeof AuthRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/admin': {
-      id: '/admin'
-      path: '/admin'
-      fullPath: '/admin'
-      preLoaderRoute: typeof AdminRouteImport
+    '/': {
+      id: '/'
+      path: '/'
+      fullPath: '/'
+      preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/_tabs': {
@@ -800,200 +730,81 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof TabsRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/': {
-      id: '/'
-      path: '/'
-      fullPath: '/'
-      preLoaderRoute: typeof IndexRouteImport
+    '/admin': {
+      id: '/admin'
+      path: '/admin'
+      fullPath: '/admin'
+      preLoaderRoute: typeof AdminRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/orgs/': {
-      id: '/orgs/'
-      path: '/orgs'
-      fullPath: '/orgs/'
-      preLoaderRoute: typeof OrgsIndexRouteImport
+    '/auth': {
+      id: '/auth'
+      path: '/auth'
+      fullPath: '/auth'
+      preLoaderRoute: typeof AuthRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/messages/': {
-      id: '/messages/'
-      path: '/messages'
-      fullPath: '/messages/'
-      preLoaderRoute: typeof MessagesIndexRouteImport
+    '/available-players': {
+      id: '/available-players'
+      path: '/available-players'
+      fullPath: '/available-players'
+      preLoaderRoute: typeof AvailablePlayersRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/trainers/create': {
-      id: '/trainers/create'
-      path: '/trainers/create'
-      fullPath: '/trainers/create'
-      preLoaderRoute: typeof TrainersCreateRouteImport
+    '/mcp': {
+      id: '/mcp'
+      path: '/mcp'
+      fullPath: '/mcp'
+      preLoaderRoute: typeof McpRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/teams/create': {
-      id: '/teams/create'
-      path: '/teams/create'
-      fullPath: '/teams/create'
-      preLoaderRoute: typeof TeamsCreateRouteImport
+    '/payments': {
+      id: '/payments'
+      path: '/payments'
+      fullPath: '/payments'
+      preLoaderRoute: typeof PaymentsRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/review/new': {
-      id: '/review/new'
-      path: '/review/new'
-      fullPath: '/review/new'
-      preLoaderRoute: typeof ReviewNewRouteImport
+    '/pickup': {
+      id: '/pickup'
+      path: '/pickup'
+      fullPath: '/pickup'
+      preLoaderRoute: typeof PickupRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/profile/edit': {
-      id: '/profile/edit'
-      path: '/profile/edit'
-      fullPath: '/profile/edit'
-      preLoaderRoute: typeof ProfileEditRouteImport
+    '/plans': {
+      id: '/plans'
+      path: '/plans'
+      fullPath: '/plans'
+      preLoaderRoute: typeof PlansRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/players/$userId': {
-      id: '/players/$userId'
-      path: '/players/$userId'
-      fullPath: '/players/$userId'
-      preLoaderRoute: typeof PlayersUserIdRouteImport
+    '/reset-password': {
+      id: '/reset-password'
+      path: '/reset-password'
+      fullPath: '/reset-password'
+      preLoaderRoute: typeof ResetPasswordRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/orgs/create': {
-      id: '/orgs/create'
-      path: '/orgs/create'
-      fullPath: '/orgs/create'
-      preLoaderRoute: typeof OrgsCreateRouteImport
+    '/reviews': {
+      id: '/reviews'
+      path: '/reviews'
+      fullPath: '/reviews'
+      preLoaderRoute: typeof ReviewsRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/orgs/$orgId': {
-      id: '/orgs/$orgId'
-      path: '/orgs/$orgId'
-      fullPath: '/orgs/$orgId'
-      preLoaderRoute: typeof OrgsOrgIdRouteImport
+    '/settings': {
+      id: '/settings'
+      path: '/settings'
+      fullPath: '/settings'
+      preLoaderRoute: typeof SettingsRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/onboarding/welcome': {
-      id: '/onboarding/welcome'
-      path: '/onboarding/welcome'
-      fullPath: '/onboarding/welcome'
-      preLoaderRoute: typeof OnboardingWelcomeRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/onboarding/account-type': {
-      id: '/onboarding/account-type'
-      path: '/onboarding/account-type'
-      fullPath: '/onboarding/account-type'
-      preLoaderRoute: typeof OnboardingAccountTypeRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/messages/$conversationId': {
-      id: '/messages/$conversationId'
-      path: '/messages/$conversationId'
-      fullPath: '/messages/$conversationId'
-      preLoaderRoute: typeof MessagesConversationIdRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/games/$gameId': {
-      id: '/games/$gameId'
-      path: '/games/$gameId'
-      fullPath: '/games/$gameId'
-      preLoaderRoute: typeof GamesGameIdRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/checkout/return': {
-      id: '/checkout/return'
-      path: '/checkout/return'
-      fullPath: '/checkout/return'
-      preLoaderRoute: typeof CheckoutReturnRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/admin/location-analytics': {
-      id: '/admin/location-analytics'
-      path: '/location-analytics'
-      fullPath: '/admin/location-analytics'
-      preLoaderRoute: typeof AdminLocationAnalyticsRouteImport
-      parentRoute: typeof AdminRoute
-    }
-    '/account/security': {
-      id: '/account/security'
-      path: '/account/security'
-      fullPath: '/account/security'
-      preLoaderRoute: typeof AccountSecurityRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/account/notifications': {
-      id: '/account/notifications'
-      path: '/account/notifications'
-      fullPath: '/account/notifications'
-      preLoaderRoute: typeof AccountNotificationsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/_tabs/trainers': {
-      id: '/_tabs/trainers'
-      path: '/trainers'
-      fullPath: '/trainers'
-      preLoaderRoute: typeof TabsTrainersRouteImport
-      parentRoute: typeof TabsRoute
-    }
-    '/_tabs/teams': {
-      id: '/_tabs/teams'
-      path: '/teams'
-      fullPath: '/teams'
-      preLoaderRoute: typeof TabsTeamsRouteImport
-      parentRoute: typeof TabsRoute
-    }
-    '/_tabs/reels': {
-      id: '/_tabs/reels'
-      path: '/reels'
-      fullPath: '/reels'
-      preLoaderRoute: typeof TabsReelsRouteImport
-      parentRoute: typeof TabsRoute
-    }
-    '/_tabs/profile': {
-      id: '/_tabs/profile'
-      path: '/profile'
-      fullPath: '/profile'
-      preLoaderRoute: typeof TabsProfileRouteImport
-      parentRoute: typeof TabsRoute
-    }
-    '/_tabs/players': {
-      id: '/_tabs/players'
-      path: '/players'
-      fullPath: '/players'
-      preLoaderRoute: typeof TabsPlayersRouteImport
-      parentRoute: typeof TabsRoute
-    }
-    '/_tabs/notifications': {
-      id: '/_tabs/notifications'
-      path: '/notifications'
-      fullPath: '/notifications'
-      preLoaderRoute: typeof TabsNotificationsRouteImport
-      parentRoute: typeof TabsRoute
-    }
-    '/_tabs/feed': {
-      id: '/_tabs/feed'
-      path: '/feed'
-      fullPath: '/feed'
-      preLoaderRoute: typeof TabsFeedRouteImport
-      parentRoute: typeof TabsRoute
-    }
-    '/_tabs/discover': {
-      id: '/_tabs/discover'
-      path: '/discover'
-      fullPath: '/discover'
-      preLoaderRoute: typeof TabsDiscoverRouteImport
-      parentRoute: typeof TabsRoute
-    }
-    '/_tabs/create': {
-      id: '/_tabs/create'
-      path: '/create'
-      fullPath: '/create'
-      preLoaderRoute: typeof TabsCreateRouteImport
-      parentRoute: typeof TabsRoute
-    }
-    '/.well-known/oauth-protected-resource': {
-      id: '/.well-known/oauth-protected-resource'
-      path: '/.well-known/oauth-protected-resource'
-      fullPath: '/.well-known/oauth-protected-resource'
-      preLoaderRoute: typeof Char91DotwellKnownChar93OauthProtectedResourceRouteImport
+    '/shop': {
+      id: '/shop'
+      path: '/shop'
+      fullPath: '/shop'
+      preLoaderRoute: typeof ShopRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/.mcp/list-tools': {
@@ -1003,74 +814,193 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof Char91DotmcpChar93ListToolsRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/trainers/$trainerId/': {
-      id: '/trainers/$trainerId/'
-      path: '/trainers/$trainerId'
-      fullPath: '/trainers/$trainerId/'
-      preLoaderRoute: typeof TrainersTrainerIdIndexRouteImport
+    '/.well-known/oauth-protected-resource': {
+      id: '/.well-known/oauth-protected-resource'
+      path: '/.well-known/oauth-protected-resource'
+      fullPath: '/.well-known/oauth-protected-resource'
+      preLoaderRoute: typeof Char91DotwellKnownChar93OauthProtectedResourceRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/teams/$teamId/': {
-      id: '/teams/$teamId/'
-      path: '/teams/$teamId'
-      fullPath: '/teams/$teamId/'
-      preLoaderRoute: typeof TeamsTeamIdIndexRouteImport
+    '/_tabs/create': {
+      id: '/_tabs/create'
+      path: '/create'
+      fullPath: '/create'
+      preLoaderRoute: typeof TabsCreateRouteImport
+      parentRoute: typeof TabsRoute
+    }
+    '/_tabs/discover': {
+      id: '/_tabs/discover'
+      path: '/discover'
+      fullPath: '/discover'
+      preLoaderRoute: typeof TabsDiscoverRouteImport
+      parentRoute: typeof TabsRoute
+    }
+    '/_tabs/feed': {
+      id: '/_tabs/feed'
+      path: '/feed'
+      fullPath: '/feed'
+      preLoaderRoute: typeof TabsFeedRouteImport
+      parentRoute: typeof TabsRoute
+    }
+    '/_tabs/notifications': {
+      id: '/_tabs/notifications'
+      path: '/notifications'
+      fullPath: '/notifications'
+      preLoaderRoute: typeof TabsNotificationsRouteImport
+      parentRoute: typeof TabsRoute
+    }
+    '/_tabs/players': {
+      id: '/_tabs/players'
+      path: '/players'
+      fullPath: '/players'
+      preLoaderRoute: typeof TabsPlayersRouteImport
+      parentRoute: typeof TabsRoute
+    }
+    '/_tabs/profile': {
+      id: '/_tabs/profile'
+      path: '/profile'
+      fullPath: '/profile'
+      preLoaderRoute: typeof TabsProfileRouteImport
+      parentRoute: typeof TabsRoute
+    }
+    '/_tabs/reels': {
+      id: '/_tabs/reels'
+      path: '/reels'
+      fullPath: '/reels'
+      preLoaderRoute: typeof TabsReelsRouteImport
+      parentRoute: typeof TabsRoute
+    }
+    '/_tabs/teams': {
+      id: '/_tabs/teams'
+      path: '/teams'
+      fullPath: '/teams'
+      preLoaderRoute: typeof TabsTeamsRouteImport
+      parentRoute: typeof TabsRoute
+    }
+    '/_tabs/trainers': {
+      id: '/_tabs/trainers'
+      path: '/trainers'
+      fullPath: '/trainers'
+      preLoaderRoute: typeof TabsTrainersRouteImport
+      parentRoute: typeof TabsRoute
+    }
+    '/account/notifications': {
+      id: '/account/notifications'
+      path: '/account/notifications'
+      fullPath: '/account/notifications'
+      preLoaderRoute: typeof AccountNotificationsRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/games/$gameId/': {
-      id: '/games/$gameId/'
-      path: '/'
-      fullPath: '/games/$gameId/'
-      preLoaderRoute: typeof GamesGameIdIndexRouteImport
-      parentRoute: typeof GamesGameIdRoute
-    }
-    '/trainers/$trainerId/edit': {
-      id: '/trainers/$trainerId/edit'
-      path: '/trainers/$trainerId/edit'
-      fullPath: '/trainers/$trainerId/edit'
-      preLoaderRoute: typeof TrainersTrainerIdEditRouteImport
+    '/account/security': {
+      id: '/account/security'
+      path: '/account/security'
+      fullPath: '/account/security'
+      preLoaderRoute: typeof AccountSecurityRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/teams/$teamId/edit': {
-      id: '/teams/$teamId/edit'
-      path: '/teams/$teamId/edit'
-      fullPath: '/teams/$teamId/edit'
-      preLoaderRoute: typeof TeamsTeamIdEditRouteImport
+    '/admin/location-analytics': {
+      id: '/admin/location-analytics'
+      path: '/location-analytics'
+      fullPath: '/admin/location-analytics'
+      preLoaderRoute: typeof AdminLocationAnalyticsRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/checkout/return': {
+      id: '/checkout/return'
+      path: '/checkout/return'
+      fullPath: '/checkout/return'
+      preLoaderRoute: typeof CheckoutReturnRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/orgs/$orgId/members': {
-      id: '/orgs/$orgId/members'
-      path: '/members'
-      fullPath: '/orgs/$orgId/members'
-      preLoaderRoute: typeof OrgsOrgIdMembersRouteImport
-      parentRoute: typeof OrgsOrgIdRoute
+    '/games/$gameId': {
+      id: '/games/$gameId'
+      path: '/games/$gameId'
+      fullPath: '/games/$gameId'
+      preLoaderRoute: typeof GamesGameIdRouteImport
+      parentRoute: typeof rootRouteImport
     }
-    '/orgs/$orgId/edit': {
-      id: '/orgs/$orgId/edit'
-      path: '/edit'
-      fullPath: '/orgs/$orgId/edit'
-      preLoaderRoute: typeof OrgsOrgIdEditRouteImport
-      parentRoute: typeof OrgsOrgIdRoute
+    '/messages/': {
+      id: '/messages/'
+      path: '/messages'
+      fullPath: '/messages/'
+      preLoaderRoute: typeof MessagesIndexRouteImport
+      parentRoute: typeof rootRouteImport
     }
-    '/games/$gameId/payment-setup': {
-      id: '/games/$gameId/payment-setup'
-      path: '/payment-setup'
-      fullPath: '/games/$gameId/payment-setup'
-      preLoaderRoute: typeof GamesGameIdPaymentSetupRouteImport
-      parentRoute: typeof GamesGameIdRoute
+    '/messages/$conversationId': {
+      id: '/messages/$conversationId'
+      path: '/messages/$conversationId'
+      fullPath: '/messages/$conversationId'
+      preLoaderRoute: typeof MessagesConversationIdRouteImport
+      parentRoute: typeof rootRouteImport
     }
-    '/games/$gameId/pay': {
-      id: '/games/$gameId/pay'
-      path: '/pay'
-      fullPath: '/games/$gameId/pay'
-      preLoaderRoute: typeof GamesGameIdPayRouteImport
-      parentRoute: typeof GamesGameIdRoute
+    '/onboarding/account-type': {
+      id: '/onboarding/account-type'
+      path: '/onboarding/account-type'
+      fullPath: '/onboarding/account-type'
+      preLoaderRoute: typeof OnboardingAccountTypeRouteImport
+      parentRoute: typeof rootRouteImport
     }
-    '/.mcp/invoke-tool/$tool': {
-      id: '/.mcp/invoke-tool/$tool'
-      path: '/.mcp/invoke-tool/$tool'
-      fullPath: '/.mcp/invoke-tool/$tool'
-      preLoaderRoute: typeof Char91DotmcpChar93InvokeToolToolRouteImport
+    '/onboarding/welcome': {
+      id: '/onboarding/welcome'
+      path: '/onboarding/welcome'
+      fullPath: '/onboarding/welcome'
+      preLoaderRoute: typeof OnboardingWelcomeRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/orgs/': {
+      id: '/orgs/'
+      path: '/orgs'
+      fullPath: '/orgs/'
+      preLoaderRoute: typeof OrgsIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/orgs/$orgId': {
+      id: '/orgs/$orgId'
+      path: '/orgs/$orgId'
+      fullPath: '/orgs/$orgId'
+      preLoaderRoute: typeof OrgsOrgIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/orgs/create': {
+      id: '/orgs/create'
+      path: '/orgs/create'
+      fullPath: '/orgs/create'
+      preLoaderRoute: typeof OrgsCreateRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/players/$userId': {
+      id: '/players/$userId'
+      path: '/players/$userId'
+      fullPath: '/players/$userId'
+      preLoaderRoute: typeof PlayersUserIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/profile/edit': {
+      id: '/profile/edit'
+      path: '/profile/edit'
+      fullPath: '/profile/edit'
+      preLoaderRoute: typeof ProfileEditRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/review/new': {
+      id: '/review/new'
+      path: '/review/new'
+      fullPath: '/review/new'
+      preLoaderRoute: typeof ReviewNewRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/teams/create': {
+      id: '/teams/create'
+      path: '/teams/create'
+      fullPath: '/teams/create'
+      preLoaderRoute: typeof TeamsCreateRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/trainers/create': {
+      id: '/trainers/create'
+      path: '/trainers/create'
+      fullPath: '/trainers/create'
+      preLoaderRoute: typeof TrainersCreateRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/.lovable/oauth/consent': {
@@ -1080,11 +1010,74 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DotlovableOauthConsentRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/public/reels/process': {
-      id: '/api/public/reels/process'
-      path: '/api/public/reels/process'
-      fullPath: '/api/public/reels/process'
-      preLoaderRoute: typeof ApiPublicReelsProcessRouteImport
+    '/.mcp/invoke-tool/$tool': {
+      id: '/.mcp/invoke-tool/$tool'
+      path: '/.mcp/invoke-tool/$tool'
+      fullPath: '/.mcp/invoke-tool/$tool'
+      preLoaderRoute: typeof Char91DotmcpChar93InvokeToolToolRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/games/$gameId/': {
+      id: '/games/$gameId/'
+      path: '/'
+      fullPath: '/games/$gameId/'
+      preLoaderRoute: typeof GamesGameIdIndexRouteImport
+      parentRoute: typeof GamesGameIdRoute
+    }
+    '/games/$gameId/pay': {
+      id: '/games/$gameId/pay'
+      path: '/pay'
+      fullPath: '/games/$gameId/pay'
+      preLoaderRoute: typeof GamesGameIdPayRouteImport
+      parentRoute: typeof GamesGameIdRoute
+    }
+    '/games/$gameId/payment-setup': {
+      id: '/games/$gameId/payment-setup'
+      path: '/payment-setup'
+      fullPath: '/games/$gameId/payment-setup'
+      preLoaderRoute: typeof GamesGameIdPaymentSetupRouteImport
+      parentRoute: typeof GamesGameIdRoute
+    }
+    '/orgs/$orgId/edit': {
+      id: '/orgs/$orgId/edit'
+      path: '/edit'
+      fullPath: '/orgs/$orgId/edit'
+      preLoaderRoute: typeof OrgsOrgIdEditRouteImport
+      parentRoute: typeof OrgsOrgIdRoute
+    }
+    '/orgs/$orgId/members': {
+      id: '/orgs/$orgId/members'
+      path: '/members'
+      fullPath: '/orgs/$orgId/members'
+      preLoaderRoute: typeof OrgsOrgIdMembersRouteImport
+      parentRoute: typeof OrgsOrgIdRoute
+    }
+    '/teams/$teamId/': {
+      id: '/teams/$teamId/'
+      path: '/teams/$teamId'
+      fullPath: '/teams/$teamId/'
+      preLoaderRoute: typeof TeamsTeamIdIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/teams/$teamId/edit': {
+      id: '/teams/$teamId/edit'
+      path: '/teams/$teamId/edit'
+      fullPath: '/teams/$teamId/edit'
+      preLoaderRoute: typeof TeamsTeamIdEditRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/trainers/$trainerId/': {
+      id: '/trainers/$trainerId/'
+      path: '/trainers/$trainerId'
+      fullPath: '/trainers/$trainerId/'
+      preLoaderRoute: typeof TrainersTrainerIdIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/trainers/$trainerId/edit': {
+      id: '/trainers/$trainerId/edit'
+      path: '/trainers/$trainerId/edit'
+      fullPath: '/trainers/$trainerId/edit'
+      preLoaderRoute: typeof TrainersTrainerIdEditRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/public/payments/webhook': {
@@ -1092,6 +1085,13 @@ declare module '@tanstack/react-router' {
       path: '/api/public/payments/webhook'
       fullPath: '/api/public/payments/webhook'
       preLoaderRoute: typeof ApiPublicPaymentsWebhookRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/reels/process': {
+      id: '/api/public/reels/process'
+      path: '/api/public/reels/process'
+      fullPath: '/api/public/reels/process'
+      preLoaderRoute: typeof ApiPublicReelsProcessRouteImport
       parentRoute: typeof rootRouteImport
     }
   }
