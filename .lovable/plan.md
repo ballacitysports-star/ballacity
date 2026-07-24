@@ -1,18 +1,47 @@
-## Add Apple sign-in to `/auth`
+## Goal
+For any user signing in with Google or Apple whose `profiles.account_type` is still empty, unconditionally redirect them to `/onboarding/account-type` — even if a "pending" choice was stashed before the OAuth handoff. Email sign-ins and returning users are unaffected.
 
-Mirror the existing Google flow in `src/routes/auth.tsx` and enable the provider server-side.
+## Current behavior (verified)
+`src/routes/__root.tsx` (auth-state effect, ~L503–539):
+1. On any `SIGNED_IN` event, read `profiles.account_type`.
+2. If it exists → done.
+3. If it's missing but `readPendingAccountType()` has a value → silently write it into the profile and continue to the saved `next` path.
+4. Otherwise → navigate to `/onboarding/account-type`.
 
-### Steps
+Because branch 3 auto-applies a locally stashed choice, a first-time Google/Apple user can bypass the account-type screen (e.g. if a stale `pending` value exists, or if the flow ever pre-selects one).
 
-1. **Enable Apple provider** via `supabase--configure_social_auth` with `providers: ["apple"]` (managed Apple auth — no BYO credentials).
-2. **`src/routes/auth.tsx`**:
-   - Add an `apple(opts)` handler that mirrors `google(...)`: same synchronous first call to `lovable.auth.signInWithOAuth("apple", { redirect_uri: window.location.origin })`, same `next` stashing to `sessionStorage`, same `pendingAccountType` handling, same popup/vendor error toasts (labels swapped to "Apple"), same analytics events.
-   - Add a "Continue with Apple" button under the Google button using the existing pill style, with an Apple logo SVG and `disabled={busy}`.
-3. **Analytics**: reuse `trackSigninEvent`; include `{ provider: "apple" | "google" }` in event payloads so we can distinguish. Update the two existing Google call sites to pass `provider: "google"` for parity (small, additive).
-4. **No other changes**: `__root.tsx` post-auth flow (`openrun:oauth-next` consumption, account-type reconciliation) already works for any provider, since it listens to `SIGNED_IN` regardless of source.
+## Change
+In `src/routes/__root.tsx`, for OAuth (Google/Apple) sign-ins with no existing `account_type`, skip the pending auto-apply and always navigate to `/onboarding/account-type`. The pending value (and the saved `next` path) stay in storage so the picker/wizard can consume them after the user confirms their type.
 
-### Verification
+Detection: use `session.user.app_metadata.provider` (values `"google"` / `"apple"`). Email/password sign-ins keep today's behavior (still redirected to the picker when type is missing, since branch 4 already handles it; branch 3 only matters when a `pending` value exists, which for email is set on the same device moments earlier).
 
-- Manually click "Continue with Apple" in preview → popup opens; on cancel, no error toast crash.
-- Confirm `pending_account_type` still stored in localStorage when signing up as a new type via Apple.
-- Extend `e2e/google-vendor-rejection.spec.ts` (or add a sibling `apple-vendor-rejection.spec.ts`) that stubs `lovable.auth.signInWithOAuth("apple", ...)` and asserts the actionable toast + preserved `next` behavior.
+### Pseudocode
+```ts
+const provider = session.user.app_metadata?.provider;
+const isOAuth = provider === "google" || provider === "apple";
+
+// existing profile lookup...
+if (isAccountType(existing)) { /* unchanged */ return; }
+
+if (isOAuth) {
+  // Always force the picker for new social sign-ins.
+  if (router.state.location.pathname !== "/onboarding/account-type") {
+    router.navigate({ to: "/onboarding/account-type", replace: true });
+  }
+  return;
+}
+
+// Non-OAuth: keep current pending-apply behavior.
+if (pending) { /* update profile, consume next */ return; }
+router.navigate({ to: "/onboarding/account-type", replace: true });
+```
+
+The existing `AuthGate` type-check guard (L389–422) already blocks protected routes when `account_type` is missing, so this is a belt-and-suspenders redirect that guarantees the picker screen appears immediately after OAuth callback rather than after a route flash.
+
+## Files touched
+- `src/routes/__root.tsx` — adjust the `SIGNED_IN` reconcile block only.
+
+## Out of scope
+- No DB / RLS / auth-provider changes.
+- No changes to `/onboarding/account-type` UI or to `onboarding.welcome.tsx`.
+- Email sign-in flow unchanged.

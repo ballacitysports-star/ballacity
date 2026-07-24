@@ -506,6 +506,8 @@ function RootComponent() {
         // picker so social sign-ins can never land on the feed as a default.
         const pending = readPendingAccountType();
         const uid = session.user.id;
+        const provider = session.user.app_metadata?.provider;
+        const isOAuth = provider === "google" || provider === "apple";
         void supabase
           .from("profiles")
           .select("account_type")
@@ -516,6 +518,14 @@ function RootComponent() {
             if (isAccountType(existing)) {
               if (pending) clearPendingAccountType();
               consumeSavedNext();
+              return;
+            }
+            // New Google/Apple sign-ins must always go through the account
+            // type picker — never auto-apply a stashed pending choice.
+            if (isOAuth) {
+              if (router.state.location.pathname !== "/onboarding/account-type") {
+                router.navigate({ to: "/onboarding/account-type", replace: true });
+              }
               return;
             }
             if (pending) {
@@ -537,6 +547,7 @@ function RootComponent() {
               router.navigate({ to: "/onboarding/account-type", replace: true });
             }
           });
+
       }
     });
     return () => {
