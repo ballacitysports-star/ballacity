@@ -337,52 +337,76 @@ function Profile() {
         </div>
       </div>
 
-      {/* Identity */}
+      {/* Identity — IG-style */}
       <div className="px-4 -mt-12 relative">
-        <motion.div
-          initial={{ scale: 0, rotate: -10 }}
-          animate={{ scale: 1, rotate: 0 }}
-          transition={{ type: "spring", stiffness: 220, damping: 16 }}
-          className="grid h-24 w-24 place-items-center overflow-hidden rounded-3xl border-4 border-background bg-lime-gradient font-display text-3xl font-bold text-primary-foreground glow-lime"
-        >
-          {me.avatarUrl ? (
-            <img src={me.avatarUrl} alt={me.name} className="h-full w-full object-cover" />
-          ) : (
-            me.avatar
-          )}
-        </motion.div>
-        <div className="mt-3 flex items-start justify-between">
-          <div>
-            <h1 className="font-display text-2xl font-bold flex items-center gap-2">
-              {me.name}
-              {me.birthday &&
-                (() => {
-                  const a = ageFrom(me.birthday);
-                  return a != null ? (
-                    <span className="text-sm font-normal text-muted-foreground">· {a}</span>
-                  ) : null;
-                })()}
-              <span className="inline-flex items-center gap-1 rounded-full bg-lime/15 px-2 py-0.5 text-xs font-bold text-lime">
-                <Shield className="h-3 w-3" /> Verified
-              </span>
-            </h1>
-            <div className="text-sm text-muted-foreground">
-              {me.username} · {me.city}
-            </div>
-            {(me.birthday || me.graduatingClass) && (
-              <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-muted-foreground">
-                {me.birthday && (
-                  <span>
-                    🎂 {formatBirthday(me.birthday)}
-                    {ageFrom(me.birthday) != null ? ` · ${ageFrom(me.birthday)} yrs` : ""}
-                  </span>
-                )}
-                {me.graduatingClass && <span>🎓 Class of {me.graduatingClass}</span>}
-              </div>
+        <div className="flex items-center gap-5">
+          <motion.div
+            initial={{ scale: 0, rotate: -10 }}
+            animate={{ scale: 1, rotate: 0 }}
+            transition={{ type: "spring", stiffness: 220, damping: 16 }}
+            className="grid h-24 w-24 shrink-0 place-items-center overflow-hidden rounded-full border-4 border-background bg-lime-gradient font-display text-3xl font-bold text-primary-foreground glow-lime"
+          >
+            {me.avatarUrl ? (
+              <img src={me.avatarUrl} alt={me.name} className="h-full w-full object-cover" />
+            ) : (
+              me.avatar
             )}
+          </motion.div>
+          {/* IG stat row */}
+          <div className="mt-10 flex flex-1 items-center justify-around text-center">
+            <div className="px-1">
+              <div className="font-display text-lg font-bold leading-tight">
+                {upcomingGroups.total}
+              </div>
+              <div className="text-[11px] text-muted-foreground">games</div>
+            </div>
+            <button
+              type="button"
+              onClick={() => setFollowList("followers")}
+              className="min-w-[56px] rounded-lg px-1 transition-colors hover:bg-surface"
+            >
+              <div className="font-display text-lg font-bold leading-tight">
+                {follow.followers}
+              </div>
+              <div className="text-[11px] text-muted-foreground">followers</div>
+            </button>
+            <button
+              type="button"
+              onClick={() => setFollowList("following")}
+              className="min-w-[56px] rounded-lg px-1 transition-colors hover:bg-surface"
+            >
+              <div className="font-display text-lg font-bold leading-tight">
+                {follow.following}
+              </div>
+              <div className="text-[11px] text-muted-foreground">following</div>
+            </button>
           </div>
         </div>
-        <p className="mt-3 text-sm text-foreground/90">{me.bio}</p>
+
+        {/* Name + meta */}
+        <div className="mt-3">
+          <h1 className="font-display text-xl font-bold flex flex-wrap items-center gap-x-2 gap-y-1">
+            <span className="truncate">{me.name}</span>
+            {me.birthday &&
+              (() => {
+                const a = ageFrom(me.birthday);
+                return a != null ? (
+                  <span className="text-sm font-normal text-muted-foreground">· {a}</span>
+                ) : null;
+              })()}
+            <span className="inline-flex items-center gap-1 rounded-full bg-lime/15 px-2 py-0.5 text-[10px] font-bold text-lime">
+              <Shield className="h-3 w-3" /> Verified
+            </span>
+          </h1>
+          <div className="text-sm text-muted-foreground">
+            {me.username} · {me.city}
+          </div>
+          {me.graduatingClass && (
+            <div className="mt-0.5 text-xs text-muted-foreground">🎓 Class of {me.graduatingClass}</div>
+          )}
+        </div>
+
+        {me.bio && <p className="mt-2 text-sm text-foreground/90 whitespace-pre-wrap">{me.bio}</p>}
 
         {me.links && me.links.length > 0 && (
           <div className="mt-3">
@@ -390,31 +414,42 @@ function Profile() {
           </div>
         )}
 
-        {/* Stats */}
-        <div className="mt-5 grid grid-cols-5 gap-2">
+        {/* Action row */}
+        <div className="mt-4 grid grid-cols-2 gap-2">
+          <Link
+            to="/profile/edit"
+            className="inline-flex items-center justify-center rounded-lg border border-border bg-surface px-3 py-1.5 text-sm font-semibold"
+          >
+            Edit profile
+          </Link>
+          <button
+            type="button"
+            onClick={() => setReviewsOpen(true)}
+            className="inline-flex items-center justify-center gap-1 rounded-lg border border-border bg-surface px-3 py-1.5 text-sm font-semibold"
+          >
+            <Star className="h-3.5 w-3.5" /> Reviews · {myRep.count}
+          </button>
+        </div>
+
+        {/* Secondary stats — compact */}
+        <div className="mt-4 grid grid-cols-3 gap-2">
           {[
-            { k: me.stats.played, v: "Games" },
             { k: me.stats.reliability + "%", v: "Reliable" },
             { k: me.stats.sportsmanship, v: "Sport" },
             { k: me.stats.friends, v: "Crew" },
-            { k: myRep.count, v: "Reviews" },
-          ].map((s, i) => (
-            <button
+          ].map((s) => (
+            <div
               key={s.v}
-              type="button"
-              onClick={s.v === "Reviews" ? () => setReviewsOpen(true) : undefined}
-              className={`rounded-2xl border border-border bg-surface p-3 text-center transition-all hover:border-lime/40 ${
-                s.v === "Reviews" ? "cursor-pointer" : ""
-              }`}
+              className="rounded-xl border border-border bg-surface p-2 text-center"
             >
-              <div className="font-display text-lg font-bold">{s.k}</div>
-              <div className="text-[10px] uppercase tracking-wider text-muted-foreground flex items-center justify-center gap-1">
-                {s.v === "Reviews" && <Star className="h-3 w-3" />}
+              <div className="font-display text-sm font-bold">{s.k}</div>
+              <div className="text-[10px] uppercase tracking-wider text-muted-foreground">
                 {s.v}
               </div>
-            </button>
+            </div>
           ))}
         </div>
+
 
         {/* Reputation badge (above the fold) */}
         <div className="mt-4">
