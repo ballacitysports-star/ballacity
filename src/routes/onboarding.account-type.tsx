@@ -59,15 +59,9 @@ function OnboardingAccountTypePage() {
       // Route to the correct linked-profile creation flow for non-player types.
       // Player accounts already have their linked row (public.profiles) from the
       // handle_new_user trigger, so they go straight to the feed.
-      if (pick === "team") {
-        nav({ to: "/teams/create" });
-      } else if (pick === "trainer") {
-        nav({ to: "/trainers/create" });
-      } else if (pick === "gym") {
-        nav({ to: "/orgs/create" });
-      } else {
-        nav({ to: "/feed" });
-      }
+      // Route to the type-specific welcome step. It handles player quick-setup
+      // and shows next-steps for team/trainer/gym before their creation flow.
+      nav({ to: "/onboarding/welcome", search: { type: pick } });
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Could not save account type");
     } finally {
