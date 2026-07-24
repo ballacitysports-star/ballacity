@@ -100,7 +100,7 @@ function AuthPage() {
           email,
           password,
           options: {
-            emailRedirectTo: next ? `${window.location.origin}${next}` : window.location.origin,
+            emailRedirectTo: window.location.origin,
             data: {
               display_name: displayName || email.split("@")[0],
               account_type: accountType,
@@ -172,8 +172,18 @@ function AuthPage() {
     if (mode === "signup" && accountType) {
       setPendingAccountType(accountType);
     }
+    // Stash the intended destination so we can navigate to it AFTER the
+    // Supabase session is confirmed. `redirect_uri` MUST be a public
+    // same-origin URL — passing a protected route (e.g. /feed?...) is
+    // rejected by the vendor with "failed to sign in with vendor".
+    try {
+      if (next) window.sessionStorage.setItem("openrun:oauth-next", next);
+      else window.sessionStorage.removeItem("openrun:oauth-next");
+    } catch {
+      /* sessionStorage may be unavailable in private mode */
+    }
     const promise = lovable.auth.signInWithOAuth("google", {
-      redirect_uri: next ? `${window.location.origin}${next}` : window.location.origin,
+      redirect_uri: window.location.origin,
       extraParams: { prompt: "select_account" },
     });
 
@@ -222,6 +232,20 @@ function AuthPage() {
     // treat the sign-in as blocked/failed when the OAuth helper's promise
     // itself rejects or returns an error — that IS the signal that the
     // popup couldn't open. onAuthStateChange handles the success redirect.
+    const reportVendorFailure = (raw: string) => {
+      // Log the raw error so recurrences leave a diagnosable trail.
+      console.error("[auth] google sign-in failed:", raw);
+      trackSigninEvent("failure", { errorMessage: raw });
+      if (/vendor|provider|external_provider|oauth/i.test(raw)) {
+        toast.error("Google sign-in was rejected by the provider", {
+          description:
+            "Please try again. If it keeps failing, sign in with your email and password instead.",
+        });
+      } else {
+        toast.error(raw || "Google sign-in failed");
+      }
+    };
+
     promise
       .then((result) => {
         if (result?.error) {
@@ -229,8 +253,7 @@ function AuthPage() {
           if (/popup|blocked|window|opener/i.test(msg)) {
             showBlockedToast(msg);
           } else {
-            trackSigninEvent("failure", { errorMessage: msg });
-            toast.error(msg || "Google sign-in failed");
+            reportVendorFailure(msg);
           }
         } else if (!result?.redirected) {
           // Tokens were returned in-window and setSession was called.
@@ -248,8 +271,7 @@ function AuthPage() {
         if (/popup|blocked|window|opener/i.test(msg)) {
           showBlockedToast(msg);
         } else {
-          trackSigninEvent("failure", { errorMessage: msg });
-          toast.error(msg || "Google sign-in failed");
+          reportVendorFailure(msg);
         }
       })
       .finally(() => {

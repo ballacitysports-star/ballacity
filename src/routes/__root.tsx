@@ -485,6 +485,21 @@ function RootComponent() {
       }
       if ((event === "SIGNED_IN" || event === "USER_UPDATED") && session?.user) {
         runLegacyHostMigration(session.user.id);
+        // Consume the OAuth `next` stashed by the sign-in button (kept out
+        // of `redirect_uri` because it must stay a public same-origin URL).
+        const consumeSavedNext = () => {
+          let saved: string | null = null;
+          try {
+            saved = window.sessionStorage.getItem("openrun:oauth-next");
+            if (saved) window.sessionStorage.removeItem("openrun:oauth-next");
+          } catch {
+            /* sessionStorage unavailable */
+          }
+          const dest = sanitizeNextPath(saved);
+          if (dest && dest !== router.state.location.pathname) {
+            router.navigate({ to: dest, replace: true });
+          }
+        };
         // Reconcile account_type after any sign-in (Google, Apple, email).
         // If the user picked a type before OAuth we persist it; otherwise if
         // the profile still has no account_type we route to the onboarding
@@ -500,6 +515,7 @@ function RootComponent() {
             const existing = (data as { account_type?: string } | null)?.account_type;
             if (isAccountType(existing)) {
               if (pending) clearPendingAccountType();
+              consumeSavedNext();
               return;
             }
             if (pending) {
@@ -510,10 +526,13 @@ function RootComponent() {
                 .then(() => {
                   clearPendingAccountType();
                   router.invalidate();
+                  consumeSavedNext();
                 });
               return;
             }
             // No pending choice and no stored type → force the picker.
+            // The saved next stays in sessionStorage; onboarding consumes it
+            // after the user picks a type.
             if (router.state.location.pathname !== "/onboarding/account-type") {
               router.navigate({ to: "/onboarding/account-type", replace: true });
             }
