@@ -69,8 +69,11 @@ function Profile() {
   const { user, loading } = useAuth();
   const [confirmedUser, setConfirmedUser] = useState<User | null>(null);
   const [reviewsOpen, setReviewsOpen] = useState(false);
+  const [followList, setFollowList] = useState<null | "followers" | "following">(null);
+  const [activeTab, setActiveTab] = useState<"games" | "hosting" | "requests" | "reviews">("games");
   const profileUser = user ?? confirmedUser;
   const me = useMyProfile(profileUser);
+  const follow = useFollow(profileUser?.id ?? "");
   const joinedGameIds = useJoinedGameIds();
   const hosted = useHostedGames();
   const upcomingGroups = useMemo(() => {
