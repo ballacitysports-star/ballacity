@@ -320,20 +320,97 @@ export const GAMES: Game[] = [
   },
 ];
 
+/** Sportsmanship trait tallies drawn from peer reviews. */
+export type SportsmanshipTraits = {
+  respectful: number;
+  communicative: number;
+  fairPlay: number;
+  positive: number;
+  onTime: number;
+};
+
+/** Reliability breakdown so completion screens can show more than a single number. */
+export type ReliabilityBreakdown = {
+  score: number; // 0–100 headline
+  showUpRate: number; // % of RSVPs where the player actually showed
+  onTimeRate: number; // % of shows that arrived on time
+  lastMinuteCancels: number; // last 30 days
+  currentStreak: number; // consecutive games shown on time
+  longestStreak: number;
+};
+
+/** Per-sport skill entry with the rating system + tier used by that sport. */
+export type MeSport = {
+  name: Sport;
+  skill: number; // 1.0–5.0 (normalized for progress bars)
+  system: "NTRP" | "DUPR" | "UTR" | "PACE" | "SELF";
+  tier: string; // e.g. "3.5 NTRP", "Intermediate", "PACE 6.2"
+  favorite?: boolean;
+  gamesPlayed: number;
+  winRate: number; // 0–1
+};
+
 export const ME = {
   name: "Alex Rivera",
   username: "@alex",
   avatar: "AR",
   bio: "Pickup hooper · weekend keeper · always down for one more game.",
   city: "New York, NY",
-  stats: { played: 47, reliability: 98, sportsmanship: 4.9, friends: 124 },
+  stats: {
+    played: 47,
+    reliability: 98,
+    sportsmanship: 4.9,
+    friends: 124,
+    hosted: 12,
+    endorsements: 63,
+  },
+  reliability: {
+    score: 98,
+    showUpRate: 0.98,
+    onTimeRate: 0.94,
+    lastMinuteCancels: 0,
+    currentStreak: 9,
+    longestStreak: 14,
+  } satisfies ReliabilityBreakdown,
+  sportsmanship: {
+    rating: 4.9,
+    reviewCount: 38,
+    traits: {
+      respectful: 36,
+      communicative: 31,
+      fairPlay: 34,
+      positive: 29,
+      onTime: 33,
+    } satisfies SportsmanshipTraits,
+    quotes: [
+      { author: "Jamie L.", body: "Always calls his own fouls. Great teammate.", sport: "Basketball" as Sport },
+      { author: "Priya S.", body: "On time, communicative, and hustles every play.", sport: "Soccer" as Sport },
+      { author: "Marcus T.", body: "Encourages everyone on the court, beginners included.", sport: "Pickleball" as Sport },
+    ],
+  },
   sports: [
-    { name: "Basketball" as Sport, skill: 4.2 },
-    { name: "Soccer" as Sport, skill: 3.8 },
-    { name: "Pickleball" as Sport, skill: 3.5 },
+    { name: "Basketball" as Sport, skill: 4.2, system: "SELF", tier: "Advanced", favorite: true, gamesPlayed: 24, winRate: 0.62 },
+    { name: "Soccer" as Sport, skill: 3.8, system: "SELF", tier: "Intermediate+", favorite: true, gamesPlayed: 14, winRate: 0.57 },
+    { name: "Pickleball" as Sport, skill: 3.5, system: "DUPR", tier: "3.5 DUPR", favorite: false, gamesPlayed: 9, winRate: 0.66 },
+    { name: "Tennis" as Sport, skill: 3.0, system: "NTRP", tier: "3.0 NTRP", favorite: false, gamesPlayed: 5, winRate: 0.4 },
+    { name: "Running" as Sport, skill: 3.6, system: "PACE", tier: "7:45/mi", favorite: false, gamesPlayed: 11, winRate: 0.0 },
+  ] satisfies MeSport[],
+  badges: [
+    "Reliable Player",
+    "Captain x12",
+    "On a 9-game streak",
+    "Verified",
+    "Top 5% Sportsmanship",
+    "Host · 12 games",
+    "Community MVP",
   ],
-  badges: ["Reliable Player", "Captain x12", "On a 9-game streak", "Verified"],
+  recentActivity: [
+    { kind: "played", label: "Sunday Run at Rucker", when: "2 days ago", sport: "Basketball" as Sport },
+    { kind: "hosted", label: "Pickleball open play", when: "5 days ago", sport: "Pickleball" as Sport },
+    { kind: "review", label: "Received a 5★ review", when: "1 week ago", sport: "Soccer" as Sport },
+  ],
 };
+
 
 // ============= Teams & Coaches =============
 
