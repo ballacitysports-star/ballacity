@@ -210,11 +210,11 @@ function AuthPage() {
         blockedReported = true;
         trackSigninEvent("popup_blocked", { errorMessage: errorMessage ?? null });
       }
-      toast.error("Google sign-in popup was blocked", {
+      toast.error(`${providerLabel} sign-in popup was blocked`, {
         description: browserGuidance,
         action: {
           label: "Retry",
-          onClick: () => google({ isRetry: true }),
+          onClick: () => oauth(provider, { isRetry: true }),
         },
         cancel: {
           label: "Copy link",
