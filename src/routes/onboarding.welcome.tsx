@@ -74,33 +74,119 @@ function OnboardingWelcomePage() {
 function LinkedProfileWelcome({ type }: { type: Exclude<AccountType, "player"> }) {
   const nav = useNavigate();
   const cfg = NEXT_STEPS[type];
+  const [active, setActive] = useState(0);
+  const [expanded, setExpanded] = useState<Record<number, boolean>>({ 0: true });
+
+  const toggle = (i: number) => {
+    setActive(i);
+    setExpanded((e) => ({ ...e, [i]: !e[i] }));
+  };
+
+  const goBack = () => nav({ to: "/onboarding/account-type" });
+
   return (
     <div className="mx-auto flex min-h-dvh w-full max-w-md flex-col px-4 py-8">
+      <button
+        onClick={goBack}
+        className="mb-3 self-start text-xs text-muted-foreground hover:text-foreground"
+      >
+        ← Change account type
+      </button>
       <div>
         <div className="font-display text-2xl font-bold">{cfg.title}</div>
         <p className="mt-1 text-sm text-muted-foreground">
-          Here's what comes next. You can revisit any of these later from settings.
+          Tap a step to preview details. You can revisit any of these later from settings.
         </p>
       </div>
-      <ol className="mt-6 space-y-3">
-        {cfg.steps.map((s, i) => (
-          <li
-            key={s.title}
-            className="flex gap-3 rounded-2xl border border-border/60 bg-surface p-4"
-          >
-            <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-lime-gradient text-xs font-bold text-primary-foreground">
-              {i + 1}
-            </div>
-            <div>
-              <div className="text-sm font-semibold">{s.title}</div>
-              <div className="mt-0.5 text-xs text-muted-foreground">{s.body}</div>
-            </div>
-          </li>
+
+      <div className="mt-4 flex items-center gap-1.5" aria-label="Progress">
+        {cfg.steps.map((_, i) => (
+          <div
+            key={i}
+            className={`h-1 flex-1 rounded-full transition ${
+              i <= active ? "bg-lime-gradient" : "bg-border/60"
+            }`}
+          />
         ))}
+      </div>
+
+      <ol className="mt-4 space-y-2">
+        {cfg.steps.map((s, i) => {
+          const isOpen = !!expanded[i];
+          const isActive = active === i;
+          return (
+            <li key={s.title}>
+              <button
+                type="button"
+                onClick={() => toggle(i)}
+                aria-expanded={isOpen}
+                className={`flex w-full items-start gap-3 rounded-2xl border p-4 text-left transition ${
+                  isActive
+                    ? "border-primary/50 bg-surface shadow-sm"
+                    : "border-border/60 bg-surface hover:border-border"
+                }`}
+              >
+                <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-lime-gradient text-xs font-bold text-primary-foreground">
+                  {i + 1}
+                </div>
+                <div className="flex-1">
+                  <div className="flex items-center justify-between">
+                    <div className="text-sm font-semibold">{s.title}</div>
+                    <span
+                      className={`ml-2 text-muted-foreground transition-transform ${
+                        isOpen ? "rotate-180" : ""
+                      }`}
+                      aria-hidden
+                    >
+                      ▾
+                    </span>
+                  </div>
+                  <div
+                    className={`grid overflow-hidden text-xs text-muted-foreground transition-all ${
+                      isOpen ? "mt-1 grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0"
+                    }`}
+                  >
+                    <div className="min-h-0">{s.body}</div>
+                  </div>
+                </div>
+              </button>
+            </li>
+          );
+        })}
       </ol>
+
+      <div className="mt-6 flex items-center gap-2">
+        <button
+          onClick={() => setActive((a) => Math.max(0, a - 1))}
+          disabled={active === 0}
+          className="rounded-full border border-border/60 bg-surface px-3 py-2 text-xs font-medium text-foreground disabled:opacity-40"
+        >
+          Previous
+        </button>
+        {active < cfg.steps.length - 1 ? (
+          <button
+            onClick={() => {
+              const next = active + 1;
+              setActive(next);
+              setExpanded((e) => ({ ...e, [next]: true }));
+            }}
+            className="ml-auto rounded-full bg-lime-gradient px-4 py-2 text-xs font-bold text-primary-foreground"
+          >
+            Next step
+          </button>
+        ) : (
+          <button
+            onClick={() => nav({ to: cfg.goto })}
+            className="ml-auto rounded-full bg-lime-gradient px-4 py-2 text-xs font-bold text-primary-foreground"
+          >
+            {cfg.cta}
+          </button>
+        )}
+      </div>
+
       <button
         onClick={() => nav({ to: cfg.goto })}
-        className="mt-6 w-full rounded-full bg-lime-gradient px-4 py-3 text-sm font-bold text-primary-foreground"
+        className="mt-4 w-full rounded-full bg-lime-gradient px-4 py-3 text-sm font-bold text-primary-foreground"
       >
         {cfg.cta}
       </button>
