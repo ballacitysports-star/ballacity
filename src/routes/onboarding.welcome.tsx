@@ -1,12 +1,14 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { z } from "zod";
 import { toast } from "sonner";
+import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
 import { useAccountType, type AccountType } from "@/lib/account-type";
 import { SPORTS, type Sport } from "@/lib/sample-data";
 import { SPORT_CONFIG } from "@/lib/sport-config";
+import { getFeedPrefsSnapshot, setFeedPrefs } from "@/lib/user-prefs-store";
 
 const searchSchema = z.object({
   type: z.enum(["player", "team", "trainer", "gym"]).optional(),
@@ -203,10 +205,12 @@ function LinkedProfileWelcome({ type }: { type: Exclude<AccountType, "player"> }
 function PlayerWelcome() {
   const nav = useNavigate();
   const { user } = useAuth();
+  const queryClient = useQueryClient();
   const [sport, setSport] = useState<Sport | null>(null);
   const [level, setLevel] = useState<string | null>(null);
   const [radius, setRadius] = useState<number>(15);
   const [status, setStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
+  const lastRefreshRef = useRef<string>("");
 
   // Location permission state
   type GeoState =
@@ -306,6 +310,54 @@ function PlayerWelcome() {
           /* ignore */
         }
         setStatus("saved");
+
+        // Refresh the home feed with the newly-saved preferences.
+        const signature = `${sport ?? ""}|${level ?? ""}|${radius}`;
+        if (signature !== lastRefreshRef.current) {
+          lastRefreshRef.current = signature;
+
+          // Sync the client-side feed prefs so the feed's sport chip + distance
+          // filter immediately reflect the onboarding selection on arrival.
+          try {
+            const current = getFeedPrefsSnapshot();
+            const radiusInPrefUnit =
+              current.distanceUnit === "km" ? radius : Math.round(radius * 0.621371);
+            setFeedPrefs({
+              ...current,
+              preferredSports: sport
+                ? Array.from(new Set([sport, ...current.preferredSports]))
+                : current.preferredSports,
+              maxDistanceMi: radiusInPrefUnit,
+            });
+          } catch {
+            /* ignore */
+          }
+
+          // Invalidate any Query cache keyed by feed/games/profile so the feed
+          // refetches with the new sport / level / radius on arrival.
+          await Promise.all([
+            queryClient.invalidateQueries({ queryKey: ["feed-team-posts"] }),
+            queryClient.invalidateQueries({
+              predicate: (q) => {
+                const k = q.queryKey?.[0];
+                return (
+                  typeof k === "string" &&
+                  (k.startsWith("feed") || k.startsWith("games") || k === "profile" || k === "me")
+                );
+              },
+            }),
+          ]);
+          // Broadcast for non-Query subscribers (Zustand stores, custom hooks).
+          try {
+            window.dispatchEvent(
+              new CustomEvent("openrun:prefs-updated", {
+                detail: { sport, level, radiusKm: radius },
+              }),
+            );
+          } catch {
+            /* ignore */
+          }
+        }
       } catch (err) {
         setStatus("error");
         toast.error(err instanceof Error ? err.message : "Could not save your preferences");
