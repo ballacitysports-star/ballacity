@@ -1,7 +1,7 @@
 import { test, expect, type Page } from "@playwright/test";
 
 /**
- * Reproduces the "failed to sign in with vendor" Google OAuth error by stubbing
+ * Reproduces the "failed to sign in with vendor" OAuth error by stubbing
  * `lovable.auth.signInWithOAuth`, and asserts that:
  *  - The actionable "rejected by the provider" toast appears.
  *  - The user stays on /auth in the correct mode.
@@ -11,7 +11,7 @@ import { test, expect, type Page } from "@playwright/test";
 
 type OAuthResult = { error?: { message: string }; redirected?: boolean };
 
-async function stubGoogleOAuth(page: Page, result: OAuthResult) {
+async function stubOAuth(page: Page, result: OAuthResult) {
   await page.evaluate(async (r) => {
     const mod = await import("/src/integrations/lovable/index.ts");
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -19,82 +19,105 @@ async function stubGoogleOAuth(page: Page, result: OAuthResult) {
   }, result);
 }
 
-const googleButton = (page: Page) => page.getByRole("button", { name: /google/i }).first();
+const PENDING_KEY = "openrun.pending_account_type";
+const NEXT_KEY = "openrun:oauth-next";
+const PROVIDERS = ["google", "apple"] as const;
 
-test.describe("Google vendor rejection", () => {
-  test("signin: vendor error surfaces actionable toast and preserves next", async ({ page }) => {
-    await page.goto("/auth?next=%2Ffeed", { waitUntil: "domcontentloaded" });
-    await expect(googleButton(page)).toBeVisible();
+const providerButton = (page: Page, provider: "google" | "apple") =>
+  page.getByRole("button", { name: new RegExp(provider, "i") }).first();
 
-    await stubGoogleOAuth(page, {
-      error: { message: "failed to sign in with vendor" },
-      redirected: false,
+test.describe("OAuth vendor rejection", () => {
+  for (const provider of PROVIDERS) {
+    test(`${provider}: signin vendor error surfaces actionable toast and preserves next`, async ({
+      page,
+    }) => {
+      await page.goto("/auth?next=%2Ffeed", { waitUntil: "domcontentloaded" });
+      const button = providerButton(page, provider);
+      await expect(button).toBeVisible();
+
+      await stubOAuth(page, {
+        error: { message: "failed to sign in with vendor" },
+        redirected: false,
+      });
+
+      await button.click();
+
+      await expect(page.getByText(/rejected by the provider/i)).toBeVisible({ timeout: 5_000 });
+      await expect(page.getByText(/account setup choice is still saved/i)).toBeVisible();
+
+      await expect(page).toHaveURL(/\/auth\?next=%2Ffeed$/);
+
+      const stashed = await page.evaluate(
+        ([nextKey, providerKey]) => ({
+          next: window.sessionStorage.getItem(nextKey!),
+          provider: window.sessionStorage.getItem(providerKey!),
+        }),
+        [NEXT_KEY, "openrun:oauth-provider"] as const,
+      );
+      expect(stashed.next).toBe("/feed");
+      expect(stashed.provider).toBe(provider);
+
+      // Button re-enabled once the promise settled.
+      await expect(button).toBeEnabled();
     });
 
-    await googleButton(page).click();
+    test(`${provider}: signup vendor error preserves pending account type for onboarding`, async ({
+      page,
+    }) => {
+      await page.goto("/auth", { waitUntil: "domcontentloaded" });
 
-    await expect(page.getByText(/rejected by the provider/i)).toBeVisible({ timeout: 5_000 });
-    await expect(page.getByText(/sign in with your email and password/i)).toBeVisible();
+      // Switch to signup mode.
+      await page.getByRole("button", { name: /create( an)? account|sign ?up/i }).first().click();
 
-    await expect(page).toHaveURL(/\/auth\?next=%2Ffeed$/);
+      // Pick the "player" account type on the picker.
+      const playerCard = page
+        .getByRole("button", { name: /player/i })
+        .or(page.getByText(/^player$/i))
+        .first();
+      await playerCard.click();
 
-    const stashed = await page.evaluate(() =>
-      window.sessionStorage.getItem("openrun:oauth-next"),
-    );
-    expect(stashed).toBe("/feed");
+      // Advance to the form step (Continue button on the picker).
+      await page.getByRole("button", { name: /^continue$/i }).first().click();
 
-    // Button re-enabled once the promise settled.
-    await expect(googleButton(page)).toBeEnabled();
-  });
+      const button = providerButton(page, provider);
+      await expect(button).toBeVisible();
 
-  test("signup: vendor error preserves pending account type for onboarding", async ({ page }) => {
-    await page.goto("/auth", { waitUntil: "domcontentloaded" });
+      await stubOAuth(page, {
+        error: { message: "failed to sign in with vendor" },
+        redirected: false,
+      });
 
-    // Switch to signup mode.
-    await page.getByRole("button", { name: /create( an)? account|sign ?up/i }).first().click();
+      await button.click();
 
-    // Pick the "player" account type on the picker.
-    const playerCard = page
-      .getByRole("button", { name: /player/i })
-      .or(page.getByText(/^player$/i))
-      .first();
-    await playerCard.click();
+      await expect(page.getByText(/rejected by the provider/i)).toBeVisible({ timeout: 5_000 });
 
-    // Advance to the form step (Continue button on the picker).
-    await page.getByRole("button", { name: /^continue$/i }).first().click();
+      // Still on /auth, still in signup form (email field is present).
+      await expect(page).toHaveURL(/\/auth(?:\?.*)?$/);
+      await expect(page.getByLabel(/email/i).or(page.locator('input[type="email"]')).first()).toBeVisible();
 
-    // The signup form should now render a Google button.
-    await expect(googleButton(page)).toBeVisible();
-
-    await stubGoogleOAuth(page, {
-      error: { message: "failed to sign in with vendor" },
-      redirected: false,
+      const state = await page.evaluate(
+        ([pendingKey, providerKey]) => ({
+          pending: window.sessionStorage.getItem(pendingKey!),
+          provider: window.sessionStorage.getItem(providerKey!),
+        }),
+        [PENDING_KEY, "openrun:oauth-provider"] as const,
+      );
+      expect(state.pending).toBe("player");
+      expect(state.provider).toBe(provider);
     });
-
-    await googleButton(page).click();
-
-    await expect(page.getByText(/rejected by the provider/i)).toBeVisible({ timeout: 5_000 });
-
-    // Still on /auth, still in signup form (email field is present).
-    await expect(page).toHaveURL(/\/auth(?:\?.*)?$/);
-    await expect(page.getByLabel(/email/i).or(page.locator('input[type="email"]')).first()).toBeVisible();
-
-    const pendingType = await page.evaluate(() =>
-      window.localStorage.getItem("openrun:pending-account-type"),
-    );
-    expect(pendingType).toBe("player");
-  });
+  }
 
   test("negative control: non-vendor error uses plain toast", async ({ page }) => {
     await page.goto("/auth", { waitUntil: "domcontentloaded" });
-    await expect(googleButton(page)).toBeVisible();
+    const button = providerButton(page, "google");
+    await expect(button).toBeVisible();
 
-    await stubGoogleOAuth(page, {
+    await stubOAuth(page, {
       error: { message: "network unreachable" },
       redirected: false,
     });
 
-    await googleButton(page).click();
+    await button.click();
 
     await expect(page.getByText(/network unreachable/i)).toBeVisible({ timeout: 5_000 });
     await expect(page.getByText(/rejected by the provider/i)).toHaveCount(0);
