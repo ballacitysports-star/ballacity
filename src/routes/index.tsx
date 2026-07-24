@@ -9,6 +9,8 @@ import { AuthRedirectSkeleton } from "@/components/AuthRedirectSkeleton";
 import { useAuth } from "@/hooks/use-auth";
 import { readStoredSupabaseSession } from "@/lib/authgate-log";
 import { readLastVisited } from "@/lib/last-visited";
+import { isAccountType } from "@/lib/account-type";
+import { supabase } from "@/integrations/supabase/client";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -37,8 +39,21 @@ function Landing() {
 
   useEffect(() => {
     if (loading || !user) return;
-    const dest = readLastVisited() ?? "/feed";
-    router.navigate({ to: dest, replace: true });
+    let cancelled = false;
+    (async () => {
+      const { data } = await supabase
+        .from("profiles")
+        .select("account_type")
+        .eq("id", user.id)
+        .maybeSingle();
+      if (cancelled) return;
+      const t = (data as { account_type?: string } | null)?.account_type;
+      const dest = isAccountType(t) ? (readLastVisited() ?? "/feed") : "/onboarding/account-type";
+      router.navigate({ to: dest, replace: true });
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, [loading, user, router]);
 
   // Signed-in users (or those with a persisted session still hydrating)
