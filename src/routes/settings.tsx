@@ -362,10 +362,22 @@ function DeleteAccountButton() {
         <AlertDialogHeader>
           <AlertDialogTitle>Delete your account?</AlertDialogTitle>
           <AlertDialogDescription>
-            This permanently deletes your account and all associated data — profile, teams,
-            trainer/gym pages, games, messages, and follows. This action cannot be undone.
+            This action is permanent and cannot be undone. The following data will be
+            permanently removed:
           </AlertDialogDescription>
         </AlertDialogHeader>
+        <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-3">
+          <ul className="space-y-1.5 text-sm text-foreground">
+            <li className="flex gap-2"><span aria-hidden>•</span><span>Your profile, avatar, cover photo, and bio</span></li>
+            <li className="flex gap-2"><span aria-hidden>•</span><span>Teams, trainer profiles, and gym pages you own</span></li>
+            <li className="flex gap-2"><span aria-hidden>•</span><span>Games you've hosted and your participation history</span></li>
+            <li className="flex gap-2"><span aria-hidden>•</span><span>Messages, comments, posts, and reactions</span></li>
+            <li className="flex gap-2"><span aria-hidden>•</span><span>Followers, following, blocks, and reports</span></li>
+            <li className="flex gap-2"><span aria-hidden>•</span><span>Ratings, reviews, and training session requests</span></li>
+            <li className="flex gap-2"><span aria-hidden>•</span><span>Availability, preferences, and saved locations</span></li>
+            <li className="flex gap-2"><span aria-hidden>•</span><span>Login credentials and all connected sign-in methods</span></li>
+          </ul>
+        </div>
         <div className="space-y-2">
           <label className="text-xs text-muted-foreground">
             Type <span className="font-semibold text-foreground">DELETE</span> to confirm
@@ -384,7 +396,7 @@ function DeleteAccountButton() {
             onClick={(e) => { e.preventDefault(); onDelete(); }}
             className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
           >
-            {busy ? "Deleting…" : "Delete account"}
+            {busy ? "Deleting…" : "Permanently delete account"}
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>
