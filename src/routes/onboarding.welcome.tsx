@@ -128,7 +128,7 @@ function PlayerWelcome() {
     if (!user || busy) return;
     setBusy(true);
     try {
-      const patch: Record<string, unknown> = {};
+      const patch: { sport?: string; skill_levels?: Record<string, string> } = {};
       if (sport) patch.sport = sport;
       if (sport && level) patch.skill_levels = { [sport]: level };
       if (Object.keys(patch).length) {
