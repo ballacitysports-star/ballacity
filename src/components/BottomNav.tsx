@@ -1,5 +1,5 @@
 import { Link, useLocation } from "@tanstack/react-router";
-import { Home, Search, PlusSquare, Heart } from "lucide-react";
+import { Home, Users, PlusSquare, Heart } from "lucide-react";
 import { MyAvatar } from "@/components/UserAvatar";
 
 type NavItem = {
@@ -24,10 +24,11 @@ const items: NavItem[] = [
     match: (p) => p === "/feed" || p === "/" || p === "/pickup",
   },
   {
-    to: "/discover",
-    icon: Search,
-    label: "Search",
+    to: "/available-players",
+    icon: Users,
+    label: "Available Players",
     match: (p) =>
+      p.startsWith("/available-players") ||
       p.startsWith("/discover") ||
       p.startsWith("/players") ||
       p.startsWith("/teams") ||
@@ -86,7 +87,7 @@ export function BottomNav() {
                       : "text-muted-foreground"
                 }`}
                 strokeWidth={iconStroke}
-                fill={active && !it.gradient && it.label !== "Search" ? "currentColor" : "none"}
+                fill={active && !it.gradient ? "currentColor" : "none"}
               />
             ) : null}
         <span className="sr-only">{it.label}</span>
