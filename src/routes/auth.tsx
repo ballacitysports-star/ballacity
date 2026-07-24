@@ -90,12 +90,21 @@ function AuthPage() {
     setBusy(true);
     try {
       if (mode === "signup") {
+        if (!accountType) {
+          toast.error("Pick an account type first.");
+          setSignupStep("type");
+          return;
+        }
+        setPendingAccountType(accountType);
         const { data, error } = await supabase.auth.signUp({
           email,
           password,
           options: {
             emailRedirectTo: next ? `${window.location.origin}${next}` : window.location.origin,
-            data: { display_name: displayName || email.split("@")[0] },
+            data: {
+              display_name: displayName || email.split("@")[0],
+              account_type: accountType,
+            },
           },
         });
         if (error) throw error;
