@@ -1,44 +1,42 @@
-## Goal
+## Problem
 
-Lock each auth user to exactly one account type (player, team, trainer, or gym) chosen at signup. Remove every path that lets a signed-in user create or switch to a different type on the same account. To use another type, users must register a separate account with a different email.
+When a new user signs in with Google from the "Sign in" tab (or the "Sign up" tab without first picking a type), no `pendingAccountType` is stashed before the OAuth redirect. On return, the `handle_new_user` DB trigger creates the profile with `account_type = 'player'` by default, so the app treats them as an existing player and never shows the account-type picker.
 
-## Current State (verified)
+Root cause (verified in `src/routes/auth.tsx` L172-174 and the `handle_new_user` function in db-functions): the picker only runs pre-OAuth in signup mode with an explicit selection; the trigger silently defaults everyone else to `player`.
 
-- `public.profiles.account_type` is set once by `handle_new_user` from signup metadata.
-- `change_account_type(_new_type)` RPC exists and deletes linked rows to allow switching — this is the main leak.
-- `/onboarding/account-type` route lets a signed-in user re-pick and calls `change_account_type`.
-- `AccountTypePicker` is used both at signup and post-signup.
-- `enforce_account_type_lock` trigger already blocks direct `account_type` updates when a linked profile exists, but the RPC is SECURITY DEFINER and bypasses it.
-- Creation routes exist for each type: `/teams/create`, `/trainers/create`, `/orgs/create`. DB triggers (`enforce_team_owner_account_type`, `enforce_org_owner_account_type`) already reject creating a linked profile whose kind doesn't match `account_type`, so the DB is already safe — but the UI still exposes those routes to mismatched users.
+## Fix
 
-## Changes
+Make account type "unset until the user picks it" and gate the app on that.
 
-### 1. Database migration
-- Drop the `change_account_type(text)` RPC entirely. No replacement.
-- Keep existing triggers (`enforce_account_type_lock`, `enforce_team/org_owner_account_type`, `enforce_single_linked_team/org`) — they already enforce the rule server-side.
+### 1. DB migration
+- Update `handle_new_user()` so `account_type` is set only when `raw_user_meta_data->>'account_type'` is one of `player|team|trainer|gym`; otherwise insert `NULL`.
+- Keep the `enforce_account_type_lock` trigger — still valid (nothing linked yet when null).
+- No changes to grants/RLS.
 
-### 2. Remove the switch-type route
-- Delete `src/routes/onboarding.account-type.tsx`.
-- `src/routes/__root.tsx`: remove the redirect that sends users missing `account_type` to `/onboarding/account-type`. Account type is now always set at signup (metadata → `handle_new_user`), so this gate is obsolete. If a legacy account somehow lacks it, fall back to sign-out with a message rather than offering a picker.
+### 2. New route `src/routes/onboarding.account-type.tsx`
+- Public-ish route reachable only when authenticated with a null `account_type`.
+- Renders the existing `AccountTypePicker` (same 4-card UI used in signup).
+- On confirm: `UPDATE profiles SET account_type = <choice> WHERE id = auth.uid()`, then navigate:
+  - `player` → `/onboarding/welcome`
+  - `team` → `/teams/create`
+  - `trainer` → `/trainers/create`
+  - `gym` → `/orgs/create`
+- Cannot be dismissed; no back-to-app link. Sign-out button available.
 
-### 3. Signup is the only place to pick
-- `src/routes/auth.tsx`: keep the `AccountTypePicker` on the signup form. Confirm it passes `account_type` in `signUp` metadata (already the case). Add copy under the picker: "This is permanent. To use a different account type, sign up with a different email."
-- No picker on sign-in.
+### 3. `src/routes/__root.tsx` gate change (L389-411)
+Replace the "sign out on missing type" branch with:
+- If `account_type` is null/invalid AND current path is not `/onboarding/account-type` → `router.navigate({ to: "/onboarding/account-type", replace: true })`.
+- Leave the existing pending-type persistence path (L476-499) intact so users who did pick a type pre-OAuth skip the picker automatically.
 
-### 4. Gate creation routes to matching type
-- `/teams/create`, `/trainers/create`, `/orgs/create`: on mount, read `useAccountType()`. If the current user's `account_type` doesn't match the route's kind, render a blocked-state card ("Your account is a {type}. Team/Trainer/Gym profiles require a separate account.") with a link back to `/profile` — do not render the wizard. Also skip the auto-redirect from `onboarding.welcome` for mismatched types (shouldn't happen post-cleanup, but defensive).
+### 4. Add `/onboarding/account-type` to the auth-gate allow list
+The route must render for signed-in users but not require an existing `account_type`. Add it to whatever guard exposes `isPublic` / gate skip list in `__root.tsx` so the null-type redirect doesn't loop.
 
-### 5. Remove entry points from Settings / Profile
-- `src/routes/settings.tsx`: remove any "Change account type" link/section if present. Keep "My organizations" only for gym accounts (already the case via ownership).
-- Audit `src/routes/_tabs.profile.tsx` and `src/routes/_tabs.create.tsx` for any "switch type" affordance and remove.
+## Result
+- Existing users with a real `account_type` are unaffected.
+- New Google sign-ins land on the account-type wizard, then the correct create/onboarding screen.
+- Email signups still pre-select the type (pending key path) and skip the wizard.
 
-### 6. Copy update on delete-account modal
-- Clarify that deleting is the only way to free the email for a different account type.
-
-## Out of scope
-- Cross-account linking / "switch profile" UX. Users manage multiple accounts by signing out and signing in with a different email.
-- Data migration for existing users who already switched via the old RPC — their current `account_type` stands.
-
-## Technical notes
-- Dropping the RPC is safe: after the UI cleanup, nothing else calls it. Grep confirms only `onboarding.account-type.tsx` invokes `supabase.rpc("change_account_type", …)`.
-- DB triggers make the guarantee authoritative regardless of client bugs.
+## Files touched
+- New: Supabase migration updating `handle_new_user`.
+- New: `src/routes/onboarding.account-type.tsx`.
+- Edit: `src/routes/__root.tsx` (redirect instead of sign-out; allow the new route through the gate).
