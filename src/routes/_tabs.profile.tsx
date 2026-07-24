@@ -12,7 +12,13 @@ import {
   Star,
   Crown,
   Users,
+  Grid3x3,
+  Bookmark,
+  Inbox,
+  UserSquare2,
 } from "lucide-react";
+import { useFollow } from "@/lib/follows";
+import { FollowSheet } from "@/components/FollowSheet";
 import { ME, GAMES, type Game } from "@/lib/sample-data";
 import { GameCard } from "@/components/GameCard";
 import { RequestGameCard } from "@/components/RequestGameCard";
