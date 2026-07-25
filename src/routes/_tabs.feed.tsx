@@ -172,7 +172,7 @@ function Feed() {
   // chip toggles that sport in/out of preferredSports; "All sports" clears.
   const chipSelected: string[] = prefs.preferredSports;
 
-  // Recent posts from teams & clubs (public read). Filtered by sport when the
+  // Recent posts from teams (public read). Filtered by sport when the
   // chip row has exactly one sport selected.
   const fetchRecentTeamPosts = useServerFn(listRecentTeamPosts);
   const TEAM_POSTS_PAGE = 10;
