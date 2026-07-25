@@ -304,7 +304,7 @@ function MyOrgsSection() {
                 <AlertDialogHeader>
                   <AlertDialogTitle>Delete {o.name}?</AlertDialogTitle>
                   <AlertDialogDescription>
-                    This permanently removes the organization and its memberships. This action
+                    This permanently removes the gym and its memberships. This action
                     cannot be undone.
                   </AlertDialogDescription>
                 </AlertDialogHeader>
