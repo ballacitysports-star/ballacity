@@ -244,6 +244,36 @@ function SettingsHubPage() {
   );
 }
 
+function OnboardingDetailsSection() {
+  const { accountType, loading } = useAccountType();
+  if (loading || !accountType) return null;
+  const meta = ACCOUNT_TYPE_META[accountType];
+  return (
+    <section>
+      <h2 className="px-1 pb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+        Onboarding details
+      </h2>
+      <div className="overflow-hidden rounded-xl border bg-card">
+        <div className="flex items-center gap-3 px-4 py-3">
+          <span className="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-muted text-lg" aria-hidden>
+            {meta.emoji}
+          </span>
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-1.5">
+              <span className="text-sm font-semibold">{meta.label} account</span>
+              <BadgeCheck className="h-4 w-4 text-primary" aria-hidden />
+            </div>
+            <p className="text-xs text-muted-foreground">{meta.blurb}</p>
+          </div>
+        </div>
+        <div className="border-t px-4 py-2.5 text-xs text-muted-foreground">
+          Your account type is locked to <span className="font-medium text-foreground">{meta.label}</span>. To use OpenRun as a different type, create a separate account.
+        </div>
+      </div>
+    </section>
+  );
+}
+
 function MyOrgsSection() {
   const qc = useQueryClient();
   const { user } = useAuth();
