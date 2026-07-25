@@ -552,7 +552,7 @@ function Feed() {
         <section className="mb-6">
           <div className="flex items-center justify-between mb-2">
             <h2 className="font-display text-sm font-bold uppercase tracking-wider text-muted-foreground">
-              From teams &amp; clubs
+              From teams
             </h2>
             <Link to="/teams" className="text-xs font-semibold text-lime">
               See all

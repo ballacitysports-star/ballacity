@@ -48,8 +48,8 @@ const NEXT_STEPS: Record<Exclude<AccountType, "player">, { title: string; steps:
     cta: "Create gym profile",
     goto: "/orgs/create",
     steps: [
-      { title: "Facility profile", body: "Name, address, and photos so members can find you." },
-      { title: "Invite trainers", body: "Link the coaches who run sessions at your facility." },
+      { title: "Gym profile", body: "Name, address, and photos so members can find you." },
+      { title: "Invite trainers", body: "Link the trainers who run sessions at your gym." },
       { title: "Publish programs", body: "Post clinics, camps, and open runs to your community." },
     ],
   },

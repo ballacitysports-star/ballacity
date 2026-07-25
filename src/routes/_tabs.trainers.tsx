@@ -525,7 +525,7 @@ function TrainersPage() {
                 )}
 
                 {(orgsListQuery.data ?? []).length > 0 && (
-                  <FilterSection label="Organization">
+                  <FilterSection label="Gym">
                     <div className="flex flex-wrap gap-2">
                       <button
                         onClick={() => setOrgId("")}

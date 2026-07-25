@@ -601,7 +601,7 @@ export function CreateTrainerWizard() {
               </Section>
 
               <Section
-                title="Organization / Gym (optional)"
+                title="Gym (optional)"
                 hint="Attach a gym or academy. Pick one to request to join, or add a new one you own."
               >
                 {draft.orgChoice.mode === "existing" && draft.orgChoice.orgId ? (

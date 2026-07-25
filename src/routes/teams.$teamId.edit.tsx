@@ -784,7 +784,7 @@ export function EditOrgScreen({ org }: { org: Org }) {
               </Section>
 
               <Section
-                title="Organization / Gym (optional)"
+                title="Gym (optional)"
                 hint="Attach a gym or academy. Pick one to request to join, or add a new one you own."
               >
                 {orgChoice.mode === "existing" && orgChoice.orgId ? (
