@@ -252,7 +252,7 @@ function MyOrgsSection() {
   const del = useMutation({
     mutationFn: (id: string) => deleteTrainerOrg({ data: { id } }),
     onSuccess: () => {
-      toast.success("Organization deleted");
+      toast.success("Gym deleted");
       qc.invalidateQueries({ queryKey: ["my-orgs"] });
       qc.invalidateQueries({ queryKey: ["trainer-org-memberships"] });
       qc.invalidateQueries({ queryKey: ["trainer-org"] });
@@ -266,7 +266,7 @@ function MyOrgsSection() {
   return (
     <section>
       <h2 className="px-1 pb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-        My organizations
+        My gyms
       </h2>
       <ul className="overflow-hidden rounded-xl border bg-card divide-y">
         {orgs.map((o) => (
