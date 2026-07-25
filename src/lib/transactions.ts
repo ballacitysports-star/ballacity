@@ -44,7 +44,7 @@ const seeded: ClosedTxn[] = [
   {
     id: "txn-tr-1",
     counterpartyId: "c-jordan-kim",
-    counterpartyName: "Coach Jordan Kim",
+    counterpartyName: "Trainer Jordan Kim",
     kind: "training",
     context: "Spring 5K Block · Week 6",
     date: ago(8),
