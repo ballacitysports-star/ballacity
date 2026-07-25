@@ -12,6 +12,62 @@ export type OnboardingStatus = {
 };
 
 /**
+ * Pure decision function — mirrors the routing rules used by the server fn
+ * below. Extracted so unit tests can exercise every identity / metadata /
+ * claims combination without a live backend.
+ *
+ *  - An identity whose `provider` is in `SOCIAL_PROVIDERS` wins first:
+ *    sets `isSocial: true` and `provider`.
+ *  - Otherwise falls back to `appMetadataProvider` for `provider`; that path
+ *    only flips `isSocial` when the metadata provider is itself social.
+ *  - When `adminLookupFailed` is true, identities/appMetadata are ignored
+ *    and `claimsProvider` is used (matching the catch branch in the handler).
+ *  - `needsOnboarding` is true unless `accountType` is one of ALLOWED_TYPES.
+ */
+export function resolveOnboardingStatus(input: {
+  accountType: string | null | undefined;
+  identities?: Array<{ provider: string }> | null;
+  appMetadataProvider?: string | null;
+  claimsProvider?: string | null;
+  adminLookupFailed?: boolean;
+}): OnboardingStatus {
+  const accountType =
+    typeof input.accountType === "string" && ALLOWED_TYPES.has(input.accountType)
+      ? input.accountType
+      : null;
+
+  let provider: string | null = null;
+  let isSocial = false;
+
+  if (input.adminLookupFailed) {
+    const cp = input.claimsProvider;
+    if (typeof cp === "string") {
+      provider = cp;
+      if (SOCIAL_PROVIDERS.has(cp)) isSocial = true;
+    }
+  } else {
+    for (const identity of input.identities ?? []) {
+      if (SOCIAL_PROVIDERS.has(identity.provider)) {
+        isSocial = true;
+        provider = identity.provider;
+        break;
+      }
+    }
+    if (!provider && typeof input.appMetadataProvider === "string") {
+      provider = input.appMetadataProvider;
+      if (SOCIAL_PROVIDERS.has(input.appMetadataProvider)) isSocial = true;
+    }
+  }
+
+  return {
+    needsOnboarding: accountType === null,
+    isSocial,
+    provider,
+    accountType,
+  };
+}
+
+/**
  * Authoritative server-side onboarding guard.
  *
  * Even if the browser session lost `app_metadata.provider` (some OAuth return
@@ -26,7 +82,6 @@ export const getOnboardingStatus = createServerFn({ method: "GET" })
   .handler(async ({ context }): Promise<OnboardingStatus> => {
     const { userId, supabase } = context;
 
-    // Read the profile row under the user's own RLS.
     const { data: profile } = await supabase
       .from("profiles")
       .select("account_type")
@@ -35,43 +90,34 @@ export const getOnboardingStatus = createServerFn({ method: "GET" })
     const accountType =
       (profile as { account_type?: string | null } | null)?.account_type ?? null;
 
-    // Detect social identities via the admin API — this is the authoritative
-    // source and does not depend on `app_metadata.provider` being present in
-    // the current session's JWT.
-    let provider: string | null = null;
-    let isSocial = false;
+    let identities: Array<{ provider: string }> = [];
+    let appMetadataProvider: string | null = null;
+    let adminLookupFailed = false;
     try {
       const { supabaseAdmin } = await import(
         "@/integrations/supabase/client.server"
       );
       const { data } = await supabaseAdmin.auth.admin.getUserById(userId);
-      const identities = data?.user?.identities ?? [];
-      for (const identity of identities) {
-        const p = identity.provider;
-        if (SOCIAL_PROVIDERS.has(p)) {
-          isSocial = true;
-          provider = p;
-          break;
-        }
-      }
-      if (!provider) {
-        const meta = data?.user?.app_metadata?.provider;
-        if (typeof meta === "string") provider = meta;
-      }
+      identities = (data?.user?.identities ?? []).map((i) => ({
+        provider: i.provider,
+      }));
+      const meta = data?.user?.app_metadata?.provider;
+      if (typeof meta === "string") appMetadataProvider = meta;
     } catch {
-      // If the admin lookup fails for any reason, fall back to session claims.
-      const claimProvider = context.claims?.app_metadata?.provider;
-      if (typeof claimProvider === "string") {
-        provider = claimProvider;
-        if (SOCIAL_PROVIDERS.has(claimProvider)) isSocial = true;
-      }
+      adminLookupFailed = true;
     }
 
-    const hasType = typeof accountType === "string" && ALLOWED_TYPES.has(accountType);
-    return {
-      needsOnboarding: !hasType,
-      isSocial,
-      provider,
-      accountType: hasType ? accountType : null,
-    };
+    const claimsProvider =
+      typeof context.claims?.app_metadata?.provider === "string"
+        ? (context.claims.app_metadata.provider as string)
+        : null;
+
+    return resolveOnboardingStatus({
+      accountType,
+      identities,
+      appMetadataProvider,
+      claimsProvider,
+      adminLookupFailed,
+    });
   });
+
