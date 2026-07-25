@@ -47,7 +47,7 @@ export function TrainerOrgSection({ trainerId }: Props) {
     <div className="rounded-2xl border border-border/60 bg-surface p-4 space-y-3">
       <div className="flex items-center gap-2">
         <Building2 className="h-4 w-4 text-lime" />
-        <h3 className="text-sm font-semibold">Organization</h3>
+        <h3 className="text-sm font-semibold">Gym</h3>
       </div>
 
       {current ? (
@@ -58,7 +58,7 @@ export function TrainerOrgSection({ trainerId }: Props) {
               params={{ orgId: current.org_id }}
               className="text-sm font-medium hover:underline truncate block"
             >
-              {current.org?.name ?? "Organization"}
+              {current.org?.name ?? "Gym"}
               {current.org?.verified ? " ✓" : ""}
             </Link>
             <div className="text-[11px] text-muted-foreground">
@@ -237,7 +237,7 @@ function CreateForm({ trainerId, onDone }: { trainerId: string; onDone: () => vo
 
   return (
     <div className="space-y-2">
-      <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Organization name" className="h-9" />
+      <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Gym name" className="h-9" />
       <Input
         value={handle}
         onChange={(e) => setHandle(e.target.value.toLowerCase().replace(/[^a-z0-9_-]/g, ""))}
@@ -260,7 +260,7 @@ function CreateForm({ trainerId, onDone }: { trainerId: string; onDone: () => vo
             await createTrainerOrg({
               data: { name, handle, trainerId, city: city || undefined, bio: bio || undefined },
             });
-            toast.success("Organization created");
+            toast.success("Gym created");
             onDone();
           } catch (e) {
             toast.error(e instanceof Error ? e.message : "Failed to create");

@@ -634,7 +634,7 @@ export const ORGS: Org[] = [
   {
     id: "c-jordan-kim",
     kind: "coach",
-    name: "Coach Jordan Kim",
+    name: "Trainer Jordan Kim",
     handle: "@coachjordan",
     tagline: "USATF L2 endurance coach · marathon · 5K specialist",
     city: "Williamsburg, NY",
@@ -693,7 +693,7 @@ export const ORGS: Org[] = [
   {
     id: "c-priya-n",
     kind: "coach",
-    name: "Coach Priya Nair",
+    name: "Trainer Priya Nair",
     handle: "@coachpriya",
     tagline: "USAV-certified volleyball coach · setters & DS specialist",
     city: "Chelsea, NY",
