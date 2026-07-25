@@ -313,7 +313,7 @@ export function CreateOrgWizard({ kind }: { kind: OrgKind }) {
                 geo: orgChoice.geo ?? undefined,
               },
             });
-            toast.success("Organization created");
+            toast.success("Gym created");
 
           } else if (orgChoice.mode === "join") {
             await requestToJoinTrainerOrg({
@@ -1227,7 +1227,7 @@ export function CreateOrgWizard({ kind }: { kind: OrgKind }) {
               </Section>
 
               {isCoach && (
-                <Section title="Organization (optional)">
+                <Section title="Gym (optional)">
                   <div className="flex gap-2">
                     {(["independent", "join", "create"] as const).map((m) => {
                       const active = orgChoice.mode === m;
@@ -1260,7 +1260,7 @@ export function CreateOrgWizard({ kind }: { kind: OrgKind }) {
                       <input
                         value={orgSearch}
                         onChange={(e) => setOrgSearch(e.target.value)}
-                        placeholder="Search organizations…"
+                        placeholder="Search gyms…"
                         className="w-full rounded-2xl border border-border bg-surface px-4 py-3 text-sm outline-none focus:border-lime"
                       />
                       <div className="max-h-56 overflow-auto space-y-1">
@@ -1293,12 +1293,12 @@ export function CreateOrgWizard({ kind }: { kind: OrgKind }) {
                         })}
                         {orgSearchResults.data && orgSearchResults.data.length === 0 && (
                           <div className="text-[11px] text-muted-foreground px-2 py-3">
-                            No orgs found. Try a different search or create a new one.
+                            No gyms found. Try a different search or create a new one.
                           </div>
                         )}
                       </div>
                       <p className="text-[11px] text-muted-foreground">
-                        A join request will be sent to the org after your profile is published.
+                        A join request will be sent to the gym after your profile is published.
                       </p>
                     </div>
                   )}
@@ -1310,7 +1310,7 @@ export function CreateOrgWizard({ kind }: { kind: OrgKind }) {
                         onChange={(e) =>
                           setOrgChoice({ ...orgChoice, name: e.target.value })
                         }
-                        placeholder="Organization name"
+                        placeholder="Gym name"
                         className="w-full rounded-2xl border border-border bg-surface px-4 py-3 text-sm outline-none focus:border-lime"
                       />
                       <div className="flex items-center gap-2 rounded-2xl border border-border bg-surface px-4 py-3 focus-within:border-lime">
