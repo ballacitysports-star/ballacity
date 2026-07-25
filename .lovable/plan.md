@@ -1,68 +1,49 @@
 ## Goal
 
-Lock in the routing contract for `getOnboardingStatus` (`src/lib/onboarding.functions.ts`) with tests that exercise the three cases the user called out plus the surrounding branches, so onboarding routing never silently regresses.
+Make profile-type wording consistent everywhere. Today the app mixes "Team", "Club", "Trainer", "Coach", "Gym", "Facility", "Organization" without rules — the account picker uses combined labels ("Team / Club"), while other screens say "Coach", "Organization", or "Club" independently. Users see different words for the same thing depending on where they are.
 
-## Approach
+## Canonical vocabulary
 
-`getOnboardingStatus` is a `createServerFn` handler that mixes three inputs: the `profiles.account_type` row read under RLS, the admin API `identities` list, and the session `claims.app_metadata.provider` fallback. That combination is not cleanly testable end-to-end without a signed-in user + admin key, so extract the decision logic into a pure helper and test that directly. The `createServerFn` handler becomes a thin adapter that fetches inputs and delegates.
+Adopt one label per account type and use it everywhere the type is named to a user:
 
-### 1. Refactor `src/lib/onboarding.functions.ts`
+| Type    | Noun (singular) | Plural  | Verb / role phrasing              |
+| ------- | --------------- | ------- | --------------------------------- |
+| player  | Player          | Players | "Play", "Join a game"             |
+| team    | Team            | Teams   | "Host as team", "Team roster"     |
+| trainer | Trainer         | Trainers| "Book a trainer", "Trainer profile"|
+| gym     | Gym             | Gyms    | "Manage gym", "Gym members"       |
 
-Extract a pure function next to the server fn (same file, exported):
+Rules:
+- Drop the slash pairs ("Team / Club", "Trainer / Coach", "Gym / Facility"). The account picker becomes single-word labels with a one-line blurb underneath.
+- "Club" → "Team" everywhere user-facing.
+- "Coach" → "Trainer" everywhere user-facing (except where "Head Coach" is a job title inside a team roster — that's a role, not a profile type, keep it).
+- "Facility" → "Gym" in profile-type contexts. In review-category labels like "Facility Quality" (which describes the venue, not the profile) keep as-is.
+- "Organization" stays only for the technical trainer-org grouping feature (multi-trainer gyms). Its user-facing label becomes "Gym" wherever it names the account type, and stays "Organization" only in the internal org-membership UI where trainers join a gym.
 
-```ts
-export function resolveOnboardingStatus(input: {
-  accountType: string | null | undefined;
-  identities: Array<{ provider: string }> | null | undefined;
-  appMetadataProvider: string | null | undefined;
-  claimsProvider: string | null | undefined;
-  adminLookupFailed?: boolean;
-}): OnboardingStatus
-```
+## Scope of edits (user-facing strings only)
 
-Rules mirrored exactly from the current handler:
-- Identity match against `SOCIAL_PROVIDERS` wins first — sets `isSocial: true` and `provider`.
-- Otherwise fall back to `appMetadataProvider` (string only) for `provider`, `isSocial` stays false unless it is also a social provider.
-- When `adminLookupFailed`, ignore identities/appMetadata and use `claimsProvider`: set `provider`, and `isSocial` when it's in `SOCIAL_PROVIDERS`.
-- `needsOnboarding = !(accountType is one of ALLOWED_TYPES)`.
-- Returned `accountType` is the valid type or `null`.
+1. `src/lib/account-type.ts` — update `ACCOUNT_TYPE_META` labels and blurbs to the canonical vocabulary; add optional `plural` and `verb` fields so callers can render consistent copy from one source.
+2. `src/routes/onboarding.account-type.tsx`, `src/components/AccountTypePicker.tsx`, `src/components/AccountTypeGate.tsx` — read from the updated meta; no bespoke labels.
+3. Team-side surfaces (`src/routes/teams.*`, `TeamCoverUploader`, `CreatePostSheet` team copy, `_tabs.teams.tsx`, filter labels) — replace "Club" with "Team".
+4. Trainer-side surfaces (`src/routes/trainers.*`, `create/CreateTrainerWizard.tsx`, `TrainerActions`, `TrainerProfileChecklist`, `TrainerOrgSection`, review-flow labels for trainers) — replace user-facing "Coach" with "Trainer"; keep "Head Coach" only where it's a roster job title.
+5. Gym-side surfaces (`src/routes/orgs.*`, `OrgForm`, `OrgCard`, `CreateOrgWizard`, settings "My organizations") — where the label names the account type, use "Gym"; keep "Organization" only in the trainer→gym membership UI copy where it refers to the linkage feature, not the profile type.
+6. Feed/discover copy (`_tabs.feed.tsx`, `_tabs.discover.tsx`, filter chips, empty states) — normalize headings like "From teams & clubs" → "From teams", "Coaches" → "Trainers", "Facilities" → "Gyms".
+7. Host-selection UI (`_tabs.create.tsx` "Host as", `EditGameModal` host picker) — use "Team" and "Gym"/"Trainer" verbatim.
+8. Settings and profile chips already using `ACCOUNT_TYPE_META.label` inherit the new wording automatically.
 
-The handler is updated to call `resolveOnboardingStatus` with fetched inputs; no behavior change.
+## Out of scope
 
-### 2. Add `src/lib/onboarding-status.test.ts` (vitest, pure — no backend, no skip)
-
-Cases the user asked for, plus the natural neighbors so the matrix is complete:
-
-1. **Missing `app_metadata.provider`, identity present (google)** → `isSocial: true`, `provider: "google"`, `needsOnboarding: true` when accountType null.
-2. **Missing `app_metadata.provider`, identity present (apple)** → same shape with `provider: "apple"`.
-3. **Identity present but non-social (e.g. `email`)**, no metadata → `isSocial: false`, `provider: null`.
-4. **Identity missing, `app_metadata.provider = "google"`** → `isSocial: true`, `provider: "google"` (populated from metadata fallback).
-5. **Identity missing, `app_metadata.provider = "email"`** → `isSocial: false`, `provider: "email"`.
-6. **Identity missing, no metadata** → `isSocial: false`, `provider: null`.
-7. **Admin lookup failed, `claimsProvider = "google"`** → `isSocial: true`, `provider: "google"` (identities ignored).
-8. **Admin lookup failed, no claims** → `isSocial: false`, `provider: null`.
-9. **`accountType` valid (`"player"`)** → `needsOnboarding: false`, `accountType: "player"` regardless of identity.
-10. **`accountType` invalid (`"admin"`)** → `needsOnboarding: true`, `accountType: null`.
-11. **Multiple identities, first non-social + second social** → picks the social one, `isSocial: true`.
-
-Each test asserts the full `OnboardingStatus` object shape to catch drift on any field.
-
-### 3. Add `src/lib/onboarding.integration.test.ts` (real backend, auto-skips)
-
-Follows the pattern in `src/lib/invite-deeplink.integration.test.ts`: skips when `VITE_SUPABASE_URL` / `VITE_SUPABASE_PUBLISHABLE_KEY` are absent, uses `TEST_ACCOUNTS` to sign in, and invokes the server fn via `useServerFn` isn't available in Node — instead directly call the server-fn stub over `fetch` is blocked by the RPC protocol. So this file will only:
-- Sign in as the seeded player fixture (which has `account_type = "player"` and email provider).
-- Assert `resolveOnboardingStatus` returns `needsOnboarding: false, isSocial: false` for that shape when fed the real profile row + a synthetic `identities: [{provider:"email"}]` list.
-- Confirms the pure helper's assumptions match a real profile row (defensive against schema drift in `profiles.account_type`).
-
-Full end-to-end coverage of the `createServerFn` handler stays in the existing Playwright specs (`e2e/oauth-missing-provider-metadata.spec.ts`, `e2e/oauth-new-user-onboarding.spec.ts`) which already exercise the wire behavior via the browser.
-
-## Files
-
-- `src/lib/onboarding.functions.ts` — extract `resolveOnboardingStatus`, keep handler wiring.
-- `src/lib/onboarding-status.test.ts` — new, ~11 pure cases.
-- `src/lib/onboarding.integration.test.ts` — new, backend-guarded schema check.
+- Database column names, enum values (`team`, `trainer`, `gym`, `player` stay).
+- Route paths (`/teams`, `/trainers`, `/orgs`) stay — no navigation breakage.
+- Review category labels that describe the venue itself ("Facility Quality") not the profile type.
+- Job-title role strings inside team rosters ("Head Coach", "Player-Coach").
+- Any layout, color, or component-shape changes.
 
 ## Verification
 
-- `bunx vitest run src/lib/onboarding-status.test.ts src/lib/onboarding.integration.test.ts`
-- Existing OAuth E2E specs continue to pass unchanged (no behavior change in the handler).
+- Grep for the retired phrases ("/ Club", "/ Coach", "/ Facility", user-facing "Club", user-facing "Coach", "Facilities") and confirm remaining hits fall into an allow-list (role titles, review categories, technical org linkage).
+- Manual pass over: account picker, onboarding, `/settings`, `/profile`, `/teams`, `/trainers`, `/orgs`, feed filter chips, create-game "Host as", edit-game host picker.
+
+## Files touched
+
+`src/lib/account-type.ts` plus targeted string replacements in the components and routes listed above. No new files, no schema, no route changes.
