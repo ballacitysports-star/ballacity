@@ -269,6 +269,24 @@ function OnboardingDetailsSection() {
         <div className="border-t px-4 py-2.5 text-xs text-muted-foreground">
           Your account type is locked to <span className="font-medium text-foreground">{meta.label}</span>. To use OpenRun as a different type, create a separate account.
         </div>
+        <Link
+          to="/onboarding/welcome"
+          search={{ type: accountType }}
+          className="flex items-center gap-3 border-t px-4 py-3 hover:bg-muted/50 active:bg-muted"
+        >
+          <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-muted">
+            <Pencil className="h-4 w-4" />
+          </span>
+          <span className="min-w-0 flex-1">
+            <span className="block truncate text-sm font-medium">Edit onboarding details</span>
+            <span className="block truncate text-xs text-muted-foreground">
+              {accountType === "player"
+                ? "Update your sport, level, location, and radius"
+                : `Revisit your ${meta.label.toLowerCase()} setup steps`}
+            </span>
+          </span>
+          <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
+        </Link>
       </div>
     </section>
   );

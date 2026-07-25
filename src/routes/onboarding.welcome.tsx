@@ -202,7 +202,43 @@ function PlayerWelcome() {
   const [level, setLevel] = useState<string | null>(null);
   const [radius, setRadius] = useState<number>(15);
   const [status, setStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
+  const [prefilled, setPrefilled] = useState(false);
   const lastRefreshRef = useRef<string>("");
+
+  // Prefill from existing profile + saved radius so returning users edit rather than re-enter.
+  useEffect(() => {
+    if (!user || prefilled) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const { data } = await supabase
+          .from("profiles")
+          .select("sport, skill_levels")
+          .eq("id", user.id)
+          .maybeSingle();
+        if (cancelled) return;
+        const row = data as { sport?: string | null; skill_levels?: Record<string, string> | null } | null;
+        const currentSport = row?.sport && SPORTS.some((s) => s.name === row.sport) ? (row.sport as Sport) : null;
+        if (currentSport) {
+          setSport(currentSport);
+          const lv = row?.skill_levels?.[currentSport];
+          if (lv) setLevel(lv);
+        }
+      } catch {
+        /* ignore */
+      }
+      try {
+        const r = Number(localStorage.getItem("openrun.default_radius_km"));
+        if (Number.isFinite(r) && r > 0) setRadius(r);
+      } catch {
+        /* ignore */
+      }
+      setPrefilled(true);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [user, prefilled]);
 
   // Location permission state
   type GeoState =
