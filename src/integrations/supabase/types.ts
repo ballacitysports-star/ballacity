@@ -1962,6 +1962,7 @@ export type Database = {
         Args: { _game_id: string; _user_id: string }
         Returns: boolean
       }
+      is_org_member: { Args: { _org: string; _user: string }; Returns: boolean }
       is_trainer_org_admin: {
         Args: { _org: string; _user: string }
         Returns: boolean
