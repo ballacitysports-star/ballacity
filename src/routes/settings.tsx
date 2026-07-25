@@ -191,6 +191,8 @@ function SettingsHubPage() {
           </div>
         </section>
 
+        <OnboardingDetailsSection />
+
         <MyOrgsSection />
 
         {SECTIONS.map((section) => (
