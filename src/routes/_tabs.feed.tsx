@@ -172,7 +172,7 @@ function Feed() {
   // chip toggles that sport in/out of preferredSports; "All sports" clears.
   const chipSelected: string[] = prefs.preferredSports;
 
-  // Recent posts from teams & clubs (public read). Filtered by sport when the
+  // Recent posts from teams (public read). Filtered by sport when the
   // chip row has exactly one sport selected.
   const fetchRecentTeamPosts = useServerFn(listRecentTeamPosts);
   const TEAM_POSTS_PAGE = 10;
@@ -552,7 +552,7 @@ function Feed() {
         <section className="mb-6">
           <div className="flex items-center justify-between mb-2">
             <h2 className="font-display text-sm font-bold uppercase tracking-wider text-muted-foreground">
-              From teams &amp; clubs
+              From teams
             </h2>
             <Link to="/teams" className="text-xs font-semibold text-lime">
               See all

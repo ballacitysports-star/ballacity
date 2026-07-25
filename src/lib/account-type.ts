@@ -8,27 +8,31 @@ export const ACCOUNT_TYPES: AccountType[] = ["player", "team", "trainer", "gym"]
 
 export const ACCOUNT_TYPE_META: Record<
   AccountType,
-  { label: string; emoji: string; blurb: string }
+  { label: string; plural: string; emoji: string; blurb: string }
 > = {
   player: {
     label: "Player",
+    plural: "Players",
     emoji: "🏃",
     blurb: "Find games, join teams, and track your reputation.",
   },
   team: {
-    label: "Team / Club",
+    label: "Team",
+    plural: "Teams",
     emoji: "👥",
     blurb: "Host games and manage your roster as a team.",
   },
   trainer: {
-    label: "Trainer / Coach",
+    label: "Trainer",
+    plural: "Trainers",
     emoji: "🎯",
     blurb: "Offer sessions and manage your availability.",
   },
   gym: {
-    label: "Gym / Facility",
+    label: "Gym",
+    plural: "Gyms",
     emoji: "🏢",
-    blurb: "Run an organization with trainers and members.",
+    blurb: "Run a gym with trainers and members.",
   },
 };
 

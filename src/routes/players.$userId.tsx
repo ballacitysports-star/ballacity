@@ -244,7 +244,7 @@ function PlayerProfilePage() {
           </div>
         )}
 
-        {/* Organizations (live) */}
+        {/* Gyms (live) */}
         <PlayerOrgsSection userId={userId} />
 
 
