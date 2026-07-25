@@ -24,7 +24,7 @@ export const Route = createFileRoute("/orgs/$orgId/edit")({
     <div className="p-8 text-sm text-coral">{error.message}</div>
   ),
   notFoundComponent: () => (
-    <div className="p-8 text-sm text-muted-foreground">Organization not found.</div>
+    <div className="p-8 text-sm text-muted-foreground">Gym not found.</div>
   ),
 });
 

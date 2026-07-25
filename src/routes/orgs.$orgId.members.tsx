@@ -30,7 +30,7 @@ export const Route = createFileRoute("/orgs/$orgId/members")({
     <div className="p-8 text-sm text-coral">{error.message}</div>
   ),
   notFoundComponent: () => (
-    <div className="p-8 text-sm text-muted-foreground">Organization not found.</div>
+    <div className="p-8 text-sm text-muted-foreground">Gym not found.</div>
   ),
 });
 
@@ -118,7 +118,7 @@ function MembersPage() {
           params={{ orgId }}
           className="inline-flex text-sm font-semibold text-lime hover:underline"
         >
-          Back to organization
+          Back to gym
         </Link>
       </div>
     );

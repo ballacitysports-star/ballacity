@@ -511,7 +511,7 @@ export const setOrgMemberRole = createServerFn({ method: "POST" })
       .select("owner_id")
       .eq("id", data.orgId)
       .maybeSingle();
-    if (!org) throw new Error("Organization not found");
+    if (!org) throw new Error("Gym not found");
     if (data.role === "owner" && org.owner_id !== context.userId) {
       throw new Error("Only the owner can promote to owner.");
     }

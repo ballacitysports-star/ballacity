@@ -67,7 +67,7 @@ export const Route = createFileRoute("/teams/$teamId/edit")({
   ),
   notFoundComponent: () => (
     <div className="mx-auto max-w-md px-6 pt-24 text-center">
-      <p className="text-muted-foreground">Organization not found.</p>
+      <p className="text-muted-foreground">Gym not found.</p>
       <Link
         to="/teams"
         className="mt-4 inline-block rounded-full bg-lime px-4 py-2 text-sm font-bold text-primary-foreground"

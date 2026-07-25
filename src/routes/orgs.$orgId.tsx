@@ -41,11 +41,11 @@ export const Route = createFileRoute("/orgs/$orgId")({
   head: ({ loaderData }) => {
     const o = (loaderData as Awaited<ReturnType<typeof getTrainerOrg>> | undefined) ?? null;
     if (!o?.org) {
-      return { meta: [{ title: "Organization — OpenRun" }, { name: "robots", content: "noindex" }] };
+      return { meta: [{ title: "Gym — OpenRun" }, { name: "robots", content: "noindex" }] };
     }
     return {
       meta: [
-        { title: `${o.org.name} — Trainer organization on OpenRun` },
+        { title: `${o.org.name} — Gym on OpenRun` },
         { name: "description", content: (o.org.bio || `${o.org.name} on OpenRun.`).slice(0, 155) },
       ],
     };
@@ -59,7 +59,7 @@ export const Route = createFileRoute("/orgs/$orgId")({
   errorComponent: ({ error }) => (
     <div className="p-6 text-sm text-muted-foreground">Failed to load: {error.message}</div>
   ),
-  notFoundComponent: () => <div className="p-6 text-sm text-muted-foreground">Organization not found.</div>,
+  notFoundComponent: () => <div className="p-6 text-sm text-muted-foreground">Gym not found.</div>,
 });
 
 function OrgPage() {
@@ -359,7 +359,7 @@ function MembershipCta({
             onClick={async () => {
               try {
                 await leaveTrainerOrg({ data: { orgId, trainerId: myMember.trainer_id } });
-                toast.success("Left organization");
+                toast.success("Left gym");
                 invalidate();
               } catch (e) {
                 toast.error(e instanceof Error ? e.message : "Failed");
@@ -380,7 +380,7 @@ function MembershipCta({
         <Link to="/trainers/create" className="text-lime hover:underline font-semibold">
           Create a trainer profile
         </Link>{" "}
-        to join this organization.
+        to join this gym.
       </div>
     );
   }
@@ -397,7 +397,7 @@ function MembershipCta({
           onClick={async () => {
             try {
               await respondToTrainerOrgInvite({ data: { inviteId: pendingInvite.id, action: "accept" } });
-              toast.success("Joined organization");
+              toast.success("Joined gym");
               invalidate();
             } catch (e) {
               toast.error(e instanceof Error ? e.message : "Failed");
@@ -595,10 +595,10 @@ function MemberJoinCta({ orgId }: { orgId: string }) {
           size="sm"
           variant="ghost"
           onClick={async () => {
-            if (!confirm("Leave this organization?")) return;
+            if (!confirm("Leave this gym?")) return;
             try {
               await leaveOrgMembership({ data: { orgId } });
-              toast.success("Left organization");
+              toast.success("Left gym");
               qc.invalidateQueries({ queryKey: ["org-members", orgId] });
               qc.invalidateQueries({ queryKey: ["my-org-member-request", orgId] });
             } catch (e) {
