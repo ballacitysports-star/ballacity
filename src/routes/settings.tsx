@@ -16,7 +16,9 @@ import {
   Sun,
   Trash2,
   UserCog,
+  BadgeCheck,
 } from "lucide-react";
+import { ACCOUNT_TYPE_META, useAccountType } from "@/lib/account-type";
 import type { LucideIcon } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
