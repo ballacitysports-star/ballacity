@@ -77,12 +77,17 @@ async function stubBackend(page: Page, status: Status, opts: { failOnPatch?: boo
       await route.fallback();
       return;
     }
+    // Server-fn responses are seroval-encoded — encode the same way so the
+    // client resolves a real value instead of throwing (which would silently
+    // fall back to the client-side profile check and hide regressions).
+    const payload = await toJSONAsync({ result: status, error: undefined, context: {} });
     await route.fulfill({
       status: 200,
       contentType: "application/json",
-      body: JSON.stringify({ result: status }),
+      body: JSON.stringify(payload),
     });
   });
+
 }
 
 
