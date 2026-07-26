@@ -133,16 +133,26 @@ async function signIn(
   await page.getByRole("button", { name: /^Sign in$/ }).click();
 }
 
-function readState(page: Page) {
-  return page.evaluate(
-    ([pendingKey, nextKey, providerKey]) => ({
-      pending: window.sessionStorage.getItem(pendingKey!),
-      next: window.sessionStorage.getItem(nextKey!),
-      provider: window.sessionStorage.getItem(providerKey!),
-    }),
-    [PENDING_KEY, NEXT_KEY, PROVIDER_KEY] as const,
-  );
+async function readState(page: Page) {
+  // A redirect can be mid-flight; retry once the document settles.
+  for (let attempt = 0; ; attempt++) {
+    try {
+      await page.waitForLoadState("domcontentloaded");
+      return await page.evaluate(
+        ([pendingKey, nextKey, providerKey]) => ({
+          pending: window.sessionStorage.getItem(pendingKey!),
+          next: window.sessionStorage.getItem(nextKey!),
+          provider: window.sessionStorage.getItem(providerKey!),
+        }),
+        [PENDING_KEY, NEXT_KEY, PROVIDER_KEY] as const,
+      );
+    } catch (err) {
+      if (attempt >= 4) throw err;
+      await page.waitForTimeout(500);
+    }
+  }
 }
+
 
 test.describe("social login: identity-present vs identity-missing", () => {
   for (const provider of ["google", "apple"] as const) {
