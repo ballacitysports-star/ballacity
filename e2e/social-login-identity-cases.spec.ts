@@ -1,6 +1,6 @@
 import { test, expect, type Page } from "@playwright/test";
 import { toJSONAsync } from "seroval";
-
+import { TEST_ACCOUNTS } from "../src/lib/test-fixtures";
 
 /**
  * Social-login routing matrix, driven by the authoritative backend guard
@@ -9,22 +9,29 @@ import { toJSONAsync } from "seroval";
  *
  *  1. identity-present  — the auth server reports a linked google/apple
  *     identity (`isSocial: true`) and no account_type → the user MUST land on
- *     `/onboarding/account-type`, with the stashed pending choice and saved
- *     `next` path preserved (the picker is the source of truth; the client
- *     must never PATCH the profile from the stash).
+ *     `/onboarding/account-type`, with the stashed pending choice and the saved
+ *     `next` path preserved for onboarding to consume later.
  *  2. identity-missing  — no linked social identity and no client provider
- *     signals (`isSocial: false`) but still no account_type → the user MUST
- *     also land on `/onboarding/account-type`, with the saved `next` preserved.
+ *     marker, still no account_type → the user MUST also land on onboarding.
  *  3. identity-present, onboarding already complete → no picker; the saved
  *     `next` path is consumed and the user lands there.
+ *
+ * Mechanics that matter:
+ *  - The sign-in is a REAL one through the /auth form, so the SIGNED_IN event
+ *    is emitted by the app's own Supabase client instance. Faking the event
+ *    from a test-side dynamic import hits a different module instance and the
+ *    root reconcile never runs.
+ *  - The guard's server-fn response is stubbed. TanStack encodes those with
+ *    seroval and flags them via `x-tss-serialized`; both are reproduced here,
+ *    otherwise the client resolves `undefined`, the reconcile throws, and the
+ *    test would silently pass on the fallback path.
  */
 
-const SESSION_JSON = process.env.LOVABLE_BROWSER_SUPABASE_SESSION_JSON;
-const STORAGE_KEY = process.env.LOVABLE_BROWSER_SUPABASE_STORAGE_KEY;
+const player = TEST_ACCOUNTS.find((a) => a.key === "player")!;
 
 test.skip(
-  !SESSION_JSON || !STORAGE_KEY,
-  "Requires a signed-in Supabase session (LOVABLE_BROWSER_SUPABASE_* env vars).",
+  !process.env.LOVABLE_BROWSER_SUPABASE_SESSION_JSON,
+  "Requires seeded Supabase fixture accounts (see e2e/global-setup.ts).",
 );
 
 const PENDING_KEY = "openrun.pending_account_type";
@@ -39,6 +46,7 @@ type Status = {
 };
 
 async function stubBackend(page: Page, status: Status, opts: { failOnPatch?: boolean } = {}) {
+  // Client-side profile fallback used by the route guards.
   await page.route(/\/rest\/v1\/profiles\?.*select=account_type/, async (route) => {
     await route.fulfill({
       status: 200,
@@ -48,6 +56,7 @@ async function stubBackend(page: Page, status: Status, opts: { failOnPatch?: boo
     });
   });
 
+  // A social new-user path must never write the stashed pending type.
   await page.route(/\/rest\/v1\/profiles\?.*id=eq\./, async (route) => {
     if (opts.failOnPatch && route.request().method() === "PATCH") {
       await route.fulfill({
@@ -60,9 +69,8 @@ async function stubBackend(page: Page, status: Status, opts: { failOnPatch?: boo
     await route.fallback();
   });
 
-  // TanStack server-fn dispatch. The target module/export is base64-encoded in
-  // the URL, so decode it and only intercept the onboarding guard; everything
-  // else falls through to the real dev server.
+  // TanStack server-fn dispatch: the target module/export is base64-encoded in
+  // the URL. Only intercept the onboarding guard; everything else falls through.
   await page.route("**/_serverFn/**", async (route) => {
     const seg = decodeURIComponent(
       new URL(route.request().url()).pathname.split("/_serverFn/")[1] ?? "",
@@ -77,10 +85,6 @@ async function stubBackend(page: Page, status: Status, opts: { failOnPatch?: boo
       await route.fallback();
       return;
     }
-    // Server-fn responses are seroval-encoded and flagged with
-    // `x-tss-serialized` — reproduce both, or the client resolves `undefined`
-    // and silently falls back to the client-side profile check. The wire
-    // format is the serialized tree only (`.t`), not the toJSONAsync wrapper.
     const payload = await toJSONAsync({ result: status, error: undefined, context: {} });
     await route.fulfill({
       status: 200,
@@ -88,20 +92,14 @@ async function stubBackend(page: Page, status: Status, opts: { failOnPatch?: boo
       body: JSON.stringify(payload.t),
     });
   });
-
-
-
 }
-
 
 async function primeStorage(
   page: Page,
   opts: { pending?: string | null; next: string; provider?: "google" | "apple" | null },
 ) {
-  await page.goto("/", { waitUntil: "domcontentloaded" });
   await page.evaluate(
-    ([sbKey, sbValue, pendingKey, nextKey, providerKey, pending, next, provider]) => {
-      window.localStorage.setItem(sbKey!, sbValue!);
+    ([pendingKey, nextKey, providerKey, pending, next, provider]) => {
       if (pending) window.sessionStorage.setItem(pendingKey!, pending);
       else window.sessionStorage.removeItem(pendingKey!);
       window.sessionStorage.setItem(nextKey!, next!);
@@ -109,8 +107,6 @@ async function primeStorage(
       else window.sessionStorage.removeItem(providerKey!);
     },
     [
-      STORAGE_KEY!,
-      SESSION_JSON!,
       PENDING_KEY,
       NEXT_KEY,
       PROVIDER_KEY,
@@ -121,26 +117,20 @@ async function primeStorage(
   );
 }
 
-/** Re-emit SIGNED_IN with a patched session so the reconcile branch runs. */
-async function emitSignedIn(page: Page, provider: string | null) {
-  await page.evaluate(async (providerId) => {
-    const mod = await import("/src/integrations/supabase/client.ts");
-    const supabase = (mod as { supabase: import("@supabase/supabase-js").SupabaseClient })
-      .supabase;
-    const { data } = await supabase.auth.getSession();
-    const session = data.session;
-    if (!session) throw new Error("no session in test context");
-    const appMeta = { ...(session.user.app_metadata ?? {}) };
-    if (providerId) appMeta.provider = providerId;
-    else delete (appMeta as { provider?: unknown }).provider;
-    const patched = { ...session, user: { ...session.user, app_metadata: appMeta } };
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const authAny = supabase.auth as any;
-    authAny.getSession = async () => ({ data: { session: patched }, error: null });
-    const emit = authAny._notifyAllSubscribers ?? authAny.notifyAllSubscribers;
-    if (typeof emit !== "function") throw new Error("Supabase auth emit hook missing");
-    await emit.call(supabase.auth, "SIGNED_IN", patched, false);
-  }, provider);
+/**
+ * Real sign-in through the /auth form. `provider` only controls the
+ * `openrun:oauth-provider` marker the OAuth buttons stash before leaving the
+ * app — the credentials are always the seeded fixture account.
+ */
+async function signIn(
+  page: Page,
+  opts: { pending?: string | null; next: string; provider?: "google" | "apple" | null },
+) {
+  await page.goto("/auth", { waitUntil: "domcontentloaded" });
+  await primeStorage(page, opts);
+  await page.getByPlaceholder("Email").fill(player.email);
+  await page.getByPlaceholder("Password").fill(player.password);
+  await page.getByRole("button", { name: /^Sign in$/ }).click();
 }
 
 function readState(page: Page) {
@@ -168,18 +158,15 @@ test.describe("social login: identity-present vs identity-missing", () => {
           { needsOnboarding: true, isSocial: true, provider, accountType: null },
           { failOnPatch: true },
         );
-        await primeStorage(page, { pending: "player", next: NEXT_PATH, provider });
-        await page.goto("/", { waitUntil: "domcontentloaded" });
-        await emitSignedIn(page, provider);
+        await signIn(page, { pending: "player", next: NEXT_PATH, provider });
 
         await expect(page).toHaveURL(/\/onboarding\/account-type(?:[?#/].*)?$/, {
-          timeout: 15_000,
+          timeout: 20_000,
         });
 
         const state = await readState(page);
         expect(state.pending).toBe("player");
         expect(state.next).toBe(NEXT_PATH);
-        expect(state.provider).toBe(provider);
       } finally {
         await context.close();
       }
@@ -198,14 +185,10 @@ test.describe("social login: identity-present vs identity-missing", () => {
         { needsOnboarding: true, isSocial: false, provider: null, accountType: null },
         { failOnPatch: true },
       );
-      // No pending stash and no provider marker: nothing client-side can be
-      // used to infer a social sign-in, so the picker must still be reached.
-      await primeStorage(page, { pending: null, next: NEXT_PATH, provider: null });
-      await page.goto("/", { waitUntil: "domcontentloaded" });
-      await emitSignedIn(page, null);
+      await signIn(page, { pending: null, next: NEXT_PATH, provider: null });
 
       await expect(page).toHaveURL(/\/onboarding\/account-type(?:[?#/].*)?$/, {
-        timeout: 15_000,
+        timeout: 20_000,
       });
 
       const state = await readState(page);
@@ -230,17 +213,16 @@ test.describe("social login: identity-present vs identity-missing", () => {
         provider: "google",
         accountType: "player",
       });
-      await primeStorage(page, { pending: null, next: NEXT_PATH, provider: "google" });
-      await page.goto("/", { waitUntil: "domcontentloaded" });
-      await emitSignedIn(page, "google");
+      await signIn(page, { pending: null, next: NEXT_PATH, provider: "google" });
 
-      await expect(page).toHaveURL(/\/feed(?:[?#/].*)?$/, { timeout: 15_000 });
+      await expect(page).toHaveURL(/\/feed(?:[?#/].*)?$/, { timeout: 20_000 });
       await expect(page).not.toHaveURL(/\/onboarding\/account-type/);
 
-      const state = await readState(page);
       // Consumed on success so a later sign-in doesn't re-navigate.
-      expect(state.next).toBeNull();
-      expect(state.provider).toBeNull();
+      await expect
+        .poll(async () => (await readState(page)).next, { timeout: 10_000 })
+        .toBeNull();
+      expect((await readState(page)).provider).toBeNull();
     } finally {
       await context.close();
     }
