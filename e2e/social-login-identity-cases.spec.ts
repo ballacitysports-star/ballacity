@@ -1,4 +1,6 @@
 import { test, expect, type Page } from "@playwright/test";
+import { toJSONAsync } from "seroval";
+
 
 /**
  * Social-login routing matrix, driven by the authoritative backend guard
