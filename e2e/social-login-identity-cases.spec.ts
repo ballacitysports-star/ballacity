@@ -58,8 +58,23 @@ async function stubBackend(page: Page, status: Status, opts: { failOnPatch?: boo
     await route.fallback();
   });
 
-  // TanStack server-fn dispatch for the onboarding guard.
-  await page.route(/\/n\/.*onboarding.*/i, async (route) => {
+  // TanStack server-fn dispatch. The target module/export is base64-encoded in
+  // the URL, so decode it and only intercept the onboarding guard; everything
+  // else falls through to the real dev server.
+  await page.route("**/_serverFn/**", async (route) => {
+    const seg = decodeURIComponent(
+      new URL(route.request().url()).pathname.split("/_serverFn/")[1] ?? "",
+    ).split("?")[0];
+    let decoded = "";
+    try {
+      decoded = Buffer.from(seg, "base64").toString("utf8");
+    } catch {
+      /* not base64 — treat as non-onboarding */
+    }
+    if (!/onboarding/i.test(decoded)) {
+      await route.fallback();
+      return;
+    }
     await route.fulfill({
       status: 200,
       contentType: "application/json",
@@ -67,6 +82,7 @@ async function stubBackend(page: Page, status: Status, opts: { failOnPatch?: boo
     });
   });
 }
+
 
 async function primeStorage(
   page: Page,
