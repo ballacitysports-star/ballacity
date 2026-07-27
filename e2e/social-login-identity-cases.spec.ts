@@ -243,31 +243,34 @@ test.describe("social login: identity-present vs identity-missing", () => {
   });
 
 
-  test("identity-present, onboarding complete: saved next path is consumed", async ({
-    browser,
-  }) => {
-    const context = await browser.newContext();
-    const page = await context.newPage();
-    const NEXT_PATH = "/feed?src=identity-present-complete";
-    try {
-      await stubBackend(page, {
-        needsOnboarding: false,
-        isSocial: true,
-        provider: "google",
-        accountType: "player",
-      });
-      await signIn(page, { pending: null, next: NEXT_PATH, provider: "google" });
+  for (const provider of ["google", "apple"] as const) {
+    test(`identity-present (${provider}), onboarding complete: saved next path is consumed`, async ({
+      browser,
+    }) => {
+      const context = await browser.newContext();
+      const page = await context.newPage();
+      const NEXT_PATH = `/feed?src=identity-present-complete-${provider}`;
+      try {
+        await stubBackend(page, {
+          needsOnboarding: false,
+          isSocial: true,
+          provider,
+          accountType: "player",
+        });
+        await signIn(page, { pending: null, next: NEXT_PATH, provider });
 
-      await expect(page).toHaveURL(/\/feed(?:[?#/].*)?$/, { timeout: 20_000 });
-      await expect(page).not.toHaveURL(/\/onboarding\/account-type/);
+        await expect(page).toHaveURL(/\/feed(?:[?#/].*)?$/, { timeout: 20_000 });
+        await expect(page).not.toHaveURL(/\/onboarding\/account-type/);
 
-      // Consumed on success so a later sign-in doesn't re-navigate.
-      await expect
-        .poll(async () => (await readState(page)).next, { timeout: 10_000 })
-        .toBeNull();
-      expect((await readState(page)).provider).toBeNull();
-    } finally {
-      await context.close();
-    }
-  });
+        // Consumed on success so a later sign-in doesn't re-navigate.
+        await expect
+          .poll(async () => (await readState(page)).next, { timeout: 10_000 })
+          .toBeNull();
+        expect((await readState(page)).provider).toBeNull();
+      } finally {
+        await context.close();
+      }
+    });
+  }
+
 });
