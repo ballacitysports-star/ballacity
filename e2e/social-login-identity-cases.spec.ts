@@ -183,6 +183,38 @@ test.describe("social login: identity-present vs identity-missing", () => {
     });
   }
 
+  // Identity-missing, per provider: the client stashed a provider marker (the
+  // user really did tap Continue with Google/Apple) but the auth server reports
+  // no linked social identity. The guard must still force the picker and keep
+  // the saved next path for onboarding to consume.
+  for (const provider of ["google", "apple"] as const) {
+    test(`identity-missing (${provider}): provider marker without a linked identity still routes to onboarding`, async ({
+      browser,
+    }) => {
+      const context = await browser.newContext();
+      const page = await context.newPage();
+      const NEXT_PATH = `/feed?src=identity-missing-${provider}`;
+      try {
+        await stubBackend(
+          page,
+          { needsOnboarding: true, isSocial: false, provider: null, accountType: null },
+          { failOnPatch: true },
+        );
+        await signIn(page, { pending: null, next: NEXT_PATH, provider });
+
+        await expect(page).toHaveURL(/\/onboarding\/account-type(?:[?#/].*)?$/, {
+          timeout: 20_000,
+        });
+
+        const state = await readState(page);
+        expect(state.pending).toBeNull();
+        expect(state.next).toBe(NEXT_PATH);
+      } finally {
+        await context.close();
+      }
+    });
+  }
+
   test("identity-missing: no social identity and no account type still routes to onboarding", async ({
     browser,
   }) => {
@@ -210,31 +242,35 @@ test.describe("social login: identity-present vs identity-missing", () => {
     }
   });
 
-  test("identity-present, onboarding complete: saved next path is consumed", async ({
-    browser,
-  }) => {
-    const context = await browser.newContext();
-    const page = await context.newPage();
-    const NEXT_PATH = "/feed?src=identity-present-complete";
-    try {
-      await stubBackend(page, {
-        needsOnboarding: false,
-        isSocial: true,
-        provider: "google",
-        accountType: "player",
-      });
-      await signIn(page, { pending: null, next: NEXT_PATH, provider: "google" });
 
-      await expect(page).toHaveURL(/\/feed(?:[?#/].*)?$/, { timeout: 20_000 });
-      await expect(page).not.toHaveURL(/\/onboarding\/account-type/);
+  for (const provider of ["google", "apple"] as const) {
+    test(`identity-present (${provider}), onboarding complete: saved next path is consumed`, async ({
+      browser,
+    }) => {
+      const context = await browser.newContext();
+      const page = await context.newPage();
+      const NEXT_PATH = `/feed?src=identity-present-complete-${provider}`;
+      try {
+        await stubBackend(page, {
+          needsOnboarding: false,
+          isSocial: true,
+          provider,
+          accountType: "player",
+        });
+        await signIn(page, { pending: null, next: NEXT_PATH, provider });
 
-      // Consumed on success so a later sign-in doesn't re-navigate.
-      await expect
-        .poll(async () => (await readState(page)).next, { timeout: 10_000 })
-        .toBeNull();
-      expect((await readState(page)).provider).toBeNull();
-    } finally {
-      await context.close();
-    }
-  });
+        await expect(page).toHaveURL(/\/feed(?:[?#/].*)?$/, { timeout: 20_000 });
+        await expect(page).not.toHaveURL(/\/onboarding\/account-type/);
+
+        // Consumed on success so a later sign-in doesn't re-navigate.
+        await expect
+          .poll(async () => (await readState(page)).next, { timeout: 10_000 })
+          .toBeNull();
+        expect((await readState(page)).provider).toBeNull();
+      } finally {
+        await context.close();
+      }
+    });
+  }
+
 });
