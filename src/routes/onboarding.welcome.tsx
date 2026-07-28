@@ -1,14 +1,20 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { z } from "zod";
 import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
 import { useAccountType, type AccountType } from "@/lib/account-type";
-import { SPORTS, type Sport } from "@/lib/sample-data";
-import { SPORT_CONFIG } from "@/lib/sport-config";
-import { getFeedPrefsSnapshot, setFeedPrefs } from "@/lib/user-prefs-store";
+import { getFeedPrefsSnapshot, setFeedPrefs, setProfileOverrides, useMyProfile } from "@/lib/user-prefs-store";
+import { Section, validateBirthday } from "@/components/profile/ProfileFormPrimitives";
+import {
+  ProfileBasicsFields,
+  type ProfileBasicsValue,
+} from "@/components/profile/ProfileBasicsFields";
+import {
+  ProfileSportsFields,
+  type SportEntry,
+} from "@/components/profile/ProfileSportsFields";
 
 const searchSchema = z.object({
   type: z.enum(["player", "team", "trainer", "gym"]).optional(),
@@ -22,7 +28,10 @@ export const Route = createFileRoute("/onboarding/welcome")({
 
 type NextStep = { title: string; body: string };
 
-const NEXT_STEPS: Record<Exclude<AccountType, "player">, { title: string; steps: NextStep[]; cta: string; goto: string }> = {
+const NEXT_STEPS: Record<
+  Exclude<AccountType, "player">,
+  { title: string; steps: NextStep[]; cta: string; goto: string }
+> = {
   team: {
     title: "Set up your team",
     cta: "Create team profile",
@@ -69,188 +78,74 @@ function OnboardingWelcomePage() {
 
   if (authLoading || typeLoading || !type) return null;
 
-  if (type === "player") return <PlayerWelcome />;
-  return <LinkedProfileWelcome type={type} />;
+  return <OnboardingWizard type={type} />;
 }
 
-function LinkedProfileWelcome({ type }: { type: Exclude<AccountType, "player"> }) {
-  const nav = useNavigate();
-  const cfg = NEXT_STEPS[type];
-  const [active, setActive] = useState(0);
-  const [expanded, setExpanded] = useState<Record<number, boolean>>({ 0: true });
+type GeoState =
+  | { kind: "idle" }
+  | { kind: "requesting" }
+  | { kind: "granted"; lat: number; lng: number; accuracy: number }
+  | { kind: "denied"; message: string; canRetry: boolean }
+  | { kind: "unavailable"; message: string };
 
-  const toggle = (i: number) => {
-    setActive(i);
-    setExpanded((e) => ({ ...e, [i]: !e[i] }));
-  };
-
-  return (
-    <div className="mx-auto flex min-h-dvh w-full max-w-md flex-col px-4 py-8">
-      <div>
-        <div className="font-display text-2xl font-bold">{cfg.title}</div>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Tap a step to preview details. You can revisit any of these later from settings.
-        </p>
-      </div>
-
-      <div className="mt-4 flex items-center gap-1.5" aria-label="Progress">
-        {cfg.steps.map((_, i) => (
-          <div
-            key={i}
-            className={`h-1 flex-1 rounded-full transition ${
-              i <= active ? "bg-lime-gradient" : "bg-border/60"
-            }`}
-          />
-        ))}
-      </div>
-
-      <ol className="mt-4 space-y-2">
-        {cfg.steps.map((s, i) => {
-          const isOpen = !!expanded[i];
-          const isActive = active === i;
-          return (
-            <li key={s.title}>
-              <button
-                type="button"
-                onClick={() => toggle(i)}
-                aria-expanded={isOpen}
-                className={`flex w-full items-start gap-3 rounded-2xl border p-4 text-left transition ${
-                  isActive
-                    ? "border-primary/50 bg-surface shadow-sm"
-                    : "border-border/60 bg-surface hover:border-border"
-                }`}
-              >
-                <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-lime-gradient text-xs font-bold text-primary-foreground">
-                  {i + 1}
-                </div>
-                <div className="flex-1">
-                  <div className="flex items-center justify-between">
-                    <div className="text-sm font-semibold">{s.title}</div>
-                    <span
-                      className={`ml-2 text-muted-foreground transition-transform ${
-                        isOpen ? "rotate-180" : ""
-                      }`}
-                      aria-hidden
-                    >
-                      ▾
-                    </span>
-                  </div>
-                  <div
-                    className={`grid overflow-hidden text-xs text-muted-foreground transition-all ${
-                      isOpen ? "mt-1 grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0"
-                    }`}
-                  >
-                    <div className="min-h-0">{s.body}</div>
-                  </div>
-                </div>
-              </button>
-            </li>
-          );
-        })}
-      </ol>
-
-      <div className="mt-6 flex items-center gap-2">
-        <button
-          onClick={() => setActive((a) => Math.max(0, a - 1))}
-          disabled={active === 0}
-          className="rounded-full border border-border/60 bg-surface px-3 py-2 text-xs font-medium text-foreground disabled:opacity-40"
-        >
-          Previous
-        </button>
-        {active < cfg.steps.length - 1 ? (
-          <button
-            onClick={() => {
-              const next = active + 1;
-              setActive(next);
-              setExpanded((e) => ({ ...e, [next]: true }));
-            }}
-            className="ml-auto rounded-full bg-lime-gradient px-4 py-2 text-xs font-bold text-primary-foreground"
-          >
-            Next step
-          </button>
-        ) : (
-          <button
-            onClick={() => nav({ to: cfg.goto })}
-            className="ml-auto rounded-full bg-lime-gradient px-4 py-2 text-xs font-bold text-primary-foreground"
-          >
-            {cfg.cta}
-          </button>
-        )}
-      </div>
-
-      <button
-        onClick={() => nav({ to: cfg.goto })}
-        className="mt-4 w-full rounded-full bg-lime-gradient px-4 py-3 text-sm font-bold text-primary-foreground"
-      >
-        {cfg.cta}
-      </button>
-      <button
-        onClick={() => nav({ to: "/feed" })}
-        className="mt-2 w-full rounded-full px-4 py-2 text-xs text-muted-foreground"
-      >
-        I'll do this later
-      </button>
-    </div>
-  );
-}
-
-function PlayerWelcome() {
+function OnboardingWizard({ type }: { type: AccountType }) {
   const nav = useNavigate();
   const { user } = useAuth();
+  const profile = useMyProfile(user);
   const queryClient = useQueryClient();
-  const [sport, setSport] = useState<Sport | null>(null);
-  const [level, setLevel] = useState<string | null>(null);
-  const [radius, setRadius] = useState<number>(15);
-  const [status, setStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
+
+  const isPlayer = type === "player";
+  const nextCfg = isPlayer ? null : NEXT_STEPS[type as Exclude<AccountType, "player">];
+
+  const stepLabels = isPlayer
+    ? ["Basics", "Sports & skill", "Location"]
+    : ["Basics", "Sports & skill", "Location", "Next steps"];
+
+  const [step, setStep] = useState(0);
+  const [saving, setSaving] = useState(false);
   const [prefilled, setPrefilled] = useState(false);
-  const lastRefreshRef = useRef<string>("");
+  const [birthdayError, setBirthdayError] = useState<string | null>(null);
 
-  // Prefill from existing profile + saved radius so returning users edit rather than re-enter.
-  useEffect(() => {
-    if (!user || prefilled) return;
-    let cancelled = false;
-    (async () => {
-      try {
-        const { data } = await supabase
-          .from("profiles")
-          .select("sport, skill_levels")
-          .eq("id", user.id)
-          .maybeSingle();
-        if (cancelled) return;
-        const row = data as { sport?: string | null; skill_levels?: Record<string, string> | null } | null;
-        const currentSport = row?.sport && SPORTS.some((s) => s.name === row.sport) ? (row.sport as Sport) : null;
-        if (currentSport) {
-          setSport(currentSport);
-          const lv = row?.skill_levels?.[currentSport];
-          if (lv) setLevel(lv);
-        }
-      } catch {
-        /* ignore */
-      }
-      try {
-        const r = Number(localStorage.getItem("openrun.default_radius_km"));
-        if (Number.isFinite(r) && r > 0) setRadius(r);
-      } catch {
-        /* ignore */
-      }
-      setPrefilled(true);
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [user, prefilled]);
-
-  // Location permission state
-  type GeoState =
-    | { kind: "idle" }
-    | { kind: "requesting" }
-    | { kind: "granted"; lat: number; lng: number; accuracy: number }
-    | { kind: "denied"; message: string; canRetry: boolean }
-    | { kind: "unavailable"; message: string };
+  const [basics, setBasics] = useState<ProfileBasicsValue>({
+    name: "",
+    username: "",
+    avatar: "",
+    avatarUrl: undefined,
+    coverUrl: undefined,
+    city: "",
+    bio: "",
+    birthday: "",
+    graduatingClass: "",
+  });
+  const [sports, setSports] = useState<SportEntry[]>([]);
+  const [radius, setRadius] = useState(15);
   const [geo, setGeo] = useState<GeoState>({ kind: "idle" });
   const [attempt, setAttempt] = useState(0);
 
-  const levels = useMemo(() => (sport ? SPORT_CONFIG[sport]?.ratingLevels ?? [] : []), [sport]);
+  // Prefill from the same profile store Edit profile uses so returning users edit
+  // rather than re-enter.
+  useEffect(() => {
+    if (!profile || prefilled) return;
+    setBasics({
+      name: profile.name ?? "",
+      username: profile.username ?? "",
+      avatar: profile.avatar ?? "",
+      avatarUrl: profile.avatarUrl,
+      coverUrl: profile.coverUrl,
+      city: profile.city ?? "",
+      bio: profile.bio ?? "",
+      birthday: profile.birthday ?? "",
+      graduatingClass: profile.graduatingClass != null ? String(profile.graduatingClass) : "",
+    });
+    setSports((profile.sports ?? []) as SportEntry[]);
+    try {
+      const r = Number(localStorage.getItem("openrun.default_radius_km"));
+      if (Number.isFinite(r) && r > 0) setRadius(r);
+    } catch {
+      /* ignore */
+    }
+    setPrefilled(true);
+  }, [profile, prefilled]);
 
   const requestLocation = () => {
     if (typeof navigator === "undefined" || !navigator.geolocation) {
@@ -273,7 +168,6 @@ function PlayerWelcome() {
         toast.success("Location set");
       },
       (err) => {
-        // 1 = PERMISSION_DENIED, 2 = POSITION_UNAVAILABLE, 3 = TIMEOUT
         if (err.code === 1) {
           setGeo({
             kind: "denied",
@@ -305,124 +199,158 @@ function PlayerWelcome() {
     );
   };
 
-  // Persist location coordinates locally when granted.
   useEffect(() => {
     if (geo.kind !== "granted") return;
     try {
-      localStorage.setItem(
-        "openrun.home_coords",
-        JSON.stringify({ lat: geo.lat, lng: geo.lng }),
-      );
+      localStorage.setItem("openrun.home_coords", JSON.stringify({ lat: geo.lat, lng: geo.lng }));
     } catch {
       /* ignore */
     }
   }, [geo]);
 
-  // Auto-save whenever sport / level / radius changes (debounced).
-  useEffect(() => {
-    if (!user) return;
-    if (!sport && level === null && radius === 15) return;
-    const t = setTimeout(async () => {
-      setStatus("saving");
+  const save = async () => {
+    if (!user) {
+      toast.error("Sign in to save");
+      return false;
+    }
+    const trimmedName = basics.name.trim().slice(0, 60);
+    if (!trimmedName) {
+      toast.error("Name is required");
+      setStep(0);
+      return false;
+    }
+    const birthdayErr = validateBirthday(basics.birthday);
+    if (birthdayErr) {
+      setBirthdayError(birthdayErr);
+      toast.error(birthdayErr);
+      setStep(0);
+      return false;
+    }
+    const birthdayClean =
+      basics.birthday && /^\d{4}-\d{2}-\d{2}$/.test(basics.birthday) ? basics.birthday : undefined;
+    const gradNum = basics.graduatingClass.trim() ? parseInt(basics.graduatingClass, 10) : NaN;
+    const currentYear = new Date().getFullYear();
+    const gradClean =
+      Number.isFinite(gradNum) && gradNum >= 1950 && gradNum <= currentYear + 15 ? gradNum : undefined;
+    if (basics.graduatingClass.trim() && gradClean === undefined) {
+      toast.error("Graduating class must be a valid year");
+      setStep(0);
+      return false;
+    }
+    const trimmedCity = basics.city.trim().slice(0, 80);
+    const initials = (basics.avatar.trim() || trimmedName.slice(0, 2)).toUpperCase().slice(0, 3);
+
+    setSaving(true);
+    try {
+      setProfileOverrides(user.id, {
+        name: trimmedName,
+        username: basics.username.trim().slice(0, 30),
+        avatar: initials,
+        avatarUrl: basics.avatarUrl,
+        coverUrl: basics.coverUrl,
+        city: trimmedCity,
+        bio: basics.bio.trim().slice(0, 280),
+        birthday: birthdayClean,
+        graduatingClass: gradClean,
+        sports,
+      });
+
+      const { supabase } = await import("@/integrations/supabase/client");
+      const primary = sports[0]?.name;
+      const skillLevels = Object.fromEntries(sports.map((s) => [s.name, String(s.skill)]));
+      const { error } = await supabase.from("profiles").upsert(
+        {
+          id: user.id,
+          display_name: trimmedName,
+          username: basics.username.trim().replace(/^@/, "").slice(0, 30) || null,
+          avatar_initials: initials,
+          bio: basics.bio.trim().slice(0, 280) || null,
+          city: trimmedCity || null,
+          avatar_url: basics.avatarUrl ?? null,
+          cover_url: basics.coverUrl ?? null,
+          birthday: birthdayClean ?? null,
+          graduating_class: gradClean ?? null,
+          ...(primary ? { sport: primary, skill_levels: skillLevels } : {}),
+        } as never,
+        { onConflict: "id" },
+      );
+      if (error) throw error;
+
       try {
-        const patch: { sport?: string; skill_levels?: Record<string, string> } = {};
-        if (sport) patch.sport = sport;
-        if (sport && level) patch.skill_levels = { [sport]: level };
-        if (Object.keys(patch).length) {
-          const { error } = await supabase.from("profiles").update(patch).eq("id", user.id);
-          if (error) throw error;
-        }
-        try {
-          localStorage.setItem("openrun.default_radius_km", String(radius));
-        } catch {
-          /* ignore */
-        }
-        setStatus("saved");
-
-        // Refresh the home feed with the newly-saved preferences.
-        const signature = `${sport ?? ""}|${level ?? ""}|${radius}`;
-        if (signature !== lastRefreshRef.current) {
-          lastRefreshRef.current = signature;
-
-          // Sync the client-side feed prefs so the feed's sport chip + distance
-          // filter immediately reflect the onboarding selection on arrival.
-          try {
-            const current = getFeedPrefsSnapshot();
-            const radiusInPrefUnit =
-              current.distanceUnit === "km" ? radius : Math.round(radius * 0.621371);
-            setFeedPrefs({
-              ...current,
-              preferredSports: sport
-                ? Array.from(new Set([sport, ...current.preferredSports]))
-                : current.preferredSports,
-              maxDistanceMi: radiusInPrefUnit,
-            });
-          } catch {
-            /* ignore */
-          }
-
-          // Invalidate any Query cache keyed by feed/games/profile so the feed
-          // refetches with the new sport / level / radius on arrival.
-          await Promise.all([
-            queryClient.invalidateQueries({ queryKey: ["feed-team-posts"] }),
-            queryClient.invalidateQueries({
-              predicate: (q) => {
-                const k = q.queryKey?.[0];
-                return (
-                  typeof k === "string" &&
-                  (k.startsWith("feed") || k.startsWith("games") || k === "profile" || k === "me")
-                );
-              },
-            }),
-          ]);
-          // Broadcast for non-Query subscribers (Zustand stores, custom hooks).
-          try {
-            window.dispatchEvent(
-              new CustomEvent("openrun:prefs-updated", {
-                detail: { sport, level, radiusKm: radius },
-              }),
-            );
-          } catch {
-            /* ignore */
-          }
-        }
-      } catch (err) {
-        setStatus("error");
-        toast.error(err instanceof Error ? err.message : "Could not save your preferences");
+        localStorage.setItem("openrun.default_radius_km", String(radius));
+      } catch {
+        /* ignore */
       }
-    }, 500);
-    return () => clearTimeout(t);
-  }, [user, sport, level, radius]);
 
-  const cont = () => nav({ to: "/feed" });
+      const current = getFeedPrefsSnapshot();
+      const radiusInPrefUnit =
+        current.distanceUnit === "km" ? radius : Math.round(radius * 0.621371);
+      setFeedPrefs({
+        ...current,
+        preferredSports: Array.from(
+          new Set([...sports.map((s) => s.name), ...current.preferredSports]),
+        ),
+        maxDistanceMi: radiusInPrefUnit,
+      });
 
-  const locationDone = geo.kind === "granted" || geo.kind === "unavailable" || geo.kind === "denied";
-  const steps = [
-    { key: "sport", label: "Sport", done: !!sport },
-    { key: "level", label: "Level", done: !!level },
-    { key: "location", label: "Location", done: locationDone },
-    { key: "radius", label: "Radius", done: true },
-  ];
-  const completed = steps.filter((s) => s.done).length;
-  const currentIdx = steps.findIndex((s) => !s.done);
-  const activeIdx = currentIdx === -1 ? steps.length - 1 : currentIdx;
-  const pct = Math.round((completed / steps.length) * 100);
-  const allDone = completed === steps.length;
+      await queryClient.invalidateQueries({
+        predicate: (q) => {
+          const k = q.queryKey?.[0];
+          return (
+            typeof k === "string" &&
+            (k.startsWith("feed") || k.startsWith("games") || k === "profile" || k === "me")
+          );
+        },
+      });
+      try {
+        window.dispatchEvent(
+          new CustomEvent("openrun:prefs-updated", {
+            detail: { sport: primary, radiusKm: radius },
+          }),
+        );
+      } catch {
+        /* ignore */
+      }
+      return true;
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Could not save your profile");
+      return false;
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const isLast = step === stepLabels.length - 1;
+
+  const onNext = async () => {
+    // Save once the profile steps are complete (before location/next-steps handoff).
+    if (step === 2) {
+      const ok = await save();
+      if (!ok) return;
+    }
+    if (isLast) {
+      if (nextCfg) nav({ to: nextCfg.goto });
+      else nav({ to: "/feed" });
+      return;
+    }
+    setStep((s) => s + 1);
+  };
+
+  const pct = Math.round(((step + 1) / stepLabels.length) * 100);
 
   return (
     <div className="mx-auto flex min-h-dvh w-full max-w-md flex-col px-4 py-8">
       <div>
-        <div className="font-display text-2xl font-bold">A few quick things</div>
+        <div className="font-display text-2xl font-bold">Set up your profile</div>
         <p className="mt-1 text-sm text-muted-foreground">
-          Personalize your feed. Changes save automatically.
+          Same details as Edit profile — you can change any of it later.
         </p>
       </div>
 
-      {/* Step-by-step progress */}
       <div className="mt-5">
         <div className="flex items-center justify-between text-xs font-medium text-muted-foreground">
           <span>
-            Step {Math.min(activeIdx + 1, steps.length)} of {steps.length}
+            Step {step + 1} of {stepLabels.length} · {stepLabels[step]}
           </span>
           <span>{pct}%</span>
         </div>
@@ -432,191 +360,154 @@ function PlayerWelcome() {
             style={{ width: `${pct}%` }}
           />
         </div>
-        <ol className="mt-3 flex items-center justify-between gap-2">
-          {steps.map((s, i) => {
-            const isActive = i === activeIdx;
-            return (
-              <li key={s.key} className="flex flex-1 items-center gap-2">
-                <span
-                  className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[11px] font-bold ${
-                    s.done
-                      ? "bg-lime-gradient text-primary-foreground"
-                      : isActive
-                        ? "border border-foreground bg-background text-foreground"
-                        : "border border-border/60 bg-surface text-muted-foreground"
-                  }`}
-                  aria-current={isActive ? "step" : undefined}
-                >
-                  {s.done ? "✓" : i + 1}
-                </span>
-                <span
-                  className={`truncate text-xs ${
-                    isActive || s.done ? "text-foreground" : "text-muted-foreground"
-                  }`}
-                >
-                  {s.label}
-                </span>
-              </li>
-            );
-          })}
-        </ol>
       </div>
 
-      <section className="mt-6">
-        <div className="text-sm font-semibold">1. Primary sport</div>
-        <div className="mt-2 flex flex-wrap gap-2">
-          {SPORTS.map((s) => {
-            const active = sport === s.name;
-            return (
-              <button
-                key={s.name}
-                onClick={() => {
-                  setSport(s.name);
-                  setLevel(null);
-                }}
-                className={`rounded-full border px-3 py-1.5 text-xs font-medium transition ${
-                  active
-                    ? "border-transparent bg-lime-gradient text-primary-foreground"
-                    : "border-border/60 bg-surface text-foreground"
-                }`}
-              >
-                <span className="mr-1">{s.emoji}</span>
-                {s.name}
-              </button>
-            );
-          })}
-        </div>
-      </section>
+      {step === 0 && (
+        <Section title="Basics">
+          <ProfileBasicsFields
+            userId={user?.id}
+            value={basics}
+            birthdayError={birthdayError}
+            onChange={(patch) => {
+              setBasics((b) => ({ ...b, ...patch }));
+              if ("birthday" in patch) setBirthdayError(validateBirthday(patch.birthday ?? ""));
+            }}
+          />
+        </Section>
+      )}
 
-      {sport && levels.length > 0 ? (
-        <section className="mt-6">
-          <div className="text-sm font-semibold">2. Your level ({SPORT_CONFIG[sport].ratingSystem})</div>
-          <div className="mt-2 flex flex-wrap gap-2">
-            {levels.map((lv) => {
-              const active = level === lv;
-              return (
-                <button
-                  key={lv}
-                  onClick={() => setLevel(lv)}
-                  className={`rounded-full border px-3 py-1.5 text-xs font-medium transition ${
-                    active
-                      ? "border-transparent bg-lime-gradient text-primary-foreground"
-                      : "border-border/60 bg-surface text-foreground"
-                  }`}
-                >
-                  {lv}
-                </button>
-              );
-            })}
-          </div>
-        </section>
-      ) : null}
+      {step === 1 && (
+        <Section title="Sports & skill">
+          <ProfileSportsFields sports={sports} onChange={setSports} />
+        </Section>
+      )}
 
-      <section className="mt-6">
-        <div className="text-sm font-semibold">3. Location</div>
-        <p className="mt-1 text-xs text-muted-foreground">
-          We use your location to show nearby games. You can also skip and set a radius manually.
-        </p>
+      {step === 2 && (
+        <Section title="Location">
+          <p className="mb-3 text-xs text-muted-foreground">
+            We use your location to show nearby games. You can also skip and set a radius manually.
+          </p>
 
-        {geo.kind === "granted" ? (
-          <div className="mt-3 rounded-xl border border-border/60 bg-surface p-3">
-            <div className="flex items-center justify-between gap-2">
-              <div className="flex items-center gap-2 text-sm">
-                <span className="flex h-6 w-6 items-center justify-center rounded-full bg-lime-gradient text-[11px] font-bold text-primary-foreground">
-                  ✓
-                </span>
-                <div>
-                  <div className="font-medium text-foreground">Location shared</div>
-                  <div className="text-xs text-muted-foreground">
-                    Accurate to ~{Math.round(geo.accuracy)} m
+          {geo.kind === "granted" ? (
+            <div className="rounded-xl border border-border/60 bg-surface p-3">
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2 text-sm">
+                  <span className="flex h-6 w-6 items-center justify-center rounded-full bg-lime-gradient text-[11px] font-bold text-primary-foreground">
+                    ✓
+                  </span>
+                  <div>
+                    <div className="font-medium text-foreground">Location shared</div>
+                    <div className="text-xs text-muted-foreground">
+                      Accurate to ~{Math.round(geo.accuracy)} m
+                    </div>
                   </div>
                 </div>
+                <button
+                  onClick={requestLocation}
+                  className="rounded-full border border-border/60 px-3 py-1.5 text-xs font-medium"
+                >
+                  Refresh
+                </button>
               </div>
+            </div>
+          ) : (
+            <div className="space-y-2">
               <button
                 onClick={requestLocation}
-                className="rounded-full border border-border/60 px-3 py-1.5 text-xs font-medium"
+                disabled={geo.kind === "requesting"}
+                className="w-full rounded-full border border-border/60 bg-surface px-4 py-2.5 text-sm font-medium disabled:opacity-60"
               >
-                Refresh
+                {geo.kind === "requesting"
+                  ? "Requesting location…"
+                  : attempt === 0
+                    ? "Use my location"
+                    : "Try again"}
               </button>
-            </div>
-          </div>
-        ) : (
-          <div className="mt-3 space-y-2">
-            <button
-              onClick={requestLocation}
-              disabled={geo.kind === "requesting"}
-              className="w-full rounded-full border border-border/60 bg-surface px-4 py-2.5 text-sm font-medium disabled:opacity-60"
-            >
-              {geo.kind === "requesting"
-                ? "Requesting location…"
-                : attempt === 0
-                  ? "Use my location"
-                  : "Try again"}
-            </button>
 
-            {geo.kind === "denied" || geo.kind === "unavailable" ? (
-              <div className="rounded-xl border border-destructive/40 bg-destructive/5 p-3 text-xs">
-                <div className="font-semibold text-destructive">Location unavailable</div>
-                <p className="mt-1 text-muted-foreground">{geo.message}</p>
-                {geo.kind === "denied" && geo.canRetry ? (
-                  <div className="mt-2 flex flex-wrap gap-2">
+              {geo.kind === "denied" || geo.kind === "unavailable" ? (
+                <div className="rounded-xl border border-destructive/40 bg-destructive/5 p-3 text-xs">
+                  <div className="font-semibold text-destructive">Location unavailable</div>
+                  <p className="mt-1 text-muted-foreground">{geo.message}</p>
+                  {geo.kind === "denied" && geo.canRetry ? (
                     <button
                       onClick={requestLocation}
-                      className="rounded-full border border-border/60 bg-background px-3 py-1 text-xs font-medium"
+                      className="mt-2 rounded-full border border-border/60 bg-background px-3 py-1 text-xs font-medium"
                     >
                       Retry
                     </button>
-                    <span className="self-center text-[11px] text-muted-foreground">
-                      or adjust the radius below to browse a wider area
-                    </span>
-                  </div>
-                ) : null}
-              </div>
-            ) : null}
+                  ) : null}
+                </div>
+              ) : null}
+            </div>
+          )}
+
+          <div className="mt-5">
+            <div className="flex items-center justify-between text-sm font-semibold">
+              <span>Search radius</span>
+              <span className="text-muted-foreground">{radius} km</span>
+            </div>
+            <input
+              type="range"
+              min={1}
+              max={100}
+              step={1}
+              value={radius}
+              onChange={(e) => setRadius(Number(e.target.value))}
+              className="mt-2 w-full accent-lime"
+              aria-label="Search radius in kilometers"
+            />
+            <div className="mt-1 flex justify-between text-[11px] text-muted-foreground">
+              <span>1 km</span>
+              <span>50 km</span>
+              <span>100 km</span>
+            </div>
           </div>
-        )}
-      </section>
+        </Section>
+      )}
 
-      <section className="mt-6">
-        <div className="flex items-center justify-between text-sm font-semibold">
-          <span>4. Search radius</span>
-          <span className="text-muted-foreground">{radius} km</span>
-        </div>
-        <input
-          type="range"
-          min={1}
-          max={100}
-          step={1}
-          value={radius}
-          onChange={(e) => setRadius(Number(e.target.value))}
-          className="mt-2 w-full accent-primary"
-          aria-label="Search radius in kilometers"
-        />
-        <div className="mt-1 flex justify-between text-[11px] text-muted-foreground">
-          <span>1 km</span>
-          <span>50 km</span>
-          <span>100 km</span>
-        </div>
-        {geo.kind !== "granted" ? (
-          <p className="mt-2 text-xs text-muted-foreground">
-            Without location, we'll use your saved city and this radius to find games.
-          </p>
-        ) : null}
-      </section>
+      {step === 3 && nextCfg && (
+        <Section title={nextCfg.title}>
+          <ol className="space-y-2">
+            {nextCfg.steps.map((s, i) => (
+              <li
+                key={s.title}
+                className="flex items-start gap-3 rounded-2xl border border-border/60 bg-surface p-4"
+              >
+                <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-lime-gradient text-xs font-bold text-primary-foreground">
+                  {i + 1}
+                </div>
+                <div>
+                  <div className="text-sm font-semibold">{s.title}</div>
+                  <div className="mt-1 text-xs text-muted-foreground">{s.body}</div>
+                </div>
+              </li>
+            ))}
+          </ol>
+        </Section>
+      )}
 
-
-      <div className="mt-4 h-4 text-xs text-muted-foreground" aria-live="polite">
-        {status === "saving" && "Saving…"}
-        {status === "saved" && "Saved"}
-        {status === "error" && "Couldn't save — try again"}
+      <div className="mt-6 flex items-center gap-2">
+        <button
+          onClick={() => setStep((s) => Math.max(0, s - 1))}
+          disabled={step === 0 || saving}
+          className="rounded-full border border-border/60 bg-surface px-4 py-2 text-xs font-medium text-foreground disabled:opacity-40"
+        >
+          Back
+        </button>
+        <button
+          onClick={onNext}
+          disabled={saving}
+          className="ml-auto rounded-full bg-lime-gradient px-5 py-2.5 text-xs font-bold text-primary-foreground disabled:opacity-50"
+        >
+          {saving ? "Saving…" : isLast ? (nextCfg ? nextCfg.cta : "Continue to feed") : "Continue"}
+        </button>
       </div>
 
       <button
-        onClick={cont}
-        disabled={status === "saving"}
-        className="mt-4 w-full rounded-full bg-lime-gradient px-4 py-3 text-sm font-bold text-primary-foreground disabled:opacity-50"
+        onClick={() => nav({ to: "/feed" })}
+        className="mt-3 w-full rounded-full px-4 py-2 text-xs text-muted-foreground"
       >
-        {allDone ? "Continue to feed" : `Continue (${completed}/${steps.length})`}
+        I'll do this later
       </button>
     </div>
   );
