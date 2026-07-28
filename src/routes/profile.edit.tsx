@@ -15,7 +15,7 @@ import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import type { User } from "@supabase/supabase-js";
 import { toast } from "sonner";
-import { SPORTS, POSITIONS_BY_SPORT, type Sport } from "@/lib/sample-data";
+import { SPORTS, type Sport } from "@/lib/sample-data";
 import {
   useMyProfile,
   setProfileOverrides,
