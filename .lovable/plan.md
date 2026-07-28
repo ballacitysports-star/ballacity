@@ -1,49 +1,40 @@
 ## Goal
 
-Make profile-type wording consistent everywhere. Today the app mixes "Team", "Club", "Trainer", "Coach", "Gym", "Facility", "Organization" without rules — the account picker uses combined labels ("Team / Club"), while other screens say "Coach", "Organization", or "Club" independently. Users see different words for the same thing depending on where they are.
+Make onboarding signup collect the same core details as **Edit profile**, using the same field UI, for every account type (player, team, trainer, gym).
 
-## Canonical vocabulary
+## What onboarding will ask for
 
-Adopt one label per account type and use it everywhere the type is named to a user:
+**Step 1 — Basics** (all account types), mirroring the Edit profile "Basics" section:
+- Cover photo and avatar photo (same uploader as Edit profile)
+- Display name, username, avatar initials
+- City (same city autocomplete)
+- Bio (280-char counter)
+- Birthday (with the same validation message) and graduating class
 
-| Type    | Noun (singular) | Plural  | Verb / role phrasing              |
-| ------- | --------------- | ------- | --------------------------------- |
-| player  | Player          | Players | "Play", "Join a game"             |
-| team    | Team            | Teams   | "Host as team", "Team roster"     |
-| trainer | Trainer         | Trainers| "Book a trainer", "Trainer profile"|
-| gym     | Gym             | Gyms    | "Manage gym", "Gym members"       |
+**Step 2 — Sports & skill** (all account types), mirroring the Edit profile "Sports & skill" section:
+- Add one or more sports, 1–5 skill slider per sport, position chips per sport
+- The first added sport becomes the primary sport saved to the profile
 
-Rules:
-- Drop the slash pairs ("Team / Club", "Trainer / Coach", "Gym / Facility"). The account picker becomes single-word labels with a one-line blurb underneath.
-- "Club" → "Team" everywhere user-facing.
-- "Coach" → "Trainer" everywhere user-facing (except where "Head Coach" is a job title inside a team roster — that's a role, not a profile type, keep it).
-- "Facility" → "Gym" in profile-type contexts. In review-category labels like "Facility Quality" (which describes the venue, not the profile) keep as-is.
-- "Organization" stays only for the technical trainer-org grouping feature (multi-trainer gyms). Its user-facing label becomes "Gym" wherever it names the account type, and stays "Organization" only in the internal org-membership UI where trainers join a gym.
+**Step 3 — Location & radius** (players keep today's behavior, now also shown to the others):
+- "Use my location" permission request with the existing denial/retry messaging
+- Search-radius slider
 
-## Scope of edits (user-facing strings only)
+**Step 4 — Next steps** (team / trainer / gym only):
+- The existing three-step checklist and "Create team/trainer/gym profile" call to action, unchanged in content
 
-1. `src/lib/account-type.ts` — update `ACCOUNT_TYPE_META` labels and blurbs to the canonical vocabulary; add optional `plural` and `verb` fields so callers can render consistent copy from one source.
-2. `src/routes/onboarding.account-type.tsx`, `src/components/AccountTypePicker.tsx`, `src/components/AccountTypeGate.tsx` — read from the updated meta; no bespoke labels.
-3. Team-side surfaces (`src/routes/teams.*`, `TeamCoverUploader`, `CreatePostSheet` team copy, `_tabs.teams.tsx`, filter labels) — replace "Club" with "Team".
-4. Trainer-side surfaces (`src/routes/trainers.*`, `create/CreateTrainerWizard.tsx`, `TrainerActions`, `TrainerProfileChecklist`, `TrainerOrgSection`, review-flow labels for trainers) — replace user-facing "Coach" with "Trainer"; keep "Head Coach" only where it's a roster job title.
-5. Gym-side surfaces (`src/routes/orgs.*`, `OrgForm`, `OrgCard`, `CreateOrgWizard`, settings "My organizations") — where the label names the account type, use "Gym"; keep "Organization" only in the trainer→gym membership UI copy where it refers to the linkage feature, not the profile type.
-6. Feed/discover copy (`_tabs.feed.tsx`, `_tabs.discover.tsx`, filter chips, empty states) — normalize headings like "From teams & clubs" → "From teams", "Coaches" → "Trainers", "Facilities" → "Gyms".
-7. Host-selection UI (`_tabs.create.tsx` "Host as", `EditGameModal` host picker) — use "Team" and "Gym"/"Trainer" verbatim.
-8. Settings and profile chips already using `ACCOUNT_TYPE_META.label` inherit the new wording automatically.
+Players finish with "Continue to feed"; team/trainer/gym finish with their existing create-profile call to action plus "I'll do this later".
 
-## Out of scope
+## Behavior
 
-- Database column names, enum values (`team`, `trainer`, `gym`, `player` stay).
-- Route paths (`/teams`, `/trainers`, `/orgs`) stay — no navigation breakage.
-- Review category labels that describe the venue itself ("Facility Quality") not the profile type.
-- Job-title role strings inside team rosters ("Head Coach", "Player-Coach").
-- Any layout, color, or component-shape changes.
+- Everything prefills from the existing profile so returning users edit rather than re-enter, matching what the Settings "Edit onboarding details" link already implies.
+- Autosave stays: changes save with the same debounce and the same Saving / Saved / Couldn't save status line.
+- The step progress bar at the top updates to reflect the new steps and shows completion per step.
+- Field-level limits and the birthday check match Edit profile exactly, so nothing invalid can be saved from onboarding.
 
-## Verification
+## Technical notes
 
-- Grep for the retired phrases ("/ Club", "/ Coach", "/ Facility", user-facing "Club", user-facing "Coach", "Facilities") and confirm remaining hits fall into an allow-list (role titles, review categories, technical org linkage).
-- Manual pass over: account picker, onboarding, `/settings`, `/profile`, `/teams`, `/trainers`, `/orgs`, feed filter chips, create-game "Host as", edit-game host picker.
-
-## Files touched
-
-`src/lib/account-type.ts` plus targeted string replacements in the components and routes listed above. No new files, no schema, no route changes.
+- Extract the shared presentational pieces from `src/routes/profile.edit.tsx` — `Section`, `Field`, `Input`, plus the Basics block and the Sports & skill block — into a shared component module (e.g. `src/components/profile/ProfileBasicsFields.tsx` and `ProfileSportsFields.tsx`), driven by value/onChange props. Both `profile.edit.tsx` and `onboarding.welcome.tsx` render those same components, so the two screens cannot drift.
+- `onboarding.welcome.tsx` becomes a single stepper shared by all account types: steps 1–3 common, step 4 rendered only for non-player types from the existing `NEXT_STEPS` map.
+- Saving continues through the existing paths: `profiles` row update via the browser Supabase client (`display_name`, `username`, `avatar_initials`, `avatar_url`, `cover_url`, `city`, `bio`, `birthday`, `graduating_class`, `sport`, `skill_levels`) plus `setProfileOverrides` / `setFeedPrefs` in `src/lib/user-prefs-store.ts` for sports, positions, and radius — same writes Edit profile already performs. No schema change and no new server functions.
+- Keep the existing post-save feed invalidation and `openrun:prefs-updated` broadcast.
+- No change to `AccountTypeGate`, the account-type picker, or the account-type lock.
