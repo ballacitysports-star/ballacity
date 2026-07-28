@@ -34,6 +34,15 @@ import { LocationAutocomplete } from "@/components/LocationAutocomplete";
 import { LINK_TYPES, LinkIcon } from "@/components/ProfileLinks";
 import { ImageUploader } from "@/components/ImageUploader";
 import { Dumbbell } from "lucide-react";
+import {
+  Section,
+  Field,
+  Input,
+  Toggle,
+  validateBirthday,
+} from "@/components/profile/ProfileFormPrimitives";
+import { ProfileBasicsFields } from "@/components/profile/ProfileBasicsFields";
+import { ProfileSportsFields } from "@/components/profile/ProfileSportsFields";
 
 export const Route = createFileRoute("/profile/edit")({
   head: () => ({ meta: [{ title: "Edit profile — OpenRun" }] }),
