@@ -15,7 +15,7 @@ import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import type { User } from "@supabase/supabase-js";
 import { toast } from "sonner";
-import { SPORTS, POSITIONS_BY_SPORT, type Sport } from "@/lib/sample-data";
+import { SPORTS, type Sport } from "@/lib/sample-data";
 import {
   useMyProfile,
   setProfileOverrides,
@@ -30,10 +30,17 @@ import { OrgCard } from "@/components/OrgCard";
 import { listTrainerOrgs } from "@/lib/trainer-orgs.functions";
 import { useQuery } from "@tanstack/react-query";
 import { getCurrentUser, useAuth } from "@/hooks/use-auth";
-import { LocationAutocomplete } from "@/components/LocationAutocomplete";
 import { LINK_TYPES, LinkIcon } from "@/components/ProfileLinks";
-import { ImageUploader } from "@/components/ImageUploader";
 import { Dumbbell } from "lucide-react";
+import {
+  Section,
+  Field,
+  Input,
+  Toggle,
+  validateBirthday,
+} from "@/components/profile/ProfileFormPrimitives";
+import { ProfileBasicsFields } from "@/components/profile/ProfileBasicsFields";
+import { ProfileSportsFields } from "@/components/profile/ProfileSportsFields";
 
 export const Route = createFileRoute("/profile/edit")({
   head: () => ({ meta: [{ title: "Edit profile — OpenRun" }] }),
@@ -117,30 +124,8 @@ function EditProfile() {
     setSections((prev) => ({ ...prev, [k]: !prev[k] }));
   };
 
-  const addSport = (s: Sport) => {
-    if (sports.some((x) => x.name === s)) return;
-    markDirty();
-    setSports([...sports, { name: s, skill: 3 }]);
-  };
-  const removeSport = (s: Sport) => {
-    markDirty();
-    setSports(sports.filter((x) => x.name !== s));
-  };
-  const setSkill = (s: Sport, skill: number) => {
-    markDirty();
-    setSports(sports.map((x) => (x.name === s ? { ...x, skill } : x)));
-  };
-  const togglePosition = (s: Sport, pos: string) => {
-    markDirty();
-    setSports(
-      sports.map((x) => {
-        if (x.name !== s) return x;
-        const cur = x.positions ?? [];
-        const next = cur.includes(pos) ? cur.filter((p) => p !== pos) : [...cur, pos];
-        return { ...x, positions: next };
-      }),
-    );
-  };
+
+
 
   useEffect(() => {
     if (user) setConfirmedUser(user);
@@ -236,24 +221,6 @@ function EditProfile() {
   };
   const linkErrors = links.map((l) => validateUrl(l.url));
 
-  function validateBirthday(value: string): string | null {
-    if (!value) return null;
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return "Enter a valid date (YYYY-MM-DD)";
-    const [y, m, day] = value.split("-").map(Number);
-    const d = new Date(y, m - 1, day);
-    if (
-      isNaN(d.getTime()) ||
-      d.getFullYear() !== y ||
-      d.getMonth() !== m - 1 ||
-      d.getDate() !== day
-    ) {
-      return "Enter a valid date (e.g., 2005-06-15)";
-    }
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    if (d > today) return "Birthday cannot be in the future";
-    return null;
-  }
 
   const save = async () => {
     if (!profileUser) {
@@ -360,193 +327,46 @@ function EditProfile() {
       </div>
 
       <Section title="Basics">
-        <Field label="Cover photo">
-          <ImageUploader
-            kind="cover"
-            bucket="covers"
-            pathPrefix={profileUser?.id}
-            value={coverUrl ?? ""}
-            onChange={(url) => {
-              markDirty();
-              setCoverUrl(url);
-            }}
-            onClear={() => {
-              markDirty();
-              setCoverUrl(undefined);
-            }}
-          />
-        </Field>
-        <Field label="Photo">
-          <ImageUploader
-            kind="avatar"
-            bucket="avatars"
-            pathPrefix={profileUser?.id}
-            value={avatarUrl ?? ""}
-            onChange={(url) => {
-              markDirty();
-              setAvatarUrl(url);
-            }}
-            onClear={() => {
-              markDirty();
-              setAvatarUrl(undefined);
-            }}
-          />
-        </Field>
-        <Field label="Display name">
-          <Input
-            value={name}
-            onChange={(v) => {
-              markDirty();
-              setName(v);
-            }}
-            maxLength={60}
-          />
-        </Field>
-        <Field label="Username">
-          <Input
-            value={username}
-            onChange={(v) => {
-              markDirty();
-              setUsername(v);
-            }}
-            maxLength={30}
-            placeholder="@you"
-          />
-        </Field>
-        <Field label="Avatar initials (fallback)">
-          <Input
-            value={avatar}
-            onChange={(v) => {
-              markDirty();
-              setAvatar(v);
-            }}
-            maxLength={3}
-          />
-        </Field>
-        <Field label="City">
-          <LocationAutocomplete
-            value={city}
-            onChange={(v) => {
-              markDirty();
-              setCity(v);
-            }}
-            placeholder="Your city"
-            mode="city"
-          />
-        </Field>
-        <Field label="Bio">
-          <textarea
-            value={bio}
-            onChange={(e) => {
-              markDirty();
-              setBio(e.target.value);
-            }}
-            maxLength={280}
-            rows={3}
-            className="w-full rounded-2xl border border-border bg-surface px-3 py-2 text-sm outline-none focus:border-lime"
-          />
-          <div className="mt-1 text-right text-[10px] text-muted-foreground">{bio.length}/280</div>
-        </Field>
-        <Field label="Birthday">
-          <input
-            type="date"
-            value={birthday}
-            onChange={(e) => {
-              markDirty();
-              const v = e.target.value;
-              setBirthday(v);
-              setBirthdayError(validateBirthday(v));
-            }}
-            max={new Date().toISOString().slice(0, 10)}
-            aria-invalid={birthdayError ? true : undefined}
-            className={`w-full rounded-2xl border bg-surface px-3 py-2 text-sm outline-none focus:border-lime ${birthdayError ? "border-destructive" : "border-border"}`}
-          />
-          {birthdayError && <p className="mt-1 text-xs text-destructive">{birthdayError}</p>}
-        </Field>
-        <Field label="Graduating class">
-          <Input
-            value={graduatingClass}
-            onChange={(v) => {
-              markDirty();
-              setGraduatingClass(v.replace(/[^0-9]/g, "").slice(0, 4));
-            }}
-            placeholder={`e.g. ${new Date().getFullYear() + 4}`}
-            maxLength={4}
-          />
-        </Field>
+        <ProfileBasicsFields
+          userId={profileUser?.id}
+          value={{
+            name,
+            username,
+            avatar,
+            avatarUrl,
+            coverUrl,
+            city,
+            bio,
+            birthday,
+            graduatingClass,
+          }}
+          birthdayError={birthdayError}
+          onChange={(patch) => {
+            markDirty();
+            if ("name" in patch) setName(patch.name!);
+            if ("username" in patch) setUsername(patch.username!);
+            if ("avatar" in patch) setAvatar(patch.avatar!);
+            if ("avatarUrl" in patch) setAvatarUrl(patch.avatarUrl);
+            if ("coverUrl" in patch) setCoverUrl(patch.coverUrl);
+            if ("city" in patch) setCity(patch.city!);
+            if ("bio" in patch) setBio(patch.bio!);
+            if ("birthday" in patch) {
+              setBirthday(patch.birthday!);
+              setBirthdayError(validateBirthday(patch.birthday!));
+            }
+            if ("graduatingClass" in patch) setGraduatingClass(patch.graduatingClass!);
+          }}
+        />
       </Section>
 
       <Section title="Sports & skill">
-        <div className="space-y-2">
-          {sports.map((s) => (
-            <div key={s.name} className="rounded-2xl border border-border bg-surface p-3">
-              <div className="flex items-center justify-between text-sm">
-                <span className="font-semibold">{s.name}</span>
-                <div className="flex items-center gap-2">
-                  <span className="text-lime font-bold w-12 text-right">
-                    {s.skill.toFixed(1)} / 5
-                  </span>
-                  <button
-                    onClick={() => removeSport(s.name)}
-                    className="grid h-7 w-7 place-items-center rounded-full border border-border text-muted-foreground"
-                  >
-                    <X className="h-3.5 w-3.5" />
-                  </button>
-                </div>
-              </div>
-              <input
-                type="range"
-                min={1}
-                max={5}
-                step={0.1}
-                value={s.skill}
-                onChange={(e) => setSkill(s.name, parseFloat(e.target.value))}
-                className="mt-2 w-full accent-lime"
-              />
-              {POSITIONS_BY_SPORT[s.name]?.length > 0 && (
-                <div className="mt-3">
-                  <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1.5">
-                    Positions
-                  </div>
-                  <div className="flex flex-wrap gap-1.5">
-                    {POSITIONS_BY_SPORT[s.name].map((pos) => {
-                      const active = (s.positions ?? []).includes(pos);
-                      return (
-                        <button
-                          key={pos}
-                          type="button"
-                          onClick={() => togglePosition(s.name, pos)}
-                          className={`rounded-full border px-2.5 py-1 text-[11px] font-semibold transition-colors ${
-                            active
-                              ? "border-lime bg-lime/15 text-lime"
-                              : "border-border bg-background text-muted-foreground hover:border-lime/40 hover:text-foreground"
-                          }`}
-                        >
-                          {pos}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
-            </div>
-          ))}
-        </div>
-        <div className="mt-3">
-          <div className="text-xs text-muted-foreground mb-1.5">Add sport</div>
-          <div className="flex flex-wrap gap-2">
-            {SPORTS.filter((s) => !sports.some((x) => x.name === s.name)).map((s) => (
-              <button
-                key={s.name}
-                onClick={() => addSport(s.name)}
-                className="inline-flex items-center gap-1 rounded-full border border-border bg-surface px-3 py-1.5 text-xs font-semibold hover:border-lime/40"
-              >
-                <span>{s.emoji}</span>
-                {s.name}
-              </button>
-            ))}
-          </div>
-        </div>
+        <ProfileSportsFields
+          sports={sports}
+          onChange={(next) => {
+            markDirty();
+            setSports(next);
+          }}
+        />
       </Section>
 
       <Section title="Profile links">
@@ -937,79 +757,5 @@ function EditProfile() {
   );
 }
 
-function Section({
-  title,
-  right,
-  children,
-}: {
-  title: string;
-  right?: React.ReactNode;
-  children: React.ReactNode;
-}) {
-  return (
-    <div className="mt-6">
-      <div className="flex items-center justify-between mb-2">
-        <h2 className="font-display text-sm font-bold uppercase tracking-wider text-muted-foreground">
-          {title}
-        </h2>
-        {right}
-      </div>
-      <div>{children}</div>
-    </div>
-  );
-}
-
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <label className="block mb-3">
-      <div className="text-xs font-semibold text-muted-foreground mb-1">{label}</div>
-      {children}
-    </label>
-  );
-}
-
-function Input({
-  value,
-  onChange,
-  ...rest
-}: { value: string; onChange: (v: string) => void } & Omit<
-  React.InputHTMLAttributes<HTMLInputElement>,
-  "value" | "onChange"
->) {
-  return (
-    <input
-      {...rest}
-      value={value}
-      onChange={(e) => onChange(e.target.value)}
-      className="w-full rounded-full border border-border bg-surface px-4 py-2 text-sm outline-none focus:border-lime"
-    />
-  );
-}
-
-function Toggle({
-  label,
-  checked,
-  onChange,
-}: {
-  label: string;
-  checked: boolean;
-  onChange: () => void;
-}) {
-  return (
-    <button
-      onClick={onChange}
-      className="w-full flex items-center justify-between rounded-2xl border border-border bg-surface px-4 py-3 text-sm font-semibold"
-    >
-      <span>{label}</span>
-      <span
-        className={`h-6 w-10 rounded-full p-0.5 transition-colors ${checked ? "bg-lime" : "bg-secondary"}`}
-      >
-        <span
-          className={`block h-5 w-5 rounded-full bg-background transition-transform ${checked ? "translate-x-4" : ""}`}
-        />
-      </span>
-    </button>
-  );
-}
 
 
