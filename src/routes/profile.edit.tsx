@@ -126,30 +126,8 @@ function EditProfile() {
     setSections((prev) => ({ ...prev, [k]: !prev[k] }));
   };
 
-  const addSport = (s: Sport) => {
-    if (sports.some((x) => x.name === s)) return;
-    markDirty();
-    setSports([...sports, { name: s, skill: 3 }]);
-  };
-  const removeSport = (s: Sport) => {
-    markDirty();
-    setSports(sports.filter((x) => x.name !== s));
-  };
-  const setSkill = (s: Sport, skill: number) => {
-    markDirty();
-    setSports(sports.map((x) => (x.name === s ? { ...x, skill } : x)));
-  };
-  const togglePosition = (s: Sport, pos: string) => {
-    markDirty();
-    setSports(
-      sports.map((x) => {
-        if (x.name !== s) return x;
-        const cur = x.positions ?? [];
-        const next = cur.includes(pos) ? cur.filter((p) => p !== pos) : [...cur, pos];
-        return { ...x, positions: next };
-      }),
-    );
-  };
+
+
 
   useEffect(() => {
     if (user) setConfirmedUser(user);
