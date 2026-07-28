@@ -223,24 +223,6 @@ function EditProfile() {
   };
   const linkErrors = links.map((l) => validateUrl(l.url));
 
-  function validateBirthday(value: string): string | null {
-    if (!value) return null;
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return "Enter a valid date (YYYY-MM-DD)";
-    const [y, m, day] = value.split("-").map(Number);
-    const d = new Date(y, m - 1, day);
-    if (
-      isNaN(d.getTime()) ||
-      d.getFullYear() !== y ||
-      d.getMonth() !== m - 1 ||
-      d.getDate() !== day
-    ) {
-      return "Enter a valid date (e.g., 2005-06-15)";
-    }
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    if (d > today) return "Birthday cannot be in the future";
-    return null;
-  }
 
   const save = async () => {
     if (!profileUser) {
