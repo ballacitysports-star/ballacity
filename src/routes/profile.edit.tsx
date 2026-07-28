@@ -347,120 +347,36 @@ function EditProfile() {
       </div>
 
       <Section title="Basics">
-        <Field label="Cover photo">
-          <ImageUploader
-            kind="cover"
-            bucket="covers"
-            pathPrefix={profileUser?.id}
-            value={coverUrl ?? ""}
-            onChange={(url) => {
-              markDirty();
-              setCoverUrl(url);
-            }}
-            onClear={() => {
-              markDirty();
-              setCoverUrl(undefined);
-            }}
-          />
-        </Field>
-        <Field label="Photo">
-          <ImageUploader
-            kind="avatar"
-            bucket="avatars"
-            pathPrefix={profileUser?.id}
-            value={avatarUrl ?? ""}
-            onChange={(url) => {
-              markDirty();
-              setAvatarUrl(url);
-            }}
-            onClear={() => {
-              markDirty();
-              setAvatarUrl(undefined);
-            }}
-          />
-        </Field>
-        <Field label="Display name">
-          <Input
-            value={name}
-            onChange={(v) => {
-              markDirty();
-              setName(v);
-            }}
-            maxLength={60}
-          />
-        </Field>
-        <Field label="Username">
-          <Input
-            value={username}
-            onChange={(v) => {
-              markDirty();
-              setUsername(v);
-            }}
-            maxLength={30}
-            placeholder="@you"
-          />
-        </Field>
-        <Field label="Avatar initials (fallback)">
-          <Input
-            value={avatar}
-            onChange={(v) => {
-              markDirty();
-              setAvatar(v);
-            }}
-            maxLength={3}
-          />
-        </Field>
-        <Field label="City">
-          <LocationAutocomplete
-            value={city}
-            onChange={(v) => {
-              markDirty();
-              setCity(v);
-            }}
-            placeholder="Your city"
-            mode="city"
-          />
-        </Field>
-        <Field label="Bio">
-          <textarea
-            value={bio}
-            onChange={(e) => {
-              markDirty();
-              setBio(e.target.value);
-            }}
-            maxLength={280}
-            rows={3}
-            className="w-full rounded-2xl border border-border bg-surface px-3 py-2 text-sm outline-none focus:border-lime"
-          />
-          <div className="mt-1 text-right text-[10px] text-muted-foreground">{bio.length}/280</div>
-        </Field>
-        <Field label="Birthday">
-          <input
-            type="date"
-            value={birthday}
-            onChange={(e) => {
-              markDirty();
-              const v = e.target.value;
-              setBirthday(v);
-              setBirthdayError(validateBirthday(v));
-            }}
-            max={new Date().toISOString().slice(0, 10)}
-            aria-invalid={birthdayError ? true : undefined}
-            className={`w-full rounded-2xl border bg-surface px-3 py-2 text-sm outline-none focus:border-lime ${birthdayError ? "border-destructive" : "border-border"}`}
-          />
-          {birthdayError && <p className="mt-1 text-xs text-destructive">{birthdayError}</p>}
-        </Field>
-        <Field label="Graduating class">
-          <Input
-            value={graduatingClass}
-            onChange={(v) => {
-              markDirty();
-              setGraduatingClass(v.replace(/[^0-9]/g, "").slice(0, 4));
-            }}
-            placeholder={`e.g. ${new Date().getFullYear() + 4}`}
-            maxLength={4}
-          />
-        </Field>
+        <ProfileBasicsFields
+          userId={profileUser?.id}
+          value={{
+            name,
+            username,
+            avatar,
+            avatarUrl,
+            coverUrl,
+            city,
+            bio,
+            birthday,
+            graduatingClass,
+          }}
+          birthdayError={birthdayError}
+          onChange={(patch) => {
+            markDirty();
+            if ("name" in patch) setName(patch.name!);
+            if ("username" in patch) setUsername(patch.username!);
+            if ("avatar" in patch) setAvatar(patch.avatar!);
+            if ("avatarUrl" in patch) setAvatarUrl(patch.avatarUrl);
+            if ("coverUrl" in patch) setCoverUrl(patch.coverUrl);
+            if ("city" in patch) setCity(patch.city!);
+            if ("bio" in patch) setBio(patch.bio!);
+            if ("birthday" in patch) {
+              setBirthday(patch.birthday!);
+              setBirthdayError(validateBirthday(patch.birthday!));
+            }
+            if ("graduatingClass" in patch) setGraduatingClass(patch.graduatingClass!);
+          }}
+        />
       </Section>
 
       <Section title="Sports & skill">
