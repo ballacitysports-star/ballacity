@@ -353,6 +353,19 @@ function OnboardingWizard({ type }: { type: AccountType }) {
     }
   };
 
+  // Collapses concurrent submissions (double taps, retry while pending) into a
+  // single in-flight save.
+  const save = () => {
+    if (inFlightRef.current) return inFlightRef.current;
+    const p = runSave().finally(() => {
+      inFlightRef.current = null;
+    });
+    inFlightRef.current = p;
+    return p;
+  };
+
+
+
   const isLast = step === stepLabels.length - 1;
 
   const onNext = async () => {
