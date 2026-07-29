@@ -16,6 +16,8 @@ import { motion } from "framer-motion";
 import type { User } from "@supabase/supabase-js";
 import { toast } from "sonner";
 import { SPORTS, type Sport } from "@/lib/sample-data";
+import { buildProfileRow } from "@/lib/profile-payload";
+
 import {
   useMyProfile,
   setProfileOverrides,
