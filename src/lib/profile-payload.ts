@@ -42,3 +42,16 @@ export function buildProfileRow(input: ProfilePayloadInput) {
     ...(input.links ? { links: input.links } : {}),
   };
 }
+
+/**
+ * Stable fingerprint of a profile row, used as an idempotency key so repeated
+ * onboarding submissions with unchanged data are skipped instead of re-written.
+ */
+export function profileRowFingerprint(row: Record<string, unknown>): string {
+  const stable = Object.keys(row)
+    .sort()
+    .map((k) => [k, row[k]] as const);
+  return JSON.stringify(stable);
+}
+
+export const onboardingSaveKey = (userId: string) => `openrun.onboarding_saved.${userId}`;
