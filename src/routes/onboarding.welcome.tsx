@@ -256,25 +256,26 @@ function OnboardingWizard({ type }: { type: AccountType }) {
       });
 
       const { supabase } = await import("@/integrations/supabase/client");
+      const { buildProfileRow } = await import("@/lib/profile-payload");
       const primary = sports[0]?.name;
-      const skillLevels = Object.fromEntries(sports.map((s) => [s.name, String(s.skill)]));
       const { error } = await supabase.from("profiles").upsert(
-        {
-          id: user.id,
-          display_name: trimmedName,
-          username: basics.username.trim().replace(/^@/, "").slice(0, 30) || null,
-          avatar_initials: initials,
-          bio: basics.bio.trim().slice(0, 280) || null,
-          city: trimmedCity || null,
-          avatar_url: basics.avatarUrl ?? null,
-          cover_url: basics.coverUrl ?? null,
-          birthday: birthdayClean ?? null,
-          graduating_class: gradClean ?? null,
-          ...(primary ? { sport: primary, skill_levels: skillLevels } : {}),
-        } as never,
+        buildProfileRow({
+          userId: user.id,
+          name: trimmedName,
+          username: basics.username,
+          avatarInitials: initials,
+          bio: basics.bio,
+          city: trimmedCity,
+          avatarUrl: basics.avatarUrl,
+          coverUrl: basics.coverUrl,
+          birthday: birthdayClean,
+          graduatingClass: gradClean,
+          sports,
+        }) as never,
         { onConflict: "id" },
       );
       if (error) throw error;
+
 
       try {
         localStorage.setItem("openrun.default_radius_km", String(radius));

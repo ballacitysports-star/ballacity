@@ -16,6 +16,8 @@ import { motion } from "framer-motion";
 import type { User } from "@supabase/supabase-js";
 import { toast } from "sonner";
 import { SPORTS, type Sport } from "@/lib/sample-data";
+import { buildProfileRow } from "@/lib/profile-payload";
+
 import {
   useMyProfile,
   setProfileOverrides,
@@ -274,19 +276,21 @@ function EditProfile() {
     let syncedToServer = false;
     try {
       const { supabase } = await import("@/integrations/supabase/client");
-      const profilePayload = {
-        id: profileUser.id,
-        display_name: trimmedName,
-        username: username.trim().replace(/^@/, "").slice(0, 30) || null,
-        avatar_initials: (avatar.trim() || trimmedName.slice(0, 2)).toUpperCase().slice(0, 3),
-        bio: bio.trim().slice(0, 280) || null,
-        city: trimmedCity || null,
-        avatar_url: avatarUrl ?? null,
-        cover_url: coverUrl ?? null,
-        birthday: birthdayClean ?? null,
-        graduating_class: gradClean ?? null,
-        ...(linksDirty ? { links: cleanedLinks as any } : {}),
-      };
+      const profilePayload = buildProfileRow({
+        userId: profileUser.id,
+        name: trimmedName,
+        username: username,
+        avatarInitials: (avatar.trim() || trimmedName.slice(0, 2)).toUpperCase().slice(0, 3),
+        bio,
+        city: trimmedCity,
+        avatarUrl,
+        coverUrl,
+        birthday: birthdayClean,
+        graduatingClass: gradClean,
+        sports,
+        links: linksDirty ? cleanedLinks : undefined,
+      });
+
       const { error } = await supabase
         .from("profiles")
         .upsert(profilePayload as any, { onConflict: "id" });
