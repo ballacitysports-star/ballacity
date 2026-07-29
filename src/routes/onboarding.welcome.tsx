@@ -1,5 +1,5 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { z } from "zod";
 import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
@@ -122,6 +122,12 @@ function OnboardingWizard({ type }: { type: AccountType }) {
   const [geo, setGeo] = useState<GeoState>({ kind: "idle" });
   const [attempt, setAttempt] = useState(0);
 
+  // Idempotency guards: one in-flight save at a time, plus the fingerprint of
+  // the last row we successfully persisted for this user.
+  const inFlightRef = useRef<Promise<boolean> | null>(null);
+  const savedFingerprintRef = useRef<string | null>(null);
+
+
   // Prefill from the same profile store Edit profile uses so returning users edit
   // rather than re-enter.
   useEffect(() => {
@@ -208,7 +214,7 @@ function OnboardingWizard({ type }: { type: AccountType }) {
     }
   }, [geo]);
 
-  const save = async () => {
+  const runSave = async () => {
     if (!user) {
       toast.error("Sign in to save");
       return false;
@@ -256,25 +262,51 @@ function OnboardingWizard({ type }: { type: AccountType }) {
       });
 
       const { supabase } = await import("@/integrations/supabase/client");
-      const { buildProfileRow } = await import("@/lib/profile-payload");
-      const primary = sports[0]?.name;
-      const { error } = await supabase.from("profiles").upsert(
-        buildProfileRow({
-          userId: user.id,
-          name: trimmedName,
-          username: basics.username,
-          avatarInitials: initials,
-          bio: basics.bio,
-          city: trimmedCity,
-          avatarUrl: basics.avatarUrl,
-          coverUrl: basics.coverUrl,
-          birthday: birthdayClean,
-          graduatingClass: gradClean,
-          sports,
-        }) as never,
-        { onConflict: "id" },
+      const { buildProfileRow, profileRowFingerprint, onboardingSaveKey } = await import(
+        "@/lib/profile-payload"
       );
-      if (error) throw error;
+      const primary = sports[0]?.name;
+      const row = buildProfileRow({
+        userId: user.id,
+        name: trimmedName,
+        username: basics.username,
+        avatarInitials: initials,
+        bio: basics.bio,
+        city: trimmedCity,
+        avatarUrl: basics.avatarUrl,
+        coverUrl: basics.coverUrl,
+        birthday: birthdayClean,
+        graduatingClass: gradClean,
+        sports,
+      });
+
+      // Idempotency: skip the write entirely when this exact row was already
+      // saved for this user (double taps, retries after a remount, back/next).
+      const fingerprint = profileRowFingerprint(row);
+      let alreadySaved = savedFingerprintRef.current === fingerprint;
+      if (!alreadySaved) {
+        try {
+          alreadySaved = localStorage.getItem(onboardingSaveKey(user.id)) === fingerprint;
+        } catch {
+          /* ignore */
+        }
+      }
+
+      if (!alreadySaved) {
+        // Keyed on the primary key, so a retry updates the same row and can
+        // never insert a second profile for this user.
+        const { error } = await supabase
+          .from("profiles")
+          .upsert(row as never, { onConflict: "id", ignoreDuplicates: false });
+        if (error) throw error;
+        savedFingerprintRef.current = fingerprint;
+        try {
+          localStorage.setItem(onboardingSaveKey(user.id), fingerprint);
+        } catch {
+          /* ignore */
+        }
+      }
+
 
 
       try {
@@ -320,6 +352,19 @@ function OnboardingWizard({ type }: { type: AccountType }) {
       setSaving(false);
     }
   };
+
+  // Collapses concurrent submissions (double taps, retry while pending) into a
+  // single in-flight save.
+  const save = () => {
+    if (inFlightRef.current) return inFlightRef.current;
+    const p = runSave().finally(() => {
+      inFlightRef.current = null;
+    });
+    inFlightRef.current = p;
+    return p;
+  };
+
+
 
   const isLast = step === stepLabels.length - 1;
 
