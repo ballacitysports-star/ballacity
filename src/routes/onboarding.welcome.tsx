@@ -122,6 +122,12 @@ function OnboardingWizard({ type }: { type: AccountType }) {
   const [geo, setGeo] = useState<GeoState>({ kind: "idle" });
   const [attempt, setAttempt] = useState(0);
 
+  // Idempotency guards: one in-flight save at a time, plus the fingerprint of
+  // the last row we successfully persisted for this user.
+  const inFlightRef = useRef<Promise<boolean> | null>(null);
+  const savedFingerprintRef = useRef<string | null>(null);
+
+
   // Prefill from the same profile store Edit profile uses so returning users edit
   // rather than re-enter.
   useEffect(() => {
