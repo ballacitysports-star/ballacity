@@ -208,7 +208,7 @@ function OnboardingWizard({ type }: { type: AccountType }) {
     }
   }, [geo]);
 
-  const save = async () => {
+  const runSave = async () => {
     if (!user) {
       toast.error("Sign in to save");
       return false;
