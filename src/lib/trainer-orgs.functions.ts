@@ -381,6 +381,13 @@ export const createStandaloneOrg = createServerFn({ method: "POST" })
     address?: string;
     placeId?: string;
     geo?: { lat: number; lng: number } | null;
+    phone?: string;
+    email?: string;
+    category?: string;
+    amenities?: string[];
+    photos?: string[];
+    hours?: Record<string, unknown>;
+    timezone?: string;
   }) =>
     z
       .object({
@@ -395,6 +402,13 @@ export const createStandaloneOrg = createServerFn({ method: "POST" })
         address: z.string().max(300).optional(),
         placeId: z.string().max(200).optional(),
         geo: geoSchema,
+        phone: z.string().max(40).optional(),
+        email: z.string().email().max(200).optional(),
+        category: z.string().max(60).optional(),
+        amenities: z.array(z.string().max(60)).max(30).optional(),
+        photos: z.array(z.string().url().max(1000)).max(12).optional(),
+        hours: z.record(z.string(), z.unknown()).optional(),
+        timezone: z.string().max(80).optional(),
       })
       .parse(d),
   )
@@ -415,7 +429,14 @@ export const createStandaloneOrg = createServerFn({ method: "POST" })
         address: data.address ?? null,
         place_id: data.placeId ?? null,
         geo: data.geo ?? null,
-      })
+        phone: data.phone ?? null,
+        email: data.email ?? null,
+        category: data.category ?? null,
+        amenities: data.amenities ?? [],
+        photos: data.photos ?? [],
+        hours: data.hours ?? {},
+        timezone: data.timezone ?? null,
+      } as never)
       .select("id")
       .single();
     if (error) throw new Error(error.message);
@@ -454,6 +475,13 @@ export const updateTrainerOrg = createServerFn({ method: "POST" })
     address?: string | null;
     placeId?: string | null;
     geo?: { lat: number; lng: number } | null;
+    phone?: string | null;
+    email?: string | null;
+    category?: string | null;
+    amenities?: string[];
+    photos?: string[];
+    hours?: Record<string, unknown>;
+    timezone?: string | null;
   }) =>
     z
       .object({
@@ -469,6 +497,13 @@ export const updateTrainerOrg = createServerFn({ method: "POST" })
         address: z.string().max(300).nullable().optional(),
         placeId: z.string().max(200).nullable().optional(),
         geo: geoSchema,
+        phone: z.string().max(40).nullable().optional(),
+        email: z.string().email().max(200).nullable().optional(),
+        category: z.string().max(60).nullable().optional(),
+        amenities: z.array(z.string().max(60)).max(30).optional(),
+        photos: z.array(z.string().url().max(1000)).max(12).optional(),
+        hours: z.record(z.string(), z.unknown()).optional(),
+        timezone: z.string().max(80).nullable().optional(),
       })
       .parse(d),
   )
@@ -485,6 +520,14 @@ export const updateTrainerOrg = createServerFn({ method: "POST" })
     if (data.address !== undefined) patch.address = data.address;
     if (data.placeId !== undefined) patch.place_id = data.placeId;
     if (data.geo !== undefined) patch.geo = data.geo ?? null;
+    const extra = patch as Record<string, unknown>;
+    if (data.phone !== undefined) extra.phone = data.phone;
+    if (data.email !== undefined) extra.email = data.email;
+    if (data.category !== undefined) extra.category = data.category;
+    if (data.amenities !== undefined) extra.amenities = data.amenities;
+    if (data.photos !== undefined) extra.photos = data.photos;
+    if (data.hours !== undefined) extra.hours = data.hours;
+    if (data.timezone !== undefined) extra.timezone = data.timezone;
     const { error } = await context.supabase
       .from("trainer_orgs")
       .update(patch)
