@@ -349,44 +349,66 @@ export type MeSport = {
   winRate: number; // 0–1
 };
 
+const ME_STATS = {
+  played: 47,
+  reliability: 98,
+  sportsmanship: 4.9,
+  friends: 124,
+  hosted: 12,
+  endorsements: 63,
+};
+
+const ME_RELIABILITY = {
+  score: 98,
+  showUpRate: 0.98,
+  onTimeRate: 0.94,
+  lastMinuteCancels: 0,
+  currentStreak: 9,
+  longestStreak: 14,
+} satisfies ReliabilityBreakdown;
+
+const ME_SPORTSMANSHIP = {
+  rating: 4.9,
+  reviewCount: 38,
+  traits: {
+    respectful: 36,
+    communicative: 31,
+    fairPlay: 34,
+    positive: 29,
+    onTime: 33,
+  } satisfies SportsmanshipTraits,
+  quotes: [
+    { author: "Jamie L.", body: "Always calls his own fouls. Great teammate.", sport: "Basketball" as Sport },
+    { author: "Priya S.", body: "On time, communicative, and hustles every play.", sport: "Soccer" as Sport },
+    { author: "Marcus T.", body: "Encourages everyone on the court, beginners included.", sport: "Pickleball" as Sport },
+  ],
+};
+
+/** Badge engine inputs for the demo profile — reliability + sportsmanship only. */
+export const ME_BADGE_STATS: BadgeStats = makeBadgeStats({
+  gamesPlayed: ME_STATS.played,
+  hosted: ME_STATS.hosted,
+  showUpRate: ME_RELIABILITY.showUpRate,
+  onTimeRate: ME_RELIABILITY.onTimeRate,
+  lastMinuteCancels: ME_RELIABILITY.lastMinuteCancels,
+  currentStreak: ME_RELIABILITY.currentStreak,
+  longestStreak: ME_RELIABILITY.longestStreak,
+  daysSinceLastCancel: 180,
+  sportsmanshipRating: ME_SPORTSMANSHIP.rating,
+  reviewCount: ME_SPORTSMANSHIP.reviewCount,
+  traits: ME_SPORTSMANSHIP.traits,
+  verified: true,
+});
+
 export const ME = {
   name: "Alex Rivera",
   username: "@alex",
   avatar: "AR",
   bio: "Pickup hooper · weekend keeper · always down for one more game.",
   city: "New York, NY",
-  stats: {
-    played: 47,
-    reliability: 98,
-    sportsmanship: 4.9,
-    friends: 124,
-    hosted: 12,
-    endorsements: 63,
-  },
-  reliability: {
-    score: 98,
-    showUpRate: 0.98,
-    onTimeRate: 0.94,
-    lastMinuteCancels: 0,
-    currentStreak: 9,
-    longestStreak: 14,
-  } satisfies ReliabilityBreakdown,
-  sportsmanship: {
-    rating: 4.9,
-    reviewCount: 38,
-    traits: {
-      respectful: 36,
-      communicative: 31,
-      fairPlay: 34,
-      positive: 29,
-      onTime: 33,
-    } satisfies SportsmanshipTraits,
-    quotes: [
-      { author: "Jamie L.", body: "Always calls his own fouls. Great teammate.", sport: "Basketball" as Sport },
-      { author: "Priya S.", body: "On time, communicative, and hustles every play.", sport: "Soccer" as Sport },
-      { author: "Marcus T.", body: "Encourages everyone on the court, beginners included.", sport: "Pickleball" as Sport },
-    ],
-  },
+  stats: ME_STATS,
+  reliability: ME_RELIABILITY,
+  sportsmanship: ME_SPORTSMANSHIP,
   sports: [
     { name: "Basketball" as Sport, system: "SELF", tier: "Advanced", favorite: true, gamesPlayed: 24, winRate: 0.62 },
     { name: "Soccer" as Sport, system: "SELF", tier: "Intermediate+", favorite: true, gamesPlayed: 14, winRate: 0.57 },
@@ -394,15 +416,9 @@ export const ME = {
     { name: "Tennis" as Sport, system: "NTRP", tier: "3.0 NTRP", favorite: false, gamesPlayed: 5, winRate: 0.4 },
     { name: "Running" as Sport, system: "PACE", tier: "7:45/mi", favorite: false, gamesPlayed: 11, winRate: 0.0 },
   ] satisfies MeSport[],
-  badges: [
-    "Reliable Player",
-    "Captain x12",
-    "On a 9-game streak",
-    "Verified",
-    "Top 5% Sportsmanship",
-    "Host · 12 games",
-    "Community MVP",
-  ],
+  /** Derived from attendance reliability + sportsmanship, never from skill. */
+  badges: earnedBadgeIds(ME_BADGE_STATS),
+
   recentActivity: [
     { kind: "played", label: "Sunday Run at Rucker", when: "2 days ago", sport: "Basketball" as Sport },
     { kind: "hosted", label: "Pickleball open play", when: "5 days ago", sport: "Pickleball" as Sport },
