@@ -5,7 +5,8 @@ import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/use-auth";
 import { useAccountType, type AccountType } from "@/lib/account-type";
-import { getFeedPrefsSnapshot, setFeedPrefs, setProfileOverrides, useMyProfile } from "@/lib/user-prefs-store";
+import { getFeedPrefsSnapshot, setFeedPrefs, setProfileOverrides, useMyProfile, useDistanceUnit } from "@/lib/user-prefs-store";
+import { kmToMi, miToKm } from "@/lib/distance";
 import { Section, validateBirthday } from "@/components/profile/ProfileFormPrimitives";
 import {
   ProfileBasicsFields,
