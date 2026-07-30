@@ -9,6 +9,8 @@ import { useAuth } from "@/hooks/use-auth";
 import { getOrCreateDirectConversation } from "@/lib/messages";
 import { Button } from "@/components/ui/button";
 import { SPORTS, HERO_IMAGE } from "@/lib/sample-data";
+import { formatSportLevel, parseSportLevels } from "@/lib/sport-levels";
+
 import { kmToMi } from "@/lib/distance";
 import type { PlayerAvailability } from "@/lib/availability";
 import { ReviewsSection } from "@/components/ReviewsSection";
