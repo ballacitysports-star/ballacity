@@ -330,6 +330,26 @@ export function useFeedPrefs(): FeedPrefs {
   };
 }
 
+/** Resolve an "auto" preference into a concrete unit using device locale. */
+export function resolveDistanceUnit(pref: DistanceUnitPref): DistanceUnit {
+  if (pref === "mi" || pref === "km") return pref;
+  return getDetectedDistanceUnit();
+}
+
+/**
+ * The unit the UI should render with. Returns the stored override when the
+ * user pinned one; otherwise the region-detected unit (after hydration).
+ */
+export function useDistanceUnit(): DistanceUnit {
+  const { distanceUnit } = useFeedPrefs();
+  const [detected, setDetected] = useState<DistanceUnit>("mi");
+  useEffect(() => {
+    setDetected(getDetectedDistanceUnit());
+  }, []);
+  if (distanceUnit === "mi" || distanceUnit === "km") return distanceUnit;
+  return detected;
+}
+
 export function setFeedPrefs(next: FeedPrefs) {
   prefsStore.set(next);
 }
