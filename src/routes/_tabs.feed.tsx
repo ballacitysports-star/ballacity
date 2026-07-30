@@ -843,13 +843,13 @@ function FeedFilterBody() {
               ) : null}
             </span>
             <span className="inline-flex rounded-full border border-border bg-surface p-0.5">
-              {(["mi", "km"] as const).map((u) => (
+              {(["auto", "mi", "km"] as const).map((u) => (
                 <button
                   key={u}
                   onClick={() => setUnit(u)}
-                  className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase ${unit === u ? "bg-lime text-primary-foreground" : "text-muted-foreground"}`}
+                  className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase ${unitPref === u ? "bg-lime text-primary-foreground" : "text-muted-foreground"}`}
                 >
-                  {u}
+                  {u === "auto" ? `Auto (${unit})` : u}
                 </button>
               ))}
             </span>
