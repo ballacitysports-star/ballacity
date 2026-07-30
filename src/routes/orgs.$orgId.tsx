@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { Building2, MapPin, Users, ShieldCheck, Check, X, LogIn, UserPlus, Clock, Crown, UserMinus } from "lucide-react";
 import { VenueMapPreview } from "@/components/VenueMapPreview";
+import { OrgListingHeader, type OrgListingRow } from "@/components/org/OrgListingHeader";
 
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
