@@ -43,6 +43,8 @@ import {
 } from "@/components/profile/ProfileFormPrimitives";
 import { ProfileBasicsFields } from "@/components/profile/ProfileBasicsFields";
 import { ProfileSportsFields } from "@/components/profile/ProfileSportsFields";
+import { useAutosave } from "@/hooks/use-autosave";
+import { SaveStatus } from "@/components/SaveStatus";
 
 export const Route = createFileRoute("/profile/edit")({
   head: () => ({ meta: [{ title: "Edit profile — OpenRun" }] }),
@@ -762,12 +764,15 @@ function EditProfile() {
         </div>
       </Section>
 
-      <button
-        onClick={save}
-        className="mt-6 w-full rounded-full bg-lime-gradient py-3 text-sm font-bold text-primary-foreground"
-      >
-        Save changes
-      </button>
+      <div className="mt-6 flex items-center justify-between gap-3">
+        <SaveStatus {...autosave} />
+        <button
+          onClick={done}
+          className="rounded-full bg-lime-gradient px-6 py-3 text-sm font-bold text-primary-foreground"
+        >
+          Done
+        </button>
+      </div>
     </div>
   );
 }
