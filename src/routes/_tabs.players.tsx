@@ -518,7 +518,12 @@ function PlayersFilterBody({
   setIncludeUnknownAge: (v: boolean) => void;
 }) {
   const SKILLS = ["All Levels", "Beginner", "Intermediate", "Advanced"];
-  const DISTANCES = [0, 5, 10, 25, 50, 100];
+  const unit = useDistanceUnit();
+  // Round presets in the viewer's unit; the stored value stays in miles.
+  const presets = distancePresets(unit).map((p) => ({
+    ...p,
+    mi: Math.round(p.mi * 100) / 100,
+  }));
   return (
     <>
       <FilterSection label="Sport (Players)">
