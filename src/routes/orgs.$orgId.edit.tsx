@@ -15,6 +15,8 @@ import {
   removeGenericOrgMember,
 } from "@/lib/trainer-orgs.functions";
 import { OrgForm, type OrgFormValue } from "@/components/OrgForm";
+import { useAutosave } from "@/hooks/use-autosave";
+import { SaveStatus } from "@/components/SaveStatus";
 
 export const Route = createFileRoute("/orgs/$orgId/edit")({
   ssr: false,
@@ -121,6 +123,38 @@ function EditOrg() {
       (m) => m.user_id === userId && (m.role === "owner" || m.role === "admin"),
     );
 
+  const persist = async (v: OrgFormValue | null) => {
+    if (!v) return;
+    await update({
+      data: {
+        id: orgId,
+        name: v.name.trim(),
+        handle: v.handle.trim().toLowerCase(),
+        bio: v.bio.trim() || null,
+        city: v.city.trim() || null,
+        website: v.website.trim() || null,
+        address: v.address.trim() || null,
+        placeId: v.placeId || null,
+        geo: v.geo,
+        avatarUrl: v.avatarUrl || null,
+        coverUrl: v.coverUrl || null,
+      },
+    });
+    qc.invalidateQueries({ queryKey: ["org-edit", orgId] });
+  };
+
+  const autosave = useAutosave<OrgFormValue | null>({
+    value,
+    enabled: !!value && isAdmin,
+    validate: (v) => {
+      if (!v) return null;
+      if (!v.name.trim()) return "name is required";
+      if (!v.handle.trim()) return "handle is required";
+      return null;
+    },
+    save: persist,
+  });
+
   if (orgQ.isLoading || !value) {
     return <div className="p-8 text-sm text-muted-foreground">Loading…</div>;
   }
@@ -146,29 +180,10 @@ function EditOrg() {
   }
 
   async function onSubmit() {
-    if (!value) return;
     setSaving(true);
     try {
-      await update({
-        data: {
-          id: orgId,
-          name: value.name.trim(),
-          handle: value.handle.trim().toLowerCase(),
-          bio: value.bio.trim() || null,
-          city: value.city.trim() || null,
-          website: value.website.trim() || null,
-          address: value.address.trim() || null,
-          placeId: value.placeId || null,
-          geo: value.geo,
-          avatarUrl: value.avatarUrl || null,
-          coverUrl: value.coverUrl || null,
-        },
-      });
-      toast.success("Saved");
-      qc.invalidateQueries({ queryKey: ["org-edit", orgId] });
+      await autosave.flush();
       navigate({ to: "/orgs/$orgId", params: { orgId } });
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Failed to save");
     } finally {
       setSaving(false);
     }
@@ -206,6 +221,7 @@ function EditOrg() {
         <p className="text-sm text-muted-foreground mt-1">
           Update details, branding, and members.
         </p>
+        <SaveStatus {...autosave} className="mt-2" />
       </header>
 
       <OrgForm
@@ -215,7 +231,7 @@ function EditOrg() {
         submitting={saving}
         onSubmit={onSubmit}
         onDelete={isOwner ? onDelete : undefined}
-        submitLabel="Save changes"
+        submitLabel="Done"
       />
 
       <section className="rounded-2xl border border-border bg-surface p-4 space-y-3">

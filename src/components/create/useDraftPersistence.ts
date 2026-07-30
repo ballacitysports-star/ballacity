@@ -1,8 +1,9 @@
-import { useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 /**
  * Persist a JSON-serializable draft to localStorage with debounced writes.
- * Returns a `clear()` fn to remove the draft on submit success.
+ * Returns a `clear()` fn to remove the draft on submit success, plus a
+ * status/savedAt pair shaped for <SaveStatus savedLabel="Draft saved" />.
  * Call `loadDraft(key)` at mount time to hydrate initial state.
  */
 export function loadDraft<T>(key: string): T | null {
@@ -18,12 +19,23 @@ export function loadDraft<T>(key: string): T | null {
 
 export function useDraftPersistence<T>(key: string, value: T, delay = 400) {
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const touched = useRef(false);
+  const [status, setStatus] = useState<"idle" | "dirty" | "saved">("idle");
+  const [savedAt, setSavedAt] = useState<number | null>(null);
+
   useEffect(() => {
     if (typeof window === "undefined") return;
     if (timer.current) clearTimeout(timer.current);
+    if (!touched.current) {
+      touched.current = true;
+      return;
+    }
+    setStatus("dirty");
     timer.current = setTimeout(() => {
       try {
         window.localStorage.setItem(key, JSON.stringify(value));
+        setStatus("saved");
+        setSavedAt(Date.now());
       } catch {
         // Ignore quota errors — draft persistence is best-effort.
       }
@@ -33,13 +45,23 @@ export function useDraftPersistence<T>(key: string, value: T, delay = 400) {
     };
   }, [key, value, delay]);
 
+  const clear = useCallback(() => {
+    try {
+      window.localStorage.removeItem(key);
+    } catch {
+      // Ignore.
+    }
+    touched.current = false;
+    setStatus("idle");
+    setSavedAt(null);
+  }, [key]);
+
   return {
-    clear: () => {
-      try {
-        window.localStorage.removeItem(key);
-      } catch {
-        // Ignore.
-      }
-    },
+    clear,
+    status,
+    savedAt,
+    reason: null as string | null,
+    error: null as string | null,
+    retry: async () => {},
   };
 }

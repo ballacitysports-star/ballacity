@@ -43,6 +43,8 @@ import {
 } from "@/components/profile/ProfileFormPrimitives";
 import { ProfileBasicsFields } from "@/components/profile/ProfileBasicsFields";
 import { ProfileSportsFields } from "@/components/profile/ProfileSportsFields";
+import { useAutosave } from "@/hooks/use-autosave";
+import { SaveStatus } from "@/components/SaveStatus";
 
 export const Route = createFileRoute("/profile/edit")({
   head: () => ({ meta: [{ title: "Edit profile — OpenRun" }] }),
@@ -224,44 +226,36 @@ function EditProfile() {
   const linkErrors = links.map((l) => validateUrl(l.url));
 
 
-  const save = async () => {
-    if (!profileUser) {
-      toast.error("Sign in to save");
-      return;
-    }
+  const gradNum = graduatingClass.trim() ? parseInt(graduatingClass, 10) : NaN;
+  const currentYear = new Date().getFullYear();
+  const gradClean =
+    Number.isFinite(gradNum) && gradNum >= 1950 && gradNum <= currentYear + 15
+      ? gradNum
+      : undefined;
+
+  const validate = (): string | null => {
+    if (!name.trim()) return "name is required";
+    if (linkErrors.some((e) => e !== null)) return "fix your profile links";
+    const birthdayErr = validateBirthday(birthday);
+    if (birthdayErr) return birthdayErr.toLowerCase();
+    if (graduatingClass.trim() && gradClean === undefined) return "graduating class must be a year";
+    return null;
+  };
+
+  const persist = async () => {
+    if (!profileUser) throw new Error("Sign in to save");
     const trimmedName = name.trim().slice(0, 60);
-    if (!trimmedName) {
-      toast.error("Name is required");
-      return;
-    }
-    if (linkErrors.some((e) => e !== null)) {
-      toast.error("Fix invalid profile links before saving");
-      return;
-    }
     const cleanedLinks = links
       .map((l) => ({ ...l, url: normalizeUrl(l.url), label: l.label?.trim() || undefined }))
       .filter((l) => l.url);
     const trimmedCity = city.trim().slice(0, 80);
-    const birthdayErr = validateBirthday(birthday);
-    if (birthdayErr) {
-      toast.error(birthdayErr);
-      return;
-    }
     const birthdayClean = birthday && /^\d{4}-\d{2}-\d{2}$/.test(birthday) ? birthday : undefined;
-    const gradNum = graduatingClass.trim() ? parseInt(graduatingClass, 10) : NaN;
-    const currentYear = new Date().getFullYear();
-    const gradClean =
-      Number.isFinite(gradNum) && gradNum >= 1950 && gradNum <= currentYear + 15
-        ? gradNum
-        : undefined;
-    if (graduatingClass.trim() && gradClean === undefined) {
-      toast.error("Graduating class must be a valid year");
-      return;
-    }
+    const initials = (avatar.trim() || trimmedName.slice(0, 2)).toUpperCase().slice(0, 3);
+
     setProfileOverrides(profileUser.id, {
       name: trimmedName,
       username: username.trim().slice(0, 30),
-      avatar: (avatar.trim() || trimmedName.slice(0, 2)).toUpperCase().slice(0, 3),
+      avatar: initials,
       avatarUrl,
       coverUrl,
       city: trimmedCity,
@@ -271,38 +265,53 @@ function EditProfile() {
       sports,
       links: cleanedLinks,
     });
-
-    // Persist publicly visible fields to the profiles table so other users can see them
-    let syncedToServer = false;
-    try {
-      const { supabase } = await import("@/integrations/supabase/client");
-      const profilePayload = buildProfileRow({
-        userId: profileUser.id,
-        name: trimmedName,
-        username: username,
-        avatarInitials: (avatar.trim() || trimmedName.slice(0, 2)).toUpperCase().slice(0, 3),
-        bio,
-        city: trimmedCity,
-        avatarUrl,
-        coverUrl,
-        birthday: birthdayClean,
-        graduatingClass: gradClean,
-        sports,
-        links: linksDirty ? cleanedLinks : undefined,
-      });
-
-      const { error } = await supabase
-        .from("profiles")
-        .upsert(profilePayload as any, { onConflict: "id" });
-      if (error) throw error;
-      syncedToServer = true;
-    } catch (e: any) {
-      console.error("Failed to sync profile to server", e);
-      toast.error(`Saved locally, but couldn't sync to server: ${e?.message ?? "unknown error"}`);
-    }
-
     setFeedPrefs({ ...prefs, preferredSports, sections });
-    if (syncedToServer) toast.success("Profile saved & synced");
+
+    // Persist publicly visible fields so other users can see them.
+    const { supabase } = await import("@/integrations/supabase/client");
+    const profilePayload = buildProfileRow({
+      userId: profileUser.id,
+      name: trimmedName,
+      username,
+      avatarInitials: initials,
+      bio,
+      city: trimmedCity,
+      avatarUrl,
+      coverUrl,
+      birthday: birthdayClean,
+      graduatingClass: gradClean,
+      sports,
+      links: linksDirty ? cleanedLinks : undefined,
+    });
+    const { error } = await supabase
+      .from("profiles")
+      .upsert(profilePayload as any, { onConflict: "id" });
+    if (error) throw error;
+  };
+
+  const autosave = useAutosave({
+    value: {
+      name,
+      username,
+      avatar,
+      avatarUrl,
+      coverUrl,
+      city,
+      bio,
+      birthday,
+      graduatingClass,
+      sports,
+      links,
+      preferredSports,
+      sections,
+    },
+    enabled: !!profileUser,
+    validate,
+    save: persist,
+  });
+
+  const done = async () => {
+    await autosave.flush();
     nav({ to: "/profile" });
   };
 
@@ -314,21 +323,25 @@ function EditProfile() {
 
   return (
     <div className="mx-auto w-full max-w-md sm:max-w-2xl lg:max-w-4xl px-4 py-6 pb-32">
-      <div className="flex items-center justify-between mb-5">
+      <div className="flex items-center justify-between gap-2 mb-5">
         <Link
           to="/profile"
-          className="grid h-10 w-10 place-items-center rounded-full border border-border bg-surface"
+          className="grid h-10 w-10 shrink-0 place-items-center rounded-full border border-border bg-surface"
         >
           <ArrowLeft className="h-4 w-4" />
         </Link>
-        <h1 className="font-display text-lg font-bold">Edit profile</h1>
+        <div className="min-w-0 flex-1 text-center">
+          <h1 className="font-display text-lg font-bold leading-tight">Edit profile</h1>
+          <SaveStatus {...autosave} className="mt-0.5" />
+        </div>
         <button
-          onClick={save}
-          className="inline-flex items-center gap-1 rounded-full bg-lime-gradient px-4 py-2 text-xs font-bold text-primary-foreground"
+          onClick={done}
+          className="inline-flex shrink-0 items-center gap-1 rounded-full bg-lime-gradient px-4 py-2 text-xs font-bold text-primary-foreground"
         >
-          <Check className="h-3.5 w-3.5" /> Save
+          <Check className="h-3.5 w-3.5" /> Done
         </button>
       </div>
+
 
       <Section title="Basics">
         <ProfileBasicsFields
@@ -751,12 +764,15 @@ function EditProfile() {
         </div>
       </Section>
 
-      <button
-        onClick={save}
-        className="mt-6 w-full rounded-full bg-lime-gradient py-3 text-sm font-bold text-primary-foreground"
-      >
-        Save changes
-      </button>
+      <div className="mt-6 flex items-center justify-between gap-3">
+        <SaveStatus {...autosave} />
+        <button
+          onClick={done}
+          className="rounded-full bg-lime-gradient px-6 py-3 text-sm font-bold text-primary-foreground"
+        >
+          Done
+        </button>
+      </div>
     </div>
   );
 }

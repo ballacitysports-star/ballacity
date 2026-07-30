@@ -41,6 +41,8 @@ import {
 import { autocompletePlaces, getPlaceDetails } from "@/lib/places.functions";
 import { useUserLocation } from "@/lib/geo";
 import { toast } from "sonner";
+import { useAutosave } from "@/hooks/use-autosave";
+import { SaveStatus } from "@/components/SaveStatus";
 
 export const Route = createFileRoute("/teams/$teamId/edit")({
   ssr: false,
@@ -428,61 +430,83 @@ export function EditOrgScreen({ org }: { org: Org }) {
   }
 
 
-  async function save() {
-    if (kind === "coach" && slotsError) { alert(slotsError.message); return; }
-    if (kind === "coach" && overridesError) { alert(overridesError.message); return; }
-    if (kind === "coach" && rulesError) { alert(rulesError.message); return; }
-    if (kind === "coach" && venuesError) { alert(venueValidation.firstError ?? "Fix venue addresses"); return; }
+  function validateOrg(): string | null {
+    if (!name.trim()) return "name is required";
+    if (kind === "coach" && slotsError) return slotsError.message;
+    if (kind === "coach" && overridesError) return overridesError.message;
+    if (kind === "coach" && rulesError) return rulesError.message;
+    if (kind === "coach" && venuesError) return venueValidation.firstError ?? "fix venue addresses";
+    return null;
+  }
+
+  async function persistOrg() {
     const handleClean = (handle.startsWith("@") ? handle.slice(1) : handle)
       .replace(/[^a-zA-Z0-9_]/g, "")
       .toLowerCase();
+    await updateOrg(org.id, {
+      name,
+      handle: `@${handleClean || org.handle.slice(1)}`,
+      tagline,
+      city,
+      founded,
+      sports,
+      cover,
+      avatar: computedAvatar,
+      accent,
+      bio,
+      achievements,
+      credentials: kind === "coach" ? credentials : undefined,
+      ratePerHour: kind === "coach" ? rate : undefined,
+      sessionTypes: kind === "coach" ? sessionTypes : undefined,
+      skillRange: kind === "coach" ? { min: skillMin, max: skillMax } : undefined,
+      availabilitySlots: kind === "coach"
+        ? slots
+            .filter((s) => s.start && s.end && s.end > s.start)
+            .map((s) => ({
+              ...s,
+              venue:
+                s.venue && venueAddresses.map((v) => v.trim()).includes(s.venue.trim())
+                  ? s.venue.trim()
+                  : undefined,
+            }))
+        : undefined,
+      availabilityOverrides: kind === "coach" ? overrides : undefined,
+      availabilityRules: kind === "coach" ? rules : undefined,
+      timezone: kind === "coach" ? timezone : undefined,
+      venueAddresses: kind === "coach"
+        ? venueAddresses.map((a) => a.trim()).filter((a) => a.length > 0)
+        : undefined,
+      verifiedVenues: kind === "coach" ? Array.from(verifiedVenues) : undefined,
+      venueGeo: kind === "coach" ? buildVenueGeo(venueAddresses, verifiedVenues, venueGeoMap) : undefined,
+      primaryVenue: kind === "coach"
+        ? primaryVenue && venueAddresses.map((v) => v.trim()).includes(primaryVenue.trim())
+          ? primaryVenue.trim()
+          : null
+        : undefined,
+      league: kind === "team" ? league : undefined,
+      record: kind === "team" ? { w: wins, l: losses } : undefined,
+      homeCourt: kind === "team" ? homeCourt : undefined,
+      staff: kind === "team" ? staff : undefined,
+      roster: kind === "team" ? staff.length : org.roster,
+    });
+  }
+
+  const autosave = useAutosave({
+    value: {
+      name, handle, tagline, city, founded, sports, cover, computedAvatar, accent, bio,
+      achievements, credentials, rate, sessionTypes, skillMin, skillMax, slots, overrides,
+      rules, timezone, venueAddresses, verifiedVenues: Array.from(verifiedVenues), venueGeoMap,
+      primaryVenue, league, wins, losses, homeCourt, staff,
+    },
+    validate: validateOrg,
+    save: persistOrg,
+  });
+
+  async function save() {
+    const invalid = validateOrg();
+    if (invalid) { alert(invalid); return; }
     try {
-      await updateOrg(org.id, {
-        name,
-        handle: `@${handleClean || org.handle.slice(1)}`,
-        tagline,
-        city,
-        founded,
-        sports,
-        cover,
-        avatar: computedAvatar,
-        accent,
-        bio,
-        achievements,
-        credentials: kind === "coach" ? credentials : undefined,
-        ratePerHour: kind === "coach" ? rate : undefined,
-        sessionTypes: kind === "coach" ? sessionTypes : undefined,
-        skillRange: kind === "coach" ? { min: skillMin, max: skillMax } : undefined,
-        availabilitySlots: kind === "coach"
-          ? slots
-              .filter((s) => s.start && s.end && s.end > s.start)
-              .map((s) => ({
-                ...s,
-                venue:
-                  s.venue && venueAddresses.map((v) => v.trim()).includes(s.venue.trim())
-                    ? s.venue.trim()
-                    : undefined,
-              }))
-          : undefined,
-        availabilityOverrides: kind === "coach" ? overrides : undefined,
-        availabilityRules: kind === "coach" ? rules : undefined,
-        timezone: kind === "coach" ? timezone : undefined,
-        venueAddresses: kind === "coach"
-          ? venueAddresses.map((a) => a.trim()).filter((a) => a.length > 0)
-          : undefined,
-        verifiedVenues: kind === "coach" ? Array.from(verifiedVenues) : undefined,
-        venueGeo: kind === "coach" ? buildVenueGeo(venueAddresses, verifiedVenues, venueGeoMap) : undefined,
-        primaryVenue: kind === "coach"
-          ? primaryVenue && venueAddresses.map((v) => v.trim()).includes(primaryVenue.trim())
-            ? primaryVenue.trim()
-            : null
-          : undefined,
-        league: kind === "team" ? league : undefined,
-        record: kind === "team" ? { w: wins, l: losses } : undefined,
-        homeCourt: kind === "team" ? homeCourt : undefined,
-        staff: kind === "team" ? staff : undefined,
-        roster: kind === "team" ? staff.length : org.roster,
-      });
+      await autosave.flush();
       if (kind === "coach") await applyOrgChoiceChange();
       if (kind === "coach") {
         nav({ to: "/trainers/$trainerId", params: { trainerId: org.id } });
@@ -577,6 +601,7 @@ export function EditOrgScreen({ org }: { org: Org }) {
             Step {step} of {STEPS.length}
           </div>
           <h1 className="font-display text-xl font-bold leading-tight">{STEPS[step - 1]}</h1>
+          <SaveStatus {...autosave} className="mt-0.5" />
         </div>
         <div className="rounded-full bg-secondary px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
           {kind === "team" ? "Team" : "Trainer"}
@@ -1489,7 +1514,7 @@ export function EditOrgScreen({ org }: { org: Org }) {
               disabled={kind === "coach" && (!!slotsError || venuesError)}
               className="flex-1 inline-flex items-center justify-center gap-2 rounded-2xl bg-coral-gradient py-3.5 text-sm font-bold text-white glow-coral disabled:opacity-50"
             >
-              <Sparkles className="h-4 w-4" /> Save changes
+              <Sparkles className="h-4 w-4" /> Done
             </motion.button>
           )}
         </div>
