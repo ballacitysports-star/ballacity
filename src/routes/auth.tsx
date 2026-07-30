@@ -460,7 +460,7 @@ function AuthPage() {
                   d="M43.6 20.5H42V20H24v8h11.3c-.8 2.3-2.3 4.3-4.2 5.7l6.2 5.2C40.8 35.6 44 30.2 44 24c0-1.3-.1-2.3-.4-3.5z"
                 />
               </svg>
-              Continue with Google
+              {waitingProvider === "Google" ? "Finishing sign-in…" : "Continue with Google"}
             </button>
 
             <button
