@@ -538,6 +538,7 @@ function AvailablePlayersPage() {
             <span>100 {unit}</span>
           </div>
         </FilterSection>
+      </FilterSheet>
 
 
       {(postOpen || editingPost) && (
