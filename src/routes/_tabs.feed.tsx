@@ -220,10 +220,11 @@ function Feed() {
           ? !!(g.positionsNeeded && (g.positionsNeeded[positionFilter] ?? 0) > 0)
           : true,
       )
-      .filter((g) => (prefs.sections.hostedByMeOnly ? hostedIds.has(g.id) : true))
-      .filter((g) => (prefs.sections.joinedOnly ? joinedSet.has(g.id) : true))
-      .filter((g) => (prefs.sections.freeOnly ? g.price === 0 : true))
-      .filter((g) => (prefs.sections.paidOnly ? g.price > 0 : true))
+      .filter((g) => (prefs.mineFilter === "hosting" ? hostedIds.has(g.id) : true))
+      .filter((g) => (prefs.mineFilter === "joined" ? joinedSet.has(g.id) : true))
+      .filter((g) => (prefs.moneyFilter === "free" ? g.price === 0 : true))
+      .filter((g) => (prefs.moneyFilter === "paid" ? g.price > 0 : true))
+
       .filter((g) =>
         prefs.maxDistanceMi != null ? g.distanceMi <= prefs.maxDistanceMi : true,
       )
