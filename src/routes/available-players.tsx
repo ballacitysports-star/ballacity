@@ -519,19 +519,23 @@ function AvailablePlayersPage() {
           label="Max travel distance"
           hint={maxDistance > 0 ? formatDistance(maxDistance, unit) : "Any"}
         >
+          {/* Slider steps in the viewer's unit; state stays in miles. */}
           <input
             type="range"
             min={0}
             max={100}
             step={5}
-            value={maxDistance}
-            onChange={(e) => setMaxDistance(Number(e.target.value))}
+            value={Math.round(unit === "km" ? miToKm(maxDistance) : maxDistance)}
+            onChange={(e) => {
+              const v = Number(e.target.value);
+              setMaxDistance(unit === "km" ? Math.round(kmToMi(v) * 100) / 100 : v);
+            }}
             className="w-full accent-lime"
-            aria-label="Max travel distance in miles"
+            aria-label={`Max travel distance in ${unit === "km" ? "kilometers" : "miles"}`}
           />
           <div className="flex justify-between text-[10px] uppercase tracking-wider text-muted-foreground">
             <span>Any</span>
-            <span>{formatDistance(100, unit)}</span>
+            <span>100 {unit}</span>
           </div>
         </FilterSection>
       </FilterSheet>

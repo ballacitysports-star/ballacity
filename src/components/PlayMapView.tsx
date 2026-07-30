@@ -59,14 +59,22 @@ export function PlayMapView<T extends MapItemLike>(props?: {
 
   const pins: MapPinItem[] = useMemo(() => {
     if (props?.pins) return props.pins;
-    return defaultGames.map((g) => ({
+    // No explicit pins: derive them from the (already filtered/sorted) items.
+    const games = items as unknown as Array<{
+      id: string;
+      sport: string;
+      lat: number;
+      lng: number;
+      urgent?: boolean;
+    }>;
+    return games.map((g) => ({
       id: g.id,
       emoji: emojiBySport[g.sport] ?? "📍",
       lat: g.lat,
       lng: g.lng,
       urgent: g.urgent,
     }));
-  }, [props?.pins, defaultGames]);
+  }, [props?.pins, items]);
 
   const [active, setActive] = useState<string>(items[0]?.id ?? "");
   const [visibleIds, setVisibleIds] = useState<string[] | null>(null);

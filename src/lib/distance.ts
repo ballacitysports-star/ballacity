@@ -28,6 +28,21 @@ export function formatDistance(
   return `${value.toFixed(decimals)} ${unit}`;
 }
 
+/**
+ * Round distance presets expressed in the viewer's unit, with the underlying
+ * mile value used for filtering/sorting. Keeps chips readable in both systems
+ * (5/10/25/50/100 mi vs 5/10/25/50/100 km) instead of showing 8/16/40 km.
+ */
+export function distancePresets(
+  unit: DistanceUnit,
+  steps: number[] = [5, 10, 25, 50, 100],
+): { mi: number; label: string }[] {
+  return steps.map((v) => ({
+    mi: unit === "km" ? v / KM_PER_MI : v,
+    label: `${v} ${unit}`,
+  }));
+}
+
 /** Render a kilometer-based value in the viewer's unit. */
 export function formatDistanceFromKm(
   valueKm: number | null | undefined,

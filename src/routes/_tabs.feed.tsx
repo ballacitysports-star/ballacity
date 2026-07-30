@@ -17,7 +17,7 @@ import { GAMES, SPORTS, POSITIONS_BY_SPORT, type Sport } from "@/lib/sample-data
 import { useHostedGames } from "@/lib/hosted-games-store";
 import { useJoinedGameIds } from "@/lib/games-store";
 import { useFeedPrefs, setFeedPrefs, DEFAULT_PREFS, useMyProfile, useDistanceUnit, type DistanceUnitPref } from "@/lib/user-prefs-store";
-import { miToKm } from "@/lib/distance";
+import { distancePresets } from "@/lib/distance";
 import { clearScrollRestore, useScrollRestore } from "@/hooks/use-scroll-restore";
 import { motion } from "framer-motion";
 import { zodValidator, fallback } from "@tanstack/zod-adapter";
@@ -476,7 +476,11 @@ function Feed() {
 
 
       {viewMode === "map" ? (
-        <PlayMapView />
+        <PlayMapView
+          items={filtered}
+          getHref={(g) => ({ to: "/games/$gameId", params: { gameId: g.id } })}
+        />
+
       ) : (
       <>
       <div className="relative mb-4">
@@ -775,7 +779,9 @@ function FeedFilterBody() {
   const sections = prefs.sections;
   const unitPref = prefs.distanceUnit;
   const unit = useDistanceUnit();
-  const presetsMi = [5, 10, 25, 50, 100];
+  // Presets are round numbers in the viewer's resolved unit; the stored value
+  // stays in miles so filtering/sorting is unit-agnostic.
+  const presets = distancePresets(unit);
 
   const toggleSport = (s: Sport) => {
     const next = preferredSports.includes(s)
@@ -872,12 +878,12 @@ function FeedFilterBody() {
           >
             Any
           </button>
-          {presetsMi.map((mi) => {
-            const active = prefs.maxDistanceMi === mi;
-            const label = unit === "mi" ? `${mi} mi` : `${miToKm(mi)} km`;
+          {presets.map(({ mi, label }) => {
+            const active =
+              prefs.maxDistanceMi != null && Math.abs(prefs.maxDistanceMi - mi) < 0.01;
             return (
               <button
-                key={mi}
+                key={label}
                 onClick={() => setMaxMi(mi)}
                 className={`rounded-full border px-3 py-1.5 text-xs font-semibold ${active ? "border-lime bg-lime text-primary-foreground" : "border-border bg-surface"}`}
               >

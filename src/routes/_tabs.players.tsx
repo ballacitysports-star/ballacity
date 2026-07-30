@@ -48,7 +48,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import { kmToMi, miToKm } from "@/lib/distance";
+import { kmToMi, miToKm, distancePresets } from "@/lib/distance";
 import { useMyProfile } from "@/lib/user-prefs-store";
 import { FilterBar } from "@/components/FilterBar";
 import { FilterSection } from "@/components/FilterSheet";
@@ -518,7 +518,12 @@ function PlayersFilterBody({
   setIncludeUnknownAge: (v: boolean) => void;
 }) {
   const SKILLS = ["All Levels", "Beginner", "Intermediate", "Advanced"];
-  const DISTANCES = [0, 5, 10, 25, 50, 100];
+  const unit = useDistanceUnit();
+  // Round presets in the viewer's unit; the stored value stays in miles.
+  const presets = distancePresets(unit).map((p) => ({
+    ...p,
+    mi: Math.round(p.mi * 100) / 100,
+  }));
   return (
     <>
       <FilterSection label="Sport (Players)">
@@ -550,9 +555,16 @@ function PlayersFilterBody({
 
       <FilterSection label="Max travel distance">
         <div className="flex flex-wrap gap-2">
-          {DISTANCES.map((d) => (
-            <Chip key={d} active={maxDistance === d} onClick={() => setMaxDistance(d)}>
-              {d === 0 ? "Any" : <>≤ <Distance mi={d} /></>}
+          <Chip active={maxDistance === 0} onClick={() => setMaxDistance(0)}>
+            Any
+          </Chip>
+          {presets.map(({ mi, label }) => (
+            <Chip
+              key={label}
+              active={Math.abs(maxDistance - mi) < 0.01}
+              onClick={() => setMaxDistance(mi)}
+            >
+              ≤ {label}
             </Chip>
           ))}
         </div>
