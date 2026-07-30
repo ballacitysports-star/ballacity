@@ -52,13 +52,19 @@ export const listMyOrgs = createServerFn({ method: "GET" })
     return (data ?? []) as { id: string; name: string; handle: string; avatar: string | null }[];
   });
 
+// Columns anonymous visitors may read. `phone`/`email` are deliberately absent:
+// the database revokes them from the `anon` role so contact details cannot be
+// scraped from every gym listing, so selecting "*" here would fail for guests.
+const ORG_PUBLIC_COLUMNS =
+  "id,owner_id,name,handle,bio,avatar,city,website,verified,created_at,updated_at,avatar_url,cover_url,address,place_id,geo,category,amenities,photos,hours,timezone";
+
 export const getTrainerOrg = createServerFn({ method: "GET" })
   .inputValidator((d: { id: string }) => z.object({ id: z.string().uuid() }).parse(d))
   .handler(async ({ data }) => {
     const sb = publicClient();
     const { data: org, error } = await sb
       .from("trainer_orgs")
-      .select("*")
+      .select(ORG_PUBLIC_COLUMNS)
       .eq("id", data.id)
       .maybeSingle();
     if (error) throw new Error(error.message);
@@ -70,6 +76,21 @@ export const getTrainerOrg = createServerFn({ method: "GET" })
       .order("joined_at", { ascending: true });
     return { org, members: members ?? [] };
   });
+
+// Contact details are only readable by signed-in users.
+export const getTrainerOrgContact = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { id: string }) => z.object({ id: z.string().uuid() }).parse(d))
+  .handler(async ({ data, context }) => {
+    const { data: row, error } = await context.supabase
+      .from("trainer_orgs")
+      .select("phone,email")
+      .eq("id", data.id)
+      .maybeSingle();
+    if (error) throw new Error(error.message);
+    return { phone: row?.phone ?? null, email: row?.email ?? null };
+  });
+
 
 export const createTrainerOrg = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
