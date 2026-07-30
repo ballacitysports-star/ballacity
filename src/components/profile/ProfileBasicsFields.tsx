@@ -86,17 +86,11 @@ export function ProfileBasicsFields({
         </div>
       </Field>
       <Field label="Birthday">
-        <input
-          type="date"
+        <BirthdayInput
           value={value.birthday}
-          onChange={(e) => onChange({ birthday: e.target.value })}
-          max={new Date().toISOString().slice(0, 10)}
-          aria-invalid={birthdayError ? true : undefined}
-          className={`w-full rounded-2xl border bg-surface px-3 py-2 text-sm outline-none focus:border-lime ${
-            birthdayError ? "border-destructive" : "border-border"
-          }`}
+          onChange={(v) => onChange({ birthday: v })}
+          error={birthdayError}
         />
-        {birthdayError && <p className="mt-1 text-xs text-destructive">{birthdayError}</p>}
       </Field>
       <Field label="Graduating class">
         <Input
