@@ -1,6 +1,13 @@
 import { useEffect, useState, useSyncExternalStore } from "react";
 import type { User } from "@supabase/supabase-js";
 import { ME, type Sport } from "@/lib/sample-data";
+import { earnedBadgeIds, makeBadgeStats } from "@/lib/badges";
+
+/** Engine-earned badges first, stored override extras appended (deduped). */
+function mergeBadges(earned: string[], overrides?: string[]): string[] {
+  return Array.from(new Set([...earned, ...(overrides ?? [])]));
+}
+
 import { useAuth } from "@/hooks/use-auth";
 import { supabase } from "@/integrations/supabase/client";
 
