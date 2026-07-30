@@ -100,6 +100,15 @@ function EditOrg() {
 
   useEffect(() => {
     if (orgQ.data && !value) {
+      const row = orgQ.data as typeof orgQ.data & {
+        phone?: string | null;
+        email?: string | null;
+        category?: string | null;
+        amenities?: string[] | null;
+        photos?: string[] | null;
+        hours?: unknown;
+        timezone?: string | null;
+      };
       const geo = orgQ.data.geo as { lat?: number; lng?: number } | null;
       setValue({
         name: orgQ.data.name ?? "",
@@ -112,9 +121,17 @@ function EditOrg() {
         geo: geo?.lat && geo?.lng ? { lat: geo.lat, lng: geo.lng } : null,
         avatarUrl: orgQ.data.avatar_url ?? "",
         coverUrl: orgQ.data.cover_url ?? "",
+        phone: row.phone ?? "",
+        email: row.email ?? "",
+        category: row.category ?? "",
+        amenities: row.amenities ?? [],
+        photos: row.photos ?? [],
+        hours: parseHours(row.hours),
+        timezone: row.timezone ?? "",
       });
     }
   }, [orgQ.data, value]);
+
 
   const isOwner = !!userId && orgQ.data?.owner_id === userId;
   const isAdmin =
