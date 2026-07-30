@@ -53,7 +53,44 @@ export function ProfileSportsFields({
                 <X className="h-3.5 w-3.5" />
               </button>
             </div>
+            {(() => {
+              const scale = scaleForSport(s.name);
+              return (
+                <div className="mt-3">
+                  <div className="mb-1.5 flex items-baseline gap-2">
+                    <span className="text-[10px] uppercase tracking-wider text-muted-foreground">
+                      Level
+                    </span>
+                    <span className="text-[10px] text-muted-foreground/70">{scale.system}</span>
+                  </div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {scale.tiers.map((tier) => {
+                      const active = s.level?.tier === tier;
+                      return (
+                        <button
+                          key={tier}
+                          type="button"
+                          aria-pressed={active}
+                          onClick={() => setLevel(s.name, tier)}
+                          className={`rounded-full border px-2.5 py-1 text-[11px] font-semibold transition-colors ${
+                            active
+                              ? "border-lime bg-lime/15 text-lime"
+                              : "border-border bg-background text-muted-foreground hover:border-lime/40 hover:text-foreground"
+                          }`}
+                        >
+                          {tier}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  {scale.hint && (
+                    <p className="mt-1.5 text-[10px] text-muted-foreground">{scale.hint}</p>
+                  )}
+                </div>
+              );
+            })()}
             {POSITIONS_BY_SPORT[s.name]?.length > 0 && (
+
               <div className="mt-3">
                 <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1.5">
                   Positions
