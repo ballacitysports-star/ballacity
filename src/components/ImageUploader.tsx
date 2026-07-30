@@ -205,20 +205,24 @@ export function ImageUploader({
         </div>
       )}
 
-      <ImageEditorDialog
-        open={open}
-        file={file}
-        aspect={aspect}
-        outputMaxSize={outputMaxSize}
-        shape={shape}
-        title={isCover ? "Edit cover" : "Edit photo"}
-        allowBgRemoval={bgRemoval}
-        onCancel={() => {
-          setOpen(false);
-          setFile(null);
-        }}
-        onConfirm={handleConfirm}
-      />
+      {typeof document !== "undefined" &&
+        createPortal(
+          <ImageEditorDialog
+            open={open}
+            file={file}
+            aspect={aspect}
+            outputMaxSize={outputMaxSize}
+            shape={shape}
+            title={isCover ? "Edit cover" : "Edit photo"}
+            allowBgRemoval={bgRemoval}
+            onCancel={() => {
+              setOpen(false);
+              setFile(null);
+            }}
+            onConfirm={handleConfirm}
+          />,
+          document.body,
+        )}
     </div>
   );
 }
