@@ -78,7 +78,7 @@ export async function listOpenAvailabilities(
   const ids = Array.from(new Set(rows.map((r) => r.user_id)));
   const { data: profs } = await supabase
     .from("profiles")
-    .select("id, display_name, avatar_initials, avatar_url")
+    .select("id, display_name, avatar_initials, avatar_url, sport_levels")
     .in("id", ids);
   const { data: ageRows } = await (supabase.rpc as any)("profile_ages", { _ids: ids });
   const ageById: Record<string, number | null> = Object.fromEntries(
@@ -91,7 +91,9 @@ export async function listOpenAvailabilities(
     author_initials: byId[r.user_id]?.avatar_initials ?? null,
     author_avatar_url: byId[r.user_id]?.avatar_url ?? null,
     author_age: ageById[r.user_id] ?? null,
+    author_sport_levels: byId[r.user_id]?.sport_levels ?? null,
   }));
+
 }
 
 
