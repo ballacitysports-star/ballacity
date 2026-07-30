@@ -269,6 +269,17 @@ export function useMyProfile(currentUser?: User | null): MyProfile | null {
   const dbLinks: ProfileLink[] = Array.isArray(dbProfile?.links)
     ? (dbProfile!.links as ProfileLink[])
     : [];
+  // Per-sport levels live in `profiles.sport_levels`, so they follow the user across devices.
+  const dbLevels = parseSportLevels(dbProfile?.sport_levels);
+  const localSports = overrides.sports;
+  const sports = localSports
+    ? localSports.map((s) => ({ ...s, level: s.level ?? dbLevels[s.name] ?? null }))
+    : Object.keys(dbLevels).length
+      ? (Object.keys(dbLevels) as Sport[]).map((name) => ({ name, level: dbLevels[name] }))
+      : dbProfile?.sport
+        ? [{ name: dbProfile.sport as Sport, level: dbLevels[dbProfile.sport] ?? null }]
+        : base.sports;
+
   return {
     name: overrides.name ?? dbProfile?.display_name ?? base.name,
     username:
