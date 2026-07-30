@@ -9,6 +9,8 @@ import { useAuth } from "@/hooks/use-auth";
 import { getOrCreateDirectConversation } from "@/lib/messages";
 import { Button } from "@/components/ui/button";
 import { SPORTS, HERO_IMAGE } from "@/lib/sample-data";
+import { formatSportLevel, parseSportLevels } from "@/lib/sport-levels";
+
 import { kmToMi } from "@/lib/distance";
 import type { PlayerAvailability } from "@/lib/availability";
 import { ReviewsSection } from "@/components/ReviewsSection";
@@ -71,7 +73,7 @@ function PlayerProfilePage() {
       supabase
         .from("profiles")
         .select(
-          "id, display_name, avatar_initials, bio, sport, username, city, avatar_url, cover_url, graduating_class, links",
+          "id, display_name, avatar_initials, bio, sport, username, city, avatar_url, cover_url, graduating_class, links, sport_levels",
         )
         .eq("id", userId)
         .maybeSingle(),
@@ -155,13 +157,21 @@ function PlayerProfilePage() {
   ).trim();
   const bio = overrides.bio ?? profile.bio ?? "";
   const city = overrides.city ?? profile.city ?? "";
-  const sportsList = overrides.sports?.length
+  const sportLevels = parseSportLevels((profile as any).sport_levels);
+  const sportsBase: { name: string }[] = overrides.sports?.length
     ? overrides.sports
-    : availability?.sports?.length
-      ? availability.sports.map((name) => ({ name }))
-      : profile.sport
-        ? [{ name: profile.sport as any }]
-        : [];
+    : Object.keys(sportLevels).length
+      ? Object.keys(sportLevels).map((name) => ({ name }))
+      : availability?.sports?.length
+        ? availability.sports.map((name) => ({ name }))
+        : profile.sport
+          ? [{ name: profile.sport as any }]
+          : [];
+  const sportsList = sportsBase.map((s) => ({
+    ...s,
+    level: (s as any).level ?? sportLevels[s.name] ?? null,
+  }));
+
   const badges = overrides.badges ?? [];
   const dbLinks = Array.isArray(profile.links) ? (profile.links as any[]) : [];
   const links = overrides.links?.length ? overrides.links : dbLinks;
@@ -352,9 +362,17 @@ function PlayerProfilePage() {
             <div className="space-y-2">
               {sportsList.map((s) => (
                 <div key={s.name} className="rounded-2xl border border-border bg-surface p-3">
-                  <div className="text-sm font-semibold">
-                    {SPORTS.find((sp) => sp.name === s.name)?.emoji ?? "🎯"} {s.name}
+                  <div className="flex items-center gap-2 text-sm font-semibold">
+                    <span>
+                      {SPORTS.find((sp) => sp.name === s.name)?.emoji ?? "🎯"} {s.name}
+                    </span>
+                    {formatSportLevel(s.level) && (
+                      <span className="rounded-full border border-lime/40 bg-lime/10 px-2 py-0.5 text-[10px] font-bold text-lime">
+                        {formatSportLevel(s.level)}
+                      </span>
+                    )}
                   </div>
+
                   {"positions" in s && Array.isArray((s as any).positions) && (s as any).positions.length > 0 && (
                     <div className="mt-2 flex flex-wrap gap-1.5">
                       {((s as any).positions as string[]).map((p) => (

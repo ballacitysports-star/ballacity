@@ -3,6 +3,8 @@ import type { User } from "@supabase/supabase-js";
 import { ME, type Sport } from "@/lib/sample-data";
 import { earnedBadgeIds, makeBadgeStats } from "@/lib/badges";
 import { getDetectedDistanceUnit, type DistanceUnit } from "@/lib/measurement-system";
+import { parseSportLevels, type SportLevel } from "@/lib/sport-levels";
+
 
 /** Engine-earned badges first, stored override extras appended (deduped). */
 function mergeBadges(earned: string[], overrides?: string[]): string[] {
@@ -39,7 +41,7 @@ export type ProfileOverrides = {
   city?: string;
   birthday?: string; // ISO date (YYYY-MM-DD)
   graduatingClass?: number;
-  sports?: { name: Sport; positions?: string[] }[];
+  sports?: { name: Sport; positions?: string[]; level?: SportLevel | null }[];
   badges?: string[];
   links?: ProfileLink[];
 };
@@ -55,7 +57,7 @@ export type MyProfile = {
   birthday?: string;
   graduatingClass?: number;
   stats: typeof ME.stats;
-  sports: { name: Sport; positions?: string[] }[];
+  sports: { name: Sport; positions?: string[]; level?: SportLevel | null }[];
   badges: string[];
   links: ProfileLink[];
 };
@@ -228,7 +230,10 @@ export function useMyProfile(currentUser?: User | null): MyProfile | null {
     birthday?: string | null;
     graduating_class?: number | null;
     links?: unknown;
+    sport?: string | null;
+    sport_levels?: unknown;
   } | null>(null);
+
   useEffect(() => {
     const cb = () => setTick((t) => t + 1);
     overrideListeners.add(cb);
@@ -245,8 +250,9 @@ export function useMyProfile(currentUser?: User | null): MyProfile | null {
     supabase
       .from("profiles")
       .select(
-        "display_name, username, avatar_initials, bio, city, avatar_url, cover_url, graduating_class, links",
+        "display_name, username, avatar_initials, bio, city, avatar_url, cover_url, graduating_class, links, sport, sport_levels",
       )
+
       .eq("id", user.id)
       .maybeSingle()
       .then(async ({ data }) => {
@@ -265,6 +271,17 @@ export function useMyProfile(currentUser?: User | null): MyProfile | null {
   const dbLinks: ProfileLink[] = Array.isArray(dbProfile?.links)
     ? (dbProfile!.links as ProfileLink[])
     : [];
+  // Per-sport levels live in `profiles.sport_levels`, so they follow the user across devices.
+  const dbLevels = parseSportLevels(dbProfile?.sport_levels);
+  const localSports = overrides.sports;
+  const sports = localSports
+    ? localSports.map((s) => ({ ...s, level: s.level ?? dbLevels[s.name] ?? null }))
+    : Object.keys(dbLevels).length
+      ? (Object.keys(dbLevels) as Sport[]).map((name) => ({ name, level: dbLevels[name] }))
+      : dbProfile?.sport
+        ? [{ name: dbProfile.sport as Sport, level: dbLevels[dbProfile.sport] ?? null }]
+        : base.sports;
+
   return {
     name: overrides.name ?? dbProfile?.display_name ?? base.name,
     username:

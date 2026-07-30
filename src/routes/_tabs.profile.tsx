@@ -2,6 +2,8 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { zodValidator, fallback } from "@tanstack/zod-adapter";
 import { z } from "zod";
 import { motion } from "framer-motion";
+import { formatSportLevel } from "@/lib/sport-levels";
+
 import {
   Settings,
   Trophy,
@@ -718,7 +720,15 @@ function Profile() {
           <div className="space-y-2">
             {me.sports.map((s) => (
               <div key={s.name} className="rounded-2xl border border-border bg-surface p-3">
-                <div className="text-sm font-semibold">{s.name}</div>
+                <div className="flex items-center gap-2 text-sm font-semibold">
+                  <span>{s.name}</span>
+                  {formatSportLevel(s.level) && (
+                    <span className="rounded-full border border-lime/40 bg-lime/10 px-2 py-0.5 text-[10px] font-bold text-lime">
+                      {formatSportLevel(s.level)}
+                    </span>
+                  )}
+                </div>
+
                 {s.positions && s.positions.length > 0 && (
                   <div className="mt-2 flex flex-wrap gap-1.5">
                     {s.positions.map((p) => (
