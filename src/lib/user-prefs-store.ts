@@ -245,12 +245,14 @@ export function useMyProfile(currentUser?: User | null): MyProfile | null {
     supabase
       .from("profiles")
       .select(
-        "display_name, username, avatar_initials, bio, city, avatar_url, cover_url, birthday, graduating_class, links",
+        "display_name, username, avatar_initials, bio, city, avatar_url, cover_url, graduating_class, links",
       )
       .eq("id", user.id)
       .maybeSingle()
-      .then(({ data }) => {
-        if (!cancelled) setDbProfile(data as any);
+      .then(async ({ data }) => {
+        if (cancelled) return;
+        const { data: bday } = await (supabase.rpc as any)("get_my_birthday");
+        if (!cancelled) setDbProfile({ ...(data as any), birthday: (bday as string | null) ?? null });
       });
     return () => {
       cancelled = true;

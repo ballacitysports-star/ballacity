@@ -240,7 +240,7 @@ function PlayersPage() {
         }
       }
       if (minA !== null || maxA !== null) {
-        const age = ageFromBirthday(a.author_birthday);
+        const age = a.author_age ?? null;
         if (age === null) {
           // No birthday on file — include only when the user has opted in.
           if (!includeUnknownAge) return false;
@@ -265,16 +265,6 @@ function PlayersPage() {
     });
   }, [list, q, sport, skill, maxDistance, ageMin, ageMax, includeUnknownAge, when]);
 
-  function ageFromBirthday(iso: string | null): number | null {
-    if (!iso) return null;
-    const d = new Date(iso);
-    if (isNaN(d.getTime())) return null;
-    const now = new Date();
-    let age = now.getFullYear() - d.getFullYear();
-    const m = now.getMonth() - d.getMonth();
-    if (m < 0 || (m === 0 && now.getDate() < d.getDate())) age--;
-    return age;
-  }
 
 
 

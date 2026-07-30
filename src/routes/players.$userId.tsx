@@ -42,7 +42,6 @@ type ProfileRow = {
   city: string | null;
   avatar_url: string | null;
   cover_url: string | null;
-  birthday: string | null;
   graduating_class: number | null;
   links: any;
 };
@@ -52,6 +51,7 @@ function PlayerProfilePage() {
   const { user } = useAuth();
   const navigate = useNavigate();
   const [profile, setProfile] = useState<ProfileRow | null>(null);
+  const [age, setAge] = useState<number | null>(null);
   const [availability, setAvailability] = useState<PlayerAvailability | null>(null);
   const [loading, setLoading] = useState(true);
   const [opening, setOpening] = useState(false);
@@ -71,7 +71,7 @@ function PlayerProfilePage() {
       supabase
         .from("profiles")
         .select(
-          "id, display_name, avatar_initials, bio, sport, username, city, avatar_url, cover_url, birthday, graduating_class, links",
+          "id, display_name, avatar_initials, bio, sport, username, city, avatar_url, cover_url, graduating_class, links",
         )
         .eq("id", userId)
         .maybeSingle(),
@@ -87,6 +87,11 @@ function PlayerProfilePage() {
       if (cancelled) return;
       if (prof.error) toast.error(prof.error.message);
       setProfile((prof.data as ProfileRow) ?? null);
+      (supabase.rpc as any)("profile_ages", { _ids: [userId] }).then(
+        ({ data }: { data: { age: number | null }[] | null }) => {
+          if (!cancelled) setAge(data?.[0]?.age ?? null);
+        },
+      );
       setAvailability((avail.data as unknown as PlayerAvailability) ?? null);
       setLoading(false);
     });
@@ -207,9 +212,7 @@ function PlayerProfilePage() {
               {[
                 username,
                 city,
-                profile.birthday && ageFrom(profile.birthday) != null
-                  ? `${ageFrom(profile.birthday)}`
-                  : "",
+                age != null ? `${age}` : "",
               ]
                 .filter(Boolean)
                 .join(" · ")}
@@ -507,15 +510,6 @@ function formatBirthday(iso: string): string {
   return d.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
 }
 
-function ageFrom(iso: string): number | null {
-  const d = new Date(iso + "T00:00:00");
-  if (isNaN(d.getTime())) return null;
-  const now = new Date();
-  let age = now.getFullYear() - d.getFullYear();
-  const m = now.getMonth() - d.getMonth();
-  if (m < 0 || (m === 0 && now.getDate() < d.getDate())) age--;
-  return age >= 0 && age < 150 ? age : null;
-}
 
 type PlayerOrgRow = {
   id: string;
