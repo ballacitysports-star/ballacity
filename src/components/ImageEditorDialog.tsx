@@ -1,7 +1,5 @@
 import { useEffect, useRef, useState, useCallback, useMemo } from "react";
 import {
-  X,
-  Check,
   ZoomIn,
   ZoomOut,
   RotateCw,
@@ -15,6 +13,7 @@ import {
   Sparkles,
   Loader2,
   Scissors,
+  SlidersHorizontal,
 } from "lucide-react";
 import { toast } from "sonner";
 import { loadNormalizedDataUrl } from "@/lib/image-orientation";
@@ -22,13 +21,24 @@ import {
   FILTER_PRESETS,
   DEFAULT_ADJUST,
   buildFilterString,
-  type FilterPreset,
   type Adjust,
 } from "@/lib/image-filters";
 import { removeBackground } from "@/lib/bg-remove.functions";
+import { useIsMobile } from "@/hooks/use-mobile";
+import { useCropGestures } from "@/hooks/use-crop-gestures";
+import { CropOverlay } from "@/components/crop/CropOverlay";
+import {
+  CropAction,
+  CropBottomBar,
+  CropHint,
+  CropOptionsSheet,
+  CropTopBar,
+  OutputOptions,
+  type CropQualityPreset,
+  type CropSizePreset,
+} from "@/components/crop/CropChrome";
 
-export type CropSizePreset = { label: string; maxSize: number };
-export type CropQualityPreset = { label: string; quality: number };
+export type { CropSizePreset, CropQualityPreset };
 
 const DEFAULT_SIZE_PRESETS: CropSizePreset[] = [
   { label: "S", maxSize: 512 },
@@ -70,6 +80,7 @@ export function ImageEditorDialog({
   onCancel,
   onConfirm,
 }: Props) {
+  const isMobile = useIsMobile();
   const [imgSrc, setImgSrc] = useState<string | null>(null);
   const [img, setImg] = useState<HTMLImageElement | null>(null);
   const [hasAlpha, setHasAlpha] = useState(false);
@@ -79,7 +90,7 @@ export function ImageEditorDialog({
   const [minScale, setMinScale] = useState(1);
   const [offset, setOffset] = useState({ x: 0, y: 0 });
 
-  // New transform / adjust / filter state
+  // Transform / adjust / filter state
   const [rotation90, setRotation90] = useState(0); // multiples of 90, in degrees
   const [straighten, setStraighten] = useState(0); // -45..45
   const [flipH, setFlipH] = useState(false);
@@ -89,6 +100,8 @@ export function ImageEditorDialog({
   const [bgRemoving, setBgRemoving] = useState(false);
 
   const [tab, setTab] = useState<Tab>("crop");
+  const [showOptions, setShowOptions] = useState(false);
+  const [touched, setTouched] = useState(false);
 
   const initialSizeIndex = (() => {
     let best = 0;
@@ -103,21 +116,6 @@ export function ImageEditorDialog({
   const [qualityIdx, setQualityIdx] = useState(1);
   const outMax = sizePresets[sizeIdx]?.maxSize ?? outputMaxSize;
   const outQuality = qualityPresets[qualityIdx]?.quality ?? 0.9;
-
-  const pointersRef = useRef<Map<number, { x: number; y: number }>>(new Map());
-  const gestureRef = useRef<{
-    mode: "none" | "pan" | "pinch";
-    startOffset: { x: number; y: number };
-    startScale: number;
-    startCenter: { x: number; y: number };
-    startDist: number;
-  }>({
-    mode: "none",
-    startOffset: { x: 0, y: 0 },
-    startScale: 1,
-    startCenter: { x: 0, y: 0 },
-    startDist: 0,
-  });
 
   // Reset all state whenever the file changes
   useEffect(() => {
@@ -134,6 +132,8 @@ export function ImageEditorDialog({
     setFilterId("original");
     setHasAlpha(false);
     setTab("crop");
+    setShowOptions(false);
+    setTouched(false);
     let cancelled = false;
     loadNormalizedDataUrl(file)
       .then((url) => { if (!cancelled) setImgSrc(url); })
@@ -149,6 +149,14 @@ export function ImageEditorDialog({
     el.src = imgSrc;
   }, [imgSrc]);
 
+  // Lock page scroll while the full-screen editor is open
+  useEffect(() => {
+    if (!open) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => { document.body.style.overflow = prev; };
+  }, [open]);
+
   useEffect(() => {
     if (!open) return;
     const measure = () => {
@@ -159,8 +167,12 @@ export function ImageEditorDialog({
     };
     measure();
     window.addEventListener("resize", measure);
-    return () => window.removeEventListener("resize", measure);
-  }, [open]);
+    window.addEventListener("orientationchange", measure);
+    return () => {
+      window.removeEventListener("resize", measure);
+      window.removeEventListener("orientationchange", measure);
+    };
+  }, [open, tab]);
 
   // Effective source dims after 90° rotation
   const rotatedDims = useMemo(() => {
@@ -169,8 +181,9 @@ export function ImageEditorDialog({
     return { w: swap ? img.height : img.width, h: swap ? img.width : img.height };
   }, [img, rotation90]);
 
+  const gutter = isMobile ? 16 : 24;
   const cropW = containerSize.w > 0
-    ? Math.min(containerSize.w - 24, (containerSize.h - 24) * aspect)
+    ? Math.min(containerSize.w - gutter, (containerSize.h - gutter) * aspect)
     : 0;
   const cropH = cropW / aspect;
 
@@ -214,88 +227,20 @@ export function ImageEditorDialog({
     };
   }, [open]);
 
-  const getPointersArray = () => Array.from(pointersRef.current.values());
+  const { interacting, handlers } = useCropGestures({
+    containerRef,
+    scale,
+    setScale,
+    offset,
+    setOffset,
+    minScale,
+    maxScale,
+    clamp: clampOffset,
+  });
 
-  const startGesture = useCallback(() => {
-    const pts = getPointersArray();
-    if (pts.length === 1) {
-      gestureRef.current = {
-        mode: "pan",
-        startOffset: { x: offset.x, y: offset.y },
-        startScale: scale,
-        startCenter: { x: pts[0].x, y: pts[0].y },
-        startDist: 0,
-      };
-    } else if (pts.length >= 2) {
-      const [a, b] = pts;
-      const cx = (a.x + b.x) / 2;
-      const cy = (a.y + b.y) / 2;
-      const dist = Math.hypot(a.x - b.x, a.y - b.y);
-      gestureRef.current = {
-        mode: "pinch",
-        startOffset: { x: offset.x, y: offset.y },
-        startScale: scale,
-        startCenter: { x: cx, y: cy },
-        startDist: dist || 1,
-      };
-    } else {
-      gestureRef.current.mode = "none";
-    }
-  }, [offset.x, offset.y, scale]);
-
-  const onPointerDown = (e: React.PointerEvent) => {
-    (e.target as Element).setPointerCapture?.(e.pointerId);
-    pointersRef.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
-    startGesture();
-  };
-
-  const onPointerMove = (e: React.PointerEvent) => {
-    if (!pointersRef.current.has(e.pointerId)) return;
-    pointersRef.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
-    const g = gestureRef.current;
-    const pts = getPointersArray();
-    if (g.mode === "pan" && pts.length === 1) {
-      const dx = pts[0].x - g.startCenter.x;
-      const dy = pts[0].y - g.startCenter.y;
-      setOffset(clampOffset(g.startOffset.x + dx, g.startOffset.y + dy, scale));
-    } else if (g.mode === "pinch" && pts.length >= 2) {
-      const [a, b] = pts;
-      const cx = (a.x + b.x) / 2;
-      const cy = (a.y + b.y) / 2;
-      const dist = Math.hypot(a.x - b.x, a.y - b.y);
-      const ratio = dist / g.startDist;
-      const nextScale = Math.max(minScale, Math.min(maxScale, g.startScale * ratio));
-      const el = containerRef.current;
-      const rect = el?.getBoundingClientRect();
-      if (rect) {
-        const containerCx = rect.left + rect.width / 2;
-        const containerCy = rect.top + rect.height / 2;
-        const focalX = (g.startCenter.x - containerCx - g.startOffset.x) / g.startScale;
-        const focalY = (g.startCenter.y - containerCy - g.startOffset.y) / g.startScale;
-        const nx = cx - containerCx - focalX * nextScale;
-        const ny = cy - containerCy - focalY * nextScale;
-        setScale(nextScale);
-        setOffset(clampOffset(nx, ny, nextScale));
-      } else {
-        setScale(nextScale);
-      }
-    }
-  };
-
-  const endPointer = (e: React.PointerEvent) => {
-    (e.target as Element).releasePointerCapture?.(e.pointerId);
-    pointersRef.current.delete(e.pointerId);
-    if (pointersRef.current.size === 0) gestureRef.current.mode = "none";
-    else startGesture();
-  };
-
-  const onWheel = (e: React.WheelEvent) => {
-    e.preventDefault();
-    const delta = -e.deltaY * 0.0015;
-    const next = Math.max(minScale, Math.min(maxScale, scale * (1 + delta)));
-    setScale(next);
-    setOffset(clampOffset(offset.x, offset.y, next));
-  };
+  useEffect(() => {
+    if (interacting) setTouched(true);
+  }, [interacting]);
 
   const onScale = (v: number) => {
     const ratio = v / scale;
@@ -387,9 +332,6 @@ export function ImageEditorDialog({
 
   if (!open) return null;
 
-  const imgW = rotatedDims.w * scale;
-  const imgH = rotatedDims.h * scale;
-
   const tabs: { id: Tab; label: string; icon: React.ReactNode }[] = [
     { id: "crop", label: "Crop", icon: <CropIcon className="h-4 w-4" /> },
     { id: "transform", label: "Transform", icon: <RotateCw className="h-4 w-4" /> },
@@ -400,31 +342,25 @@ export function ImageEditorDialog({
       : []),
   ];
 
+  const options = (
+    <OutputOptions
+      aspect={aspect}
+      sizePresets={sizePresets}
+      sizeIdx={sizeIdx}
+      onSizeIdx={setSizeIdx}
+      qualityPresets={qualityPresets}
+      qualityIdx={qualityIdx}
+      onQualityIdx={setQualityIdx}
+    />
+  );
+
   return (
-    <div className="fixed inset-0 z-[100] flex flex-col bg-black/95 backdrop-blur">
-      <div className="flex items-center justify-between px-4 py-3 text-white">
-        <button
-          type="button"
-          onClick={onCancel}
-          className="grid h-10 w-10 place-items-center rounded-full bg-white/10"
-          aria-label="Cancel"
-        >
-          <X className="h-4 w-4" />
-        </button>
-        <h2 className="font-display text-sm font-bold">{title}</h2>
-        <button
-          type="button"
-          onClick={confirm}
-          disabled={!img}
-          className="inline-flex items-center gap-1 rounded-full bg-lime-gradient px-4 py-2 text-xs font-bold text-primary-foreground disabled:opacity-50"
-        >
-          <Check className="h-3.5 w-3.5" /> Done
-        </button>
-      </div>
+    <div className="fixed inset-0 z-[100] flex h-[100dvh] flex-col overscroll-none bg-black/95 backdrop-blur">
+      <CropTopBar title={title} onCancel={onCancel} onDone={confirm} doneDisabled={!img} />
 
       <div
         ref={containerRef}
-        className="relative flex-1 overflow-hidden touch-none select-none overscroll-none"
+        className="relative min-h-0 flex-1 select-none touch-none overflow-hidden overscroll-none"
         style={{
           touchAction: "none",
           backgroundImage:
@@ -434,12 +370,7 @@ export function ImageEditorDialog({
           backgroundSize: hasAlpha ? "20px 20px" : undefined,
           backgroundPosition: hasAlpha ? "0 0,0 10px,10px -10px,-10px 0px" : undefined,
         }}
-        onPointerDown={onPointerDown}
-        onPointerMove={onPointerMove}
-        onPointerUp={endPointer}
-        onPointerCancel={endPointer}
-        onPointerLeave={endPointer}
-        onWheel={onWheel}
+        {...handlers}
       >
         {img && cropW > 0 && (
           <>
@@ -460,19 +391,8 @@ export function ImageEditorDialog({
                 filter: filterString || undefined,
               }}
             />
-            <div className="pointer-events-none absolute inset-0">
-              <div
-                className="absolute left-1/2 top-1/2"
-                style={{
-                  width: cropW,
-                  height: cropH,
-                  transform: "translate(-50%, -50%)",
-                  boxShadow: "0 0 0 9999px rgba(0,0,0,0.6)",
-                  borderRadius: shape === "circle" ? "9999px" : "12px",
-                  border: "2px solid rgba(255,255,255,0.9)",
-                }}
-              />
-            </div>
+            <CropOverlay width={cropW} height={cropH} shape={shape} showGrid={interacting} />
+            <CropHint visible={!!img && !touched && tab === "crop"} />
           </>
         )}
         {bgRemoving && (
@@ -483,34 +403,53 @@ export function ImageEditorDialog({
             </div>
           </div>
         )}
-        {imgW /* keep referenced for eslint */ === -1 && null}
-        {imgH === -1 && null}
+
+        <CropOptionsSheet open={showOptions} onClose={() => setShowOptions(false)}>
+          {options}
+        </CropOptionsSheet>
       </div>
 
-      <div className="flex flex-col gap-3 px-4 py-3 text-white">
+      <CropBottomBar>
         {/* Tab content */}
         {tab === "crop" && (
-          <div className="flex items-center gap-3">
-            <ZoomOut className="h-4 w-4 opacity-70" />
-            <input
-              type="range"
-              min={minScale}
-              max={maxScale}
-              step={(maxScale - minScale) / 200 || 0.01}
-              value={scale}
-              onChange={(e) => onScale(parseFloat(e.target.value))}
-              className="flex-1 accent-lime"
-              aria-label="Zoom"
-            />
-            <ZoomIn className="h-4 w-4 opacity-70" />
-            <button
-              type="button"
+          <div className="flex items-center justify-center gap-2">
+            {!isMobile && (
+              <>
+                <ZoomOut className="h-4 w-4 opacity-70" />
+                <input
+                  type="range"
+                  min={minScale}
+                  max={maxScale}
+                  step={(maxScale - minScale) / 200 || 0.01}
+                  value={scale}
+                  onChange={(e) => onScale(parseFloat(e.target.value))}
+                  className="flex-1 accent-lime"
+                  aria-label="Zoom"
+                />
+                <ZoomIn className="h-4 w-4 opacity-70" />
+              </>
+            )}
+            <CropAction
               onClick={fitToFrame}
               disabled={!img}
-              className="inline-flex items-center gap-1 rounded-full bg-white/10 px-3 py-1.5 text-[11px] font-semibold hover:bg-white/20 disabled:opacity-50"
-            >
-              <Maximize2 className="h-3.5 w-3.5" /> Fit
-            </button>
+              icon={<Maximize2 className="h-4 w-4" />}
+              label="Fit"
+            />
+            {isMobile && (
+              <>
+                <CropAction
+                  onClick={() => setRotation90((r) => (r + 90) % 360)}
+                  disabled={!img}
+                  icon={<RotateCw className="h-4 w-4" />}
+                  label="Rotate"
+                />
+                <CropAction
+                  onClick={() => setShowOptions(true)}
+                  icon={<SlidersHorizontal className="h-4 w-4" />}
+                  label="Options"
+                />
+              </>
+            )}
           </div>
         )}
 
@@ -518,20 +457,20 @@ export function ImageEditorDialog({
           <div className="space-y-3">
             <div className="flex items-center justify-center gap-2">
               <IconBtn onClick={() => setRotation90((r) => (r - 90 + 360) % 360)} label="Rotate left">
-                <RotateCcw className="h-4 w-4" />
+                <RotateCcw className="h-5 w-5" />
               </IconBtn>
               <IconBtn onClick={() => setRotation90((r) => (r + 90) % 360)} label="Rotate right">
-                <RotateCw className="h-4 w-4" />
+                <RotateCw className="h-5 w-5" />
               </IconBtn>
               <IconBtn onClick={() => setFlipH((v) => !v)} label="Flip horizontal" active={flipH}>
-                <FlipHorizontal className="h-4 w-4" />
+                <FlipHorizontal className="h-5 w-5" />
               </IconBtn>
               <IconBtn onClick={() => setFlipV((v) => !v)} label="Flip vertical" active={flipV}>
-                <FlipVertical className="h-4 w-4" />
+                <FlipVertical className="h-5 w-5" />
               </IconBtn>
             </div>
             <div className="flex items-center gap-3">
-              <span className="w-16 text-[10px] uppercase tracking-wider opacity-60">Straighten</span>
+              <span className="w-16 shrink-0 text-[10px] uppercase tracking-wider opacity-60">Straighten</span>
               <input
                 type="range"
                 min={-45}
@@ -539,7 +478,8 @@ export function ImageEditorDialog({
                 step={0.5}
                 value={straighten}
                 onChange={(e) => setStraighten(parseFloat(e.target.value))}
-                className="flex-1 accent-lime"
+                className="h-8 flex-1 accent-lime"
+                aria-label="Straighten"
               />
               <span className="w-10 text-right text-[11px] tabular-nums">{straighten.toFixed(0)}°</span>
             </div>
@@ -556,17 +496,18 @@ export function ImageEditorDialog({
               ] as [keyof Adjust, string, number, number][]
             ).map(([key, label, min, max]) => (
               <div key={key} className="flex items-center gap-3">
-                <span className="w-20 text-[10px] uppercase tracking-wider opacity-60">{label}</span>
+                <span className="w-20 shrink-0 text-[10px] uppercase tracking-wider opacity-60">{label}</span>
                 <input
                   type="range"
                   min={min}
                   max={max}
                   step={0.01}
                   value={adjust[key]}
+                  aria-label={label}
                   onChange={(e) =>
                     setAdjust((a) => ({ ...a, [key]: parseFloat(e.target.value) }))
                   }
-                  className="flex-1 accent-lime"
+                  className="h-8 flex-1 accent-lime"
                 />
                 <span className="w-10 text-right text-[11px] tabular-nums">
                   {adjust[key].toFixed(2)}
@@ -576,7 +517,7 @@ export function ImageEditorDialog({
             <button
               type="button"
               onClick={() => setAdjust(DEFAULT_ADJUST)}
-              className="mx-auto block rounded-full bg-white/10 px-3 py-1 text-[11px] font-semibold hover:bg-white/20"
+              className="mx-auto block h-9 rounded-full bg-white/10 px-4 text-[11px] font-semibold hover:bg-white/20"
             >
               Reset
             </button>
@@ -584,13 +525,13 @@ export function ImageEditorDialog({
         )}
 
         {tab === "filter" && (
-          <div className="flex flex-wrap justify-center gap-2">
+          <div className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:flex-wrap sm:justify-center sm:overflow-visible">
             {FILTER_PRESETS.map((f) => (
               <button
                 key={f.id}
                 type="button"
                 onClick={() => setFilterId(f.id)}
-                className={`rounded-full px-3 py-1.5 text-[11px] font-semibold transition ${
+                className={`h-10 shrink-0 rounded-full px-4 text-[12px] font-semibold transition ${
                   filterId === f.id
                     ? "bg-lime-gradient text-primary-foreground"
                     : "bg-white/10 text-white hover:bg-white/20"
@@ -608,25 +549,26 @@ export function ImageEditorDialog({
               type="button"
               onClick={handleBgRemove}
               disabled={bgRemoving || !img}
-              className="inline-flex items-center gap-2 rounded-full bg-lime-gradient px-4 py-2 text-xs font-bold text-primary-foreground disabled:opacity-50"
+              className="inline-flex h-11 items-center gap-2 rounded-full bg-lime-gradient px-5 text-xs font-bold text-primary-foreground disabled:opacity-50"
             >
               <Sparkles className="h-4 w-4" />
               {hasAlpha ? "Remove background again" : "Remove background"}
             </button>
-            <p className="text-[10px] text-white/60 text-center max-w-xs">
+            <p className="max-w-xs text-center text-[10px] text-white/60">
               Uses AI to cut out the subject. Output will export as PNG with transparency.
             </p>
           </div>
         )}
 
-        {/* Tab bar */}
-        <div className="flex justify-center gap-1 rounded-full bg-white/5 p-1">
+        {/* Tab bar — scrollable, icon over label, thumb-sized targets */}
+        <div className="-mx-4 flex gap-1 overflow-x-auto px-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:mx-0 sm:justify-center sm:overflow-visible sm:rounded-full sm:bg-white/5 sm:p-1">
           {tabs.map((t) => (
             <button
               key={t.id}
               type="button"
               onClick={() => setTab(t.id)}
-              className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[11px] font-semibold transition ${
+              aria-pressed={tab === t.id}
+              className={`inline-flex min-w-[68px] shrink-0 flex-col items-center justify-center gap-1 rounded-2xl px-3 py-2 text-[11px] font-semibold transition sm:min-w-0 sm:flex-row sm:gap-1.5 sm:rounded-full sm:py-1.5 ${
                 tab === t.id ? "bg-white text-black" : "text-white/80 hover:bg-white/10"
               }`}
             >
@@ -636,48 +578,9 @@ export function ImageEditorDialog({
           ))}
         </div>
 
-        {/* Size + quality */}
-        <div className="flex flex-col gap-1.5">
-          <div className="flex items-center gap-2">
-            <span className="w-14 text-[10px] font-semibold uppercase tracking-wider opacity-60">Size</span>
-            <div className="flex flex-1 gap-1 rounded-full bg-white/5 p-1">
-              {sizePresets.map((p, i) => {
-                const w = aspect >= 1 ? p.maxSize : Math.round(p.maxSize * aspect);
-                const h = aspect >= 1 ? Math.round(p.maxSize / aspect) : p.maxSize;
-                return (
-                  <button
-                    key={p.label}
-                    type="button"
-                    onClick={() => setSizeIdx(i)}
-                    className={`flex-1 rounded-full px-2 py-1 text-[11px] font-semibold transition ${
-                      i === sizeIdx ? "bg-white text-black" : "text-white/80 hover:bg-white/10"
-                    }`}
-                  >
-                    {p.label} <span className="opacity-60">· {w}×{h}</span>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-          <div className="flex items-center gap-2">
-            <span className="w-14 text-[10px] font-semibold uppercase tracking-wider opacity-60">Quality</span>
-            <div className="flex flex-1 gap-1 rounded-full bg-white/5 p-1">
-              {qualityPresets.map((q, i) => (
-                <button
-                  key={q.label}
-                  type="button"
-                  onClick={() => setQualityIdx(i)}
-                  className={`flex-1 rounded-full px-2 py-1 text-[11px] font-semibold transition ${
-                    i === qualityIdx ? "bg-white text-black" : "text-white/80 hover:bg-white/10"
-                  }`}
-                >
-                  {q.label}
-                </button>
-              ))}
-            </div>
-          </div>
-        </div>
-      </div>
+        {/* Size + quality stay inline on desktop; mobile gets them in the sheet */}
+        {!isMobile && options}
+      </CropBottomBar>
     </div>
   );
 }
@@ -698,7 +601,7 @@ function IconBtn({
       type="button"
       onClick={onClick}
       aria-label={label}
-      className={`grid h-10 w-10 place-items-center rounded-full transition ${
+      className={`grid h-11 w-11 place-items-center rounded-full transition ${
         active ? "bg-lime-gradient text-primary-foreground" : "bg-white/10 text-white hover:bg-white/20"
       }`}
     >
