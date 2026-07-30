@@ -13,6 +13,7 @@ import {
   Share2,
   Mail,
   ChevronDown,
+  Star,
 } from "lucide-react";
 import { toast } from "sonner";
 import { VenueMapPreview } from "@/components/VenueMapPreview";
