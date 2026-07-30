@@ -5,7 +5,7 @@ import {
   type FeedView,
 } from "@/lib/user-prefs-store";
 import type { DistanceUnit } from "@/lib/measurement-system";
-import { formatDistanceValue } from "@/lib/distance";
+import { formatDistance } from "@/lib/distance";
 
 /** The saveable part of the prefs: everything that narrows or orders results. */
 export function filterSnapshot(p: FeedPrefs): FeedFilterSnapshot {
@@ -46,7 +46,7 @@ export function suggestViewName(f: FeedFilterSnapshot, unit: DistanceUnit): stri
   const parts: string[] = [];
   if (f.preferredSports.length === 1) parts.push(f.preferredSports[0]);
   else if (f.preferredSports.length > 1) parts.push(`${f.preferredSports.length} sports`);
-  if (f.maxDistanceMi != null) parts.push(formatDistanceValue(f.maxDistanceMi, unit));
+  if (f.maxDistanceMi != null) parts.push(formatDistance(f.maxDistanceMi, unit));
   if (f.moneyFilter === "free") parts.push("Free");
   if (f.moneyFilter === "paid") parts.push("Paid");
   if (f.mineFilter === "hosting") parts.push("Hosting");
