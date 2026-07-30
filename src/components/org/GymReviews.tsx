@@ -178,8 +178,9 @@ export function GymReviews({
               <div className="flex items-start gap-2">
                 <UserAvatar
                   name={r.reviewer?.display_name ?? "Member"}
-                  src={r.reviewer?.avatar_url ?? undefined}
-                  className="h-8 w-8"
+                  initials={r.reviewer?.avatar_initials}
+                  avatarUrl={r.reviewer?.avatar_url}
+                  size="sm"
                 />
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
