@@ -474,6 +474,18 @@ function AuthPage() {
               {waitingProvider === "Apple" ? "Finishing sign-in…" : "Continue with Apple"}
             </button>
 
+            {waitingProvider ? (
+              <p
+                role="status"
+                aria-live="polite"
+                className="text-center text-xs text-muted-foreground"
+              >
+                Waiting for {waitingProvider} to finish… keep this tab open.
+              </p>
+            ) : null}
+
+
+
             <div className="flex items-center gap-3 text-[10px] uppercase tracking-wider text-muted-foreground">
               <div className="h-px flex-1 bg-border" /> or <div className="h-px flex-1 bg-border" />
             </div>
