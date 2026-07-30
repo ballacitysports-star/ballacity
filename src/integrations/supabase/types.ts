@@ -1973,12 +1973,20 @@ export type Database = {
         }
         Returns: boolean
       }
+      has_verified_gym_visit: {
+        Args: { _org: string; _user: string }
+        Returns: boolean
+      }
       is_conversation_participant: {
         Args: { _conv: string; _user: string }
         Returns: boolean
       }
       is_game_participant: {
         Args: { _game_id: string; _user_id: string }
+        Returns: boolean
+      }
+      is_gym_admin_text: {
+        Args: { _reviewee_id: string; _user: string }
         Returns: boolean
       }
       is_org_member: { Args: { _org: string; _user: string }; Returns: boolean }
@@ -1998,6 +2006,10 @@ export type Database = {
           status: string
         }[]
       }
+      moderate_gym_review: {
+        Args: { _hidden: boolean; _review_id: string }
+        Returns: undefined
+      }
       profile_ages: {
         Args: { _ids: string[] }
         Returns: {
@@ -2005,6 +2017,7 @@ export type Database = {
           id: string
         }[]
       }
+      try_uuid: { Args: { _v: string }; Returns: string }
       unsend_message: { Args: { _id: string }; Returns: undefined }
     }
     Enums: {
