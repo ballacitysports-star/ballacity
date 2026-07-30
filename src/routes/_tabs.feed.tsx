@@ -476,7 +476,11 @@ function Feed() {
 
 
       {viewMode === "map" ? (
-        <PlayMapView />
+        <PlayMapView
+          items={filtered}
+          getHref={(g) => ({ to: "/games/$gameId", params: { gameId: g.id } })}
+        />
+
       ) : (
       <>
       <div className="relative mb-4">
