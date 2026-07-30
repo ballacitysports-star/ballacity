@@ -85,6 +85,7 @@ type Tab = "browse" | "mine";
 
 function AvailablePlayersPage() {
   const { user } = useAuth();
+  const unit = useDistanceUnit();
   const navigate = useNavigate();
   const { post: postParam } = Route.useSearch();
   const [tab, setTab] = useState<Tab>("browse");
