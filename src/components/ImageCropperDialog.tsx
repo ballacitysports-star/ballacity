@@ -1,9 +1,21 @@
 import { useEffect, useRef, useState, useCallback } from "react";
-import { X, Check, ZoomIn, ZoomOut, RotateCcw, Maximize2 } from "lucide-react";
+import { ZoomIn, ZoomOut, RotateCcw, Maximize2, SlidersHorizontal } from "lucide-react";
 import { loadNormalizedDataUrl } from "@/lib/image-orientation";
+import { useIsMobile } from "@/hooks/use-mobile";
+import { useCropGestures } from "@/hooks/use-crop-gestures";
+import { CropOverlay } from "@/components/crop/CropOverlay";
+import {
+  CropAction,
+  CropBottomBar,
+  CropHint,
+  CropOptionsSheet,
+  CropTopBar,
+  OutputOptions,
+  type CropQualityPreset,
+  type CropSizePreset,
+} from "@/components/crop/CropChrome";
 
-export type CropSizePreset = { label: string; maxSize: number };
-export type CropQualityPreset = { label: string; quality: number };
+export type { CropSizePreset, CropQualityPreset };
 
 const DEFAULT_SIZE_PRESETS: CropSizePreset[] = [
   { label: "S", maxSize: 512 },
@@ -41,6 +53,7 @@ export function ImageCropperDialog({
   onCancel,
   onConfirm,
 }: Props) {
+  const isMobile = useIsMobile();
   const [imgSrc, setImgSrc] = useState<string | null>(null);
   const [img, setImg] = useState<HTMLImageElement | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -48,6 +61,8 @@ export function ImageCropperDialog({
   const [scale, setScale] = useState(1);
   const [minScale, setMinScale] = useState(1);
   const [offset, setOffset] = useState({ x: 0, y: 0 });
+  const [showOptions, setShowOptions] = useState(false);
+  const [touched, setTouched] = useState(false);
 
   // Pick the preset closest to the parent-provided default as the initial choice
   const initialSizeIndex = (() => {
@@ -64,28 +79,14 @@ export function ImageCropperDialog({
   const outMax = sizePresets[sizeIdx]?.maxSize ?? outputMaxSize;
   const outQuality = qualityPresets[qualityIdx]?.quality ?? 0.9;
 
-  // Multi-pointer tracking for pinch + pan
-  const pointersRef = useRef<Map<number, { x: number; y: number }>>(new Map());
-  const gestureRef = useRef<{
-    mode: "none" | "pan" | "pinch";
-    startOffset: { x: number; y: number };
-    startScale: number;
-    startCenter: { x: number; y: number };
-    startDist: number;
-  }>({
-    mode: "none",
-    startOffset: { x: 0, y: 0 },
-    startScale: 1,
-    startCenter: { x: 0, y: 0 },
-    startDist: 0,
-  });
-
   useEffect(() => {
     if (!open || !file) {
       setImgSrc(null);
       setImg(null);
       return;
     }
+    setTouched(false);
+    setShowOptions(false);
     let cancelled = false;
     loadNormalizedDataUrl(file)
       .then((url) => { if (!cancelled) setImgSrc(url); })
@@ -101,6 +102,14 @@ export function ImageCropperDialog({
     el.src = imgSrc;
   }, [imgSrc]);
 
+  // Lock page scroll while the full-screen editor is open
+  useEffect(() => {
+    if (!open) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => { document.body.style.overflow = prev; };
+  }, [open]);
+
   // Compute container / crop-box size
   useEffect(() => {
     if (!open) return;
@@ -112,12 +121,17 @@ export function ImageCropperDialog({
     };
     measure();
     window.addEventListener("resize", measure);
-    return () => window.removeEventListener("resize", measure);
+    window.addEventListener("orientationchange", measure);
+    return () => {
+      window.removeEventListener("resize", measure);
+      window.removeEventListener("orientationchange", measure);
+    };
   }, [open]);
 
   // Crop box dimensions (fit inside container while preserving aspect)
+  const gutter = isMobile ? 16 : 24;
   const cropW = containerSize.w > 0
-    ? Math.min(containerSize.w - 24, (containerSize.h - 24) * aspect)
+    ? Math.min(containerSize.w - gutter, (containerSize.h - gutter) * aspect)
     : 0;
   const cropH = cropW / aspect;
 
@@ -163,119 +177,26 @@ export function ImageCropperDialog({
     };
   }, [open]);
 
-  const getPointersArray = () => Array.from(pointersRef.current.values());
+  const { interacting, handlers } = useCropGestures({
+    containerRef,
+    scale,
+    setScale,
+    offset,
+    setOffset,
+    minScale,
+    maxScale,
+    clamp: clampOffset,
+  });
 
-  const startGesture = useCallback(() => {
-    const pts = getPointersArray();
-    if (pts.length === 1) {
-      gestureRef.current = {
-        mode: "pan",
-        startOffset: { x: offset.x, y: offset.y },
-        startScale: scale,
-        startCenter: { x: pts[0].x, y: pts[0].y },
-        startDist: 0,
-      };
-    } else if (pts.length >= 2) {
-      const [a, b] = pts;
-      const cx = (a.x + b.x) / 2;
-      const cy = (a.y + b.y) / 2;
-      const dist = Math.hypot(a.x - b.x, a.y - b.y);
-      gestureRef.current = {
-        mode: "pinch",
-        startOffset: { x: offset.x, y: offset.y },
-        startScale: scale,
-        startCenter: { x: cx, y: cy },
-        startDist: dist || 1,
-      };
-    } else {
-      gestureRef.current.mode = "none";
-    }
-  }, [offset.x, offset.y, scale]);
-
-  const onPointerDown = (e: React.PointerEvent) => {
-    (e.target as Element).setPointerCapture?.(e.pointerId);
-    pointersRef.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
-    startGesture();
-  };
-
-  const onPointerMove = (e: React.PointerEvent) => {
-    if (!pointersRef.current.has(e.pointerId)) return;
-    pointersRef.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
-    const g = gestureRef.current;
-    const pts = getPointersArray();
-
-    if (g.mode === "pan" && pts.length === 1) {
-      const dx = pts[0].x - g.startCenter.x;
-      const dy = pts[0].y - g.startCenter.y;
-      setOffset(clampOffset(g.startOffset.x + dx, g.startOffset.y + dy, scale));
-    } else if (g.mode === "pinch" && pts.length >= 2) {
-      const [a, b] = pts;
-      const cx = (a.x + b.x) / 2;
-      const cy = (a.y + b.y) / 2;
-      const dist = Math.hypot(a.x - b.x, a.y - b.y);
-      const ratio = dist / g.startDist;
-      const nextScale = Math.max(minScale, Math.min(maxScale, g.startScale * ratio));
-
-      // Zoom around the pinch center: keep the image point under the gesture center stable,
-      // and follow the two-finger center as it moves (allows repositioning while zooming).
-      const el = containerRef.current;
-      const rect = el?.getBoundingClientRect();
-      if (rect) {
-        const containerCx = rect.left + rect.width / 2;
-        const containerCy = rect.top + rect.height / 2;
-        // Image-space point under the initial pinch center at start of gesture
-        const focalX = (g.startCenter.x - containerCx - g.startOffset.x) / g.startScale;
-        const focalY = (g.startCenter.y - containerCy - g.startOffset.y) / g.startScale;
-        // New offset so that focal point sits under the current pinch center
-        const nx = cx - containerCx - focalX * nextScale;
-        const ny = cy - containerCy - focalY * nextScale;
-        setScale(nextScale);
-        setOffset(clampOffset(nx, ny, nextScale));
-      } else {
-        setScale(nextScale);
-      }
-    }
-  };
-
-  const endPointer = (e: React.PointerEvent) => {
-    (e.target as Element).releasePointerCapture?.(e.pointerId);
-    pointersRef.current.delete(e.pointerId);
-    if (pointersRef.current.size === 0) {
-      gestureRef.current.mode = "none";
-    } else {
-      // Re-anchor remaining pointers so transitioning pinch→pan is smooth
-      startGesture();
-    }
-  };
-
-  const onWheel = (e: React.WheelEvent) => {
-    e.preventDefault();
-    const el = containerRef.current;
-    const rect = el?.getBoundingClientRect();
-    const delta = -e.deltaY * 0.0015;
-    const next = Math.max(minScale, Math.min(maxScale, scale * (1 + delta)));
-    if (rect) {
-      const containerCx = rect.left + rect.width / 2;
-      const containerCy = rect.top + rect.height / 2;
-      const focalX = (e.clientX - containerCx - offset.x) / scale;
-      const focalY = (e.clientY - containerCy - offset.y) / scale;
-      const nx = e.clientX - containerCx - focalX * next;
-      const ny = e.clientY - containerCy - focalY * next;
-      setScale(next);
-      setOffset(clampOffset(nx, ny, next));
-    } else {
-      setScale(next);
-      setOffset(clampOffset(offset.x, offset.y, next));
-    }
-  };
+  useEffect(() => {
+    if (interacting) setTouched(true);
+  }, [interacting]);
 
   const onScale = (v: number) => {
     // Zoom around image center for the slider
     const ratio = v / scale;
-    const nx = offset.x * ratio;
-    const ny = offset.y * ratio;
     setScale(v);
-    setOffset(clampOffset(nx, ny, v));
+    setOffset(clampOffset(offset.x * ratio, offset.y * ratio, v));
   };
 
   const confirm = () => {
@@ -303,45 +224,32 @@ export function ImageCropperDialog({
     setOffset({ x: 0, y: 0 });
   }, [minScale]);
 
-  const resetView = fitToFrame;
-
   if (!open) return null;
 
   const imgW = img ? img.width * scale : 0;
   const imgH = img ? img.height * scale : 0;
 
+  const options = (
+    <OutputOptions
+      aspect={aspect}
+      sizePresets={sizePresets}
+      sizeIdx={sizeIdx}
+      onSizeIdx={setSizeIdx}
+      qualityPresets={qualityPresets}
+      qualityIdx={qualityIdx}
+      onQualityIdx={setQualityIdx}
+    />
+  );
+
   return (
-    <div className="fixed inset-0 z-[100] flex flex-col bg-black/95 backdrop-blur">
-      <div className="flex items-center justify-between px-4 py-3 text-white">
-        <button
-          type="button"
-          onClick={onCancel}
-          className="grid h-10 w-10 place-items-center rounded-full bg-white/10"
-          aria-label="Cancel"
-        >
-          <X className="h-4 w-4" />
-        </button>
-        <h2 className="font-display text-sm font-bold">{title}</h2>
-        <button
-          type="button"
-          onClick={confirm}
-          disabled={!img}
-          className="inline-flex items-center gap-1 rounded-full bg-lime-gradient px-4 py-2 text-xs font-bold text-primary-foreground disabled:opacity-50"
-        >
-          <Check className="h-3.5 w-3.5" /> Done
-        </button>
-      </div>
+    <div className="fixed inset-0 z-[100] flex h-[100dvh] flex-col overscroll-none bg-black/95 backdrop-blur">
+      <CropTopBar title={title} onCancel={onCancel} onDone={confirm} doneDisabled={!img} />
 
       <div
         ref={containerRef}
-        className="relative flex-1 overflow-hidden touch-none select-none overscroll-none"
+        className="relative min-h-0 flex-1 select-none touch-none overflow-hidden overscroll-none"
         style={{ touchAction: "none" }}
-        onPointerDown={onPointerDown}
-        onPointerMove={onPointerMove}
-        onPointerUp={endPointer}
-        onPointerCancel={endPointer}
-        onPointerLeave={endPointer}
-        onWheel={onWheel}
+        {...handlers}
       >
         {img && cropW > 0 && (
           <>
@@ -361,101 +269,58 @@ export function ImageCropperDialog({
                 willChange: "transform",
               }}
             />
-            <div className="pointer-events-none absolute inset-0">
-              <div
-                className="absolute left-1/2 top-1/2"
-                style={{
-                  width: cropW,
-                  height: cropH,
-                  transform: "translate(-50%, -50%)",
-                  boxShadow: "0 0 0 9999px rgba(0,0,0,0.6)",
-                  borderRadius: shape === "circle" ? "9999px" : "12px",
-                  border: "2px solid rgba(255,255,255,0.9)",
-                }}
-              />
-            </div>
+            <CropOverlay width={cropW} height={cropH} shape={shape} showGrid={interacting} />
+            <CropHint visible={!!img && !touched} />
           </>
         )}
+
+        <CropOptionsSheet open={showOptions} onClose={() => setShowOptions(false)}>
+          {options}
+        </CropOptionsSheet>
       </div>
 
-      <div className="flex flex-col gap-2 px-6 py-4 text-white">
-        <div className="flex items-center gap-3">
-          <ZoomOut className="h-4 w-4 opacity-70" />
-          <input
-            type="range"
-            min={minScale}
-            max={maxScale}
-            step={(maxScale - minScale) / 200 || 0.01}
-            value={scale}
-            onChange={(e) => onScale(parseFloat(e.target.value))}
-            className="flex-1 accent-lime"
-            aria-label="Zoom"
-          />
-          <ZoomIn className="h-4 w-4 opacity-70" />
-        </div>
+      <CropBottomBar>
+        {!isMobile && (
+          <div className="flex items-center gap-3">
+            <ZoomOut className="h-4 w-4 opacity-70" />
+            <input
+              type="range"
+              min={minScale}
+              max={maxScale}
+              step={(maxScale - minScale) / 200 || 0.01}
+              value={scale}
+              onChange={(e) => onScale(parseFloat(e.target.value))}
+              className="flex-1 accent-lime"
+              aria-label="Zoom"
+            />
+            <ZoomIn className="h-4 w-4 opacity-70" />
+          </div>
+        )}
+
         <div className="flex items-center justify-center gap-2">
-          <button
-            type="button"
+          <CropAction
             onClick={fitToFrame}
             disabled={!img}
-            className="inline-flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-1.5 text-xs font-semibold text-white hover:bg-white/20 disabled:opacity-50"
-            aria-label="Fit to frame"
-          >
-            <Maximize2 className="h-3.5 w-3.5" /> Fit
-          </button>
-          <button
-            type="button"
-            onClick={resetView}
+            icon={<Maximize2 className="h-4 w-4" />}
+            label="Fit"
+          />
+          <CropAction
+            onClick={fitToFrame}
             disabled={!img}
-            className="inline-flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-1.5 text-xs font-semibold text-white hover:bg-white/20 disabled:opacity-50"
-            aria-label="Reset crop"
-          >
-            <RotateCcw className="h-3.5 w-3.5" /> Reset
-          </button>
+            icon={<RotateCcw className="h-4 w-4" />}
+            label="Reset"
+          />
+          {isMobile && (
+            <CropAction
+              onClick={() => setShowOptions(true)}
+              icon={<SlidersHorizontal className="h-4 w-4" />}
+              label="Options"
+            />
+          )}
         </div>
-        <div className="flex flex-col gap-1.5 pt-1">
-          <div className="flex items-center gap-2">
-            <span className="w-14 text-[10px] font-semibold uppercase tracking-wider opacity-60">Size</span>
-            <div className="flex flex-1 gap-1 rounded-full bg-white/5 p-1">
-              {sizePresets.map((p, i) => {
-                const w = aspect >= 1 ? p.maxSize : Math.round(p.maxSize * aspect);
-                const h = aspect >= 1 ? Math.round(p.maxSize / aspect) : p.maxSize;
-                return (
-                  <button
-                    key={p.label}
-                    type="button"
-                    onClick={() => setSizeIdx(i)}
-                    className={`flex-1 rounded-full px-2 py-1 text-[11px] font-semibold transition ${
-                      i === sizeIdx ? "bg-white text-black" : "text-white/80 hover:bg-white/10"
-                    }`}
-                    aria-pressed={i === sizeIdx}
-                  >
-                    {p.label} <span className="opacity-60">· {w}×{h}</span>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-          <div className="flex items-center gap-2">
-            <span className="w-14 text-[10px] font-semibold uppercase tracking-wider opacity-60">Quality</span>
-            <div className="flex flex-1 gap-1 rounded-full bg-white/5 p-1">
-              {qualityPresets.map((q, i) => (
-                <button
-                  key={q.label}
-                  type="button"
-                  onClick={() => setQualityIdx(i)}
-                  className={`flex-1 rounded-full px-2 py-1 text-[11px] font-semibold transition ${
-                    i === qualityIdx ? "bg-white text-black" : "text-white/80 hover:bg-white/10"
-                  }`}
-                  aria-pressed={i === qualityIdx}
-                >
-                  {q.label}
-                </button>
-              ))}
-            </div>
-          </div>
-        </div>
-      </div>
+
+        {!isMobile && options}
+      </CropBottomBar>
     </div>
   );
 }
