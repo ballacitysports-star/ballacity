@@ -219,7 +219,9 @@ export function ImageUploader({
               setOpen(false);
               setFile(null);
             }}
+            onPickFile={(f) => pickFile(f)}
             onConfirm={handleConfirm}
+
           />,
           document.body,
         )}
