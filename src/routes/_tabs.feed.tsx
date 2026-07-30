@@ -773,7 +773,8 @@ function FeedFilterBody() {
   const hasCity = Boolean(profile?.city?.trim());
   const preferredSports = prefs.preferredSports;
   const sections = prefs.sections;
-  const unit = prefs.distanceUnit;
+  const unitPref = prefs.distanceUnit;
+  const unit = useDistanceUnit();
   const presetsMi = [5, 10, 25, 50, 100];
 
   const toggleSport = (s: Sport) => {
