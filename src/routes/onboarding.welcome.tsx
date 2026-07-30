@@ -490,22 +490,31 @@ function OnboardingWizard({ type }: { type: AccountType }) {
           <div className="mt-5">
             <div className="flex items-center justify-between text-sm font-semibold">
               <span>Search radius</span>
-              <span className="text-muted-foreground">{radius} km</span>
+              <span className="text-muted-foreground">
+                {radiusDisplay} {unit}
+              </span>
             </div>
             <input
               type="range"
               min={1}
-              max={100}
+              max={radiusMax}
               step={1}
-              value={radius}
-              onChange={(e) => setRadius(Number(e.target.value))}
+              value={radiusDisplay}
+              onChange={(e) => {
+                const v = Number(e.target.value);
+                setRadius(unit === "km" ? v : miToKm(v));
+              }}
               className="mt-2 w-full accent-lime"
-              aria-label="Search radius in kilometers"
+              aria-label={`Search radius in ${unit === "km" ? "kilometers" : "miles"}`}
             />
             <div className="mt-1 flex justify-between text-[11px] text-muted-foreground">
-              <span>1 km</span>
-              <span>50 km</span>
-              <span>100 km</span>
+              <span>1 {unit}</span>
+              <span>
+                {Math.round(radiusMax / 2)} {unit}
+              </span>
+              <span>
+                {radiusMax} {unit}
+              </span>
             </div>
           </div>
         </Section>
