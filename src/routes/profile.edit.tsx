@@ -602,6 +602,7 @@ function EditProfile() {
           );
         })()}
       </Section>
+      )}
 
 
       <Section title="Reviews">
