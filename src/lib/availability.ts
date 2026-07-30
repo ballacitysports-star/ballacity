@@ -24,7 +24,11 @@ export type AvailabilityWithAuthor = PlayerAvailability & {
   author_initials: string | null;
   author_avatar_url: string | null;
   author_age: number | null;
+  /** Raw `profiles.sport_levels` jsonb for the author — profile tiers win over `skill_level`. */
+  author_sport_levels: unknown;
 };
+
+
 
 
 export type AvailabilityContactRequest = {
