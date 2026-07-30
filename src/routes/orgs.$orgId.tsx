@@ -79,7 +79,18 @@ function OrgPage() {
     initialData: initial,
   });
 
+  // Phone/email are not readable by signed-out visitors, so they load
+  // separately once we know there's a session.
+  const contact = useQuery({
+    queryKey: ["trainer-org-contact", orgId],
+    queryFn: () => getTrainerOrgContact({ data: { id: orgId } }),
+    enabled: !!auth.user,
+  });
+
   const org = data?.org;
+  const orgWithContact = org
+    ? { ...org, phone: contact.data?.phone ?? null, email: contact.data?.email ?? null }
+    : null;
   const members = (data?.members ?? []) as Array<{
     id: string;
     trainer_id: string;
@@ -91,6 +102,7 @@ function OrgPage() {
   const isOwner = !!auth.user && !!org && org.owner_id === auth.user.id;
   const isAdmin =
     isOwner || (!!myMembership && (myMembership.role === "owner" || myMembership.role === "admin"));
+
 
   const gymReviews = useGymReviews(orgId);
   const reviewSummary = summarizeGymReviews(gymReviews.data ?? []);
