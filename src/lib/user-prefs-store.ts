@@ -228,7 +228,10 @@ export function useMyProfile(currentUser?: User | null): MyProfile | null {
     birthday?: string | null;
     graduating_class?: number | null;
     links?: unknown;
+    sport?: string | null;
+    sport_levels?: unknown;
   } | null>(null);
+
   useEffect(() => {
     const cb = () => setTick((t) => t + 1);
     overrideListeners.add(cb);
