@@ -363,7 +363,7 @@ function EditProfile() {
         />
       </Section>
 
-      <Section title="Sports & skill">
+      <Section title="Sports">
         <ProfileSportsFields
           sports={sports}
           onChange={(next) => {
