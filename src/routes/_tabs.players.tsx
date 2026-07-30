@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import { ViewDensityToggle, type ViewMode, type Density } from "@/components/ViewDensityToggle";
 import { PlayersMapView } from "@/components/PlayersMapView";
+import { NearbyPlayersPanel } from "@/components/NearbyPlayersPanel";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
 import { Logo } from "@/components/Logo";
