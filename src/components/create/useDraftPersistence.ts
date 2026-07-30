@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 /**
  * Persist a JSON-serializable draft to localStorage with debounced writes.
@@ -18,12 +18,23 @@ export function loadDraft<T>(key: string): T | null {
 
 export function useDraftPersistence<T>(key: string, value: T, delay = 400) {
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const first = useRef(true);
+  const [status, setStatus] = useState<"idle" | "dirty" | "saving" | "saved">("idle");
+  const [savedAt, setSavedAt] = useState<number | null>(null);
+
   useEffect(() => {
     if (typeof window === "undefined") return;
     if (timer.current) clearTimeout(timer.current);
+    if (first.current) {
+      first.current = false;
+    } else {
+      setStatus("dirty");
+    }
     timer.current = setTimeout(() => {
       try {
         window.localStorage.setItem(key, JSON.stringify(value));
+        setStatus((s) => (s === "idle" ? s : "saved"));
+        setSavedAt((prev) => (status === "idle" ? prev : Date.now()));
       } catch {
         // Ignore quota errors — draft persistence is best-effort.
       }
@@ -33,13 +44,15 @@ export function useDraftPersistence<T>(key: string, value: T, delay = 400) {
     };
   }, [key, value, delay]);
 
-  return {
-    clear: () => {
-      try {
-        window.localStorage.removeItem(key);
-      } catch {
-        // Ignore.
-      }
-    },
-  };
+  const clear = useCallback(() => {
+    try {
+      window.localStorage.removeItem(key);
+    } catch {
+      // Ignore.
+    }
+    setStatus("idle");
+    setSavedAt(null);
+  }, [key]);
+
+  return { clear, status, savedAt, reason: undefined, error: undefined, retry: () => {} };
 }
