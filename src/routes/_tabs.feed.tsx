@@ -17,8 +17,7 @@ import { useFeedPrefsSync } from "@/hooks/use-feed-prefs-sync";
 import { GAMES, SPORTS, POSITIONS_BY_SPORT, type Sport } from "@/lib/sample-data";
 import { useHostedGames } from "@/lib/hosted-games-store";
 import { useJoinedGameIds } from "@/lib/games-store";
-import { useFeedPrefs, setFeedPrefs, DEFAULT_PREFS, DEFAULT_FILTERS, useMyProfile, useDistanceUnit, type DistanceUnitPref } from "@/lib/user-prefs-store";
-import { distancePresets } from "@/lib/distance";
+import { useFeedPrefs, setFeedPrefs, DEFAULT_PREFS, DEFAULT_FILTERS, useMyProfile } from "@/lib/user-prefs-store";
 import { clearScrollRestore, useScrollRestore } from "@/hooks/use-scroll-restore";
 import { motion } from "framer-motion";
 import { zodValidator, fallback } from "@tanstack/zod-adapter";
@@ -96,6 +95,7 @@ function Feed() {
   const hosted = useHostedGames();
   const joinedIds = useJoinedGameIds();
   const prefs = useFeedPrefs();
+  useFeedPrefsSync();
   const profile = useMyProfile();
   const joinedSet = useMemo(() => new Set(joinedIds), [joinedIds]);
   const hostedIds = useMemo(() => new Set(hosted.map((g) => g.id)), [hosted]);
@@ -514,6 +514,12 @@ function Feed() {
         )}
       </div>
 
+
+      {prefs.savedViews.length > 0 && (
+        <div className="mb-3">
+          <FeedViewsRow compact />
+        </div>
+      )}
 
       <div className="mb-5">
         <SportChips selected={chipSelected} onSelect={setChipSport} />
