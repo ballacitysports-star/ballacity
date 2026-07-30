@@ -775,7 +775,9 @@ function FeedFilterBody() {
   const sections = prefs.sections;
   const unitPref = prefs.distanceUnit;
   const unit = useDistanceUnit();
-  const presetsMi = [5, 10, 25, 50, 100];
+  // Presets are round numbers in the viewer's resolved unit; the stored value
+  // stays in miles so filtering/sorting is unit-agnostic.
+  const presets = distancePresets(unit);
 
   const toggleSport = (s: Sport) => {
     const next = preferredSports.includes(s)
