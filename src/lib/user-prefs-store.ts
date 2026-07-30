@@ -74,11 +74,13 @@ export type FeedSectionToggles = {
 
 export type FeedSortBy = "nearest" | "soonest";
 
+export type DistanceUnitPref = "auto" | DistanceUnit;
+
 export type FeedPrefs = {
   preferredSports: Sport[];
   sections: FeedSectionToggles;
   maxDistanceMi: number | null;
-  distanceUnit: "mi" | "km";
+  distanceUnit: DistanceUnitPref;
   sortBy: FeedSortBy;
 };
 
@@ -93,7 +95,7 @@ export const DEFAULT_PREFS: FeedPrefs = {
     freeOnly: false,
   },
   maxDistanceMi: null,
-  distanceUnit: "mi",
+  distanceUnit: "auto",
   sortBy: "nearest",
 };
 
