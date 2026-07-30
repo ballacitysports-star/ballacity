@@ -15,6 +15,7 @@ import {
   removeGenericOrgMember,
 } from "@/lib/trainer-orgs.functions";
 import { OrgForm, type OrgFormValue } from "@/components/OrgForm";
+import { parseHours } from "@/lib/org-hours";
 import { useAutosave } from "@/hooks/use-autosave";
 import { SaveStatus } from "@/components/SaveStatus";
 
