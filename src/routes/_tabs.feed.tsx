@@ -874,12 +874,12 @@ function FeedFilterBody() {
           >
             Any
           </button>
-          {presetsMi.map((mi) => {
-            const active = prefs.maxDistanceMi === mi;
-            const label = unit === "mi" ? `${mi} mi` : `${miToKm(mi)} km`;
+          {presets.map(({ mi, label }) => {
+            const active =
+              prefs.maxDistanceMi != null && Math.abs(prefs.maxDistanceMi - mi) < 0.01;
             return (
               <button
-                key={mi}
+                key={label}
                 onClick={() => setMaxMi(mi)}
                 className={`rounded-full border px-3 py-1.5 text-xs font-semibold ${active ? "border-lime bg-lime text-primary-foreground" : "border-border bg-surface"}`}
               >
