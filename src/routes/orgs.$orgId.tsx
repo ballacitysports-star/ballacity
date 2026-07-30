@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { Building2, MapPin, Users, ShieldCheck, Check, X, LogIn, UserPlus, Clock, Crown, UserMinus } from "lucide-react";
 import { VenueMapPreview } from "@/components/VenueMapPreview";
+import { OrgListingHeader, type OrgListingRow } from "@/components/org/OrgListingHeader";
 
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -108,104 +109,18 @@ function OrgPage() {
 
   return (
     <div className="mx-auto w-full max-w-md sm:max-w-2xl lg:max-w-4xl p-4 pb-40 space-y-6">
-      <header className="overflow-hidden rounded-2xl border border-border/60 bg-surface">
-        {org.cover_url ? (
-          <div className="relative h-40 w-full sm:h-52">
-            <img src={org.cover_url} alt="" className="h-full w-full object-cover" />
-          </div>
-        ) : null}
-        <div className="flex items-start gap-3 p-5">
-          <div className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-lime/15 text-2xl">
-            {org.avatar_url ? (
-              <img src={org.avatar_url} alt="" className="h-full w-full object-cover" />
-            ) : org.avatar ? (
-              <span>{org.avatar}</span>
-            ) : (
-              <Building2 className="h-6 w-6 text-lime" />
-            )}
-          </div>
-          <div className="min-w-0 flex-1">
-            <h1 className="font-display text-2xl font-bold flex items-center gap-2 flex-wrap">
-              {org.name}
-              {org.verified && (
-                <span className="inline-flex items-center gap-1 rounded-full bg-lime/15 px-2 py-0.5 text-xs font-bold text-lime">
-                  <ShieldCheck className="h-3 w-3" /> Verified
-                </span>
-              )}
-              {isAdmin && (
-                <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/15 px-2 py-0.5 text-xs font-bold text-amber-500">
-                  <Crown className="h-3 w-3" /> {isOwner ? "Owner" : "Admin"}
-                </span>
-              )}
-            </h1>
-            <div className="mt-1 text-sm text-muted-foreground flex flex-wrap items-center gap-2">
-              <span>@{org.handle}</span>
-              {org.city && (
-                <>
-                  <span>·</span>
-                  <span className="inline-flex items-center gap-1">
-                    <MapPin className="h-3.5 w-3.5" /> {org.city}
-                  </span>
-                </>
-              )}
-              <span>·</span>
-              <span className="inline-flex items-center gap-1">
-                <Users className="h-3.5 w-3.5" /> {members.length} trainer{members.length === 1 ? "" : "s"}
-              </span>
-            </div>
-            {org.bio && <p className="mt-3 text-sm text-foreground/90 whitespace-pre-wrap">{org.bio}</p>}
-            {(org as { address?: string | null }).address && (
-              <div className="mt-2 inline-flex items-center gap-1 text-xs text-muted-foreground">
-                <MapPin className="h-3.5 w-3.5" /> {(org as { address?: string }).address}
-              </div>
-            )}
-            {(() => {
-              const geo = (org as { geo?: { lat?: number; lng?: number } | null }).geo;
-              if (!geo || typeof geo.lat !== "number" || typeof geo.lng !== "number") return null;
-              const address = (org as { address?: string | null }).address ?? org.name;
-              const placeId = (org as { place_id?: string | null }).place_id ?? undefined;
-              return (
-                <div className="mt-3 overflow-hidden rounded-2xl border border-border">
-                  <VenueMapPreview address={address} lat={geo.lat} lng={geo.lng} placeId={placeId ?? undefined} />
-                </div>
-              );
-            })()}
-            {org.website && (
-              <a
-                href={org.website}
-                target="_blank"
-                rel="noreferrer"
-                className="mt-2 inline-block text-xs text-lime hover:underline"
-              >
-                {org.website}
-              </a>
-            )}
-
-            <div className="mt-4 flex flex-col gap-2">
-              <MembershipCta orgId={orgId} members={members} />
-              <MemberJoinCta orgId={orgId} />
-            </div>
-          </div>
-          {isAdmin && (
-            <div className="flex shrink-0 flex-col gap-2">
-              <Link
-                to="/orgs/$orgId/edit"
-                params={{ orgId }}
-                className="rounded-full border border-lime/40 bg-lime/10 px-3 py-1.5 text-center text-xs font-bold text-lime hover:bg-lime/20"
-              >
-                Edit
-              </Link>
-              <Link
-                to="/orgs/$orgId/members"
-                params={{ orgId }}
-                className="rounded-full border border-border bg-surface px-3 py-1.5 text-center text-xs font-semibold hover:bg-secondary/60"
-              >
-                Manage members
-              </Link>
-            </div>
-          )}
+      <OrgListingHeader
+        org={org as unknown as OrgListingRow}
+        memberCount={members.length}
+        isAdmin={isAdmin}
+        isOwner={isOwner}
+      >
+        <div className="flex flex-col gap-2">
+          <MembershipCta orgId={orgId} members={members} />
+          <MemberJoinCta orgId={orgId} />
         </div>
-      </header>
+      </OrgListingHeader>
+
 
       <section className="rounded-2xl border border-border/60 bg-surface p-4">
         <h2 className="text-sm font-semibold mb-3 flex items-center gap-2">

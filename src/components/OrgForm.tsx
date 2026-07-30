@@ -1,10 +1,16 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { Loader2, Search } from "lucide-react";
 import { useServerFn } from "@tanstack/react-start";
 import { LocationAutocomplete } from "@/components/LocationAutocomplete";
 import { VenueMapPreview } from "@/components/VenueMapPreview";
 import { ImageUploader } from "@/components/ImageUploader";
+import { HoursEditor } from "@/components/org/HoursEditor";
+import { PhotoGalleryEditor } from "@/components/org/PhotoGalleryEditor";
+import { ProfileStrengthMeter } from "@/components/org/ProfileStrengthMeter";
+import { ListingPreviewCard } from "@/components/org/ListingPreviewCard";
+import { detectTimezone, emptyHours, type OrgHours } from "@/lib/org-hours";
+import { ORG_AMENITIES, ORG_CATEGORIES, isValidPhone, scoreListing } from "@/lib/org-listing";
 import {
   autocompletePlaces,
   getPlaceDetails,
@@ -30,6 +36,13 @@ export type OrgFormValue = {
   geo: { lat: number; lng: number } | null;
   avatarUrl: string;
   coverUrl: string;
+  phone: string;
+  email: string;
+  category: string;
+  amenities: string[];
+  photos: string[];
+  hours: OrgHours;
+  timezone: string;
 };
 
 export function emptyOrgForm(): OrgFormValue {
@@ -44,19 +57,53 @@ export function emptyOrgForm(): OrgFormValue {
     geo: null,
     avatarUrl: "",
     coverUrl: "",
+    phone: "",
+    email: "",
+    category: "",
+    amenities: [],
+    photos: [],
+    hours: emptyHours(),
+    timezone: "",
   };
 }
 
 const HANDLE_RE = /^[a-z0-9_-]{3,40}$/;
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export function validateOrgForm(v: OrgFormValue): string | null {
   if (v.name.trim().length < 2) return "Name is too short.";
   if (!HANDLE_RE.test(v.handle.trim().toLowerCase()))
     return "Handle must be 3–40 chars: a–z, 0–9, - or _.";
   if (v.website && !/^https?:\/\//i.test(v.website)) return "Website must start with http(s)://";
+  if (v.phone && !isValidPhone(v.phone)) return "Phone number looks invalid.";
+  if (v.email && !EMAIL_RE.test(v.email.trim())) return "Email looks invalid.";
   return null;
 }
 
+function Section({
+  id,
+  title,
+  children,
+}: {
+  id: string;
+  title: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <section id={id} className="scroll-mt-20 rounded-2xl border border-border bg-surface p-4 space-y-3">
+      <h2 className="text-xs uppercase tracking-wider font-bold text-muted-foreground">{title}</h2>
+      {children}
+    </section>
+  );
+}
+
+const inputCls =
+  "w-full rounded-xl border border-border bg-background px-3 py-2 text-sm outline-none focus:border-lime/60";
+
+/**
+ * Google Business Profile–style gym listing editor. Used by both the create
+ * and edit routes so the two screens can never drift apart.
+ */
 export function OrgForm({
   value,
   onChange,
@@ -87,6 +134,26 @@ export function OrgForm({
   const timerRef = useRef<number | null>(null);
   const reqIdRef = useRef(0);
 
+  const strength = useMemo(
+    () =>
+      scoreListing({
+        name: value.name,
+        handle: value.handle,
+        category: value.category,
+        address: value.address,
+        phone: value.phone,
+        email: value.email,
+        website: value.website,
+        bio: value.bio,
+        hours: value.hours,
+        amenities: value.amenities,
+        photos: value.photos,
+        avatarUrl: value.avatarUrl,
+        coverUrl: value.coverUrl,
+      }),
+    [value],
+  );
+
   useEffect(() => {
     if (typeof navigator === "undefined" || !navigator.geolocation) return;
     const id = navigator.geolocation.watchPosition(
@@ -98,6 +165,12 @@ export function OrgForm({
     );
     return () => navigator.geolocation.clearWatch(id);
   }, []);
+
+  // Default the listing timezone to the device's, so open/closed is sensible.
+  useEffect(() => {
+    if (!value.timezone) onChange({ ...value, timezone: detectTimezone() });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [value.timezone]);
 
   function patch(p: Partial<OrgFormValue>) {
     onChange({ ...value, ...p });
@@ -158,6 +231,7 @@ export function OrgForm({
           address: d.formattedAddress || fallbackAddress,
           placeId: s.id,
           geo: { lat: d.lat, lng: d.lng },
+          category: value.category || "Gym",
         });
       })
       .catch((e) => {
@@ -165,193 +239,309 @@ export function OrgForm({
       });
   };
 
+  const preview = (
+    <ListingPreviewCard
+      v={{
+        name: value.name,
+        category: value.category,
+        handle: value.handle,
+        address: value.address,
+        city: value.city,
+        phone: value.phone,
+        website: value.website,
+        avatarUrl: value.avatarUrl,
+        coverUrl: value.coverUrl,
+        photos: value.photos,
+        amenities: value.amenities,
+        hours: value.hours,
+        timezone: value.timezone,
+      }}
+      compact
+    />
+  );
+
   return (
-    <div className="space-y-5">
-      <section className="rounded-2xl border border-border bg-surface p-4 space-y-3">
-        <h2 className="text-xs uppercase tracking-wider font-bold text-muted-foreground">
-          Identity
-        </h2>
-        <label className="block space-y-1">
-          <span className="text-xs font-semibold text-muted-foreground">Name</span>
-          <div className="relative">
-            <div className="flex items-center gap-2 rounded-xl border border-border bg-background px-3">
-              <Search className="h-4 w-4 text-muted-foreground shrink-0" />
-              <input
-                value={value.name}
-                onChange={(e) => handleNameChange(e.target.value)}
-                onFocus={() => nameSuggestions.length > 0 && setNameOpen(true)}
-                onBlur={() => setTimeout(() => setNameOpen(false), 150)}
-                placeholder="Search a gym or type a name"
-                className="flex-1 bg-transparent py-2 text-sm outline-none min-w-0"
-              />
-              {nameLoading && (
-                <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" />
+    <div className="lg:grid lg:grid-cols-[minmax(0,1fr)_20rem] lg:items-start lg:gap-6">
+      <div className="space-y-5">
+        <ProfileStrengthMeter percent={strength.percent} items={strength.items} />
+
+        <Section id="org-business" title="Business info">
+          <label className="block space-y-1">
+            <span className="text-xs font-semibold text-muted-foreground">Name</span>
+            <div className="relative">
+              <div className="flex items-center gap-2 rounded-xl border border-border bg-background px-3">
+                <Search className="h-4 w-4 text-muted-foreground shrink-0" />
+                <input
+                  value={value.name}
+                  onChange={(e) => handleNameChange(e.target.value)}
+                  onFocus={() => nameSuggestions.length > 0 && setNameOpen(true)}
+                  onBlur={() => setTimeout(() => setNameOpen(false), 150)}
+                  placeholder="Search a gym or type a name"
+                  className="flex-1 bg-transparent py-2 text-sm outline-none min-w-0"
+                />
+                {nameLoading && (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" />
+                )}
+              </div>
+              {nameOpen && nameSuggestions.length > 0 && (
+                <ul className="absolute z-20 mt-1 w-full overflow-hidden rounded-2xl border border-border bg-surface shadow-lg">
+                  {nameSuggestions.map((s) => (
+                    <li key={s.id}>
+                      <button
+                        type="button"
+                        onMouseDown={(e) => {
+                          e.preventDefault();
+                          pickNameSuggestion(s);
+                        }}
+                        className="flex w-full items-start gap-2 px-4 py-2.5 text-left text-sm hover:bg-secondary"
+                      >
+                        <Search className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
+                        <span className="min-w-0">
+                          <span className="block truncate font-medium">{s.primary}</span>
+                          {s.secondary && (
+                            <span className="block truncate text-xs text-muted-foreground">
+                              {s.secondary}
+                            </span>
+                          )}
+                        </span>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
               )}
             </div>
-            {nameOpen && nameSuggestions.length > 0 && (
-              <ul className="absolute z-20 mt-1 w-full overflow-hidden rounded-2xl border border-border bg-surface shadow-lg">
-                {nameSuggestions.map((s) => (
-                  <li key={s.id}>
-                    <button
-                      type="button"
-                      onMouseDown={(e) => {
-                        e.preventDefault();
-                        pickNameSuggestion(s);
-                      }}
-                      className="flex w-full items-start gap-2 px-4 py-2.5 text-left text-sm hover:bg-secondary"
-                    >
-                      <Search className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
-                      <span className="min-w-0">
-                        <span className="block truncate font-medium">{s.primary}</span>
-                        {s.secondary && (
-                          <span className="block truncate text-xs text-muted-foreground">
-                            {s.secondary}
-                          </span>
-                        )}
-                      </span>
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div>
-        </label>
-        <label className="block space-y-1">
-          <span className="text-xs font-semibold text-muted-foreground">Handle</span>
-          <div className="flex items-center gap-1 rounded-xl border border-border bg-background px-3">
-            <span className="text-sm text-muted-foreground">@</span>
-            <input
-              value={value.handle}
-              onChange={(e) =>
-                patch({ handle: e.target.value.toLowerCase().replace(/[^a-z0-9_-]/g, "") })
-              }
-              placeholder="peakgym"
-              className="flex-1 bg-transparent py-2 text-sm outline-none"
-            />
-          </div>
-        </label>
-        <label className="block space-y-1">
-          <span className="text-xs font-semibold text-muted-foreground">Bio</span>
-          <textarea
-            value={value.bio}
-            onChange={(e) => patch({ bio: e.target.value })}
-            rows={3}
-            placeholder="A short description of the gym or organization."
-            className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm outline-none focus:border-lime/60"
-          />
-        </label>
-        <label className="block space-y-1">
-          <span className="text-xs font-semibold text-muted-foreground">Website</span>
-          <input
-            value={value.website}
-            onChange={(e) => patch({ website: e.target.value })}
-            placeholder="https://example.com"
-            className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm outline-none focus:border-lime/60"
-          />
-        </label>
-      </section>
+          </label>
 
-      <section className="rounded-2xl border border-border bg-surface p-4 space-y-3">
-        <h2 className="text-xs uppercase tracking-wider font-bold text-muted-foreground">
-          Location
-        </h2>
-        <label className="block space-y-1">
-          <span className="text-xs font-semibold text-muted-foreground">City</span>
-          <LocationAutocomplete
-            value={value.city}
-            onChange={(v) => patch({ city: v })}
-            mode="city"
-            placeholder="City, region"
-          />
-        </label>
-        <label className="block space-y-1">
-          <span className="text-xs font-semibold text-muted-foreground">Address</span>
-          <LocationAutocomplete
-            value={value.address}
-            onChange={(v) => patch({ address: v })}
-            onPick={(full, placeId, geo) =>
-              patch({
-                address: full,
-                placeId,
-                geo: geo ? { lat: geo.lat, lng: geo.lng } : null,
-              })
-            }
-            placeholder="Street address"
-          />
-        </label>
-        {value.geo && value.address && (
-          <div className="overflow-hidden rounded-xl border border-border">
-            <VenueMapPreview
-              address={value.address}
-              lat={value.geo.lat}
-              lng={value.geo.lng}
-              placeId={value.placeId || undefined}
+          <div className="space-y-1">
+            <span className="text-xs font-semibold text-muted-foreground">Primary category</span>
+            <div className="flex flex-wrap gap-1.5">
+              {ORG_CATEGORIES.map((c) => (
+                <button
+                  key={c}
+                  type="button"
+                  onClick={() => patch({ category: value.category === c ? "" : c })}
+                  className={`rounded-full px-3 py-1.5 text-xs font-semibold ${
+                    value.category === c
+                      ? "bg-lime/15 text-lime border border-lime/40"
+                      : "border border-border text-muted-foreground"
+                  }`}
+                >
+                  {c}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <label className="block space-y-1">
+            <span className="text-xs font-semibold text-muted-foreground">City</span>
+            <LocationAutocomplete
+              value={value.city}
+              onChange={(v) => patch({ city: v })}
+              mode="city"
+              placeholder="City, region"
             />
+          </label>
+          <label className="block space-y-1">
+            <span className="text-xs font-semibold text-muted-foreground">Address</span>
+            <LocationAutocomplete
+              value={value.address}
+              onChange={(v) => patch({ address: v })}
+              onPick={(full, placeId, geo) =>
+                patch({
+                  address: full,
+                  placeId,
+                  geo: geo ? { lat: geo.lat, lng: geo.lng } : null,
+                })
+              }
+              placeholder="Street address"
+            />
+          </label>
+          {value.geo && value.address && (
+            <div className="overflow-hidden rounded-xl border border-border">
+              <VenueMapPreview
+                address={value.address}
+                lat={value.geo.lat}
+                lng={value.geo.lng}
+                placeId={value.placeId || undefined}
+              />
+            </div>
+          )}
+        </Section>
+
+        <Section id="org-contact" title="Contact">
+          <label className="block space-y-1">
+            <span className="text-xs font-semibold text-muted-foreground">Phone</span>
+            <input
+              value={value.phone}
+              onChange={(e) => patch({ phone: e.target.value })}
+              inputMode="tel"
+              placeholder="(555) 123-4567"
+              className={inputCls}
+            />
+          </label>
+          <label className="block space-y-1">
+            <span className="text-xs font-semibold text-muted-foreground">Public email</span>
+            <input
+              value={value.email}
+              onChange={(e) => patch({ email: e.target.value })}
+              inputMode="email"
+              placeholder="hello@yourgym.com"
+              className={inputCls}
+            />
+          </label>
+          <label className="block space-y-1">
+            <span className="text-xs font-semibold text-muted-foreground">Website</span>
+            <input
+              value={value.website}
+              onChange={(e) => patch({ website: e.target.value })}
+              placeholder="https://example.com"
+              className={inputCls}
+            />
+          </label>
+        </Section>
+
+        <Section id="org-hours" title="Hours">
+          <label className="block space-y-1">
+            <span className="text-xs font-semibold text-muted-foreground">Timezone</span>
+            <input
+              value={value.timezone}
+              onChange={(e) => patch({ timezone: e.target.value })}
+              placeholder="America/New_York"
+              className={inputCls}
+            />
+          </label>
+          <HoursEditor value={value.hours} onChange={(h) => patch({ hours: h })} />
+        </Section>
+
+        <Section id="org-amenities" title="Amenities">
+          <div className="flex flex-wrap gap-1.5">
+            {ORG_AMENITIES.map((a) => {
+              const on = value.amenities.includes(a);
+              return (
+                <button
+                  key={a}
+                  type="button"
+                  onClick={() =>
+                    patch({
+                      amenities: on
+                        ? value.amenities.filter((x) => x !== a)
+                        : [...value.amenities, a],
+                    })
+                  }
+                  className={`rounded-full px-3 py-1.5 text-xs font-semibold ${
+                    on
+                      ? "bg-lime/15 text-lime border border-lime/40"
+                      : "border border-border text-muted-foreground"
+                  }`}
+                >
+                  {a}
+                </button>
+              );
+            })}
+          </div>
+        </Section>
+
+        <Section id="org-photos" title="Photos">
+          <div>
+            <div className="text-xs font-semibold text-muted-foreground mb-2">Logo</div>
+            <ImageUploader
+              kind="avatar"
+              bucket="org-avatars"
+              pathPrefix={userId}
+              value={value.avatarUrl}
+              onChange={(url) => patch({ avatarUrl: url })}
+              onClear={() => patch({ avatarUrl: "" })}
+            />
+          </div>
+          <div>
+            <div className="text-xs font-semibold text-muted-foreground mb-2">Cover image</div>
+            <ImageUploader
+              kind="cover"
+              bucket="org-covers"
+              pathPrefix={userId}
+              value={value.coverUrl}
+              onChange={(url) => patch({ coverUrl: url })}
+              onClear={() => patch({ coverUrl: "" })}
+            />
+          </div>
+          <div>
+            <div className="text-xs font-semibold text-muted-foreground mb-2">Gallery</div>
+            <PhotoGalleryEditor
+              value={value.photos}
+              onChange={(p) => patch({ photos: p })}
+              pathPrefix={userId}
+            />
+          </div>
+        </Section>
+
+        <Section id="org-about" title="About">
+          <label className="block space-y-1">
+            <span className="text-xs font-semibold text-muted-foreground">Handle</span>
+            <div className="flex items-center gap-1 rounded-xl border border-border bg-background px-3">
+              <span className="text-sm text-muted-foreground">@</span>
+              <input
+                value={value.handle}
+                onChange={(e) =>
+                  patch({ handle: e.target.value.toLowerCase().replace(/[^a-z0-9_-]/g, "") })
+                }
+                placeholder="peakgym"
+                className="flex-1 bg-transparent py-2 text-sm outline-none"
+              />
+            </div>
+          </label>
+          <label className="block space-y-1">
+            <span className="text-xs font-semibold text-muted-foreground">Description</span>
+            <textarea
+              value={value.bio}
+              onChange={(e) => patch({ bio: e.target.value })}
+              rows={4}
+              placeholder="What makes this gym worth the trip? Programs, courts, coaching, community."
+              className={inputCls}
+            />
+          </label>
+        </Section>
+
+        {err && (
+          <div className="rounded-xl border border-coral/40 bg-coral/10 px-3 py-2 text-xs text-coral">
+            {err}
           </div>
         )}
-      </section>
 
-      <section className="rounded-2xl border border-border bg-surface p-4 space-y-4">
-        <h2 className="text-xs uppercase tracking-wider font-bold text-muted-foreground">
-          Branding
-        </h2>
-        <div>
-          <div className="text-xs font-semibold text-muted-foreground mb-2">Logo / Avatar</div>
-          <ImageUploader
-            kind="avatar"
-            bucket="org-avatars"
-            pathPrefix={userId}
-            value={value.avatarUrl}
-            onChange={(url) => patch({ avatarUrl: url })}
-            onClear={() => patch({ avatarUrl: "" })}
-          />
-        </div>
-        <div>
-          <div className="text-xs font-semibold text-muted-foreground mb-2">Cover image</div>
-          <ImageUploader
-            kind="cover"
-            bucket="org-covers"
-            pathPrefix={userId}
-            value={value.coverUrl}
-            onChange={(url) => patch({ coverUrl: url })}
-            onClear={() => patch({ coverUrl: "" })}
-          />
-        </div>
-      </section>
-
-      {err && (
-        <div className="rounded-xl border border-coral/40 bg-coral/10 px-3 py-2 text-xs text-coral">
-          {err}
-        </div>
-      )}
-
-      <div className="flex items-center gap-2">
-        <button
-          type="button"
-          disabled={submitting}
-          onClick={() => {
-            setTouched(true);
-            const e = validateOrgForm(value);
-            if (e) {
-              toast.error(e);
-              return;
-            }
-            onSubmit();
-          }}
-          className="flex-1 rounded-full bg-lime-gradient px-4 py-3 text-sm font-bold text-primary-foreground glow-lime disabled:opacity-60"
-        >
-          {submitting ? "Saving…" : submitLabel}
-        </button>
-        {onDelete && (
+        <div className="flex items-center gap-2">
           <button
             type="button"
-            onClick={onDelete}
-            className="rounded-full border border-coral/40 bg-coral/10 px-4 py-3 text-xs font-bold text-coral"
+            disabled={submitting}
+            onClick={() => {
+              setTouched(true);
+              const e = validateOrgForm(value);
+              if (e) {
+                toast.error(e);
+                return;
+              }
+              onSubmit();
+            }}
+            className="flex-1 rounded-full bg-lime-gradient px-4 py-3 text-sm font-bold text-primary-foreground glow-lime disabled:opacity-60"
           >
-            Delete
+            {submitting ? "Saving…" : submitLabel}
           </button>
-        )}
+          {onDelete && (
+            <button
+              type="button"
+              onClick={onDelete}
+              className="rounded-full border border-coral/40 bg-coral/10 px-4 py-3 text-xs font-bold text-coral"
+            >
+              Delete
+            </button>
+          )}
+        </div>
       </div>
+
+      <aside className="mt-6 space-y-2 lg:sticky lg:top-4 lg:mt-0">
+        <div className="text-xs uppercase tracking-wider font-bold text-muted-foreground">
+          Live preview
+        </div>
+        {preview}
+      </aside>
     </div>
   );
 }

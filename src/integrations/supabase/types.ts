@@ -1675,54 +1675,75 @@ export type Database = {
       trainer_orgs: {
         Row: {
           address: string | null
+          amenities: string[]
           avatar: string | null
           avatar_url: string | null
           bio: string | null
+          category: string | null
           city: string | null
           cover_url: string | null
           created_at: string
+          email: string | null
           geo: Json | null
           handle: string
+          hours: Json
           id: string
           name: string
           owner_id: string
+          phone: string | null
+          photos: string[]
           place_id: string | null
+          timezone: string | null
           updated_at: string
           verified: boolean
           website: string | null
         }
         Insert: {
           address?: string | null
+          amenities?: string[]
           avatar?: string | null
           avatar_url?: string | null
           bio?: string | null
+          category?: string | null
           city?: string | null
           cover_url?: string | null
           created_at?: string
+          email?: string | null
           geo?: Json | null
           handle: string
+          hours?: Json
           id?: string
           name: string
           owner_id: string
+          phone?: string | null
+          photos?: string[]
           place_id?: string | null
+          timezone?: string | null
           updated_at?: string
           verified?: boolean
           website?: string | null
         }
         Update: {
           address?: string | null
+          amenities?: string[]
           avatar?: string | null
           avatar_url?: string | null
           bio?: string | null
+          category?: string | null
           city?: string | null
           cover_url?: string | null
           created_at?: string
+          email?: string | null
           geo?: Json | null
           handle?: string
+          hours?: Json
           id?: string
           name?: string
           owner_id?: string
+          phone?: string | null
+          photos?: string[]
           place_id?: string | null
+          timezone?: string | null
           updated_at?: string
           verified?: boolean
           website?: string | null

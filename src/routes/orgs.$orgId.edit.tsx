@@ -15,6 +15,7 @@ import {
   removeGenericOrgMember,
 } from "@/lib/trainer-orgs.functions";
 import { OrgForm, type OrgFormValue } from "@/components/OrgForm";
+import { parseHours } from "@/lib/org-hours";
 import { useAutosave } from "@/hooks/use-autosave";
 import { SaveStatus } from "@/components/SaveStatus";
 
@@ -100,6 +101,15 @@ function EditOrg() {
 
   useEffect(() => {
     if (orgQ.data && !value) {
+      const row = orgQ.data as typeof orgQ.data & {
+        phone?: string | null;
+        email?: string | null;
+        category?: string | null;
+        amenities?: string[] | null;
+        photos?: string[] | null;
+        hours?: unknown;
+        timezone?: string | null;
+      };
       const geo = orgQ.data.geo as { lat?: number; lng?: number } | null;
       setValue({
         name: orgQ.data.name ?? "",
@@ -112,9 +122,17 @@ function EditOrg() {
         geo: geo?.lat && geo?.lng ? { lat: geo.lat, lng: geo.lng } : null,
         avatarUrl: orgQ.data.avatar_url ?? "",
         coverUrl: orgQ.data.cover_url ?? "",
+        phone: row.phone ?? "",
+        email: row.email ?? "",
+        category: row.category ?? "",
+        amenities: row.amenities ?? [],
+        photos: row.photos ?? [],
+        hours: parseHours(row.hours),
+        timezone: row.timezone ?? "",
       });
     }
   }, [orgQ.data, value]);
+
 
   const isOwner = !!userId && orgQ.data?.owner_id === userId;
   const isAdmin =
@@ -138,6 +156,13 @@ function EditOrg() {
         geo: v.geo,
         avatarUrl: v.avatarUrl || null,
         coverUrl: v.coverUrl || null,
+        phone: v.phone.trim() || null,
+        email: v.email.trim() || null,
+        category: v.category || null,
+        amenities: v.amenities,
+        photos: v.photos,
+        hours: v.hours,
+        timezone: v.timezone || null,
       },
     });
     qc.invalidateQueries({ queryKey: ["org-edit", orgId] });
@@ -205,7 +230,7 @@ function EditOrg() {
   }
 
   return (
-    <div className="mx-auto w-full max-w-md sm:max-w-2xl p-4 pb-40 space-y-4">
+    <div className="mx-auto w-full max-w-md sm:max-w-2xl lg:max-w-5xl p-4 pb-40 space-y-4">
       <div className="flex items-center gap-2">
         <Link
           to="/orgs/$orgId"
