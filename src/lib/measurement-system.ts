@@ -127,12 +127,17 @@ export function detectDistanceUnit(): DistanceUnit {
     if (region) return IMPERIAL_REGIONS.has(region) ? "mi" : "km";
   }
 
+  // No explicit region: the timezone is a better regional signal than a
+  // maximized locale (bare "en" maximizes to en-US everywhere).
+  const byZone = unitFromTimeZone();
+  if (byZone) return byZone;
+
   for (const locale of locales) {
     const bySystem = unitFromMeasurementSystem(locale);
     if (bySystem) return bySystem;
   }
 
-  return unitFromTimeZone() ?? "mi";
+  return "mi";
 }
 
 let cached: DistanceUnit | null = null;
