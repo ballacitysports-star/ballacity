@@ -555,9 +555,16 @@ function PlayersFilterBody({
 
       <FilterSection label="Max travel distance">
         <div className="flex flex-wrap gap-2">
-          {DISTANCES.map((d) => (
-            <Chip key={d} active={maxDistance === d} onClick={() => setMaxDistance(d)}>
-              {d === 0 ? "Any" : <>≤ <Distance mi={d} /></>}
+          <Chip active={maxDistance === 0} onClick={() => setMaxDistance(0)}>
+            Any
+          </Chip>
+          {presets.map(({ mi, label }) => (
+            <Chip
+              key={label}
+              active={Math.abs(maxDistance - mi) < 0.01}
+              onClick={() => setMaxDistance(mi)}
+            >
+              ≤ {label}
             </Chip>
           ))}
         </div>
