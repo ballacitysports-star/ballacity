@@ -21,6 +21,7 @@ import { AvailabilityCalendar } from "@/components/AvailabilityCalendar";
 import { AvailabilityRulesEditor } from "@/components/AvailabilityRulesEditor";
 import type { AvailabilityRule } from "@/lib/availability-resolve";
 import { loadDraft, useDraftPersistence } from "@/components/create/useDraftPersistence";
+import { SaveStatus } from "@/components/SaveStatus";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { listTrainerOrgs, createTrainerOrg, requestToJoinTrainerOrg } from "@/lib/trainer-orgs.functions";
@@ -152,7 +153,7 @@ export function CreateTrainerWizard() {
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [restored, setRestored] = useState(false);
 
-  const { clear: clearDraft } = useDraftPersistence(DRAFT_KEY, draft);
+  const { clear: clearDraft, ...draftStatus } = useDraftPersistence(DRAFT_KEY, draft);
 
   const listOrgs = useServerFn(listTrainerOrgs);
   const createOrg = useServerFn(createTrainerOrg);
@@ -391,6 +392,7 @@ export function CreateTrainerWizard() {
             {step === 3 && "When you're available"}
             
           </h1>
+          <SaveStatus {...draftStatus} savedLabel="Draft saved" className="mt-0.5" />
         </div>
       </div>
 
