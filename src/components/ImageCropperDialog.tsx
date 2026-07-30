@@ -321,7 +321,10 @@ export function ImageCropperDialog({
         </div>
 
         {!isMobile && options}
+
+        <CropConfirmBar onCancel={onCancel} onApply={confirm} applyDisabled={!img} />
       </CropBottomBar>
+
     </div>
   );
 }
