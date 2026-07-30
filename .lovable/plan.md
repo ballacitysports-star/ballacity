@@ -1,79 +1,35 @@
-## Goal
+## What's broken
 
-Rebuild the feed preference sheet so it reads clearly, saves to your account, and supports saved presets you can tap to apply.
+The public player card at `/players/:userId` fails for signed-out visitors. Verified in the database:
 
-## What's wrong today
+- `public.profiles` has **no table or column SELECT privilege for `anon`** (only `authenticated` has column-level SELECT on the safe columns). The card's `profiles` query therefore returns a permission error, and the page falls through to "Player not found".
+- The only SELECT policy on `profiles` (`Profiles viewable by authenticated users`) is scoped to the `authenticated` role, so even with grants, anon rows would be filtered out.
+- `profile_ages()` has EXECUTE for `authenticated` only (`anon` = false), so the age lookup also errors when signed out.
 
-The sheet (`FeedFilterBody` in `src/routes/_tabs.feed.tsx`) has four flat blocks: Sort by, Sport, Distance, and a "Sections" list of six identical switches. The problem is that "Sections" quietly mixes two different kinds of setting:
+This is fallout from the earlier PII-hardening migration, which revoked broad access and re-granted it to `authenticated` only.
 
-- **Display toggles** — "Needs players now", "For you list" — these turn feed sections on and off.
-- **Hard filters** — "Games I host", "Games I joined", "Free games", "Paid games" — these remove games from results.
+## Fix
 
-Because they look identical, turning on "Paid games" feels like showing a section but actually hides most of the feed. There are also silent mutual-exclusion rules (paid clears free, hosted clears joined) that the user never sees explained. Preferences live only in `localStorage`, so they don't follow you between devices.
+**1. Migration — restore public read of non-PII profile fields**
 
-## New structure
+- `GRANT SELECT (id, username, display_name, avatar_initials, bio, sport, created_at, updated_at, links, city, avatar_url, cover_url, graduating_class, account_type, sport_levels) ON public.profiles TO anon;` — `birthday` stays revoked for both anon and authenticated (owner-only), preserving the security finding fix.
+- Add an anon SELECT policy: `CREATE POLICY "Profiles viewable by anon" ON public.profiles FOR SELECT TO anon USING (true);`
+- `GRANT EXECUTE ON FUNCTION public.profile_ages(uuid[]) TO anon;` — it returns only a derived age, no birthdate.
 
-Three clearly separated groups, in this order:
+**2. Same-category check for the other queries the public card makes**
 
-```text
-┌─ Feed filters ─────────────────────────┐
-│  MY VIEWS                              │
-│  [ All games ] [ Weeknights ] [ + ]    │  ← saved presets, tap to apply
-│                                        │
-│  1. NARROW RESULTS                     │
-│     Sport         chips (multi)        │
-│     Distance      Any 5 10 25 · unit   │
-│     Show me       All / Free / Paid    │  ← segmented, exclusivity obvious
-│     My games      All / Hosting / Joined│  ← segmented, exclusivity obvious
-│                                        │
-│  2. ORDER                              │
-│     Sort          Nearest / Soonest    │
-│                                        │
-│  3. FEED LAYOUT                        │
-│     ▸ Needs players now      [toggle]  │
-│     ▸ For you                [toggle]  │
-│                                        │
-│  [ Reset ]                [ Show 24 ]  │  ← live count in the footer
-└────────────────────────────────────────┘
-```
+Before finishing, verify grants/policies for `anon` on the sibling reads on this page so the card is not half-broken:
+- `trainer_org_members` + `trainer_orgs` (the gyms chips)
+- `reviews` (reputation badge / reviews dialog)
+- `player_availabilities` (open availability block)
+- `follows` (follower/following counts)
 
-Key changes:
+Where a table is already meant to be publicly readable, add the matching `anon` SELECT grant and policy; where it is intentionally auth-only, leave it and let the card degrade gracefully instead of erroring.
 
-- The four filter switches become two **segmented pickers** ("Show me": All / Free only / Paid only; "My games": All / Hosting / Joined). Exclusivity becomes visually obvious instead of a hidden rule, and the underlying booleans no longer need cross-clearing hacks.
-- Only the two genuine display toggles stay as switches, under a "Feed layout" heading.
-- A live result count on the apply button so you can see the effect of a filter before closing the sheet.
-- Each group shows a small count badge of how many filters are active within it, and "Reset" only clears filters (not your layout toggles).
+**3. Verify**
 
-## Saved presets
+Load `/players/:userId` in a signed-out browser session and confirm the name, avatar, sports, and age render with no console/network errors, then re-check signed-in rendering is unchanged.
 
-A "My views" row at the top of the sheet. Each preset stores a full snapshot of sport, distance, unit, sort, and the two exclusivity pickers.
+## Notes
 
-- Tap a preset chip to apply it; the active one is highlighted.
-- "Save current as view" prompts for a name (with a suggested name derived from the active filters, e.g. "Basketball · 10 mi · Soonest").
-- Long-press / overflow on a chip to rename or delete.
-- "All games" is a built-in, non-deletable preset equal to the defaults.
-- Editing any filter while a preset is active marks it "Edited" with an inline "Update view" action, so you never silently overwrite a saved view.
-
-Presets also render as a compact row directly above the feed's sport chips, so common views are one tap away without opening the sheet.
-
-## Account sync
-
-Preferences and presets move to a `feed_preferences` table keyed to your user, with the existing `localStorage` store kept as an offline cache and as the storage for signed-out visitors.
-
-- Signed in: read from your account on load, write with a short debounce (the same pattern as the existing real-time profile save), so switching devices carries your setup over.
-- Signed out: behaves exactly as today, on-device only.
-- First sign-in after this change adopts whatever is currently on the device rather than wiping it.
-- Shared links keep winning over saved preferences, as they do today, so a shared feed URL always shows the sender's view.
-
-## Technical notes
-
-- New `src/components/feed/FeedPreferencesSheet.tsx` plus small pieces (`SegmentedFilter`, `PresetRow`) so `_tabs.feed.tsx` stops holding this UI inline; the route keeps ownership of filtering, URL sync, and result counts.
-- `FeedPrefs` in `src/lib/user-prefs-store.ts` gains `moneyFilter: "all" | "free" | "paid"` and `mineFilter: "all" | "hosting" | "joined"`, replacing the four booleans in `sections`; `sections` narrows to the two display toggles. A migration in the store's loader maps existing localStorage values forward so nobody loses their current setup.
-- New `savedViews: FeedView[]` on the prefs shape (`id`, `name`, `filters` snapshot, `createdAt`).
-- Database migration: `feed_preferences` (`user_id` primary key, `prefs` jsonb, `saved_views` jsonb, timestamps) with grants and owner-only access rules, plus an updated-at trigger. Reads and writes go through a new `src/lib/feed-prefs.functions.ts` using the authenticated server-function path.
-- Filtering in the route switches from the six booleans to the two new enum fields; URL params keep short names, with the old `free`/`paid`/`hosted`/`joined` params still accepted on read so existing shared links keep working.
-- Preset apply/save/delete are pure prefs writes, so no change to feed query logic is needed.
-
-## Out of scope
-
-No new filter dimensions (time of day, skill level, indoor/outdoor, spots left) in this pass — the rebuild is about structure, sync, and presets. Easy to add afterwards since "Narrow results" becomes the obvious home for them.
+No UI changes are needed — the component logic is fine; it is purely a database access problem.
