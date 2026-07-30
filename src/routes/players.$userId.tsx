@@ -18,6 +18,7 @@ import { ReputationBadge } from "@/components/ReputationBadge";
 import { computeReputation, useReviewsFor } from "@/lib/reviews";
 import { useProfileOverrides } from "@/lib/user-prefs-store";
 import { ProfileLinksList } from "@/components/ProfileLinks";
+import { BadgeList } from "@/components/BadgeList";
 import {
   Dialog,
   DialogContent,
@@ -369,24 +370,9 @@ function PlayerProfilePage() {
           </div>
         )}
 
-        {/* Badges */}
-        {badges.length > 0 && (
-          <div className="mt-6">
-            <h2 className="font-display text-sm font-bold uppercase tracking-wider text-muted-foreground mb-2 flex items-center gap-1.5">
-              <Trophy className="h-4 w-4" /> Badges
-            </h2>
-            <div className="flex flex-wrap gap-2">
-              {badges.map((b) => (
-                <span
-                  key={b}
-                  className="rounded-full border border-border bg-surface px-3 py-1.5 text-xs font-semibold"
-                >
-                  {b}
-                </span>
-              ))}
-            </div>
-          </div>
-        )}
+        {/* Badges — earned from attendance reliability + sportsmanship */}
+        {badges.length > 0 && <BadgeList className="mt-6" badgeIds={badges} />}
+
 
         {/* Reviews popup */}
         <Dialog open={reviewsOpen} onOpenChange={setReviewsOpen}>

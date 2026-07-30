@@ -1,6 +1,13 @@
 import { useEffect, useState, useSyncExternalStore } from "react";
 import type { User } from "@supabase/supabase-js";
 import { ME, type Sport } from "@/lib/sample-data";
+import { earnedBadgeIds, makeBadgeStats } from "@/lib/badges";
+
+/** Engine-earned badges first, stored override extras appended (deduped). */
+function mergeBadges(earned: string[], overrides?: string[]): string[] {
+  return Array.from(new Set([...earned, ...(overrides ?? [])]));
+}
+
 import { useAuth } from "@/hooks/use-auth";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -267,7 +274,21 @@ export function useMyProfile(currentUser?: User | null): MyProfile | null {
     graduatingClass: overrides.graduatingClass ?? dbProfile?.graduating_class ?? undefined,
     stats: base.stats,
     sports: overrides.sports ?? base.sports,
-    badges: overrides.badges ?? base.badges,
+    // Earned badges come from the badge engine (reliability + sportsmanship);
+    // stored overrides are merged on top as extras.
+    badges: mergeBadges(
+      earnedBadgeIds(
+        makeBadgeStats({
+          gamesPlayed: base.stats.played,
+          hosted: base.stats.hosted ?? 0,
+          showUpRate: (base.stats.reliability ?? 0) / 100,
+          onTimeRate: (base.stats.reliability ?? 0) / 100,
+          sportsmanshipRating: base.stats.sportsmanship ?? 0,
+        }),
+      ),
+      overrides.badges,
+    ),
+
     links: overrides.links?.length ? overrides.links : dbLinks,
   };
 }
