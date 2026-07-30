@@ -29,6 +29,15 @@ import {
 import { getOnboardingStatus } from "@/lib/onboarding.functions";
 
 function NotFoundComponent() {
+  const router = useRouter();
+  const [path, setPath] = useState("");
+
+  useEffect(() => {
+    const attempted = window.location.pathname + window.location.search;
+    setPath(attempted);
+    console.warn("[404] no route matched:", attempted);
+  }, []);
+
   return (
     <div className="flex min-h-screen items-center justify-center bg-background px-4">
       <div className="max-w-md text-center">
@@ -37,7 +46,19 @@ function NotFoundComponent() {
         <p className="mt-2 text-sm text-muted-foreground">
           The page you're looking for doesn't exist or has been moved.
         </p>
-        <div className="mt-6">
+        {path && (
+          <p className="mt-3 break-all rounded-lg border border-border bg-surface px-3 py-2 font-mono text-xs text-muted-foreground">
+            {path}
+          </p>
+        )}
+        <div className="mt-6 flex items-center justify-center gap-2">
+          <button
+            type="button"
+            onClick={() => router.history.back()}
+            className="inline-flex items-center justify-center rounded-md border border-border px-4 py-2 text-sm font-medium text-foreground transition-colors hover:bg-surface"
+          >
+            Go back
+          </button>
           <Link
             to="/"
             className="inline-flex items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
@@ -49,6 +70,7 @@ function NotFoundComponent() {
     </div>
   );
 }
+
 
 function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
   console.error(error);
