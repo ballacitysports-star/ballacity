@@ -316,7 +316,7 @@ function PlayersPage() {
 
       <NearbyPlayersPanel
         players={list}
-        mySports={profile?.sports}
+        mySports={profile?.sports?.map((s) => s.name)}
         myCity={profile?.city}
         currentUserId={user?.id ?? null}
       />
