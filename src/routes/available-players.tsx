@@ -52,7 +52,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import { kmToMi, miToKm } from "@/lib/distance";
+import { kmToMi, miToKm, formatDistance } from "@/lib/distance";
+import { Distance } from "@/components/Distance";
+import { useDistanceUnit } from "@/lib/user-prefs-store";
 import { RequestStatusPanel } from "@/components/RequestStatusPanel";
 import { UserAvatar } from "@/components/UserAvatar";
 import type { ExistingRequestSummary } from "@/lib/availability";
@@ -83,6 +85,7 @@ type Tab = "browse" | "mine";
 
 function AvailablePlayersPage() {
   const { user } = useAuth();
+  const unit = useDistanceUnit();
   const navigate = useNavigate();
   const { post: postParam } = Route.useSearch();
   const [tab, setTab] = useState<Tab>("browse");
@@ -316,7 +319,7 @@ function AvailablePlayersPage() {
               )}
               {maxDistance > 0 && (
                 <ActiveChip
-                  label={`≤ ${maxDistance} mi`}
+                  label={`≤ ${formatDistance(maxDistance, unit)}`}
                   onClear={() => setMaxDistance(0)}
                 />
               )}
@@ -514,7 +517,7 @@ function AvailablePlayersPage() {
 
         <FilterSection
           label="Max travel distance"
-          hint={maxDistance > 0 ? `${maxDistance} mi` : "Any"}
+          hint={maxDistance > 0 ? formatDistance(maxDistance, unit) : "Any"}
         >
           <input
             type="range"
@@ -528,7 +531,7 @@ function AvailablePlayersPage() {
           />
           <div className="flex justify-between text-[10px] uppercase tracking-wider text-muted-foreground">
             <span>Any</span>
-            <span>100 mi</span>
+            <span>{formatDistance(100, unit)}</span>
           </div>
         </FilterSection>
       </FilterSheet>
@@ -736,7 +739,7 @@ function AvailabilityCard({
             {a.author_name}
           </Link>
           <span className="text-[11px] text-muted-foreground">
-            {a.city || "Anywhere"} · up to {kmToMi(a.travel_radius_km)} mi
+            {a.city || "Anywhere"} · up to <Distance km={a.travel_radius_km} />
           </span>
         </div>
         <span className="shrink-0 rounded-full bg-lime/15 px-2 py-0.5 text-[10px] font-bold text-lime">
@@ -850,7 +853,7 @@ function AvailabilityCard({
         )}
         <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
           <MapPin className="h-3.5 w-3.5" />
-          {a.city || "Anywhere"} · up to {kmToMi(a.travel_radius_km)} mi
+          {a.city || "Anywhere"} · up to <Distance km={a.travel_radius_km} />
         </p>
         {a.note && (
           <p className="pt-1 text-sm leading-snug">
@@ -927,7 +930,10 @@ function PostAvailabilityDialog({
   const [ends, setEnds] = useState(initial?.ends_on ?? "");
   const [days, setDays] = useState<string[]>(initial?.recurring_days ?? []);
   const [city, setCity] = useState(initial?.city ?? "");
-  const [radius, setRadius] = useState(initial ? kmToMi(initial.travel_radius_km) : 25);
+  const unit = useDistanceUnit();
+  const [radius, setRadius] = useState(() =>
+    initial ? Math.round(unit === "km" ? initial.travel_radius_km : kmToMi(initial.travel_radius_km)) : 25,
+  );
   const [note, setNote] = useState(initial?.note ?? "");
   const [saving, setSaving] = useState(false);
 
@@ -948,7 +954,7 @@ function PostAvailabilityDialog({
         ends_on: ends || null,
         recurring_days: days,
         city,
-        travel_radius_km: miToKm(radius),
+        travel_radius_km: unit === "km" ? radius : miToKm(radius),
         note,
       };
       if (isEdit && initial) {
@@ -1036,7 +1042,7 @@ function PostAvailabilityDialog({
               />
             </div>
             <div>
-              <Label htmlFor="radius">Radius (mi)</Label>
+              <Label htmlFor="radius">Radius ({unit})</Label>
               <Input
                 id="radius"
                 type="number"
@@ -1501,7 +1507,7 @@ function AvailabilityDetailDialog({
               {(a.city || a.travel_radius_km) && (
                 <p className="mt-1 flex items-center gap-1 text-xs text-muted-foreground">
                   <MapPin className="h-3.5 w-3.5" />
-                  {a.city || "Anywhere"} · up to {kmToMi(a.travel_radius_km)} mi
+                  {a.city || "Anywhere"} · up to <Distance km={a.travel_radius_km} />
                 </p>
               )}
           {a.note && <p className="mt-2 text-sm leading-snug">{a.note}</p>}

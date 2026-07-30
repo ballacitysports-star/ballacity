@@ -2,6 +2,7 @@ import { useEffect, useState, useSyncExternalStore } from "react";
 import type { User } from "@supabase/supabase-js";
 import { ME, type Sport } from "@/lib/sample-data";
 import { earnedBadgeIds, makeBadgeStats } from "@/lib/badges";
+import { getDetectedDistanceUnit, type DistanceUnit } from "@/lib/measurement-system";
 
 /** Engine-earned badges first, stored override extras appended (deduped). */
 function mergeBadges(earned: string[], overrides?: string[]): string[] {
@@ -74,11 +75,13 @@ export type FeedSectionToggles = {
 
 export type FeedSortBy = "nearest" | "soonest";
 
+export type DistanceUnitPref = "auto" | DistanceUnit;
+
 export type FeedPrefs = {
   preferredSports: Sport[];
   sections: FeedSectionToggles;
   maxDistanceMi: number | null;
-  distanceUnit: "mi" | "km";
+  distanceUnit: DistanceUnitPref;
   sortBy: FeedSortBy;
 };
 
@@ -93,7 +96,7 @@ export const DEFAULT_PREFS: FeedPrefs = {
     freeOnly: false,
   },
   maxDistanceMi: null,
-  distanceUnit: "mi",
+  distanceUnit: "auto",
   sortBy: "nearest",
 };
 
@@ -315,7 +318,8 @@ export function useFeedPrefs(): FeedPrefs {
     typeof parsed.maxDistanceMi === "number" && parsed.maxDistanceMi > 0
       ? parsed.maxDistanceMi
       : null;
-  const distanceUnit = parsed.distanceUnit === "km" ? "km" : "mi";
+  const distanceUnit: DistanceUnitPref =
+    parsed.distanceUnit === "km" ? "km" : parsed.distanceUnit === "mi" ? "mi" : "auto";
   const sortBy: FeedSortBy = parsed.sortBy === "soonest" ? "soonest" : "nearest";
   return {
     preferredSports: parsed.preferredSports ?? [],
@@ -324,6 +328,26 @@ export function useFeedPrefs(): FeedPrefs {
     distanceUnit,
     sortBy,
   };
+}
+
+/** Resolve an "auto" preference into a concrete unit using device locale. */
+export function resolveDistanceUnit(pref: DistanceUnitPref): DistanceUnit {
+  if (pref === "mi" || pref === "km") return pref;
+  return getDetectedDistanceUnit();
+}
+
+/**
+ * The unit the UI should render with. Returns the stored override when the
+ * user pinned one; otherwise the region-detected unit (after hydration).
+ */
+export function useDistanceUnit(): DistanceUnit {
+  const { distanceUnit } = useFeedPrefs();
+  const [detected, setDetected] = useState<DistanceUnit>("mi");
+  useEffect(() => {
+    setDetected(getDetectedDistanceUnit());
+  }, []);
+  if (distanceUnit === "mi" || distanceUnit === "km") return distanceUnit;
+  return detected;
 }
 
 export function setFeedPrefs(next: FeedPrefs) {

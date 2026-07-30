@@ -13,7 +13,7 @@ import { SportChips } from "@/components/SportChips";
 import { ViewDensityToggle, type ViewMode, type Density } from "@/components/ViewDensityToggle";
 import { TeamsMapView } from "@/components/TeamsMapView";
 import { TrainerActions } from "@/components/TrainerActions";
-import { useMyProfile, useFeedPrefs } from "@/lib/user-prefs-store";
+import { useMyProfile, useDistanceUnit } from "@/lib/user-prefs-store";
 import { useAuth } from "@/hooks/use-auth";
 import { usePersistedSearch } from "@/hooks/use-persisted-search";
 import { toast } from "sonner";
@@ -129,7 +129,7 @@ function TrainersPage() {
   const viewMode: ViewMode = search.view === "map" ? "map" : "list";
   const density: Density = search.density === "grid" ? "grid" : "list";
 
-  const { distanceUnit } = useFeedPrefs();
+  const distanceUnit = useDistanceUnit();
   const unitLabel = distanceUnit === "km" ? "km" : "mi";
   const { coords, status: geoStatus, request: requestLocation } = useUserLocation();
   const radiusKm = radius > 0 ? (distanceUnit === "km" ? radius : radius * KM_PER_MI) : 0;

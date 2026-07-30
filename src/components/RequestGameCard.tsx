@@ -8,6 +8,7 @@ import type { Game } from "@/lib/sample-data";
 import { formatWhen } from "@/lib/format";
 import { useLiveParticipantCount } from "@/lib/game-participants-store";
 import type { JoinRequest } from "@/lib/payments";
+import { Distance } from "@/components/Distance";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -178,7 +179,7 @@ function RequestGameCardInner({
               </span>
               <span className="inline-flex items-center gap-1.5">
                 <MapPin className="h-3.5 w-3.5 text-coral" />
-                {game.distanceMi} mi
+                <Distance mi={game.distanceMi} />
               </span>
             </div>
             <div className="flex items-center justify-between gap-2">

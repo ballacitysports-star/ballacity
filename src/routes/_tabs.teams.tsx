@@ -15,6 +15,7 @@ import { FilterSection, ChipRow } from "@/components/FilterSheet";
 import { useMyProfile } from "@/lib/user-prefs-store";
 import { useAuth } from "@/hooks/use-auth";
 import { usePersistedSearch } from "@/hooks/use-persisted-search";
+import { Distance } from "@/components/Distance";
 
 
 type SortBy = "nearest" | "followers" | "name";
@@ -307,7 +308,7 @@ function TeamsPage() {
             <div key={o.id} className="relative">
               <OrgCard org={o} index={i} />
               <span className="pointer-events-none absolute top-3 right-3 rounded-full bg-background/70 backdrop-blur px-2 py-0.5 text-[10px] font-bold text-foreground">
-                {dist} mi
+                <Distance mi={dist} decimals={1} />
               </span>
             </div>
           ))}

@@ -77,6 +77,7 @@ import { PlayerFlowPill } from "@/components/PlayerFlowPill";
 import { PaymentRequiredBanner } from "@/components/PaymentRequiredBanner";
 import { HostPaymentsPanel, PlayerPaymentsPanel } from "@/components/GamePaymentsPanel";
 import { PostEngagement } from "@/components/PostEngagement";
+import { Distance } from "@/components/Distance";
 
 import { useHostedGames, fetchHostedGame, updateHostedGame, deleteHostedGame } from "@/lib/hosted-games-store";
 import type { Game } from "@/lib/sample-data";
@@ -1305,7 +1306,7 @@ function GameDetail() {
           <Meta
             icon={<MapPin className="h-4 w-4 text-coral" />}
             label="Distance"
-            value={`${game.distanceMi} mi`}
+            value={<Distance mi={game.distanceMi} />}
           />
         </div>
 
@@ -2997,7 +2998,7 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
   );
 }
 
-function Meta({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) {
+function Meta({ icon, label, value }: { icon: React.ReactNode; label: string; value: React.ReactNode }) {
   return (
     <div className="rounded-2xl border border-border bg-surface p-3">
       <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-wider text-muted-foreground">

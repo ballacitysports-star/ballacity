@@ -16,7 +16,7 @@ import { FilterSection } from "@/components/FilterSheet";
 import { GAMES, SPORTS, POSITIONS_BY_SPORT, type Sport } from "@/lib/sample-data";
 import { useHostedGames } from "@/lib/hosted-games-store";
 import { useJoinedGameIds } from "@/lib/games-store";
-import { useFeedPrefs, setFeedPrefs, DEFAULT_PREFS, useMyProfile } from "@/lib/user-prefs-store";
+import { useFeedPrefs, setFeedPrefs, DEFAULT_PREFS, useMyProfile, useDistanceUnit, type DistanceUnitPref } from "@/lib/user-prefs-store";
 import { miToKm } from "@/lib/distance";
 import { clearScrollRestore, useScrollRestore } from "@/hooks/use-scroll-restore";
 import { motion } from "framer-motion";
@@ -773,7 +773,8 @@ function FeedFilterBody() {
   const hasCity = Boolean(profile?.city?.trim());
   const preferredSports = prefs.preferredSports;
   const sections = prefs.sections;
-  const unit = prefs.distanceUnit;
+  const unitPref = prefs.distanceUnit;
+  const unit = useDistanceUnit();
   const presetsMi = [5, 10, 25, 50, 100];
 
   const toggleSport = (s: Sport) => {
@@ -790,7 +791,7 @@ function FeedFilterBody() {
     if (k === "joinedOnly" && nextSections.joinedOnly) nextSections.hostedByMeOnly = false;
     setFeedPrefs({ ...prefs, sections: nextSections });
   };
-  const setUnit = (u: "mi" | "km") => setFeedPrefs({ ...prefs, distanceUnit: u });
+  const setUnit = (u: DistanceUnitPref) => setFeedPrefs({ ...prefs, distanceUnit: u });
   const setMaxMi = (mi: number | null) => setFeedPrefs({ ...prefs, maxDistanceMi: mi });
 
   return (
@@ -842,13 +843,13 @@ function FeedFilterBody() {
               ) : null}
             </span>
             <span className="inline-flex rounded-full border border-border bg-surface p-0.5">
-              {(["mi", "km"] as const).map((u) => (
+              {(["auto", "mi", "km"] as const).map((u) => (
                 <button
                   key={u}
                   onClick={() => setUnit(u)}
-                  className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase ${unit === u ? "bg-lime text-primary-foreground" : "text-muted-foreground"}`}
+                  className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase ${unitPref === u ? "bg-lime text-primary-foreground" : "text-muted-foreground"}`}
                 >
-                  {u}
+                  {u === "auto" ? `Auto (${unit})` : u}
                 </button>
               ))}
             </span>

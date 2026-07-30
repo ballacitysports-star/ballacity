@@ -1,5 +1,8 @@
 // Distance unit helpers. The DB stores kilometers (legacy column name
-// `travel_radius_km`); the UI works entirely in miles.
+// `travel_radius_km`) and miles (`distance_mi`); the UI renders whichever unit
+// the viewer's region uses.
+import type { DistanceUnit } from "./measurement-system";
+
 const KM_PER_MI = 1.609344;
 
 export function miToKm(mi: number): number {
@@ -9,4 +12,29 @@ export function miToKm(mi: number): number {
 export function kmToMi(km: number | null | undefined): number {
   if (km == null) return 0;
   return Math.round(km / KM_PER_MI);
+}
+
+/**
+ * Render a mile-based value in the viewer's unit.
+ * `decimals` controls the rounding of the displayed number.
+ */
+export function formatDistance(
+  valueMi: number | null | undefined,
+  unit: DistanceUnit,
+  decimals = 0,
+): string {
+  if (valueMi == null || Number.isNaN(valueMi)) return "";
+  const value = unit === "km" ? valueMi * KM_PER_MI : valueMi;
+  return `${value.toFixed(decimals)} ${unit}`;
+}
+
+/** Render a kilometer-based value in the viewer's unit. */
+export function formatDistanceFromKm(
+  valueKm: number | null | undefined,
+  unit: DistanceUnit,
+  decimals = 0,
+): string {
+  if (valueKm == null || Number.isNaN(valueKm)) return "";
+  const value = unit === "km" ? valueKm : valueKm / KM_PER_MI;
+  return `${value.toFixed(decimals)} ${unit}`;
 }

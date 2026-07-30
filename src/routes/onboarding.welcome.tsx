@@ -5,7 +5,8 @@ import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/use-auth";
 import { useAccountType, type AccountType } from "@/lib/account-type";
-import { getFeedPrefsSnapshot, setFeedPrefs, setProfileOverrides, useMyProfile } from "@/lib/user-prefs-store";
+import { getFeedPrefsSnapshot, setFeedPrefs, setProfileOverrides, useMyProfile, useDistanceUnit } from "@/lib/user-prefs-store";
+import { kmToMi, miToKm } from "@/lib/distance";
 import { Section, validateBirthday } from "@/components/profile/ProfileFormPrimitives";
 import {
   ProfileBasicsFields,
@@ -118,7 +119,13 @@ function OnboardingWizard({ type }: { type: AccountType }) {
     graduatingClass: "",
   });
   const [sports, setSports] = useState<SportEntry[]>([]);
-  const [radius, setRadius] = useState(15);
+  const [radius, setRadius] = useState(15); // kilometers (canonical)
+  const unit = useDistanceUnit();
+  const radiusMax = unit === "km" ? 100 : 60;
+  const radiusDisplay = Math.min(
+    radiusMax,
+    Math.max(1, unit === "km" ? radius : kmToMi(radius)),
+  );
   const [geo, setGeo] = useState<GeoState>({ kind: "idle" });
   const [attempt, setAttempt] = useState(0);
 
@@ -316,14 +323,13 @@ function OnboardingWizard({ type }: { type: AccountType }) {
       }
 
       const current = getFeedPrefsSnapshot();
-      const radiusInPrefUnit =
-        current.distanceUnit === "km" ? radius : Math.round(radius * 0.621371);
       setFeedPrefs({
         ...current,
         preferredSports: Array.from(
           new Set([...sports.map((s) => s.name), ...current.preferredSports]),
         ),
-        maxDistanceMi: radiusInPrefUnit,
+        // `maxDistanceMi` is always stored in miles; `radius` is kilometers.
+        maxDistanceMi: Math.max(1, kmToMi(radius)),
       });
 
       await queryClient.invalidateQueries({
@@ -490,22 +496,31 @@ function OnboardingWizard({ type }: { type: AccountType }) {
           <div className="mt-5">
             <div className="flex items-center justify-between text-sm font-semibold">
               <span>Search radius</span>
-              <span className="text-muted-foreground">{radius} km</span>
+              <span className="text-muted-foreground">
+                {radiusDisplay} {unit}
+              </span>
             </div>
             <input
               type="range"
               min={1}
-              max={100}
+              max={radiusMax}
               step={1}
-              value={radius}
-              onChange={(e) => setRadius(Number(e.target.value))}
+              value={radiusDisplay}
+              onChange={(e) => {
+                const v = Number(e.target.value);
+                setRadius(unit === "km" ? v : miToKm(v));
+              }}
               className="mt-2 w-full accent-lime"
-              aria-label="Search radius in kilometers"
+              aria-label={`Search radius in ${unit === "km" ? "kilometers" : "miles"}`}
             />
             <div className="mt-1 flex justify-between text-[11px] text-muted-foreground">
-              <span>1 km</span>
-              <span>50 km</span>
-              <span>100 km</span>
+              <span>1 {unit}</span>
+              <span>
+                {Math.round(radiusMax / 2)} {unit}
+              </span>
+              <span>
+                {radiusMax} {unit}
+              </span>
             </div>
           </div>
         </Section>
