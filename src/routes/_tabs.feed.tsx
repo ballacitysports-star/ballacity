@@ -12,11 +12,12 @@ import { GameCard } from "@/components/GameCard";
 import { GameListRow } from "@/components/GameListRow";
 import { GameCardSkeleton, GameListRowSkeleton } from "@/components/GameCardSkeleton";
 import { FilterBar } from "@/components/FilterBar";
-import { FilterSection } from "@/components/FilterSheet";
+import { FeedPreferencesBody, FeedViewsRow } from "@/components/feed/FeedPreferencesSheet";
+import { useFeedPrefsSync } from "@/hooks/use-feed-prefs-sync";
 import { GAMES, SPORTS, POSITIONS_BY_SPORT, type Sport } from "@/lib/sample-data";
 import { useHostedGames } from "@/lib/hosted-games-store";
 import { useJoinedGameIds } from "@/lib/games-store";
-import { useFeedPrefs, setFeedPrefs, DEFAULT_PREFS, useMyProfile, useDistanceUnit, type DistanceUnitPref } from "@/lib/user-prefs-store";
+import { useFeedPrefs, setFeedPrefs, DEFAULT_PREFS, DEFAULT_FILTERS, useMyProfile, useDistanceUnit, type DistanceUnitPref } from "@/lib/user-prefs-store";
 import { distancePresets } from "@/lib/distance";
 import { clearScrollRestore, useScrollRestore } from "@/hooks/use-scroll-restore";
 import { motion } from "framer-motion";
@@ -492,14 +493,9 @@ function Feed() {
           activeFilterCount={activeFilterCount}
           create={{ to: "/create", label: "Create game" }}
           sheetTitle="Feed filters"
-          sheet={<FeedFilterBody />}
+          sheet={<FeedPreferencesBody />}
           onReset={() =>
-            setFeedPrefs({
-              ...prefs,
-              preferredSports: [],
-              sections: DEFAULT_PREFS.sections,
-              maxDistanceMi: null,
-            })
+            setFeedPrefs({ ...prefs, ...DEFAULT_FILTERS, activeViewId: null })
           }
         />
         {q && suggestions.length > 0 && (
@@ -771,160 +767,3 @@ function BellLink() {
     </Link>
   );
 }
-
-function FeedFilterBody() {
-  const prefs = useFeedPrefs();
-  const profile = useMyProfile();
-  const hasCity = Boolean(profile?.city?.trim());
-  const preferredSports = prefs.preferredSports;
-  const sections = prefs.sections;
-  const unitPref = prefs.distanceUnit;
-  const unit = useDistanceUnit();
-  // Presets are round numbers in the viewer's resolved unit; the stored value
-  // stays in miles so filtering/sorting is unit-agnostic.
-  const presets = distancePresets(unit);
-
-  const toggleSport = (s: Sport) => {
-    const next = preferredSports.includes(s)
-      ? preferredSports.filter((x) => x !== s)
-      : [...preferredSports, s];
-    setFeedPrefs({ ...prefs, preferredSports: next });
-  };
-  const toggleSection = (k: keyof typeof sections) => {
-    const nextSections = { ...sections, [k]: !sections[k] };
-    if (k === "paidOnly" && nextSections.paidOnly) nextSections.freeOnly = false;
-    if (k === "freeOnly" && nextSections.freeOnly) nextSections.paidOnly = false;
-    if (k === "hostedByMeOnly" && nextSections.hostedByMeOnly) nextSections.joinedOnly = false;
-    if (k === "joinedOnly" && nextSections.joinedOnly) nextSections.hostedByMeOnly = false;
-    setFeedPrefs({ ...prefs, sections: nextSections });
-  };
-  const setUnit = (u: DistanceUnitPref) => setFeedPrefs({ ...prefs, distanceUnit: u });
-  const setMaxMi = (mi: number | null) => setFeedPrefs({ ...prefs, maxDistanceMi: mi });
-
-  return (
-    <>
-      <FilterSection label="Sort by">
-        <div className="flex flex-wrap gap-2">
-          {(["nearest", "soonest"] as const).map((s) => {
-            const active = prefs.sortBy === s;
-            return (
-              <button
-                key={s}
-                onClick={() => setFeedPrefs({ ...prefs, sortBy: s })}
-                className={`flex-1 rounded-full border px-3 py-2 text-xs font-semibold ${active ? "border-lime bg-lime text-primary-foreground" : "border-border bg-surface"}`}
-              >
-                {s === "nearest" ? "Nearest" : "Soonest"}
-              </button>
-            );
-          })}
-        </div>
-      </FilterSection>
-
-      <FilterSection label="Sport (Games)">
-        <div className="flex flex-wrap gap-2">
-          {SPORTS.map((s) => {
-            const active = preferredSports.includes(s.name);
-            return (
-              <button
-                key={s.name}
-                onClick={() => toggleSport(s.name)}
-                className={`inline-flex items-center gap-1 rounded-full border px-3 py-1.5 text-xs font-semibold ${active ? "border-lime bg-lime text-primary-foreground" : "border-border bg-surface"}`}
-              >
-                <span>{s.emoji}</span>
-                {s.name}
-              </button>
-            );
-          })}
-        </div>
-      </FilterSection>
-
-      <FilterSection
-        label={
-          <span className="flex items-center justify-between">
-            <span>
-              Distance from you
-              {hasCity && profile?.city ? (
-                <span className="ml-2 normal-case tracking-normal text-muted-foreground/80">
-                  · {profile.city}
-                </span>
-              ) : null}
-            </span>
-            <span className="inline-flex rounded-full border border-border bg-surface p-0.5">
-              {(["auto", "mi", "km"] as const).map((u) => (
-                <button
-                  key={u}
-                  onClick={() => setUnit(u)}
-                  className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase ${unitPref === u ? "bg-lime text-primary-foreground" : "text-muted-foreground"}`}
-                >
-                  {u === "auto" ? `Auto (${unit})` : u}
-                </button>
-              ))}
-            </span>
-          </span>
-        }
-      >
-
-        {!hasCity && (
-          <p className="text-xs text-muted-foreground mb-2">
-            <Link to="/profile/edit" className="text-lime font-semibold">
-              Set your city
-            </Link>{" "}
-            to filter by distance.
-          </p>
-        )}
-        <div className={`flex flex-wrap gap-2 ${hasCity ? "" : "opacity-50 pointer-events-none"}`}>
-          <button
-            onClick={() => setMaxMi(null)}
-            className={`rounded-full border px-3 py-1.5 text-xs font-semibold ${prefs.maxDistanceMi == null ? "border-lime bg-lime text-primary-foreground" : "border-border bg-surface"}`}
-          >
-            Any
-          </button>
-          {presets.map(({ mi, label }) => {
-            const active =
-              prefs.maxDistanceMi != null && Math.abs(prefs.maxDistanceMi - mi) < 0.01;
-            return (
-              <button
-                key={label}
-                onClick={() => setMaxMi(mi)}
-                className={`rounded-full border px-3 py-1.5 text-xs font-semibold ${active ? "border-lime bg-lime text-primary-foreground" : "border-border bg-surface"}`}
-              >
-                {label}
-              </button>
-            );
-          })}
-        </div>
-      </FilterSection>
-
-      <FilterSection label="Sections">
-        <div className="space-y-2">
-          {(
-            [
-              ["showUrgent", "Needs players now"],
-              ["showForYou", '"For you" list'],
-              ["hostedByMeOnly", "Games I host"],
-              ["joinedOnly", "Games I joined"],
-              ["freeOnly", "Free games"],
-              ["paidOnly", "Paid games"],
-            ] as const
-          ).map(([k, label]) => (
-            <button
-              key={k}
-              onClick={() => toggleSection(k)}
-              className="w-full flex items-center justify-between rounded-2xl border border-border bg-surface px-4 py-3 text-sm font-semibold"
-            >
-              <span>{label}</span>
-              <span
-                className={`h-6 w-10 rounded-full p-0.5 transition-colors ${sections[k] ? "bg-lime" : "bg-secondary"}`}
-              >
-                <span
-                  className={`block h-5 w-5 rounded-full bg-background transition-transform ${sections[k] ? "translate-x-4" : ""}`}
-                />
-              </span>
-            </button>
-          ))}
-        </div>
-      </FilterSection>
-    </>
-  );
-}
-
