@@ -54,8 +54,16 @@ function CreateOrg() {
           geo: value.geo,
           avatarUrl: value.avatarUrl || undefined,
           coverUrl: value.coverUrl || undefined,
+          phone: value.phone.trim() || undefined,
+          email: value.email.trim() || undefined,
+          category: value.category || undefined,
+          amenities: value.amenities,
+          photos: value.photos,
+          hours: value.hours,
+          timezone: value.timezone || undefined,
         },
       });
+
       clearDraft();
       toast.success("Gym created");
       navigate({ to: "/orgs/$orgId", params: { orgId: id } });
