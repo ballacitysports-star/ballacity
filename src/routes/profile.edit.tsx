@@ -63,6 +63,8 @@ function EditProfile() {
   const profileUser = user ?? confirmedUser;
   const profile = useMyProfile(profileUser);
   const prefs = useFeedPrefs();
+  const { accountType, loading: accountTypeLoading } = useAccountType();
+  const showOrgs = !accountTypeLoading && accountType !== null && accountType !== "player";
   const nav = useNavigate();
 
   const [name, setName] = useState(profile?.name ?? "");
