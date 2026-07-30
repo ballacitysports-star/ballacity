@@ -89,12 +89,16 @@ export function OrgListingHeader({
   memberCount,
   isAdmin,
   isOwner,
+  rating,
+  reviewCount,
   children,
 }: {
   org: OrgListingRow;
   memberCount: number;
   isAdmin: boolean;
   isOwner: boolean;
+  rating?: number | null;
+  reviewCount?: number;
   children?: React.ReactNode;
 }) {
   const [hoursOpen, setHoursOpen] = useState(false);
