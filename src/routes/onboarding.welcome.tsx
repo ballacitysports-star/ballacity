@@ -119,7 +119,13 @@ function OnboardingWizard({ type }: { type: AccountType }) {
     graduatingClass: "",
   });
   const [sports, setSports] = useState<SportEntry[]>([]);
-  const [radius, setRadius] = useState(15);
+  const [radius, setRadius] = useState(15); // kilometers (canonical)
+  const unit = useDistanceUnit();
+  const radiusMax = unit === "km" ? 100 : 60;
+  const radiusDisplay = Math.min(
+    radiusMax,
+    Math.max(1, unit === "km" ? radius : kmToMi(radius)),
+  );
   const [geo, setGeo] = useState<GeoState>({ kind: "idle" });
   const [attempt, setAttempt] = useState(0);
 
