@@ -734,22 +734,20 @@ function Profile() {
           </div>
         </div>
 
-        {/* Badges */}
-        <div className={`mt-8 ${activeTab === "games" ? "" : "hidden"}`}>
-          <h2 className="font-display text-sm font-bold uppercase tracking-wider text-muted-foreground mb-2 flex items-center gap-1.5">
-            <Trophy className="h-4 w-4" /> Badges
-          </h2>
-          <div className="flex flex-wrap gap-2">
-            {me.badges.map((b) => (
-              <span
-                key={b}
-                className="rounded-full border border-border bg-surface px-3 py-1.5 text-xs font-semibold"
-              >
-                {b}
-              </span>
-            ))}
-          </div>
-        </div>
+        {/* Badges — earned from attendance reliability + sportsmanship */}
+        <BadgeList
+          className={`mt-8 ${activeTab === "games" ? "" : "hidden"}`}
+          badgeIds={me.badges}
+          stats={makeBadgeStats({
+            gamesPlayed: me.stats.played,
+            hosted: me.stats.hosted ?? 0,
+            showUpRate: (me.stats.reliability ?? 0) / 100,
+            onTimeRate: (me.stats.reliability ?? 0) / 100,
+            sportsmanshipRating: me.stats.sportsmanship ?? 0,
+          })}
+          showProgress
+        />
+
 
         {/* Reviews tab — inline */}
         <div className={`mt-6 ${activeTab === "reviews" ? "" : "hidden"}`}>
