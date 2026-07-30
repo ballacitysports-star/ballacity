@@ -240,7 +240,7 @@ function PlayersPage() {
         }
       }
       if (minA !== null || maxA !== null) {
-        const age = ageFromBirthday(a.author_birthday);
+        const age = a.author_age ?? null;
         if (age === null) {
           // No birthday on file — include only when the user has opted in.
           if (!includeUnknownAge) return false;

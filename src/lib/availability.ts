@@ -23,7 +23,7 @@ export type AvailabilityWithAuthor = PlayerAvailability & {
   author_name: string;
   author_initials: string | null;
   author_avatar_url: string | null;
-  author_birthday: string | null;
+  author_age: number | null;
 };
 
 
@@ -74,15 +74,19 @@ export async function listOpenAvailabilities(
   const ids = Array.from(new Set(rows.map((r) => r.user_id)));
   const { data: profs } = await supabase
     .from("profiles")
-    .select("id, display_name, avatar_initials, avatar_url, birthday")
+    .select("id, display_name, avatar_initials, avatar_url")
     .in("id", ids);
+  const { data: ageRows } = await (supabase.rpc as any)("profile_ages", { _ids: ids });
+  const ageById: Record<string, number | null> = Object.fromEntries(
+    ((ageRows ?? []) as { id: string; age: number | null }[]).map((r) => [r.id, r.age]),
+  );
   const byId = Object.fromEntries(((profs ?? []) as any[]).map((p) => [p.id, p]));
   return rows.map((r) => ({
     ...r,
     author_name: byId[r.user_id]?.display_name ?? "Player",
     author_initials: byId[r.user_id]?.avatar_initials ?? null,
     author_avatar_url: byId[r.user_id]?.avatar_url ?? null,
-    author_birthday: byId[r.user_id]?.birthday ?? null,
+    author_age: ageById[r.user_id] ?? null,
   }));
 }
 
@@ -98,7 +102,7 @@ export async function getAvailabilityById(id: string): Promise<AvailabilityWithA
   const row = data as unknown as PlayerAvailability;
   const { data: prof } = await supabase
     .from("profiles")
-    .select("id, display_name, avatar_initials, avatar_url, birthday")
+    .select("id, display_name, avatar_initials, avatar_url")
     .eq("id", row.user_id)
     .maybeSingle();
   return {
@@ -106,8 +110,13 @@ export async function getAvailabilityById(id: string): Promise<AvailabilityWithA
     author_name: (prof as any)?.display_name ?? "Player",
     author_initials: (prof as any)?.avatar_initials ?? null,
     author_avatar_url: (prof as any)?.avatar_url ?? null,
-    author_birthday: (prof as any)?.birthday ?? null,
+    author_age: await profileAge(row.user_id),
   };
+}
+
+async function profileAge(userId: string): Promise<number | null> {
+  const { data } = await (supabase.rpc as any)("profile_ages", { _ids: [userId] });
+  return ((data ?? []) as { age: number | null }[])[0]?.age ?? null;
 }
 
 export async function listMyAvailabilities(): Promise<PlayerAvailability[]> {

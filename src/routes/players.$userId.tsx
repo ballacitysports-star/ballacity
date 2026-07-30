@@ -42,7 +42,6 @@ type ProfileRow = {
   city: string | null;
   avatar_url: string | null;
   cover_url: string | null;
-  birthday: string | null;
   graduating_class: number | null;
   links: any;
 };
@@ -52,6 +51,7 @@ function PlayerProfilePage() {
   const { user } = useAuth();
   const navigate = useNavigate();
   const [profile, setProfile] = useState<ProfileRow | null>(null);
+  const [age, setAge] = useState<number | null>(null);
   const [availability, setAvailability] = useState<PlayerAvailability | null>(null);
   const [loading, setLoading] = useState(true);
   const [opening, setOpening] = useState(false);
@@ -71,7 +71,7 @@ function PlayerProfilePage() {
       supabase
         .from("profiles")
         .select(
-          "id, display_name, avatar_initials, bio, sport, username, city, avatar_url, cover_url, birthday, graduating_class, links",
+          "id, display_name, avatar_initials, bio, sport, username, city, avatar_url, cover_url, graduating_class, links",
         )
         .eq("id", userId)
         .maybeSingle(),
@@ -207,9 +207,7 @@ function PlayerProfilePage() {
               {[
                 username,
                 city,
-                profile.birthday && ageFrom(profile.birthday) != null
-                  ? `${ageFrom(profile.birthday)}`
-                  : "",
+                age != null ? `${age}` : "",
               ]
                 .filter(Boolean)
                 .join(" · ")}
