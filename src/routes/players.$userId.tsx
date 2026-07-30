@@ -362,9 +362,17 @@ function PlayerProfilePage() {
             <div className="space-y-2">
               {sportsList.map((s) => (
                 <div key={s.name} className="rounded-2xl border border-border bg-surface p-3">
-                  <div className="text-sm font-semibold">
-                    {SPORTS.find((sp) => sp.name === s.name)?.emoji ?? "🎯"} {s.name}
+                  <div className="flex items-center gap-2 text-sm font-semibold">
+                    <span>
+                      {SPORTS.find((sp) => sp.name === s.name)?.emoji ?? "🎯"} {s.name}
+                    </span>
+                    {formatSportLevel(s.level) && (
+                      <span className="rounded-full border border-lime/40 bg-lime/10 px-2 py-0.5 text-[10px] font-bold text-lime">
+                        {formatSportLevel(s.level)}
+                      </span>
+                    )}
                   </div>
+
                   {"positions" in s && Array.isArray((s as any).positions) && (s as any).positions.length > 0 && (
                     <div className="mt-2 flex flex-wrap gap-1.5">
                       {((s as any).positions as string[]).map((p) => (
