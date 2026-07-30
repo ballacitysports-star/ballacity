@@ -37,6 +37,15 @@ function AuthPage() {
   const [password, setPassword] = useState("");
   const [displayName, setDisplayName] = useState("");
   const [busy, setBusy] = useState(false);
+  // Non-null while we're inside the post-provider grace window (see oauth()).
+  const [waitingProvider, setWaitingProvider] = useState<string | null>(null);
+  // Monotonic token: bumping it cancels any in-flight session poll.
+  const waitingRef = useRef(0);
+
+  useEffect(() => () => {
+    waitingRef.current += 1;
+  }, []);
+
 
   const needsAccountType = async (currentUser: User | null | undefined) => {
     if (!currentUser) return false;
