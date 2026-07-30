@@ -248,8 +248,9 @@ export function useMyProfile(currentUser?: User | null): MyProfile | null {
     supabase
       .from("profiles")
       .select(
-        "display_name, username, avatar_initials, bio, city, avatar_url, cover_url, graduating_class, links",
+        "display_name, username, avatar_initials, bio, city, avatar_url, cover_url, graduating_class, links, sport, sport_levels",
       )
+
       .eq("id", user.id)
       .maybeSingle()
       .then(async ({ data }) => {
