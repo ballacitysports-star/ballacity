@@ -249,8 +249,10 @@ export function useMyProfile(currentUser?: User | null): MyProfile | null {
       )
       .eq("id", user.id)
       .maybeSingle()
-      .then(({ data }) => {
-        if (!cancelled) setDbProfile(data as any);
+      .then(async ({ data }) => {
+        if (cancelled) return;
+        const { data: bday } = await (supabase.rpc as any)("get_my_birthday");
+        if (!cancelled) setDbProfile({ ...(data as any), birthday: (bday as string | null) ?? null });
       });
     return () => {
       cancelled = true;

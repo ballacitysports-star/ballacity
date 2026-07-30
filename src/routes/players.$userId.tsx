@@ -87,6 +87,11 @@ function PlayerProfilePage() {
       if (cancelled) return;
       if (prof.error) toast.error(prof.error.message);
       setProfile((prof.data as ProfileRow) ?? null);
+      (supabase.rpc as any)("profile_ages", { _ids: [userId] }).then(
+        ({ data }: { data: { age: number | null }[] | null }) => {
+          if (!cancelled) setAge(data?.[0]?.age ?? null);
+        },
+      );
       setAvailability((avail.data as unknown as PlayerAvailability) ?? null);
       setLoading(false);
     });
@@ -505,15 +510,6 @@ function formatBirthday(iso: string): string {
   return d.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
 }
 
-function ageFrom(iso: string): number | null {
-  const d = new Date(iso + "T00:00:00");
-  if (isNaN(d.getTime())) return null;
-  const now = new Date();
-  let age = now.getFullYear() - d.getFullYear();
-  const m = now.getMonth() - d.getMonth();
-  if (m < 0 || (m === 0 && now.getDate() < d.getDate())) age--;
-  return age >= 0 && age < 150 ? age : null;
-}
 
 type PlayerOrgRow = {
   id: string;
