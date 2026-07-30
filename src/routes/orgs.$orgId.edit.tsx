@@ -156,6 +156,13 @@ function EditOrg() {
         geo: v.geo,
         avatarUrl: v.avatarUrl || null,
         coverUrl: v.coverUrl || null,
+        phone: v.phone.trim() || null,
+        email: v.email.trim() || null,
+        category: v.category || null,
+        amenities: v.amenities,
+        photos: v.photos,
+        hours: v.hours,
+        timezone: v.timezone || null,
       },
     });
     qc.invalidateQueries({ queryKey: ["org-edit", orgId] });
