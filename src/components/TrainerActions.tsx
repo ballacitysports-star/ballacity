@@ -118,7 +118,7 @@ export function TrainerActions({ org, defaultVenue = null }: { org: Org; default
             e.preventDefault();
             e.stopPropagation();
             if (!requireAuth()) return;
-            nav({ to: "/inbox", search: { to: org.id } as never });
+            nav({ to: "/messages" });
           }}
           className="inline-flex items-center justify-center gap-1.5 rounded-full border border-border bg-surface px-2.5 py-2 text-xs font-semibold text-foreground hover:border-lime/50"
           aria-label={`Message ${org.name}`}

@@ -1,35 +1,27 @@
-## What's broken
+## What I verified so far
 
-The public player card at `/players/:userId` fails for signed-out visitors. Verified in the database:
+- The player route exists and works: `/players/<uuid>` returns a real rendered "Player profile" page both on the local dev server and on the published site.
+- Every player card link I found (`profile` tab game cards, followers/following sheet, players tab, map, messages, game pages) uses the correct typed link `to="/players/$userId"` — none build the URL by hand.
+- The "404" screen you saw is the app's own not-found screen in `src/routes/__root.tsx`, which currently shows only a big "404" with no indication of which URL failed.
 
-- `public.profiles` has **no table or column SELECT privilege for `anon`** (only `authenticated` has column-level SELECT on the safe columns). The card's `profiles` query therefore returns a permission error, and the page falls through to "Player not found".
-- The only SELECT policy on `profiles` (`Profiles viewable by authenticated users`) is scoped to the `authenticated` role, so even with grants, anon rows would be filtered out.
-- `profile_ages()` has EXECUTE for `authenticated` only (`anon` = false), so the age lookup also errors when signed out.
+So the diagnosis is **not confirmed yet**: something is producing a URL the router can't match (most likely a card rendered with a missing/empty user id, so the link resolves to something like `/players/` or `/players/undefined`), but I can't prove which card without seeing the failing URL.
 
-This is fallout from the earlier PII-hardening migration, which revoked broad access and re-granted it to `authenticated` only.
+## Plan
 
-## Fix
+1. **Make the 404 page self-diagnosing (and more useful anyway)**
+   - Update the not-found component in `src/routes/__root.tsx` to show the attempted path, plus "Go back" and "Go home" buttons.
+   - Log the unmatched path to the console so it shows up in preview logs.
 
-**1. Migration — restore public read of non-PII profile fields**
+2. **Reproduce and identify the failing card**
+   - With the path visible, reproduce the click from the Profile tab and capture the exact URL.
 
-- `GRANT SELECT (id, username, display_name, avatar_initials, bio, sport, created_at, updated_at, links, city, avatar_url, cover_url, graduating_class, account_type, sport_levels) ON public.profiles TO anon;` — `birthday` stays revoked for both anon and authenticated (owner-only), preserving the security finding fix.
-- Add an anon SELECT policy: `CREATE POLICY "Profiles viewable by anon" ON public.profiles FOR SELECT TO anon USING (true);`
-- `GRANT EXECUTE ON FUNCTION public.profile_ages(uuid[]) TO anon;` — it returns only a derived age, no birthdate.
+3. **Fix the root cause**
+   - If the id is missing/empty: guard the card so it renders as non-clickable (or links to the correct target) when there's no user id, at the component that produced it — and apply the same guard to the sibling cards that share the pattern (game host avatar, followers/following rows, roster chips).
+   - If the id is present but the route genuinely doesn't match, fix the route/link mismatch instead.
 
-**2. Same-category check for the other queries the public card makes**
+4. **Verify** by clicking through the Profile tab cards (game host, followers, following) and confirming each lands on the player page, and that a card with no linked account no longer navigates anywhere.
 
-Before finishing, verify grants/policies for `anon` on the sibling reads on this page so the card is not half-broken:
-- `trainer_org_members` + `trainer_orgs` (the gyms chips)
-- `reviews` (reputation badge / reviews dialog)
-- `player_availabilities` (open availability block)
-- `follows` (follower/following counts)
+## Technical notes
 
-Where a table is already meant to be publicly readable, add the matching `anon` SELECT grant and policy; where it is intentionally auth-only, leave it and let the card degrade gracefully instead of erroring.
-
-**3. Verify**
-
-Load `/players/:userId` in a signed-out browser session and confirm the name, avatar, sports, and age render with no console/network errors, then re-check signed-in rendering is unchanged.
-
-## Notes
-
-No UI changes are needed — the component logic is fine; it is purely a database access problem.
+- Files likely touched: `src/routes/__root.tsx` (not-found UI), and whichever of `src/components/GameCard.tsx`, `src/components/FollowSheet.tsx`, `src/components/RequestGameCard.tsx` turns out to emit the bad link.
+- No database or backend changes are needed for this.

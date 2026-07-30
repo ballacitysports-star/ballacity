@@ -665,8 +665,7 @@ function TrainerPage() {
           <div className="mx-auto max-w-md sm:max-w-2xl lg:max-w-4xl">
             <div className="pointer-events-auto flex items-center gap-2 rounded-full border border-border bg-background/85 backdrop-blur-xl p-2 shadow-2xl">
               <Link
-                to="/inbox"
-                search={{ to: org.id } as never}
+                to="/messages"
                 className="flex-1 inline-flex items-center justify-center gap-2 rounded-full border border-border bg-surface px-4 py-3 text-sm font-bold"
               >
                 <MessageCircle className="h-4 w-4" /> Message
