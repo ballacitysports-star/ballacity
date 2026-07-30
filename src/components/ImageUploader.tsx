@@ -149,8 +149,14 @@ export function ImageUploader({
               ref={inputRef}
               type="file"
               accept="image/*"
-              disabled={uploading || disabled}
+              disabled={uploading || disabled || open}
               className="hidden"
+              onClick={(e) => {
+                // Never let a bubbling click from elsewhere (e.g. the crop editor)
+                // reopen the OS file picker.
+                if (open) e.preventDefault();
+                e.stopPropagation();
+              }}
               onChange={(e) => {
                 pickFile(e.target.files?.[0]);
                 e.target.value = "";
