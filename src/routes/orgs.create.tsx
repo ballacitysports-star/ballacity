@@ -7,6 +7,10 @@ import { useEffect } from "react";
 import { createStandaloneOrg } from "@/lib/trainer-orgs.functions";
 import { OrgForm, emptyOrgForm, type OrgFormValue } from "@/components/OrgForm";
 import { AccountTypeGate } from "@/components/AccountTypeGate";
+import { loadDraft, useDraftPersistence } from "@/components/create/useDraftPersistence";
+import { SaveStatus } from "@/components/SaveStatus";
+
+const DRAFT_KEY = "openrun:draft:create-org";
 
 export const Route = createFileRoute("/orgs/create")({
   ssr: false,
@@ -23,9 +27,13 @@ export const Route = createFileRoute("/orgs/create")({
 function CreateOrg() {
   const navigate = useNavigate();
   const [userId, setUserId] = useState<string | null>(null);
-  const [value, setValue] = useState<OrgFormValue>(emptyOrgForm());
+  const [value, setValue] = useState<OrgFormValue>(() => ({
+    ...emptyOrgForm(),
+    ...(loadDraft<OrgFormValue>(DRAFT_KEY) ?? {}),
+  }));
   const [submitting, setSubmitting] = useState(false);
   const create = useServerFn(createStandaloneOrg);
+  const { clear: clearDraft, ...draftStatus } = useDraftPersistence(DRAFT_KEY, value);
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => setUserId(data.user?.id ?? null));
@@ -48,6 +56,7 @@ function CreateOrg() {
           coverUrl: value.coverUrl || undefined,
         },
       });
+      clearDraft();
       toast.success("Gym created");
       navigate({ to: "/orgs/$orgId", params: { orgId: id } });
     } catch (e) {
@@ -64,6 +73,7 @@ function CreateOrg() {
         <p className="text-sm text-muted-foreground mt-1">
           Set up a training organization or gym profile.
         </p>
+        <SaveStatus {...draftStatus} savedLabel="Draft saved" className="mt-1" />
       </header>
       <OrgForm
         value={value}

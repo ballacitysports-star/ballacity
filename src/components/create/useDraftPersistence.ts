@@ -62,6 +62,6 @@ export function useDraftPersistence<T>(key: string, value: T, delay = 400) {
     savedAt,
     reason: undefined as string | undefined,
     error: undefined as string | undefined,
-    retry: () => {},
+    retry: async () => {},
   };
 }
