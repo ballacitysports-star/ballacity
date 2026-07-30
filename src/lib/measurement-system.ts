@@ -63,8 +63,8 @@ function regionFromLocale(locale: string): string | null {
     };
     if (anyIntl.Locale) {
       const loc = new anyIntl.Locale(locale);
-      const region = loc.region ?? loc.maximize?.().region;
-      if (region) return region.toUpperCase();
+      // Only trust an explicit region subtag — maximize() would guess "en" -> US.
+      if (loc.region) return loc.region.toUpperCase();
     }
   } catch {
     /* fall through to manual parsing */
