@@ -1,5 +1,5 @@
 import * as React from "react";
-import { Check, X } from "lucide-react";
+import { Check, ImageUp, X } from "lucide-react";
 
 export type CropSizePreset = { label: string; maxSize: number };
 export type CropQualityPreset = { label: string; quality: number };
@@ -219,5 +219,50 @@ export function CropAction({
     >
       {icon} {label}
     </button>
+  );
+}
+
+/**
+ * Explicit "Upload" pill with its own hidden file input, so choosing a new
+ * image on the crop screen is always a deliberate tap — the crop surface
+ * itself never opens the OS picker.
+ */
+export function CropUploadButton({
+  onPickFile,
+  disabled,
+  label = "Upload",
+}: {
+  onPickFile: (file: File) => void;
+  disabled?: boolean;
+  label?: string;
+}) {
+  const inputRef = React.useRef<HTMLInputElement>(null);
+  return (
+    <>
+      <button
+        type="button"
+        disabled={disabled}
+        onClick={(e) => {
+          e.stopPropagation();
+          inputRef.current?.click();
+        }}
+        aria-label={label}
+        className="inline-flex h-11 items-center gap-1.5 rounded-full border border-white/25 bg-white/10 px-4 text-xs font-semibold text-white transition hover:bg-white/20 disabled:opacity-50"
+      >
+        <ImageUp className="h-4 w-4" /> {label}
+      </button>
+      <input
+        ref={inputRef}
+        type="file"
+        accept="image/*"
+        className="hidden"
+        onClick={(e) => e.stopPropagation()}
+        onChange={(e) => {
+          const f = e.target.files?.[0];
+          e.target.value = "";
+          if (f) onPickFile(f);
+        }}
+      />
+    </>
   );
 }
