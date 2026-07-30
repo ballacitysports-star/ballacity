@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Link } from "@tanstack/react-router";
 import { Bookmark, BookmarkPlus, Check, Trash2, X } from "lucide-react";
 import { FilterSection } from "@/components/FilterSheet";
-import { SPORTS, type Sport } from "@/lib/sports";
+import { SPORTS, type Sport } from "@/lib/sample-data";
 import { distancePresets } from "@/lib/distance";
 import {
   useFeedPrefs,
