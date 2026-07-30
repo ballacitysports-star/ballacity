@@ -78,7 +78,7 @@ export function Toggle({
 /** Shared birthday validation so onboarding and edit-profile stay identical. */
 export function validateBirthday(value: string): string | null {
   if (!value) return null;
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return "Enter a valid date (YYYY-MM-DD)";
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return "Enter a valid date (MM/DD/YYYY)";
   const [y, m, day] = value.split("-").map(Number);
   const d = new Date(y, m - 1, day);
   if (
