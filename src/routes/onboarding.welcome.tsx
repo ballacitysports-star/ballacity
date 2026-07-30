@@ -13,11 +13,12 @@ import {
   type ProfileBasicsValue,
 } from "@/components/profile/ProfileBasicsFields";
 import {
-import { useAutosave } from "@/hooks/use-autosave";
-import { SaveStatus } from "@/components/SaveStatus";
   ProfileSportsFields,
   type SportEntry,
 } from "@/components/profile/ProfileSportsFields";
+import { useAutosave } from "@/hooks/use-autosave";
+import { SaveStatus } from "@/components/SaveStatus";
+
 
 const searchSchema = z.object({
   type: z.enum(["player", "team", "trainer", "gym"]).optional(),
