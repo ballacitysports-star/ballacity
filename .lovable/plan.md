@@ -1,41 +1,48 @@
-## Goal
+## What's actually happening
 
-When a player picks their sports, let them set a skill level for each one — using the language that sport actually uses (Baseball: AA / AAA / Major / National, Tennis: NTRP, Pickleball: DUPR, Running: pace, etc.) — save it to their account, and show it on their profile and public player page.
+Your sign-in telemetry has the answer. From the iPhone Safari attempts a few minutes ago (`auth_signin_events`):
 
-## Scales per sport
+```text
+20:15:49  attempt   Safari / iOS
+20:15:57  failure   "Sign in was cancelled"
+20:15:58  attempt   Safari / iOS
+20:16:09  failure   "Sign in was cancelled"
+20:16:09  attempt   Safari / iOS
+20:16:20  success
+```
 
-Each sport gets its own labelled scale. Proposed sets (easy to tweak later):
+So Google sign-in isn't blocked — it's being reported as cancelled while it's still in progress, and only worked on the third try.
 
-- **Baseball / Softball**: Rec, Little League, High School, Travel / Showcase, College, Minor A, Minor AA, Minor AAA, Major, National
-- **Basketball**: Rec, High School, AAU / Travel, College, Semi-Pro, Pro
-- **Football**: Flag Rec, Flag Competitive, High School, College, Semi-Pro
-- **Soccer**: Rec, High School, Club / Travel, College, Semi-Pro, Pro
-- **Tennis**: NTRP 1.5 → 7.0 (half-step increments)
-- **Pickleball**: DUPR 2.0 → 6.0 (half-step increments)
-- **Volleyball**: B, BB, A, AA, Open (plus Rec)
-- **Running**: pace bands (e.g. 10:00+/mi, 9:00, 8:00, 7:00, sub-6:00) shown in the viewer's units
-- **Fallback for anything without a curated scale**: Beginner, Intermediate, Advanced, Pro
+Why: when the app runs inside a frame (Lovable preview), the sign-in helper opens Google in a **new tab** on iOS and then polls that tab to see if it was closed. On iPhone Safari the original tab gets backgrounded/frozen as soon as you switch to Google, and the poll reads the Google tab as "closed" — so the helper rejects with `Sign in was cancelled` and our code shows an error toast, even though the sign-in is still running (and often completes moments later). Our current error handling treats that message as a hard failure.
 
-Each entry records the scale name (e.g. "NTRP", "MiLB", "Self-rated") plus the chosen tier, so the profile can render "Tennis · 3.5 NTRP" or "Baseball · AAA".
+## The fix
 
-## What the player sees
+Stop treating an ambiguous "cancelled/closed tab" signal as a failure. Wait for the session instead.
 
-- **Sports editor** (shared by onboarding and Edit profile): under each selected sport, a "Level" row of chips using that sport's scale, plus the existing Positions chips. Optional — leaving it blank shows no level.
-- **My profile**: each sport row shows its level next to the sport name, positions underneath.
-- **Public player page**: same level badge, read from the saved account data.
-- Real-time/draft save behaves exactly like the rest of those forms.
+1. **`src/routes/auth.tsx` — classify the outcome instead of erroring**
+   - Add an "inconclusive" bucket for messages matching `cancelled` / `closed` / `timed out` (and any popup-closed variant).
+   - On inconclusive: do **not** show an error toast. Enter a "Waiting for Google to finish…" state and poll `supabase.auth.getSession()` (e.g. every 1s for up to ~2 minutes) while `onAuthStateChange` also stays in play. First one to see a session wins → run the existing `goPostAuth` path.
+   - Only if the grace window expires with no session, show a calm message: "We didn't hear back from Google" + **Retry** action.
+   - Keep genuine provider/vendor errors and true "Popup was blocked" on the existing hard-error path.
 
-## Technical details
+2. **Make the waiting state visible and idempotent**
+   - Keep the button in a busy/"Finishing sign-in…" state during the grace window instead of clearing `busy` immediately in `.finally()`.
+   - Guard against double-handling if both the poller and `onAuthStateChange` resolve.
+   - Cancel the poller on unmount / successful redirect.
 
-1. **Migration**: add `sport_levels jsonb not null default '{}'` to `public.profiles` (map of sport → `{ system, tier }`). No new table, so existing grants/RLS apply unchanged; owner-write + existing read policies already cover it.
-2. **New `src/lib/sport-levels.ts`**: `LEVELS_BY_SPORT` (scale id, label, ordered tiers), the generic fallback, and helpers `levelsForSport()`, `formatSportLevel()`, plus parse/serialize for the jsonb map.
-3. **`SportEntry`** in `src/components/profile/ProfileSportsFields.tsx` gains an optional `level?: { system: string; tier: string }`; the component renders the level chip row per sport.
-4. **`src/lib/profile-payload.ts`**: `buildProfileRow` writes `sport_levels` from `input.sports`, so onboarding and Edit profile stay byte-identical (fingerprint/idempotency logic keeps working).
-5. **`src/lib/user-prefs-store.ts`**: `ProfileOverrides.sports` / `MyProfile.sports` carry `level`; hydrate from `profiles.sport_levels` when loading the profile so it survives across devices.
-6. **Display**: `src/routes/_tabs.profile.tsx` and `src/routes/players.$userId.tsx` render `formatSportLevel()` next to each sport.
-7. No numeric 1–5 skill ratings return — these are named tiers on the sports list only; game difficulty stays untouched.
+3. **Fix the misleading iOS copy**
+   - The current guidance tells iPhone users to disable Block Pop-ups. Only show that for a real `Popup was blocked` error, not for the cancelled/closed case.
 
-## Not included
+4. **Telemetry**
+   - Record a distinct event for the inconclusive case (e.g. `inconclusive_wait`) plus `success_after_wait` / `timeout`, so we can confirm from data that the false failures are gone instead of guessing.
 
-- Filtering/search by sport level (can follow once the data exists).
-- Verification of claimed levels.
+## Notes
+
+- On the published site (not framed), the helper does a full-page redirect and never opens a tab, so this specific failure is preview/framed-context specific — the change is safe there and just makes the flow quieter.
+- No database or backend changes; work is confined to the sign-in screen's outcome handling and copy.
+
+## Verification
+
+- Re-run the Google sign-in on iPhone Safari and confirm no error toast appears mid-flow and you land signed in on the first attempt.
+- Re-query `auth_signin_events` afterwards: expect `attempt → inconclusive_wait → success_after_wait` with no `failure / "Sign in was cancelled"` rows.
+- Existing social-login E2E specs (`e2e/social-login-identity-cases.spec.ts`) plus a new case asserting an inconclusive helper result does not surface an error toast.
