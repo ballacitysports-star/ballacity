@@ -1,4 +1,5 @@
 import { useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { Upload, Loader2, X, ImagePlus } from "lucide-react";
 import { toast } from "sonner";
 import { ImageEditorDialog } from "@/components/ImageEditorDialog";
@@ -148,8 +149,14 @@ export function ImageUploader({
               ref={inputRef}
               type="file"
               accept="image/*"
-              disabled={uploading || disabled}
+              disabled={uploading || disabled || open}
               className="hidden"
+              onClick={(e) => {
+                // Never let a bubbling click from elsewhere (e.g. the crop editor)
+                // reopen the OS file picker.
+                if (open) e.preventDefault();
+                e.stopPropagation();
+              }}
               onChange={(e) => {
                 pickFile(e.target.files?.[0]);
                 e.target.value = "";
@@ -198,20 +205,24 @@ export function ImageUploader({
         </div>
       )}
 
-      <ImageEditorDialog
-        open={open}
-        file={file}
-        aspect={aspect}
-        outputMaxSize={outputMaxSize}
-        shape={shape}
-        title={isCover ? "Edit cover" : "Edit photo"}
-        allowBgRemoval={bgRemoval}
-        onCancel={() => {
-          setOpen(false);
-          setFile(null);
-        }}
-        onConfirm={handleConfirm}
-      />
+      {typeof document !== "undefined" &&
+        createPortal(
+          <ImageEditorDialog
+            open={open}
+            file={file}
+            aspect={aspect}
+            outputMaxSize={outputMaxSize}
+            shape={shape}
+            title={isCover ? "Edit cover" : "Edit photo"}
+            allowBgRemoval={bgRemoval}
+            onCancel={() => {
+              setOpen(false);
+              setFile(null);
+            }}
+            onConfirm={handleConfirm}
+          />,
+          document.body,
+        )}
     </div>
   );
 }

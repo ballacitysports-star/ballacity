@@ -1,35 +1,17 @@
-## Goal
+## What's happening
 
-Make photo cropping feel like Facebook's mobile photo cropper: a full-screen, thumb-driven surface where the photo is dragged and pinched directly, controls are big and out of the way, and advanced options are hidden until asked for.
+The full-screen crop/edit screen is rendered *inside* the form field it belongs to, and that field is built as a `<label>` element (`Field` in `src/components/profile/ProfileFormPrimitives.tsx:26-32`) that also contains the hidden `<input type="file">` (`src/components/ImageUploader.tsx:147-157`). Clicking anywhere inside a label activates its file input — so every tap on the crop surface, the drag area, or the bottom controls re-opens the OS file browser.
 
-## What changes for the user
+## The fix
 
-**On phones (the primary fix)**
-- Full-screen editor that respects the notch/home bar, so Cancel and Done are always reachable and nothing is cut off.
-- Big, obvious top bar: "Cancel" on the left, title centered, a filled "Done" pill on the right — all at least 44px tall.
-- The photo fills the screen; you reposition it by dragging and zoom by pinching, exactly as today, plus:
-  - Double-tap to zoom in/out around the tap point.
-  - Gentle rubber-band when you drag past the edge, snapping back on release (FB feel) instead of a hard stop.
-  - A "Drag to reposition" hint that fades in on open and disappears on first touch.
-- Crop overlay upgraded to FB style: dimmed surround, thin white frame, rule-of-thirds grid that appears only while you're actively dragging/pinching, and corner ticks.
-- The zoom slider is removed from the mobile default view (pinch/double-tap replaces it) and replaced by a compact bottom action row: Fit, Rotate, Reset.
-- Size and Quality pickers move off the main screen into an "Options" sheet (tap the sliders icon), so the mobile view isn't three stacked rows of tiny pills.
-- Tool tabs (Crop / Transform / Adjust / Filter / Background) become a scrollable, icon-over-label row with larger tap targets, and the active tool's controls sit directly above them.
-- Body scroll is locked while the editor is open, and browser pull-to-refresh/overscroll can't fire mid-drag.
+1. **Render the editor outside the label.** In `src/components/ImageUploader.tsx`, mount `ImageEditorDialog` through `createPortal(..., document.body)` so the full-screen editor is a top-level DOM node and no longer a descendant of the label or the form field. Same treatment for any other place that mounts the editor inline.
+2. **Stop labels from swallowing unrelated clicks.** Change `Field` to a `<div>` with a plain text caption instead of a `<label>` wrapper, so image uploaders (and any future rich control) inside a field can't accidentally trigger the field's inputs. Text inputs keep working; they just lose click-the-caption-to-focus, which no longer applies since the caption isn't tied to a single control.
+3. **Belt and braces inside the uploader.** Keep the upload button's own `<label>` as the only file-input trigger, and give the hidden input an explicit `onClick` stop-propagation guard so a stray bubbling click can't reopen the picker while the editor is open.
 
-**On desktop**
-- Layout stays essentially as it is today: zoom slider, Fit/Reset, and inline Size/Quality rows remain visible. Only spacing and hit areas get a light pass so the two modes share one component.
+## Verification
 
-## Technical notes
-
-- Files: `src/components/ImageEditorDialog.tsx` (main work), `src/components/ImageCropperDialog.tsx` (same treatment so the legacy cropper doesn't drift), plus a small shared gesture hook.
-- Extract the pointer/pinch logic that is currently duplicated in both dialogs into `src/hooks/use-crop-gestures.ts`: pointer map, pan/pinch anchoring (keep the existing focal-point math), new rubber-band clamp with spring-back, double-tap detection, and an `interacting` flag used to show/hide the thirds grid.
-- Use the existing `useIsMobile()` hook (`src/hooks/use-mobile.tsx`) to branch layout only. Crop math, export/`confirm()` canvas path, filters, transform, and background removal are untouched, so output files are byte-for-byte equivalent for the same crop.
-- Safe areas via `env(safe-area-inset-*)` padding on the top/bottom bars; container gets `h-[100dvh]` and `overscroll-none`.
-- Options sheet uses the existing shadcn `Drawer`/`Sheet` primitive already in the project rather than a new dependency.
-- Colors stay on existing tokens (`bg-lime-gradient`, `text-primary-foreground`, white/10 overlays) — no hardcoded hex.
-- Verification: typecheck, then a Playwright pass at a 390x844 mobile viewport driving open → drag → pinch → double-tap → Done on the profile avatar and cover uploaders, with element screenshots of the crop surface at each step.
+Typecheck, then a Playwright pass at a 390x844 mobile viewport on `/profile/edit`: open the avatar uploader, tap/drag on the crop surface, tap the bottom action row and the Options sheet, and confirm no file-chooser event fires; then confirm the upload button still opens the picker and Done still returns a cropped image.
 
 ## Out of scope
 
-No change to upload/storage behavior, no new crop aspect ratios, no free-form crop handles (FB doesn't offer them for avatar/cover either).
+No changes to crop math, gestures, export quality, or upload/storage behavior.

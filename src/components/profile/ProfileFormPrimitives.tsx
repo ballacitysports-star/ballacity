@@ -24,10 +24,10 @@ export function Section({
 
 export function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <label className="block mb-3">
+    <div className="block mb-3">
       <div className="text-xs font-semibold text-muted-foreground mb-1">{label}</div>
       {children}
-    </label>
+    </div>
   );
 }
 
