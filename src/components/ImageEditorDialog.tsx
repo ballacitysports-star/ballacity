@@ -592,7 +592,15 @@ export function ImageEditorDialog({
 
         {/* Size + quality stay inline on desktop; mobile gets them in the sheet */}
         {!isMobile && options}
+
+        <CropConfirmBar
+          onCancel={onCancel}
+          onApply={confirm}
+          applyDisabled={!img}
+          busy={bgRemoving}
+        />
       </CropBottomBar>
+
     </div>
   );
 }
