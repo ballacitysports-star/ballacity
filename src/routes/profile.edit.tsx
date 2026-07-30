@@ -44,6 +44,7 @@ import {
 import { ProfileBasicsFields } from "@/components/profile/ProfileBasicsFields";
 import { ProfileSportsFields } from "@/components/profile/ProfileSportsFields";
 import { useAutosave } from "@/hooks/use-autosave";
+import { useAccountType } from "@/lib/account-type";
 import { SaveStatus } from "@/components/SaveStatus";
 
 export const Route = createFileRoute("/profile/edit")({
