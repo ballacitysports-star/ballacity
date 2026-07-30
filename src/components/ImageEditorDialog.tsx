@@ -30,6 +30,7 @@ import { CropOverlay } from "@/components/crop/CropOverlay";
 import {
   CropAction,
   CropBottomBar,
+  CropConfirmBar,
   CropHint,
   CropOptionsSheet,
   CropTopBar,
@@ -592,7 +593,15 @@ export function ImageEditorDialog({
 
         {/* Size + quality stay inline on desktop; mobile gets them in the sheet */}
         {!isMobile && options}
+
+        <CropConfirmBar
+          onCancel={onCancel}
+          onApply={confirm}
+          applyDisabled={!img}
+          busy={bgRemoving}
+        />
       </CropBottomBar>
+
     </div>
   );
 }
