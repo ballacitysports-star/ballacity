@@ -8,8 +8,8 @@ import type { Game } from "@/lib/sample-data";
 import { formatWhen } from "@/lib/format";
 import { useLiveParticipantCount } from "@/lib/game-participants-store";
 import type { JoinRequest } from "@/lib/payments";
-import {
 import { Distance } from "@/components/Distance";
+import {
   AlertDialog,
   AlertDialogAction,
   AlertDialogCancel,
