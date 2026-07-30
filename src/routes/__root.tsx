@@ -36,6 +36,7 @@ function NotFoundComponent() {
     const attempted = window.location.pathname + window.location.search;
     setPath(attempted);
     console.warn("[404] no route matched:", attempted);
+    logNotFound(attempted, document.referrer || "");
   }, []);
 
   return (
@@ -66,10 +67,19 @@ function NotFoundComponent() {
             Go home
           </Link>
         </div>
+        <div className="mt-4">
+          <a
+            href={`/dev/route-doctor?path=${encodeURIComponent(path)}`}
+            className="text-xs text-muted-foreground underline underline-offset-4 hover:text-foreground"
+          >
+            Diagnose this link
+          </a>
+        </div>
       </div>
     </div>
   );
 }
+
 
 
 function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
