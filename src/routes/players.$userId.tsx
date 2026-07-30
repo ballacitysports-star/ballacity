@@ -155,13 +155,21 @@ function PlayerProfilePage() {
   ).trim();
   const bio = overrides.bio ?? profile.bio ?? "";
   const city = overrides.city ?? profile.city ?? "";
-  const sportsList = overrides.sports?.length
+  const sportLevels = parseSportLevels((profile as any).sport_levels);
+  const sportsBase: { name: string }[] = overrides.sports?.length
     ? overrides.sports
-    : availability?.sports?.length
-      ? availability.sports.map((name) => ({ name }))
-      : profile.sport
-        ? [{ name: profile.sport as any }]
-        : [];
+    : Object.keys(sportLevels).length
+      ? Object.keys(sportLevels).map((name) => ({ name }))
+      : availability?.sports?.length
+        ? availability.sports.map((name) => ({ name }))
+        : profile.sport
+          ? [{ name: profile.sport as any }]
+          : [];
+  const sportsList = sportsBase.map((s) => ({
+    ...s,
+    level: (s as any).level ?? sportLevels[s.name] ?? null,
+  }));
+
   const badges = overrides.badges ?? [];
   const dbLinks = Array.isArray(profile.links) ? (profile.links as any[]) : [];
   const links = overrides.links?.length ? overrides.links : dbLinks;
