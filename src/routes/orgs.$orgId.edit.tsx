@@ -230,7 +230,7 @@ function EditOrg() {
   }
 
   return (
-    <div className="mx-auto w-full max-w-md sm:max-w-2xl p-4 pb-40 space-y-4">
+    <div className="mx-auto w-full max-w-md sm:max-w-2xl lg:max-w-5xl p-4 pb-40 space-y-4">
       <div className="flex items-center gap-2">
         <Link
           to="/orgs/$orgId"

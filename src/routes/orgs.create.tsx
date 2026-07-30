@@ -75,7 +75,7 @@ function CreateOrg() {
   }
 
   return (
-    <div className="mx-auto w-full max-w-md sm:max-w-2xl p-4 pb-40 space-y-4">
+    <div className="mx-auto w-full max-w-md sm:max-w-2xl lg:max-w-5xl p-4 pb-40 space-y-4">
       <header>
         <h1 className="font-display text-3xl font-bold">Create gym.</h1>
         <p className="text-sm text-muted-foreground mt-1">
