@@ -1940,6 +1940,7 @@ export type Database = {
           username: string
         }[]
       }
+      get_my_birthday: { Args: never; Returns: string }
       has_active_subscription: {
         Args: { check_env?: string; user_uuid: string }
         Returns: boolean
@@ -1974,6 +1975,13 @@ export type Database = {
           end_time: string
           start_time: string
           status: string
+        }[]
+      }
+      profile_ages: {
+        Args: { _ids: string[] }
+        Returns: {
+          age: number
+          id: string
         }[]
       }
       unsend_message: { Args: { _id: string }; Returns: undefined }
