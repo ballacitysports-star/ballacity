@@ -7,6 +7,8 @@ import footballCover from "@/assets/sport-football.jpg";
 import baseballCover from "@/assets/sport-baseball.jpg";
 import softballCover from "@/assets/sport-softball.jpg";
 import runningCover from "@/assets/sport-running.jpg";
+import { earnedBadgeIds, makeBadgeStats, type BadgeStats } from "@/lib/badges";
+
 
 export type Sport =
   | "Baseball"
