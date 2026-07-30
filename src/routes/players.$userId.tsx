@@ -73,7 +73,7 @@ function PlayerProfilePage() {
       supabase
         .from("profiles")
         .select(
-          "id, display_name, avatar_initials, bio, sport, username, city, avatar_url, cover_url, graduating_class, links",
+          "id, display_name, avatar_initials, bio, sport, username, city, avatar_url, cover_url, graduating_class, links, sport_levels",
         )
         .eq("id", userId)
         .maybeSingle(),
