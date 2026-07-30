@@ -1,46 +1,50 @@
 ## Goal
 
-Stop making people hunt for a Save button. Any profile you're **editing** saves itself a moment after you stop typing. Any profile you're **creating** keeps a local draft as you go, and only becomes real when you submit.
+Turn the gym (org) profile into a Google Business Profile–style listing: place-search driven, with hours, contact, category/amenities, and photos — edited on a single page with a live listing preview and a profile-strength meter, and shown publicly as a Google-listing-style page.
 
-## Behavior
+## New listing fields
 
-**Edit screens** (profile, team, trainer, gym) — real auto-save:
-- ~800ms after you stop typing, changes are written to the backend.
-- Nothing is sent while a field is invalid (bad birthday, malformed link URL, missing required name) — the status line shows the reason instead of failing silently.
-- Repeat saves of unchanged data are skipped, and only one write is ever in flight at a time.
-- A failed save shows "Couldn't save — retry" with a retry action; nothing is lost, the next edit retries.
-- Leaving the page flushes any pending save first.
+Added to the gym record:
+- **Hours** — per weekday open/close ranges, "closed" and "open 24 hours" toggles; derived "Open now / Closed / Closes soon" status computed in the gym's timezone.
+- **Contact** — phone number and public email (validated, tap-to-call / mailto on the public page).
+- **Category + amenities** — one primary category (Gym, Fitness studio, Training facility, Court rental, Sports complex, Other) plus amenity chips (parking, showers, lockers, indoor courts, outdoor courts, weight room, turf, kids programs, accessible entrance, Wi-Fi).
+- **Photos** — a gallery of up to 12 images in addition to logo and cover, with reorder and delete; first photo doubles as the listing hero if no cover is set.
 
-**Create screens** (new team, new trainer, new gym, onboarding sign-up steps) — draft auto-save:
-- Your in-progress input is stored locally and restored if you close the tab or navigate away.
-- No row is written to the database until you press the create/finish button, so half-built profiles never show up to anyone else.
-- Status line reads "Draft saved" instead of "Saved".
+## Editor (create + edit)
 
-**Status indicator** (subtle text, no toasts):
-- Idle: nothing shown
-- Typing: "Saving…"
-- Done: "Saved just now" → "Saved 2m ago"
-- Blocked: "Not saved — fix birthday" (or whichever field)
-- Failed: "Couldn't save · Retry"
+One scrolling page, same component used by `/orgs/create` and `/orgs/$orgId/edit`:
 
-Placed in the screen header next to the title. On edit screens the explicit Save button is removed and replaced by a Done/Back action that flushes pending changes; on create screens the create button stays as-is.
+```text
++-------------------------------+------------------+
+| Profile strength  ▓▓▓▓▓░░ 68% |                  |
+| Business info (name search,   |  LIVE PREVIEW    |
+|   category, address+map)      |  listing card:   |
+| Contact (phone, email, site)  |  photo strip     |
+| Hours                         |  name • category |
+| Amenities                     |  ★ rating        |
+| Photos (logo, cover, gallery) |  Open now · addr |
+| About (bio, handle)           |  action row      |
++-------------------------------+------------------+
+```
 
-## Screens covered
+- **Name field stays place-search driven** (existing Google Places autocomplete); picking a place prefills address, coordinates, and — when available — phone, website, and category, each shown as an "auto-filled, tap to edit" value.
+- **Profile strength meter** at the top with a checklist of what's missing ("Add hours", "Add 3 photos", …), each item scrolling to its section.
+- **Live preview card** on the right (stacked below the form on mobile) rendering exactly the public listing header as you type.
+- Behavior preserved: edit screen keeps autosave + `SaveStatus`; create screen keeps localStorage drafts and writes to the database only on submit.
 
-| Screen | Mode |
-| --- | --- |
-| `/profile/edit` | auto-save |
-| `/onboarding/welcome` (existing profile row) | auto-save per step |
-| `/teams/:id/edit`, `/trainers/:id/edit` | auto-save |
-| `/orgs/:id/edit` | auto-save |
-| `/teams/create`, `/trainers/create`, `/orgs/create` | draft only |
+## Public gym page
+
+`/orgs/$orgId` redesigned as a listing:
+- Photo strip hero (cover + gallery, tap to open a lightbox).
+- Title block: name, verified check, category, rating + review count, price/level line.
+- Action row: Call, Directions, Website, Share, Save — Directions opens Google Maps for the stored place.
+- Info rows: address with map preview, expandable hours with today's line and open/closed pill, phone, website.
+- Amenity chips, About, then the existing sections (members/trainers, posts, reviews) kept below.
 
 ## Technical notes
 
-- New `src/hooks/use-autosave.ts`: generic hook taking `{ value, save, validate, delay, enabled }`. Internals: value fingerprint (JSON hash, same approach as `profileRowFingerprint`), debounce timer, in-flight promise ref for dedupe, sequence counter so a stale response can't overwrite a newer one, `flush()` for unmount/navigation, and a `status` union (`idle | dirty | saving | saved | invalid | error`).
-- New `src/components/SaveStatus.tsx`: renders the status union as muted text, with relative "Saved Xm ago" ticking and a retry button on error.
-- `profile.edit.tsx`: wire `useAutosave` around the existing `save()` body, split into `validate()` (name/links/birthday/grad-year checks that currently toast) and `persist()` (overrides + `buildProfileRow` upsert + feed prefs). Remove the header Save button and the post-save `nav({ to: "/profile" })`; keep the local-override write immediate so other screens reflect edits instantly.
-- `teams.$teamId.edit.tsx` / `orgs.$orgId.edit.tsx`: same treatment around their existing `save()` / `onSubmit()`, calling `updateTeam` / the org update fn. Org join-request side effects stay on the explicit action, not on autosave.
-- Create screens (`CreateOrgWizard`, `CreateTrainerWizard`, `orgs.create.tsx`, and any team-create wizard): already have `useDraftPersistence`; extend that hook to expose a `status` so `SaveStatus` can render "Draft saved", and add it where missing.
-- `onboarding.welcome.tsx`: reuse its existing `runSave` + fingerprint/in-flight guards as the autosave `save` fn — the idempotency work already there stays intact.
-- No schema or RLS changes.
+- Migration on `trainer_orgs`: add `phone text`, `email text`, `category text`, `amenities text[] not null default '{}'`, `photos text[] not null default '{}'`, `hours jsonb not null default '{}'`, `timezone text`. Existing RLS/grants unchanged; the create RPC and `updateTrainerOrg`/`createStandaloneOrg` server functions extended to accept and validate the new fields.
+- Gallery images upload to the existing public `org-covers` bucket via `uploadDataUrlToBucket` (path prefix already scoped to the owner id).
+- New shared modules: `src/lib/org-hours.ts` (hours type, validation, open-now resolution, formatting), `src/lib/org-listing.ts` (category/amenity catalogs, profile-strength scoring), `src/components/org/HoursEditor.tsx`, `PhotoGalleryEditor.tsx`, `ListingPreviewCard.tsx`, `ProfileStrengthMeter.tsx`.
+- `OrgForm.tsx` is rebuilt into the listing editor and continues to be the single source used by both create and edit routes, so the two stay in sync.
+- Unit tests for hours parsing/open-now (including overnight ranges and closed days) and profile-strength scoring.
