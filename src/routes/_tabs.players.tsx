@@ -313,6 +313,13 @@ function PlayersPage() {
         </p>
       </motion.div>
 
+      <NearbyPlayersPanel
+        players={list}
+        mySports={profile?.sports}
+        myCity={profile?.city}
+        currentUserId={user?.id ?? null}
+      />
+
       <ViewDensityToggle
         view={viewMode}
         onViewChange={switchView}
