@@ -114,12 +114,19 @@ function OrgPage() {
         memberCount={members.length}
         isAdmin={isAdmin}
         isOwner={isOwner}
+        rating={reviewSummary.count ? reviewSummary.avg : null}
+        reviewCount={reviewSummary.count}
       >
         <div className="flex flex-col gap-2">
           <MembershipCta orgId={orgId} members={members} />
           <MemberJoinCta orgId={orgId} />
         </div>
       </OrgListingHeader>
+
+      <div id="gym-reviews">
+        <GymReviews orgId={orgId} orgName={org.name} isAdmin={isAdmin} />
+      </div>
+
 
 
       <section className="rounded-2xl border border-border/60 bg-surface p-4">
