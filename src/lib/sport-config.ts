@@ -51,7 +51,7 @@ export const SPORT_CONFIG: Record<Sport, SportConfig> = {
   },
   Football: {
     individualSport: false,
-    formats: ["11v11 Tackle", "7v7", "5v5 Flag", "Skills"],
+    formats: ["11v11 Tackle", "7v7 Passing", "5v5 Flag", "Skills"],
     venues: ["Turf", "Grass", "Indoor Facility"],
     cadences: COMMON_CADENCES,
     equipment: ["Cleats", "Flags", "Mouthguard", "Water"],
