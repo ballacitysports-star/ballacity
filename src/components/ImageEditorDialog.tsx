@@ -434,12 +434,19 @@ export function ImageEditorDialog({
                 <ZoomIn className="h-4 w-4 opacity-70" />
               </>
             )}
+            {onPickFile && (
+              <CropUploadButton
+                onPickFile={onPickFile}
+                label={isMobile ? "Upload" : "Upload new photo"}
+              />
+            )}
             <CropAction
               onClick={fitToFrame}
               disabled={!img}
               icon={<Maximize2 className="h-4 w-4" />}
               label="Fit"
             />
+
             {isMobile && (
               <>
                 <CropAction
