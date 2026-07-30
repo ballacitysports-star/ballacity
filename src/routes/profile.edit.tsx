@@ -746,27 +746,12 @@ function EditProfile() {
             checked={sections.showForYou}
             onChange={() => toggleSection("showForYou")}
           />
-          <Toggle
-            label="Only games I host"
-            checked={sections.hostedByMeOnly}
-            onChange={() => toggleSection("hostedByMeOnly")}
-          />
-          <Toggle
-            label="Only games I joined"
-            checked={sections.joinedOnly}
-            onChange={() => toggleSection("joinedOnly")}
-          />
-          <Toggle
-            label="Free games only"
-            checked={sections.freeOnly}
-            onChange={() => toggleSection("freeOnly")}
-          />
-          <Toggle
-            label="Paid games only"
-            checked={sections.paidOnly}
-            onChange={() => toggleSection("paidOnly")}
-          />
         </div>
+        <p className="mt-3 text-xs text-muted-foreground">
+          Price, distance and “my games” filters now live in the feed's filter sheet, where you can
+          also save them as reusable views.
+        </p>
+
       </Section>
 
       <div className="mt-6 flex items-center justify-between gap-3">

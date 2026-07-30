@@ -1,48 +1,79 @@
-## What's actually happening
+## Goal
 
-Your sign-in telemetry has the answer. From the iPhone Safari attempts a few minutes ago (`auth_signin_events`):
+Rebuild the feed preference sheet so it reads clearly, saves to your account, and supports saved presets you can tap to apply.
+
+## What's wrong today
+
+The sheet (`FeedFilterBody` in `src/routes/_tabs.feed.tsx`) has four flat blocks: Sort by, Sport, Distance, and a "Sections" list of six identical switches. The problem is that "Sections" quietly mixes two different kinds of setting:
+
+- **Display toggles** — "Needs players now", "For you list" — these turn feed sections on and off.
+- **Hard filters** — "Games I host", "Games I joined", "Free games", "Paid games" — these remove games from results.
+
+Because they look identical, turning on "Paid games" feels like showing a section but actually hides most of the feed. There are also silent mutual-exclusion rules (paid clears free, hosted clears joined) that the user never sees explained. Preferences live only in `localStorage`, so they don't follow you between devices.
+
+## New structure
+
+Three clearly separated groups, in this order:
 
 ```text
-20:15:49  attempt   Safari / iOS
-20:15:57  failure   "Sign in was cancelled"
-20:15:58  attempt   Safari / iOS
-20:16:09  failure   "Sign in was cancelled"
-20:16:09  attempt   Safari / iOS
-20:16:20  success
+┌─ Feed filters ─────────────────────────┐
+│  MY VIEWS                              │
+│  [ All games ] [ Weeknights ] [ + ]    │  ← saved presets, tap to apply
+│                                        │
+│  1. NARROW RESULTS                     │
+│     Sport         chips (multi)        │
+│     Distance      Any 5 10 25 · unit   │
+│     Show me       All / Free / Paid    │  ← segmented, exclusivity obvious
+│     My games      All / Hosting / Joined│  ← segmented, exclusivity obvious
+│                                        │
+│  2. ORDER                              │
+│     Sort          Nearest / Soonest    │
+│                                        │
+│  3. FEED LAYOUT                        │
+│     ▸ Needs players now      [toggle]  │
+│     ▸ For you                [toggle]  │
+│                                        │
+│  [ Reset ]                [ Show 24 ]  │  ← live count in the footer
+└────────────────────────────────────────┘
 ```
 
-So Google sign-in isn't blocked — it's being reported as cancelled while it's still in progress, and only worked on the third try.
+Key changes:
 
-Why: when the app runs inside a frame (Lovable preview), the sign-in helper opens Google in a **new tab** on iOS and then polls that tab to see if it was closed. On iPhone Safari the original tab gets backgrounded/frozen as soon as you switch to Google, and the poll reads the Google tab as "closed" — so the helper rejects with `Sign in was cancelled` and our code shows an error toast, even though the sign-in is still running (and often completes moments later). Our current error handling treats that message as a hard failure.
+- The four filter switches become two **segmented pickers** ("Show me": All / Free only / Paid only; "My games": All / Hosting / Joined). Exclusivity becomes visually obvious instead of a hidden rule, and the underlying booleans no longer need cross-clearing hacks.
+- Only the two genuine display toggles stay as switches, under a "Feed layout" heading.
+- A live result count on the apply button so you can see the effect of a filter before closing the sheet.
+- Each group shows a small count badge of how many filters are active within it, and "Reset" only clears filters (not your layout toggles).
 
-## The fix
+## Saved presets
 
-Stop treating an ambiguous "cancelled/closed tab" signal as a failure. Wait for the session instead.
+A "My views" row at the top of the sheet. Each preset stores a full snapshot of sport, distance, unit, sort, and the two exclusivity pickers.
 
-1. **`src/routes/auth.tsx` — classify the outcome instead of erroring**
-   - Add an "inconclusive" bucket for messages matching `cancelled` / `closed` / `timed out` (and any popup-closed variant).
-   - On inconclusive: do **not** show an error toast. Enter a "Waiting for Google to finish…" state and poll `supabase.auth.getSession()` (e.g. every 1s for up to ~2 minutes) while `onAuthStateChange` also stays in play. First one to see a session wins → run the existing `goPostAuth` path.
-   - Only if the grace window expires with no session, show a calm message: "We didn't hear back from Google" + **Retry** action.
-   - Keep genuine provider/vendor errors and true "Popup was blocked" on the existing hard-error path.
+- Tap a preset chip to apply it; the active one is highlighted.
+- "Save current as view" prompts for a name (with a suggested name derived from the active filters, e.g. "Basketball · 10 mi · Soonest").
+- Long-press / overflow on a chip to rename or delete.
+- "All games" is a built-in, non-deletable preset equal to the defaults.
+- Editing any filter while a preset is active marks it "Edited" with an inline "Update view" action, so you never silently overwrite a saved view.
 
-2. **Make the waiting state visible and idempotent**
-   - Keep the button in a busy/"Finishing sign-in…" state during the grace window instead of clearing `busy` immediately in `.finally()`.
-   - Guard against double-handling if both the poller and `onAuthStateChange` resolve.
-   - Cancel the poller on unmount / successful redirect.
+Presets also render as a compact row directly above the feed's sport chips, so common views are one tap away without opening the sheet.
 
-3. **Fix the misleading iOS copy**
-   - The current guidance tells iPhone users to disable Block Pop-ups. Only show that for a real `Popup was blocked` error, not for the cancelled/closed case.
+## Account sync
 
-4. **Telemetry**
-   - Record a distinct event for the inconclusive case (e.g. `inconclusive_wait`) plus `success_after_wait` / `timeout`, so we can confirm from data that the false failures are gone instead of guessing.
+Preferences and presets move to a `feed_preferences` table keyed to your user, with the existing `localStorage` store kept as an offline cache and as the storage for signed-out visitors.
 
-## Notes
+- Signed in: read from your account on load, write with a short debounce (the same pattern as the existing real-time profile save), so switching devices carries your setup over.
+- Signed out: behaves exactly as today, on-device only.
+- First sign-in after this change adopts whatever is currently on the device rather than wiping it.
+- Shared links keep winning over saved preferences, as they do today, so a shared feed URL always shows the sender's view.
 
-- On the published site (not framed), the helper does a full-page redirect and never opens a tab, so this specific failure is preview/framed-context specific — the change is safe there and just makes the flow quieter.
-- No database or backend changes; work is confined to the sign-in screen's outcome handling and copy.
+## Technical notes
 
-## Verification
+- New `src/components/feed/FeedPreferencesSheet.tsx` plus small pieces (`SegmentedFilter`, `PresetRow`) so `_tabs.feed.tsx` stops holding this UI inline; the route keeps ownership of filtering, URL sync, and result counts.
+- `FeedPrefs` in `src/lib/user-prefs-store.ts` gains `moneyFilter: "all" | "free" | "paid"` and `mineFilter: "all" | "hosting" | "joined"`, replacing the four booleans in `sections`; `sections` narrows to the two display toggles. A migration in the store's loader maps existing localStorage values forward so nobody loses their current setup.
+- New `savedViews: FeedView[]` on the prefs shape (`id`, `name`, `filters` snapshot, `createdAt`).
+- Database migration: `feed_preferences` (`user_id` primary key, `prefs` jsonb, `saved_views` jsonb, timestamps) with grants and owner-only access rules, plus an updated-at trigger. Reads and writes go through a new `src/lib/feed-prefs.functions.ts` using the authenticated server-function path.
+- Filtering in the route switches from the six booleans to the two new enum fields; URL params keep short names, with the old `free`/`paid`/`hosted`/`joined` params still accepted on read so existing shared links keep working.
+- Preset apply/save/delete are pure prefs writes, so no change to feed query logic is needed.
 
-- Re-run the Google sign-in on iPhone Safari and confirm no error toast appears mid-flow and you land signed in on the first attempt.
-- Re-query `auth_signin_events` afterwards: expect `attempt → inconclusive_wait → success_after_wait` with no `failure / "Sign in was cancelled"` rows.
-- Existing social-login E2E specs (`e2e/social-login-identity-cases.spec.ts`) plus a new case asserting an inconclusive helper result does not surface an error toast.
+## Out of scope
+
+No new filter dimensions (time of day, skill level, indoor/outdoor, spots left) in this pass — the rebuild is about structure, sync, and presets. Easy to add afterwards since "Narrow results" becomes the obvious home for them.

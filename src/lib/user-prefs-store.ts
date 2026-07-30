@@ -66,41 +66,119 @@ const PROFILE_KEY_PREFIX = "openrun.profile.v2.";
 const PREFS_KEY = "openrun.feedPrefs.v1";
 
 // ---------- Feed prefs ----------
+/** Display-only toggles: which sections the feed renders. */
 export type FeedSectionToggles = {
   showUrgent: boolean;
   showForYou: boolean;
-  hostedByMeOnly: boolean;
-  joinedOnly: boolean;
-  paidOnly: boolean;
-  freeOnly: boolean;
 };
 
 export type FeedSortBy = "nearest" | "soonest";
 
 export type DistanceUnitPref = "auto" | DistanceUnit;
 
-export type FeedPrefs = {
+/** Mutually exclusive price filter — replaces the old freeOnly/paidOnly pair. */
+export type FeedMoneyFilter = "all" | "free" | "paid";
+/** Mutually exclusive ownership filter — replaces hostedByMeOnly/joinedOnly. */
+export type FeedMineFilter = "all" | "hosting" | "joined";
+
+/** Everything that narrows or orders results — the part a saved view stores. */
+export type FeedFilterSnapshot = {
   preferredSports: Sport[];
-  sections: FeedSectionToggles;
   maxDistanceMi: number | null;
   distanceUnit: DistanceUnitPref;
   sortBy: FeedSortBy;
+  moneyFilter: FeedMoneyFilter;
+  mineFilter: FeedMineFilter;
 };
 
-export const DEFAULT_PREFS: FeedPrefs = {
+export type FeedView = {
+  id: string;
+  name: string;
+  filters: FeedFilterSnapshot;
+  createdAt: string;
+};
+
+export type FeedPrefs = FeedFilterSnapshot & {
+  sections: FeedSectionToggles;
+  savedViews: FeedView[];
+  activeViewId: string | null;
+};
+
+export const DEFAULT_FILTERS: FeedFilterSnapshot = {
   preferredSports: [],
-  sections: {
-    showUrgent: true,
-    showForYou: true,
-    hostedByMeOnly: false,
-    joinedOnly: false,
-    paidOnly: false,
-    freeOnly: false,
-  },
   maxDistanceMi: null,
   distanceUnit: "auto",
   sortBy: "nearest",
+  moneyFilter: "all",
+  mineFilter: "all",
 };
+
+export const DEFAULT_PREFS: FeedPrefs = {
+  ...DEFAULT_FILTERS,
+  sections: {
+    showUrgent: true,
+    showForYou: true,
+  },
+  savedViews: [],
+  activeViewId: null,
+};
+
+/**
+ * Normalizes any stored/remote prefs blob into the current shape, mapping the
+ * legacy `sections.freeOnly / paidOnly / hostedByMeOnly / joinedOnly` booleans
+ * forward so existing users keep their setup.
+ */
+export function normalizeFeedPrefs(raw: unknown): FeedPrefs {
+  const parsed = (raw ?? {}) as Record<string, any>;
+  const legacy = (parsed.sections ?? {}) as Record<string, any>;
+
+  const sections: FeedSectionToggles = {
+    showUrgent: legacy.showUrgent !== false,
+    showForYou: legacy.showForYou !== false,
+  };
+  if (!sections.showForYou && !sections.showUrgent) sections.showForYou = true;
+
+  let moneyFilter: FeedMoneyFilter =
+    parsed.moneyFilter === "free" || parsed.moneyFilter === "paid" ? parsed.moneyFilter : "all";
+  if (!parsed.moneyFilter) {
+    if (legacy.freeOnly && !legacy.paidOnly) moneyFilter = "free";
+    else if (legacy.paidOnly && !legacy.freeOnly) moneyFilter = "paid";
+  }
+
+  let mineFilter: FeedMineFilter =
+    parsed.mineFilter === "hosting" || parsed.mineFilter === "joined" ? parsed.mineFilter : "all";
+  if (!parsed.mineFilter) {
+    if (legacy.hostedByMeOnly && !legacy.joinedOnly) mineFilter = "hosting";
+    else if (legacy.joinedOnly && !legacy.hostedByMeOnly) mineFilter = "joined";
+  }
+
+  const savedViews: FeedView[] = Array.isArray(parsed.savedViews)
+    ? parsed.savedViews
+        .filter((v: any) => v && typeof v.id === "string" && typeof v.name === "string")
+        .map((v: any) => ({
+          id: v.id,
+          name: String(v.name).slice(0, 40),
+          filters: { ...DEFAULT_FILTERS, ...(v.filters ?? {}) },
+          createdAt: typeof v.createdAt === "string" ? v.createdAt : new Date().toISOString(),
+        }))
+    : [];
+
+  return {
+    preferredSports: Array.isArray(parsed.preferredSports) ? parsed.preferredSports : [],
+    maxDistanceMi:
+      typeof parsed.maxDistanceMi === "number" && parsed.maxDistanceMi > 0
+        ? parsed.maxDistanceMi
+        : null,
+    distanceUnit:
+      parsed.distanceUnit === "km" ? "km" : parsed.distanceUnit === "mi" ? "mi" : "auto",
+    sortBy: parsed.sortBy === "soonest" ? "soonest" : "nearest",
+    moneyFilter,
+    mineFilter,
+    sections,
+    savedViews,
+    activeViewId: typeof parsed.activeViewId === "string" ? parsed.activeViewId : null,
+  };
+}
 
 // ---------- Generic JSON store ----------
 function makeStore<T>(key: string, fallback: T) {
@@ -319,34 +397,7 @@ export function useFeedPrefs(): FeedPrefs {
   const s = useSyncExternalStore(prefsStore.subscribe, prefsStore.getSnapshot, () =>
     JSON.stringify(DEFAULT_PREFS),
   );
-  const parsed = JSON.parse(s) as FeedPrefs;
-  const sections = { ...DEFAULT_PREFS.sections, ...(parsed.sections ?? {}) };
-  // Sanitize impossible filter combinations that would yield an empty feed forever
-  if (sections.paidOnly && sections.freeOnly) {
-    sections.paidOnly = false;
-    sections.freeOnly = false;
-  }
-  if (sections.hostedByMeOnly && sections.joinedOnly) {
-    sections.hostedByMeOnly = false;
-    sections.joinedOnly = false;
-  }
-  if (!sections.showForYou && !sections.showUrgent) {
-    sections.showForYou = true;
-  }
-  const maxDistanceMi =
-    typeof parsed.maxDistanceMi === "number" && parsed.maxDistanceMi > 0
-      ? parsed.maxDistanceMi
-      : null;
-  const distanceUnit: DistanceUnitPref =
-    parsed.distanceUnit === "km" ? "km" : parsed.distanceUnit === "mi" ? "mi" : "auto";
-  const sortBy: FeedSortBy = parsed.sortBy === "soonest" ? "soonest" : "nearest";
-  return {
-    preferredSports: parsed.preferredSports ?? [],
-    sections,
-    maxDistanceMi,
-    distanceUnit,
-    sortBy,
-  };
+  return normalizeFeedPrefs(JSON.parse(s));
 }
 
 /** Resolve an "auto" preference into a concrete unit using device locale. */
