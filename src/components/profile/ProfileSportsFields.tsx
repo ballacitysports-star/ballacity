@@ -1,7 +1,8 @@
 import { X } from "lucide-react";
 import { SPORTS, POSITIONS_BY_SPORT, type Sport } from "@/lib/sample-data";
+import { scaleForSport, type SportLevel } from "@/lib/sport-levels";
 
-export type SportEntry = { name: Sport; positions?: string[] };
+export type SportEntry = { name: Sport; positions?: string[]; level?: SportLevel | null };
 
 /**
  * The canonical "Sports" editor. Shared by Edit profile and onboarding.
@@ -18,6 +19,14 @@ export function ProfileSportsFields({
     onChange([...sports, { name: s }]);
   };
   const removeSport = (s: Sport) => onChange(sports.filter((x) => x.name !== s));
+  const setLevel = (s: Sport, tier: string) =>
+    onChange(
+      sports.map((x) => {
+        if (x.name !== s) return x;
+        const same = x.level?.tier === tier;
+        return { ...x, level: same ? null : { system: scaleForSport(s).system, tier } };
+      }),
+    );
   const togglePosition = (s: Sport, pos: string) =>
     onChange(
       sports.map((x) => {
@@ -26,6 +35,7 @@ export function ProfileSportsFields({
         return { ...x, positions: cur.includes(pos) ? cur.filter((p) => p !== pos) : [...cur, pos] };
       }),
     );
+
 
   return (
     <>
