@@ -1,4 +1,6 @@
 import type { SportEntry } from "@/components/profile/ProfileSportsFields";
+import { serializeSportLevels } from "@/lib/sport-levels";
+
 
 export type ProfileLink = { url: string; label?: string; [k: string]: unknown };
 
