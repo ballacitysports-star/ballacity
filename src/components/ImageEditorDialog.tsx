@@ -67,6 +67,8 @@ type Props = {
   qualityPresets?: CropQualityPreset[];
   onCancel: () => void;
   onConfirm: (dataUrl: string) => void;
+  /** When provided, shows an explicit "Upload" button to swap the source image. */
+  onPickFile?: (file: File) => void;
 };
 
 export function ImageEditorDialog({
@@ -81,6 +83,7 @@ export function ImageEditorDialog({
   qualityPresets = DEFAULT_QUALITY_PRESETS,
   onCancel,
   onConfirm,
+  onPickFile,
 }: Props) {
   const isMobile = useIsMobile();
   const [imgSrc, setImgSrc] = useState<string | null>(null);
