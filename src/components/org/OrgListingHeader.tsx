@@ -13,6 +13,7 @@ import {
   Share2,
   Mail,
   ChevronDown,
+  Star,
 } from "lucide-react";
 import { toast } from "sonner";
 import { VenueMapPreview } from "@/components/VenueMapPreview";
@@ -89,12 +90,16 @@ export function OrgListingHeader({
   memberCount,
   isAdmin,
   isOwner,
+  rating,
+  reviewCount,
   children,
 }: {
   org: OrgListingRow;
   memberCount: number;
   isAdmin: boolean;
   isOwner: boolean;
+  rating?: number | null;
+  reviewCount?: number;
   children?: React.ReactNode;
 }) {
   const [hoursOpen, setHoursOpen] = useState(false);
@@ -163,6 +168,13 @@ export function OrgListingHeader({
               )}
             </h1>
             <div className="mt-1 flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
+              {typeof rating === "number" && rating > 0 && (
+                <a href="#gym-reviews" className="inline-flex items-center gap-1 font-semibold text-foreground">
+                  <Star className="h-3.5 w-3.5 fill-amber-400 text-amber-400" />
+                  {rating.toFixed(1)}
+                  {reviewCount ? ` (${reviewCount})` : ""}
+                </a>
+              )}
               {org.category && <span className="font-semibold text-foreground">{org.category}</span>}
               <span>@{org.handle}</span>
               {org.city && (

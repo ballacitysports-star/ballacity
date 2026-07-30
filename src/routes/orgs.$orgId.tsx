@@ -5,6 +5,8 @@ import { useAuth } from "@/hooks/use-auth";
 import { Building2, MapPin, Users, ShieldCheck, Check, X, LogIn, UserPlus, Clock, Crown, UserMinus } from "lucide-react";
 import { VenueMapPreview } from "@/components/VenueMapPreview";
 import { OrgListingHeader, type OrgListingRow } from "@/components/org/OrgListingHeader";
+import { GymReviews } from "@/components/org/GymReviews";
+import { summarizeGymReviews, useGymReviews } from "@/lib/gym-reviews";
 
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -88,6 +90,9 @@ function OrgPage() {
   const isAdmin =
     isOwner || (!!myMembership && (myMembership.role === "owner" || myMembership.role === "admin"));
 
+  const gymReviews = useGymReviews(orgId);
+  const reviewSummary = summarizeGymReviews(gymReviews.data ?? []);
+
   const requests = useQuery({
     queryKey: ["trainer-org-requests", orgId],
     queryFn: () => listJoinRequestsForOrg({ data: { orgId } }),
@@ -114,12 +119,19 @@ function OrgPage() {
         memberCount={members.length}
         isAdmin={isAdmin}
         isOwner={isOwner}
+        rating={reviewSummary.count ? reviewSummary.avg : null}
+        reviewCount={reviewSummary.count}
       >
         <div className="flex flex-col gap-2">
           <MembershipCta orgId={orgId} members={members} />
           <MemberJoinCta orgId={orgId} />
         </div>
       </OrgListingHeader>
+
+      <div id="gym-reviews">
+        <GymReviews orgId={orgId} orgName={org.name} isAdmin={isAdmin} />
+      </div>
+
 
 
       <section className="rounded-2xl border border-border/60 bg-surface p-4">
