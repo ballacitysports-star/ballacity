@@ -37,6 +37,8 @@ export function buildProfileRow(input: ProfilePayloadInput) {
     birthday: input.birthday ?? null,
     graduating_class: input.graduatingClass ?? null,
     sport: primary ?? null,
+    sport_levels: serializeSportLevels(input.sports),
+
     ...(input.links ? { links: input.links } : {}),
   };
 }
