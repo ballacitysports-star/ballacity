@@ -30,6 +30,7 @@ import { CropOverlay } from "@/components/crop/CropOverlay";
 import {
   CropAction,
   CropBottomBar,
+  CropConfirmBar,
   CropHint,
   CropOptionsSheet,
   CropTopBar,
