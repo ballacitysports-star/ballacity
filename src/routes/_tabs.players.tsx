@@ -53,6 +53,8 @@ import { useMyProfile } from "@/lib/user-prefs-store";
 import { FilterBar } from "@/components/FilterBar";
 import { FilterSection } from "@/components/FilterSheet";
 import { usePersistedSearch } from "@/hooks/use-persisted-search";
+import { Distance } from "@/components/Distance";
+import { useDistanceUnit } from "@/lib/user-prefs-store";
 
 // URL-persisted Players state. Refreshing or sharing the URL restores the
 // exact view: search text, sport chip, skill, distance cap, age range,
@@ -550,7 +552,7 @@ function PlayersFilterBody({
         <div className="flex flex-wrap gap-2">
           {DISTANCES.map((d) => (
             <Chip key={d} active={maxDistance === d} onClick={() => setMaxDistance(d)}>
-              {d === 0 ? "Any" : `≤ ${d} mi`}
+              {d === 0 ? "Any" : <>≤ <Distance mi={d} /></>}
             </Chip>
           ))}
         </div>
@@ -776,7 +778,7 @@ function AvailabilityCard({
           {(a.city || a.travel_radius_km) && (
             <p className="mt-1 flex items-center gap-1 text-xs text-muted-foreground">
               <MapPin className="h-3.5 w-3.5" />
-              {a.city || "Anywhere"} · up to {kmToMi(a.travel_radius_km)} mi
+              {a.city || "Anywhere"} · up to <Distance km={a.travel_radius_km} />
             </p>
           )}
           {a.note && <p className="mt-2 text-sm leading-snug">{a.note}</p>}
@@ -845,7 +847,8 @@ function PostAvailabilityDialog({
   const [ends, setEnds] = useState("");
   const [days, setDays] = useState<string[]>([]);
   const [city, setCity] = useState("");
-  const [radius, setRadius] = useState(25);
+  const unit = useDistanceUnit();
+  const [radius, setRadius] = useState(25); // in the viewer's unit
   const [note, setNote] = useState("");
   const [saving, setSaving] = useState(false);
   const toggle = (arr: string[], v: string) =>
@@ -866,7 +869,7 @@ function PostAvailabilityDialog({
         ends_on: ends ? ends.slice(0, 10) : null,
         recurring_days: days,
         city,
-        travel_radius_km: miToKm(radius),
+        travel_radius_km: unit === "km" ? radius : miToKm(radius),
         note,
       });
       onPosted();
@@ -956,7 +959,7 @@ function PostAvailabilityDialog({
               />
             </div>
             <div>
-              <Label htmlFor="radius">Radius (mi)</Label>
+              <Label htmlFor="radius">Radius ({unit})</Label>
               <Input
                 id="radius"
                 type="number"
