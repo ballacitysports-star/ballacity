@@ -129,7 +129,7 @@ function TrainersPage() {
   const viewMode: ViewMode = search.view === "map" ? "map" : "list";
   const density: Density = search.density === "grid" ? "grid" : "list";
 
-  const { distanceUnit } = useFeedPrefs();
+  const distanceUnit = useDistanceUnit();
   const unitLabel = distanceUnit === "km" ? "km" : "mi";
   const { coords, status: geoStatus, request: requestLocation } = useUserLocation();
   const radiusKm = radius > 0 ? (distanceUnit === "km" ? radius : radius * KM_PER_MI) : 0;
