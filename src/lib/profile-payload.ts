@@ -23,9 +23,6 @@ export type ProfilePayloadInput = {
  */
 export function buildProfileRow(input: ProfilePayloadInput) {
   const primary = input.sports[0]?.name;
-  const skillLevels = Object.fromEntries(
-    input.sports.map((s) => [s.name, String(s.skill)]),
-  );
   return {
     id: input.userId,
     display_name: input.name,
@@ -38,7 +35,6 @@ export function buildProfileRow(input: ProfilePayloadInput) {
     birthday: input.birthday ?? null,
     graduating_class: input.graduatingClass ?? null,
     sport: primary ?? null,
-    skill_levels: skillLevels,
     ...(input.links ? { links: input.links } : {}),
   };
 }

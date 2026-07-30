@@ -98,8 +98,8 @@ function OnboardingWizard({ type }: { type: AccountType }) {
   const nextCfg = isPlayer ? null : NEXT_STEPS[type as Exclude<AccountType, "player">];
 
   const stepLabels = isPlayer
-    ? ["Basics", "Sports & skill", "Location"]
-    : ["Basics", "Sports & skill", "Location", "Next steps"];
+    ? ["Basics", "Sports", "Location"]
+    : ["Basics", "Sports", "Location", "Next steps"];
 
   const [step, setStep] = useState(0);
   const [saving, setSaving] = useState(false);
@@ -423,7 +423,7 @@ function OnboardingWizard({ type }: { type: AccountType }) {
       )}
 
       {step === 1 && (
-        <Section title="Sports & skill">
+        <Section title="Sports">
           <ProfileSportsFields sports={sports} onChange={setSports} />
         </Section>
       )}

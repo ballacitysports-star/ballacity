@@ -152,9 +152,9 @@ function PlayerProfilePage() {
   const sportsList = overrides.sports?.length
     ? overrides.sports
     : availability?.sports?.length
-      ? availability.sports.map((name) => ({ name, skill: 3 }))
+      ? availability.sports.map((name) => ({ name }))
       : profile.sport
-        ? [{ name: profile.sport as any, skill: 3 }]
+        ? [{ name: profile.sport as any }]
         : [];
   const badges = overrides.badges ?? [];
   const dbLinks = Array.isArray(profile.links) ? (profile.links as any[]) : [];
@@ -339,7 +339,7 @@ function PlayerProfilePage() {
           </div>
         )}
 
-        {/* Sports & skill */}
+        {/* Sports */}
         {sportsList.length > 0 && (
           <div className="mt-6">
             <h2 className="font-display text-sm font-bold uppercase tracking-wider text-muted-foreground mb-2">
@@ -348,19 +348,8 @@ function PlayerProfilePage() {
             <div className="space-y-2">
               {sportsList.map((s) => (
                 <div key={s.name} className="rounded-2xl border border-border bg-surface p-3">
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="font-semibold">
-                      {SPORTS.find((sp) => sp.name === s.name)?.emoji ?? "🎯"} {s.name}
-                    </span>
-                    <span className="text-lime font-bold">{s.skill.toFixed(1)} / 5</span>
-                  </div>
-                  <div className="mt-2 h-1.5 rounded-full bg-secondary overflow-hidden">
-                    <motion.div
-                      initial={{ width: 0 }}
-                      animate={{ width: `${(s.skill / 5) * 100}%` }}
-                      transition={{ duration: 0.8 }}
-                      className="h-full bg-lime-gradient"
-                    />
+                  <div className="text-sm font-semibold">
+                    {SPORTS.find((sp) => sp.name === s.name)?.emoji ?? "🎯"} {s.name}
                   </div>
                   {"positions" in s && Array.isArray((s as any).positions) && (s as any).positions.length > 0 && (
                     <div className="mt-2 flex flex-wrap gap-1.5">

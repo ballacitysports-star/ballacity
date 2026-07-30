@@ -1,10 +1,10 @@
 import { X } from "lucide-react";
 import { SPORTS, POSITIONS_BY_SPORT, type Sport } from "@/lib/sample-data";
 
-export type SportEntry = { name: Sport; skill: number; positions?: string[] };
+export type SportEntry = { name: Sport; positions?: string[] };
 
 /**
- * The canonical "Sports & skill" editor. Shared by Edit profile and onboarding.
+ * The canonical "Sports" editor. Shared by Edit profile and onboarding.
  */
 export function ProfileSportsFields({
   sports,
@@ -15,11 +15,9 @@ export function ProfileSportsFields({
 }) {
   const addSport = (s: Sport) => {
     if (sports.some((x) => x.name === s)) return;
-    onChange([...sports, { name: s, skill: 3 }]);
+    onChange([...sports, { name: s }]);
   };
   const removeSport = (s: Sport) => onChange(sports.filter((x) => x.name !== s));
-  const setSkill = (s: Sport, skill: number) =>
-    onChange(sports.map((x) => (x.name === s ? { ...x, skill } : x)));
   const togglePosition = (s: Sport, pos: string) =>
     onChange(
       sports.map((x) => {
@@ -36,30 +34,15 @@ export function ProfileSportsFields({
           <div key={s.name} className="rounded-2xl border border-border bg-surface p-3">
             <div className="flex items-center justify-between text-sm">
               <span className="font-semibold">{s.name}</span>
-              <div className="flex items-center gap-2">
-                <span className="text-lime font-bold w-12 text-right">
-                  {s.skill.toFixed(1)} / 5
-                </span>
-                <button
-                  type="button"
-                  onClick={() => removeSport(s.name)}
-                  aria-label={`Remove ${s.name}`}
-                  className="grid h-7 w-7 place-items-center rounded-full border border-border text-muted-foreground"
-                >
-                  <X className="h-3.5 w-3.5" />
-                </button>
-              </div>
+              <button
+                type="button"
+                onClick={() => removeSport(s.name)}
+                aria-label={`Remove ${s.name}`}
+                className="grid h-7 w-7 place-items-center rounded-full border border-border text-muted-foreground"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
             </div>
-            <input
-              type="range"
-              min={1}
-              max={5}
-              step={0.1}
-              value={s.skill}
-              onChange={(e) => setSkill(s.name, parseFloat(e.target.value))}
-              aria-label={`${s.name} skill`}
-              className="mt-2 w-full accent-lime"
-            />
             {POSITIONS_BY_SPORT[s.name]?.length > 0 && (
               <div className="mt-3">
                 <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1.5">

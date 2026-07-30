@@ -708,7 +708,7 @@ function Profile() {
         </section>
 
 
-        {/* Sports & skill */}
+        {/* Sports */}
         <div className={`mt-8 ${activeTab === "games" ? "" : "hidden"}`}>
           <h2 className="font-display text-sm font-bold uppercase tracking-wider text-muted-foreground mb-2">
             Sports
@@ -716,18 +716,7 @@ function Profile() {
           <div className="space-y-2">
             {me.sports.map((s) => (
               <div key={s.name} className="rounded-2xl border border-border bg-surface p-3">
-                <div className="flex items-center justify-between text-sm">
-                  <span className="font-semibold">{s.name}</span>
-                  <span className="text-lime font-bold">{s.skill.toFixed(1)} / 5</span>
-                </div>
-                <div className="mt-2 h-1.5 rounded-full bg-secondary overflow-hidden">
-                  <motion.div
-                    initial={{ width: 0 }}
-                    animate={{ width: `${(s.skill / 5) * 100}%` }}
-                    transition={{ duration: 0.8 }}
-                    className="h-full bg-lime-gradient"
-                  />
-                </div>
+                <div className="text-sm font-semibold">{s.name}</div>
                 {s.positions && s.positions.length > 0 && (
                   <div className="mt-2 flex flex-wrap gap-1.5">
                     {s.positions.map((p) => (
