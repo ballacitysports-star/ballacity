@@ -316,14 +316,13 @@ function OnboardingWizard({ type }: { type: AccountType }) {
       }
 
       const current = getFeedPrefsSnapshot();
-      const radiusInPrefUnit =
-        current.distanceUnit === "km" ? radius : Math.round(radius * 0.621371);
       setFeedPrefs({
         ...current,
         preferredSports: Array.from(
           new Set([...sports.map((s) => s.name), ...current.preferredSports]),
         ),
-        maxDistanceMi: radiusInPrefUnit,
+        // `maxDistanceMi` is always stored in miles; `radius` is kilometers.
+        maxDistanceMi: Math.max(1, kmToMi(radius)),
       });
 
       await queryClient.invalidateQueries({
