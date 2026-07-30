@@ -1,6 +1,14 @@
+import * as React from "react";
+import { CalendarIcon } from "lucide-react";
 import { ImageUploader } from "@/components/ImageUploader";
 import { LocationAutocomplete } from "@/components/LocationAutocomplete";
-import { Field, Input } from "@/components/profile/ProfileFormPrimitives";
+import {
+  Field,
+  Input,
+  birthdayToDisplay,
+  formatBirthdayInput,
+  parseBirthdayInput,
+} from "@/components/profile/ProfileFormPrimitives";
 
 export type ProfileBasicsValue = {
   name: string;
