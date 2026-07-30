@@ -1,35 +1,46 @@
 ## Goal
 
-Distance units (miles vs kilometers) should default to whatever matches the user's region, detected from their device locale and timezone, instead of always defaulting to miles. Users can still force a unit from the feed filter toggle, and that choice sticks.
+Stop making people hunt for a Save button. Any profile you're **editing** saves itself a moment after you stop typing. Any profile you're **creating** keeps a local draft as you go, and only becomes real when you submit.
 
-## How detection works
+## Behavior
 
-A new helper `src/lib/measurement-system.ts`:
+**Edit screens** (profile, team, trainer, gym) — real auto-save:
+- ~800ms after you stop typing, changes are written to the backend.
+- Nothing is sent while a field is invalid (bad birthday, malformed link URL, missing required name) — the status line shows the reason instead of failing silently.
+- Repeat saves of unchanged data are skipped, and only one write is ever in flight at a time.
+- A failed save shows "Couldn't save — retry" with a retry action; nothing is lost, the next edit retries.
+- Leaving the page flushes any pending save first.
 
-- Reads `navigator.language`/`navigator.languages` and `Intl.DateTimeFormat().resolvedOptions().timeZone`.
-- Uses the standard imperial set — US (plus territories), Liberia, Myanmar, and UK-as-miles — everything else metric.
-- Prefers the modern `Intl.Locale(...).getWeekInfo`/`measurementSystem` API where available, falling back to the country-code list, then to timezone (`America/New_York` → imperial, `Europe/Berlin` → metric), then to `mi` as last resort.
-- SSR-safe: returns `"mi"` when `window`/`navigator` are unavailable, and detection runs on the client after hydration so no hydration mismatch occurs.
+**Create screens** (new team, new trainer, new gym, onboarding sign-up steps) — draft auto-save:
+- Your in-progress input is stored locally and restored if you close the tab or navigate away.
+- No row is written to the database until you press the create/finish button, so half-built profiles never show up to anyone else.
+- Status line reads "Draft saved" instead of "Saved".
 
-## Preference model
+**Status indicator** (subtle text, no toasts):
+- Idle: nothing shown
+- Typing: "Saving…"
+- Done: "Saved just now" → "Saved 2m ago"
+- Blocked: "Not saved — fix birthday" (or whichever field)
+- Failed: "Couldn't save · Retry"
 
-`src/lib/user-prefs-store.ts`:
+Placed in the screen header next to the title. On edit screens the explicit Save button is removed and replaced by a Done/Back action that flushes pending changes; on create screens the create button stays as-is.
 
-- `distanceUnit` becomes `"auto" | "mi" | "km"`, with `"auto"` as the new default.
-- Existing saved prefs are untouched: anyone who already has `"mi"` or `"km"` stored keeps that explicit value, so nothing changes under them.
-- Add a resolved accessor (`useDistanceUnit()` / `resolveDistanceUnit(prefs)`) returning a concrete `"mi" | "km"` — this is what components render with.
+## Screens covered
 
-## UI changes
-
-- Feed filter unit toggle (`src/routes/_tabs.feed.tsx`) gains a third option: `Auto` / `mi` / `km`, with `Auto` showing the detected unit as a hint (e.g. "Auto (km)"). Picking `mi` or `km` pins it.
-- Onboarding radius step (`src/routes/onboarding.welcome.tsx`) currently hardcodes "km" labels and a 1–100 km scale; it switches to the resolved unit with correct labels and presets (1–60 mi / 1–100 km) and keeps saving kilometers to the database.
-- Screens that print a unit — game cards/rows, game detail, trainers, teams, players, available players, map, request cards — read the resolved unit instead of assuming `mi`/`km`.
-
-## Data stays unchanged
-
-No migration. The database keeps storing kilometers in `travel_radius_km` and miles in `distance_mi`; conversion stays in `src/lib/distance.ts`, which gains a `formatDistance(valueMi, unit)` helper so every screen renders the same rounding and suffix.
+| Screen | Mode |
+| --- | --- |
+| `/profile/edit` | auto-save |
+| `/onboarding/welcome` (existing profile row) | auto-save per step |
+| `/teams/:id/edit`, `/trainers/:id/edit` | auto-save |
+| `/orgs/:id/edit` | auto-save |
+| `/teams/create`, `/trainers/create`, `/orgs/create` | draft only |
 
 ## Technical notes
 
-- Detection result is memoized per session; the store exposes it via `useSyncExternalStore` so a locale change on remount is picked up.
-- Tests: extend `src/lib/distance.test.ts` and add `measurement-system.test.ts` covering US/GB/DE/MM locales, timezone-only fallback, missing-navigator fallback, and that an explicit stored `mi`/`km` always wins over detection.
+- New `src/hooks/use-autosave.ts`: generic hook taking `{ value, save, validate, delay, enabled }`. Internals: value fingerprint (JSON hash, same approach as `profileRowFingerprint`), debounce timer, in-flight promise ref for dedupe, sequence counter so a stale response can't overwrite a newer one, `flush()` for unmount/navigation, and a `status` union (`idle | dirty | saving | saved | invalid | error`).
+- New `src/components/SaveStatus.tsx`: renders the status union as muted text, with relative "Saved Xm ago" ticking and a retry button on error.
+- `profile.edit.tsx`: wire `useAutosave` around the existing `save()` body, split into `validate()` (name/links/birthday/grad-year checks that currently toast) and `persist()` (overrides + `buildProfileRow` upsert + feed prefs). Remove the header Save button and the post-save `nav({ to: "/profile" })`; keep the local-override write immediate so other screens reflect edits instantly.
+- `teams.$teamId.edit.tsx` / `orgs.$orgId.edit.tsx`: same treatment around their existing `save()` / `onSubmit()`, calling `updateTeam` / the org update fn. Org join-request side effects stay on the explicit action, not on autosave.
+- Create screens (`CreateOrgWizard`, `CreateTrainerWizard`, `orgs.create.tsx`, and any team-create wizard): already have `useDraftPersistence`; extend that hook to expose a `status` so `SaveStatus` can render "Draft saved", and add it where missing.
+- `onboarding.welcome.tsx`: reuse its existing `runSave` + fingerprint/in-flight guards as the autosave `save` fn — the idempotency work already there stays intact.
+- No schema or RLS changes.
