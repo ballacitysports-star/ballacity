@@ -13,6 +13,8 @@ import {
   type ProfileBasicsValue,
 } from "@/components/profile/ProfileBasicsFields";
 import {
+import { useAutosave } from "@/hooks/use-autosave";
+import { SaveStatus } from "@/components/SaveStatus";
   ProfileSportsFields,
   type SportEntry,
 } from "@/components/profile/ProfileSportsFields";
@@ -372,6 +374,21 @@ function OnboardingWizard({ type }: { type: AccountType }) {
 
 
 
+  const autosave = useAutosave({
+    value: { basics, sports, radius },
+    enabled: !!user,
+    validate: () => {
+      if (!basics.name.trim()) return "name is required";
+      const err = validateBirthday(basics.birthday);
+      if (err) return err.toLowerCase();
+      return null;
+    },
+    save: async () => {
+      const ok = await save();
+      if (!ok) throw new Error("Couldn't save your profile");
+    },
+  });
+
   const isLast = step === stepLabels.length - 1;
 
   const onNext = async () => {
@@ -405,6 +422,9 @@ function OnboardingWizard({ type }: { type: AccountType }) {
             Step {step + 1} of {stepLabels.length} · {stepLabels[step]}
           </span>
           <span>{pct}%</span>
+        </div>
+        <div className="mt-1.5">
+          <SaveStatus {...autosave} />
         </div>
         <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-surface">
           <div
