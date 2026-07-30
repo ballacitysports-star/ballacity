@@ -108,7 +108,7 @@ export async function getAvailabilityById(id: string): Promise<AvailabilityWithA
   const row = data as unknown as PlayerAvailability;
   const { data: prof } = await supabase
     .from("profiles")
-    .select("id, display_name, avatar_initials, avatar_url")
+    .select("id, display_name, avatar_initials, avatar_url, sport_levels")
     .eq("id", row.user_id)
     .maybeSingle();
   return {
@@ -116,9 +116,11 @@ export async function getAvailabilityById(id: string): Promise<AvailabilityWithA
     author_name: (prof as any)?.display_name ?? "Player",
     author_initials: (prof as any)?.avatar_initials ?? null,
     author_avatar_url: (prof as any)?.avatar_url ?? null,
+    author_sport_levels: (prof as any)?.sport_levels ?? null,
     author_age: await profileAge(row.user_id),
   };
 }
+
 
 async function profileAge(userId: string): Promise<number | null> {
   const { data } = await (supabase.rpc as any)("profile_ages", { _ids: [userId] });
