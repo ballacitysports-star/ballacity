@@ -78,7 +78,7 @@ export function Toggle({
 /** Shared birthday validation so onboarding and edit-profile stay identical. */
 export function validateBirthday(value: string): string | null {
   if (!value) return null;
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return "Enter a valid date (YYYY-MM-DD)";
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return "Enter a valid date (MM/DD/YYYY)";
   const [y, m, day] = value.split("-").map(Number);
   const d = new Date(y, m - 1, day);
   if (
@@ -93,4 +93,39 @@ export function validateBirthday(value: string): string | null {
   today.setHours(0, 0, 0, 0);
   if (d > today) return "Birthday cannot be in the future";
   return null;
+}
+
+/** Format free-typed digits as MM/DD/YYYY while the user types. */
+export function formatBirthdayInput(raw: string): string {
+  // Allow ISO typing (YYYY-MM-DD) to pass through untouched.
+  if (/^\d{4}-\d{0,2}(-\d{0,2})?$/.test(raw)) return raw.slice(0, 10);
+  const digits = raw.replace(/[^0-9]/g, "").slice(0, 8);
+  if (digits.length <= 2) return digits;
+  if (digits.length <= 4) return `${digits.slice(0, 2)}/${digits.slice(2)}`;
+  return `${digits.slice(0, 2)}/${digits.slice(2, 4)}/${digits.slice(4)}`;
+}
+
+/** Convert a canonical YYYY-MM-DD value into the MM/DD/YYYY display form. */
+export function birthdayToDisplay(iso: string): string {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(iso)) return iso;
+  const [y, m, d] = iso.split("-");
+  return `${m}/${d}/${y}`;
+}
+
+/**
+ * Parse typed text into a canonical YYYY-MM-DD string.
+ * Returns `complete: false` while the entry is still partial.
+ */
+export function parseBirthdayInput(text: string): { iso: string | null; complete: boolean } {
+  const t = text.trim();
+  if (!t) return { iso: "", complete: true };
+  const iso = t.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (iso) return { iso: `${iso[1]}-${iso[2]}-${iso[3]}`, complete: true };
+  const us = t.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if (us) {
+    const mm = us[1].padStart(2, "0");
+    const dd = us[2].padStart(2, "0");
+    return { iso: `${us[3]}-${mm}-${dd}`, complete: true };
+  }
+  return { iso: null, complete: false };
 }
