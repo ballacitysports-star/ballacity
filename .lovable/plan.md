@@ -1,27 +1,32 @@
-## What I verified so far
+## Goal
 
-- The player route exists and works: `/players/<uuid>` returns a real rendered "Player profile" page both on the local dev server and on the published site.
-- Every player card link I found (`profile` tab game cards, followers/following sheet, players tab, map, messages, game pages) uses the correct typed link `to="/players/$userId"` — none build the URL by hand.
-- The "404" screen you saw is the app's own not-found screen in `src/routes/__root.tsx`, which currently shows only a big "404" with no indication of which URL failed.
+Make skill level on the Players tab read exactly like it does on a profile — per-sport tiers (Minor AAA, 3.5 NTRP, AAU / Travel) instead of generic Beginner / Intermediate / Advanced — across display, filtering, and posting availability. Profile levels win over the level stored on an old post.
 
-So the diagnosis is **not confirmed yet**: something is producing a URL the router can't match (most likely a card rendered with a missing/empty user id, so the link resolves to something like `/players/` or `/players/undefined`), but I can't prove which card without seeing the failing URL.
+## What changes
 
-## Plan
+**1. Player levels come along with availability**
+- Extend the availability fetch so each row also carries the author's `sport_levels` from their profile (same query that already pulls name/avatar/age — just add the column).
+- Add a small helper that, given a post and a sport, resolves the level to show: profile tier for that sport first, then the post's own generic level as fallback.
 
-1. **Make the 404 page self-diagnosing (and more useful anyway)**
-   - Update the not-found component in `src/routes/__root.tsx` to show the attempted path, plus "Go back" and "Go home" buttons.
-   - Log the unmatched path to the console so it shows up in preview logs.
+**2. Player cards (Players tab list)**
+- Replace the single lime "Intermediate" pill with per-sport level badges rendered the same way as the profile page (`formatSportLevel`), one per sport chip that has a level.
+- Sports without a level on the profile keep just the sport chip — no fake level.
 
-2. **Reproduce and identify the failing card**
-   - With the path visible, reproduce the click from the Profile tab and capture the exact URL.
+**3. Nearby players panel**
+- Same resolution helper, so the card subtitle shows the profile tier for the matched sport instead of the generic label.
 
-3. **Fix the root cause**
-   - If the id is missing/empty: guard the card so it renders as non-clickable (or links to the correct target) when there's no user id, at the component that produced it — and apply the same guard to the sibling cards that share the pattern (game host avatar, followers/following rows, roster chips).
-   - If the id is present but the route genuinely doesn't match, fix the route/link mismatch instead.
+**4. Skill filter**
+- The skill chips become sport-aware: when a sport is selected, chips list that sport's real tiers (from `LEVELS_BY_SPORT`); with no sport selected, show the generic tiers so the filter still works across sports.
+- Matching uses the resolved level (profile-first), so filtering by "Minor AAA" finds players whose profile says so even if their post says "Advanced".
+- Changing the sport clears an incompatible skill selection so the URL state never holds a tier that doesn't exist for the sport.
 
-4. **Verify** by clicking through the Profile tab cards (game host, followers, following) and confirming each lands on the player page, and that a card with no linked account no longer navigates anywhere.
+**5. Post availability dialog**
+- Skill picker becomes per-sport: for each sport selected in the dialog, show that sport's tier chips, prefilled from the poster's own profile levels.
+- Saved back into the existing `skill_level` text column as the primary sport's tier, so nothing about the table changes.
 
 ## Technical notes
 
-- Files likely touched: `src/routes/__root.tsx` (not-found UI), and whichever of `src/components/GameCard.tsx`, `src/components/FollowSheet.tsx`, `src/components/RequestGameCard.tsx` turns out to emit the bad link.
-- No database or backend changes are needed for this.
+- No database migration. `profiles.sport_levels` already exists and `player_availabilities.skill_level` stays a text column.
+- Shared wording continues to come from `src/lib/sport-levels.ts` (`scaleForSport`, `levelsForSport`, `formatSportLevel`) — no duplicated tier lists.
+- Files touched: `src/lib/availability.ts`, `src/lib/sport-levels.ts` (add resolver), `src/routes/_tabs.players.tsx`, `src/components/NearbyPlayersPanel.tsx`.
+- Existing posts with legacy values ("All Levels", "Beginner") keep rendering fine through the fallback path.
