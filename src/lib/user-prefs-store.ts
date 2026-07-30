@@ -397,34 +397,7 @@ export function useFeedPrefs(): FeedPrefs {
   const s = useSyncExternalStore(prefsStore.subscribe, prefsStore.getSnapshot, () =>
     JSON.stringify(DEFAULT_PREFS),
   );
-  const parsed = JSON.parse(s) as FeedPrefs;
-  const sections = { ...DEFAULT_PREFS.sections, ...(parsed.sections ?? {}) };
-  // Sanitize impossible filter combinations that would yield an empty feed forever
-  if (sections.paidOnly && sections.freeOnly) {
-    sections.paidOnly = false;
-    sections.freeOnly = false;
-  }
-  if (sections.hostedByMeOnly && sections.joinedOnly) {
-    sections.hostedByMeOnly = false;
-    sections.joinedOnly = false;
-  }
-  if (!sections.showForYou && !sections.showUrgent) {
-    sections.showForYou = true;
-  }
-  const maxDistanceMi =
-    typeof parsed.maxDistanceMi === "number" && parsed.maxDistanceMi > 0
-      ? parsed.maxDistanceMi
-      : null;
-  const distanceUnit: DistanceUnitPref =
-    parsed.distanceUnit === "km" ? "km" : parsed.distanceUnit === "mi" ? "mi" : "auto";
-  const sortBy: FeedSortBy = parsed.sortBy === "soonest" ? "soonest" : "nearest";
-  return {
-    preferredSports: parsed.preferredSports ?? [],
-    sections,
-    maxDistanceMi,
-    distanceUnit,
-    sortBy,
-  };
+  return normalizeFeedPrefs(JSON.parse(s));
 }
 
 /** Resolve an "auto" preference into a concrete unit using device locale. */
