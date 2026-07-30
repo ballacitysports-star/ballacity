@@ -90,6 +90,9 @@ function OrgPage() {
   const isAdmin =
     isOwner || (!!myMembership && (myMembership.role === "owner" || myMembership.role === "admin"));
 
+  const gymReviews = useGymReviews(orgId);
+  const reviewSummary = summarizeGymReviews(gymReviews.data ?? []);
+
   const requests = useQuery({
     queryKey: ["trainer-org-requests", orgId],
     queryFn: () => listJoinRequestsForOrg({ data: { orgId } }),
