@@ -33,10 +33,12 @@ import {
   CropHint,
   CropOptionsSheet,
   CropTopBar,
+  CropUploadButton,
   OutputOptions,
   type CropQualityPreset,
   type CropSizePreset,
 } from "@/components/crop/CropChrome";
+
 
 export type { CropSizePreset, CropQualityPreset };
 
@@ -65,6 +67,8 @@ type Props = {
   qualityPresets?: CropQualityPreset[];
   onCancel: () => void;
   onConfirm: (dataUrl: string) => void;
+  /** When provided, shows an explicit "Upload" button to swap the source image. */
+  onPickFile?: (file: File) => void;
 };
 
 export function ImageEditorDialog({
@@ -79,6 +83,7 @@ export function ImageEditorDialog({
   qualityPresets = DEFAULT_QUALITY_PRESETS,
   onCancel,
   onConfirm,
+  onPickFile,
 }: Props) {
   const isMobile = useIsMobile();
   const [imgSrc, setImgSrc] = useState<string | null>(null);
@@ -429,12 +434,19 @@ export function ImageEditorDialog({
                 <ZoomIn className="h-4 w-4 opacity-70" />
               </>
             )}
+            {onPickFile && (
+              <CropUploadButton
+                onPickFile={onPickFile}
+                label={isMobile ? "Upload" : "Upload new photo"}
+              />
+            )}
             <CropAction
               onClick={fitToFrame}
               disabled={!img}
               icon={<Maximize2 className="h-4 w-4" />}
               label="Fit"
             />
+
             {isMobile && (
               <>
                 <CropAction
