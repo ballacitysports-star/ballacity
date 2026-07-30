@@ -1095,6 +1095,7 @@ export type Database = {
           id: string
           links: Json
           sport: string | null
+          sport_levels: Json
           updated_at: string
           username: string | null
         }
@@ -1112,6 +1113,7 @@ export type Database = {
           id: string
           links?: Json
           sport?: string | null
+          sport_levels?: Json
           updated_at?: string
           username?: string | null
         }
@@ -1129,6 +1131,7 @@ export type Database = {
           id?: string
           links?: Json
           sport?: string | null
+          sport_levels?: Json
           updated_at?: string
           username?: string | null
         }
