@@ -791,7 +791,7 @@ function FeedFilterBody() {
     if (k === "joinedOnly" && nextSections.joinedOnly) nextSections.hostedByMeOnly = false;
     setFeedPrefs({ ...prefs, sections: nextSections });
   };
-  const setUnit = (u: "mi" | "km") => setFeedPrefs({ ...prefs, distanceUnit: u });
+  const setUnit = (u: DistanceUnitPref) => setFeedPrefs({ ...prefs, distanceUnit: u });
   const setMaxMi = (mi: number | null) => setFeedPrefs({ ...prefs, maxDistanceMi: mi });
 
   return (
