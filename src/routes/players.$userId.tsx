@@ -18,6 +18,7 @@ import { ReputationBadge } from "@/components/ReputationBadge";
 import { computeReputation, useReviewsFor } from "@/lib/reviews";
 import { useProfileOverrides } from "@/lib/user-prefs-store";
 import { ProfileLinksList } from "@/components/ProfileLinks";
+import { BadgeList } from "@/components/BadgeList";
 import {
   Dialog,
   DialogContent,
