@@ -33,10 +33,12 @@ import {
   CropHint,
   CropOptionsSheet,
   CropTopBar,
+  CropUploadButton,
   OutputOptions,
   type CropQualityPreset,
   type CropSizePreset,
 } from "@/components/crop/CropChrome";
+
 
 export type { CropSizePreset, CropQualityPreset };
 
