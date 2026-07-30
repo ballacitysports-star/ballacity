@@ -259,7 +259,7 @@ function AuthPage() {
     const reportVendorFailure = (raw: string) => {
       // Log the raw error so recurrences leave a diagnosable trail.
       console.error(`[auth] ${provider} sign-in failed:`, raw);
-      trackSigninEvent("failure", { errorMessage: raw });
+      trackSigninEvent("failure", { provider, errorMessage: raw });
       if (/vendor|provider|external_provider|oauth/i.test(raw)) {
         toast.error(`${providerLabel} sign-in was rejected by the provider`, {
           description:
@@ -275,40 +275,90 @@ function AuthPage() {
       }
     };
 
+    // iPhone Safari freezes the opener tab the moment the user switches to
+    // the provider tab, so the helper's popup-closed watcher fires a bogus
+    // "Sign in was cancelled". That signal is NOT proof of failure — keep
+    // waiting for a session before showing anything scary.
+    const isInconclusive = (raw: string) =>
+      /cancel|closed|dismiss|abort|timed?\s?out/i.test(raw);
+
+    const waitForSession = (raw: string) => {
+      waitingRef.current += 1;
+      const token = waitingRef.current;
+      trackSigninEvent("inconclusive_wait", { provider, errorMessage: raw });
+      setWaitingProvider(providerLabel);
+      const startedAt = Date.now();
+      const GRACE_MS = 120_000;
+      const tick = async () => {
+        if (waitingRef.current !== token) return; // superseded / unmounted
+        const { data } = await supabase.auth.getSession();
+        if (waitingRef.current !== token) return;
+        if (data.session?.user) {
+          waitingRef.current += 1; // stop further ticks and dedupe handling
+          trackSigninEvent("success_after_wait", { provider });
+          setWaitingProvider(null);
+          void goPostAuth(data.session.user);
+          return;
+        }
+        if (Date.now() - startedAt >= GRACE_MS) {
+          waitingRef.current += 1;
+          trackSigninEvent("wait_timeout", { provider, errorMessage: raw });
+          setWaitingProvider(null);
+          setBusy(false);
+          toast.error(`We didn't hear back from ${providerLabel}`, {
+            description: "Nothing was submitted. You can try signing in again.",
+            action: {
+              label: "Retry",
+              onClick: () => oauth(provider, { isRetry: true }),
+            },
+            duration: 12000,
+          });
+          return;
+        }
+        window.setTimeout(() => void tick(), 1000);
+      };
+      void tick();
+    };
+
+    // Set when we enter the grace window, so `finally` leaves the button in
+    // its "Finishing sign-in…" state instead of looking idle.
+    let waiting = false;
+    const handleAmbiguous = (raw: string) => {
+      if (isInconclusive(raw)) {
+        waiting = true;
+        waitForSession(raw);
+      } else if (/popup|blocked|window|opener/i.test(raw)) {
+        showBlockedToast(raw);
+      } else {
+        reportVendorFailure(raw);
+      }
+    };
+
     promise
       .then((result) => {
         if (result?.error) {
-          const msg = result.error.message || "";
-          if (/popup|blocked|window|opener/i.test(msg)) {
-            showBlockedToast(msg);
-          } else {
-            reportVendorFailure(msg);
-          }
+          handleAmbiguous(result.error.message || "");
         } else if (!result?.redirected) {
           // Tokens were returned in-window and setSession was called.
           // Hard-reload bypasses router/state races in mobile webviews
           // (notably the Lovable Android app) where onAuthStateChange
           // fires but the client-side navigate never leaves /auth.
-          trackSigninEvent("success");
+          trackSigninEvent("success", { provider });
           void supabase.auth.getSession().then(({ data }) => {
             void goPostAuth(data.session?.user ?? user);
           });
         } else {
-          trackSigninEvent("success");
+          trackSigninEvent("success", { provider });
         }
       })
       .catch((err: unknown) => {
-        const msg = err instanceof Error ? err.message : String(err);
-        if (/popup|blocked|window|opener/i.test(msg)) {
-          showBlockedToast(msg);
-        } else {
-          reportVendorFailure(msg);
-        }
+        handleAmbiguous(err instanceof Error ? err.message : String(err));
       })
       .finally(() => {
-        setBusy(false);
+        if (!waiting) setBusy(false);
       });
   };
+
 
   return (
     <div className="mx-auto max-w-md min-h-screen flex flex-col pb-12">
