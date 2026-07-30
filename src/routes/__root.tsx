@@ -27,6 +27,8 @@ import {
   readPendingAccountType,
 } from "@/lib/account-type";
 import { getOnboardingStatus } from "@/lib/onboarding.functions";
+import { logNotFound } from "@/lib/route-doctor";
+
 
 function NotFoundComponent() {
   const router = useRouter();
