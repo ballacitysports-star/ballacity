@@ -339,10 +339,9 @@ export type ReliabilityBreakdown = {
   longestStreak: number;
 };
 
-/** Per-sport skill entry with the rating system + tier used by that sport. */
+/** Per-sport entry with the rating system + tier used by that sport. */
 export type MeSport = {
   name: Sport;
-  skill: number; // 1.0–5.0 (normalized for progress bars)
   system: "NTRP" | "DUPR" | "UTR" | "PACE" | "SELF";
   tier: string; // e.g. "3.5 NTRP", "Intermediate", "PACE 6.2"
   favorite?: boolean;
@@ -389,11 +388,11 @@ export const ME = {
     ],
   },
   sports: [
-    { name: "Basketball" as Sport, skill: 4.2, system: "SELF", tier: "Advanced", favorite: true, gamesPlayed: 24, winRate: 0.62 },
-    { name: "Soccer" as Sport, skill: 3.8, system: "SELF", tier: "Intermediate+", favorite: true, gamesPlayed: 14, winRate: 0.57 },
-    { name: "Pickleball" as Sport, skill: 3.5, system: "DUPR", tier: "3.5 DUPR", favorite: false, gamesPlayed: 9, winRate: 0.66 },
-    { name: "Tennis" as Sport, skill: 3.0, system: "NTRP", tier: "3.0 NTRP", favorite: false, gamesPlayed: 5, winRate: 0.4 },
-    { name: "Running" as Sport, skill: 3.6, system: "PACE", tier: "7:45/mi", favorite: false, gamesPlayed: 11, winRate: 0.0 },
+    { name: "Basketball" as Sport, system: "SELF", tier: "Advanced", favorite: true, gamesPlayed: 24, winRate: 0.62 },
+    { name: "Soccer" as Sport, system: "SELF", tier: "Intermediate+", favorite: true, gamesPlayed: 14, winRate: 0.57 },
+    { name: "Pickleball" as Sport, system: "DUPR", tier: "3.5 DUPR", favorite: false, gamesPlayed: 9, winRate: 0.66 },
+    { name: "Tennis" as Sport, system: "NTRP", tier: "3.0 NTRP", favorite: false, gamesPlayed: 5, winRate: 0.4 },
+    { name: "Running" as Sport, system: "PACE", tier: "7:45/mi", favorite: false, gamesPlayed: 11, winRate: 0.0 },
   ] satisfies MeSport[],
   badges: [
     "Reliable Player",
