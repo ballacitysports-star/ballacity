@@ -3,14 +3,9 @@ import { detectDistanceUnit, resetDetectedDistanceUnit } from "./measurement-sys
 
 function withLocale(languages: string[], timeZone = "Europe/Berlin") {
   vi.stubGlobal("navigator", { languages, language: languages[0] });
-  const real = Intl.DateTimeFormat;
-  vi.spyOn(Intl, "DateTimeFormat").mockImplementation(((...args: unknown[]) => {
-    const inst = new (real as never)(...(args as []));
-    return {
-      ...inst,
-      resolvedOptions: () => ({ ...inst.resolvedOptions(), timeZone }),
-    };
-  }) as never);
+  vi.spyOn(Intl, "DateTimeFormat").mockImplementation(
+    (() => ({ resolvedOptions: () => ({ timeZone }) })) as never,
+  );
 }
 
 afterEach(() => {
