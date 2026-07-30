@@ -1,23 +1,32 @@
 ## Goal
-Let people type a birthday by hand (not just use the native date picker) everywhere a birthday can be edited.
 
-## Where it applies
-Both editable birthday fields — Edit profile (`src/routes/profile.edit.tsx`) and onboarding (`src/routes/onboarding.welcome.tsx`) — already render the same shared component, so a single change covers both:
-- `src/components/profile/ProfileBasicsFields.tsx` (the `Birthday` field)
-- `src/components/profile/ProfileFormPrimitives.tsx` (`validateBirthday`)
+Remove the player profile skill rating (the 1–5 self-rated slider per sport). Sports stay — players still pick favorite sports and positions, just without a numeric skill score.
 
-## What to build
-Replace the single `<input type="date">` with a combined control:
-- A free-text input as the primary entry, accepting `MM/DD/YYYY` and `YYYY-MM-DD` while typing, with light auto-formatting (auto-insert `/`) and a `MM/DD/YYYY` placeholder.
-- A small calendar icon button next to it that opens the native date picker (a visually compact `<input type="date">`), keeping the existing tap-to-pick behavior.
-- Both paths write the same canonical `YYYY-MM-DD` string back through `onChange({ birthday })`, so save logic and payload building stay untouched.
+Out of scope (left untouched): game skill level ("Intermediate"/"All levels"), player availability `skill_level` and its filter chips on the Players screen, and team/trainer skill ranges.
 
-## Validation
-- Extend `validateBirthday` with a parse helper that normalizes typed input to `YYYY-MM-DD`, returning the existing error messages for invalid, incomplete, or future dates.
-- Validation runs on change (as today) and on blur; the inline error text and `aria-invalid` styling stay the same.
-- Partially typed values don't show an error until blur, so the field isn't red while typing.
+## UI changes
+
+- `src/components/profile/ProfileSportsFields.tsx` — drop the skill slider and the "X.X / 5" readout from each sport card; keep the sport chip, remove button, and Positions picker.
+- `src/routes/_tabs.profile.tsx` (Sports & skill block) — remove the numeric score and the animated skill progress bar; render sports (and positions) as plain chips. Rename the heading to "Sports".
+- `src/routes/players.$userId.tsx` — same treatment on the public player profile; stop synthesizing a placeholder `skill: 3` when deriving sports from availability/profile.
+- `src/routes/profile.edit.tsx` and `src/routes/onboarding.welcome.tsx` — rename the "Sports & skill" section/step label to "Sports"; both keep using the shared fieldset, so no other change.
+
+## Data model changes
+
+- `src/lib/profile-payload.ts` — remove the `skill_levels` map from `buildProfileRow`; sports input becomes `{ name, positions? }`. Fingerprint updates automatically.
+- `src/lib/user-prefs-store.ts` — drop `skill` from the stored sports entry type.
+- `src/lib/sample-data.ts` — remove `skill` from the per-sport profile stat entries (keeps `tier`, `gamesPlayed`, `winRate`, `favorite`).
+- Fix any remaining type errors that fall out of these type changes.
+
+## Database migration
+
+- `ALTER TABLE public.profiles DROP COLUMN skill_levels;`
+- Regenerated types then drop `skill_levels` from `profiles`.
+
+Order: run the migration first, then update the code that writes/reads the column.
 
 ## Technical notes
-- No data-model, payload, or persistence changes; `basics.birthday` remains `YYYY-MM-DD` or `""`.
-- Existing callers in `profile.edit.tsx` and `onboarding.welcome.tsx` need no edits since they consume the shared component's `onChange`/`birthdayError` contract.
-- Keep the input `inputMode="numeric"` and `maxLength={10}` for a good mobile keyboard.
+
+- `profiles.sport` (primary sport) is unaffected.
+- No RLS/grant changes needed — dropping a column doesn't alter policies.
+- Existing skill values in `skill_levels` are permanently deleted, per your choice.
