@@ -602,7 +602,7 @@ export function BookSessionSheet({
                 <button
                   onClick={() => {
                     onOpenChange(false);
-                    nav({ to: "/inbox", search: { to: org.id } as never });
+                    nav({ to: "/messages" });
                   }}
                   className="flex-1 rounded-full bg-lime-gradient px-4 py-3 text-sm font-bold text-primary-foreground glow-lime"
                 >
@@ -621,7 +621,7 @@ export function BookSessionSheet({
               <button
                 onClick={() => {
                   onOpenChange(false);
-                  nav({ to: "/inbox", search: { to: org.id } as never });
+                  nav({ to: "/messages" });
                 }}
                 className="flex-1 rounded-full bg-lime-gradient px-4 py-3 text-sm font-bold text-primary-foreground glow-lime"
               >
