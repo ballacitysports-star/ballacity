@@ -1,5 +1,5 @@
 import * as React from "react";
-import { Check, ImageUp, X } from "lucide-react";
+import { Check, ImageUp, Loader2, X } from "lucide-react";
 
 export type CropSizePreset = { label: string; maxSize: number };
 export type CropQualityPreset = { label: string; quality: number };
@@ -264,5 +264,46 @@ export function CropUploadButton({
         }}
       />
     </>
+  );
+}
+
+/**
+ * Prominent Cancel / Apply pair pinned at the bottom of the crop screen so
+ * finishing is unambiguous on mobile (full-width, 48px targets).
+ */
+export function CropConfirmBar({
+  onCancel,
+  onApply,
+  applyDisabled,
+  applyLabel = "Apply",
+  cancelLabel = "Cancel",
+  busy,
+}: {
+  onCancel: () => void;
+  onApply: () => void;
+  applyDisabled?: boolean;
+  applyLabel?: string;
+  cancelLabel?: string;
+  busy?: boolean;
+}) {
+  return (
+    <div className="flex items-center gap-2">
+      <button
+        type="button"
+        onClick={onCancel}
+        className="inline-flex h-12 flex-1 items-center justify-center gap-1.5 rounded-2xl border border-white/25 bg-white/5 text-sm font-bold text-white transition hover:bg-white/15"
+      >
+        <X className="h-4 w-4" /> {cancelLabel}
+      </button>
+      <button
+        type="button"
+        onClick={onApply}
+        disabled={applyDisabled || busy}
+        className="inline-flex h-12 flex-[1.4] items-center justify-center gap-1.5 rounded-2xl bg-lime-gradient text-sm font-bold text-primary-foreground transition disabled:opacity-50"
+      >
+        {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
+        {applyLabel}
+      </button>
+    </div>
   );
 }
