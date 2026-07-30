@@ -496,6 +496,7 @@ function EditProfile() {
         </div>
       </Section>
 
+      {showOrgs && (
       <Section
         title="My organizations"
         right={
