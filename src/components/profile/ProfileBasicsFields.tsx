@@ -111,3 +111,86 @@ export function ProfileBasicsFields({
     </>
   );
 }
+
+/**
+ * Birthday entry that supports typing the date by hand (MM/DD/YYYY or
+ * YYYY-MM-DD) while keeping the native calendar picker available.
+ */
+function BirthdayInput({
+  value,
+  onChange,
+  error,
+}: {
+  value: string;
+  onChange: (iso: string) => void;
+  error?: string | null;
+}) {
+  const [text, setText] = React.useState(() => birthdayToDisplay(value));
+  const dateRef = React.useRef<HTMLInputElement>(null);
+  const today = new Date().toISOString().slice(0, 10);
+
+  // Keep the visible text in sync when the value changes from outside (picker, prefill).
+  React.useEffect(() => {
+    const parsed = parseBirthdayInput(text);
+    if (parsed.iso !== value) setText(birthdayToDisplay(value));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [value]);
+
+  return (
+    <>
+      <div className="relative">
+        <input
+          type="text"
+          inputMode="numeric"
+          autoComplete="bday"
+          maxLength={10}
+          placeholder="MM/DD/YYYY"
+          value={text}
+          aria-label="Birthday"
+          aria-invalid={error ? true : undefined}
+          onChange={(e) => {
+            const next = formatBirthdayInput(e.target.value);
+            setText(next);
+            const parsed = parseBirthdayInput(next);
+            if (parsed.complete) onChange(parsed.iso ?? "");
+          }}
+          onBlur={() => {
+            const parsed = parseBirthdayInput(text);
+            onChange(parsed.complete ? (parsed.iso ?? "") : text);
+          }}
+          className={`w-full rounded-2xl border bg-surface px-3 py-2 pr-11 text-sm outline-none focus:border-lime ${
+            error ? "border-destructive" : "border-border"
+          }`}
+        />
+        <button
+          type="button"
+          aria-label="Open calendar"
+          onClick={(e) => {
+            e.preventDefault();
+            const el = dateRef.current;
+            if (!el) return;
+            if (typeof el.showPicker === "function") el.showPicker();
+            else el.click();
+          }}
+          className="absolute right-1 top-1/2 -translate-y-1/2 rounded-full p-2 text-muted-foreground hover:text-foreground"
+        >
+          <CalendarIcon className="h-4 w-4" />
+        </button>
+        <input
+          ref={dateRef}
+          type="date"
+          tabIndex={-1}
+          aria-hidden="true"
+          value={/^\d{4}-\d{2}-\d{2}$/.test(value) ? value : ""}
+          max={today}
+          onChange={(e) => {
+            onChange(e.target.value);
+            setText(birthdayToDisplay(e.target.value));
+          }}
+          className="pointer-events-none absolute right-3 bottom-1 h-0 w-0 opacity-0"
+        />
+      </div>
+      {error && <p className="mt-1 text-xs text-destructive">{error}</p>}
+    </>
+  );
+}
