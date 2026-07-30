@@ -315,7 +315,8 @@ export function useFeedPrefs(): FeedPrefs {
     typeof parsed.maxDistanceMi === "number" && parsed.maxDistanceMi > 0
       ? parsed.maxDistanceMi
       : null;
-  const distanceUnit = parsed.distanceUnit === "km" ? "km" : "mi";
+  const distanceUnit: DistanceUnitPref =
+    parsed.distanceUnit === "km" ? "km" : parsed.distanceUnit === "mi" ? "mi" : "auto";
   const sortBy: FeedSortBy = parsed.sortBy === "soonest" ? "soonest" : "nearest";
   return {
     preferredSports: parsed.preferredSports ?? [],
