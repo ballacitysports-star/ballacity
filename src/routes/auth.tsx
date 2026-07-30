@@ -333,15 +333,17 @@ function AuthPage() {
     // its "Finishing sign-in…" state instead of looking idle.
     let waiting = false;
     const handleAmbiguous = (raw: string) => {
-      if (isInconclusive(raw)) {
+      const outcome = classifyOAuthFailure(raw);
+      if (outcome === "inconclusive") {
         waiting = true;
         waitForSession(raw);
-      } else if (/popup|blocked|window|opener/i.test(raw)) {
+      } else if (outcome === "popup_blocked") {
         showBlockedToast(raw);
       } else {
         reportVendorFailure(raw);
       }
     };
+
 
     promise
       .then((result) => {
