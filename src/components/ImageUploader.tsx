@@ -1,4 +1,5 @@
 import { useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { Upload, Loader2, X, ImagePlus } from "lucide-react";
 import { toast } from "sonner";
 import { ImageEditorDialog } from "@/components/ImageEditorDialog";
