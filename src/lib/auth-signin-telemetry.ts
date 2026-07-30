@@ -11,12 +11,18 @@ export type SigninEvent =
   | "retry_clicked"
   | "success"
   | "failure"
-  | "copy_link_clicked";
+  | "copy_link_clicked"
+  // The provider window reported "cancelled/closed" but that signal is
+  // unreliable on iOS Safari — we keep waiting for a session instead.
+  | "inconclusive_wait"
+  | "success_after_wait"
+  | "wait_timeout";
 
 export type SigninContext = {
-  provider?: "google";
+  provider?: "google" | "apple";
   errorMessage?: string | null;
 };
+
 
 function detectPlatform(ua: string): string {
   if (/iPad|iPhone|iPod/.test(ua)) return "iOS";

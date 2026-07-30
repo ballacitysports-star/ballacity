@@ -1,0 +1,2 @@
+ALTER TABLE public.auth_signin_events DROP CONSTRAINT IF EXISTS auth_signin_events_event_check;
+ALTER TABLE public.auth_signin_events ADD CONSTRAINT auth_signin_events_event_check CHECK (event = ANY (ARRAY['attempt','popup_blocked','retry_clicked','success','failure','copy_link_clicked','inconclusive_wait','success_after_wait','wait_timeout']));

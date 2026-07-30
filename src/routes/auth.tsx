@@ -1,12 +1,13 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import type { User } from "@supabase/supabase-js";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ArrowLeft } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { lovable } from "@/integrations/lovable";
 import { useAuth } from "@/hooks/use-auth";
 import { trackSigninEvent } from "@/lib/auth-signin-telemetry";
+import { classifyOAuthFailure } from "@/lib/oauth-outcome";
 import { sanitizeNextPath } from "@/routes/__root";
 import { readLastVisited } from "@/lib/last-visited";
 import { AccountTypePicker } from "@/components/AccountTypePicker";
@@ -37,6 +38,15 @@ function AuthPage() {
   const [password, setPassword] = useState("");
   const [displayName, setDisplayName] = useState("");
   const [busy, setBusy] = useState(false);
+  // Non-null while we're inside the post-provider grace window (see oauth()).
+  const [waitingProvider, setWaitingProvider] = useState<string | null>(null);
+  // Monotonic token: bumping it cancels any in-flight session poll.
+  const waitingRef = useRef(0);
+
+  useEffect(() => () => {
+    waitingRef.current += 1;
+  }, []);
+
 
   const needsAccountType = async (currentUser: User | null | undefined) => {
     if (!currentUser) return false;
@@ -259,7 +269,7 @@ function AuthPage() {
     const reportVendorFailure = (raw: string) => {
       // Log the raw error so recurrences leave a diagnosable trail.
       console.error(`[auth] ${provider} sign-in failed:`, raw);
-      trackSigninEvent("failure", { errorMessage: raw });
+      trackSigninEvent("failure", { provider, errorMessage: raw });
       if (/vendor|provider|external_provider|oauth/i.test(raw)) {
         toast.error(`${providerLabel} sign-in was rejected by the provider`, {
           description:
@@ -275,40 +285,92 @@ function AuthPage() {
       }
     };
 
+    // iPhone Safari freezes the opener tab the moment the user switches to
+    // the provider tab, so the helper's popup-closed watcher fires a bogus
+    // "Sign in was cancelled". That signal is NOT proof of failure — keep
+    // waiting for a session before showing anything scary. Classification
+    // lives in @/lib/oauth-outcome so it can be unit-tested.
+
+
+    const waitForSession = (raw: string) => {
+      waitingRef.current += 1;
+      const token = waitingRef.current;
+      trackSigninEvent("inconclusive_wait", { provider, errorMessage: raw });
+      setWaitingProvider(providerLabel);
+      const startedAt = Date.now();
+      const GRACE_MS = 120_000;
+      const tick = async () => {
+        if (waitingRef.current !== token) return; // superseded / unmounted
+        const { data } = await supabase.auth.getSession();
+        if (waitingRef.current !== token) return;
+        if (data.session?.user) {
+          waitingRef.current += 1; // stop further ticks and dedupe handling
+          trackSigninEvent("success_after_wait", { provider });
+          setWaitingProvider(null);
+          void goPostAuth(data.session.user);
+          return;
+        }
+        if (Date.now() - startedAt >= GRACE_MS) {
+          waitingRef.current += 1;
+          trackSigninEvent("wait_timeout", { provider, errorMessage: raw });
+          setWaitingProvider(null);
+          setBusy(false);
+          toast.error(`We didn't hear back from ${providerLabel}`, {
+            description: "Nothing was submitted. You can try signing in again.",
+            action: {
+              label: "Retry",
+              onClick: () => oauth(provider, { isRetry: true }),
+            },
+            duration: 12000,
+          });
+          return;
+        }
+        window.setTimeout(() => void tick(), 1000);
+      };
+      void tick();
+    };
+
+    // Set when we enter the grace window, so `finally` leaves the button in
+    // its "Finishing sign-in…" state instead of looking idle.
+    let waiting = false;
+    const handleAmbiguous = (raw: string) => {
+      const outcome = classifyOAuthFailure(raw);
+      if (outcome === "inconclusive") {
+        waiting = true;
+        waitForSession(raw);
+      } else if (outcome === "popup_blocked") {
+        showBlockedToast(raw);
+      } else {
+        reportVendorFailure(raw);
+      }
+    };
+
+
     promise
       .then((result) => {
         if (result?.error) {
-          const msg = result.error.message || "";
-          if (/popup|blocked|window|opener/i.test(msg)) {
-            showBlockedToast(msg);
-          } else {
-            reportVendorFailure(msg);
-          }
+          handleAmbiguous(result.error.message || "");
         } else if (!result?.redirected) {
           // Tokens were returned in-window and setSession was called.
           // Hard-reload bypasses router/state races in mobile webviews
           // (notably the Lovable Android app) where onAuthStateChange
           // fires but the client-side navigate never leaves /auth.
-          trackSigninEvent("success");
+          trackSigninEvent("success", { provider });
           void supabase.auth.getSession().then(({ data }) => {
             void goPostAuth(data.session?.user ?? user);
           });
         } else {
-          trackSigninEvent("success");
+          trackSigninEvent("success", { provider });
         }
       })
       .catch((err: unknown) => {
-        const msg = err instanceof Error ? err.message : String(err);
-        if (/popup|blocked|window|opener/i.test(msg)) {
-          showBlockedToast(msg);
-        } else {
-          reportVendorFailure(msg);
-        }
+        handleAmbiguous(err instanceof Error ? err.message : String(err));
       })
       .finally(() => {
-        setBusy(false);
+        if (!waiting) setBusy(false);
       });
   };
+
 
   return (
     <div className="mx-auto max-w-md min-h-screen flex flex-col pb-12">
@@ -401,7 +463,7 @@ function AuthPage() {
                   d="M43.6 20.5H42V20H24v8h11.3c-.8 2.3-2.3 4.3-4.2 5.7l6.2 5.2C40.8 35.6 44 30.2 44 24c0-1.3-.1-2.3-.4-3.5z"
                 />
               </svg>
-              Continue with Google
+              {waitingProvider === "Google" ? "Finishing sign-in…" : "Continue with Google"}
             </button>
 
             <button
@@ -412,8 +474,20 @@ function AuthPage() {
               <svg className="h-4 w-4" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
                 <path d="M16.365 1.43c0 1.14-.42 2.22-1.19 3.02-.83.87-2.14 1.54-3.24 1.45-.14-1.09.42-2.24 1.16-3.02.82-.87 2.22-1.51 3.27-1.45zM20.5 17.36c-.55 1.27-.82 1.84-1.53 2.96-.99 1.56-2.39 3.5-4.12 3.51-1.54.02-1.94-1-4.03-.99-2.09.01-2.53 1.01-4.07.99-1.73-.02-3.06-1.77-4.05-3.33C.1 16.24-.63 11.05 1.03 8.16c1.18-2.05 3.05-3.25 4.81-3.25 1.79 0 2.92 1 4.4 1 1.44 0 2.32-1 4.39-1 1.57 0 3.23.86 4.42 2.35-3.88 2.13-3.25 7.67 1.45 10.1z" />
               </svg>
-              Continue with Apple
+              {waitingProvider === "Apple" ? "Finishing sign-in…" : "Continue with Apple"}
             </button>
+
+            {waitingProvider ? (
+              <p
+                role="status"
+                aria-live="polite"
+                className="text-center text-xs text-muted-foreground"
+              >
+                Waiting for {waitingProvider} to finish… keep this tab open.
+              </p>
+            ) : null}
+
+
 
             <div className="flex items-center gap-3 text-[10px] uppercase tracking-wider text-muted-foreground">
               <div className="h-px flex-1 bg-border" /> or <div className="h-px flex-1 bg-border" />
