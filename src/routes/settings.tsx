@@ -79,7 +79,7 @@ const SECTIONS: Section[] = [
         icon: UserCog,
       },
       {
-        to: "/_tabs/profile",
+        to: "/profile",
         label: "My card",
         description: "View your public player card",
         icon: IdCard,
