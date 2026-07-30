@@ -287,9 +287,9 @@ function AuthPage() {
     // iPhone Safari freezes the opener tab the moment the user switches to
     // the provider tab, so the helper's popup-closed watcher fires a bogus
     // "Sign in was cancelled". That signal is NOT proof of failure — keep
-    // waiting for a session before showing anything scary.
-    const isInconclusive = (raw: string) =>
-      /cancel|closed|dismiss|abort|timed?\s?out/i.test(raw);
+    // waiting for a session before showing anything scary. Classification
+    // lives in @/lib/oauth-outcome so it can be unit-tested.
+
 
     const waitForSession = (raw: string) => {
       waitingRef.current += 1;
