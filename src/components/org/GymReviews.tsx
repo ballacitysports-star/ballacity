@@ -285,7 +285,7 @@ export function GymReviews({
           open
           onOpenChange={(o) => !o && setReportTarget(null)}
           userId={reportTarget.reviewer_id}
-          userName={reportTarget.reviewer?.display_name ?? "this member"}
+          displayName={reportTarget.reviewer?.display_name ?? "this member"}
         />
       )}
     </section>
