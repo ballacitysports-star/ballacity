@@ -44,6 +44,7 @@ import {
 import { ProfileBasicsFields } from "@/components/profile/ProfileBasicsFields";
 import { ProfileSportsFields } from "@/components/profile/ProfileSportsFields";
 import { useAutosave } from "@/hooks/use-autosave";
+import { useAccountType } from "@/lib/account-type";
 import { SaveStatus } from "@/components/SaveStatus";
 
 export const Route = createFileRoute("/profile/edit")({
@@ -63,6 +64,8 @@ function EditProfile() {
   const profileUser = user ?? confirmedUser;
   const profile = useMyProfile(profileUser);
   const prefs = useFeedPrefs();
+  const { accountType, loading: accountTypeLoading } = useAccountType();
+  const showOrgs = !accountTypeLoading && accountType !== null && accountType !== "player";
   const nav = useNavigate();
 
   const [name, setName] = useState(profile?.name ?? "");
@@ -493,6 +496,7 @@ function EditProfile() {
         </div>
       </Section>
 
+      {showOrgs && (
       <Section
         title="My organizations"
         right={
@@ -599,6 +603,7 @@ function EditProfile() {
           );
         })()}
       </Section>
+      )}
 
 
       <Section title="Reviews">
