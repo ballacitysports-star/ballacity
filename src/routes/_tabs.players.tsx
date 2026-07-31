@@ -185,7 +185,13 @@ function PlayersPage() {
           const f = JSON.parse(rawF) as Record<string, unknown>;
           if (typeof f.q === "string" && f.q) patch.q = f.q;
           if (typeof f.sport === "string" && f.sport) patch.sport = f.sport;
-          if (typeof f.skill === "string" && f.skill) patch.skill = f.skill;
+          if (typeof f.skill === "string" && f.skill) {
+            // A tier saved under an older sport scale must not survive the restore.
+            patch.skill = sanitizeSkillForSport(
+              typeof f.sport === "string" ? f.sport : "",
+              f.skill,
+            );
+          }
           if (typeof f.maxDistance === "number" && f.maxDistance > 0) patch.dist = f.maxDistance;
           if (typeof f.ageMin === "number") patch.ageMin = f.ageMin;
           if (typeof f.ageMax === "number") patch.ageMax = f.ageMax;
