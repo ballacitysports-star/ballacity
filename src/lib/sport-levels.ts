@@ -37,6 +37,23 @@ const BALL_TIERS = [
   "Major",
   "National",
 ];
+/** Shared sub-level ladder used by every football format. */
+const FOOTBALL_SUB_TIERS = ["Rec", "Competitive", "Showcase / Travel", "Elite"] as const;
+const FOOTBALL_FORMATS = ["Flag", "7v7", "Full contact"] as const;
+
+const FOOTBALL_GROUPS = FOOTBALL_FORMATS.map((format) => ({
+  label: format,
+  tiers: FOOTBALL_SUB_TIERS.map((t) => `${format} ${t}`),
+}));
+
+const FOOTBALL_TIERS = FOOTBALL_GROUPS.flatMap((g) => g.tiers);
+
+/** Retired Football tiers mapped forward to the format-prefixed ladder. */
+const LEGACY_TIER_ALIASES: Record<string, string> = {
+  "High School": "Full contact Competitive",
+  College: "Full contact Showcase / Travel",
+  "Semi-Pro": "Full contact Elite",
+};
 
 export const LEVELS_BY_SPORT: Record<Sport, SportScale> = {
   Baseball: { system: "MiLB", tiers: BALL_TIERS, hint: "Highest level you've played." },
@@ -47,8 +64,11 @@ export const LEVELS_BY_SPORT: Record<Sport, SportScale> = {
   },
   Football: {
     system: "Level",
-    tiers: ["Flag Rec", "Flag Competitive", "High School", "College", "Semi-Pro"],
+    tiers: FOOTBALL_TIERS,
+    groups: FOOTBALL_GROUPS,
+    hint: "Pick your format, then your level.",
   },
+
   Soccer: {
     system: "Level",
     tiers: ["Rec", "High School", "Club / Travel", "College", "Semi-Pro", "Pro"],
