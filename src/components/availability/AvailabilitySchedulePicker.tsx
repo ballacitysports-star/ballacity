@@ -324,14 +324,45 @@ export function AvailabilitySchedulePicker({
                   Apply to all
                 </button>
                 {flagged && (
-                  <p className="flex w-full items-start gap-1.5 text-[11px] font-medium text-amber-300">
-                    <AlertTriangle className="mt-0.5 h-3 w-3 shrink-0" />
-                    <span>
-                      {conflict
-                        ? `${CONFLICT_KIND_LABEL[conflict.blocks[0].kind]} — ${describeConflict(conflict)}`
-                        : "Overlaps another window you picked."}
-                    </span>
-                  </p>
+                  <div className="w-full space-y-1.5">
+                    <p className="flex items-start gap-1.5 text-[11px] font-medium text-amber-300">
+                      <AlertTriangle className="mt-0.5 h-3 w-3 shrink-0" />
+                      <span>
+                        {conflict
+                          ? `${CONFLICT_KIND_LABEL[conflict.blocks[0].kind]} — ${describeConflict(conflict)}`
+                          : "Overlaps another window you picked."}
+                      </span>
+                    </p>
+                    <div className="flex flex-wrap gap-1.5">
+                      {(conflict ? suggestSlotFixes(conflict) : []).map((fix) => (
+                        <button
+                          key={fix.id}
+                          type="button"
+                          title={fix.hint}
+                          onClick={() => applyFix(index, fix)}
+                          className={`flex items-center gap-1 rounded-full border px-2.5 py-1 text-[11px] font-bold transition-colors ${
+                            fix.id === "remove"
+                              ? "border-border text-muted-foreground hover:border-coral hover:text-coral"
+                              : "border-amber-400/70 bg-amber-400/10 text-amber-200 hover:bg-amber-400/20"
+                          }`}
+                        >
+                          {fix.id === "skip" && <SkipForward className="h-3 w-3" />}
+                          {fix.id === "shorten" && <Scissors className="h-3 w-3" />}
+                          {fix.id === "remove" && <Trash2 className="h-3 w-3" />}
+                          {fix.label}
+                        </button>
+                      ))}
+                      {!conflict && selfOverlap && (
+                        <button
+                          type="button"
+                          onClick={() => onChange(value.filter((_, i) => i !== index))}
+                          className="flex items-center gap-1 rounded-full border border-border px-2.5 py-1 text-[11px] font-bold text-muted-foreground hover:border-coral hover:text-coral"
+                        >
+                          <Trash2 className="h-3 w-3" /> Remove
+                        </button>
+                      )}
+                    </div>
+                  </div>
                 )}
               </li>
               );
