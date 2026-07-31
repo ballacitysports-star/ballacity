@@ -124,8 +124,14 @@ function PlayersPage() {
   const search = Route.useSearch();
   type PlayersSearch = typeof search;
   const navigate = useNavigate({ from: "/players" });
-  const updateSearch = (patch: Partial<PlayersSearch>) =>
-    navigate({ search: (prev: PlayersSearch) => ({ ...prev, ...patch }), replace: true });
+  // Most filter tweaks replace the current entry (they're incremental), but
+  // sport/skill are the two the user expects to step through with the browser
+  // back/forward buttons, so those push a real history entry.
+  const updateSearch = (patch: Partial<PlayersSearch>, opts?: { push?: boolean }) =>
+    navigate({
+      search: (prev: PlayersSearch) => ({ ...prev, ...patch }),
+      replace: !opts?.push,
+    });
   usePersistedSearch("openrun:players-search", search, "/players", {
     q: "", sport: "", skill: "", dist: 0, unknownAge: true, when: "any",
     view: "list", density: "list",
@@ -148,10 +154,17 @@ function PlayersPage() {
   const setQ = (v: string) => updateSearch({ q: v });
   const setSport = (v: string) => {
     // Tiers are sport-specific — drop a skill selection the new sport doesn't have.
-    updateSearch({ sport: v, skill: sanitizeSkillForSport(v, search.skill) });
+    const nextSkill = sanitizeSkillForSport(v, search.skill);
+    if (v === sport && nextSkill === skill) return;
+    updateSearch({ sport: v, skill: nextSkill }, { push: true });
   };
 
-  const setSkill = (v: string) => updateSearch({ skill: sanitizeSkillForSport(sport, v) });
+  const setSkill = (v: string) => {
+    const next = sanitizeSkillForSport(sport, v);
+    if (next === skill) return;
+    updateSearch({ skill: next }, { push: true });
+  };
+
 
   const setMaxDistance = (v: number) => updateSearch({ dist: v });
   const setAgeMin = (v: number | "") => updateSearch({ ageMin: v === "" ? undefined : v });
