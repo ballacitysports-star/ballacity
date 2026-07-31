@@ -291,9 +291,9 @@ function OnboardingWizard({ type }: { type: AccountType }) {
       });
 
       const { supabase } = await import("@/integrations/supabase/client");
-      const { buildProfileRow, profileRowFingerprint, onboardingSaveKey } = await import(
-        "@/lib/profile-payload"
-      );
+      const { buildProfileRow, profileRowFingerprint, onboardingSaveKey, saveProfileRow } =
+        await import("@/lib/profile-payload");
+
       const primary = sports[0]?.name;
       const row = buildProfileRow({
         userId: user.id,
@@ -326,10 +326,7 @@ function OnboardingWizard({ type }: { type: AccountType }) {
       if (!alreadySaved) {
         // Keyed on the primary key, so a retry updates the same row and can
         // never insert a second profile for this user.
-        const { error } = await supabase
-          .from("profiles")
-          .upsert(row as never, { onConflict: "id", ignoreDuplicates: false });
-        if (error) throw error;
+        await saveProfileRow(supabase, row);
         savedFingerprintRef.current = fingerprint;
         try {
           localStorage.setItem(onboardingSaveKey(user.id), fingerprint);

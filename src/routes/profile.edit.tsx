@@ -233,10 +233,9 @@ function EditProfile() {
       sports,
       links: linksDirty ? cleanedLinks : undefined,
     });
-    const { error } = await supabase
-      .from("profiles")
-      .upsert(profilePayload as any, { onConflict: "id" });
-    if (error) throw error;
+    const { saveProfileRow } = await import("@/lib/profile-payload");
+    await saveProfileRow(supabase, profilePayload);
+
 
     // Onboarding skips its write when the fingerprint matches its last save.
     // Clearing it here keeps the two screens in sync: re-entering onboarding
