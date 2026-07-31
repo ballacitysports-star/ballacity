@@ -6,7 +6,8 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/use-auth";
 import { useAccountType, type AccountType } from "@/lib/account-type";
 import { getFeedPrefsSnapshot, setFeedPrefs, setProfileOverrides, useMyProfileState, useDistanceUnit, type ProfileLink } from "@/lib/user-prefs-store";
-import { kmToMi, miToKm } from "@/lib/distance";
+import { clampDistanceMi, kmToMi, miToKm } from "@/lib/distance";
+import { ProfileLocationFields } from "@/components/profile/ProfileLocationFields";
 import { Section, validateBirthday } from "@/components/profile/ProfileFormPrimitives";
 import {
   ProfileBasicsFields,
@@ -293,6 +294,7 @@ function OnboardingWizard({ type }: { type: AccountType }) {
 
       const primary = sports[0]?.name;
       const row = buildProfileRow({
+        searchRadiusMi: radiusMi,
         userId: user.id,
         name: trimmedName,
         username: basics.username,
