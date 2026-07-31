@@ -109,21 +109,6 @@ function EditProfile() {
   const markDirty = () => setIsDirty(true);
 
 
-  const addLink = (type: ProfileLinkType) => {
-    markDirty();
-    setLinksDirty(true);
-    setLinks((prev) => [...prev, { type, url: "" }]);
-  };
-  const updateLink = (i: number, patch: Partial<ProfileLink>) => {
-    markDirty();
-    setLinksDirty(true);
-    setLinks((prev) => prev.map((l, idx) => (idx === i ? { ...l, ...patch } : l)));
-  };
-  const removeLink = (i: number) => {
-    markDirty();
-    setLinksDirty(true);
-    setLinks((prev) => prev.filter((_, idx) => idx !== i));
-  };
 
   const [preferredSports, setPreferredSports] = useState<Sport[]>(prefs.preferredSports);
   const [sections, setSections] = useState(prefs.sections);
