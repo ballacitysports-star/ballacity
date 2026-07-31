@@ -1,31 +1,30 @@
-## Goal
+# Fix "Could not save profile"
 
-Onboarding shows and saves exactly what Edit profile does — no blank/placeholder defaults over real saved data, no missing fields, and edits made in either screen show up in the other.
+## What's wrong
 
-## 1. Accurate prefill
+Saving a profile (onboarding and Edit profile) fails with a permission error from the backend, not a bug in the form code. Verified against the live database:
 
-Today `src/routes/onboarding.welcome.tsx` prefills on the first non-null `useMyProfile(user)` and then latches `prefilled = true`. That value can be a fallback derived from the auth user (email local-part as name, empty sports) while the saved profile row is still loading, so real data gets overwritten in the form.
+- The `profiles` table has no table-level or column-level privileges granted to any role (`anon`, `authenticated`, `service_role`) — the grant list is empty.
+- Its access rules are otherwise correct: signed-in users may read all profiles and insert/update only their own row; anonymous visitors may read.
 
-- Expose a load state from `useMyProfile` (or add a sibling flag in `src/lib/user-prefs-store.ts`) so consumers can tell "still fetching the saved row" from "fetched, empty".
-- Gate onboarding's prefill effect on that flag: render the step skeleton until the profile row resolves, then seed `basics`, `sports`, links, and radius once.
-- Keep the existing autosave disabled until prefill completes, so the debounce can't write placeholder values back over the saved row.
+Without privileges, every read/write is rejected before the rules are even evaluated. This matches the exact error the app receives on save: `permission denied for table profiles`, with the hint to grant privileges.
 
-## 2. Same fields as Edit profile
+Public player cards likely also read stale/cached data or fail for the same reason.
 
-Compared with `src/routes/profile.edit.tsx`, onboarding's Basics and Sports already use the shared components; the gap is Profile links.
+## The fix
 
-- Extract the links editor from `profile.edit.tsx` into a shared `src/components/profile/ProfileLinksFields.tsx` (same pattern as `ProfileBasicsFields` / `ProfileSportsFields`) and use it in both screens.
-- Add links to the onboarding Basics/Sports flow (as part of the "Sports" step or a short "Links" step) and pass `links` into `buildProfileRow` on save, so onboarding writes the identical row shape.
-- Account-specific sections of Edit profile (Reviews, Payments, Reels, Pro, Plans, Notifications) stay out of onboarding — they are post-signup settings, not profile data.
+One database migration that restores privileges matching the existing policies:
 
-## 3. Live two-way sync
+- `authenticated`: SELECT, INSERT, UPDATE on `public.profiles` (no DELETE — deletes stay blocked).
+- `anon`: SELECT only, keeping public player cards working.
+- `service_role`: ALL, for server-side/admin paths.
 
-- After onboarding saves, keep writing through `setProfileOverrides` and additionally invalidate the same query keys Edit profile invalidates, so a later visit to Edit profile reads fresh values instead of a cached row.
-- After Edit profile saves, publish through the same override/listener channel so a returning onboarding visit (Settings → "Edit onboarding details") prefills the new values.
-- Clear the onboarding idempotency fingerprint (`onboardingSaveKey`) when Edit profile writes a new row, so re-entering onboarding after an external edit isn't skipped as "already saved".
+Birthday privacy is unaffected: it stays behind the existing `get_my_birthday` function, which the app already calls.
 
-## Technical notes
+## Verification
 
-- Files touched: `src/routes/onboarding.welcome.tsx`, `src/routes/profile.edit.tsx`, `src/lib/user-prefs-store.ts`, new `src/components/profile/ProfileLinksFields.tsx`.
-- No schema changes; `buildProfileRow` in `src/lib/profile-payload.ts` already supports `links` and stays the single canonical payload builder.
-- Verification: typecheck plus a manual pass — save a profile in Edit profile, reopen onboarding, confirm every field (including links) is prefilled and unchanged after autosave settles.
+- Re-read the grants to confirm they exist.
+- Run the security linter to confirm nothing new is flagged.
+- Save a profile from the running app and confirm the write persists (no 403), and that a public player card still loads.
+
+No frontend changes are planned.
