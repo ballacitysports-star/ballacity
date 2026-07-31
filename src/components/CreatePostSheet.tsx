@@ -10,6 +10,8 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { PrimaryCTA } from "@/components/PrimaryCTA";
+import { LocationAutocomplete } from "@/components/LocationAutocomplete";
+
 import { createTeamPost } from "@/lib/team-posts.functions";
 import type { PostKind } from "@/lib/sample-data";
 import { POST_KIND_META } from "@/lib/sample-data";
@@ -143,12 +145,14 @@ export function CreatePostSheet({
               </div>
               <div className="col-span-2">
                 <label className="text-xs font-semibold text-muted-foreground">Location</label>
-                <input
-                  value={location}
-                  onChange={(e) => setLocation(e.target.value)}
-                  placeholder="Venue or address"
-                  className="mt-1.5 w-full rounded-2xl border border-border bg-surface px-3 py-2.5 text-sm"
-                />
+                <div className="mt-1.5">
+                  <LocationAutocomplete
+                    value={location}
+                    onChange={setLocation}
+                    placeholder="Venue or address"
+                  />
+                </div>
+
               </div>
               <div>
                 <label className="text-xs font-semibold text-muted-foreground">Price ($)</label>
