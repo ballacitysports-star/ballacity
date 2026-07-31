@@ -64,6 +64,7 @@ function PlayerProfilePage() {
   const [unfollowOpen, setUnfollowOpen] = useState(false);
 
   const overrides = useProfileOverrides(userId);
+  const unit = useDistanceUnit();
   const reviews = useReviewsFor(userId);
   const rep = useMemo(() => computeReputation(reviews, "player"), [reviews]);
   const follow = useFollow(userId);
@@ -159,7 +160,6 @@ function PlayerProfilePage() {
   ).trim();
   const bio = overrides.bio ?? profile.bio ?? "";
   const city = overrides.city ?? profile.city ?? "";
-  const unit = useDistanceUnit();
   const searchRadiusMi = (profile as any).search_radius_mi as number | null | undefined;
   const sportLevels = parseSportLevels((profile as any).sport_levels);
   const sportsBase: { name: string }[] = overrides.sports?.length
