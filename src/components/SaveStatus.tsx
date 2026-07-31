@@ -49,28 +49,44 @@ export function SaveStatus({
 
   if (status === "saving")
     return (
-      <span className={`${base} text-muted-foreground`} role="status" aria-live="polite">
+      <span
+        className={`${base} ${tone("text-lime", "border-lime/40", "bg-lime/10")}`}
+        role="status"
+        aria-live="polite"
+      >
         <Loader2 className="h-3.5 w-3.5 animate-spin" /> Saving…
       </span>
     );
 
   if (status === "dirty")
     return (
-      <span className={`${base} text-muted-foreground`} role="status" aria-live="polite">
+      <span
+        className={`${base} ${tone("text-muted-foreground", "border-border", "bg-surface")}`}
+        role="status"
+        aria-live="polite"
+      >
         Unsaved changes
       </span>
     );
 
   if (status === "invalid")
     return (
-      <span className={`${base} text-coral`} role="status" aria-live="polite">
+      <span
+        className={`${base} ${tone("text-coral", "border-coral/40", "bg-coral/10")}`}
+        role="status"
+        aria-live="polite"
+      >
         <TriangleAlert className="h-3.5 w-3.5" /> Not saved — {reason ?? "fix the errors above"}
       </span>
     );
 
   if (status === "error")
     return (
-      <span className={`${base} text-destructive`} role="status" aria-live="polite">
+      <span
+        className={`${base} ${tone("text-destructive", "border-destructive/40", "bg-destructive/10")}`}
+        role="status"
+        aria-live="polite"
+      >
         <CloudOff className="h-3.5 w-3.5" />
         <span className="truncate max-w-[12rem]">{error ?? "Couldn't save"}</span>
         <button
@@ -85,10 +101,15 @@ export function SaveStatus({
 
   if (status === "saved" && savedAt != null)
     return (
-      <span className={`${base} text-muted-foreground`} role="status" aria-live="polite">
-        <Check className="h-3.5 w-3.5 text-lime" /> {savedLabel} {relative(savedAt, now)}
+      <span
+        className={`${base} ${tone("text-lime", "border-lime/40", "bg-lime/10")}`}
+        role="status"
+        aria-live="polite"
+      >
+        <Check className="h-3.5 w-3.5" /> {savedLabel} {relative(savedAt, now)}
       </span>
     );
+
 
   return null;
 }
