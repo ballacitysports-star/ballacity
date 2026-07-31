@@ -3,6 +3,8 @@ import {
   findSelfOverlaps,
   findSlotConflicts,
   gameToBusyBlock,
+  suggestSlotFixes,
+  dropOverlappingSlots,
   type BusyBlock,
 } from "./availability-conflicts";
 import { toDateKey, type TimeSlot } from "./availability-timeslots";
@@ -86,5 +88,71 @@ describe("findSelfOverlaps", () => {
         { weekday: 3, start: "18:00", end: "20:00" },
       ]),
     ).toEqual([]);
+  });
+});
+
+describe("suggestSlotFixes", () => {
+  const conflict = (slot: TimeSlot, blocks: BusyBlock[]) =>
+    findSlotConflicts([slot], blocks)[0];
+
+  it("offers a skip to right after the busy block", () => {
+    const fixes = suggestSlotFixes(
+      conflict({ date: "2026-08-01", start: "17:00", end: "19:00" }, [block()]),
+    );
+    const skip = fixes.find((f) => f.id === "skip")!;
+    expect(skip.slot).toMatchObject({ start: "20:00", end: "22:00" });
+  });
+
+  it("shortens to the longer free side", () => {
+    const fixes = suggestSlotFixes(
+      conflict({ date: "2026-08-01", start: "14:00", end: "19:00" }, [block()]),
+    );
+    const short = fixes.find((f) => f.id === "shorten")!;
+    expect(short.slot).toMatchObject({ start: "14:00", end: "18:00" });
+  });
+
+  it("skips the shorten option when no free side is long enough", () => {
+    const fixes = suggestSlotFixes(
+      conflict({ date: "2026-08-01", start: "18:00", end: "20:00" }, [block()]),
+    );
+    expect(fixes.some((f) => f.id === "shorten")).toBe(false);
+  });
+
+  it("always offers remove", () => {
+    const fixes = suggestSlotFixes(
+      conflict({ date: "2026-08-01", start: "18:00", end: "20:00" }, [block()]),
+    );
+    expect(fixes.at(-1)).toMatchObject({ id: "remove" });
+  });
+
+  it("keeps the weekday when skipping a recurring window", () => {
+    const now = new Date(2026, 6, 30, 9, 0);
+    const c = findSlotConflicts([{ weekday: 6, start: "17:00", end: "19:00" }], [block()], { now })[0];
+    const skip = suggestSlotFixes(c).find((f) => f.id === "skip")!;
+    expect(skip.slot).toMatchObject({ weekday: 6, start: "20:00" });
+  });
+
+  it("omits skip when the clash runs to the end of the day", () => {
+    const fixes = suggestSlotFixes(
+      conflict({ date: "2026-08-01", start: "22:00", end: "23:30" }, [
+        block({ start: "22:00", end: "23:59" }),
+      ]),
+    );
+    expect(fixes.map((f) => f.id)).toEqual(["remove"]);
+  });
+});
+
+describe("dropOverlappingSlots", () => {
+  it("keeps the first of two clashing windows", () => {
+    expect(
+      dropOverlappingSlots([
+        { weekday: 2, start: "18:00", end: "20:00" },
+        { weekday: 2, start: "19:00", end: "21:00" },
+        { weekday: 3, start: "19:00", end: "21:00" },
+      ]),
+    ).toEqual([
+      { weekday: 2, start: "18:00", end: "20:00" },
+      { weekday: 3, start: "19:00", end: "21:00" },
+    ]);
   });
 });
