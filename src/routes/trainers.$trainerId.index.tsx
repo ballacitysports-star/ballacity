@@ -1,4 +1,4 @@
-import { createFileRoute, Link, notFound, redirect, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, Link, notFound, redirect } from "@tanstack/react-router";
 import { motion } from "framer-motion";
 import { useEffect, useMemo, useState } from "react";
 import { zodValidator, fallback } from "@tanstack/zod-adapter";
@@ -115,18 +115,18 @@ export const Route = createFileRoute("/trainers/$trainerId/")({
 function TrainerPage() {
   const org = Route.useLoaderData() as Org;
   const search = Route.useSearch();
-  const navigate = useNavigate({ from: "/trainers/$trainerId" });
+  const navigate = Route.useNavigate();
 
   const tab: "about" | "experience" | "reviews" =
     search.tab === "experience" || search.tab === "reviews" ? search.tab : "about";
   const reviewsOpen = search.modal === "reviews";
   const selectedVenue: string = search.venue || "";
   const setTab = (v: "about" | "experience" | "reviews") =>
-    navigate({ search: (p: any) => ({ ...p, tab: v === "about" ? "" : v }), replace: true });
+    navigate({ to: ".", search: (p) => ({ ...p, tab: v === "about" ? "" : v }), replace: true });
   const setReviewsOpen = (v: boolean) =>
-    navigate({ search: (p: any) => ({ ...p, modal: v ? "reviews" : "" }), replace: true });
+    navigate({ to: ".", search: (p) => ({ ...p, modal: v ? "reviews" : "" }), replace: true });
   const setSelectedVenue = (v: string) =>
-    navigate({ search: (p: any) => ({ ...p, venue: selectedVenue === v ? "" : v }), replace: true });
+    navigate({ to: ".", search: (p) => ({ ...p, venue: selectedVenue === v ? "" : v }), replace: true });
 
 
   const [bookOpen, setBookOpen] = useState(false);

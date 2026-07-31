@@ -1,4 +1,4 @@
-import { createFileRoute, Link, notFound, redirect, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, Link, notFound, redirect } from "@tanstack/react-router";
 import { motion } from "framer-motion";
 import { useEffect, useMemo, useState } from "react";
 import { zodValidator, fallback } from "@tanstack/zod-adapter";
@@ -101,17 +101,17 @@ const FILTERS: { key: PostKind | "all"; label: string }[] = [
 function TeamPage() {
   const org = Route.useLoaderData() as Org;
   const search = Route.useSearch();
-  const navigate = useNavigate({ from: "/teams/$teamId" });
+  const navigate = Route.useNavigate();
   const tab: "posts" | "about" | "games" =
     search.tab === "about" || search.tab === "games" ? search.tab : "posts";
   const filter: PostKind | "all" = (search.filter || "all") as PostKind | "all";
   const reviewsOpen = search.modal === "reviews";
   const setTab = (v: "posts" | "about" | "games") =>
-    navigate({ search: (p: any) => ({ ...p, tab: v === "posts" ? "" : v }), replace: true });
+    navigate({ to: ".", search: (p) => ({ ...p, tab: v === "posts" ? "" : v }), replace: true });
   const setFilter = (v: PostKind | "all") =>
-    navigate({ search: (p: any) => ({ ...p, filter: v === "all" ? "" : v }), replace: true });
+    navigate({ to: ".", search: (p) => ({ ...p, filter: v === "all" ? "" : v }), replace: true });
   const setReviewsOpen = (v: boolean) =>
-    navigate({ search: (p: any) => ({ ...p, modal: v ? "reviews" : "" }), replace: true });
+    navigate({ to: ".", search: (p) => ({ ...p, modal: v ? "reviews" : "" }), replace: true });
   const [following, setFollowing] = useState(false);
   const [mounted, setMounted] = useState(false);
   const [composerOpen, setComposerOpen] = useState(false);
