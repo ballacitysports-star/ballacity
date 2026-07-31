@@ -125,7 +125,10 @@ export function ProfileLinksFields({
                 placeholder="Optional label (e.g. @handle)"
               />
             </div>
-            {!linkErrors[i] && l.url.trim() && <LinkPreview url={l.url} type={l.type} />}
+            {!linkErrors[i] && l.url.trim() && (
+              <LinkPreview url={l.url} type={l.type} label={l.label} />
+            )}
+
           </div>
         ))}
       </div>
