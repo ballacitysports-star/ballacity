@@ -35,6 +35,7 @@ import {
   type ExistingRequestSummary,
 } from "@/lib/availability";
 import { AvailabilitySchedulePicker } from "@/components/availability/AvailabilitySchedulePicker";
+import { useMyBusyBlocks } from "@/lib/availability-conflicts";
 import {
   parseTimeSlots,
   summarizeSlots,
@@ -909,6 +910,7 @@ function PostAvailabilityDialog({
   const [levels, setLevels] = useState<Record<string, string>>({});
 
   const [slots, setSlots] = useState<TimeSlot[]>([]);
+  const { data: busy = [] } = useMyBusyBlocks();
   const [city, setCity] = useState("");
   const unit = useDistanceUnit();
   const [radius, setRadius] = useState(25); // in the viewer's unit
@@ -1015,7 +1017,7 @@ function PostAvailabilityDialog({
           )}
           <div>
             <Label className="mb-2 block">When are you free?</Label>
-            <AvailabilitySchedulePicker value={slots} onChange={setSlots} />
+            <AvailabilitySchedulePicker value={slots} onChange={setSlots} busy={busy} />
           </div>
           <div className="grid grid-cols-[1fr_110px] gap-2">
             <div>
