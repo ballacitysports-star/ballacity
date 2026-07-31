@@ -361,7 +361,9 @@ function EditProfile() {
 
       <Section title="Location preference">
         <ProfileLocationFields
+          showCity={false}
           value={{ city, searchRadiusMi }}
+
           onChange={(patch) => {
             markDirty();
             if ("city" in patch) setCity(patch.city!);
