@@ -1,24 +1,31 @@
 ## Goal
 
-Every address, gym/venue, and city field in the app uses the same Google Places autocomplete component instead of a plain text box.
+Onboarding shows and saves exactly what Edit profile does — no blank/placeholder defaults over real saved data, no missing fields, and edits made in either screen show up in the other.
 
-## Already done (no change needed)
+## 1. Accurate prefill
 
-`LocationAutocomplete` is already used in: game create (`_tabs.create.tsx`), game detail, gym/org form (`OrgForm.tsx` — city + street address), team edit, create-org wizard, create-trainer wizard, and profile basics (city).
+Today `src/routes/onboarding.welcome.tsx` prefills on the first non-null `useMyProfile(user)` and then latches `prefilled = true`. That value can be a fallback derived from the auth user (email local-part as name, empty sports) while the saved profile row is still loading, so real data gets overwritten in the form.
 
-## Fields to convert
+- Expose a load state from `useMyProfile` (or add a sibling flag in `src/lib/user-prefs-store.ts`) so consumers can tell "still fetching the saved row" from "fetched, empty".
+- Gate onboarding's prefill effect on that flag: render the step skeleton until the profile row resolves, then seed `basics`, `sports`, links, and radius once.
+- Keep the existing autosave disabled until prefill completes, so the debounce can't write placeholder values back over the saved row.
 
-1. **Available Players filter — "Location"** (`src/routes/available-players.tsx`, ~line 504): city text input → `LocationAutocomplete` with `mode="city"`, keeping the existing clear button and filter state wiring.
-2. **Available Players — post availability form "City"** (~line 1008): same swap, `mode="city"`.
-3. **Create post sheet — "Location"** (`src/components/CreatePostSheet.tsx`, ~line 145): `placeholder="Venue or address"` → `LocationAutocomplete` in `mode="place"` so it suggests gyms/courts/venues.
-4. **Trainer org quick-create — "City (optional)"** (`src/components/TrainerOrgSection.tsx`, ~line 247): swap to `LocationAutocomplete`, `mode="city"`, `showCurrentButton={false}` to keep the compact inline row.
+## 2. Same fields as Edit profile
 
-## Notes
+Compared with `src/routes/profile.edit.tsx`, onboarding's Basics and Sports already use the shared components; the gap is Profile links.
 
-- No changes to what gets saved: each field keeps storing the same free-text string, so existing rows and filters keep working. Typing manually still works — suggestions are optional.
-- The "Use current location" button is on by default; it will be hidden in the compact trainer row and shown in the fuller forms.
-- Behavior is unchanged if Google suggestions fail: the component already falls back to plain typing with a small hint message.
+- Extract the links editor from `profile.edit.tsx` into a shared `src/components/profile/ProfileLinksFields.tsx` (same pattern as `ProfileBasicsFields` / `ProfileSportsFields`) and use it in both screens.
+- Add links to the onboarding Basics/Sports flow (as part of the "Sports" step or a short "Links" step) and pass `links` into `buildProfileRow` on save, so onboarding writes the identical row shape.
+- Account-specific sections of Edit profile (Reviews, Payments, Reels, Pro, Plans, Notifications) stay out of onboarding — they are post-signup settings, not profile data.
 
-### Technical detail
+## 3. Live two-way sync
 
-`LocationAutocomplete` takes `value`/`onChange` (string) plus optional `onPick(value, placeId, geo)`. The four call sites only need the string pair, so no schema, server function, or database change is required. Its backing server functions (`autocompletePlaces`, `getPlaceDetails`) are auth-gated and already deployed.
+- After onboarding saves, keep writing through `setProfileOverrides` and additionally invalidate the same query keys Edit profile invalidates, so a later visit to Edit profile reads fresh values instead of a cached row.
+- After Edit profile saves, publish through the same override/listener channel so a returning onboarding visit (Settings → "Edit onboarding details") prefills the new values.
+- Clear the onboarding idempotency fingerprint (`onboardingSaveKey`) when Edit profile writes a new row, so re-entering onboarding after an external edit isn't skipped as "already saved".
+
+## Technical notes
+
+- Files touched: `src/routes/onboarding.welcome.tsx`, `src/routes/profile.edit.tsx`, `src/lib/user-prefs-store.ts`, new `src/components/profile/ProfileLinksFields.tsx`.
+- No schema changes; `buildProfileRow` in `src/lib/profile-payload.ts` already supports `links` and stays the single canonical payload builder.
+- Verification: typecheck plus a manual pass — save a profile in Edit profile, reopen onboarding, confirm every field (including links) is prefilled and unchanged after autosave settles.

@@ -5,7 +5,7 @@ import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/use-auth";
 import { useAccountType, type AccountType } from "@/lib/account-type";
-import { getFeedPrefsSnapshot, setFeedPrefs, setProfileOverrides, useMyProfile, useDistanceUnit } from "@/lib/user-prefs-store";
+import { getFeedPrefsSnapshot, setFeedPrefs, setProfileOverrides, useMyProfileState, useDistanceUnit, type ProfileLink } from "@/lib/user-prefs-store";
 import { kmToMi, miToKm } from "@/lib/distance";
 import { Section, validateBirthday } from "@/components/profile/ProfileFormPrimitives";
 import {
@@ -16,8 +16,14 @@ import {
   ProfileSportsFields,
   type SportEntry,
 } from "@/components/profile/ProfileSportsFields";
+import {
+  ProfileLinksFields,
+  cleanProfileLinks,
+  validateProfileUrl,
+} from "@/components/profile/ProfileLinksFields";
 import { useAutosave } from "@/hooks/use-autosave";
 import { SaveStatus } from "@/components/SaveStatus";
+
 
 
 const searchSchema = z.object({
@@ -95,15 +101,16 @@ type GeoState =
 function OnboardingWizard({ type }: { type: AccountType }) {
   const nav = useNavigate();
   const { user } = useAuth();
-  const profile = useMyProfile(user);
+  const { profile, loaded: profileLoaded } = useMyProfileState(user);
   const queryClient = useQueryClient();
 
   const isPlayer = type === "player";
   const nextCfg = isPlayer ? null : NEXT_STEPS[type as Exclude<AccountType, "player">];
 
   const stepLabels = isPlayer
-    ? ["Basics", "Sports", "Location"]
-    : ["Basics", "Sports", "Location", "Next steps"];
+    ? ["Basics", "Sports", "Links", "Location"]
+    : ["Basics", "Sports", "Links", "Location", "Next steps"];
+  const locationStep = stepLabels.indexOf("Location");
 
   const [step, setStep] = useState(0);
   const [saving, setSaving] = useState(false);
@@ -122,6 +129,7 @@ function OnboardingWizard({ type }: { type: AccountType }) {
     graduatingClass: "",
   });
   const [sports, setSports] = useState<SportEntry[]>([]);
+  const [links, setLinks] = useState<ProfileLink[]>([]);
   const [radius, setRadius] = useState(15); // kilometers (canonical)
   const unit = useDistanceUnit();
   const radiusMax = unit === "km" ? 100 : 60;
@@ -139,9 +147,11 @@ function OnboardingWizard({ type }: { type: AccountType }) {
 
 
   // Prefill from the same profile store Edit profile uses so returning users edit
-  // rather than re-enter.
+  // rather than re-enter. We wait for `profileLoaded` because until the saved row
+  // resolves the store returns auth-derived fallbacks (email local-part as name,
+  // no sports) that would overwrite real data.
   useEffect(() => {
-    if (!profile || prefilled) return;
+    if (!profile || !profileLoaded || prefilled) return;
     setBasics({
       name: profile.name ?? "",
       username: profile.username ?? "",
@@ -154,6 +164,7 @@ function OnboardingWizard({ type }: { type: AccountType }) {
       graduatingClass: profile.graduatingClass != null ? String(profile.graduatingClass) : "",
     });
     setSports((profile.sports ?? []) as SportEntry[]);
+    setLinks(profile.links ?? []);
     try {
       const r = Number(localStorage.getItem("openrun.default_radius_km"));
       if (Number.isFinite(r) && r > 0) setRadius(r);
@@ -161,7 +172,8 @@ function OnboardingWizard({ type }: { type: AccountType }) {
       /* ignore */
     }
     setPrefilled(true);
-  }, [profile, prefilled]);
+  }, [profile, profileLoaded, prefilled]);
+
 
   const requestLocation = () => {
     if (typeof navigator === "undefined" || !navigator.geolocation) {
@@ -255,6 +267,12 @@ function OnboardingWizard({ type }: { type: AccountType }) {
     }
     const trimmedCity = basics.city.trim().slice(0, 80);
     const initials = (basics.avatar.trim() || trimmedName.slice(0, 2)).toUpperCase().slice(0, 3);
+    if (links.some((l) => validateProfileUrl(l.url) !== null)) {
+      toast.error("Fix your profile links");
+      setStep(2);
+      return false;
+    }
+    const cleanedLinks = cleanProfileLinks(links);
 
     setSaving(true);
     try {
@@ -269,6 +287,7 @@ function OnboardingWizard({ type }: { type: AccountType }) {
         birthday: birthdayClean,
         graduatingClass: gradClean,
         sports,
+        links: cleanedLinks,
       });
 
       const { supabase } = await import("@/integrations/supabase/client");
@@ -288,7 +307,9 @@ function OnboardingWizard({ type }: { type: AccountType }) {
         birthday: birthdayClean,
         graduatingClass: gradClean,
         sports,
+        links: cleanedLinks,
       });
+
 
       // Idempotency: skip the write entirely when this exact row was already
       // saved for this user (double taps, retries after a remount, back/next).
@@ -376,12 +397,15 @@ function OnboardingWizard({ type }: { type: AccountType }) {
 
 
   const autosave = useAutosave({
-    value: { basics, sports, radius },
-    enabled: !!user,
+    value: { basics, sports, links, radius },
+    // Only after prefill so the debounce can't write placeholder values back
+    // over the saved profile row.
+    enabled: !!user && prefilled,
     validate: () => {
       if (!basics.name.trim()) return "name is required";
       const err = validateBirthday(basics.birthday);
       if (err) return err.toLowerCase();
+      if (links.some((l) => validateProfileUrl(l.url) !== null)) return "fix your profile links";
       return null;
     },
     save: async () => {
@@ -394,10 +418,11 @@ function OnboardingWizard({ type }: { type: AccountType }) {
 
   const onNext = async () => {
     // Save once the profile steps are complete (before location/next-steps handoff).
-    if (step === 2) {
+    if (step === locationStep) {
       const ok = await save();
       if (!ok) return;
     }
+
     if (isLast) {
       if (nextCfg) nav({ to: nextCfg.goto });
       else nav({ to: "/feed" });
@@ -456,7 +481,14 @@ function OnboardingWizard({ type }: { type: AccountType }) {
       )}
 
       {step === 2 && (
+        <Section title="Profile links">
+          <ProfileLinksFields links={links} onChange={setLinks} />
+        </Section>
+      )}
+
+      {step === locationStep && (
         <Section title="Location">
+
           <p className="mb-3 text-xs text-muted-foreground">
             We use your location to show nearby games. You can also skip and set a radius manually.
           </p>

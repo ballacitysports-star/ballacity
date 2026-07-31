@@ -293,11 +293,24 @@ function defaultsFromUser(user: User): MyProfile {
 }
 
 // ---------- Hooks ----------
-export function useMyProfile(currentUser?: User | null): MyProfile | null {
+
+/**
+ * Profile + whether the saved `profiles` row has finished loading.
+ *
+ * Forms must wait for `loaded` before seeding their fields: until then the
+ * returned profile can be a fallback derived from the auth user (email
+ * local-part as name, no sports), which would overwrite real saved data.
+ */
+export function useMyProfileState(currentUser?: User | null): {
+  profile: MyProfile | null;
+  loaded: boolean;
+} {
   const { user: authUser } = useAuth();
   const user = currentUser === undefined ? authUser : currentUser;
   const [tick, setTick] = useState(0);
+  const [loaded, setLoaded] = useState(false);
   const [dbProfile, setDbProfile] = useState<{
+
     display_name?: string | null;
     username?: string | null;
     avatar_initials?: string | null;
@@ -322,9 +335,11 @@ export function useMyProfile(currentUser?: User | null): MyProfile | null {
   useEffect(() => {
     if (!user) {
       setDbProfile(null);
+      setLoaded(false);
       return;
     }
     let cancelled = false;
+    setLoaded(false);
     supabase
       .from("profiles")
       .select(
@@ -336,13 +351,16 @@ export function useMyProfile(currentUser?: User | null): MyProfile | null {
       .then(async ({ data }) => {
         if (cancelled) return;
         const { data: bday } = await (supabase.rpc as any)("get_my_birthday");
-        if (!cancelled) setDbProfile({ ...(data as any), birthday: (bday as string | null) ?? null });
+        if (cancelled) return;
+        setDbProfile({ ...(data as any), birthday: (bday as string | null) ?? null });
+        setLoaded(true);
       });
     return () => {
       cancelled = true;
     };
   }, [user?.id]);
-  if (!user) return null;
+  if (!user) return { profile: null, loaded: false };
+
   const overrides = readOverrides(user.id);
   const base = defaultsFromUser(user);
   void tick;
@@ -360,7 +378,7 @@ export function useMyProfile(currentUser?: User | null): MyProfile | null {
         ? [{ name: dbProfile.sport as Sport, level: dbLevels[dbProfile.sport] ?? null }]
         : base.sports;
 
-  return {
+  const profile: MyProfile = {
     name: overrides.name ?? dbProfile?.display_name ?? base.name,
     username:
       overrides.username ??
@@ -373,7 +391,8 @@ export function useMyProfile(currentUser?: User | null): MyProfile | null {
     birthday: overrides.birthday ?? dbProfile?.birthday ?? undefined,
     graduatingClass: overrides.graduatingClass ?? dbProfile?.graduating_class ?? undefined,
     stats: base.stats,
-    sports: overrides.sports ?? base.sports,
+    // Per-sport levels resolved above (local overrides first, then the saved row).
+    sports,
     // Earned badges come from the badge engine (reliability + sportsmanship);
     // stored overrides are merged on top as extras.
     badges: mergeBadges(
@@ -391,7 +410,13 @@ export function useMyProfile(currentUser?: User | null): MyProfile | null {
 
     links: overrides.links?.length ? overrides.links : dbLinks,
   };
+  return { profile, loaded };
 }
+
+export function useMyProfile(currentUser?: User | null): MyProfile | null {
+  return useMyProfileState(currentUser).profile;
+}
+
 
 export function useFeedPrefs(): FeedPrefs {
   const s = useSyncExternalStore(prefsStore.subscribe, prefsStore.getSnapshot, () =>
