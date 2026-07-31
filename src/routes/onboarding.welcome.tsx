@@ -101,15 +101,16 @@ type GeoState =
 function OnboardingWizard({ type }: { type: AccountType }) {
   const nav = useNavigate();
   const { user } = useAuth();
-  const profile = useMyProfile(user);
+  const { profile, loaded: profileLoaded } = useMyProfileState(user);
   const queryClient = useQueryClient();
 
   const isPlayer = type === "player";
   const nextCfg = isPlayer ? null : NEXT_STEPS[type as Exclude<AccountType, "player">];
 
   const stepLabels = isPlayer
-    ? ["Basics", "Sports", "Location"]
-    : ["Basics", "Sports", "Location", "Next steps"];
+    ? ["Basics", "Sports", "Links", "Location"]
+    : ["Basics", "Sports", "Links", "Location", "Next steps"];
+  const locationStep = stepLabels.indexOf("Location");
 
   const [step, setStep] = useState(0);
   const [saving, setSaving] = useState(false);
@@ -128,6 +129,7 @@ function OnboardingWizard({ type }: { type: AccountType }) {
     graduatingClass: "",
   });
   const [sports, setSports] = useState<SportEntry[]>([]);
+  const [links, setLinks] = useState<ProfileLink[]>([]);
   const [radius, setRadius] = useState(15); // kilometers (canonical)
   const unit = useDistanceUnit();
   const radiusMax = unit === "km" ? 100 : 60;
@@ -145,9 +147,11 @@ function OnboardingWizard({ type }: { type: AccountType }) {
 
 
   // Prefill from the same profile store Edit profile uses so returning users edit
-  // rather than re-enter.
+  // rather than re-enter. We wait for `profileLoaded` because until the saved row
+  // resolves the store returns auth-derived fallbacks (email local-part as name,
+  // no sports) that would overwrite real data.
   useEffect(() => {
-    if (!profile || prefilled) return;
+    if (!profile || !profileLoaded || prefilled) return;
     setBasics({
       name: profile.name ?? "",
       username: profile.username ?? "",
@@ -160,6 +164,7 @@ function OnboardingWizard({ type }: { type: AccountType }) {
       graduatingClass: profile.graduatingClass != null ? String(profile.graduatingClass) : "",
     });
     setSports((profile.sports ?? []) as SportEntry[]);
+    setLinks(profile.links ?? []);
     try {
       const r = Number(localStorage.getItem("openrun.default_radius_km"));
       if (Number.isFinite(r) && r > 0) setRadius(r);
@@ -167,7 +172,8 @@ function OnboardingWizard({ type }: { type: AccountType }) {
       /* ignore */
     }
     setPrefilled(true);
-  }, [profile, prefilled]);
+  }, [profile, profileLoaded, prefilled]);
+
 
   const requestLocation = () => {
     if (typeof navigator === "undefined" || !navigator.geolocation) {
