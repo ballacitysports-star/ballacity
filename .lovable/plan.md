@@ -1,37 +1,28 @@
 ## Problem
 
-Today's "when are you free" input is thin and partly lossy:
+The crop frame ratio is already fixed (1:1 for avatars, 16:9 for covers) and stays that way. What's actually distorting is the **image being cropped**, not the frame.
 
-- It offers one start date and one end date plus weekday chips.
-- The two inputs are `datetime-local`, but the times you type are **thrown away** — only the date part is saved (`starts_on`/`ends_on` are date columns).
-- There's no way to say "Sat morning and Tue evening" — only a blanket range.
+Both crop surfaces render the photo as an absolutely positioned `<img>` with explicit pixel `width`/`height` (natural size × zoom):
 
-## What we'll build
+- `src/components/ImageEditorDialog.tsx` (lines ~383–399)
+- `src/components/ImageCropperDialog.tsx` (lines ~257–272)
 
-Two modes in the availability composer, switched by a segmented control:
+Tailwind's base stylesheet applies `img { max-width: 100%; height: auto }`. The inline `height` wins over `height: auto`, but the inline `width` does **not** override the stylesheet's `max-width: 100%`. So as soon as the zoomed image is wider than the crop container — which is the normal case for any portrait or high-res photo, and for every zoom-in — the width gets clamped to the container while the height stays at the full computed value. Result: the photo is squeezed horizontally, i.e. stretched vertically, and the aspect ratio visibly changes as you zoom.
 
-**1. Specific dates (new default)**
-- A month calendar where you tap to select any number of individual dates (multi-select, tap again to deselect, forward-looking only).
-- Selected dates appear as a list below. Each row gets its own time window (start–end) via a compact time picker.
-- Quick actions: "Apply this time to all dates", plus presets (Morning 6–11, Afternoon 12–5, Evening 5–10, All day).
-- Timezone is captured from the device so viewers see it in their own time (same helpers the trainer calendar already uses).
+## Fix
 
-**2. Recurring weekly (existing behavior, cleaned up)**
-- Weekday chips + a date range for how long the pattern runs.
-- Each selected weekday can carry its own time window, with the same "apply to all" shortcut.
+In both crop dialogs, on the crop-canvas `<img>` inline style:
 
-Both modes share one summary line at the bottom ("3 dates · Sat 8–11 AM, Sun 6–9 PM") so it's obvious what will be posted before submitting.
+- add `maxWidth: "none"` and `maxHeight: "none"` so the explicit pixel dimensions are honored exactly
+- add `objectFit: "fill"` as a harmless no-op safeguard (dimensions already match the natural ratio, so nothing is resampled)
 
-## Where it shows up
+No changes to `aspect`, `cropW`/`cropH`, `minScale`, gesture math, or the export canvas — those are already ratio-correct, and the exported crop was never distorted (only the on-screen preview was), so output stays identical.
 
-- Player cards and the Nearby Players panel show the next upcoming date + time instead of a raw date range.
-- The Players tab time filters (Today / This week / Weekend / Anytime) match against the concrete dates and times, so results are accurate rather than range-approximate.
-- The availability detail and contact-request screens show the full list of dates and times.
+## Verification
 
-## Technical notes
+Open the profile edit screen, upload a tall portrait photo into both the cover (16:9) and avatar (1:1) editors, and confirm with an element screenshot that the subject keeps its proportions at minimum zoom and while pinching/zooming in, and that the crop frame itself stays a fixed square/16:9 throughout.
 
-- Add a `time_slots` JSONB column to `player_availabilities`: an array of `{ date: "YYYY-MM-DD", start: "HH:MM", end: "HH:MM" }` for specific dates, plus `{ weekday: 0-6, start, end }` entries for recurring mode, and a `timezone` text column. Existing `starts_on` / `ends_on` / `recurring_days` stay populated (derived from the slots) so current queries, filters, and older posts keep working.
-- New helper module `src/lib/availability-timeslots.ts`: normalize/validate slots, derive the legacy range and weekday list, compute the next upcoming slot, and format summaries. Unit-tested.
-- New component `src/components/availability/AvailabilitySchedulePicker.tsx` holding the calendar, slot rows, and presets; the composer dialog in `src/routes/_tabs.players.tsx` and the availability screens consume it.
-- Filtering: extend `listOpenAvailabilities` to keep the existing coarse SQL window filter, then refine client-side against `time_slots` so "Today"/"Weekend" are exact.
-- Validation: end after start, max ~20 dates per post, dates must be in the future, overlapping same-day windows merged.
+## Files touched
+
+- `src/components/ImageEditorDialog.tsx`
+- `src/components/ImageCropperDialog.tsx`
