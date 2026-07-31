@@ -15,6 +15,8 @@ function relative(ts: number, now: number): string {
 type Props = Pick<AutosaveState, "status" | "reason" | "error" | "savedAt" | "retry"> & {
   /** Label used for the success state — "Saved" (default) or "Draft saved". */
   savedLabel?: string;
+  /** "text" (default) is subtle inline text; "pill" renders a high-contrast badge. */
+  variant?: "text" | "pill";
   className?: string;
 };
 
@@ -26,6 +28,7 @@ export function SaveStatus({
   savedAt,
   retry,
   savedLabel = "Saved",
+  variant = "text",
   className = "",
 }: Props) {
   const [now, setNow] = useState(() => Date.now());
@@ -35,7 +38,14 @@ export function SaveStatus({
     return () => clearInterval(t);
   }, [status, savedAt]);
 
-  const base = `inline-flex items-center gap-1.5 text-xs ${className}`;
+  const pill =
+    variant === "pill"
+      ? "rounded-full border px-2.5 py-1 font-semibold whitespace-nowrap"
+      : "";
+  const tone = (text: string, border: string, bg: string) =>
+    variant === "pill" ? `${text} ${border} ${bg}` : text;
+  const base = `inline-flex items-center gap-1.5 text-xs ${pill} ${className}`;
+
 
   if (status === "saving")
     return (
