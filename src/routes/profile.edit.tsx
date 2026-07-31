@@ -238,7 +238,18 @@ function EditProfile() {
       .from("profiles")
       .upsert(profilePayload as any, { onConflict: "id" });
     if (error) throw error;
+
+    // Onboarding skips its write when the fingerprint matches its last save.
+    // Clearing it here keeps the two screens in sync: re-entering onboarding
+    // after editing here always persists the values it shows.
+    try {
+      const { onboardingSaveKey } = await import("@/lib/profile-payload");
+      localStorage.removeItem(onboardingSaveKey(profileUser.id));
+    } catch {
+      /* ignore */
+    }
   };
+
 
   const autosave = useAutosave({
     value: {
