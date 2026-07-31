@@ -244,7 +244,9 @@ function PlayersPage() {
       days.some((d) => /sat|sun/i.test(d));
     return list.filter((a) => {
       if (sport && !a.sports.some((s) => s.toLowerCase() === sport.toLowerCase())) return false;
-      if (skill && a.skill_level !== skill) return false;
+      if (skill && !levelMatchesFilter(a.author_sport_levels, a.sports, a.skill_level, skill))
+        return false;
+
       if (maxDistance > 0 && kmToMi(a.travel_radius_km) > maxDistance) return false;
       if (when !== "any") {
         if (when === "today") {
