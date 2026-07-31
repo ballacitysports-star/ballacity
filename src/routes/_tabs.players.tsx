@@ -955,7 +955,17 @@ function PostAvailabilityDialog({
                 <Chip
                   key={s.name}
                   active={sports.includes(s.name)}
-                  onClick={() => setSports((arr) => toggle(arr, s.name))}
+                  onClick={() =>
+                    setSports((arr) => {
+                      const next = toggle(arr, s.name);
+                      // Prefill from the profile tier the first time a sport is added.
+                      if (!arr.includes(s.name)) {
+                        const mine = myProfile?.sports.find((x) => x.name === s.name)?.level?.tier;
+                        if (mine) setLevels((l) => ({ ...l, [s.name]: mine }));
+                      }
+                      return next;
+                    })
+                  }
                 >
                   <span className="mr-1">{s.emoji}</span>
                   {s.name}
@@ -963,18 +973,45 @@ function PostAvailabilityDialog({
               ))}
             </div>
           </div>
-          <div>
-            <Label className="mb-2 block">Skill level</Label>
-            <div className="flex flex-wrap gap-2">
-              {SKILLS.map((s) => (
-                <Chip key={s} active={skill === s} onClick={() => setSkill(s)}>
-                  {s}
-                </Chip>
-              ))}
-            </div>
-          </div>
-          <div className="grid grid-cols-2 gap-2">
-            <div>
+          {sports.length === 0 ? (
+            <p className="text-xs text-muted-foreground">
+              Pick a sport to set your level for it.
+            </p>
+          ) : (
+            sports.map((name) => {
+              const scale = scaleForSport(name as any);
+              return (
+                <div key={name}>
+                  <div className="mb-2 flex items-baseline gap-2">
+                    <Label className="block">{name} level</Label>
+                    <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                      {scale.system}
+                    </span>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {scale.tiers.map((tier) => (
+                      <Chip
+                        key={tier}
+                        active={levels[name] === tier}
+                        onClick={() =>
+                          setLevels((l) => ({
+                            ...l,
+                            [name]: l[name] === tier ? "" : tier,
+                          }))
+                        }
+                      >
+                        {tier}
+                      </Chip>
+                    ))}
+                  </div>
+                  {scale.hint && (
+                    <p className="mt-1 text-xs text-muted-foreground">{scale.hint}</p>
+                  )}
+                </div>
+              );
+            })
+          )}
+
               <Label htmlFor="starts">From</Label>
               <input
                 id="starts"
