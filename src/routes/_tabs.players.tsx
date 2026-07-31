@@ -212,6 +212,17 @@ function PlayersPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Any skill/sport pair can also arrive from a pasted URL, a browser refresh,
+  // localStorage restore, or a saved view. Scrub incompatible tiers out of the
+  // URL itself so the chips, the filter count, and the results always agree.
+  useEffect(() => {
+    const safe = sanitizeSkillForSport(sport, skill);
+    if (safe !== skill) updateSearch({ skill: safe });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sport, skill]);
+
+
+
   useEffect(() => {
     let cancelled = false;
     setList(null);
