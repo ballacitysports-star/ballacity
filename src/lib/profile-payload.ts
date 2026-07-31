@@ -44,6 +44,32 @@ export function buildProfileRow(input: ProfilePayloadInput) {
 }
 
 /**
+ * Persists a canonical profile row.
+ *
+ * `birthday` is private: signed-in users can read every other profile column
+ * but not that one, and Postgres needs read access to a column to resolve an
+ * upsert that writes it. So the upsert omits birthday and it is written with a
+ * separate self-scoped update.
+ */
+export async function saveProfileRow(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  client: any,
+  row: Record<string, unknown>,
+): Promise<void> {
+  const { birthday, ...rest } = row as { birthday?: unknown };
+  const { error } = await client.from("profiles").upsert(rest, { onConflict: "id" });
+  if (error) throw error;
+
+  if (birthday !== undefined) {
+    const { error: bErr } = await client
+      .from("profiles")
+      .update({ birthday })
+      .eq("id", row.id as string);
+    if (bErr) throw bErr;
+  }
+}
+
+/**
  * Stable fingerprint of a profile row, used as an idempotency key so repeated
  * onboarding submissions with unchanged data are skipped instead of re-written.
  */
@@ -53,5 +79,6 @@ export function profileRowFingerprint(row: Record<string, unknown>): string {
     .map((k) => [k, row[k]] as const);
   return JSON.stringify(stable);
 }
+
 
 export const onboardingSaveKey = (userId: string) => `openrun.onboarding_saved.${userId}`;
