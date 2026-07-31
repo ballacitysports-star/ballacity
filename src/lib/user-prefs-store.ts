@@ -3,6 +3,8 @@ import type { User } from "@supabase/supabase-js";
 import { ME, type Sport } from "@/lib/sample-data";
 import { earnedBadgeIds, makeBadgeStats } from "@/lib/badges";
 import { getDetectedDistanceUnit, type DistanceUnit } from "@/lib/measurement-system";
+import { clampDistanceMi } from "@/lib/distance";
+
 import { parseSportLevels, type SportLevel } from "@/lib/sport-levels";
 
 
