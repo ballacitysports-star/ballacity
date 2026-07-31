@@ -43,6 +43,7 @@ type ProfileRow = {
   sport: string | null;
   username: string | null;
   city: string | null;
+  search_radius_mi?: number | null;
   avatar_url: string | null;
   cover_url: string | null;
   graduating_class: number | null;
@@ -74,7 +75,7 @@ function PlayerProfilePage() {
       supabase
         .from("profiles")
         .select(
-          "id, display_name, avatar_initials, bio, sport, username, city, avatar_url, cover_url, graduating_class, links, sport_levels",
+          "id, display_name, avatar_initials, bio, sport, username, city, avatar_url, cover_url, graduating_class, search_radius_mi, links, sport_levels",
         )
         .eq("id", userId)
         .maybeSingle(),
@@ -158,6 +159,7 @@ function PlayerProfilePage() {
   ).trim();
   const bio = overrides.bio ?? profile.bio ?? "";
   const city = overrides.city ?? profile.city ?? "";
+  const searchRadiusMi = (profile as any).search_radius_mi as number | null | undefined;
   const sportLevels = parseSportLevels((profile as any).sport_levels);
   const sportsBase: { name: string }[] = overrides.sports?.length
     ? overrides.sports
@@ -228,6 +230,12 @@ function PlayerProfilePage() {
                 .filter(Boolean)
                 .join(" · ")}
             </div>
+            {searchRadiusMi != null && (
+              <div className="mt-1 inline-flex items-center gap-1 text-xs text-muted-foreground">
+                <MapPin className="h-3.5 w-3.5 text-lime" />
+                {city || "Anywhere"} · travels up to {formatDistance(searchRadiusMi, unit)}
+              </div>
+            )}
             {profile.graduating_class && (
               <div className="mt-1 text-xs text-muted-foreground">
                 🎓 Class of {profile.graduating_class}

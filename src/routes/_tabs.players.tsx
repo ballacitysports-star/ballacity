@@ -1065,7 +1065,7 @@ function PostAvailabilityDialog({
                 id="radius"
                 type="number"
                 min={1}
-                max={500}
+                max={MAX_DISTANCE_MI}
                 value={radius}
                 onChange={(e) => setRadius(Number(e.target.value) || 0)}
               />
