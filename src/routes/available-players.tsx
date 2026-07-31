@@ -90,7 +90,18 @@ export const Route = createFileRoute("/available-players")({
   component: AvailablePlayersPage,
 });
 
+/** Generic tiers shown when no single sport is selected. */
 const SKILLS = ["All Levels", "Beginner", "Intermediate", "Advanced"] as const;
+
+/**
+ * Skill options for the current sport: the sport's real scale (Flag / 7v7 /
+ * Full contact for Football, MiLB for Baseball, NTRP for Tennis…) so the filter
+ * and the post form read exactly like the profile does.
+ */
+function skillOptionsForSport(sport: string): string[] {
+  return sport ? ["All Levels", ...filterTiersForSport(sport)] : [...SKILLS];
+}
+
 
 type Tab = "browse" | "mine";
 
