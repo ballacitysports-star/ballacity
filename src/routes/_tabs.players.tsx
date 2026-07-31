@@ -534,7 +534,11 @@ function PlayersFilterBody({
   includeUnknownAge: boolean;
   setIncludeUnknownAge: (v: boolean) => void;
 }) {
-  const SKILLS = ["All Levels", "Beginner", "Intermediate", "Advanced"];
+  // Skill tiers mirror the profile: the picked sport's real scale, or the
+  // generic tiers when browsing all sports.
+  const scale = sport ? scaleForSport(sport as any) : null;
+  const SKILLS = sport ? levelsForSport(sport as any) : [...LEGACY_SKILLS];
+
   const unit = useDistanceUnit();
   // Round presets in the viewer's unit; the stored value stays in miles.
   const presets = distancePresets(unit).map((p) => ({
