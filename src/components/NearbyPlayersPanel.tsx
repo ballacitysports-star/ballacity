@@ -232,6 +232,21 @@ export function NearbyPlayersPanel({
                   <span>{emojiBySport[p.sports?.[0] ?? ""] ?? "🧑"}</span>
                   <span className="truncate">{p.sports?.[0] ?? "Player"}</span>
                 </div>
+                {(() => {
+                  // Profile tier first, post's own level as fallback.
+                  const level = resolvePlayerLevel(
+                    p.author_sport_levels,
+                    p.sports?.[0] ?? null,
+                    p.skill_level,
+                  );
+                  const text = formatSportLevel(level);
+                  return text ? (
+                    <span className="mt-1 inline-block rounded-full bg-lime/15 px-2 py-0.5 text-[10px] font-bold text-lime">
+                      {text}
+                    </span>
+                  ) : null;
+                })()}
+
                 <div className="mt-1.5 flex items-center gap-1 text-[11px] font-semibold text-lime">
                   <MapPin className="h-3 w-3" />
                   <Distance km={km} decimals={km < 10 ? 1 : 0} /> away
