@@ -10,7 +10,14 @@ export type SportScale = {
   tiers: string[];
   /** Optional helper copy under the chips. */
   hint?: string;
+  /**
+   * Optional grouping of `tiers` by format (e.g. Football's Flag / 7v7 /
+   * Full contact). Purely presentational — the union of every group's tiers
+   * must equal `tiers`, so filters and storage keep using flat tier strings.
+   */
+  groups?: { label: string; tiers: string[] }[];
 };
+
 
 /** Generic fallback used by any sport without a curated scale. */
 export const GENERIC_SCALE: SportScale = {
@@ -30,6 +37,23 @@ const BALL_TIERS = [
   "Major",
   "National",
 ];
+/** Shared sub-level ladder used by every football format. */
+const FOOTBALL_SUB_TIERS = ["Rec", "Competitive", "Showcase / Travel", "Elite"] as const;
+const FOOTBALL_FORMATS = ["Flag", "7v7", "Full contact"] as const;
+
+const FOOTBALL_GROUPS = FOOTBALL_FORMATS.map((format) => ({
+  label: format,
+  tiers: FOOTBALL_SUB_TIERS.map((t) => `${format} ${t}`),
+}));
+
+const FOOTBALL_TIERS = FOOTBALL_GROUPS.flatMap((g) => g.tiers);
+
+/** Retired Football tiers mapped forward to the format-prefixed ladder. */
+const LEGACY_TIER_ALIASES: Record<string, string> = {
+  "High School": "Full contact Competitive",
+  College: "Full contact Showcase / Travel",
+  "Semi-Pro": "Full contact Elite",
+};
 
 export const LEVELS_BY_SPORT: Record<Sport, SportScale> = {
   Baseball: { system: "MiLB", tiers: BALL_TIERS, hint: "Highest level you've played." },
@@ -40,8 +64,11 @@ export const LEVELS_BY_SPORT: Record<Sport, SportScale> = {
   },
   Football: {
     system: "Level",
-    tiers: ["Flag Rec", "Flag Competitive", "High School", "College", "Semi-Pro"],
+    tiers: FOOTBALL_TIERS,
+    groups: FOOTBALL_GROUPS,
+    hint: "Pick your format, then your level.",
   },
+
   Soccer: {
     system: "Level",
     tiers: ["Rec", "High School", "Club / Travel", "College", "Semi-Pro", "Pro"],
@@ -72,11 +99,17 @@ export function levelsForSport(sport: Sport): string[] {
   return scaleForSport(sport).tiers;
 }
 
-/** "3.5 NTRP", "Minor AAA", "Advanced" — scale name appended only when numeric. */
+/** "3.5 NTRP", "Minor AAA", "Advanced" — scale name appended only for pure ratings. */
 export function formatSportLevel(level?: SportLevel | null): string | null {
   if (!level?.tier) return null;
-  const numeric = /^[0-9]/.test(level.tier);
+  const numeric = /^[0-9]+(\.[0-9]+)?$/.test(level.tier);
   return numeric && level.system ? `${level.tier} ${level.system}` : level.tier;
+}
+
+/** Maps a retired tier onto its current equivalent for a sport. */
+export function migrateTier(sport: string | null | undefined, tier: string): string {
+  if (sport !== "Football") return tier;
+  return LEGACY_TIER_ALIASES[tier] ?? tier;
 }
 
 /** Reads the `profiles.sport_levels` jsonb map into typed entries. */
@@ -87,10 +120,14 @@ export function parseSportLevels(raw: unknown): Record<string, SportLevel> {
     if (!value || typeof value !== "object") continue;
     const v = value as { system?: unknown; tier?: unknown };
     if (typeof v.tier !== "string" || !v.tier) continue;
-    out[name] = { system: typeof v.system === "string" ? v.system : "", tier: v.tier };
+    out[name] = {
+      system: typeof v.system === "string" ? v.system : "",
+      tier: migrateTier(name, v.tier),
+    };
   }
   return out;
 }
+
 
 /** Builds the jsonb map written to `profiles.sport_levels`. */
 export function serializeSportLevels(
@@ -121,8 +158,10 @@ export function sanitizeSkillForSport(
   skill: string | null | undefined,
 ): string {
   if (!skill) return "";
-  return filterTiersForSport(sport || "").includes(skill) ? skill : "";
+  const migrated = migrateTier(sport, skill);
+  return filterTiersForSport(sport || "").includes(migrated) ? migrated : "";
 }
+
 
 
 /**
@@ -137,8 +176,9 @@ export function resolvePlayerLevel(
   const levels = parseSportLevels(rawSportLevels);
   if (sport && levels[sport]) return levels[sport];
   if (fallbackSkill && fallbackSkill !== "All Levels") {
-    return { system: "", tier: fallbackSkill };
+    return { system: "", tier: migrateTier(sport, fallbackSkill) };
   }
+
   return null;
 }
 
