@@ -99,11 +99,17 @@ export function levelsForSport(sport: Sport): string[] {
   return scaleForSport(sport).tiers;
 }
 
-/** "3.5 NTRP", "Minor AAA", "Advanced" — scale name appended only when numeric. */
+/** "3.5 NTRP", "Minor AAA", "Advanced" — scale name appended only for pure ratings. */
 export function formatSportLevel(level?: SportLevel | null): string | null {
   if (!level?.tier) return null;
-  const numeric = /^[0-9]/.test(level.tier);
+  const numeric = /^[0-9]+(\.[0-9]+)?$/.test(level.tier);
   return numeric && level.system ? `${level.tier} ${level.system}` : level.tier;
+}
+
+/** Maps a retired tier onto its current equivalent for a sport. */
+export function migrateTier(sport: string | null | undefined, tier: string): string {
+  if (sport !== "Football") return tier;
+  return LEGACY_TIER_ALIASES[tier] ?? tier;
 }
 
 /** Reads the `profiles.sport_levels` jsonb map into typed entries. */
@@ -114,10 +120,14 @@ export function parseSportLevels(raw: unknown): Record<string, SportLevel> {
     if (!value || typeof value !== "object") continue;
     const v = value as { system?: unknown; tier?: unknown };
     if (typeof v.tier !== "string" || !v.tier) continue;
-    out[name] = { system: typeof v.system === "string" ? v.system : "", tier: v.tier };
+    out[name] = {
+      system: typeof v.system === "string" ? v.system : "",
+      tier: migrateTier(name, v.tier),
+    };
   }
   return out;
 }
+
 
 /** Builds the jsonb map written to `profiles.sport_levels`. */
 export function serializeSportLevels(
