@@ -820,7 +820,9 @@ function AvailabilityCard({
           </span>
         </div>
         <span className="shrink-0 rounded-full bg-lime/15 px-2 py-0.5 text-[10px] font-bold text-lime">
-          {a.skill_level}
+          {formatSportLevel(
+            resolvePlayerLevel(a.author_sport_levels, a.sports[0], a.skill_level),
+          ) ?? a.skill_level}
         </span>
         <button
           type="button"
@@ -993,6 +995,15 @@ function PostAvailabilityDialog({
   const isEdit = !!initial;
   const [sports, setSports] = useState<string[]>(initial?.sports ?? []);
   const [skill, setSkill] = useState<string>(initial?.skill_level ?? "All Levels");
+  // The primary sport drives the tier list, so Football posts offer
+  // Flag / 7v7 / Full contact levels exactly like the profile does.
+  const primarySport = sports[0] ?? "";
+  const skillOptions = skillOptionsForSport(primarySport);
+  useEffect(() => {
+    if (skill === "All Levels" || !primarySport) return;
+    const kept = sanitizeSkillForSport(primarySport, skill);
+    if (kept !== skill) setSkill(kept || "All Levels");
+  }, [primarySport, skill]);
   const [slots, setSlots] = useState<TimeSlot[]>(() => parseTimeSlots(initial?.time_slots ?? []));
   const { data: busy = [] } = useMyBusyBlocks({ excludeAvailabilityId: initial?.id });
   const [city, setCity] = useState(initial?.city ?? "");
@@ -1071,9 +1082,16 @@ function PostAvailabilityDialog({
             </div>
           </div>
           <div>
-            <Label className="mb-2 block">Skill level</Label>
+            <Label className="mb-2 block">
+              Skill level
+              {primarySport && (
+                <span className="ml-1 text-[11px] font-normal text-muted-foreground">
+                  · {scaleForSport(primarySport as any).system}
+                </span>
+              )}
+            </Label>
             <div className="flex flex-wrap gap-2">
-              {SKILLS.map((s) => (
+              {skillOptions.map((s) => (
                 <Chip key={s} active={skill === s} onClick={() => setSkill(s)}>
                   {s}
                 </Chip>
@@ -1549,7 +1567,9 @@ function AvailabilityDetailDialog({
               <div className="flex items-center justify-between gap-2">
                 <p className="font-semibold truncate">{a.author_name}</p>
                 <span className="shrink-0 rounded-full bg-lime/15 px-2 py-0.5 text-[10px] font-bold text-lime">
-                  {a.skill_level}
+                  {formatSportLevel(
+                    resolvePlayerLevel(a.author_sport_levels, a.sports[0], a.skill_level),
+                  ) ?? a.skill_level}
                 </span>
               </div>
               <div className="mt-1 flex flex-wrap gap-1">
