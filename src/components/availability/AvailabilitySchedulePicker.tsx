@@ -13,6 +13,7 @@ import {
   TIME_PRESETS,
   WEEKDAY_LABELS,
   fmtShortDate,
+  fromDateKey,
   isDateSlot,
   normalizeSlots,
   summarizeSlots,
@@ -200,6 +201,7 @@ export function AvailabilitySchedulePicker({
               const inMonth = d.getMonth() === monthStart.getMonth();
               const past = d < today;
               const selected = dateSlots.some((s) => s.date === key);
+              const busyHere = (busyByDate.get(key) ?? []).length > 0;
               return (
                 <button
                   key={key}
@@ -208,7 +210,8 @@ export function AvailabilitySchedulePicker({
                   aria-pressed={selected}
                   aria-label={fmtShortDate(key)}
                   onClick={() => toggleDate(key)}
-                  className={`aspect-square rounded-xl border text-xs font-semibold transition-all ${
+                  title={busyHere ? "You already have something booked this day" : undefined}
+                  className={`relative aspect-square rounded-xl border text-xs font-semibold transition-all ${
                     past
                       ? "cursor-not-allowed border-border/30 text-muted-foreground/40"
                       : selected
@@ -217,6 +220,12 @@ export function AvailabilitySchedulePicker({
                   } ${!inMonth && !past ? "opacity-50" : ""}`}
                 >
                   {d.getDate()}
+                  {busyHere && !past && (
+                    <span
+                      aria-hidden
+                      className="absolute bottom-1 left-1/2 h-1 w-1 -translate-x-1/2 rounded-full bg-amber-400"
+                    />
+                  )}
                 </button>
               );
             })}
@@ -226,6 +235,7 @@ export function AvailabilitySchedulePicker({
         <div className="flex flex-wrap gap-2">
           {WEEKDAY_LABELS.map((label, w) => {
             const on = weekSlots.some((s) => s.weekday === w);
+            const busyHere = busy.some((b) => fromDateKey(b.date).getDay() === w);
             return (
               <button
                 key={label}
@@ -239,6 +249,7 @@ export function AvailabilitySchedulePicker({
                 }`}
               >
                 {label}
+                {busyHere && <span className="ml-1 text-amber-400">•</span>}
               </button>
             );
           })}
@@ -264,10 +275,16 @@ export function AvailabilitySchedulePicker({
           </div>
 
           <ul className="space-y-1.5">
-            {rows.map(({ slot, index }) => (
+            {rows.map(({ slot, index }) => {
+              const conflict = conflictBySlot.get(index);
+              const selfOverlap = selfOverlaps.has(index);
+              const flagged = !!conflict || selfOverlap;
+              return (
               <li
                 key={isDateSlot(slot) ? slot.date : `w${slot.weekday}`}
-                className="flex flex-wrap items-center gap-2 rounded-2xl border border-border bg-surface px-3 py-2"
+                className={`flex flex-wrap items-center gap-2 rounded-2xl border px-3 py-2 ${
+                  flagged ? "border-amber-500/60 bg-amber-500/10" : "border-border bg-surface"
+                }`}
               >
                 <span className="min-w-[86px] flex-1 text-xs font-bold">
                   {isDateSlot(slot) ? fmtShortDate(slot.date) : WEEKDAY_LABELS[slot.weekday]}
@@ -306,12 +323,39 @@ export function AvailabilitySchedulePicker({
                 >
                   Apply to all
                 </button>
+                {flagged && (
+                  <p className="flex w-full items-start gap-1.5 text-[11px] font-medium text-amber-300">
+                    <AlertTriangle className="mt-0.5 h-3 w-3 shrink-0" />
+                    <span>
+                      {conflict
+                        ? `${CONFLICT_KIND_LABEL[conflict.blocks[0].kind]} — ${describeConflict(conflict)}`
+                        : "Overlaps another window you picked."}
+                    </span>
+                  </p>
+                )}
               </li>
-            ))}
+              );
+            })}
           </ul>
         </>
       )}
 
+      {(conflicts.length > 0 || selfOverlaps.size > 0) && (
+        <div
+          role="status"
+          className="flex items-start gap-2 rounded-2xl border border-amber-500/60 bg-amber-500/10 px-3 py-2 text-[11px] text-amber-200"
+        >
+          <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+          <span>
+            <span className="font-bold">
+              {conflicts.length + (selfOverlaps.size > 0 ? 1 : 0)} scheduling conflict
+              {conflicts.length + (selfOverlaps.size > 0 ? 1 : 0) === 1 ? "" : "s"}
+            </span>{" "}
+            — these windows clash with times you already joined, host, or marked
+            unavailable. You can still post; players will just see overlapping times.
+          </span>
+        </div>
+      )}
       <div className="flex items-center justify-between gap-2 rounded-2xl border border-border bg-surface/60 px-3 py-2 text-[11px] text-muted-foreground">
         <span>
           {value.length === 0
