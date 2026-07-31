@@ -34,6 +34,17 @@ import {
   type PlayerAvailability,
   type ExistingRequestSummary,
 } from "@/lib/availability";
+import { AvailabilitySchedulePicker } from "@/components/availability/AvailabilitySchedulePicker";
+import {
+  parseTimeSlots,
+  summarizeSlots,
+  nextOccurrence,
+  slotsHitRange,
+  fmtShortDate,
+  fmt12,
+  formatAvailabilityWindow,
+  type TimeSlot,
+} from "@/lib/availability-timeslots";
 import { RequestStatusPanel } from "@/components/RequestStatusPanel";
 import { getOrCreateDirectConversation } from "@/lib/messages";
 import { useHostedGames } from "@/lib/hosted-games-store";
@@ -92,7 +103,6 @@ export const Route = createFileRoute("/_tabs/players")({
 });
 
 const SKILLS = ["All Levels", "Beginner", "Intermediate", "Advanced"] as const;
-const WEEKDAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
 
 function PlayersPage() {
@@ -240,6 +250,12 @@ function PlayersPage() {
       const e = end ?? to;
       return s <= to && e >= from;
     };
+    // Prefer explicit time slots when present; fall back to the legacy range.
+    const hits = (a: AvailabilityWithAuthor, from: string, to: string) => {
+      const slots = parseTimeSlots(a.time_slots ?? []);
+      if (slots.length > 0) return slotsHitRange(slots, from, to);
+      return overlaps(a.starts_on, a.ends_on, from, to);
+    };
     const hasWeekendDay = (days: string[]) =>
       days.some((d) => /sat|sun/i.test(d));
     return list.filter((a) => {
@@ -250,11 +266,11 @@ function PlayersPage() {
       if (maxDistance > 0 && kmToMi(a.travel_radius_km) > maxDistance) return false;
       if (when !== "any") {
         if (when === "today") {
-          if (!overlaps(a.starts_on, a.ends_on, todayISO, todayISO)) return false;
+          if (!hits(a, todayISO, todayISO)) return false;
         } else if (when === "week") {
-          if (!overlaps(a.starts_on, a.ends_on, todayISO, weekEnd)) return false;
+          if (!hits(a, todayISO, weekEnd)) return false;
         } else if (when === "weekend") {
-          const dateHit = overlaps(a.starts_on, a.ends_on, satISO, sunISO);
+          const dateHit = hits(a, satISO, sunISO);
           const recurHit = hasWeekendDay(a.recurring_days ?? []);
           if (!dateHit && !recurHit) return false;
         }
@@ -873,17 +889,7 @@ function AvailabilityCard({
   );
 }
 
-function formatWindow(a: PlayerAvailability): string {
-  const parts: string[] = [];
-  if (a.starts_on || a.ends_on) {
-    const s = a.starts_on ? fmtDate(a.starts_on) : "";
-    const e = a.ends_on ? fmtDate(a.ends_on) : "";
-    if (s && e) parts.push(s === e ? s : `${s} – ${e}`);
-    else parts.push(s || e);
-  }
-  if (a.recurring_days.length) parts.push(a.recurring_days.join(" · "));
-  return parts.join(" · ");
-}
+const formatWindow = (a: PlayerAvailability): string => formatAvailabilityWindow(a);
 
 function fmtDate(iso: string) {
   const d = new Date(iso + "T00:00:00");
@@ -902,9 +908,7 @@ function PostAvailabilityDialog({
   // Per-sport tiers, mirroring the profile editor. Keyed by sport name.
   const [levels, setLevels] = useState<Record<string, string>>({});
 
-  const [starts, setStarts] = useState("");
-  const [ends, setEnds] = useState("");
-  const [days, setDays] = useState<string[]>([]);
+  const [slots, setSlots] = useState<TimeSlot[]>([]);
   const [city, setCity] = useState("");
   const unit = useDistanceUnit();
   const [radius, setRadius] = useState(25); // in the viewer's unit
@@ -926,9 +930,7 @@ function PostAvailabilityDialog({
         skill_level: (sports.length ? levels[sports[0]] : "") || "All Levels",
 
         // datetime-local gives "YYYY-MM-DDTHH:mm"; DB columns are DATE → store date portion only.
-        starts_on: starts ? starts.slice(0, 10) : null,
-        ends_on: ends ? ends.slice(0, 10) : null,
-        recurring_days: days,
+        time_slots: slots,
         city,
         travel_radius_km: unit === "km" ? radius : miToKm(radius),
         note,
@@ -1011,42 +1013,9 @@ function PostAvailabilityDialog({
               );
             })
           )}
-          <div className="grid grid-cols-2 gap-2">
-            <div>
-              <Label htmlFor="starts">From</Label>
-
-              <input
-                id="starts"
-                type="datetime-local"
-                value={starts}
-                onChange={(e) => setStarts(e.target.value)}
-                className="w-full rounded-2xl border border-border bg-surface px-4 py-3 text-sm outline-none focus:border-lime [color-scheme:dark]"
-              />
-            </div>
-            <div>
-              <Label htmlFor="ends">Until</Label>
-              <input
-                id="ends"
-                type="datetime-local"
-                value={ends}
-                onChange={(e) => setEnds(e.target.value)}
-                className="w-full rounded-2xl border border-border bg-surface px-4 py-3 text-sm outline-none focus:border-lime [color-scheme:dark]"
-              />
-            </div>
-          </div>
           <div>
-            <Label className="mb-2 block">Recurring days (optional)</Label>
-            <div className="flex flex-wrap gap-2">
-              {WEEKDAYS.map((d) => (
-                <Chip
-                  key={d}
-                  active={days.includes(d)}
-                  onClick={() => setDays((arr) => toggle(arr, d))}
-                >
-                  {d}
-                </Chip>
-              ))}
-            </div>
+            <Label className="mb-2 block">When are you free?</Label>
+            <AvailabilitySchedulePicker value={slots} onChange={setSlots} />
           </div>
           <div className="grid grid-cols-[1fr_110px] gap-2">
             <div>

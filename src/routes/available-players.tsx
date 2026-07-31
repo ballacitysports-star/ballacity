@@ -39,6 +39,12 @@ import {
   updateAvailability,
   type PlayerAvailability,
 } from "@/lib/availability";
+import { AvailabilitySchedulePicker } from "@/components/availability/AvailabilitySchedulePicker";
+import {
+  formatAvailabilityWindow,
+  parseTimeSlots,
+  type TimeSlot,
+} from "@/lib/availability-timeslots";
 import { supabase } from "@/integrations/supabase/client";
 import { getOrCreateDirectConversation } from "@/lib/messages";
 import {
@@ -79,7 +85,6 @@ export const Route = createFileRoute("/available-players")({
 });
 
 const SKILLS = ["All Levels", "Beginner", "Intermediate", "Advanced"] as const;
-const WEEKDAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
 type Tab = "browse" | "mine";
 
@@ -901,17 +906,7 @@ function AvailabilityCardSkeleton() {
   );
 }
 
-function formatWindow(a: PlayerAvailability): string {
-  const parts: string[] = [];
-  if (a.starts_on || a.ends_on) {
-    const s = a.starts_on ? fmtDate(a.starts_on) : "";
-    const e = a.ends_on ? fmtDate(a.ends_on) : "";
-    if (s && e) parts.push(s === e ? s : `${s} – ${e}`);
-    else parts.push(s || e);
-  }
-  if (a.recurring_days.length) parts.push(a.recurring_days.join(" · "));
-  return parts.join(" · ");
-}
+const formatWindow = (a: PlayerAvailability): string => formatAvailabilityWindow(a);
 
 function fmtDate(iso: string) {
   const d = new Date(iso + "T00:00:00");
@@ -930,9 +925,7 @@ function PostAvailabilityDialog({
   const isEdit = !!initial;
   const [sports, setSports] = useState<string[]>(initial?.sports ?? []);
   const [skill, setSkill] = useState<string>(initial?.skill_level ?? "All Levels");
-  const [starts, setStarts] = useState(initial?.starts_on ?? "");
-  const [ends, setEnds] = useState(initial?.ends_on ?? "");
-  const [days, setDays] = useState<string[]>(initial?.recurring_days ?? []);
+  const [slots, setSlots] = useState<TimeSlot[]>(() => parseTimeSlots(initial?.time_slots ?? []));
   const [city, setCity] = useState(initial?.city ?? "");
   const unit = useDistanceUnit();
   const [radius, setRadius] = useState(() =>
@@ -954,9 +947,7 @@ function PostAvailabilityDialog({
       const payload = {
         sports,
         skill_level: skill,
-        starts_on: starts || null,
-        ends_on: ends || null,
-        recurring_days: days,
+        time_slots: slots,
         city,
         travel_radius_km: unit === "km" ? radius : miToKm(radius),
         note,
@@ -1006,34 +997,9 @@ function PostAvailabilityDialog({
               ))}
             </div>
           </div>
-          <div className="grid grid-cols-2 gap-2">
-            <div>
-              <Label htmlFor="starts">From</Label>
-              <Input
-                id="starts"
-                type="date"
-                value={starts}
-                onChange={(e) => setStarts(e.target.value)}
-              />
-            </div>
-            <div>
-              <Label htmlFor="ends">Until</Label>
-              <Input id="ends" type="date" value={ends} onChange={(e) => setEnds(e.target.value)} />
-            </div>
-          </div>
           <div>
-            <Label className="mb-2 block">Recurring days (optional)</Label>
-            <div className="flex flex-wrap gap-2">
-              {WEEKDAYS.map((d) => (
-                <Chip
-                  key={d}
-                  active={days.includes(d)}
-                  onClick={() => setDays((arr) => toggle(arr, d))}
-                >
-                  {d}
-                </Chip>
-              ))}
-            </div>
+            <Label className="mb-2 block">When are you free?</Label>
+            <AvailabilitySchedulePicker value={slots} onChange={setSlots} />
           </div>
           <div className="grid grid-cols-[1fr_110px] gap-2">
             <div>

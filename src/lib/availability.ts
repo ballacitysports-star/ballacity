@@ -1,4 +1,10 @@
 import { supabase } from "@/integrations/supabase/client";
+import {
+  deriveLegacyFields,
+  normalizeSlots,
+  parseTimeSlots,
+  type TimeSlot,
+} from "./availability-timeslots";
 
 export type AvailabilityStatus = "open" | "closed";
 export type ContactRequestStatus = "pending" | "accepted" | "declined" | "withdrawn";
@@ -15,6 +21,9 @@ export type PlayerAvailability = {
   travel_radius_km: number;
   note: string | null;
   status: AvailabilityStatus;
+  /** Individual dates and/or weekly windows with times. Superset of the legacy columns. */
+  time_slots: TimeSlot[];
+  timezone: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -139,6 +148,26 @@ export async function listMyAvailabilities(): Promise<PlayerAvailability[]> {
   return (data ?? []) as unknown as PlayerAvailability[];
 }
 
+/**
+ * Normalize `time_slots` and keep the legacy date/weekday columns in sync so
+ * existing readers and SQL overlap filters keep working.
+ */
+function slotFields(input: Partial<PlayerAvailability>) {
+  const slots = normalizeSlots(parseTimeSlots(input.time_slots ?? []));
+  const legacy = deriveLegacyFields(slots, {
+    starts_on: input.starts_on ?? null,
+    ends_on: input.ends_on ?? null,
+  });
+  return {
+    time_slots: slots,
+    starts_on: legacy.starts_on,
+    ends_on: legacy.ends_on,
+    recurring_days: slots.length > 0 ? legacy.recurring_days : (input.recurring_days ?? []),
+    timezone:
+      input.timezone ?? Intl.DateTimeFormat().resolvedOptions().timeZone ?? null,
+  };
+}
+
 export async function createAvailability(input: Partial<PlayerAvailability>) {
   const { data: u } = await supabase.auth.getUser();
   if (!u.user) throw new Error("Sign in to post availability.");
@@ -146,9 +175,7 @@ export async function createAvailability(input: Partial<PlayerAvailability>) {
     user_id: u.user.id,
     sports: input.sports ?? [],
     skill_level: input.skill_level ?? "All Levels",
-    starts_on: input.starts_on ?? null,
-    ends_on: input.ends_on ?? null,
-    recurring_days: input.recurring_days ?? [],
+    ...slotFields(input),
     city: input.city?.trim() || null,
     travel_radius_km: input.travel_radius_km ?? 25,
     note: input.note?.slice(0, 500) ?? null,
@@ -164,9 +191,10 @@ export async function createAvailability(input: Partial<PlayerAvailability>) {
 }
 
 export async function updateAvailability(id: string, patch: Partial<PlayerAvailability>) {
+  const body = patch.time_slots !== undefined ? { ...patch, ...slotFields(patch) } : patch;
   const { error } = await supabase
     .from("player_availabilities" as any)
-    .update(patch as any)
+    .update(body as any)
     .eq("id", id);
   if (error) throw error;
 

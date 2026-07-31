@@ -4,6 +4,7 @@ import { motion } from "framer-motion";
 import { ArrowLeft, MessageCircle, Loader2, Calendar, MapPin, Shield, Trophy, UserPlus, UserCheck, Building2, ShieldCheck } from "lucide-react";
 import { useFollow } from "@/lib/follows";
 import { toast } from "sonner";
+import { formatAvailabilityWindow } from "@/lib/availability-timeslots";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
 import { getOrCreateDirectConversation } from "@/lib/messages";
@@ -505,17 +506,7 @@ function PlayerCard({ a }: { a: PlayerAvailability }) {
   );
 }
 
-function formatWindow(a: PlayerAvailability): string {
-  const parts: string[] = [];
-  if (a.starts_on || a.ends_on) {
-    const s = a.starts_on ? fmtDate(a.starts_on) : "";
-    const e = a.ends_on ? fmtDate(a.ends_on) : "";
-    if (s && e) parts.push(s === e ? s : `${s} – ${e}`);
-    else parts.push(s || e);
-  }
-  if (a.recurring_days.length) parts.push(a.recurring_days.join(" · "));
-  return parts.join(" · ");
-}
+const formatWindow = (a: PlayerAvailability): string => formatAvailabilityWindow(a);
 
 function fmtDate(iso: string) {
   const d = new Date(iso + "T00:00:00");

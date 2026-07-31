@@ -1,32 +1,37 @@
-## Goal
+## Problem
 
-Make skill level on the Players tab read exactly like it does on a profile — per-sport tiers (Minor AAA, 3.5 NTRP, AAU / Travel) instead of generic Beginner / Intermediate / Advanced — across display, filtering, and posting availability. Profile levels win over the level stored on an old post.
+Today's "when are you free" input is thin and partly lossy:
 
-## What changes
+- It offers one start date and one end date plus weekday chips.
+- The two inputs are `datetime-local`, but the times you type are **thrown away** — only the date part is saved (`starts_on`/`ends_on` are date columns).
+- There's no way to say "Sat morning and Tue evening" — only a blanket range.
 
-**1. Player levels come along with availability**
-- Extend the availability fetch so each row also carries the author's `sport_levels` from their profile (same query that already pulls name/avatar/age — just add the column).
-- Add a small helper that, given a post and a sport, resolves the level to show: profile tier for that sport first, then the post's own generic level as fallback.
+## What we'll build
 
-**2. Player cards (Players tab list)**
-- Replace the single lime "Intermediate" pill with per-sport level badges rendered the same way as the profile page (`formatSportLevel`), one per sport chip that has a level.
-- Sports without a level on the profile keep just the sport chip — no fake level.
+Two modes in the availability composer, switched by a segmented control:
 
-**3. Nearby players panel**
-- Same resolution helper, so the card subtitle shows the profile tier for the matched sport instead of the generic label.
+**1. Specific dates (new default)**
+- A month calendar where you tap to select any number of individual dates (multi-select, tap again to deselect, forward-looking only).
+- Selected dates appear as a list below. Each row gets its own time window (start–end) via a compact time picker.
+- Quick actions: "Apply this time to all dates", plus presets (Morning 6–11, Afternoon 12–5, Evening 5–10, All day).
+- Timezone is captured from the device so viewers see it in their own time (same helpers the trainer calendar already uses).
 
-**4. Skill filter**
-- The skill chips become sport-aware: when a sport is selected, chips list that sport's real tiers (from `LEVELS_BY_SPORT`); with no sport selected, show the generic tiers so the filter still works across sports.
-- Matching uses the resolved level (profile-first), so filtering by "Minor AAA" finds players whose profile says so even if their post says "Advanced".
-- Changing the sport clears an incompatible skill selection so the URL state never holds a tier that doesn't exist for the sport.
+**2. Recurring weekly (existing behavior, cleaned up)**
+- Weekday chips + a date range for how long the pattern runs.
+- Each selected weekday can carry its own time window, with the same "apply to all" shortcut.
 
-**5. Post availability dialog**
-- Skill picker becomes per-sport: for each sport selected in the dialog, show that sport's tier chips, prefilled from the poster's own profile levels.
-- Saved back into the existing `skill_level` text column as the primary sport's tier, so nothing about the table changes.
+Both modes share one summary line at the bottom ("3 dates · Sat 8–11 AM, Sun 6–9 PM") so it's obvious what will be posted before submitting.
+
+## Where it shows up
+
+- Player cards and the Nearby Players panel show the next upcoming date + time instead of a raw date range.
+- The Players tab time filters (Today / This week / Weekend / Anytime) match against the concrete dates and times, so results are accurate rather than range-approximate.
+- The availability detail and contact-request screens show the full list of dates and times.
 
 ## Technical notes
 
-- No database migration. `profiles.sport_levels` already exists and `player_availabilities.skill_level` stays a text column.
-- Shared wording continues to come from `src/lib/sport-levels.ts` (`scaleForSport`, `levelsForSport`, `formatSportLevel`) — no duplicated tier lists.
-- Files touched: `src/lib/availability.ts`, `src/lib/sport-levels.ts` (add resolver), `src/routes/_tabs.players.tsx`, `src/components/NearbyPlayersPanel.tsx`.
-- Existing posts with legacy values ("All Levels", "Beginner") keep rendering fine through the fallback path.
+- Add a `time_slots` JSONB column to `player_availabilities`: an array of `{ date: "YYYY-MM-DD", start: "HH:MM", end: "HH:MM" }` for specific dates, plus `{ weekday: 0-6, start, end }` entries for recurring mode, and a `timezone` text column. Existing `starts_on` / `ends_on` / `recurring_days` stay populated (derived from the slots) so current queries, filters, and older posts keep working.
+- New helper module `src/lib/availability-timeslots.ts`: normalize/validate slots, derive the legacy range and weekday list, compute the next upcoming slot, and format summaries. Unit-tested.
+- New component `src/components/availability/AvailabilitySchedulePicker.tsx` holding the calendar, slot rows, and presets; the composer dialog in `src/routes/_tabs.players.tsx` and the availability screens consume it.
+- Filtering: extend `listOpenAvailabilities` to keep the existing coarse SQL window filter, then refine client-side against `time_slots` so "Today"/"Weekend" are exact.
+- Validation: end after start, max ~20 dates per post, dates must be in the future, overlapping same-day windows merged.
