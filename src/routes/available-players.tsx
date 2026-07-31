@@ -153,7 +153,7 @@ function AvailablePlayersPage() {
         if (cancelled) return;
         if (!row) {
           toast.error("That availability post is no longer available.");
-          navigate({ to: "/available-players", search: {}, replace: true });
+          navigate({ to: "/available-players", search: { post: undefined }, replace: true });
           return;
         }
         setDetailPost(row);
@@ -585,16 +585,16 @@ function AvailablePlayersPage() {
             }
             setContactFor({ availability: detailPost, mode });
             setDetailPost(null);
-            navigate({ to: "/available-players", search: {}, replace: true });
+            navigate({ to: "/available-players", search: { post: undefined }, replace: true });
           }}
           onEdit={() => {
             setEditingPost(detailPost);
             setDetailPost(null);
-            navigate({ to: "/available-players", search: {}, replace: true });
+            navigate({ to: "/available-players", search: { post: undefined }, replace: true });
           }}
           onClose={() => {
             setDetailPost(null);
-            navigate({ to: "/available-players", search: {}, replace: true });
+            navigate({ to: "/available-players", search: { post: undefined }, replace: true });
           }}
         />
       )}
