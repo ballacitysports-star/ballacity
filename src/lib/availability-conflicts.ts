@@ -100,7 +100,7 @@ export async function listMyBusyBlocks(
   if (joinedIds.length > 0) {
     const { data: joinedGames } = await supabase
       .from("hosted_games")
-      .select("id, title, date, duration")
+      .select("id, title, date, duration, host_id")
       .in("id", joinedIds)
       .gte("date", fromIso);
     for (const g of joinedGames ?? []) {
