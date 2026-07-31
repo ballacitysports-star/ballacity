@@ -37,11 +37,20 @@ export function distancePresets(
   unit: DistanceUnit,
   steps: number[] = [5, 10, 25, 50, 100],
 ): { mi: number; label: string }[] {
-  return steps.map((v) => ({
-    mi: unit === "km" ? v / KM_PER_MI : v,
-    label: `${v} ${unit}`,
-  }));
+  const presets = steps
+    .filter((v) => (unit === "km" ? v / KM_PER_MI : v) <= MAX_DISTANCE_MI)
+    .map((v) => ({
+      mi: unit === "km" ? v / KM_PER_MI : v,
+      label: `${v} ${unit}`,
+    }));
+  // Top end: one shared cap so no control can ask for more than 12,500 mi.
+  presets.push({
+    mi: MAX_DISTANCE_MI,
+    label: `${maxDistanceInUnit(unit).toLocaleString("en-US")} ${unit} (anywhere)`,
+  });
+  return presets;
 }
+
 
 /** Render a kilometer-based value in the viewer's unit. */
 export function formatDistanceFromKm(
