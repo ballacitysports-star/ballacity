@@ -163,12 +163,18 @@ function OnboardingWizard({ type }: { type: AccountType }) {
     });
     setSports((profile.sports ?? []) as SportEntry[]);
     setLinks(profile.links ?? []);
-    try {
-      const r = Number(localStorage.getItem("openrun.default_radius_km"));
-      if (Number.isFinite(r) && r > 0) setRadius(r);
-    } catch {
-      /* ignore */
+    // Saved profile radius wins over the local default from a previous device.
+    if (profile.searchRadiusMi != null) {
+      setRadius(miToKm(profile.searchRadiusMi));
+    } else {
+      try {
+        const r = Number(localStorage.getItem("openrun.default_radius_km"));
+        if (Number.isFinite(r) && r > 0) setRadius(r);
+      } catch {
+        /* ignore */
+      }
     }
+
     setPrefilled(true);
   }, [profile, profileLoaded, prefilled]);
 
