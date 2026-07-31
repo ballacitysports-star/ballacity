@@ -56,3 +56,23 @@ describe("levelsForSport", () => {
     expect(levelsForSport("Tennis" as any)).toContain("3.5");
   });
 });
+
+describe("sanitizeSkillForSport", () => {
+  it("keeps a tier that belongs to the sport's scale", () => {
+    expect(sanitizeSkillForSport("Baseball", levelsForSport("Baseball" as never)[1])).toBe(
+      levelsForSport("Baseball" as never)[1],
+    );
+  });
+  it("drops a tier from a different sport's scale", () => {
+    const tennisTier = levelsForSport("Tennis" as never)[0];
+    expect(sanitizeSkillForSport("Baseball", tennisTier)).toBe("");
+  });
+  it("allows legacy generic tiers when no sport is picked", () => {
+    expect(sanitizeSkillForSport("", "Intermediate")).toBe("Intermediate");
+    expect(sanitizeSkillForSport("", levelsForSport("Baseball" as never)[0])).toBe("");
+  });
+  it("passes empty values through", () => {
+    expect(sanitizeSkillForSport("Baseball", "")).toBe("");
+    expect(sanitizeSkillForSport(null, undefined)).toBe("");
+  });
+});
