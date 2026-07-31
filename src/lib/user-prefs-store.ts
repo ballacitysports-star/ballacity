@@ -41,6 +41,8 @@ export type ProfileOverrides = {
   city?: string;
   birthday?: string; // ISO date (YYYY-MM-DD)
   graduatingClass?: number;
+  /** Saved search radius in miles (location preference). */
+  searchRadiusMi?: number;
   sports?: { name: Sport; positions?: string[]; level?: SportLevel | null }[];
   badges?: string[];
   links?: ProfileLink[];
@@ -56,6 +58,8 @@ export type MyProfile = {
   city: string;
   birthday?: string;
   graduatingClass?: number;
+  /** Saved search radius in miles (location preference). */
+  searchRadiusMi?: number;
   stats: typeof ME.stats;
   sports: { name: Sport; positions?: string[]; level?: SportLevel | null }[];
   badges: string[];
@@ -167,7 +171,7 @@ export function normalizeFeedPrefs(raw: unknown): FeedPrefs {
     preferredSports: Array.isArray(parsed.preferredSports) ? parsed.preferredSports : [],
     maxDistanceMi:
       typeof parsed.maxDistanceMi === "number" && parsed.maxDistanceMi > 0
-        ? parsed.maxDistanceMi
+        ? clampDistanceMi(parsed.maxDistanceMi)
         : null,
     distanceUnit:
       parsed.distanceUnit === "km" ? "km" : parsed.distanceUnit === "mi" ? "mi" : "auto",
@@ -320,6 +324,7 @@ export function useMyProfileState(currentUser?: User | null): {
     cover_url?: string | null;
     birthday?: string | null;
     graduating_class?: number | null;
+    search_radius_mi?: number | null;
     links?: unknown;
     sport?: string | null;
     sport_levels?: unknown;
@@ -343,7 +348,7 @@ export function useMyProfileState(currentUser?: User | null): {
     supabase
       .from("profiles")
       .select(
-        "display_name, username, avatar_initials, bio, city, avatar_url, cover_url, graduating_class, links, sport, sport_levels",
+        "display_name, username, avatar_initials, bio, city, avatar_url, cover_url, graduating_class, search_radius_mi, links, sport, sport_levels",
       )
 
       .eq("id", user.id)
@@ -390,6 +395,9 @@ export function useMyProfileState(currentUser?: User | null): {
     city: overrides.city ?? dbProfile?.city ?? base.city,
     birthday: overrides.birthday ?? dbProfile?.birthday ?? undefined,
     graduatingClass: overrides.graduatingClass ?? dbProfile?.graduating_class ?? undefined,
+    searchRadiusMi:
+      clampDistanceMi(overrides.searchRadiusMi ?? dbProfile?.search_radius_mi ?? undefined) ??
+      undefined,
     stats: base.stats,
     // Per-sport levels resolved above (local overrides first, then the saved row).
     sports,

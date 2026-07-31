@@ -1,5 +1,6 @@
 import type { SportEntry } from "@/components/profile/ProfileSportsFields";
 import { serializeSportLevels } from "@/lib/sport-levels";
+import { clampDistanceMi } from "@/lib/distance";
 
 
 export type ProfileLink = { url: string; label?: string; [k: string]: unknown };
@@ -15,6 +16,8 @@ export type ProfilePayloadInput = {
   coverUrl?: string;
   birthday?: string;
   graduatingClass?: number;
+  /** Location preference: saved search radius in miles. */
+  searchRadiusMi?: number | null;
   sports: SportEntry[];
   links?: ProfileLink[];
 };
@@ -36,6 +39,7 @@ export function buildProfileRow(input: ProfilePayloadInput) {
     cover_url: input.coverUrl ?? null,
     birthday: input.birthday ?? null,
     graduating_class: input.graduatingClass ?? null,
+    search_radius_mi: clampDistanceMi(input.searchRadiusMi ?? null),
     sport: primary ?? null,
     sport_levels: serializeSportLevels(input.sports),
 
