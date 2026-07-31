@@ -1011,8 +1011,10 @@ function PostAvailabilityDialog({
               );
             })
           )}
-
+          <div className="grid grid-cols-2 gap-2">
+            <div>
               <Label htmlFor="starts">From</Label>
+
               <input
                 id="starts"
                 type="datetime-local"
