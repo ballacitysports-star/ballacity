@@ -388,12 +388,15 @@ function OnboardingWizard({ type }: { type: AccountType }) {
 
 
   const autosave = useAutosave({
-    value: { basics, sports, radius },
-    enabled: !!user,
+    value: { basics, sports, links, radius },
+    // Only after prefill so the debounce can't write placeholder values back
+    // over the saved profile row.
+    enabled: !!user && prefilled,
     validate: () => {
       if (!basics.name.trim()) return "name is required";
       const err = validateBirthday(basics.birthday);
       if (err) return err.toLowerCase();
+      if (links.some((l) => validateProfileUrl(l.url) !== null)) return "fix your profile links";
       return null;
     },
     save: async () => {
@@ -406,10 +409,11 @@ function OnboardingWizard({ type }: { type: AccountType }) {
 
   const onNext = async () => {
     // Save once the profile steps are complete (before location/next-steps handoff).
-    if (step === 2) {
+    if (step === locationStep) {
       const ok = await save();
       if (!ok) return;
     }
+
     if (isLast) {
       if (nextCfg) nav({ to: nextCfg.goto });
       else nav({ to: "/feed" });
