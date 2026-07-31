@@ -40,6 +40,7 @@ import {
   type PlayerAvailability,
 } from "@/lib/availability";
 import { AvailabilitySchedulePicker } from "@/components/availability/AvailabilitySchedulePicker";
+import { useMyBusyBlocks } from "@/lib/availability-conflicts";
 import {
   formatAvailabilityWindow,
   parseTimeSlots,
@@ -926,6 +927,7 @@ function PostAvailabilityDialog({
   const [sports, setSports] = useState<string[]>(initial?.sports ?? []);
   const [skill, setSkill] = useState<string>(initial?.skill_level ?? "All Levels");
   const [slots, setSlots] = useState<TimeSlot[]>(() => parseTimeSlots(initial?.time_slots ?? []));
+  const { data: busy = [] } = useMyBusyBlocks({ excludeAvailabilityId: initial?.id });
   const [city, setCity] = useState(initial?.city ?? "");
   const unit = useDistanceUnit();
   const [radius, setRadius] = useState(() =>
@@ -999,7 +1001,7 @@ function PostAvailabilityDialog({
           </div>
           <div>
             <Label className="mb-2 block">When are you free?</Label>
-            <AvailabilitySchedulePicker value={slots} onChange={setSlots} />
+            <AvailabilitySchedulePicker value={slots} onChange={setSlots} busy={busy} />
           </div>
           <div className="grid grid-cols-[1fr_110px] gap-2">
             <div>
