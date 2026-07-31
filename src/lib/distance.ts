@@ -5,6 +5,24 @@ import type { DistanceUnit } from "./measurement-system";
 
 const KM_PER_MI = 1.609344;
 
+/**
+ * Single shared ceiling for every distance/radius control in the app
+ * (~half the earth's circumference, i.e. effectively "anywhere").
+ */
+export const MAX_DISTANCE_MI = 12500;
+
+/** The cap expressed in the viewer's unit, rounded to a whole number. */
+export function maxDistanceInUnit(unit: DistanceUnit): number {
+  return unit === "km" ? Math.round(MAX_DISTANCE_MI * KM_PER_MI) : MAX_DISTANCE_MI;
+}
+
+/** Clamp a mile value into 1…MAX_DISTANCE_MI (null passes through). */
+export function clampDistanceMi<T extends number | null | undefined>(value: T): T {
+  if (value == null || Number.isNaN(value)) return value;
+  return Math.min(MAX_DISTANCE_MI, Math.max(1, value as number)) as T;
+}
+
+
 export function miToKm(mi: number): number {
   return Math.round(mi * KM_PER_MI);
 }
