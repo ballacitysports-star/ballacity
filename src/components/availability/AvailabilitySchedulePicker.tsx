@@ -4,9 +4,7 @@ import {
   MAX_SLOTS,
   TIME_PRESETS,
   WEEKDAY_LABELS,
-  fmt12,
   fmtShortDate,
-  fromDateKey,
   isDateSlot,
   normalizeSlots,
   summarizeSlots,
@@ -297,8 +295,6 @@ export function AvailabilitySchedulePicker({
           </button>
         )}
       </div>
-      <p className="sr-only">{value.map((s) => fmt12(s.start)).join(", ")}</p>
-      <p className="hidden">{fromDateKey("2026-01-01").getFullYear()}</p>
     </div>
   );
 }
