@@ -1136,6 +1136,7 @@ export type Database = {
           graduating_class: number | null
           id: string
           links: Json
+          search_radius_mi: number | null
           sport: string | null
           sport_levels: Json
           updated_at: string
@@ -1154,6 +1155,7 @@ export type Database = {
           graduating_class?: number | null
           id: string
           links?: Json
+          search_radius_mi?: number | null
           sport?: string | null
           sport_levels?: Json
           updated_at?: string
@@ -1172,6 +1174,7 @@ export type Database = {
           graduating_class?: number | null
           id?: string
           links?: Json
+          search_radius_mi?: number | null
           sport?: string | null
           sport_levels?: Json
           updated_at?: string

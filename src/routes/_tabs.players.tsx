@@ -61,7 +61,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import { kmToMi, miToKm, distancePresets } from "@/lib/distance";
+import { kmToMi, miToKm, distancePresets, MAX_DISTANCE_MI } from "@/lib/distance";
 import { useMyProfile } from "@/lib/user-prefs-store";
 import { FilterBar } from "@/components/FilterBar";
 import { FilterSection } from "@/components/FilterSheet";
@@ -1065,7 +1065,7 @@ function PostAvailabilityDialog({
                 id="radius"
                 type="number"
                 min={1}
-                max={500}
+                max={MAX_DISTANCE_MI}
                 value={radius}
                 onChange={(e) => setRadius(Number(e.target.value) || 0)}
               />
