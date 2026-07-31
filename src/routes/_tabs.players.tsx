@@ -883,17 +883,7 @@ function AvailabilityCard({
   );
 }
 
-function formatWindow(a: PlayerAvailability): string {
-  const parts: string[] = [];
-  if (a.starts_on || a.ends_on) {
-    const s = a.starts_on ? fmtDate(a.starts_on) : "";
-    const e = a.ends_on ? fmtDate(a.ends_on) : "";
-    if (s && e) parts.push(s === e ? s : `${s} – ${e}`);
-    else parts.push(s || e);
-  }
-  if (a.recurring_days.length) parts.push(a.recurring_days.join(" · "));
-  return parts.join(" · ");
-}
+const formatWindow = (a: PlayerAvailability): string => formatAvailabilityWindow(a);
 
 function fmtDate(iso: string) {
   const d = new Date(iso + "T00:00:00");

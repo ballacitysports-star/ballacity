@@ -190,3 +190,33 @@ export function slotsHitRange(slots: TimeSlot[], fromKey: string, toKey: string)
   }
   return false;
 }
+
+/**
+ * Human window label for an availability post. Prefers the richer `time_slots`
+ * and falls back to the legacy date range / weekday columns.
+ */
+export function formatAvailabilityWindow(a: {
+  time_slots?: unknown;
+  starts_on?: string | null;
+  ends_on?: string | null;
+  recurring_days?: string[] | null;
+}): string {
+  const slots = parseTimeSlots(a.time_slots ?? []);
+  if (slots.length > 0) {
+    const next = nextOccurrence(slots);
+    const head = next
+      ? `Next: ${fmtShortDate(next.dateKey)} ${fmt12(next.start)}–${fmt12(next.end)}`
+      : "";
+    const rest = summarizeSlots(slots);
+    return [head, rest].filter(Boolean).join(" · ");
+  }
+  const parts: string[] = [];
+  if (a.starts_on || a.ends_on) {
+    const s = a.starts_on ? fmtShortDate(a.starts_on) : "";
+    const e = a.ends_on ? fmtShortDate(a.ends_on) : "";
+    if (s && e) parts.push(s === e ? s : `${s} – ${e}`);
+    else parts.push(s || e);
+  }
+  if (a.recurring_days?.length) parts.push(a.recurring_days.join(" · "));
+  return parts.join(" · ");
+}
