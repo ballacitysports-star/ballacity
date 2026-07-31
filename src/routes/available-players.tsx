@@ -130,6 +130,14 @@ function AvailablePlayersPage() {
 
   const [includeAnywhere, setIncludeAnywhere] = useState(true);
   const [skill, setSkill] = useState<string>("All Levels");
+  // A tier from another sport (or a retired Football tier) can never stick when
+  // the sport changes — the profile scale is the source of truth.
+  useEffect(() => {
+    if (skill === "All Levels") return;
+    if (!sport) return;
+    const kept = sanitizeSkillForSport(sport, skill);
+    if (kept !== skill) setSkill(kept || "All Levels");
+  }, [sport, skill]);
   const [window, setWindow] = useState<"any" | "week" | "month" | "custom">("any");
   const [customFrom, setCustomFrom] = useState("");
   const [customTo, setCustomTo] = useState("");
@@ -200,7 +208,7 @@ function AvailablePlayersPage() {
 
   useEffect(() => {
     setList(null);
-  }, [sport, city, includeAnywhere, skill, fromISO, toISO]);
+  }, [sport, city, includeAnywhere, fromISO, toISO]);
 
   const activeFilterCount =
     (skill !== "All Levels" ? 1 : 0) +
@@ -210,16 +218,22 @@ function AvailablePlayersPage() {
 
   const filteredList = useMemo(() => {
     if (!list) return null;
-    if (maxDistance <= 0) return list;
+    const wanted = skill !== "All Levels" ? skill : "";
+    const bySkill = wanted
+      ? list.filter((a) =>
+          levelMatchesFilter(a.author_sport_levels, a.sports, a.skill_level, wanted),
+        )
+      : list;
+    if (maxDistance <= 0) return bySkill;
     const km = miToKm(maxDistance);
-    return list.filter((a) => {
+    return bySkill.filter((a) => {
       // Precise: both the filter city and the post carry Google Places coordinates.
       if (cityGeo && a.lat != null && a.lng != null) {
         return haversineKm(cityGeo, { lat: Number(a.lat), lng: Number(a.lng) }) <= km;
       }
       return (a.travel_radius_km ?? 0) <= km;
     });
-  }, [list, maxDistance, cityGeo]);
+  }, [list, maxDistance, cityGeo, skill]);
 
 
   useEffect(() => {
@@ -228,7 +242,6 @@ function AvailablePlayersPage() {
       sport: sport || undefined,
       city: city.trim() || undefined,
       includeAnywhere: city.trim() ? includeAnywhere : undefined,
-      skill: skill !== "All Levels" ? skill : undefined,
       from: fromISO,
       to: toISO,
     })
@@ -244,7 +257,7 @@ function AvailablePlayersPage() {
     return () => {
       cancelled = true;
     };
-  }, [sport, city, includeAnywhere, skill, fromISO, toISO, refreshKey]);
+  }, [sport, city, includeAnywhere, fromISO, toISO, refreshKey]);
 
   // Realtime: refresh list whenever any availability row changes.
   useEffect(() => {
@@ -490,11 +503,13 @@ function AvailablePlayersPage() {
           </div>
         </FilterSection>
 
-        <FilterSection label="Skill level">
+        <FilterSection
+          label={sport ? `Skill level · ${scaleForSport(sport as any).system}` : "Skill level"}
+        >
           <ChipRow
             value={skill}
             onChange={(v) => setSkill(v)}
-            options={SKILLS.map((s) => ({ value: s, label: s }))}
+            options={skillOptionsForSport(sport).map((s) => ({ value: s, label: s }))}
           />
         </FilterSection>
 
