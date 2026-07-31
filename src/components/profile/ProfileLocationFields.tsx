@@ -50,7 +50,7 @@ export function ProfileLocationFields({
   return (
     <>
       {showCity && (
-        <Field label="City" hint="Used to find games and players near you">
+        <Field label="City">
           <LocationAutocomplete
             value={value.city}
             onChange={(v) => onChange({ city: v })}
@@ -60,10 +60,10 @@ export function ProfileLocationFields({
         </Field>
       )}
 
-      <Field
-        label="Search radius"
-        hint={`How far you're willing to travel — up to ${capInUnit.toLocaleString("en-US")} ${unit}`}
-      >
+      <Field label="Search radius">
+        <p className="mb-2 text-xs text-muted-foreground">
+          How far you&apos;re willing to travel — up to {capInUnit.toLocaleString("en-US")} {unit}.
+        </p>
         <div className="flex items-center justify-between text-sm font-semibold">
           <span className="inline-flex items-center gap-1.5 text-muted-foreground">
             <MapPin className="h-3.5 w-3.5 text-lime" />
