@@ -34,6 +34,16 @@ import {
   type PlayerAvailability,
   type ExistingRequestSummary,
 } from "@/lib/availability";
+import { AvailabilitySchedulePicker } from "@/components/availability/AvailabilitySchedulePicker";
+import {
+  parseTimeSlots,
+  summarizeSlots,
+  nextOccurrence,
+  slotsHitRange,
+  fmtShortDate,
+  fmt12,
+  type TimeSlot,
+} from "@/lib/availability-timeslots";
 import { RequestStatusPanel } from "@/components/RequestStatusPanel";
 import { getOrCreateDirectConversation } from "@/lib/messages";
 import { useHostedGames } from "@/lib/hosted-games-store";
@@ -902,9 +912,7 @@ function PostAvailabilityDialog({
   // Per-sport tiers, mirroring the profile editor. Keyed by sport name.
   const [levels, setLevels] = useState<Record<string, string>>({});
 
-  const [starts, setStarts] = useState("");
-  const [ends, setEnds] = useState("");
-  const [days, setDays] = useState<string[]>([]);
+  const [slots, setSlots] = useState<TimeSlot[]>([]);
   const [city, setCity] = useState("");
   const unit = useDistanceUnit();
   const [radius, setRadius] = useState(25); // in the viewer's unit
@@ -926,9 +934,7 @@ function PostAvailabilityDialog({
         skill_level: (sports.length ? levels[sports[0]] : "") || "All Levels",
 
         // datetime-local gives "YYYY-MM-DDTHH:mm"; DB columns are DATE → store date portion only.
-        starts_on: starts ? starts.slice(0, 10) : null,
-        ends_on: ends ? ends.slice(0, 10) : null,
-        recurring_days: days,
+        time_slots: slots,
         city,
         travel_radius_km: unit === "km" ? radius : miToKm(radius),
         note,
@@ -1011,42 +1017,9 @@ function PostAvailabilityDialog({
               );
             })
           )}
-          <div className="grid grid-cols-2 gap-2">
-            <div>
-              <Label htmlFor="starts">From</Label>
-
-              <input
-                id="starts"
-                type="datetime-local"
-                value={starts}
-                onChange={(e) => setStarts(e.target.value)}
-                className="w-full rounded-2xl border border-border bg-surface px-4 py-3 text-sm outline-none focus:border-lime [color-scheme:dark]"
-              />
-            </div>
-            <div>
-              <Label htmlFor="ends">Until</Label>
-              <input
-                id="ends"
-                type="datetime-local"
-                value={ends}
-                onChange={(e) => setEnds(e.target.value)}
-                className="w-full rounded-2xl border border-border bg-surface px-4 py-3 text-sm outline-none focus:border-lime [color-scheme:dark]"
-              />
-            </div>
-          </div>
           <div>
-            <Label className="mb-2 block">Recurring days (optional)</Label>
-            <div className="flex flex-wrap gap-2">
-              {WEEKDAYS.map((d) => (
-                <Chip
-                  key={d}
-                  active={days.includes(d)}
-                  onClick={() => setDays((arr) => toggle(arr, d))}
-                >
-                  {d}
-                </Chip>
-              ))}
-            </div>
+            <Label className="mb-2 block">When are you free?</Label>
+            <AvailabilitySchedulePicker value={slots} onChange={setSlots} />
           </div>
           <div className="grid grid-cols-[1fr_110px] gap-2">
             <div>
