@@ -6,6 +6,13 @@ import {
   type TimeSlot,
 } from "./availability-timeslots";
 
+export type PlaceGeo = {
+  lat: number;
+  lng: number;
+  placeId?: string | null;
+  formattedAddress?: string | null;
+};
+
 export type AvailabilityStatus = "open" | "closed";
 export type ContactRequestStatus = "pending" | "accepted" | "declined" | "withdrawn";
 
@@ -18,6 +25,11 @@ export type PlayerAvailability = {
   ends_on: string | null;
   recurring_days: string[];
   city: string | null;
+  /** Google Places details saved with the post so maps/distance stay accurate. */
+  place_id: string | null;
+  formatted_address: string | null;
+  lat: number | null;
+  lng: number | null;
   travel_radius_km: number;
   note: string | null;
   status: AvailabilityStatus;
@@ -177,6 +189,10 @@ export async function createAvailability(input: Partial<PlayerAvailability>) {
     skill_level: input.skill_level ?? "All Levels",
     ...slotFields(input),
     city: input.city?.trim() || null,
+    place_id: input.place_id ?? null,
+    formatted_address: input.formatted_address ?? null,
+    lat: input.lat ?? null,
+    lng: input.lng ?? null,
     travel_radius_km: input.travel_radius_km ?? 25,
     note: input.note?.slice(0, 500) ?? null,
     status: "open" as AvailabilityStatus,

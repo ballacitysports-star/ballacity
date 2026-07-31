@@ -1001,8 +1001,12 @@ export type Database = {
           city: string | null
           created_at: string
           ends_on: string | null
+          formatted_address: string | null
           id: string
+          lat: number | null
+          lng: number | null
           note: string | null
+          place_id: string | null
           recurring_days: string[]
           skill_level: string
           sports: string[]
@@ -1018,8 +1022,12 @@ export type Database = {
           city?: string | null
           created_at?: string
           ends_on?: string | null
+          formatted_address?: string | null
           id?: string
+          lat?: number | null
+          lng?: number | null
           note?: string | null
+          place_id?: string | null
           recurring_days?: string[]
           skill_level?: string
           sports?: string[]
@@ -1035,8 +1043,12 @@ export type Database = {
           city?: string | null
           created_at?: string
           ends_on?: string | null
+          formatted_address?: string | null
           id?: string
+          lat?: number | null
+          lng?: number | null
           note?: string | null
+          place_id?: string | null
           recurring_days?: string[]
           skill_level?: string
           sports?: string[]
@@ -1361,10 +1373,14 @@ export type Database = {
           body: string
           created_at: string
           event_date: string | null
+          formatted_address: string | null
           id: string
           kind: string
+          lat: number | null
+          lng: number | null
           location: string | null
           pinned: boolean
+          place_id: string | null
           price: number | null
           spots_max: number | null
           spots_taken: number
@@ -1377,10 +1393,14 @@ export type Database = {
           body?: string
           created_at?: string
           event_date?: string | null
+          formatted_address?: string | null
           id?: string
           kind: string
+          lat?: number | null
+          lng?: number | null
           location?: string | null
           pinned?: boolean
+          place_id?: string | null
           price?: number | null
           spots_max?: number | null
           spots_taken?: number
@@ -1393,10 +1413,14 @@ export type Database = {
           body?: string
           created_at?: string
           event_date?: string | null
+          formatted_address?: string | null
           id?: string
           kind?: string
+          lat?: number | null
+          lng?: number | null
           location?: string | null
           pinned?: boolean
+          place_id?: string | null
           price?: number | null
           spots_max?: number | null
           spots_taken?: number
