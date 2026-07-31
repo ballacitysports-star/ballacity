@@ -922,7 +922,9 @@ function PostAvailabilityDialog({
     try {
       await createAvailability({
         sports,
-        skill_level: skill,
+        // The primary sport's tier is what the text column stores.
+        skill_level: (sports.length ? levels[sports[0]] : "") || "All Levels",
+
         // datetime-local gives "YYYY-MM-DDTHH:mm"; DB columns are DATE → store date portion only.
         starts_on: starts ? starts.slice(0, 10) : null,
         ends_on: ends ? ends.slice(0, 10) : null,
