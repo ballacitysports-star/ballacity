@@ -40,7 +40,10 @@ import {
   setContactRequestStatus,
   updateAvailability,
   type PlayerAvailability,
+  type PlaceGeo,
 } from "@/lib/availability";
+import { haversineKm } from "@/lib/geo";
+
 import { AvailabilitySchedulePicker } from "@/components/availability/AvailabilitySchedulePicker";
 import { useMyBusyBlocks } from "@/lib/availability-conflicts";
 import {
