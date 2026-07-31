@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  filterTiersForSport,
   levelMatchesFilter,
   levelsForSport,
   playerLevelsForSports,
@@ -125,5 +126,43 @@ describe("Football formats", () => {
 
   it("does not append the scale name to 7v7 tiers", () => {
     expect(formatSportLevel({ system: "Level", tier: "7v7 Rec" })).toBe("7v7 Rec");
+  });
+});
+
+describe("feed + matchmaking with football sub-levels", () => {
+  const football = { Football: { system: "Level", tier: "7v7 Competitive" } };
+
+  it("offers every football sub-level to the skill filter", () => {
+    expect(filterTiersForSport("Football")).toContain("Flag Rec");
+    expect(filterTiersForSport("Football")).toContain("7v7 Elite");
+    expect(filterTiersForSport("Football")).toContain("Full contact Showcase / Travel");
+  });
+
+  it("matches a post on the author's profile tier", () => {
+    expect(levelMatchesFilter(football, ["Football"], "All Levels", "7v7 Competitive")).toBe(true);
+    expect(levelMatchesFilter(football, ["Football"], "All Levels", "7v7 Elite")).toBe(false);
+  });
+
+  it("lets the profile tier win over a generic tier stored on the post", () => {
+    expect(levelMatchesFilter(football, ["Football"], "Intermediate", "Intermediate")).toBe(false);
+    expect(formatSportLevel(resolvePlayerLevel(football, "Football", "Intermediate"))).toBe(
+      "7v7 Competitive",
+    );
+  });
+
+  it("falls back to the post's tier only when the profile has none", () => {
+    expect(levelMatchesFilter({}, ["Football"], "Full contact Elite", "Full contact Elite")).toBe(
+      true,
+    );
+  });
+
+  it("matches a legacy football post against the migrated tier", () => {
+    const legacy = { Football: { system: "Level", tier: "High School" } };
+    expect(levelMatchesFilter(legacy, ["Football"], null, "Full contact Competitive")).toBe(true);
+  });
+
+  it("keeps a football tier out of another sport's filter", () => {
+    expect(sanitizeSkillForSport("Basketball", "7v7 Elite")).toBe("");
+    expect(sanitizeSkillForSport("", "7v7 Elite")).toBe("");
   });
 });
