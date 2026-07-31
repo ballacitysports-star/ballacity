@@ -327,8 +327,6 @@ function OnboardingWizard({ type }: { type: AccountType }) {
         // Keyed on the primary key, so a retry updates the same row and can
         // never insert a second profile for this user.
         await saveProfileRow(supabase, row);
-
-        if (error) throw error;
         savedFingerprintRef.current = fingerprint;
         try {
           localStorage.setItem(onboardingSaveKey(user.id), fingerprint);
