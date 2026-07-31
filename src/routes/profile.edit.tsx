@@ -245,7 +245,19 @@ function EditProfile() {
     } catch {
       /* ignore */
     }
+
+    // Same keys onboarding invalidates, so either screen sees fresh values.
+    await queryClient.invalidateQueries({
+      predicate: (q) => {
+        const k = q.queryKey?.[0];
+        return (
+          typeof k === "string" &&
+          (k.startsWith("feed") || k.startsWith("games") || k === "profile" || k === "me")
+        );
+      },
+    });
   };
+
 
 
   const autosave = useAutosave({
