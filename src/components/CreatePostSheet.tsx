@@ -32,6 +32,12 @@ export function CreatePostSheet({
   const [body, setBody] = useState("");
   const [eventDate, setEventDate] = useState("");
   const [location, setLocation] = useState("");
+  const [locationGeo, setLocationGeo] = useState<{
+    placeId: string;
+    lat: number;
+    lng: number;
+    formattedAddress: string | null;
+  } | null>(null);
   const [price, setPrice] = useState("");
   const [spotsMax, setSpotsMax] = useState("");
   const [err, setErr] = useState<string | null>(null);
@@ -47,6 +53,7 @@ export function CreatePostSheet({
       setBody("");
       setEventDate("");
       setLocation("");
+      setLocationGeo(null);
       setPrice("");
       setSpotsMax("");
       setErr(null);
@@ -74,6 +81,10 @@ export function CreatePostSheet({
         body: body.trim(),
         eventDate: isEvent && eventDate ? new Date(eventDate).toISOString() : null,
         location: isEvent && location.trim() ? location.trim() : null,
+        placeId: isEvent ? (locationGeo?.placeId ?? null) : null,
+        formattedAddress: isEvent ? (locationGeo?.formattedAddress ?? null) : null,
+        lat: isEvent ? (locationGeo?.lat ?? null) : null,
+        lng: isEvent ? (locationGeo?.lng ?? null) : null,
         price: isEvent && price !== "" ? Number(price) : null,
         spotsMax: isEvent && spotsMax !== "" ? Number(spotsMax) : null,
       },
@@ -148,8 +159,24 @@ export function CreatePostSheet({
                 <div className="mt-1.5">
                   <LocationAutocomplete
                     value={location}
-                    onChange={setLocation}
+                    onChange={(v) => {
+                      setLocation(v);
+                      setLocationGeo(null);
+                    }}
                     placeholder="Venue or address"
+                    onPick={(full, placeId, geo) => {
+                      setLocation(full);
+                      setLocationGeo(
+                        geo
+                          ? {
+                              placeId,
+                              lat: geo.lat,
+                              lng: geo.lng,
+                              formattedAddress: geo.formattedAddress ?? full,
+                            }
+                          : null,
+                      );
+                    }}
                   />
                 </div>
 
