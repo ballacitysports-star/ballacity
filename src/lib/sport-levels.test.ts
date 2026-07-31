@@ -6,6 +6,7 @@ import {
   resolvePlayerLevel,
   sanitizeSkillForSport,
   formatSportLevel,
+  scaleForSport,
 } from "./sport-levels";
 
 const raw = {
@@ -75,5 +76,54 @@ describe("sanitizeSkillForSport", () => {
   it("passes empty values through", () => {
     expect(sanitizeSkillForSport("Baseball", "")).toBe("");
     expect(sanitizeSkillForSport(null, undefined)).toBe("");
+  });
+});
+
+describe("Football formats", () => {
+  const scale = scaleForSport("Football");
+
+  it("groups tiers into Flag, 7v7 and Full contact", () => {
+    expect(scale.groups?.map((g) => g.label)).toEqual(["Flag", "7v7", "Full contact"]);
+  });
+
+  it("group tiers are exactly a partition of the flat tier list", () => {
+    const flat = scale.groups!.flatMap((g) => g.tiers);
+    expect(flat).toEqual(scale.tiers);
+    expect(new Set(flat).size).toBe(flat.length);
+  });
+
+  it("gives every format the same sub-level ladder", () => {
+    for (const g of scale.groups!) {
+      expect(g.tiers).toEqual([
+        `${g.label} Rec`,
+        `${g.label} Competitive`,
+        `${g.label} Showcase / Travel`,
+        `${g.label} Elite`,
+      ]);
+    }
+  });
+
+  it("keeps a valid football tier in the skill filter", () => {
+    expect(sanitizeSkillForSport("Football", "Full contact Elite")).toBe("Full contact Elite");
+    expect(sanitizeSkillForSport("Football", "7v7 Competitive")).toBe("7v7 Competitive");
+  });
+
+  it("drops a tier that belongs to another sport", () => {
+    expect(sanitizeSkillForSport("Football", "Minor AAA")).toBe("");
+  });
+
+  it("migrates retired football tiers forward", () => {
+    expect(sanitizeSkillForSport("Football", "High School")).toBe("Full contact Competitive");
+    expect(
+      formatSportLevel(resolvePlayerLevel({ Football: { system: "Level", tier: "Semi-Pro" } }, "Football")),
+    ).toBe("Full contact Elite");
+  });
+
+  it("leaves other sports' High School tier alone", () => {
+    expect(sanitizeSkillForSport("Basketball", "High School")).toBe("High School");
+  });
+
+  it("does not append the scale name to 7v7 tiers", () => {
+    expect(formatSportLevel({ system: "Level", tier: "7v7 Rec" })).toBe("7v7 Rec");
   });
 });
