@@ -305,10 +305,11 @@ function OnboardingWizard({ type }: { type: AccountType }) {
         avatarUrl: basics.avatarUrl,
         coverUrl: basics.coverUrl,
         birthday: birthdayClean,
-
         graduatingClass: gradClean,
         sports,
+        links: cleanedLinks,
       });
+
 
       // Idempotency: skip the write entirely when this exact row was already
       // saved for this user (double taps, retries after a remount, back/next).
