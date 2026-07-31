@@ -293,11 +293,24 @@ function defaultsFromUser(user: User): MyProfile {
 }
 
 // ---------- Hooks ----------
-export function useMyProfile(currentUser?: User | null): MyProfile | null {
+
+/**
+ * Profile + whether the saved `profiles` row has finished loading.
+ *
+ * Forms must wait for `loaded` before seeding their fields: until then the
+ * returned profile can be a fallback derived from the auth user (email
+ * local-part as name, no sports), which would overwrite real saved data.
+ */
+export function useMyProfileState(currentUser?: User | null): {
+  profile: MyProfile | null;
+  loaded: boolean;
+} {
   const { user: authUser } = useAuth();
   const user = currentUser === undefined ? authUser : currentUser;
   const [tick, setTick] = useState(0);
+  const [loaded, setLoaded] = useState(false);
   const [dbProfile, setDbProfile] = useState<{
+
     display_name?: string | null;
     username?: string | null;
     avatar_initials?: string | null;
