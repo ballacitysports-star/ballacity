@@ -10,7 +10,14 @@ export type SportScale = {
   tiers: string[];
   /** Optional helper copy under the chips. */
   hint?: string;
+  /**
+   * Optional grouping of `tiers` by format (e.g. Football's Flag / 7v7 /
+   * Full contact). Purely presentational — the union of every group's tiers
+   * must equal `tiers`, so filters and storage keep using flat tier strings.
+   */
+  groups?: { label: string; tiers: string[] }[];
 };
+
 
 /** Generic fallback used by any sport without a curated scale. */
 export const GENERIC_SCALE: SportScale = {
