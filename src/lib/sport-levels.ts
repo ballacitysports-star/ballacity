@@ -176,8 +176,9 @@ export function resolvePlayerLevel(
   const levels = parseSportLevels(rawSportLevels);
   if (sport && levels[sport]) return levels[sport];
   if (fallbackSkill && fallbackSkill !== "All Levels") {
-    return { system: "", tier: fallbackSkill };
+    return { system: "", tier: migrateTier(sport, fallbackSkill) };
   }
+
   return null;
 }
 
