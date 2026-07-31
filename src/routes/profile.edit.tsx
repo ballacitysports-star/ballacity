@@ -3,13 +3,11 @@ import {
   ArrowLeft,
   Check,
   Plus,
-  X,
   Users,
   Trophy,
   BarChart3,
   CreditCard,
   Video,
-  ExternalLink,
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
@@ -25,15 +23,14 @@ import {
   setFeedPrefs,
   DEFAULT_PREFS,
   type ProfileLink,
-  type ProfileLinkType,
 } from "@/lib/user-prefs-store";
 import { useMyOrgs } from "@/lib/org-store";
 import { OrgCard } from "@/components/OrgCard";
 import { listTrainerOrgs } from "@/lib/trainer-orgs.functions";
 import { useQuery } from "@tanstack/react-query";
 import { getCurrentUser, useAuth } from "@/hooks/use-auth";
-import { LINK_TYPES, LinkIcon } from "@/components/ProfileLinks";
 import { Dumbbell } from "lucide-react";
+
 import {
   Section,
   Field,
