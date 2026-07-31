@@ -897,8 +897,11 @@ function PostAvailabilityDialog({
   onClose: () => void;
   onPosted: () => void;
 }) {
+  const myProfile = useMyProfile();
   const [sports, setSports] = useState<string[]>([]);
-  const [skill, setSkill] = useState<string>("All Levels");
+  // Per-sport tiers, mirroring the profile editor. Keyed by sport name.
+  const [levels, setLevels] = useState<Record<string, string>>({});
+
   const [starts, setStarts] = useState("");
   const [ends, setEnds] = useState("");
   const [days, setDays] = useState<string[]>([]);
