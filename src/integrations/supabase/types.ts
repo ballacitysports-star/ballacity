@@ -1008,6 +1008,8 @@ export type Database = {
           sports: string[]
           starts_on: string | null
           status: string
+          time_slots: Json
+          timezone: string | null
           travel_radius_km: number
           updated_at: string
           user_id: string
@@ -1023,6 +1025,8 @@ export type Database = {
           sports?: string[]
           starts_on?: string | null
           status?: string
+          time_slots?: Json
+          timezone?: string | null
           travel_radius_km?: number
           updated_at?: string
           user_id: string
@@ -1038,6 +1042,8 @@ export type Database = {
           sports?: string[]
           starts_on?: string | null
           status?: string
+          time_slots?: Json
+          timezone?: string | null
           travel_radius_km?: number
           updated_at?: string
           user_id?: string
