@@ -4,6 +4,7 @@ import { motion } from "framer-motion";
 import { ArrowLeft, MessageCircle, Loader2, Calendar, MapPin, Shield, Trophy, UserPlus, UserCheck, Building2, ShieldCheck } from "lucide-react";
 import { useFollow } from "@/lib/follows";
 import { toast } from "sonner";
+import { formatAvailabilityWindow } from "@/lib/availability-timeslots";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
 import { getOrCreateDirectConversation } from "@/lib/messages";

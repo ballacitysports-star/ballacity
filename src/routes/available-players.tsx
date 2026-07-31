@@ -39,6 +39,7 @@ import {
   updateAvailability,
   type PlayerAvailability,
 } from "@/lib/availability";
+import { formatAvailabilityWindow } from "@/lib/availability-timeslots";
 import { supabase } from "@/integrations/supabase/client";
 import { getOrCreateDirectConversation } from "@/lib/messages";
 import {

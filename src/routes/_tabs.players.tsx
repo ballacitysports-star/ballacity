@@ -42,6 +42,7 @@ import {
   slotsHitRange,
   fmtShortDate,
   fmt12,
+  formatAvailabilityWindow,
   type TimeSlot,
 } from "@/lib/availability-timeslots";
 import { RequestStatusPanel } from "@/components/RequestStatusPanel";
@@ -102,7 +103,6 @@ export const Route = createFileRoute("/_tabs/players")({
 });
 
 const SKILLS = ["All Levels", "Beginner", "Intermediate", "Advanced"] as const;
-const WEEKDAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
 
 function PlayersPage() {
@@ -250,6 +250,12 @@ function PlayersPage() {
       const e = end ?? to;
       return s <= to && e >= from;
     };
+    // Prefer explicit time slots when present; fall back to the legacy range.
+    const hits = (a: AvailabilityWithAuthor, from: string, to: string) => {
+      const slots = parseTimeSlots(a.time_slots ?? []);
+      if (slots.length > 0) return slotsHitRange(slots, from, to);
+      return overlaps(a.starts_on, a.ends_on, from, to);
+    };
     const hasWeekendDay = (days: string[]) =>
       days.some((d) => /sat|sun/i.test(d));
     return list.filter((a) => {
@@ -260,11 +266,11 @@ function PlayersPage() {
       if (maxDistance > 0 && kmToMi(a.travel_radius_km) > maxDistance) return false;
       if (when !== "any") {
         if (when === "today") {
-          if (!overlaps(a.starts_on, a.ends_on, todayISO, todayISO)) return false;
+          if (!hits(a, todayISO, todayISO)) return false;
         } else if (when === "week") {
-          if (!overlaps(a.starts_on, a.ends_on, todayISO, weekEnd)) return false;
+          if (!hits(a, todayISO, weekEnd)) return false;
         } else if (when === "weekend") {
-          const dateHit = overlaps(a.starts_on, a.ends_on, satISO, sunISO);
+          const dateHit = hits(a, satISO, sunISO);
           const recurHit = hasWeekendDay(a.recurring_days ?? []);
           if (!dateHit && !recurHit) return false;
         }
