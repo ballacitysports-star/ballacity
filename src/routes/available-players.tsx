@@ -99,6 +99,13 @@ function AvailablePlayersPage() {
   const [tab, setTab] = useState<Tab>("browse");
   const [sport, setSport] = useState<string>("");
   const [city, setCity] = useState("");
+  // Google Places details for the typed city — powers accurate distance filtering.
+  const [cityGeo, setCityGeo] = useState<PlaceGeo | null>(null);
+  const changeCity = (v: string) => {
+    setCity(v);
+    setCityGeo(null);
+  };
+
   const [includeAnywhere, setIncludeAnywhere] = useState(true);
   const [skill, setSkill] = useState<string>("All Levels");
   const [window, setWindow] = useState<"any" | "week" | "month" | "custom">("any");
@@ -183,8 +190,15 @@ function AvailablePlayersPage() {
     if (!list) return null;
     if (maxDistance <= 0) return list;
     const km = miToKm(maxDistance);
-    return list.filter((a) => (a.travel_radius_km ?? 0) <= km);
-  }, [list, maxDistance]);
+    return list.filter((a) => {
+      // Precise: both the filter city and the post carry Google Places coordinates.
+      if (cityGeo && a.lat != null && a.lng != null) {
+        return haversineKm(cityGeo, { lat: Number(a.lat), lng: Number(a.lng) }) <= km;
+      }
+      return (a.travel_radius_km ?? 0) <= km;
+    });
+  }, [list, maxDistance, cityGeo]);
+
 
   useEffect(() => {
     let cancelled = false;
