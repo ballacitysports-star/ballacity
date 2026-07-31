@@ -788,9 +788,18 @@ function AvailabilityCard({
             >
               {a.author_name}
             </Link>
-            <span className="shrink-0 rounded-full bg-lime/15 px-2 py-0.5 text-[10px] font-bold text-lime">
-              {a.skill_level}
-            </span>
+            {(() => {
+              // Profile tier wins; only fall back to the post's own level when
+              // the profile has none for any of the listed sports.
+              const profileLevels = playerLevelsForSports(a.author_sport_levels, a.sports);
+              if (profileLevels.length > 0) return null;
+              const fallback = resolvePlayerLevel(null, null, a.skill_level);
+              return fallback ? (
+                <span className="shrink-0 rounded-full bg-lime/15 px-2 py-0.5 text-[10px] font-bold text-lime">
+                  {formatSportLevel(fallback)}
+                </span>
+              ) : null;
+            })()}
           </div>
           <div className="mt-1 flex flex-wrap gap-1">
             {a.sports.length === 0 ? (
@@ -798,17 +807,25 @@ function AvailabilityCard({
             ) : (
               a.sports.map((s) => {
                 const emoji = SPORTS.find((sp) => sp.name === s)?.emoji ?? "🎯";
+                const level = parseSportLevels(a.author_sport_levels)[s] ?? null;
+                const levelText = formatSportLevel(level);
                 return (
                   <span
                     key={s}
-                    className="rounded-full border border-border px-2 py-0.5 text-[10px] font-semibold"
+                    className="inline-flex items-center gap-1 rounded-full border border-border px-2 py-0.5 text-[10px] font-semibold"
                   >
                     {emoji} {s}
+                    {levelText && (
+                      <span className="rounded-full bg-lime/15 px-1.5 text-[10px] font-bold text-lime">
+                        {levelText}
+                      </span>
+                    )}
                   </span>
                 );
               })
             )}
           </div>
+
           {when && (
             <p className="mt-2 flex items-center gap-1 text-xs text-muted-foreground">
               <Calendar className="h-3.5 w-3.5" /> {when}
