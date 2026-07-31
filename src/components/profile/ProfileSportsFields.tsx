@@ -55,6 +55,26 @@ export function ProfileSportsFields({
             </div>
             {(() => {
               const scale = scaleForSport(s.name);
+              const chip = (tier: string) => {
+                const active = s.level?.tier === tier;
+                return (
+                  <button
+                    key={tier}
+                    type="button"
+                    aria-pressed={active}
+                    onClick={() => setLevel(s.name, tier)}
+                    className={`rounded-full border px-2.5 py-1 text-[11px] font-semibold transition-colors ${
+                      active
+                        ? "border-lime bg-lime/15 text-lime"
+                        : "border-border bg-background text-muted-foreground hover:border-lime/40 hover:text-foreground"
+                    }`}
+                  >
+                    {tier.startsWith(`${activeGroupPrefix(scale, tier)} `)
+                      ? tier.slice(activeGroupPrefix(scale, tier).length + 1)
+                      : tier}
+                  </button>
+                );
+              };
               return (
                 <div className="mt-3">
                   <div className="mb-1.5 flex items-baseline gap-2">
@@ -63,32 +83,27 @@ export function ProfileSportsFields({
                     </span>
                     <span className="text-[10px] text-muted-foreground/70">{scale.system}</span>
                   </div>
-                  <div className="flex flex-wrap gap-1.5">
-                    {scale.tiers.map((tier) => {
-                      const active = s.level?.tier === tier;
-                      return (
-                        <button
-                          key={tier}
-                          type="button"
-                          aria-pressed={active}
-                          onClick={() => setLevel(s.name, tier)}
-                          className={`rounded-full border px-2.5 py-1 text-[11px] font-semibold transition-colors ${
-                            active
-                              ? "border-lime bg-lime/15 text-lime"
-                              : "border-border bg-background text-muted-foreground hover:border-lime/40 hover:text-foreground"
-                          }`}
-                        >
-                          {tier}
-                        </button>
-                      );
-                    })}
-                  </div>
+                  {scale.groups ? (
+                    <div className="space-y-2">
+                      {scale.groups.map((g) => (
+                        <div key={g.label}>
+                          <div className="mb-1 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/80">
+                            {g.label}
+                          </div>
+                          <div className="flex flex-wrap gap-1.5">{g.tiers.map(chip)}</div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="flex flex-wrap gap-1.5">{scale.tiers.map(chip)}</div>
+                  )}
                   {scale.hint && (
                     <p className="mt-1.5 text-[10px] text-muted-foreground">{scale.hint}</p>
                   )}
                 </div>
               );
             })()}
+
             {POSITIONS_BY_SPORT[s.name]?.length > 0 && (
 
               <div className="mt-3">
