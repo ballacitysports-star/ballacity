@@ -1,5 +1,13 @@
 import { useMemo, useState } from "react";
-import { CalendarDays, ChevronLeft, ChevronRight, Repeat, Trash2, X } from "lucide-react";
+import {
+  AlertTriangle,
+  CalendarDays,
+  ChevronLeft,
+  ChevronRight,
+  Repeat,
+  Trash2,
+  X,
+} from "lucide-react";
 import {
   MAX_SLOTS,
   TIME_PRESETS,
@@ -11,6 +19,13 @@ import {
   toDateKey,
   type TimeSlot,
 } from "@/lib/availability-timeslots";
+import {
+  CONFLICT_KIND_LABEL,
+  describeConflict,
+  findSelfOverlaps,
+  findSlotConflicts,
+  type BusyBlock,
+} from "@/lib/availability-conflicts";
 
 const DEFAULT_START = "18:00";
 const DEFAULT_END = "20:00";
@@ -29,9 +44,12 @@ function addMonths(d: Date, n: number) {
 export function AvailabilitySchedulePicker({
   value,
   onChange,
+  busy = [],
 }: {
   value: TimeSlot[];
   onChange: (slots: TimeSlot[]) => void;
+  /** Times the player is already committed to — used for conflict warnings. */
+  busy?: BusyBlock[];
 }) {
   const today = useMemo(() => {
     const t = new Date();
@@ -42,6 +60,21 @@ export function AvailabilitySchedulePicker({
     value.some((s) => !isDateSlot(s)) && !value.some(isDateSlot) ? "weekly" : "dates",
   );
   const [cursor, setCursor] = useState<Date>(startOfMonth(today));
+
+  const conflicts = useMemo(() => findSlotConflicts(value, busy), [value, busy]);
+  const conflictBySlot = useMemo(
+    () => new Map(conflicts.map((c) => [c.slotIndex, c])),
+    [conflicts],
+  );
+  const selfOverlaps = useMemo(() => new Set(findSelfOverlaps(value)), [value]);
+  const busyByDate = useMemo(() => {
+    const m = new Map<string, BusyBlock[]>();
+    for (const b of busy) {
+      if (!m.has(b.date)) m.set(b.date, []);
+      m.get(b.date)!.push(b);
+    }
+    return m;
+  }, [busy]);
 
   const dateSlots = value.filter(isDateSlot);
   const weekSlots = value.filter((s) => !isDateSlot(s)) as Extract<
