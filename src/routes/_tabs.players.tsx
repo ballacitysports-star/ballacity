@@ -56,6 +56,17 @@ import { FilterSection } from "@/components/FilterSheet";
 import { usePersistedSearch } from "@/hooks/use-persisted-search";
 import { Distance } from "@/components/Distance";
 import { useDistanceUnit } from "@/lib/user-prefs-store";
+import {
+  LEGACY_SKILLS,
+  formatSportLevel,
+  levelMatchesFilter,
+  levelsForSport,
+  parseSportLevels,
+  playerLevelsForSports,
+  resolvePlayerLevel,
+  scaleForSport,
+} from "@/lib/sport-levels";
+
 
 // URL-persisted Players state. Refreshing or sharing the URL restores the
 // exact view: search text, sport chip, skill, distance cap, age range,
@@ -123,7 +134,13 @@ function PlayersPage() {
   const density: Density = search.density === "grid" ? "grid" : "list";
 
   const setQ = (v: string) => updateSearch({ q: v });
-  const setSport = (v: string) => updateSearch({ sport: v });
+  const setSport = (v: string) => {
+    // Tiers are sport-specific — drop a skill selection the new sport doesn't have.
+    const allowed = v ? levelsForSport(v as any) : [...LEGACY_SKILLS];
+    const keepSkill = search.skill && allowed.includes(search.skill) ? search.skill : "";
+    updateSearch({ sport: v, skill: keepSkill });
+  };
+
   const setSkill = (v: string) => updateSearch({ skill: v });
   const setMaxDistance = (v: number) => updateSearch({ dist: v });
   const setAgeMin = (v: number | "") => updateSearch({ ageMin: v === "" ? undefined : v });
@@ -227,7 +244,9 @@ function PlayersPage() {
       days.some((d) => /sat|sun/i.test(d));
     return list.filter((a) => {
       if (sport && !a.sports.some((s) => s.toLowerCase() === sport.toLowerCase())) return false;
-      if (skill && a.skill_level !== skill) return false;
+      if (skill && !levelMatchesFilter(a.author_sport_levels, a.sports, a.skill_level, skill))
+        return false;
+
       if (maxDistance > 0 && kmToMi(a.travel_radius_km) > maxDistance) return false;
       if (when !== "any") {
         if (when === "today") {
@@ -515,7 +534,11 @@ function PlayersFilterBody({
   includeUnknownAge: boolean;
   setIncludeUnknownAge: (v: boolean) => void;
 }) {
-  const SKILLS = ["All Levels", "Beginner", "Intermediate", "Advanced"];
+  // Skill tiers mirror the profile: the picked sport's real scale, or the
+  // generic tiers when browsing all sports.
+  const scale = sport ? scaleForSport(sport as any) : null;
+  const SKILLS = sport ? levelsForSport(sport as any) : [...LEGACY_SKILLS];
+
   const unit = useDistanceUnit();
   // Round presets in the viewer's unit; the stored value stays in miles.
   const presets = distancePresets(unit).map((p) => ({
@@ -538,7 +561,7 @@ function PlayersFilterBody({
         </div>
       </FilterSection>
 
-      <FilterSection label="Skill level">
+      <FilterSection label={scale ? `Skill level · ${scale.system}` : "Skill level"}>
         <div className="flex flex-wrap gap-2">
           <Chip active={!skill} onClick={() => setSkill("")}>
             Any
@@ -549,7 +572,13 @@ function PlayersFilterBody({
             </Chip>
           ))}
         </div>
+        {!sport && (
+          <p className="mt-2 text-xs text-muted-foreground">
+            Pick a sport to filter by its own levels.
+          </p>
+        )}
       </FilterSection>
+
 
       <FilterSection label="Max travel distance">
         <div className="flex flex-wrap gap-2">
@@ -759,9 +788,18 @@ function AvailabilityCard({
             >
               {a.author_name}
             </Link>
-            <span className="shrink-0 rounded-full bg-lime/15 px-2 py-0.5 text-[10px] font-bold text-lime">
-              {a.skill_level}
-            </span>
+            {(() => {
+              // Profile tier wins; only fall back to the post's own level when
+              // the profile has none for any of the listed sports.
+              const profileLevels = playerLevelsForSports(a.author_sport_levels, a.sports);
+              if (profileLevels.length > 0) return null;
+              const fallback = resolvePlayerLevel(null, null, a.skill_level);
+              return fallback ? (
+                <span className="shrink-0 rounded-full bg-lime/15 px-2 py-0.5 text-[10px] font-bold text-lime">
+                  {formatSportLevel(fallback)}
+                </span>
+              ) : null;
+            })()}
           </div>
           <div className="mt-1 flex flex-wrap gap-1">
             {a.sports.length === 0 ? (
@@ -769,17 +807,25 @@ function AvailabilityCard({
             ) : (
               a.sports.map((s) => {
                 const emoji = SPORTS.find((sp) => sp.name === s)?.emoji ?? "🎯";
+                const level = parseSportLevels(a.author_sport_levels)[s] ?? null;
+                const levelText = formatSportLevel(level);
                 return (
                   <span
                     key={s}
-                    className="rounded-full border border-border px-2 py-0.5 text-[10px] font-semibold"
+                    className="inline-flex items-center gap-1 rounded-full border border-border px-2 py-0.5 text-[10px] font-semibold"
                   >
                     {emoji} {s}
+                    {levelText && (
+                      <span className="rounded-full bg-lime/15 px-1.5 text-[10px] font-bold text-lime">
+                        {levelText}
+                      </span>
+                    )}
                   </span>
                 );
               })
             )}
           </div>
+
           {when && (
             <p className="mt-2 flex items-center gap-1 text-xs text-muted-foreground">
               <Calendar className="h-3.5 w-3.5" /> {when}
@@ -851,8 +897,11 @@ function PostAvailabilityDialog({
   onClose: () => void;
   onPosted: () => void;
 }) {
+  const myProfile = useMyProfile();
   const [sports, setSports] = useState<string[]>([]);
-  const [skill, setSkill] = useState<string>("All Levels");
+  // Per-sport tiers, mirroring the profile editor. Keyed by sport name.
+  const [levels, setLevels] = useState<Record<string, string>>({});
+
   const [starts, setStarts] = useState("");
   const [ends, setEnds] = useState("");
   const [days, setDays] = useState<string[]>([]);
@@ -873,7 +922,9 @@ function PostAvailabilityDialog({
     try {
       await createAvailability({
         sports,
-        skill_level: skill,
+        // The primary sport's tier is what the text column stores.
+        skill_level: (sports.length ? levels[sports[0]] : "") || "All Levels",
+
         // datetime-local gives "YYYY-MM-DDTHH:mm"; DB columns are DATE → store date portion only.
         starts_on: starts ? starts.slice(0, 10) : null,
         ends_on: ends ? ends.slice(0, 10) : null,
@@ -904,7 +955,17 @@ function PostAvailabilityDialog({
                 <Chip
                   key={s.name}
                   active={sports.includes(s.name)}
-                  onClick={() => setSports((arr) => toggle(arr, s.name))}
+                  onClick={() =>
+                    setSports((arr) => {
+                      const next = toggle(arr, s.name);
+                      // Prefill from the profile tier the first time a sport is added.
+                      if (!arr.includes(s.name)) {
+                        const mine = myProfile?.sports.find((x) => x.name === s.name)?.level?.tier;
+                        if (mine) setLevels((l) => ({ ...l, [s.name]: mine }));
+                      }
+                      return next;
+                    })
+                  }
                 >
                   <span className="mr-1">{s.emoji}</span>
                   {s.name}
@@ -912,19 +973,48 @@ function PostAvailabilityDialog({
               ))}
             </div>
           </div>
-          <div>
-            <Label className="mb-2 block">Skill level</Label>
-            <div className="flex flex-wrap gap-2">
-              {SKILLS.map((s) => (
-                <Chip key={s} active={skill === s} onClick={() => setSkill(s)}>
-                  {s}
-                </Chip>
-              ))}
-            </div>
-          </div>
+          {sports.length === 0 ? (
+            <p className="text-xs text-muted-foreground">
+              Pick a sport to set your level for it.
+            </p>
+          ) : (
+            sports.map((name) => {
+              const scale = scaleForSport(name as any);
+              return (
+                <div key={name}>
+                  <div className="mb-2 flex items-baseline gap-2">
+                    <Label className="block">{name} level</Label>
+                    <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                      {scale.system}
+                    </span>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {scale.tiers.map((tier) => (
+                      <Chip
+                        key={tier}
+                        active={levels[name] === tier}
+                        onClick={() =>
+                          setLevels((l) => ({
+                            ...l,
+                            [name]: l[name] === tier ? "" : tier,
+                          }))
+                        }
+                      >
+                        {tier}
+                      </Chip>
+                    ))}
+                  </div>
+                  {scale.hint && (
+                    <p className="mt-1 text-xs text-muted-foreground">{scale.hint}</p>
+                  )}
+                </div>
+              );
+            })
+          )}
           <div className="grid grid-cols-2 gap-2">
             <div>
               <Label htmlFor="starts">From</Label>
+
               <input
                 id="starts"
                 type="datetime-local"

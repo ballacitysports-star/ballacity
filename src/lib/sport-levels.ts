@@ -102,3 +102,49 @@ export function serializeSportLevels(
   }
   return out;
 }
+
+/** Legacy generic tiers still stored on older availability posts. */
+export const LEGACY_SKILLS = ["Beginner", "Intermediate", "Advanced"] as const;
+
+/**
+ * Skill level to show for a player in a given sport.
+ * Profile tier wins; falls back to the post's own generic level.
+ */
+export function resolvePlayerLevel(
+  rawSportLevels: unknown,
+  sport: string | null | undefined,
+  fallbackSkill?: string | null,
+): SportLevel | null {
+  const levels = parseSportLevels(rawSportLevels);
+  if (sport && levels[sport]) return levels[sport];
+  if (fallbackSkill && fallbackSkill !== "All Levels") {
+    return { system: "", tier: fallbackSkill };
+  }
+  return null;
+}
+
+/** Every profile tier the player has, limited to the sports on the post. */
+export function playerLevelsForSports(
+  rawSportLevels: unknown,
+  sports: string[],
+): { sport: string; level: SportLevel }[] {
+  const levels = parseSportLevels(rawSportLevels);
+  return sports
+    .filter((s) => levels[s]?.tier)
+    .map((s) => ({ sport: s, level: levels[s] }));
+}
+
+/** True when a resolved level matches a chosen filter tier. */
+export function levelMatchesFilter(
+  rawSportLevels: unknown,
+  sports: string[],
+  fallbackSkill: string | null | undefined,
+  wanted: string,
+): boolean {
+  if (!wanted) return true;
+  const levels = parseSportLevels(rawSportLevels);
+  if (sports.some((s) => levels[s]?.tier === wanted)) return true;
+  const hasProfileLevel = sports.some((s) => levels[s]?.tier);
+  // Only fall back to the post's own generic value when the profile is silent.
+  return !hasProfileLevel && fallbackSkill === wanted;
+}
