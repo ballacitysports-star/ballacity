@@ -378,7 +378,7 @@ export function useMyProfileState(currentUser?: User | null): {
         ? [{ name: dbProfile.sport as Sport, level: dbLevels[dbProfile.sport] ?? null }]
         : base.sports;
 
-  return {
+  const profile: MyProfile = {
     name: overrides.name ?? dbProfile?.display_name ?? base.name,
     username:
       overrides.username ??
@@ -391,7 +391,8 @@ export function useMyProfileState(currentUser?: User | null): {
     birthday: overrides.birthday ?? dbProfile?.birthday ?? undefined,
     graduatingClass: overrides.graduatingClass ?? dbProfile?.graduating_class ?? undefined,
     stats: base.stats,
-    sports: overrides.sports ?? base.sports,
+    // Per-sport levels resolved above (local overrides first, then the saved row).
+    sports,
     // Earned badges come from the badge engine (reliability + sportsmanship);
     // stored overrides are merged on top as extras.
     badges: mergeBadges(
@@ -409,7 +410,13 @@ export function useMyProfileState(currentUser?: User | null): {
 
     links: overrides.links?.length ? overrides.links : dbLinks,
   };
+  return { profile, loaded };
 }
+
+export function useMyProfile(currentUser?: User | null): MyProfile | null {
+  return useMyProfileState(currentUser).profile;
+}
+
 
 export function useFeedPrefs(): FeedPrefs {
   const s = useSyncExternalStore(prefsStore.subscribe, prefsStore.getSnapshot, () =>
