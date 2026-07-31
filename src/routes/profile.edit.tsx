@@ -40,6 +40,7 @@ import {
 } from "@/components/profile/ProfileFormPrimitives";
 import { ProfileBasicsFields } from "@/components/profile/ProfileBasicsFields";
 import { ProfileSportsFields } from "@/components/profile/ProfileSportsFields";
+import { ProfileLocationFields } from "@/components/profile/ProfileLocationFields";
 import {
   ProfileLinksFields,
   cleanProfileLinks,
@@ -85,6 +86,10 @@ function EditProfile() {
     profile?.graduatingClass != null ? String(profile.graduatingClass) : "",
   );
   const [birthdayError, setBirthdayError] = useState<string | null>(null);
+  // Location preference: saved search radius, canonical in miles.
+  const [searchRadiusMi, setSearchRadiusMi] = useState<number>(
+    profile?.searchRadiusMi ?? prefs.maxDistanceMi ?? 25,
+  );
   const [sports, setSports] = useState(profile?.sports ?? []);
   const [links, setLinks] = useState<ProfileLink[]>(profile?.links ?? []);
   const [isDirty, setIsDirty] = useState(false);
@@ -100,6 +105,7 @@ function EditProfile() {
         bio: profile.bio,
         birthday: profile.birthday,
         graduatingClass: profile.graduatingClass,
+        searchRadiusMi: profile.searchRadiusMi,
         sports: profile.sports,
         links: profile.links,
       })
@@ -139,6 +145,7 @@ function EditProfile() {
     setBio(profile.bio);
     setBirthday(profile.birthday ?? "");
     setGraduatingClass(profile.graduatingClass != null ? String(profile.graduatingClass) : "");
+    if (profile.searchRadiusMi != null) setSearchRadiusMi(profile.searchRadiusMi);
     setSports(profile.sports);
     setLinks(profile.links);
   }, [profileUser?.id, profileSignature, isDirty]);
@@ -212,10 +219,12 @@ function EditProfile() {
       bio: bio.trim().slice(0, 280),
       birthday: birthdayClean,
       graduatingClass: gradClean,
+      searchRadiusMi,
       sports,
       links: cleanedLinks,
     });
-    setFeedPrefs({ ...prefs, preferredSports, sections });
+    // Keep the feed's distance filter aligned with the profile preference.
+    setFeedPrefs({ ...prefs, preferredSports, sections, maxDistanceMi: searchRadiusMi });
 
     // Persist publicly visible fields so other users can see them.
     const { supabase } = await import("@/integrations/supabase/client");
@@ -230,6 +239,7 @@ function EditProfile() {
       coverUrl,
       birthday: birthdayClean,
       graduatingClass: gradClean,
+      searchRadiusMi,
       sports,
       links: linksDirty ? cleanedLinks : undefined,
     });
@@ -272,6 +282,7 @@ function EditProfile() {
       bio,
       birthday,
       graduatingClass,
+      searchRadiusMi,
       sports,
       links,
       preferredSports,
@@ -344,6 +355,17 @@ function EditProfile() {
               setBirthdayError(validateBirthday(patch.birthday!));
             }
             if ("graduatingClass" in patch) setGraduatingClass(patch.graduatingClass!);
+          }}
+        />
+      </Section>
+
+      <Section title="Location preference">
+        <ProfileLocationFields
+          value={{ city, searchRadiusMi }}
+          onChange={(patch) => {
+            markDirty();
+            if ("city" in patch) setCity(patch.city!);
+            if ("searchRadiusMi" in patch) setSearchRadiusMi(patch.searchRadiusMi!);
           }}
         />
       </Section>
