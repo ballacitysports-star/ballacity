@@ -335,9 +335,11 @@ export function useMyProfileState(currentUser?: User | null): {
   useEffect(() => {
     if (!user) {
       setDbProfile(null);
+      setLoaded(false);
       return;
     }
     let cancelled = false;
+    setLoaded(false);
     supabase
       .from("profiles")
       .select(
@@ -349,13 +351,16 @@ export function useMyProfileState(currentUser?: User | null): {
       .then(async ({ data }) => {
         if (cancelled) return;
         const { data: bday } = await (supabase.rpc as any)("get_my_birthday");
-        if (!cancelled) setDbProfile({ ...(data as any), birthday: (bday as string | null) ?? null });
+        if (cancelled) return;
+        setDbProfile({ ...(data as any), birthday: (bday as string | null) ?? null });
+        setLoaded(true);
       });
     return () => {
       cancelled = true;
     };
   }, [user?.id]);
-  if (!user) return null;
+  if (!user) return { profile: null, loaded: false };
+
   const overrides = readOverrides(user.id);
   const base = defaultsFromUser(user);
   void tick;
