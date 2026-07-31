@@ -267,6 +267,12 @@ function OnboardingWizard({ type }: { type: AccountType }) {
     }
     const trimmedCity = basics.city.trim().slice(0, 80);
     const initials = (basics.avatar.trim() || trimmedName.slice(0, 2)).toUpperCase().slice(0, 3);
+    if (links.some((l) => validateProfileUrl(l.url) !== null)) {
+      toast.error("Fix your profile links");
+      setStep(2);
+      return false;
+    }
+    const cleanedLinks = cleanProfileLinks(links);
 
     setSaving(true);
     try {
@@ -281,6 +287,7 @@ function OnboardingWizard({ type }: { type: AccountType }) {
         birthday: birthdayClean,
         graduatingClass: gradClean,
         sports,
+        links: cleanedLinks,
       });
 
       const { supabase } = await import("@/integrations/supabase/client");
@@ -298,6 +305,7 @@ function OnboardingWizard({ type }: { type: AccountType }) {
         avatarUrl: basics.avatarUrl,
         coverUrl: basics.coverUrl,
         birthday: birthdayClean,
+
         graduatingClass: gradClean,
         sports,
       });
