@@ -134,7 +134,13 @@ function PlayersPage() {
   const density: Density = search.density === "grid" ? "grid" : "list";
 
   const setQ = (v: string) => updateSearch({ q: v });
-  const setSport = (v: string) => updateSearch({ sport: v });
+  const setSport = (v: string) => {
+    // Tiers are sport-specific — drop a skill selection the new sport doesn't have.
+    const allowed = v ? levelsForSport(v as any) : [...LEGACY_SKILLS];
+    const keepSkill = search.skill && allowed.includes(search.skill) ? search.skill : "";
+    updateSearch({ sport: v, skill: keepSkill });
+  };
+
   const setSkill = (v: string) => updateSearch({ skill: v });
   const setMaxDistance = (v: number) => updateSearch({ dist: v });
   const setAgeMin = (v: number | "") => updateSearch({ ageMin: v === "" ? undefined : v });
