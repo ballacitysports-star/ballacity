@@ -57,7 +57,9 @@ export const Route = createFileRoute("/profile/edit")({
 
 function EditProfile() {
   const { user, loading } = useAuth();
+  const queryClient = useQueryClient();
   const myOrgs = useMyOrgs();
+
   const { data: allGyms = [] } = useQuery({
     queryKey: ["profile-edit", "my-gyms"],
     queryFn: () => listTrainerOrgs({ data: {} }),
