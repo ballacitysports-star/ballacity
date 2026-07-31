@@ -43,6 +43,12 @@ import {
 } from "@/components/profile/ProfileFormPrimitives";
 import { ProfileBasicsFields } from "@/components/profile/ProfileBasicsFields";
 import { ProfileSportsFields } from "@/components/profile/ProfileSportsFields";
+import {
+  ProfileLinksFields,
+  cleanProfileLinks,
+  validateProfileUrl,
+} from "@/components/profile/ProfileLinksFields";
+
 import { useAutosave } from "@/hooks/use-autosave";
 import { useAccountType } from "@/lib/account-type";
 import { SaveStatus } from "@/components/SaveStatus";
