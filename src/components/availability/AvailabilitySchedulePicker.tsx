@@ -5,6 +5,8 @@ import {
   ChevronLeft,
   ChevronRight,
   Repeat,
+  Scissors,
+  SkipForward,
   Trash2,
   X,
 } from "lucide-react";
@@ -23,9 +25,12 @@ import {
 import {
   CONFLICT_KIND_LABEL,
   describeConflict,
+  dropOverlappingSlots,
   findSelfOverlaps,
   findSlotConflicts,
+  suggestSlotFixes,
   type BusyBlock,
+  type SlotFix,
 } from "@/lib/availability-conflicts";
 
 const DEFAULT_START = "18:00";
@@ -116,6 +121,15 @@ export function AvailabilitySchedulePicker({
   const patchSlot = (index: number, patch: Partial<{ start: string; end: string }>) => {
     const next = value.map((s, i) => (i === index ? { ...s, ...patch } : s));
     onChange(next as TimeSlot[]);
+  };
+
+  /** Apply a one-tap conflict fix to a single row. */
+  const applyFix = (index: number, fix: SlotFix) => {
+    if (fix.id === "remove" || !fix.slot) {
+      onChange(value.filter((_, i) => i !== index));
+      return;
+    }
+    commit(value.map((s, i) => (i === index ? fix.slot! : s)));
   };
 
   const applyToAll = (start: string, end: string) => {
@@ -385,6 +399,15 @@ export function AvailabilitySchedulePicker({
             — these windows clash with times you already joined, host, or marked
             unavailable. You can still post; players will just see overlapping times.
           </span>
+          {selfOverlaps.size > 0 && (
+            <button
+              type="button"
+              onClick={() => onChange(dropOverlappingSlots(value))}
+              className="shrink-0 self-center rounded-full border border-amber-400/70 bg-amber-400/10 px-2.5 py-1 text-[11px] font-bold text-amber-200 hover:bg-amber-400/20"
+            >
+              Remove overlaps
+            </button>
+          )}
         </div>
       )}
       <div className="flex items-center justify-between gap-2 rounded-2xl border border-border bg-surface/60 px-3 py-2 text-[11px] text-muted-foreground">
