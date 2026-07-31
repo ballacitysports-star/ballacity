@@ -158,8 +158,10 @@ export function sanitizeSkillForSport(
   skill: string | null | undefined,
 ): string {
   if (!skill) return "";
-  return filterTiersForSport(sport || "").includes(skill) ? skill : "";
+  const migrated = migrateTier(sport, skill);
+  return filterTiersForSport(sport || "").includes(migrated) ? migrated : "";
 }
+
 
 
 /**
