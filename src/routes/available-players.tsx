@@ -85,7 +85,6 @@ export const Route = createFileRoute("/available-players")({
 });
 
 const SKILLS = ["All Levels", "Beginner", "Intermediate", "Advanced"] as const;
-const WEEKDAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
 type Tab = "browse" | "mine";
 
