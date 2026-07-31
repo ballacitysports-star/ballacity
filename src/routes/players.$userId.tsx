@@ -12,14 +12,14 @@ import { Button } from "@/components/ui/button";
 import { SPORTS, HERO_IMAGE } from "@/lib/sample-data";
 import { formatSportLevel, parseSportLevels } from "@/lib/sport-levels";
 
-import { kmToMi } from "@/lib/distance";
+import { kmToMi, formatDistance } from "@/lib/distance";
 import type { PlayerAvailability } from "@/lib/availability";
 import { ReviewsSection } from "@/components/ReviewsSection";
 import { FollowSheet, UserSafetyMenu } from "@/components/FollowSheet";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { ReputationBadge } from "@/components/ReputationBadge";
 import { computeReputation, useReviewsFor } from "@/lib/reviews";
-import { useProfileOverrides } from "@/lib/user-prefs-store";
+import { useProfileOverrides, useDistanceUnit } from "@/lib/user-prefs-store";
 import { ProfileLinksList } from "@/components/ProfileLinks";
 import { BadgeList } from "@/components/BadgeList";
 import {
@@ -159,6 +159,7 @@ function PlayerProfilePage() {
   ).trim();
   const bio = overrides.bio ?? profile.bio ?? "";
   const city = overrides.city ?? profile.city ?? "";
+  const unit = useDistanceUnit();
   const searchRadiusMi = (profile as any).search_radius_mi as number | null | undefined;
   const sportLevels = parseSportLevels((profile as any).sport_levels);
   const sportsBase: { name: string }[] = overrides.sports?.length
