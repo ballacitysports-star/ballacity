@@ -27,7 +27,7 @@ import {
 import { useMyOrgs } from "@/lib/org-store";
 import { OrgCard } from "@/components/OrgCard";
 import { listTrainerOrgs } from "@/lib/trainer-orgs.functions";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { getCurrentUser, useAuth } from "@/hooks/use-auth";
 import { Dumbbell } from "lucide-react";
 
