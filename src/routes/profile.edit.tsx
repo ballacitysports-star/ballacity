@@ -206,9 +206,8 @@ function EditProfile() {
   const persist = async () => {
     if (!profileUser) throw new Error("Sign in to save");
     const trimmedName = name.trim().slice(0, 60);
-    const cleanedLinks = links
-      .map((l) => ({ ...l, url: normalizeUrl(l.url), label: l.label?.trim() || undefined }))
-      .filter((l) => l.url);
+    const cleanedLinks = cleanProfileLinks(links);
+
     const trimmedCity = city.trim().slice(0, 80);
     const birthdayClean = birthday && /^\d{4}-\d{2}-\d{2}$/.test(birthday) ? birthday : undefined;
     const initials = (avatar.trim() || trimmedName.slice(0, 2)).toUpperCase().slice(0, 3);
