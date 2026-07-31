@@ -5,7 +5,7 @@ import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/use-auth";
 import { useAccountType, type AccountType } from "@/lib/account-type";
-import { getFeedPrefsSnapshot, setFeedPrefs, setProfileOverrides, useMyProfile, useDistanceUnit } from "@/lib/user-prefs-store";
+import { getFeedPrefsSnapshot, setFeedPrefs, setProfileOverrides, useMyProfileState, useDistanceUnit, type ProfileLink } from "@/lib/user-prefs-store";
 import { kmToMi, miToKm } from "@/lib/distance";
 import { Section, validateBirthday } from "@/components/profile/ProfileFormPrimitives";
 import {
@@ -16,8 +16,14 @@ import {
   ProfileSportsFields,
   type SportEntry,
 } from "@/components/profile/ProfileSportsFields";
+import {
+  ProfileLinksFields,
+  cleanProfileLinks,
+  validateProfileUrl,
+} from "@/components/profile/ProfileLinksFields";
 import { useAutosave } from "@/hooks/use-autosave";
 import { SaveStatus } from "@/components/SaveStatus";
+
 
 
 const searchSchema = z.object({
