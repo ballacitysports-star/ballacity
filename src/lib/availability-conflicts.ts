@@ -216,6 +216,109 @@ export function describeConflict(c: SlotConflict): string {
   return `${fmtShortDate(c.date)} ${fmt12(c.slot.start)}–${fmt12(c.slot.end)} overlaps “${b.label}” (${fmt12(b.start)}–${fmt12(b.end)})${extra}`;
 }
 
+// ---------------------------------------------------------------------------
+// Quick fixes offered straight from a conflict warning
+// ---------------------------------------------------------------------------
+
+const MIN_WINDOW = 30; // minutes — anything shorter isn't worth posting
+const DAY_END = 23 * 60 + 59;
+
+const fromMin = (m: number) => {
+  const c = Math.max(0, Math.min(DAY_END, Math.round(m)));
+  return `${String(Math.floor(c / 60)).padStart(2, "0")}:${String(c % 60).padStart(2, "0")}`;
+};
+
+export type SlotFixId = "skip" | "shorten" | "remove";
+
+export type SlotFix = {
+  id: SlotFixId;
+  label: string;
+  /** Longer explanation for the button title / a11y. */
+  hint: string;
+  /** The replacement slot — omitted for "remove". */
+  slot?: TimeSlot;
+};
+
+/** Merged span of the blocks a slot collides with. */
+function busySpan(c: SlotConflict) {
+  const start = Math.min(...c.blocks.map((b) => toMin(b.start)));
+  const end = Math.max(...c.blocks.map((b) => toMin(b.end === "24:00" ? "23:59" : b.end)));
+  return { start, end };
+}
+
+/**
+ * Actionable ways to clear a conflict without leaving the picker:
+ *  - skip:    move the whole window to start when the busy block ends
+ *  - shorten: trim the window to the larger free side of the busy block
+ *  - remove:  drop the window entirely
+ */
+export function suggestSlotFixes(c: SlotConflict): SlotFix[] {
+  const slot = c.slot;
+  const s = toMin(slot.start);
+  const e = toMin(slot.end === "24:00" ? "23:59" : slot.end);
+  const dur = Math.max(MIN_WINDOW, e - s);
+  const busy = busySpan(c);
+  const fixes: SlotFix[] = [];
+
+  // Skip to the next free window — same length, starting after the clash.
+  if (busy.end + MIN_WINDOW <= DAY_END) {
+    const nextStart = busy.end;
+    const nextEnd = Math.min(DAY_END, nextStart + dur);
+    if (nextEnd - nextStart >= MIN_WINDOW) {
+      fixes.push({
+        id: "skip",
+        label: `Skip to ${fmt12(fromMin(nextStart))}`,
+        hint: `Move this window to ${fmt12(fromMin(nextStart))}–${fmt12(fromMin(nextEnd))}, right after “${c.blocks[0].label}”.`,
+        slot: { ...slot, start: fromMin(nextStart), end: fromMin(nextEnd) } as TimeSlot,
+      });
+    }
+  }
+
+  // Shorten — keep whichever free side of the clash is longer.
+  const beforeLen = busy.start - s;
+  const afterLen = e - busy.end;
+  if (Math.max(beforeLen, afterLen) >= MIN_WINDOW) {
+    const useBefore = beforeLen >= afterLen;
+    const start = useBefore ? s : busy.end;
+    const end = useBefore ? busy.start : e;
+    const already = fromMin(start) === slot.start && fromMin(end) === slot.end;
+    const dupOfSkip = fixes.some((f) => f.slot && (f.slot as any).start === fromMin(start) && (f.slot as any).end === fromMin(end));
+    if (!already && !dupOfSkip) {
+      fixes.push({
+        id: "shorten",
+        label: useBefore
+          ? `End at ${fmt12(fromMin(end))}`
+          : `Start at ${fmt12(fromMin(start))}`,
+        hint: `Shorten to ${fmt12(fromMin(start))}–${fmt12(fromMin(end))} so it stops clashing.`,
+        slot: { ...slot, start: fromMin(start), end: fromMin(end) } as TimeSlot,
+      });
+    }
+  }
+
+  fixes.push({
+    id: "remove",
+    label: "Remove",
+    hint: "Drop this window from your availability.",
+  });
+
+  return fixes;
+}
+
+/** Drop every window that overlaps an earlier one, keeping the first. */
+export function dropOverlappingSlots(slots: TimeSlot[]): TimeSlot[] {
+  const kept: TimeSlot[] = [];
+  for (const s of slots) {
+    const clashes = kept.some((k) => {
+      const sameDay = isDateSlot(k)
+        ? isDateSlot(s) && k.date === s.date
+        : !isDateSlot(s) && k.weekday === s.weekday;
+      return sameDay && overlapsTime(k.start, k.end, s.start, s.end);
+    });
+    if (!clashes) kept.push(s);
+  }
+  return kept;
+}
+
 /** Busy blocks for the signed-in player, cached for a minute. */
 export function useMyBusyBlocks(opts: { excludeAvailabilityId?: string; enabled?: boolean } = {}) {
   const { excludeAvailabilityId, enabled = true } = opts;
