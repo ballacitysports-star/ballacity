@@ -291,9 +291,9 @@ function OnboardingWizard({ type }: { type: AccountType }) {
       });
 
       const { supabase } = await import("@/integrations/supabase/client");
-      const { buildProfileRow, profileRowFingerprint, onboardingSaveKey } = await import(
-        "@/lib/profile-payload"
-      );
+      const { buildProfileRow, profileRowFingerprint, onboardingSaveKey, saveProfileRow } =
+        await import("@/lib/profile-payload");
+
       const primary = sports[0]?.name;
       const row = buildProfileRow({
         userId: user.id,
