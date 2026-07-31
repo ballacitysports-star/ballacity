@@ -20,6 +20,8 @@ import {
   SlidersHorizontal,
 } from "lucide-react";
 import { InfiniteList } from "@/components/InfiniteList";
+import { LocationAutocomplete } from "@/components/LocationAutocomplete";
+
 import { FilterSheet, FilterSection, ChipRow } from "@/components/FilterSheet";
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/use-auth";
@@ -502,12 +504,13 @@ function AvailablePlayersPage() {
         </FilterSection>
 
         <FilterSection label="Location">
-          <Input
+          <LocationAutocomplete
             value={city}
-            onChange={(e) => setCity(e.target.value)}
+            onChange={setCity}
             placeholder="City (e.g. Austin)"
-            className="h-10"
+            mode="city"
           />
+
           {city.trim() && (
             <label className="flex items-center gap-2 pt-2 text-xs text-muted-foreground">
               <input
@@ -1006,12 +1009,13 @@ function PostAvailabilityDialog({
           <div className="grid grid-cols-[1fr_110px] gap-2">
             <div>
               <Label htmlFor="city">City</Label>
-              <Input
-                id="city"
+              <LocationAutocomplete
                 value={city}
-                onChange={(e) => setCity(e.target.value)}
+                onChange={setCity}
                 placeholder="e.g. Austin"
+                mode="city"
               />
+
             </div>
             <div>
               <Label htmlFor="radius">Radius ({unit})</Label>

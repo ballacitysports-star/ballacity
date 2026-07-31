@@ -5,6 +5,8 @@ import { Building2, Check, X, Loader2, Search, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { LocationAutocomplete } from "@/components/LocationAutocomplete";
+
 import { toast } from "sonner";
 import {
   createTrainerOrg,
@@ -244,7 +246,14 @@ function CreateForm({ trainerId, onDone }: { trainerId: string; onDone: () => vo
         placeholder="handle (a-z, 0-9, _-)"
         className="h-9"
       />
-      <Input value={city} onChange={(e) => setCity(e.target.value)} placeholder="City (optional)" className="h-9" />
+      <LocationAutocomplete
+        value={city}
+        onChange={setCity}
+        placeholder="City (optional)"
+        mode="city"
+        showCurrentButton={false}
+      />
+
       <Textarea
         value={bio}
         onChange={(e) => setBio(e.target.value)}

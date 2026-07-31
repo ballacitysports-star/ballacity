@@ -1,28 +1,24 @@
-## Problem
+## Goal
 
-The crop frame ratio is already fixed (1:1 for avatars, 16:9 for covers) and stays that way. What's actually distorting is the **image being cropped**, not the frame.
+Every address, gym/venue, and city field in the app uses the same Google Places autocomplete component instead of a plain text box.
 
-Both crop surfaces render the photo as an absolutely positioned `<img>` with explicit pixel `width`/`height` (natural size × zoom):
+## Already done (no change needed)
 
-- `src/components/ImageEditorDialog.tsx` (lines ~383–399)
-- `src/components/ImageCropperDialog.tsx` (lines ~257–272)
+`LocationAutocomplete` is already used in: game create (`_tabs.create.tsx`), game detail, gym/org form (`OrgForm.tsx` — city + street address), team edit, create-org wizard, create-trainer wizard, and profile basics (city).
 
-Tailwind's base stylesheet applies `img { max-width: 100%; height: auto }`. The inline `height` wins over `height: auto`, but the inline `width` does **not** override the stylesheet's `max-width: 100%`. So as soon as the zoomed image is wider than the crop container — which is the normal case for any portrait or high-res photo, and for every zoom-in — the width gets clamped to the container while the height stays at the full computed value. Result: the photo is squeezed horizontally, i.e. stretched vertically, and the aspect ratio visibly changes as you zoom.
+## Fields to convert
 
-## Fix
+1. **Available Players filter — "Location"** (`src/routes/available-players.tsx`, ~line 504): city text input → `LocationAutocomplete` with `mode="city"`, keeping the existing clear button and filter state wiring.
+2. **Available Players — post availability form "City"** (~line 1008): same swap, `mode="city"`.
+3. **Create post sheet — "Location"** (`src/components/CreatePostSheet.tsx`, ~line 145): `placeholder="Venue or address"` → `LocationAutocomplete` in `mode="place"` so it suggests gyms/courts/venues.
+4. **Trainer org quick-create — "City (optional)"** (`src/components/TrainerOrgSection.tsx`, ~line 247): swap to `LocationAutocomplete`, `mode="city"`, `showCurrentButton={false}` to keep the compact inline row.
 
-In both crop dialogs, on the crop-canvas `<img>` inline style:
+## Notes
 
-- add `maxWidth: "none"` and `maxHeight: "none"` so the explicit pixel dimensions are honored exactly
-- add `objectFit: "fill"` as a harmless no-op safeguard (dimensions already match the natural ratio, so nothing is resampled)
+- No changes to what gets saved: each field keeps storing the same free-text string, so existing rows and filters keep working. Typing manually still works — suggestions are optional.
+- The "Use current location" button is on by default; it will be hidden in the compact trainer row and shown in the fuller forms.
+- Behavior is unchanged if Google suggestions fail: the component already falls back to plain typing with a small hint message.
 
-No changes to `aspect`, `cropW`/`cropH`, `minScale`, gesture math, or the export canvas — those are already ratio-correct, and the exported crop was never distorted (only the on-screen preview was), so output stays identical.
+### Technical detail
 
-## Verification
-
-Open the profile edit screen, upload a tall portrait photo into both the cover (16:9) and avatar (1:1) editors, and confirm with an element screenshot that the subject keeps its proportions at minimum zoom and while pinching/zooming in, and that the crop frame itself stays a fixed square/16:9 throughout.
-
-## Files touched
-
-- `src/components/ImageEditorDialog.tsx`
-- `src/components/ImageCropperDialog.tsx`
+`LocationAutocomplete` takes `value`/`onChange` (string) plus optional `onPick(value, placeId, geo)`. The four call sites only need the string pair, so no schema, server function, or database change is required. Its backing server functions (`autocompletePlaces`, `getPlaceDetails`) are auth-gated and already deployed.
