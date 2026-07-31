@@ -561,7 +561,7 @@ function PlayersFilterBody({
         </div>
       </FilterSection>
 
-      <FilterSection label="Skill level">
+      <FilterSection label={scale ? `Skill level · ${scale.system}` : "Skill level"}>
         <div className="flex flex-wrap gap-2">
           <Chip active={!skill} onClick={() => setSkill("")}>
             Any
@@ -572,7 +572,13 @@ function PlayersFilterBody({
             </Chip>
           ))}
         </div>
+        {!sport && (
+          <p className="mt-2 text-xs text-muted-foreground">
+            Pick a sport to filter by its own levels.
+          </p>
+        )}
       </FilterSection>
+
 
       <FilterSection label="Max travel distance">
         <div className="flex flex-wrap gap-2">
