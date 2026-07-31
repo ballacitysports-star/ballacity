@@ -340,7 +340,7 @@ function AvailablePlayersPage() {
                 />
               )}
               {city.trim() && (
-                <ActiveChip label={city.trim()} onClear={() => setCity("")} />
+                <ActiveChip label={city.trim()} onClear={() => changeCity("")} />
               )}
               {maxDistance > 0 && (
                 <ActiveChip
@@ -357,7 +357,7 @@ function AvailablePlayersPage() {
                     setWindow("any");
                     setCustomFrom("");
                     setCustomTo("");
-                    setCity("");
+                    changeCity("");
                     setIncludeAnywhere(true);
                     setMaxDistance(0);
                   }}
@@ -394,7 +394,7 @@ function AvailablePlayersPage() {
                       setWindow("any");
                       setCustomFrom("");
                       setCustomTo("");
-                      setCity("");
+                      changeCity("");
                       setIncludeAnywhere(true);
                       setMaxDistance(0);
                     }}
@@ -451,7 +451,7 @@ function AvailablePlayersPage() {
           setWindow("any");
           setCustomFrom("");
           setCustomTo("");
-          setCity("");
+          changeCity("");
           setIncludeAnywhere(true);
           setMaxDistance(0);
         }}
@@ -523,9 +523,22 @@ function AvailablePlayersPage() {
         <FilterSection label="Location">
           <LocationAutocomplete
             value={city}
-            onChange={setCity}
+            onChange={changeCity}
             placeholder="City (e.g. Austin)"
             mode="city"
+            onPick={(full, placeId, geo) => {
+              setCity(full);
+              setCityGeo(
+                geo
+                  ? {
+                      lat: geo.lat,
+                      lng: geo.lng,
+                      placeId,
+                      formattedAddress: geo.formattedAddress ?? full,
+                    }
+                  : null,
+              );
+            }}
           />
 
           {city.trim() && (
@@ -949,6 +962,16 @@ function PostAvailabilityDialog({
   const [slots, setSlots] = useState<TimeSlot[]>(() => parseTimeSlots(initial?.time_slots ?? []));
   const { data: busy = [] } = useMyBusyBlocks({ excludeAvailabilityId: initial?.id });
   const [city, setCity] = useState(initial?.city ?? "");
+  const [cityGeo, setCityGeo] = useState<PlaceGeo | null>(() =>
+    initial?.lat != null && initial?.lng != null
+      ? {
+          lat: Number(initial.lat),
+          lng: Number(initial.lng),
+          placeId: initial.place_id ?? null,
+          formattedAddress: initial.formatted_address ?? null,
+        }
+      : null,
+  );
   const unit = useDistanceUnit();
   const [radius, setRadius] = useState(() =>
     initial ? Math.round(unit === "km" ? initial.travel_radius_km : kmToMi(initial.travel_radius_km)) : 25,
@@ -971,6 +994,10 @@ function PostAvailabilityDialog({
         skill_level: skill,
         time_slots: slots,
         city,
+        place_id: cityGeo?.placeId ?? null,
+        formatted_address: cityGeo?.formattedAddress ?? null,
+        lat: cityGeo?.lat ?? null,
+        lng: cityGeo?.lng ?? null,
         travel_radius_km: unit === "km" ? radius : miToKm(radius),
         note,
       };
@@ -1028,9 +1055,25 @@ function PostAvailabilityDialog({
               <Label htmlFor="city">City</Label>
               <LocationAutocomplete
                 value={city}
-                onChange={setCity}
+                onChange={(v) => {
+                  setCity(v);
+                  setCityGeo(null);
+                }}
                 placeholder="e.g. Austin"
                 mode="city"
+                onPick={(full, placeId, geo) => {
+                  setCity(full);
+                  setCityGeo(
+                    geo
+                      ? {
+                          lat: geo.lat,
+                          lng: geo.lng,
+                          placeId,
+                          formattedAddress: geo.formattedAddress ?? full,
+                        }
+                      : null,
+                  );
+                }}
               />
 
             </div>
