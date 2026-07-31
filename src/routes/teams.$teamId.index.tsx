@@ -107,11 +107,11 @@ function TeamPage() {
   const filter: PostKind | "all" = (search.filter || "all") as PostKind | "all";
   const reviewsOpen = search.modal === "reviews";
   const setTab = (v: "posts" | "about" | "games") =>
-    navigate({ to: ".", search: (p) => ({ ...p, tab: v === "posts" ? "" : v }), replace: true });
+    navigate({ to: ".", search: { ...search, tab: v === "posts" ? "" : v }, replace: true });
   const setFilter = (v: PostKind | "all") =>
-    navigate({ to: ".", search: (p) => ({ ...p, filter: v === "all" ? "" : v }), replace: true });
+    navigate({ to: ".", search: { ...search, filter: v === "all" ? "" : v }, replace: true });
   const setReviewsOpen = (v: boolean) =>
-    navigate({ to: ".", search: (p) => ({ ...p, modal: v ? "reviews" : "" }), replace: true });
+    navigate({ to: ".", search: { ...search, modal: v ? "reviews" : "" }, replace: true });
   const [following, setFollowing] = useState(false);
   const [mounted, setMounted] = useState(false);
   const [composerOpen, setComposerOpen] = useState(false);

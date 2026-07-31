@@ -122,11 +122,11 @@ function TrainerPage() {
   const reviewsOpen = search.modal === "reviews";
   const selectedVenue: string = search.venue || "";
   const setTab = (v: "about" | "experience" | "reviews") =>
-    navigate({ to: ".", search: (p) => ({ ...p, tab: v === "about" ? "" : v }), replace: true });
+    navigate({ to: ".", search: { ...search, tab: v === "about" ? "" : v }, replace: true });
   const setReviewsOpen = (v: boolean) =>
-    navigate({ to: ".", search: (p) => ({ ...p, modal: v ? "reviews" : "" }), replace: true });
+    navigate({ to: ".", search: { ...search, modal: v ? "reviews" : "" }, replace: true });
   const setSelectedVenue = (v: string) =>
-    navigate({ to: ".", search: (p) => ({ ...p, venue: selectedVenue === v ? "" : v }), replace: true });
+    navigate({ to: ".", search: { ...search, venue: selectedVenue === v ? "" : v }, replace: true });
 
 
   const [bookOpen, setBookOpen] = useState(false);
