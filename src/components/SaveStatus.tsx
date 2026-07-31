@@ -15,6 +15,8 @@ function relative(ts: number, now: number): string {
 type Props = Pick<AutosaveState, "status" | "reason" | "error" | "savedAt" | "retry"> & {
   /** Label used for the success state — "Saved" (default) or "Draft saved". */
   savedLabel?: string;
+  /** "text" (default) is subtle inline text; "pill" renders a high-contrast badge. */
+  variant?: "text" | "pill";
   className?: string;
 };
 
@@ -26,6 +28,7 @@ export function SaveStatus({
   savedAt,
   retry,
   savedLabel = "Saved",
+  variant = "text",
   className = "",
 }: Props) {
   const [now, setNow] = useState(() => Date.now());
@@ -35,32 +38,55 @@ export function SaveStatus({
     return () => clearInterval(t);
   }, [status, savedAt]);
 
-  const base = `inline-flex items-center gap-1.5 text-xs ${className}`;
+  const pill =
+    variant === "pill"
+      ? "rounded-full border px-2.5 py-1 font-semibold whitespace-nowrap"
+      : "";
+  const tone = (text: string, border: string, bg: string) =>
+    variant === "pill" ? `${text} ${border} ${bg}` : text;
+  const base = `inline-flex items-center gap-1.5 text-xs ${pill} ${className}`;
+
 
   if (status === "saving")
     return (
-      <span className={`${base} text-muted-foreground`} role="status" aria-live="polite">
+      <span
+        className={`${base} ${tone("text-lime", "border-lime/40", "bg-lime/10")}`}
+        role="status"
+        aria-live="polite"
+      >
         <Loader2 className="h-3.5 w-3.5 animate-spin" /> Saving…
       </span>
     );
 
   if (status === "dirty")
     return (
-      <span className={`${base} text-muted-foreground`} role="status" aria-live="polite">
+      <span
+        className={`${base} ${tone("text-muted-foreground", "border-border", "bg-surface")}`}
+        role="status"
+        aria-live="polite"
+      >
         Unsaved changes
       </span>
     );
 
   if (status === "invalid")
     return (
-      <span className={`${base} text-coral`} role="status" aria-live="polite">
+      <span
+        className={`${base} ${tone("text-coral", "border-coral/40", "bg-coral/10")}`}
+        role="status"
+        aria-live="polite"
+      >
         <TriangleAlert className="h-3.5 w-3.5" /> Not saved — {reason ?? "fix the errors above"}
       </span>
     );
 
   if (status === "error")
     return (
-      <span className={`${base} text-destructive`} role="status" aria-live="polite">
+      <span
+        className={`${base} ${tone("text-destructive", "border-destructive/40", "bg-destructive/10")}`}
+        role="status"
+        aria-live="polite"
+      >
         <CloudOff className="h-3.5 w-3.5" />
         <span className="truncate max-w-[12rem]">{error ?? "Couldn't save"}</span>
         <button
@@ -75,10 +101,15 @@ export function SaveStatus({
 
   if (status === "saved" && savedAt != null)
     return (
-      <span className={`${base} text-muted-foreground`} role="status" aria-live="polite">
-        <Check className="h-3.5 w-3.5 text-lime" /> {savedLabel} {relative(savedAt, now)}
+      <span
+        className={`${base} ${tone("text-lime", "border-lime/40", "bg-lime/10")}`}
+        role="status"
+        aria-live="polite"
+      >
+        <Check className="h-3.5 w-3.5" /> {savedLabel} {relative(savedAt, now)}
       </span>
     );
+
 
   return null;
 }
