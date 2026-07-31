@@ -304,7 +304,7 @@ function EditProfile() {
         </Link>
         <div className="min-w-0 flex-1 text-center">
           <h1 className="font-display text-lg font-bold leading-tight">Edit profile</h1>
-          <SaveStatus {...autosave} className="mt-0.5" />
+          <SaveStatus {...autosave} variant="pill" className="mt-1" />
         </div>
         <button
           onClick={done}
@@ -629,7 +629,7 @@ function EditProfile() {
       </Section>
 
       <div className="mt-6 flex items-center justify-between gap-3">
-        <SaveStatus {...autosave} />
+        <SaveStatus {...autosave} variant="pill" />
         <button
           onClick={done}
           className="rounded-full bg-lime-gradient px-6 py-3 text-sm font-bold text-primary-foreground"

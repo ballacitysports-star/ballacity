@@ -447,7 +447,7 @@ function OnboardingWizard({ type }: { type: AccountType }) {
           <span>{pct}%</span>
         </div>
         <div className="mt-1.5">
-          <SaveStatus {...autosave} />
+          <SaveStatus {...autosave} variant="pill" />
         </div>
         <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-surface">
           <div
