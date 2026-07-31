@@ -132,11 +132,8 @@ function OnboardingWizard({ type }: { type: AccountType }) {
   const [links, setLinks] = useState<ProfileLink[]>([]);
   const [radius, setRadius] = useState(15); // kilometers (canonical)
   const unit = useDistanceUnit();
-  const radiusMax = unit === "km" ? 100 : 60;
-  const radiusDisplay = Math.min(
-    radiusMax,
-    Math.max(1, unit === "km" ? radius : kmToMi(radius)),
-  );
+  // Radius controls share the app-wide 12,500 mi ceiling.
+  const radiusMi = clampDistanceMi(Math.max(1, kmToMi(radius))) as number;
   const [geo, setGeo] = useState<GeoState>({ kind: "idle" });
   const [attempt, setAttempt] = useState(0);
 
@@ -350,7 +347,7 @@ function OnboardingWizard({ type }: { type: AccountType }) {
           new Set([...sports.map((s) => s.name), ...current.preferredSports]),
         ),
         // `maxDistanceMi` is always stored in miles; `radius` is kilometers.
-        maxDistanceMi: Math.max(1, kmToMi(radius)),
+        maxDistanceMi: radiusMi,
       });
 
       await queryClient.invalidateQueries({
@@ -544,34 +541,13 @@ function OnboardingWizard({ type }: { type: AccountType }) {
           )}
 
           <div className="mt-5">
-            <div className="flex items-center justify-between text-sm font-semibold">
-              <span>Search radius</span>
-              <span className="text-muted-foreground">
-                {radiusDisplay} {unit}
-              </span>
-            </div>
-            <input
-              type="range"
-              min={1}
-              max={radiusMax}
-              step={1}
-              value={radiusDisplay}
-              onChange={(e) => {
-                const v = Number(e.target.value);
-                setRadius(unit === "km" ? v : miToKm(v));
+            <ProfileLocationFields
+              showCity={false}
+              value={{ city: basics.city, searchRadiusMi: radiusMi }}
+              onChange={(patch) => {
+                if (patch.searchRadiusMi != null) setRadius(miToKm(patch.searchRadiusMi));
               }}
-              className="mt-2 w-full accent-lime"
-              aria-label={`Search radius in ${unit === "km" ? "kilometers" : "miles"}`}
             />
-            <div className="mt-1 flex justify-between text-[11px] text-muted-foreground">
-              <span>1 {unit}</span>
-              <span>
-                {Math.round(radiusMax / 2)} {unit}
-              </span>
-              <span>
-                {radiusMax} {unit}
-              </span>
-            </div>
           </div>
         </Section>
       )}
