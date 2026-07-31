@@ -8,6 +8,8 @@ import { Distance } from "@/components/Distance";
 import { geocodeAddress } from "@/lib/geocode.functions";
 import { haversineKm, useUserLocation, type LatLng } from "@/lib/geo";
 import { SPORTS } from "@/lib/sample-data";
+import { resolvePlayerLevel, formatSportLevel } from "@/lib/sport-levels";
+
 import type { AvailabilityWithAuthor } from "@/lib/availability";
 
 const emojiBySport: Record<string, string> = Object.fromEntries(
