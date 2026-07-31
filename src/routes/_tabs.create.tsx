@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import { SPORTS, type Sport, imageFor } from "@/lib/sample-data";
 import { addHostedGame } from "@/lib/hosted-games-store";
+import { filterTiersForSport, sanitizeSkillForSport, scaleForSport } from "@/lib/sport-levels";
 import { useServerFn } from "@tanstack/react-start";
 import { reverseGeocode } from "@/lib/geocode.functions";
 import { listMyTeams } from "@/lib/teams.functions";
@@ -89,9 +90,15 @@ function Create() {
   const [location, setLocation] = useState(profile?.city ?? "");
   const previousProfileCityRef = useRef(profile?.city ?? "");
   const locationEditedRef = useRef(false);
-  const [skill, setSkill] = useState<"All Levels" | "Beginner" | "Intermediate" | "Advanced">(
-    "All Levels",
-  );
+  // Skill options follow the picked sport's real scale (Flag / 7v7 /
+  // Full contact for Football) so a game reads like a profile tier.
+  const [skill, setSkill] = useState<string>("All Levels");
+  const skillOptions = ["All Levels", ...filterTiersForSport(sport)];
+  useEffect(() => {
+    if (skill === "All Levels") return;
+    const kept = sanitizeSkillForSport(sport, skill);
+    if (kept !== skill) setSkill(kept || "All Levels");
+  }, [sport, skill]);
   const [size, setSize] = useState(10);
   const [price, setPrice] = useState(0);
   const [indoor, setIndoor] = useState(false);
@@ -602,9 +609,9 @@ function Create() {
         </Section>
 
         {/* Skill */}
-        <Section title="Skill level">
+        <Section title={`Skill level · ${scaleForSport(sport).system}`}>
           <div className="flex gap-2 overflow-x-auto scrollbar-hide">
-            {(["All Levels", "Beginner", "Intermediate", "Advanced"] as const).map((s) => (
+            {skillOptions.map((s) => (
               <button
                 type="button"
                 key={s}

@@ -61,7 +61,12 @@ export type Game = {
   lng: number; // pseudo coords for faux map (0-100)
   maxPlayers: number;
   joined: number;
-  skill: "All Levels" | "Beginner" | "Intermediate" | "Advanced";
+  /**
+   * Skill level for the game. Either "All Levels", a legacy generic tier
+   * (Beginner/Intermediate/Advanced) or one of the sport's real tiers, e.g.
+   * "7v7 Competitive" or "Minor AAA".
+   */
+  skill: string;
   price: number; // 0 = free
   indoor: boolean;
   isPrivate: boolean;
