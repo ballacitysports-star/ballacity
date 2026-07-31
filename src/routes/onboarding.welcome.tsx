@@ -468,7 +468,14 @@ function OnboardingWizard({ type }: { type: AccountType }) {
       )}
 
       {step === 2 && (
+        <Section title="Profile links">
+          <ProfileLinksFields links={links} onChange={setLinks} />
+        </Section>
+      )}
+
+      {step === locationStep && (
         <Section title="Location">
+
           <p className="mb-3 text-xs text-muted-foreground">
             We use your location to show nearby games. You can also skip and set a radius manually.
           </p>
