@@ -106,6 +106,25 @@ export function serializeSportLevels(
 /** Legacy generic tiers still stored on older availability posts. */
 export const LEGACY_SKILLS = ["Beginner", "Intermediate", "Advanced"] as const;
 
+/** Tiers a skill filter may legally hold for a sport ("" = all sports). */
+export function filterTiersForSport(sport: string): string[] {
+  return sport ? levelsForSport(sport as Sport) : [...LEGACY_SKILLS];
+}
+
+/**
+ * Keeps a skill filter value only when the sport's own scale contains it.
+ * Used everywhere a sport/skill pair can arrive from outside the UI
+ * (URL, localStorage, saved presets) so an incompatible tier can never stick.
+ */
+export function sanitizeSkillForSport(
+  sport: string | null | undefined,
+  skill: string | null | undefined,
+): string {
+  if (!skill) return "";
+  return filterTiersForSport(sport || "").includes(skill) ? skill : "";
+}
+
+
 /**
  * Skill level to show for a player in a given sport.
  * Profile tier wins; falls back to the post's own generic level.

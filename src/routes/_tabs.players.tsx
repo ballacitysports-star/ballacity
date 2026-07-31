@@ -76,6 +76,7 @@ import {
   parseSportLevels,
   playerLevelsForSports,
   resolvePlayerLevel,
+  sanitizeSkillForSport,
   scaleForSport,
 } from "@/lib/sport-levels";
 
@@ -147,12 +148,11 @@ function PlayersPage() {
   const setQ = (v: string) => updateSearch({ q: v });
   const setSport = (v: string) => {
     // Tiers are sport-specific — drop a skill selection the new sport doesn't have.
-    const allowed = v ? levelsForSport(v as any) : [...LEGACY_SKILLS];
-    const keepSkill = search.skill && allowed.includes(search.skill) ? search.skill : "";
-    updateSearch({ sport: v, skill: keepSkill });
+    updateSearch({ sport: v, skill: sanitizeSkillForSport(v, search.skill) });
   };
 
-  const setSkill = (v: string) => updateSearch({ skill: v });
+  const setSkill = (v: string) => updateSearch({ skill: sanitizeSkillForSport(sport, v) });
+
   const setMaxDistance = (v: number) => updateSearch({ dist: v });
   const setAgeMin = (v: number | "") => updateSearch({ ageMin: v === "" ? undefined : v });
   const setAgeMax = (v: number | "") => updateSearch({ ageMax: v === "" ? undefined : v });
@@ -185,7 +185,13 @@ function PlayersPage() {
           const f = JSON.parse(rawF) as Record<string, unknown>;
           if (typeof f.q === "string" && f.q) patch.q = f.q;
           if (typeof f.sport === "string" && f.sport) patch.sport = f.sport;
-          if (typeof f.skill === "string" && f.skill) patch.skill = f.skill;
+          if (typeof f.skill === "string" && f.skill) {
+            // A tier saved under an older sport scale must not survive the restore.
+            patch.skill = sanitizeSkillForSport(
+              typeof f.sport === "string" ? f.sport : "",
+              f.skill,
+            );
+          }
           if (typeof f.maxDistance === "number" && f.maxDistance > 0) patch.dist = f.maxDistance;
           if (typeof f.ageMin === "number") patch.ageMin = f.ageMin;
           if (typeof f.ageMax === "number") patch.ageMax = f.ageMax;
@@ -205,6 +211,17 @@ function PlayersPage() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Any skill/sport pair can also arrive from a pasted URL, a browser refresh,
+  // localStorage restore, or a saved view. Scrub incompatible tiers out of the
+  // URL itself so the chips, the filter count, and the results always agree.
+  useEffect(() => {
+    const safe = sanitizeSkillForSport(sport, skill);
+    if (safe !== skill) updateSearch({ skill: safe });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sport, skill]);
+
+
 
   useEffect(() => {
     let cancelled = false;
