@@ -39,7 +39,12 @@ import {
   updateAvailability,
   type PlayerAvailability,
 } from "@/lib/availability";
-import { formatAvailabilityWindow } from "@/lib/availability-timeslots";
+import { AvailabilitySchedulePicker } from "@/components/availability/AvailabilitySchedulePicker";
+import {
+  formatAvailabilityWindow,
+  parseTimeSlots,
+  type TimeSlot,
+} from "@/lib/availability-timeslots";
 import { supabase } from "@/integrations/supabase/client";
 import { getOrCreateDirectConversation } from "@/lib/messages";
 import {
@@ -921,9 +926,7 @@ function PostAvailabilityDialog({
   const isEdit = !!initial;
   const [sports, setSports] = useState<string[]>(initial?.sports ?? []);
   const [skill, setSkill] = useState<string>(initial?.skill_level ?? "All Levels");
-  const [starts, setStarts] = useState(initial?.starts_on ?? "");
-  const [ends, setEnds] = useState(initial?.ends_on ?? "");
-  const [days, setDays] = useState<string[]>(initial?.recurring_days ?? []);
+  const [slots, setSlots] = useState<TimeSlot[]>(() => parseTimeSlots(initial?.time_slots ?? []));
   const [city, setCity] = useState(initial?.city ?? "");
   const unit = useDistanceUnit();
   const [radius, setRadius] = useState(() =>
@@ -945,9 +948,7 @@ function PostAvailabilityDialog({
       const payload = {
         sports,
         skill_level: skill,
-        starts_on: starts || null,
-        ends_on: ends || null,
-        recurring_days: days,
+        time_slots: slots,
         city,
         travel_radius_km: unit === "km" ? radius : miToKm(radius),
         note,
@@ -997,34 +998,9 @@ function PostAvailabilityDialog({
               ))}
             </div>
           </div>
-          <div className="grid grid-cols-2 gap-2">
-            <div>
-              <Label htmlFor="starts">From</Label>
-              <Input
-                id="starts"
-                type="date"
-                value={starts}
-                onChange={(e) => setStarts(e.target.value)}
-              />
-            </div>
-            <div>
-              <Label htmlFor="ends">Until</Label>
-              <Input id="ends" type="date" value={ends} onChange={(e) => setEnds(e.target.value)} />
-            </div>
-          </div>
           <div>
-            <Label className="mb-2 block">Recurring days (optional)</Label>
-            <div className="flex flex-wrap gap-2">
-              {WEEKDAYS.map((d) => (
-                <Chip
-                  key={d}
-                  active={days.includes(d)}
-                  onClick={() => setDays((arr) => toggle(arr, d))}
-                >
-                  {d}
-                </Chip>
-              ))}
-            </div>
+            <Label className="mb-2 block">When are you free?</Label>
+            <AvailabilitySchedulePicker value={slots} onChange={setSlots} />
           </div>
           <div className="grid grid-cols-[1fr_110px] gap-2">
             <div>
