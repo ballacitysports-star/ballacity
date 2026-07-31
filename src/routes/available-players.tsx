@@ -43,6 +43,14 @@ import {
   type PlaceGeo,
 } from "@/lib/availability";
 import { haversineKm } from "@/lib/geo";
+import {
+  filterTiersForSport,
+  formatSportLevel,
+  levelMatchesFilter,
+  resolvePlayerLevel,
+  sanitizeSkillForSport,
+  scaleForSport,
+} from "@/lib/sport-levels";
 
 import { AvailabilitySchedulePicker } from "@/components/availability/AvailabilitySchedulePicker";
 import { useMyBusyBlocks } from "@/lib/availability-conflicts";
