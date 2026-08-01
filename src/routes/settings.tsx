@@ -382,7 +382,7 @@ function MyOrgsSection() {
           </li>
         ))}
       </ul>
-    </section>
+    </SettingsGroup>
   );
 }
 
