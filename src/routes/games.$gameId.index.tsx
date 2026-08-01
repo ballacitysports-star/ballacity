@@ -80,7 +80,15 @@ import { PostEngagement } from "@/components/PostEngagement";
 import { Distance } from "@/components/Distance";
 
 import { useHostedGames, fetchHostedGame, updateHostedGame, deleteHostedGame } from "@/lib/hosted-games-store";
-import { filterTiersForSport, sanitizeSkillForSport, scaleForSport } from "@/lib/sport-levels";
+import {
+  ANY_SKILL,
+  filterTiersForSport,
+  formatSkillValue,
+  parseSkillTiers,
+  scaleForSport,
+  serializeSkillTiers,
+  toggleSkillTier,
+} from "@/lib/sport-levels";
 import type { Game } from "@/lib/sample-data";
 import { PositionsPicker, positionsCleanup } from "@/components/PositionsPicker";
 import { listMyTeams } from "@/lib/teams.functions";
@@ -973,7 +981,7 @@ function GameDetail() {
               {emojiBySport[game.sport]} {game.sport}
             </span>
             <span className="rounded-full bg-background/70 backdrop-blur px-3 py-1 text-xs font-semibold">
-              {game.skill}
+              {formatSkillValue(game.sport, game.skill)}
             </span>
             {game.urgent && (
               <span className="rounded-full bg-coral-gradient px-3 py-1 text-xs font-bold text-white">
@@ -2365,11 +2373,13 @@ function EditGameModal({
   const [sport, setSport] = useState<Game["sport"]>(game.sport);
   const [skill, setSkill] = useState<Game["skill"]>(game.skill);
   // Tier list follows the game's sport, matching the profile scale.
-  const skillOptions = ["All Levels", ...filterTiersForSport(sport)];
+  const skillOptions = [ANY_SKILL, ...filterTiersForSport(sport)];
+  const selectedSkillTiers = parseSkillTiers(sport, skill);
+  const skillMulti = scaleForSport(sport).multi ?? false;
   useEffect(() => {
-    if (skill === "All Levels") return;
-    const kept = sanitizeSkillForSport(sport, skill);
-    if (kept !== skill) setSkill(kept || "All Levels");
+    if (skill === ANY_SKILL) return;
+    const kept = serializeSkillTiers(sport, parseSkillTiers(sport, skill));
+    if (kept !== skill) setSkill(kept);
   }, [sport, skill]);
   const [location, setLocation] = useState(game.location);
   const [neighborhood, setNeighborhood] = useState(game.neighborhood ?? "");
@@ -2712,21 +2722,35 @@ function EditGameModal({
           {/* Skill chips */}
           <Field label={`Skill level · ${scaleForSport(sport).system}`}>
             <div className="flex gap-2 overflow-x-auto scrollbar-hide">
-              {skillOptions.map((s) => (
-                <button
-                  type="button"
-                  key={s}
-                  onClick={() => setSkill(s)}
-                  className={`shrink-0 rounded-full border px-4 py-2 text-xs font-semibold ${
-                    skill === s
-                      ? "border-lime bg-lime text-primary-foreground"
-                      : "border-border bg-background text-muted-foreground"
-                  }`}
-                >
-                  {s}
-                </button>
-              ))}
+              {skillOptions.map((s) => {
+                const active =
+                  s === ANY_SKILL
+                    ? selectedSkillTiers.length === 0
+                    : selectedSkillTiers.includes(s);
+                return (
+                  <button
+                    type="button"
+                    key={s}
+                    aria-pressed={active}
+                    onClick={() =>
+                      setSkill(s === ANY_SKILL ? ANY_SKILL : toggleSkillTier(sport, skill, s))
+                    }
+                    className={`shrink-0 rounded-full border px-4 py-2 text-xs font-semibold ${
+                      active
+                        ? "border-lime bg-lime text-primary-foreground"
+                        : "border-border bg-background text-muted-foreground"
+                    }`}
+                  >
+                    {s}
+                  </button>
+                );
+              })}
             </div>
+            {skillMulti && (
+              <p className="mt-2 text-[11px] text-muted-foreground">
+                Pick a level in each football format — selections combine.
+              </p>
+            )}
           </Field>
 
           <div className="grid grid-cols-2 gap-3">

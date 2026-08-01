@@ -92,12 +92,14 @@ function Create() {
   const locationEditedRef = useRef(false);
   // Skill options follow the picked sport's real scale (Flag / 7v7 /
   // Full contact for Football) so a game reads like a profile tier.
-  const [skill, setSkill] = useState<string>("All Levels");
-  const skillOptions = ["All Levels", ...filterTiersForSport(sport)];
+  const [skill, setSkill] = useState<string>(ANY_SKILL);
+  const skillOptions = [ANY_SKILL, ...filterTiersForSport(sport)];
+  const selectedSkillTiers = parseSkillTiers(sport, skill);
+  const skillMulti = scaleForSport(sport).multi ?? false;
   useEffect(() => {
-    if (skill === "All Levels") return;
-    const kept = sanitizeSkillForSport(sport, skill);
-    if (kept !== skill) setSkill(kept || "All Levels");
+    if (skill === ANY_SKILL) return;
+    const kept = serializeSkillTiers(sport, parseSkillTiers(sport, skill));
+    if (kept !== skill) setSkill(kept);
   }, [sport, skill]);
   const [size, setSize] = useState(10);
   const [price, setPrice] = useState(0);
@@ -611,21 +613,36 @@ function Create() {
         {/* Skill */}
         <Section title={`Skill level · ${scaleForSport(sport).system}`}>
           <div className="flex gap-2 overflow-x-auto scrollbar-hide">
-            {skillOptions.map((s) => (
-              <button
-                type="button"
-                key={s}
-                onClick={() => setSkill(s)}
-                className={`shrink-0 rounded-full border px-4 py-2 text-sm font-semibold ${
-                  skill === s
-                    ? "border-lime bg-lime text-primary-foreground"
-                    : "border-border bg-surface text-muted-foreground"
-                }`}
-              >
-                {s}
-              </button>
-            ))}
+            {skillOptions.map((s) => {
+              const active =
+                s === ANY_SKILL
+                  ? selectedSkillTiers.length === 0
+                  : selectedSkillTiers.includes(s);
+              return (
+                <button
+                  type="button"
+                  key={s}
+                  aria-pressed={active}
+                  onClick={() =>
+                    setSkill(s === ANY_SKILL ? ANY_SKILL : toggleSkillTier(sport, skill, s))
+                  }
+                  className={`shrink-0 rounded-full border px-4 py-2 text-sm font-semibold ${
+                    active
+                      ? "border-lime bg-lime text-primary-foreground"
+                      : "border-border bg-surface text-muted-foreground"
+                  }`}
+                >
+                  {s}
+                </button>
+              );
+            })}
           </div>
+          {skillMulti && (
+            <p className="mt-2 px-1 text-[11px] text-muted-foreground">
+              Pick a level in each format you welcome — selections combine (e.g. "Flag Rec ·
+              7v7 Elite").
+            </p>
+          )}
         </Section>
 
         {/* Positions needed */}
