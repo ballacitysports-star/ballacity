@@ -432,12 +432,13 @@ function DeleteAccountButton() {
       <AlertDialogTrigger asChild>
         <button
           type="button"
-          className="flex w-full items-center justify-center gap-2 rounded-xl border border-destructive/40 bg-card px-4 py-3 text-sm font-medium text-destructive hover:bg-destructive/10"
+          className="flex w-full items-center gap-4 px-4 py-3.5 text-left transition-colors hover:bg-surface active:bg-surface-2"
         >
-          <Trash2 className="h-4 w-4" />
-          Delete account
+          <Trash2 className="h-5 w-5 shrink-0 text-destructive" aria-hidden />
+          <span className="flex-1 text-sm text-destructive">Delete account</span>
         </button>
       </AlertDialogTrigger>
+
       <AlertDialogContent>
         <AlertDialogHeader>
           <AlertDialogTitle>Delete your account?</AlertDialogTitle>
