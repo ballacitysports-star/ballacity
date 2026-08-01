@@ -59,6 +59,18 @@ import {
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { BadgeList } from "@/components/BadgeList";
 import { makeBadgeStats } from "@/lib/badges";
+import {
+  ProfileChannelHeader,
+  ChannelPill,
+  channelPillClass,
+} from "@/components/profile/ProfileChannelHeader";
+import {
+  ProfileAboutSheet,
+  AboutBlock,
+  AboutStats,
+} from "@/components/profile/ProfileAboutSheet";
+import { ChannelTabs } from "@/components/profile/ChannelTabs";
+
 
 export const Route = createFileRoute("/_tabs/profile")({
   head: () => ({ meta: [{ title: "Profile — OpenRun" }] }),
