@@ -19,7 +19,15 @@ import {
   BadgeCheck,
 } from "lucide-react";
 import { ACCOUNT_TYPE_META, useAccountType } from "@/lib/account-type";
+import { useMyProfile } from "@/lib/user-prefs-store";
+import {
+  SettingsGroup,
+  SettingsLinkRow,
+  SettingsButtonRow,
+  SettingsStaticRow,
+} from "@/components/settings/SettingsRow";
 import type { LucideIcon } from "lucide-react";
+
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { Switch } from "@/components/ui/switch";
