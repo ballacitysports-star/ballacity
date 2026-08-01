@@ -148,7 +148,11 @@ function SettingsHubPage() {
     }
   };
 
-  const themeOptions: Array<{ value: "light" | "dark" | "system"; label: string; Icon: typeof Sun }> = [
+  const themeOptions: Array<{
+    value: "light" | "dark" | "system";
+    label: string;
+    Icon: typeof Sun;
+  }> = [
     { value: "light", label: "Light", Icon: Sun },
     { value: "dark", label: "Dark", Icon: Moon },
     { value: "system", label: "System", Icon: Monitor },
@@ -267,7 +271,10 @@ function OnboardingDetailsSection() {
     <SettingsGroup title="Onboarding details">
       <SettingsStaticRow>
         <div className="flex items-center gap-4">
-          <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-surface-2 text-lg" aria-hidden>
+          <span
+            className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-surface-2 text-lg"
+            aria-hidden
+          >
             {meta.emoji}
           </span>
           <div className="min-w-0 flex-1">
@@ -299,7 +306,6 @@ function OnboardingDetailsSection() {
   );
 }
 
-
 function MyOrgsSection() {
   const qc = useQueryClient();
   const { user } = useAuth();
@@ -326,7 +332,6 @@ function MyOrgsSection() {
   return (
     <SettingsGroup title="My gyms">
       <ul className="divide-y divide-border">
-
         {orgs.map((o) => (
           <li key={o.id} className="flex items-center gap-4 px-4 py-3.5">
             <span className="grid h-9 w-9 shrink-0 place-items-center overflow-hidden rounded-full bg-surface-2">
@@ -363,8 +368,8 @@ function MyOrgsSection() {
                 <AlertDialogHeader>
                   <AlertDialogTitle>Delete {o.name}?</AlertDialogTitle>
                   <AlertDialogDescription>
-                    This permanently removes the gym and its memberships. This action
-                    cannot be undone.
+                    This permanently removes the gym and its memberships. This action cannot be
+                    undone.
                   </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
@@ -406,8 +411,8 @@ function DeleteAccountButton() {
   const blockerHint = !confirmOk
     ? 'Type "DELETE" to confirm'
     : !passwordOk
-    ? "Enter your password to confirm"
-    : "";
+      ? "Enter your password to confirm"
+      : "";
 
   const onDelete = async () => {
     setBusy(true);
@@ -428,7 +433,16 @@ function DeleteAccountButton() {
   };
 
   return (
-    <AlertDialog open={open} onOpenChange={(v) => { setOpen(v); if (!v) { setConfirm(""); setPassword(""); } }}>
+    <AlertDialog
+      open={open}
+      onOpenChange={(v) => {
+        setOpen(v);
+        if (!v) {
+          setConfirm("");
+          setPassword("");
+        }
+      }}
+    >
       <AlertDialogTrigger asChild>
         <button
           type="button"
@@ -443,26 +457,51 @@ function DeleteAccountButton() {
         <AlertDialogHeader>
           <AlertDialogTitle>Delete your account?</AlertDialogTitle>
           <AlertDialogDescription>
-            This action is permanent and cannot be undone. The following data will be
-            permanently removed:
+            This action is permanent and cannot be undone. The following data will be permanently
+            removed:
           </AlertDialogDescription>
         </AlertDialogHeader>
         <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-3">
           <ul className="space-y-1.5 text-sm text-foreground">
-            <li className="flex gap-2"><span aria-hidden>•</span><span>Your profile, avatar, cover photo, and bio</span></li>
-            <li className="flex gap-2"><span aria-hidden>•</span><span>Teams, trainer profiles, and gym pages you own</span></li>
-            <li className="flex gap-2"><span aria-hidden>•</span><span>Games you've hosted and your participation history</span></li>
-            <li className="flex gap-2"><span aria-hidden>•</span><span>Messages, comments, posts, and reactions</span></li>
-            <li className="flex gap-2"><span aria-hidden>•</span><span>Followers, following, blocks, and reports</span></li>
-            <li className="flex gap-2"><span aria-hidden>•</span><span>Ratings, reviews, and training session requests</span></li>
-            <li className="flex gap-2"><span aria-hidden>•</span><span>Availability, preferences, and saved locations</span></li>
-            <li className="flex gap-2"><span aria-hidden>•</span><span>Login credentials and all connected sign-in methods</span></li>
+            <li className="flex gap-2">
+              <span aria-hidden>•</span>
+              <span>Your profile, avatar, cover photo, and bio</span>
+            </li>
+            <li className="flex gap-2">
+              <span aria-hidden>•</span>
+              <span>Teams, trainer profiles, and gym pages you own</span>
+            </li>
+            <li className="flex gap-2">
+              <span aria-hidden>•</span>
+              <span>Games you've hosted and your participation history</span>
+            </li>
+            <li className="flex gap-2">
+              <span aria-hidden>•</span>
+              <span>Messages, comments, posts, and reactions</span>
+            </li>
+            <li className="flex gap-2">
+              <span aria-hidden>•</span>
+              <span>Followers, following, blocks, and reports</span>
+            </li>
+            <li className="flex gap-2">
+              <span aria-hidden>•</span>
+              <span>Ratings, reviews, and training session requests</span>
+            </li>
+            <li className="flex gap-2">
+              <span aria-hidden>•</span>
+              <span>Availability, preferences, and saved locations</span>
+            </li>
+            <li className="flex gap-2">
+              <span aria-hidden>•</span>
+              <span>Login credentials and all connected sign-in methods</span>
+            </li>
           </ul>
         </div>
         {hasPassword ? (
           <div className="space-y-2">
             <label className="text-xs text-muted-foreground">
-              Re-enter your password for <span className="font-semibold text-foreground">{email}</span>
+              Re-enter your password for{" "}
+              <span className="font-semibold text-foreground">{email}</span>
             </label>
             <Input
               type="password"
@@ -492,7 +531,10 @@ function DeleteAccountButton() {
           <AlertDialogCancel disabled={busy}>Cancel</AlertDialogCancel>
           <AlertDialogAction
             disabled={!canDelete}
-            onClick={(e) => { e.preventDefault(); onDelete(); }}
+            onClick={(e) => {
+              e.preventDefault();
+              onDelete();
+            }}
             className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
           >
             {busy ? "Deleting…" : "Permanently delete account"}
@@ -505,5 +547,3 @@ function DeleteAccountButton() {
     </AlertDialog>
   );
 }
-
-

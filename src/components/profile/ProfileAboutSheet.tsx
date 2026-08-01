@@ -32,13 +32,7 @@ export function ProfileAboutSheet({
 }
 
 /** A labelled block inside the About sheet. */
-export function AboutBlock({
-  label,
-  children,
-}: {
-  label: string;
-  children: React.ReactNode;
-}) {
+export function AboutBlock({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <section>
       <h3 className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">

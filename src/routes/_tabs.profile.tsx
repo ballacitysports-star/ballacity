@@ -3,14 +3,7 @@ import { zodValidator, fallback } from "@tanstack/zod-adapter";
 import { z } from "zod";
 import { formatSportLevel } from "@/lib/sport-levels";
 
-import {
-  Settings,
-  Shield,
-  Clock,
-  Star,
-  Crown,
-  Users,
-} from "lucide-react";
+import { Settings, Shield, Clock, Star, Crown, Users } from "lucide-react";
 import { useFollow } from "@/lib/follows";
 import { FollowSheet } from "@/components/FollowSheet";
 import { ME, GAMES, type Game } from "@/lib/sample-data";
@@ -42,12 +35,7 @@ import {
 } from "@/lib/payments";
 import { leaveGame } from "@/lib/games-store";
 import { supabase } from "@/integrations/supabase/client";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { BadgeList } from "@/components/BadgeList";
 import { makeBadgeStats } from "@/lib/badges";
@@ -56,20 +44,13 @@ import {
   ChannelPill,
   channelPillClass,
 } from "@/components/profile/ProfileChannelHeader";
-import {
-  ProfileAboutSheet,
-  AboutBlock,
-  AboutStats,
-} from "@/components/profile/ProfileAboutSheet";
+import { ProfileAboutSheet, AboutBlock, AboutStats } from "@/components/profile/ProfileAboutSheet";
 import { ChannelTabs } from "@/components/profile/ChannelTabs";
-
 
 export const Route = createFileRoute("/_tabs/profile")({
   head: () => ({ meta: [{ title: "Profile — OpenRun" }] }),
   // URL-persisted requests filter (all/host/player).
-  validateSearch: zodValidator(
-    z.object({ req: fallback(z.string(), "").default("") }),
-  ),
+  validateSearch: zodValidator(z.object({ req: fallback(z.string(), "").default("") })),
   component: Profile,
 });
 
@@ -109,7 +90,6 @@ function Profile() {
     return { hosting, playing, total: relevant.length };
   }, [joinedGameIds, hosted, profileUser]);
 
-
   // Pending / recently-reviewed join requests for player and host views
   const [myRequests, setMyRequests] = useState<JoinRequest[]>([]);
   const [hostRequests, setHostRequests] = useState<JoinRequest[]>([]);
@@ -128,10 +108,7 @@ function Profile() {
     }
     if (!opts.silent) setRequestsLoading(true);
     try {
-      const [mine, hosted] = await Promise.all([
-        listMyJoinRequests(),
-        listHostJoinRequests(),
-      ]);
+      const [mine, hosted] = await Promise.all([listMyJoinRequests(), listHostJoinRequests()]);
       setMyRequests(mine);
       setHostRequests(hosted);
     } catch {
@@ -197,7 +174,6 @@ function Profile() {
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [profileUser?.id]);
-
 
   const gameLookup = useMemo(() => {
     const m = new Map<string, Game>();
@@ -416,7 +392,6 @@ function Profile() {
           ]}
         />
 
-
         {/* Pending approvals */}
 
         <section className={`mt-6 ${activeTab === "requests" ? "" : "hidden"}`}>
@@ -491,39 +466,55 @@ function Profile() {
                       request={r}
                       index={i}
                       isHost={isHost}
-                      onCancel={isHost ? undefined : async () => {
-                        const prev = myRequests;
-                        setMyRequests((rs) => rs.filter((x) => x.id !== r.id));
-                        try {
-                          await cancelMyJoinRequest(r.game_id);
-                          toast("Request canceled.");
-                        } catch (e: any) {
-                          setMyRequests(prev);
-                          toast.error(e.message ?? "Could not cancel.");
-                        }
-                      }}
-                      onApprove={isHost ? async () => {
-                        const prev = hostRequests;
-                        setHostRequests((rs) => rs.map((x) => x.id === r.id ? { ...x, status: "approved" } : x));
-                        try {
-                          await reviewJoinRequest(r.id, "approved");
-                          toast("Player approved.");
-                        } catch (e: any) {
-                          setHostRequests(prev);
-                          toast.error(e.message ?? "Could not approve.");
-                        }
-                      } : undefined}
-                      onDecline={isHost ? async () => {
-                        const prev = hostRequests;
-                        setHostRequests((rs) => rs.map((x) => x.id === r.id ? { ...x, status: "rejected" } : x));
-                        try {
-                          await reviewJoinRequest(r.id, "rejected");
-                          toast("Player declined.");
-                        } catch (e: any) {
-                          setHostRequests(prev);
-                          toast.error(e.message ?? "Could not decline.");
-                        }
-                      } : undefined}
+                      onCancel={
+                        isHost
+                          ? undefined
+                          : async () => {
+                              const prev = myRequests;
+                              setMyRequests((rs) => rs.filter((x) => x.id !== r.id));
+                              try {
+                                await cancelMyJoinRequest(r.game_id);
+                                toast("Request canceled.");
+                              } catch (e: any) {
+                                setMyRequests(prev);
+                                toast.error(e.message ?? "Could not cancel.");
+                              }
+                            }
+                      }
+                      onApprove={
+                        isHost
+                          ? async () => {
+                              const prev = hostRequests;
+                              setHostRequests((rs) =>
+                                rs.map((x) => (x.id === r.id ? { ...x, status: "approved" } : x)),
+                              );
+                              try {
+                                await reviewJoinRequest(r.id, "approved");
+                                toast("Player approved.");
+                              } catch (e: any) {
+                                setHostRequests(prev);
+                                toast.error(e.message ?? "Could not approve.");
+                              }
+                            }
+                          : undefined
+                      }
+                      onDecline={
+                        isHost
+                          ? async () => {
+                              const prev = hostRequests;
+                              setHostRequests((rs) =>
+                                rs.map((x) => (x.id === r.id ? { ...x, status: "rejected" } : x)),
+                              );
+                              try {
+                                await reviewJoinRequest(r.id, "rejected");
+                                toast("Player declined.");
+                              } catch (e: any) {
+                                setHostRequests(prev);
+                                toast.error(e.message ?? "Could not decline.");
+                              }
+                            }
+                          : undefined
+                      }
                     />
                   );
                 }
@@ -533,18 +524,22 @@ function Profile() {
                     request={r}
                     index={i}
                     isHost={isHost}
-                    onWithdraw={isHost || r.status !== "approved" ? undefined : async () => {
-                      const prev = myRequests;
-                      setMyRequests((rs) => rs.filter((x) => x.id !== r.id));
-                      try {
-                        await withdrawMyApprovedJoinRequest(r.game_id);
-                        leaveGame(r.game_id);
-                        toast("You withdrew from the game.");
-                      } catch (e: any) {
-                        setMyRequests(prev);
-                        toast.error(e.message ?? "Could not withdraw.");
-                      }
-                    }}
+                    onWithdraw={
+                      isHost || r.status !== "approved"
+                        ? undefined
+                        : async () => {
+                            const prev = myRequests;
+                            setMyRequests((rs) => rs.filter((x) => x.id !== r.id));
+                            try {
+                              await withdrawMyApprovedJoinRequest(r.game_id);
+                              leaveGame(r.game_id);
+                              toast("You withdrew from the game.");
+                            } catch (e: any) {
+                              setMyRequests(prev);
+                              toast.error(e.message ?? "Could not withdraw.");
+                            }
+                          }
+                    }
                   />
                 );
               }}
@@ -634,7 +629,6 @@ function Profile() {
           )}
         </section>
 
-
         {/* Sports */}
         <div className={`mt-8 ${activeTab === "games" ? "" : "hidden"}`}>
           <h2 className="font-display text-sm font-bold uppercase tracking-wider text-muted-foreground mb-2">
@@ -683,15 +677,9 @@ function Profile() {
           showProgress
         />
 
-
         {/* Reviews tab — inline */}
         <div className={`mt-6 ${activeTab === "reviews" ? "" : "hidden"}`}>
-          <ReviewsSection
-            revieweeId="me"
-            revieweeKind="player"
-            revieweeName={me.name}
-            isOwner
-          />
+          <ReviewsSection revieweeId="me" revieweeKind="player" revieweeName={me.name} isOwner />
         </div>
 
         {/* Follow list sheet */}
@@ -702,7 +690,6 @@ function Profile() {
           displayName={me.name}
           initialTab={followList ?? "followers"}
         />
-
 
         {/* Reviews popup */}
         <Dialog open={reviewsOpen} onOpenChange={setReviewsOpen}>

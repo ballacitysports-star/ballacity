@@ -7,13 +7,7 @@ import type { LucideIcon } from "lucide-react";
  * YouTube settings list geometry: a small section heading, then flat
  * full-width rows on the page background separated by hairline dividers.
  */
-export function SettingsGroup({
-  title,
-  children,
-}: {
-  title?: string;
-  children: React.ReactNode;
-}) {
+export function SettingsGroup({ title, children }: { title?: string; children: React.ReactNode }) {
   return (
     <section>
       {title && (
@@ -56,9 +50,7 @@ function RowBody({
           {label}
         </span>
         {description && (
-          <span className="mt-0.5 block truncate text-xs text-muted-foreground">
-            {description}
-          </span>
+          <span className="mt-0.5 block truncate text-xs text-muted-foreground">{description}</span>
         )}
       </span>
       {trailing}
@@ -93,7 +85,9 @@ export function SettingsLinkRow({
         label={label}
         description={description}
         trailing={
-          trailing ?? <ChevronRight className="h-5 w-5 shrink-0 text-muted-foreground" aria-hidden />
+          trailing ?? (
+            <ChevronRight className="h-5 w-5 shrink-0 text-muted-foreground" aria-hidden />
+          )
         }
       />
     </Link>

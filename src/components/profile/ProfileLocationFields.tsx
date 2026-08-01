@@ -88,7 +88,9 @@ export function ProfileLocationFields({
                     : "border-border bg-surface text-foreground"
                 }`}
               >
-                {v === capInUnit ? `${v.toLocaleString("en-US")} ${unit} (anywhere)` : `${v} ${unit}`}
+                {v === capInUnit
+                  ? `${v.toLocaleString("en-US")} ${unit} (anywhere)`
+                  : `${v} ${unit}`}
               </button>
             );
           })}

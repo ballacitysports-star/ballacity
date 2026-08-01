@@ -1,6 +1,18 @@
 import { createFileRoute, Link, useNavigate, Navigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
-import { ArrowLeft, MessageCircle, Loader2, Calendar, MapPin, Shield, Trophy, UserPlus, UserCheck, Building2, ShieldCheck } from "lucide-react";
+import {
+  ArrowLeft,
+  MessageCircle,
+  Loader2,
+  Calendar,
+  MapPin,
+  Shield,
+  Trophy,
+  UserPlus,
+  UserCheck,
+  Building2,
+  ShieldCheck,
+} from "lucide-react";
 import { useFollow } from "@/lib/follows";
 import { toast } from "sonner";
 import { formatAvailabilityWindow } from "@/lib/availability-timeslots";
@@ -20,15 +32,8 @@ import { ReputationBadge } from "@/components/ReputationBadge";
 import { computeReputation, useReviewsFor } from "@/lib/reviews";
 import { useProfileOverrides, useDistanceUnit } from "@/lib/user-prefs-store";
 import { ProfileLinksList } from "@/components/ProfileLinks";
-import {
-  ProfileChannelHeader,
-  ChannelPill,
-} from "@/components/profile/ProfileChannelHeader";
-import {
-  ProfileAboutSheet,
-  AboutBlock,
-  AboutStats,
-} from "@/components/profile/ProfileAboutSheet";
+import { ProfileChannelHeader, ChannelPill } from "@/components/profile/ProfileChannelHeader";
+import { ProfileAboutSheet, AboutBlock, AboutStats } from "@/components/profile/ProfileAboutSheet";
 import { BadgeList } from "@/components/BadgeList";
 import {
   Dialog,
@@ -291,9 +296,7 @@ function PlayerProfilePage() {
               )}
               Message
             </ChannelPill>
-            <ChannelPill onClick={() => setReviewsOpen(true)}>
-              Reviews · {rep.count}
-            </ChannelPill>
+            <ChannelPill onClick={() => setReviewsOpen(true)}>Reviews · {rep.count}</ChannelPill>
             <ChannelPill onClick={() => setAboutOpen(true)}>About</ChannelPill>
             <UserSafetyMenu userId={userId} displayName={displayName} align="end" />
           </>
@@ -345,7 +348,6 @@ function PlayerProfilePage() {
       <div className="px-4">
         <PlayerOrgsSection userId={userId} />
 
-
         {/* Open availability */}
         {availability && (
           <div className="mt-6">
@@ -376,18 +378,20 @@ function PlayerProfilePage() {
                     )}
                   </div>
 
-                  {"positions" in s && Array.isArray((s as any).positions) && (s as any).positions.length > 0 && (
-                    <div className="mt-2 flex flex-wrap gap-1.5">
-                      {((s as any).positions as string[]).map((p) => (
-                        <span
-                          key={p}
-                          className="rounded-full border border-lime/30 bg-lime/10 px-2 py-0.5 text-[10px] font-semibold text-lime"
-                        >
-                          {p}
-                        </span>
-                      ))}
-                    </div>
-                  )}
+                  {"positions" in s &&
+                    Array.isArray((s as any).positions) &&
+                    (s as any).positions.length > 0 && (
+                      <div className="mt-2 flex flex-wrap gap-1.5">
+                        {((s as any).positions as string[]).map((p) => (
+                          <span
+                            key={p}
+                            className="rounded-full border border-lime/30 bg-lime/10 px-2 py-0.5 text-[10px] font-semibold text-lime"
+                          >
+                            {p}
+                          </span>
+                        ))}
+                      </div>
+                    )}
                 </div>
               ))}
             </div>
@@ -396,7 +400,6 @@ function PlayerProfilePage() {
 
         {/* Badges — earned from attendance reliability + sportsmanship */}
         {badges.length > 0 && <BadgeList className="mt-6" badgeIds={badges} />}
-
 
         {/* Reviews popup */}
         <Dialog open={reviewsOpen} onOpenChange={setReviewsOpen}>
@@ -492,7 +495,6 @@ function formatBirthday(iso: string): string {
   return d.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
 }
 
-
 type PlayerOrgRow = {
   id: string;
   org_id: string;
@@ -528,18 +530,19 @@ function PlayerOrgsSection({ userId }: { userId: string }) {
       .channel(`player-orgs:${userId}`)
       .on(
         "postgres_changes",
-        { event: "*", schema: "public", table: "trainer_org_members", filter: `user_id=eq.${userId}` },
+        {
+          event: "*",
+          schema: "public",
+          table: "trainer_org_members",
+          filter: `user_id=eq.${userId}`,
+        },
         () => {
           fetchRows();
         },
       )
-      .on(
-        "postgres_changes",
-        { event: "UPDATE", schema: "public", table: "trainer_orgs" },
-        () => {
-          fetchRows();
-        },
-      )
+      .on("postgres_changes", { event: "UPDATE", schema: "public", table: "trainer_orgs" }, () => {
+        fetchRows();
+      })
       .subscribe();
 
     return () => {
@@ -573,4 +576,3 @@ function PlayerOrgsSection({ userId }: { userId: string }) {
     </div>
   );
 }
-
