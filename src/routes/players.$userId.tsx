@@ -21,6 +21,15 @@ import { ReputationBadge } from "@/components/ReputationBadge";
 import { computeReputation, useReviewsFor } from "@/lib/reviews";
 import { useProfileOverrides, useDistanceUnit } from "@/lib/user-prefs-store";
 import { ProfileLinksList } from "@/components/ProfileLinks";
+import {
+  ProfileChannelHeader,
+  ChannelPill,
+} from "@/components/profile/ProfileChannelHeader";
+import {
+  ProfileAboutSheet,
+  AboutBlock,
+  AboutStats,
+} from "@/components/profile/ProfileAboutSheet";
 import { BadgeList } from "@/components/BadgeList";
 import {
   Dialog,
@@ -60,6 +69,7 @@ function PlayerProfilePage() {
   const [loading, setLoading] = useState(true);
   const [opening, setOpening] = useState(false);
   const [reviewsOpen, setReviewsOpen] = useState(false);
+  const [aboutOpen, setAboutOpen] = useState(false);
   const [followList, setFollowList] = useState<null | "followers" | "following">(null);
   const [unfollowOpen, setUnfollowOpen] = useState(false);
 
