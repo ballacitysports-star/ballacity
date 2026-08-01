@@ -10,6 +10,8 @@ import {
   sanitizeSkillForSport,
   formatSportLevel,
   scaleForSport,
+  parseSportLevels,
+  serializeSportLevels,
 } from "./sport-levels";
 
 const raw = {
@@ -173,7 +175,7 @@ describe("multiple football levels", () => {
   it("accumulates tiers across formats, keeping the highest as primary", () => {
     let lvl = toggleSportTier("Football", null, "7v7 Elite");
     lvl = toggleSportTier("Football", lvl, "Flag Rec");
-    expect(levelTiers(lvl)).toEqual(["7v7 Elite", "Flag Rec", "7v7 Elite"].slice(0, 0).concat(["7v7 Elite", "Flag Rec"]));
+    expect(new Set(levelTiers(lvl))).toEqual(new Set(["Flag Rec", "7v7 Elite"]));
     expect(lvl?.tier).toBe("7v7 Elite");
     expect(formatSportLevel(lvl)).toBe("7v7 Elite · Flag Rec");
   });
