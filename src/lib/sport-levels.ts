@@ -1,7 +1,12 @@
 import type { Sport } from "@/lib/sample-data";
 
-/** A named tier inside a sport's rating scale. */
-export type SportLevel = { system: string; tier: string };
+/**
+ * A player's rating in one sport.
+ * `tier` is the primary (highest) tier and is what filters compare against.
+ * `tiers` holds every selected tier on sports that allow more than one
+ * (Football, where a player can be both "Flag Rec" and "7v7 Elite").
+ */
+export type SportLevel = { system: string; tier: string; tiers?: string[] };
 
 export type SportScale = {
   /** Short scale name shown next to the tier, e.g. "NTRP", "MiLB". */
@@ -16,6 +21,8 @@ export type SportScale = {
    * must equal `tiers`, so filters and storage keep using flat tier strings.
    */
   groups?: { label: string; tiers: string[] }[];
+  /** Allows selecting more than one tier (e.g. one per Football format). */
+  multi?: boolean;
 };
 
 
@@ -66,7 +73,8 @@ export const LEVELS_BY_SPORT: Record<Sport, SportScale> = {
     system: "Level",
     tiers: FOOTBALL_TIERS,
     groups: FOOTBALL_GROUPS,
-    hint: "Pick your format, then your level.",
+    multi: true,
+    hint: "Pick a level in each format you play — you can choose more than one.",
   },
 
   Soccer: {
@@ -99,11 +107,55 @@ export function levelsForSport(sport: Sport): string[] {
   return scaleForSport(sport).tiers;
 }
 
-/** "3.5 NTRP", "Minor AAA", "Advanced" — scale name appended only for pure ratings. */
+/** Every tier on a level, primary first. */
+export function levelTiers(level?: SportLevel | null): string[] {
+  if (!level?.tier) return [];
+  const all = level.tiers?.length ? level.tiers : [level.tier];
+  return Array.from(new Set([level.tier, ...all]));
+}
+
+/** "3.5 NTRP", "Minor AAA", "Flag Rec · 7v7 Elite" — scale name only for pure ratings. */
 export function formatSportLevel(level?: SportLevel | null): string | null {
-  if (!level?.tier) return null;
-  const numeric = /^[0-9]+(\.[0-9]+)?$/.test(level.tier);
-  return numeric && level.system ? `${level.tier} ${level.system}` : level.tier;
+  const tiers = levelTiers(level);
+  if (!tiers.length) return null;
+  const label = (tier: string) => {
+    const numeric = /^[0-9]+(\.[0-9]+)?$/.test(tier);
+    return numeric && level?.system ? `${tier} ${level.system}` : tier;
+  };
+  return tiers.map(label).join(" · ");
+}
+
+/** Orders tiers the way the sport's scale does, easiest first. */
+function orderTiers(sport: string | null | undefined, tiers: string[]): string[] {
+  const scale = sport ? scaleForSport(sport as Sport) : GENERIC_SCALE;
+  const rank = (t: string) => {
+    const i = scale.tiers.indexOf(t);
+    return i === -1 ? Number.MAX_SAFE_INTEGER : i;
+  };
+  return [...tiers].sort((a, b) => rank(a) - rank(b));
+}
+
+/**
+ * Adds or removes a tier from a level, honouring the sport's `multi` flag.
+ * Returns null when nothing is selected any more.
+ */
+export function toggleSportTier(
+  sport: Sport,
+  level: SportLevel | null | undefined,
+  tier: string,
+): SportLevel | null {
+  const scale = scaleForSport(sport);
+  const current = levelTiers(level);
+  if (!scale.multi) {
+    return current.includes(tier) ? null : { system: scale.system, tier };
+  }
+  const next = orderTiers(
+    sport,
+    current.includes(tier) ? current.filter((t) => t !== tier) : [...current, tier],
+  );
+  if (!next.length) return null;
+  // Primary = highest selected tier, so single-value filters stay meaningful.
+  return { system: scale.system, tier: next[next.length - 1], tiers: next };
 }
 
 /** Maps a retired tier onto its current equivalent for a sport. */
@@ -120,9 +172,17 @@ export function parseSportLevels(raw: unknown): Record<string, SportLevel> {
     if (!value || typeof value !== "object") continue;
     const v = value as { system?: unknown; tier?: unknown };
     if (typeof v.tier !== "string" || !v.tier) continue;
+    const raw = Array.isArray((v as { tiers?: unknown }).tiers)
+      ? ((v as { tiers: unknown[] }).tiers.filter((t) => typeof t === "string" && t) as string[])
+      : [];
+    const tiers = orderTiers(
+      name,
+      Array.from(new Set([v.tier, ...raw].map((t) => migrateTier(name, t)))),
+    );
     out[name] = {
       system: typeof v.system === "string" ? v.system : "",
-      tier: migrateTier(name, v.tier),
+      tier: tiers[tiers.length - 1] ?? migrateTier(name, v.tier),
+      ...(tiers.length > 1 ? { tiers } : {}),
     };
   }
   return out;
@@ -135,7 +195,13 @@ export function serializeSportLevels(
 ): Record<string, SportLevel> {
   const out: Record<string, SportLevel> = {};
   for (const s of sports) {
-    if (s.level?.tier) out[s.name] = { system: s.level.system || scaleForSport(s.name).system, tier: s.level.tier };
+    if (!s.level?.tier) continue;
+    const tiers = orderTiers(s.name, levelTiers(s.level));
+    out[s.name] = {
+      system: s.level.system || scaleForSport(s.name).system,
+      tier: tiers[tiers.length - 1],
+      ...(tiers.length > 1 ? { tiers } : {}),
+    };
   }
   return out;
 }
@@ -202,7 +268,7 @@ export function levelMatchesFilter(
 ): boolean {
   if (!wanted) return true;
   const levels = parseSportLevels(rawSportLevels);
-  if (sports.some((s) => levels[s]?.tier === wanted)) return true;
+  if (sports.some((s) => levelTiers(levels[s]).includes(wanted))) return true;
   const hasProfileLevel = sports.some((s) => levels[s]?.tier);
   // Only fall back to the post's own generic value when the profile is silent.
   return !hasProfileLevel && fallbackSkill === wanted;
