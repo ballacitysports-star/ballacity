@@ -1,6 +1,6 @@
 import { X } from "lucide-react";
 import { SPORTS, POSITIONS_BY_SPORT, type Sport } from "@/lib/sample-data";
-import { scaleForSport, type SportLevel } from "@/lib/sport-levels";
+import { levelTiers, scaleForSport, toggleSportTier, type SportLevel } from "@/lib/sport-levels";
 
 export type SportEntry = { name: Sport; positions?: string[]; level?: SportLevel | null };
 
@@ -23,8 +23,7 @@ export function ProfileSportsFields({
     onChange(
       sports.map((x) => {
         if (x.name !== s) return x;
-        const same = x.level?.tier === tier;
-        return { ...x, level: same ? null : { system: scaleForSport(s).system, tier } };
+        return { ...x, level: toggleSportTier(s, x.level, tier) };
       }),
     );
   const togglePosition = (s: Sport, pos: string) =>
@@ -56,7 +55,7 @@ export function ProfileSportsFields({
             {(() => {
               const scale = scaleForSport(s.name);
               const chip = (tier: string, groupLabel?: string) => {
-                const active = s.level?.tier === tier;
+                const active = levelTiers(s.level).includes(tier);
                 const label =
                   groupLabel && tier.startsWith(`${groupLabel} `)
                     ? tier.slice(groupLabel.length + 1)
@@ -85,6 +84,11 @@ export function ProfileSportsFields({
                       Level
                     </span>
                     <span className="text-[10px] text-muted-foreground/70">{scale.system}</span>
+                    {scale.multi && (
+                      <span className="text-[10px] text-muted-foreground/70">
+                        · pick one or more
+                      </span>
+                    )}
                   </div>
                   {scale.groups ? (
                     <div className="space-y-2">

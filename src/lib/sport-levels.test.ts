@@ -2,12 +2,16 @@ import { describe, expect, it } from "vitest";
 import {
   filterTiersForSport,
   levelMatchesFilter,
+  levelTiers,
+  toggleSportTier,
   levelsForSport,
   playerLevelsForSports,
   resolvePlayerLevel,
   sanitizeSkillForSport,
   formatSportLevel,
   scaleForSport,
+  parseSportLevels,
+  serializeSportLevels,
 } from "./sport-levels";
 
 const raw = {
@@ -164,5 +168,48 @@ describe("feed + matchmaking with football sub-levels", () => {
   it("keeps a football tier out of another sport's filter", () => {
     expect(sanitizeSkillForSport("Basketball", "7v7 Elite")).toBe("");
     expect(sanitizeSkillForSport("", "7v7 Elite")).toBe("");
+  });
+});
+
+describe("multiple football levels", () => {
+  it("accumulates tiers across formats, keeping the highest as primary", () => {
+    let lvl = toggleSportTier("Football", null, "7v7 Elite");
+    lvl = toggleSportTier("Football", lvl, "Flag Rec");
+    expect(new Set(levelTiers(lvl))).toEqual(new Set(["Flag Rec", "7v7 Elite"]));
+    expect(lvl?.tier).toBe("7v7 Elite");
+    expect(formatSportLevel(lvl)).toBe("7v7 Elite · Flag Rec");
+  });
+
+  it("removes a tier on second tap and clears the level when empty", () => {
+    let lvl = toggleSportTier("Football", null, "Flag Rec");
+    lvl = toggleSportTier("Football", lvl, "Full contact Elite");
+    lvl = toggleSportTier("Football", lvl, "Flag Rec");
+    expect(levelTiers(lvl)).toEqual(["Full contact Elite"]);
+    expect(toggleSportTier("Football", lvl, "Full contact Elite")).toBeNull();
+  });
+
+  it("keeps single-select sports single", () => {
+    const one = toggleSportTier("Tennis", { system: "NTRP", tier: "3.5" }, "4.0");
+    expect(levelTiers(one)).toEqual(["4.0"]);
+  });
+
+  it("round-trips multiple tiers through storage", () => {
+    const stored = serializeSportLevels([
+      { name: "Football", level: { system: "Level", tier: "Flag Rec", tiers: ["Flag Rec", "7v7 Elite"] } },
+    ]);
+    expect(stored.Football.tiers).toEqual(["Flag Rec", "7v7 Elite"]);
+    expect(parseSportLevels(stored).Football.tier).toBe("7v7 Elite");
+  });
+
+  it("matches a filter against any selected tier", () => {
+    const raw = { Football: { system: "Level", tier: "7v7 Elite", tiers: ["Flag Rec", "7v7 Elite"] } };
+    expect(levelMatchesFilter(raw, ["Football"], null, "Flag Rec")).toBe(true);
+    expect(levelMatchesFilter(raw, ["Football"], null, "7v7 Elite")).toBe(true);
+    expect(levelMatchesFilter(raw, ["Football"], null, "Flag Elite")).toBe(false);
+  });
+
+  it("migrates legacy tiers inside a multi selection", () => {
+    const raw = { Football: { system: "Level", tier: "Flag Rec", tiers: ["Flag Rec", "College"] } };
+    expect(levelTiers(parseSportLevels(raw).Football)).toContain("Full contact Showcase / Travel");
   });
 });
