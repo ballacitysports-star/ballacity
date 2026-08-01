@@ -228,6 +228,72 @@ export function sanitizeSkillForSport(
   return filterTiersForSport(sport || "").includes(migrated) ? migrated : "";
 }
 
+/** Separator used when a game stores more than one tier in a single field. */
+export const SKILL_TIER_SEPARATOR = " · ";
+/** Value meaning "no tier picked" on game/post skill fields. */
+export const ANY_SKILL = "All Levels";
+
+/**
+ * Reads a stored game/post skill value into ordered, sport-valid tiers.
+ * Handles single values, legacy tiers, and multi-select values
+ * ("Flag Rec · 7v7 Elite") the same way profile levels are parsed.
+ */
+export function parseSkillTiers(
+  sport: string | null | undefined,
+  value: string | null | undefined,
+): string[] {
+  if (!value || value === ANY_SKILL) return [];
+  const raw = value
+    .split(/·|,/)
+    .map((t) => t.trim())
+    .filter(Boolean);
+  const valid = raw
+    .map((t) => sanitizeSkillForSport(sport, t))
+    .filter((t): t is string => Boolean(t));
+  return orderTiers(sport, Array.from(new Set(valid)));
+}
+
+/** Writes tiers back into the single stored skill string. */
+export function serializeSkillTiers(
+  sport: string | null | undefined,
+  tiers: string[],
+): string {
+  const ordered = orderTiers(sport, Array.from(new Set(tiers.filter(Boolean))));
+  return ordered.length ? ordered.join(SKILL_TIER_SEPARATOR) : ANY_SKILL;
+}
+
+/**
+ * Toggles one tier on a stored skill value, honouring the sport's `multi`
+ * flag (Football keeps one tier per format; other sports stay single-select).
+ */
+export function toggleSkillTier(
+  sport: string | null | undefined,
+  value: string | null | undefined,
+  tier: string,
+): string {
+  if (tier === ANY_SKILL) return ANY_SKILL;
+  const scale = sport ? scaleForSport(sport as Sport) : GENERIC_SCALE;
+  const current = parseSkillTiers(sport, value);
+  if (!scale.multi) {
+    return current.includes(tier) ? ANY_SKILL : tier;
+  }
+  const next = current.includes(tier)
+    ? current.filter((t) => t !== tier)
+    : [...current, tier];
+  return serializeSkillTiers(sport, next);
+}
+
+/** Display string for a stored skill value ("All Levels" when empty). */
+export function formatSkillValue(
+  sport: string | null | undefined,
+  value: string | null | undefined,
+): string {
+  const tiers = parseSkillTiers(sport, value);
+  return tiers.length ? tiers.join(SKILL_TIER_SEPARATOR) : ANY_SKILL;
+}
+
+
+
 
 
 /**
