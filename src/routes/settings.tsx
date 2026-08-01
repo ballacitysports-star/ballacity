@@ -328,18 +328,19 @@ function MyOrgsSection() {
       <ul className="divide-y divide-border">
 
         {orgs.map((o) => (
-          <li key={o.id} className="flex items-center gap-3 px-4 py-3">
-            <span className="grid h-9 w-9 shrink-0 place-items-center overflow-hidden rounded-lg bg-muted">
+          <li key={o.id} className="flex items-center gap-4 px-4 py-3.5">
+            <span className="grid h-9 w-9 shrink-0 place-items-center overflow-hidden rounded-full bg-surface-2">
               {o.avatar ? (
                 <img src={o.avatar} alt="" className="h-full w-full object-cover" />
               ) : (
-                <Building2 className="h-4 w-4" />
+                <Building2 className="h-4 w-4 text-muted-foreground" />
               )}
             </span>
             <span className="min-w-0 flex-1">
-              <span className="block truncate text-sm font-medium">{o.name}</span>
+              <span className="block truncate text-sm">{o.name}</span>
               <span className="block truncate text-xs text-muted-foreground">@{o.handle}</span>
             </span>
+
             <Link
               to="/orgs/$orgId/edit"
               params={{ orgId: o.id }}
