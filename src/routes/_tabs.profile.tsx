@@ -1,23 +1,15 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { zodValidator, fallback } from "@tanstack/zod-adapter";
 import { z } from "zod";
-import { motion } from "framer-motion";
 import { formatSportLevel } from "@/lib/sport-levels";
 
 import {
   Settings,
-  Trophy,
   Shield,
-  LogIn,
-  LogOut,
   Clock,
   Star,
   Crown,
   Users,
-  Grid3x3,
-  Bookmark,
-  Inbox,
-  UserSquare2,
 } from "lucide-react";
 import { useFollow } from "@/lib/follows";
 import { FollowSheet } from "@/components/FollowSheet";
@@ -427,7 +419,7 @@ function Profile() {
 
         {/* Pending approvals */}
 
-        <section className={`mt-8 rounded-3xl border border-border bg-surface p-4 shadow-card ${activeTab === "requests" ? "" : "hidden"}`}>
+        <section className={`mt-6 ${activeTab === "requests" ? "" : "hidden"}`}>
           <div className="mb-3 flex items-center justify-between gap-3">
             <div className="flex items-center gap-2">
               <span className="grid h-8 w-8 place-items-center rounded-2xl border border-coral/30 bg-coral/10 text-coral">
@@ -563,7 +555,7 @@ function Profile() {
         </section>
 
         {/* Hosting */}
-        <section className={`mt-8 rounded-3xl border border-border bg-surface p-4 shadow-card ${activeTab === "hosting" ? "" : "hidden"}`}>
+        <section className={`mt-6 ${activeTab === "hosting" ? "" : "hidden"}`}>
           <div className="mb-3 flex items-center justify-between gap-3">
             <div className="flex items-center gap-2">
               <span className="grid h-8 w-8 place-items-center rounded-2xl border border-lime/30 bg-lime/10 text-lime">
@@ -603,7 +595,7 @@ function Profile() {
         </section>
 
         {/* Pickup / Playing */}
-        <section className={`mt-8 rounded-3xl border border-border bg-surface p-4 shadow-card ${activeTab === "games" ? "" : "hidden"}`}>
+        <section className={`mt-6 ${activeTab === "games" ? "" : "hidden"}`}>
           <div className="mb-3 flex items-center justify-between gap-3">
             <div className="flex items-center gap-2">
               <span className="grid h-8 w-8 place-items-center rounded-2xl border border-lime/30 bg-lime/10 text-lime">
