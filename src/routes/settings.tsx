@@ -324,11 +324,9 @@ function MyOrgsSection() {
   if (!orgs || orgs.length === 0) return null;
 
   return (
-    <section>
-      <h2 className="px-1 pb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-        My gyms
-      </h2>
-      <ul className="overflow-hidden rounded-xl border bg-card divide-y">
+    <SettingsGroup title="My gyms">
+      <ul className="divide-y divide-border">
+
         {orgs.map((o) => (
           <li key={o.id} className="flex items-center gap-3 px-4 py-3">
             <span className="grid h-9 w-9 shrink-0 place-items-center overflow-hidden rounded-lg bg-muted">
