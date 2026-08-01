@@ -87,6 +87,8 @@ function Profile() {
   const { user, loading } = useAuth();
   const [confirmedUser, setConfirmedUser] = useState<User | null>(null);
   const [reviewsOpen, setReviewsOpen] = useState(false);
+  const [aboutOpen, setAboutOpen] = useState(false);
+
   const [followList, setFollowList] = useState<null | "followers" | "following">(null);
   const [activeTab, setActiveTab] = useState<"games" | "hosting" | "requests" | "reviews">("games");
   const profileUser = user ?? confirmedUser;
