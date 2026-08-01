@@ -185,173 +185,157 @@ function PlayerProfilePage() {
 
   return (
     <div className="mx-auto max-w-md pb-28">
-      {/* Cover */}
-      <div className="relative h-44">
-        <img src={coverUrl ?? HERO_IMAGE} alt="" className="h-full w-full object-cover" />
-        <div className="absolute inset-0 bg-gradient-to-b from-transparent via-background/50 to-background" />
-        <div className="absolute top-4 left-4">
+      <ProfileChannelHeader
+        bannerUrl={coverUrl ?? HERO_IMAGE}
+        bannerOverlay={
           <Link
             to="/players"
-            className="grid h-10 w-10 place-items-center rounded-full border border-border bg-background/70 backdrop-blur"
+            className="grid h-9 w-9 place-items-center rounded-full bg-background/70 backdrop-blur"
             aria-label="Back to players"
           >
             <ArrowLeft className="h-4 w-4" />
           </Link>
-        </div>
-      </div>
+        }
+        avatarUrl={avatarUrl}
+        avatarFallback={initials}
+        name={displayName}
+        nameBadge={
+          <span className="inline-flex items-center gap-1 rounded-full bg-lime/15 px-2 py-0.5 text-[10px] font-bold text-lime">
+            <Shield className="h-3 w-3" /> Verified
+          </span>
+        }
+        meta={[
+          username,
+          age != null ? `${age}` : null,
+          city,
+          <button
+            key="followers"
+            type="button"
+            onClick={() => setFollowList("followers")}
+            className="underline-offset-2 hover:underline"
+          >
+            {follow.followers} followers
+          </button>,
+          <button
+            key="following"
+            type="button"
+            onClick={() => setFollowList("following")}
+            className="underline-offset-2 hover:underline"
+          >
+            {follow.following} following
+          </button>,
+          `${stats.played} games`,
+        ].filter(Boolean)}
+        description={bio}
+        onOpenAbout={() => setAboutOpen(true)}
+        actions={
+          <>
+            {follow.isFollowing ? (
+              <Popover open={unfollowOpen} onOpenChange={setUnfollowOpen}>
+                <PopoverTrigger asChild>
+                  <ChannelPill disabled={follow.pending || !user}>
+                    <UserCheck className="h-4 w-4" /> Following
+                  </ChannelPill>
+                </PopoverTrigger>
+                <PopoverContent align="start" className="w-64 p-3">
+                  <p className="text-sm">
+                    Unfollow <span className="font-semibold">{displayName}</span>?
+                  </p>
+                  <div className="mt-3 flex justify-end gap-2">
+                    <Button size="sm" variant="ghost" onClick={() => setUnfollowOpen(false)}>
+                      Cancel
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="destructive"
+                      disabled={follow.pending}
+                      onClick={() => {
+                        follow.toggle();
+                        setUnfollowOpen(false);
+                      }}
+                    >
+                      Unfollow
+                    </Button>
+                  </div>
+                </PopoverContent>
+              </Popover>
+            ) : (
+              <ChannelPill
+                variant="primary"
+                disabled={follow.pending}
+                onClick={() => {
+                  if (!user) {
+                    toast.error("Sign in to follow this player.");
+                    return;
+                  }
+                  follow.toggle();
+                }}
+              >
+                <UserPlus className="h-4 w-4" /> Follow
+              </ChannelPill>
+            )}
+            <ChannelPill onClick={handleMessage} disabled={opening}>
+              {opening ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <MessageCircle className="h-4 w-4" />
+              )}
+              Message
+            </ChannelPill>
+            <ChannelPill onClick={() => setReviewsOpen(true)}>
+              Reviews · {rep.count}
+            </ChannelPill>
+            <ChannelPill onClick={() => setAboutOpen(true)}>About</ChannelPill>
+            <UserSafetyMenu userId={userId} displayName={displayName} align="end" />
+          </>
+        }
+      />
 
-      {/* Identity */}
-      <div className="px-4 -mt-12 relative">
-        <motion.div
-          initial={{ scale: 0, rotate: -10 }}
-          animate={{ scale: 1, rotate: 0 }}
-          transition={{ type: "spring", stiffness: 220, damping: 16 }}
-          className="grid h-24 w-24 place-items-center overflow-hidden rounded-full border-4 border-background bg-lime-gradient font-display text-3xl font-bold text-primary-foreground glow-lime"
-        >
-          {avatarUrl ? (
-            <img src={avatarUrl} alt={displayName} className="h-full w-full object-cover" />
-          ) : (
-            initials
-          )}
-        </motion.div>
-        <div className="mt-3 flex items-start justify-between gap-3">
-          <div className="min-w-0">
-            <h1 className="font-display text-2xl font-bold flex items-center gap-2">
-              <span className="truncate">{displayName}</span>
-              <span className="inline-flex items-center gap-1 rounded-full bg-lime/15 px-2 py-0.5 text-xs font-bold text-lime shrink-0">
-                <Shield className="h-3 w-3" /> Verified
-              </span>
-            </h1>
-            <div className="text-sm text-muted-foreground truncate">
-              {[
-                username,
-                city,
-                age != null ? `${age}` : "",
-              ]
-                .filter(Boolean)
-                .join(" · ")}
-            </div>
+      <ProfileAboutSheet open={aboutOpen} onOpenChange={setAboutOpen}>
+        {bio && (
+          <AboutBlock label="Bio">
+            <p className="whitespace-pre-wrap">{bio}</p>
+          </AboutBlock>
+        )}
+        <AboutBlock label="Details">
+          <ul className="space-y-1 text-sm text-muted-foreground">
+            {username && <li>{username}</li>}
             {searchRadiusMi != null && (
-              <div className="mt-1 inline-flex items-center gap-1 text-xs text-muted-foreground">
+              <li className="flex items-center gap-1">
                 <MapPin className="h-3.5 w-3.5 text-lime" />
                 {city || "Anywhere"} · travels up to {formatDistance(searchRadiusMi, unit)}
-              </div>
+              </li>
             )}
-            {profile.graduating_class && (
-              <div className="mt-1 text-xs text-muted-foreground">
-                🎓 Class of {profile.graduating_class}
-              </div>
-            )}
-          </div>
-          {/* IG-style inline stats */}
-          <div className="shrink-0 flex items-center gap-4 text-center">
-            <StatCell k={stats.played} v="games" />
-            <StatCell
-              k={follow.followers}
-              v="followers"
-              onClick={() => setFollowList("followers")}
-            />
-            <StatCell
-              k={follow.following}
-              v="following"
-              onClick={() => setFollowList("following")}
-            />
-          </div>
-        </div>
-
-        {bio && <p className="mt-3 text-sm text-foreground/90 whitespace-pre-wrap">{bio}</p>}
-
-        {/* Profile links */}
+            {!searchRadiusMi && city && <li>{city}</li>}
+            {profile.graduating_class && <li>Class of {profile.graduating_class}</li>}
+          </ul>
+        </AboutBlock>
+        <AboutBlock label="Stats">
+          <AboutStats
+            items={[
+              { k: `${stats.reliability}%`, v: "Reliable" },
+              { k: stats.sportsmanship, v: "Sport" },
+              { k: stats.friends, v: "Crew" },
+            ]}
+          />
+        </AboutBlock>
         {links.length > 0 && (
-          <div className="mt-3">
+          <AboutBlock label="Links">
             <ProfileLinksList links={links} />
-          </div>
+          </AboutBlock>
         )}
-
-        {/* Gyms (live) */}
-        <PlayerOrgsSection userId={userId} />
-
-
-
-        {/* Action row — IG-style Follow / Message */}
-        <div className="mt-4 flex items-center gap-2">
-          <div className="grid flex-1 grid-cols-2 gap-2">
-          {follow.isFollowing ? (
-            <Popover open={unfollowOpen} onOpenChange={setUnfollowOpen}>
-              <PopoverTrigger asChild>
-                <Button
-                  disabled={follow.pending || !user}
-                  variant="outline"
-                  size="sm"
-                  className="rounded-lg border-border bg-surface font-semibold"
-                >
-                  <UserCheck className="h-4 w-4 mr-1.5" /> Following
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent align="start" className="w-64 p-3">
-                <p className="text-sm">
-                  Unfollow <span className="font-semibold">{displayName}</span>?
-                </p>
-                <div className="mt-3 flex justify-end gap-2">
-                  <Button size="sm" variant="ghost" onClick={() => setUnfollowOpen(false)}>
-                    Cancel
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="destructive"
-                    disabled={follow.pending}
-                    onClick={() => {
-                      follow.toggle();
-                      setUnfollowOpen(false);
-                    }}
-                  >
-                    Unfollow
-                  </Button>
-                </div>
-              </PopoverContent>
-            </Popover>
-          ) : (
-            <Button
-              onClick={() => {
-                if (!user) {
-                  toast.error("Sign in to follow this player.");
-                  return;
-                }
-                follow.toggle();
-              }}
-              disabled={follow.pending}
-              size="sm"
-              className="rounded-lg bg-lime-gradient font-semibold text-primary-foreground"
-            >
-              <UserPlus className="h-4 w-4 mr-1.5" /> Follow
-            </Button>
-          )}
-          <Button
-            onClick={handleMessage}
-            disabled={opening}
-            variant="outline"
-            size="sm"
-            className="rounded-lg border-border bg-surface font-semibold"
-          >
-            {opening ? (
-              <Loader2 className="h-4 w-4 mr-1.5 animate-spin" />
-            ) : (
-              <MessageCircle className="h-4 w-4 mr-1.5" />
-            )}
-            Message
-          </Button>
-          </div>
-          <UserSafetyMenu userId={userId} displayName={displayName} align="end" />
-        </div>
-
-        {/* Reputation badge (opens reviews popup) */}
-        <div className="mt-4">
+        <AboutBlock label="Reputation">
           <ReputationBadge
             rep={rep}
             onClick={() => setReviewsOpen(true)}
             ariaLabel={`Open reviews for ${displayName}. Trust score ${rep.trustScore}, ${rep.avg.toFixed(1)} out of 5 from ${rep.count} review${rep.count === 1 ? "" : "s"}.`}
           />
-        </div>
+        </AboutBlock>
+      </ProfileAboutSheet>
+
+      <div className="px-4">
+        <PlayerOrgsSection userId={userId} />
+
 
         {/* Open availability */}
         {availability && (
