@@ -337,5 +337,5 @@ export function levelMatchesFilter(
   if (sports.some((s) => levelTiers(levels[s]).includes(wanted))) return true;
   const hasProfileLevel = sports.some((s) => levels[s]?.tier);
   // Only fall back to the post's own generic value when the profile is silent.
-  return !hasProfileLevel && fallbackSkill === wanted;
+  return !hasProfileLevel && parseSkillTiers(sports[0] ?? null, fallbackSkill).includes(wanted);
 }
