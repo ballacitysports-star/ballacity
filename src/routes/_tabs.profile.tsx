@@ -301,198 +301,115 @@ function Profile() {
     );
   }
 
+  const age = me.birthday ? ageFrom(me.birthday) : null;
+
   return (
     <div className="mx-auto w-full max-w-md sm:max-w-2xl lg:max-w-4xl">
-      {/* Cover */}
-      <div className="relative h-44">
-        <img src={me.coverUrl ?? HERO_IMAGE} alt="" className="h-full w-full object-cover" />
-        <div className="absolute inset-0 bg-gradient-to-b from-transparent via-background/50 to-background" />
-        <div className="absolute top-4 right-4 flex items-center gap-2">
-          {user ? (
-            <button
-              onClick={async () => {
-                await signOut();
-              }}
-              className="inline-flex items-center gap-1 rounded-full border border-border bg-background/70 px-3 py-2 text-xs font-bold backdrop-blur"
-            >
-              <LogOut className="h-3.5 w-3.5" /> Sign out
-            </button>
-          ) : (
-            <Link
-              to="/auth"
-              className="inline-flex items-center gap-1 rounded-full bg-lime-gradient px-3 py-2 text-xs font-bold text-primary-foreground"
-            >
-              <LogIn className="h-3.5 w-3.5" /> Sign in
-            </Link>
-          )}
-          {user && (
-            <Link
-              to="/account/security"
-              className="inline-flex items-center gap-1 rounded-full border border-border bg-background/70 px-3 py-2 text-xs font-bold backdrop-blur"
-            >
-              <Shield className="h-3.5 w-3.5" /> Security
-            </Link>
-          )}
+      <ProfileChannelHeader
+        bannerUrl={me.coverUrl ?? HERO_IMAGE}
+        bannerOverlay={
           <Link
             to="/settings"
-            className="grid h-10 w-10 place-items-center rounded-full border border-border bg-background/70 backdrop-blur"
+            className="grid h-9 w-9 place-items-center rounded-full bg-background/70 backdrop-blur"
             aria-label="Settings"
           >
             <Settings className="h-4 w-4" />
           </Link>
-        </div>
-      </div>
-
-      {/* Identity — IG-style */}
-      <div className="px-4 -mt-12 relative">
-        <div className="flex items-center gap-5">
-          <motion.div
-            initial={{ scale: 0, rotate: -10 }}
-            animate={{ scale: 1, rotate: 0 }}
-            transition={{ type: "spring", stiffness: 220, damping: 16 }}
-            className="grid h-24 w-24 shrink-0 place-items-center overflow-hidden rounded-full border-4 border-background bg-lime-gradient font-display text-3xl font-bold text-primary-foreground glow-lime"
-          >
-            {me.avatarUrl ? (
-              <img src={me.avatarUrl} alt={me.name} className="h-full w-full object-cover" />
-            ) : (
-              me.avatar
-            )}
-          </motion.div>
-          {/* IG stat row */}
-          <div className="mt-10 flex flex-1 items-center justify-around text-center">
-            <div className="px-1">
-              <div className="font-display text-lg font-bold leading-tight">
-                {upcomingGroups.total}
-              </div>
-              <div className="text-[11px] text-muted-foreground">games</div>
-            </div>
-            <button
-              type="button"
-              onClick={() => setFollowList("followers")}
-              className="min-w-[56px] rounded-lg px-1 transition-colors hover:bg-surface"
-            >
-              <div className="font-display text-lg font-bold leading-tight">
-                {follow.followers}
-              </div>
-              <div className="text-[11px] text-muted-foreground">followers</div>
-            </button>
-            <button
-              type="button"
-              onClick={() => setFollowList("following")}
-              className="min-w-[56px] rounded-lg px-1 transition-colors hover:bg-surface"
-            >
-              <div className="font-display text-lg font-bold leading-tight">
-                {follow.following}
-              </div>
-              <div className="text-[11px] text-muted-foreground">following</div>
-            </button>
-          </div>
-        </div>
-
-        {/* Name + meta */}
-        <div className="mt-3">
-          <h1 className="font-display text-xl font-bold flex flex-wrap items-center gap-x-2 gap-y-1">
-            <span className="truncate">{me.name}</span>
-            {me.birthday &&
-              (() => {
-                const a = ageFrom(me.birthday);
-                return a != null ? (
-                  <span className="text-sm font-normal text-muted-foreground">· {a}</span>
-                ) : null;
-              })()}
-            <span className="inline-flex items-center gap-1 rounded-full bg-lime/15 px-2 py-0.5 text-[10px] font-bold text-lime">
-              <Shield className="h-3 w-3" /> Verified
-            </span>
-          </h1>
-          <div className="text-sm text-muted-foreground">
-            {me.username} · {me.city}
-          </div>
-          {me.graduatingClass && (
-            <div className="mt-0.5 text-xs text-muted-foreground">🎓 Class of {me.graduatingClass}</div>
-          )}
-        </div>
-
-        {me.bio && <p className="mt-2 text-sm text-foreground/90 whitespace-pre-wrap">{me.bio}</p>}
-
-        {me.links && me.links.length > 0 && (
-          <div className="mt-3">
-            <ProfileLinksList links={me.links} />
-          </div>
-        )}
-
-        {/* Action row */}
-        <div className="mt-4 grid grid-cols-2 gap-2">
-          <Link
-            to="/profile/edit"
-            className="inline-flex items-center justify-center rounded-lg border border-border bg-surface px-3 py-1.5 text-sm font-semibold"
-          >
-            Edit profile
-          </Link>
+        }
+        avatarUrl={me.avatarUrl}
+        avatarFallback={me.avatar}
+        name={me.name}
+        nameBadge={
+          <span className="inline-flex items-center gap-1 rounded-full bg-lime/15 px-2 py-0.5 text-[10px] font-bold text-lime">
+            <Shield className="h-3 w-3" /> Verified
+          </span>
+        }
+        meta={[
+          me.username,
+          age != null ? `${age}` : null,
+          me.city,
           <button
+            key="followers"
             type="button"
-            onClick={() => setReviewsOpen(true)}
-            className="inline-flex items-center justify-center gap-1 rounded-lg border border-border bg-surface px-3 py-1.5 text-sm font-semibold"
+            onClick={() => setFollowList("followers")}
+            className="underline-offset-2 hover:underline"
           >
-            <Star className="h-3.5 w-3.5" /> Reviews · {myRep.count}
-          </button>
-        </div>
+            {follow.followers} followers
+          </button>,
+          <button
+            key="following"
+            type="button"
+            onClick={() => setFollowList("following")}
+            className="underline-offset-2 hover:underline"
+          >
+            {follow.following} following
+          </button>,
+          `${upcomingGroups.total} games`,
+        ].filter(Boolean)}
+        description={me.bio}
+        onOpenAbout={() => setAboutOpen(true)}
+        actions={
+          <>
+            <Link to="/profile/edit" className={channelPillClass("primary")}>
+              Edit profile
+            </Link>
+            <ChannelPill onClick={() => setReviewsOpen(true)}>
+              <Star className="h-3.5 w-3.5" /> Reviews · {myRep.count}
+            </ChannelPill>
+            <ChannelPill onClick={() => setAboutOpen(true)}>About</ChannelPill>
+            <Link to="/settings" className={channelPillClass()}>
+              Settings
+            </Link>
+          </>
+        }
+      />
 
-        {/* Secondary stats — compact */}
-        <div className="mt-4 grid grid-cols-3 gap-2">
-          {[
-            { k: me.stats.reliability + "%", v: "Reliable" },
-            { k: me.stats.sportsmanship, v: "Sport" },
-            { k: me.stats.friends, v: "Crew" },
-          ].map((s) => (
-            <div
-              key={s.v}
-              className="rounded-xl border border-border bg-surface p-2 text-center"
-            >
-              <div className="font-display text-sm font-bold">{s.k}</div>
-              <div className="text-[10px] uppercase tracking-wider text-muted-foreground">
-                {s.v}
-              </div>
-            </div>
-          ))}
-        </div>
-
-
-        {/* Reputation badge (above the fold) */}
-        <div className="mt-4">
+      <ProfileAboutSheet open={aboutOpen} onOpenChange={setAboutOpen}>
+        {me.bio && (
+          <AboutBlock label="Bio">
+            <p className="whitespace-pre-wrap">{me.bio}</p>
+          </AboutBlock>
+        )}
+        <AboutBlock label="Details">
+          <ul className="space-y-1 text-sm text-muted-foreground">
+            <li>{me.username}</li>
+            {me.city && <li>{me.city}</li>}
+            {me.birthday && <li>Born {formatBirthday(me.birthday)}</li>}
+            {me.graduatingClass && <li>Class of {me.graduatingClass}</li>}
+          </ul>
+        </AboutBlock>
+        <AboutBlock label="Stats">
+          <AboutStats
+            items={[
+              { k: `${me.stats.reliability}%`, v: "Reliable" },
+              { k: me.stats.sportsmanship, v: "Sport" },
+              { k: me.stats.friends, v: "Crew" },
+            ]}
+          />
+        </AboutBlock>
+        {me.links && me.links.length > 0 && (
+          <AboutBlock label="Links">
+            <ProfileLinksList links={me.links} />
+          </AboutBlock>
+        )}
+        <AboutBlock label="Reputation">
           <ReputationBadge rep={myRep} onClick={() => setReviewsOpen(true)} />
-        </div>
+        </AboutBlock>
+      </ProfileAboutSheet>
 
-        {/* IG-style icon tab bar */}
-        <div className="mt-6 -mx-4 border-y border-border bg-background/60 sticky top-0 z-10 backdrop-blur">
-          <div className="grid grid-cols-4">
-            {[
-              { k: "games", icon: Grid3x3, label: "Games" },
-              { k: "hosting", icon: Bookmark, label: "Hosting" },
-              { k: "requests", icon: Inbox, label: "Requests" },
-              { k: "reviews", icon: UserSquare2, label: "Reviews" },
-            ].map((t) => {
-              const Icon = t.icon;
-              const active = activeTab === t.k;
-              return (
-                <button
-                  key={t.k}
-                  type="button"
-                  onClick={() => setActiveTab(t.k as any)}
-                  aria-label={t.label}
-                  aria-selected={active}
-                  className={`relative grid place-items-center py-3 text-xs font-semibold transition-colors ${
-                    active ? "text-foreground" : "text-muted-foreground"
-                  }`}
-                >
-                  <Icon className="h-5 w-5" />
-                  {active && (
-                    <span className="absolute -top-px left-0 right-0 h-0.5 bg-foreground" />
-                  )}
-                </button>
-              );
-            })}
-          </div>
-        </div>
+      <div className="px-4">
+        <ChannelTabs
+          className="mt-5"
+          value={activeTab}
+          onChange={(v) => setActiveTab(v)}
+          tabs={[
+            { k: "games" as const, label: "Games" },
+            { k: "hosting" as const, label: "Hosting" },
+            { k: "requests" as const, label: "Requests", count: pendingWithGame.length },
+            { k: "reviews" as const, label: "Reviews" },
+          ]}
+        />
+
 
         {/* Pending approvals */}
 
