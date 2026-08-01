@@ -1,0 +1,115 @@
+import * as React from "react";
+
+/**
+ * YouTube channel-page header: short rounded banner, large avatar, name, a
+ * single muted meta line, a one-line description with a "...more" affordance,
+ * and a horizontal pill action row.
+ *
+ * Shared by my own profile and public player profiles so the two can't drift.
+ */
+export function ProfileChannelHeader({
+  bannerUrl,
+  bannerOverlay,
+  avatarUrl,
+  avatarFallback,
+  name,
+  nameBadge,
+  meta,
+  description,
+  onOpenAbout,
+  actions,
+}: {
+  bannerUrl?: string | null;
+  /** Rendered in the banner's top-right (settings gear, back button, etc). */
+  bannerOverlay?: React.ReactNode;
+  avatarUrl?: string | null;
+  avatarFallback: React.ReactNode;
+  name: string;
+  nameBadge?: React.ReactNode;
+  /** Pieces joined with a middot on one muted line, YouTube-style. */
+  meta: React.ReactNode[];
+  description?: string | null;
+  onOpenAbout?: () => void;
+  actions?: React.ReactNode;
+}) {
+  const parts = meta.filter(Boolean);
+  return (
+    <header>
+      {/* Banner */}
+      <div className="px-3 pt-3">
+        <div className="relative aspect-[6/1] min-h-16 w-full overflow-hidden rounded-xl bg-surface">
+          {bannerUrl && (
+            <img src={bannerUrl} alt="" className="h-full w-full object-cover" loading="lazy" />
+          )}
+          {bannerOverlay && (
+            <div className="absolute right-2 top-2 flex items-center gap-2">{bannerOverlay}</div>
+          )}
+        </div>
+      </div>
+
+      {/* Identity */}
+      <div className="px-4 pt-4">
+        <div className="flex items-start gap-4">
+          <div className="grid h-20 w-20 shrink-0 place-items-center overflow-hidden rounded-full bg-surface-2 text-2xl font-bold">
+            {avatarUrl ? (
+              <img src={avatarUrl} alt={name} className="h-full w-full object-cover" />
+            ) : (
+              avatarFallback
+            )}
+          </div>
+          <div className="min-w-0 flex-1 pt-0.5">
+            <h1 className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xl font-bold leading-tight">
+              <span className="min-w-0 break-words">{name}</span>
+              {nameBadge}
+            </h1>
+            {parts.length > 0 && (
+              <p className="mt-1 text-[13px] leading-snug text-muted-foreground">
+                {parts.map((p, i) => (
+                  <React.Fragment key={i}>
+                    {i > 0 && <span aria-hidden> · </span>}
+                    {p}
+                  </React.Fragment>
+                ))}
+              </p>
+            )}
+            {onOpenAbout && (
+              <button
+                type="button"
+                onClick={onOpenAbout}
+                className="mt-1 block max-w-full text-left text-[13px] text-muted-foreground"
+              >
+                <span className="line-clamp-1 break-words">
+                  {description?.trim() ? description : "Tap for more about this profile"}
+                </span>
+                <span className="text-[13px] font-medium text-foreground">...more</span>
+              </button>
+            )}
+          </div>
+        </div>
+
+        {actions && (
+          <div className="scrollbar-hide mt-4 flex gap-2 overflow-x-auto pb-1">{actions}</div>
+        )}
+      </div>
+    </header>
+  );
+}
+
+/** YouTube-style action pill. `variant="primary"` is the filled Subscribe-like pill. */
+export function ChannelPill({
+  variant = "outline",
+  className = "",
+  ...rest
+}: {
+  variant?: "primary" | "outline";
+} & React.ButtonHTMLAttributes<HTMLButtonElement>) {
+  return <button {...rest} className={`${channelPillClass(variant)} ${className}`} />;
+}
+
+export function channelPillClass(variant: "primary" | "outline" = "outline") {
+  return `inline-flex shrink-0 items-center justify-center gap-1.5 rounded-full px-4 py-2 text-sm font-medium transition-colors ${
+    variant === "primary"
+      ? "bg-primary text-primary-foreground hover:opacity-90"
+      : "bg-surface-2 text-foreground hover:bg-surface"
+  }`;
+}

@@ -1,24 +1,9 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { zodValidator, fallback } from "@tanstack/zod-adapter";
 import { z } from "zod";
-import { motion } from "framer-motion";
 import { formatSportLevel } from "@/lib/sport-levels";
 
-import {
-  Settings,
-  Trophy,
-  Shield,
-  LogIn,
-  LogOut,
-  Clock,
-  Star,
-  Crown,
-  Users,
-  Grid3x3,
-  Bookmark,
-  Inbox,
-  UserSquare2,
-} from "lucide-react";
+import { Settings, Shield, Clock, Star, Crown, Users } from "lucide-react";
 import { useFollow } from "@/lib/follows";
 import { FollowSheet } from "@/components/FollowSheet";
 import { ME, GAMES, type Game } from "@/lib/sample-data";
@@ -34,7 +19,7 @@ import { computeReputation, useReviewsFor } from "@/lib/reviews";
 import { ReputationBadge } from "@/components/ReputationBadge";
 import { useEffect, useMemo, useState } from "react";
 import type { User } from "@supabase/supabase-js";
-import { getCurrentUser, useAuth, signOut } from "@/hooks/use-auth";
+import { getCurrentUser, useAuth } from "@/hooks/use-auth";
 import { toast } from "sonner";
 import { useJoinedGameIds } from "@/lib/games-store";
 import { useHostedGames } from "@/lib/hosted-games-store";
@@ -50,22 +35,22 @@ import {
 } from "@/lib/payments";
 import { leaveGame } from "@/lib/games-store";
 import { supabase } from "@/integrations/supabase/client";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { BadgeList } from "@/components/BadgeList";
 import { makeBadgeStats } from "@/lib/badges";
+import {
+  ProfileChannelHeader,
+  ChannelPill,
+  channelPillClass,
+} from "@/components/profile/ProfileChannelHeader";
+import { ProfileAboutSheet, AboutBlock, AboutStats } from "@/components/profile/ProfileAboutSheet";
+import { ChannelTabs } from "@/components/profile/ChannelTabs";
 
 export const Route = createFileRoute("/_tabs/profile")({
   head: () => ({ meta: [{ title: "Profile — OpenRun" }] }),
   // URL-persisted requests filter (all/host/player).
-  validateSearch: zodValidator(
-    z.object({ req: fallback(z.string(), "").default("") }),
-  ),
+  validateSearch: zodValidator(z.object({ req: fallback(z.string(), "").default("") })),
   component: Profile,
 });
 
@@ -75,6 +60,8 @@ function Profile() {
   const { user, loading } = useAuth();
   const [confirmedUser, setConfirmedUser] = useState<User | null>(null);
   const [reviewsOpen, setReviewsOpen] = useState(false);
+  const [aboutOpen, setAboutOpen] = useState(false);
+
   const [followList, setFollowList] = useState<null | "followers" | "following">(null);
   const [activeTab, setActiveTab] = useState<"games" | "hosting" | "requests" | "reviews">("games");
   const profileUser = user ?? confirmedUser;
@@ -103,7 +90,6 @@ function Profile() {
     return { hosting, playing, total: relevant.length };
   }, [joinedGameIds, hosted, profileUser]);
 
-
   // Pending / recently-reviewed join requests for player and host views
   const [myRequests, setMyRequests] = useState<JoinRequest[]>([]);
   const [hostRequests, setHostRequests] = useState<JoinRequest[]>([]);
@@ -122,10 +108,7 @@ function Profile() {
     }
     if (!opts.silent) setRequestsLoading(true);
     try {
-      const [mine, hosted] = await Promise.all([
-        listMyJoinRequests(),
-        listHostJoinRequests(),
-      ]);
+      const [mine, hosted] = await Promise.all([listMyJoinRequests(), listHostJoinRequests()]);
       setMyRequests(mine);
       setHostRequests(hosted);
     } catch {
@@ -191,7 +174,6 @@ function Profile() {
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [profileUser?.id]);
-
 
   const gameLookup = useMemo(() => {
     const m = new Map<string, Game>();
@@ -301,202 +283,118 @@ function Profile() {
     );
   }
 
+  const age = me.birthday ? ageFrom(me.birthday) : null;
+
   return (
     <div className="mx-auto w-full max-w-md sm:max-w-2xl lg:max-w-4xl">
-      {/* Cover */}
-      <div className="relative h-44">
-        <img src={me.coverUrl ?? HERO_IMAGE} alt="" className="h-full w-full object-cover" />
-        <div className="absolute inset-0 bg-gradient-to-b from-transparent via-background/50 to-background" />
-        <div className="absolute top-4 right-4 flex items-center gap-2">
-          {user ? (
-            <button
-              onClick={async () => {
-                await signOut();
-              }}
-              className="inline-flex items-center gap-1 rounded-full border border-border bg-background/70 px-3 py-2 text-xs font-bold backdrop-blur"
-            >
-              <LogOut className="h-3.5 w-3.5" /> Sign out
-            </button>
-          ) : (
-            <Link
-              to="/auth"
-              className="inline-flex items-center gap-1 rounded-full bg-lime-gradient px-3 py-2 text-xs font-bold text-primary-foreground"
-            >
-              <LogIn className="h-3.5 w-3.5" /> Sign in
-            </Link>
-          )}
-          {user && (
-            <Link
-              to="/account/security"
-              className="inline-flex items-center gap-1 rounded-full border border-border bg-background/70 px-3 py-2 text-xs font-bold backdrop-blur"
-            >
-              <Shield className="h-3.5 w-3.5" /> Security
-            </Link>
-          )}
+      <ProfileChannelHeader
+        bannerUrl={me.coverUrl ?? HERO_IMAGE}
+        bannerOverlay={
           <Link
             to="/settings"
-            className="grid h-10 w-10 place-items-center rounded-full border border-border bg-background/70 backdrop-blur"
+            className="grid h-9 w-9 place-items-center rounded-full bg-background/70 backdrop-blur"
             aria-label="Settings"
           >
             <Settings className="h-4 w-4" />
           </Link>
-        </div>
-      </div>
-
-      {/* Identity — IG-style */}
-      <div className="px-4 -mt-12 relative">
-        <div className="flex items-center gap-5">
-          <motion.div
-            initial={{ scale: 0, rotate: -10 }}
-            animate={{ scale: 1, rotate: 0 }}
-            transition={{ type: "spring", stiffness: 220, damping: 16 }}
-            className="grid h-24 w-24 shrink-0 place-items-center overflow-hidden rounded-full border-4 border-background bg-lime-gradient font-display text-3xl font-bold text-primary-foreground glow-lime"
-          >
-            {me.avatarUrl ? (
-              <img src={me.avatarUrl} alt={me.name} className="h-full w-full object-cover" />
-            ) : (
-              me.avatar
-            )}
-          </motion.div>
-          {/* IG stat row */}
-          <div className="mt-10 flex flex-1 items-center justify-around text-center">
-            <div className="px-1">
-              <div className="font-display text-lg font-bold leading-tight">
-                {upcomingGroups.total}
-              </div>
-              <div className="text-[11px] text-muted-foreground">games</div>
-            </div>
-            <button
-              type="button"
-              onClick={() => setFollowList("followers")}
-              className="min-w-[56px] rounded-lg px-1 transition-colors hover:bg-surface"
-            >
-              <div className="font-display text-lg font-bold leading-tight">
-                {follow.followers}
-              </div>
-              <div className="text-[11px] text-muted-foreground">followers</div>
-            </button>
-            <button
-              type="button"
-              onClick={() => setFollowList("following")}
-              className="min-w-[56px] rounded-lg px-1 transition-colors hover:bg-surface"
-            >
-              <div className="font-display text-lg font-bold leading-tight">
-                {follow.following}
-              </div>
-              <div className="text-[11px] text-muted-foreground">following</div>
-            </button>
-          </div>
-        </div>
-
-        {/* Name + meta */}
-        <div className="mt-3">
-          <h1 className="font-display text-xl font-bold flex flex-wrap items-center gap-x-2 gap-y-1">
-            <span className="truncate">{me.name}</span>
-            {me.birthday &&
-              (() => {
-                const a = ageFrom(me.birthday);
-                return a != null ? (
-                  <span className="text-sm font-normal text-muted-foreground">· {a}</span>
-                ) : null;
-              })()}
-            <span className="inline-flex items-center gap-1 rounded-full bg-lime/15 px-2 py-0.5 text-[10px] font-bold text-lime">
-              <Shield className="h-3 w-3" /> Verified
-            </span>
-          </h1>
-          <div className="text-sm text-muted-foreground">
-            {me.username} · {me.city}
-          </div>
-          {me.graduatingClass && (
-            <div className="mt-0.5 text-xs text-muted-foreground">🎓 Class of {me.graduatingClass}</div>
-          )}
-        </div>
-
-        {me.bio && <p className="mt-2 text-sm text-foreground/90 whitespace-pre-wrap">{me.bio}</p>}
-
-        {me.links && me.links.length > 0 && (
-          <div className="mt-3">
-            <ProfileLinksList links={me.links} />
-          </div>
-        )}
-
-        {/* Action row */}
-        <div className="mt-4 grid grid-cols-2 gap-2">
-          <Link
-            to="/profile/edit"
-            className="inline-flex items-center justify-center rounded-lg border border-border bg-surface px-3 py-1.5 text-sm font-semibold"
-          >
-            Edit profile
-          </Link>
+        }
+        avatarUrl={me.avatarUrl}
+        avatarFallback={me.avatar}
+        name={me.name}
+        nameBadge={
+          <span className="inline-flex items-center gap-1 rounded-full bg-lime/15 px-2 py-0.5 text-[10px] font-bold text-lime">
+            <Shield className="h-3 w-3" /> Verified
+          </span>
+        }
+        meta={[
+          me.username,
+          age != null ? `${age}` : null,
+          me.city,
           <button
+            key="followers"
             type="button"
-            onClick={() => setReviewsOpen(true)}
-            className="inline-flex items-center justify-center gap-1 rounded-lg border border-border bg-surface px-3 py-1.5 text-sm font-semibold"
+            onClick={() => setFollowList("followers")}
+            className="underline-offset-2 hover:underline"
           >
-            <Star className="h-3.5 w-3.5" /> Reviews · {myRep.count}
-          </button>
-        </div>
+            {follow.followers} followers
+          </button>,
+          <button
+            key="following"
+            type="button"
+            onClick={() => setFollowList("following")}
+            className="underline-offset-2 hover:underline"
+          >
+            {follow.following} following
+          </button>,
+          `${upcomingGroups.total} games`,
+        ].filter(Boolean)}
+        description={me.bio}
+        onOpenAbout={() => setAboutOpen(true)}
+        actions={
+          <>
+            <Link to="/profile/edit" className={channelPillClass("primary")}>
+              Edit profile
+            </Link>
+            <ChannelPill onClick={() => setReviewsOpen(true)}>
+              <Star className="h-3.5 w-3.5" /> Reviews · {myRep.count}
+            </ChannelPill>
+            <ChannelPill onClick={() => setAboutOpen(true)}>About</ChannelPill>
+            <Link to="/settings" className={channelPillClass()}>
+              Settings
+            </Link>
+          </>
+        }
+      />
 
-        {/* Secondary stats — compact */}
-        <div className="mt-4 grid grid-cols-3 gap-2">
-          {[
-            { k: me.stats.reliability + "%", v: "Reliable" },
-            { k: me.stats.sportsmanship, v: "Sport" },
-            { k: me.stats.friends, v: "Crew" },
-          ].map((s) => (
-            <div
-              key={s.v}
-              className="rounded-xl border border-border bg-surface p-2 text-center"
-            >
-              <div className="font-display text-sm font-bold">{s.k}</div>
-              <div className="text-[10px] uppercase tracking-wider text-muted-foreground">
-                {s.v}
-              </div>
-            </div>
-          ))}
-        </div>
-
-
-        {/* Reputation badge (above the fold) */}
-        <div className="mt-4">
+      <ProfileAboutSheet open={aboutOpen} onOpenChange={setAboutOpen}>
+        {me.bio && (
+          <AboutBlock label="Bio">
+            <p className="whitespace-pre-wrap">{me.bio}</p>
+          </AboutBlock>
+        )}
+        <AboutBlock label="Details">
+          <ul className="space-y-1 text-sm text-muted-foreground">
+            <li>{me.username}</li>
+            {me.city && <li>{me.city}</li>}
+            {me.birthday && <li>Born {formatBirthday(me.birthday)}</li>}
+            {me.graduatingClass && <li>Class of {me.graduatingClass}</li>}
+          </ul>
+        </AboutBlock>
+        <AboutBlock label="Stats">
+          <AboutStats
+            items={[
+              { k: `${me.stats.reliability}%`, v: "Reliable" },
+              { k: me.stats.sportsmanship, v: "Sport" },
+              { k: me.stats.friends, v: "Crew" },
+            ]}
+          />
+        </AboutBlock>
+        {me.links && me.links.length > 0 && (
+          <AboutBlock label="Links">
+            <ProfileLinksList links={me.links} />
+          </AboutBlock>
+        )}
+        <AboutBlock label="Reputation">
           <ReputationBadge rep={myRep} onClick={() => setReviewsOpen(true)} />
-        </div>
+        </AboutBlock>
+      </ProfileAboutSheet>
 
-        {/* IG-style icon tab bar */}
-        <div className="mt-6 -mx-4 border-y border-border bg-background/60 sticky top-0 z-10 backdrop-blur">
-          <div className="grid grid-cols-4">
-            {[
-              { k: "games", icon: Grid3x3, label: "Games" },
-              { k: "hosting", icon: Bookmark, label: "Hosting" },
-              { k: "requests", icon: Inbox, label: "Requests" },
-              { k: "reviews", icon: UserSquare2, label: "Reviews" },
-            ].map((t) => {
-              const Icon = t.icon;
-              const active = activeTab === t.k;
-              return (
-                <button
-                  key={t.k}
-                  type="button"
-                  onClick={() => setActiveTab(t.k as any)}
-                  aria-label={t.label}
-                  aria-selected={active}
-                  className={`relative grid place-items-center py-3 text-xs font-semibold transition-colors ${
-                    active ? "text-foreground" : "text-muted-foreground"
-                  }`}
-                >
-                  <Icon className="h-5 w-5" />
-                  {active && (
-                    <span className="absolute -top-px left-0 right-0 h-0.5 bg-foreground" />
-                  )}
-                </button>
-              );
-            })}
-          </div>
-        </div>
+      <div className="px-4">
+        <ChannelTabs
+          className="mt-5"
+          value={activeTab}
+          onChange={(v) => setActiveTab(v)}
+          tabs={[
+            { k: "games" as const, label: "Games" },
+            { k: "hosting" as const, label: "Hosting" },
+            { k: "requests" as const, label: "Requests", count: pendingWithGame.length },
+            { k: "reviews" as const, label: "Reviews" },
+          ]}
+        />
 
         {/* Pending approvals */}
 
-        <section className={`mt-8 rounded-3xl border border-border bg-surface p-4 shadow-card ${activeTab === "requests" ? "" : "hidden"}`}>
+        <section className={`mt-6 ${activeTab === "requests" ? "" : "hidden"}`}>
           <div className="mb-3 flex items-center justify-between gap-3">
             <div className="flex items-center gap-2">
               <span className="grid h-8 w-8 place-items-center rounded-2xl border border-coral/30 bg-coral/10 text-coral">
@@ -568,39 +466,55 @@ function Profile() {
                       request={r}
                       index={i}
                       isHost={isHost}
-                      onCancel={isHost ? undefined : async () => {
-                        const prev = myRequests;
-                        setMyRequests((rs) => rs.filter((x) => x.id !== r.id));
-                        try {
-                          await cancelMyJoinRequest(r.game_id);
-                          toast("Request canceled.");
-                        } catch (e: any) {
-                          setMyRequests(prev);
-                          toast.error(e.message ?? "Could not cancel.");
-                        }
-                      }}
-                      onApprove={isHost ? async () => {
-                        const prev = hostRequests;
-                        setHostRequests((rs) => rs.map((x) => x.id === r.id ? { ...x, status: "approved" } : x));
-                        try {
-                          await reviewJoinRequest(r.id, "approved");
-                          toast("Player approved.");
-                        } catch (e: any) {
-                          setHostRequests(prev);
-                          toast.error(e.message ?? "Could not approve.");
-                        }
-                      } : undefined}
-                      onDecline={isHost ? async () => {
-                        const prev = hostRequests;
-                        setHostRequests((rs) => rs.map((x) => x.id === r.id ? { ...x, status: "rejected" } : x));
-                        try {
-                          await reviewJoinRequest(r.id, "rejected");
-                          toast("Player declined.");
-                        } catch (e: any) {
-                          setHostRequests(prev);
-                          toast.error(e.message ?? "Could not decline.");
-                        }
-                      } : undefined}
+                      onCancel={
+                        isHost
+                          ? undefined
+                          : async () => {
+                              const prev = myRequests;
+                              setMyRequests((rs) => rs.filter((x) => x.id !== r.id));
+                              try {
+                                await cancelMyJoinRequest(r.game_id);
+                                toast("Request canceled.");
+                              } catch (e: any) {
+                                setMyRequests(prev);
+                                toast.error(e.message ?? "Could not cancel.");
+                              }
+                            }
+                      }
+                      onApprove={
+                        isHost
+                          ? async () => {
+                              const prev = hostRequests;
+                              setHostRequests((rs) =>
+                                rs.map((x) => (x.id === r.id ? { ...x, status: "approved" } : x)),
+                              );
+                              try {
+                                await reviewJoinRequest(r.id, "approved");
+                                toast("Player approved.");
+                              } catch (e: any) {
+                                setHostRequests(prev);
+                                toast.error(e.message ?? "Could not approve.");
+                              }
+                            }
+                          : undefined
+                      }
+                      onDecline={
+                        isHost
+                          ? async () => {
+                              const prev = hostRequests;
+                              setHostRequests((rs) =>
+                                rs.map((x) => (x.id === r.id ? { ...x, status: "rejected" } : x)),
+                              );
+                              try {
+                                await reviewJoinRequest(r.id, "rejected");
+                                toast("Player declined.");
+                              } catch (e: any) {
+                                setHostRequests(prev);
+                                toast.error(e.message ?? "Could not decline.");
+                              }
+                            }
+                          : undefined
+                      }
                     />
                   );
                 }
@@ -610,18 +524,22 @@ function Profile() {
                     request={r}
                     index={i}
                     isHost={isHost}
-                    onWithdraw={isHost || r.status !== "approved" ? undefined : async () => {
-                      const prev = myRequests;
-                      setMyRequests((rs) => rs.filter((x) => x.id !== r.id));
-                      try {
-                        await withdrawMyApprovedJoinRequest(r.game_id);
-                        leaveGame(r.game_id);
-                        toast("You withdrew from the game.");
-                      } catch (e: any) {
-                        setMyRequests(prev);
-                        toast.error(e.message ?? "Could not withdraw.");
-                      }
-                    }}
+                    onWithdraw={
+                      isHost || r.status !== "approved"
+                        ? undefined
+                        : async () => {
+                            const prev = myRequests;
+                            setMyRequests((rs) => rs.filter((x) => x.id !== r.id));
+                            try {
+                              await withdrawMyApprovedJoinRequest(r.game_id);
+                              leaveGame(r.game_id);
+                              toast("You withdrew from the game.");
+                            } catch (e: any) {
+                              setMyRequests(prev);
+                              toast.error(e.message ?? "Could not withdraw.");
+                            }
+                          }
+                    }
                   />
                 );
               }}
@@ -632,7 +550,7 @@ function Profile() {
         </section>
 
         {/* Hosting */}
-        <section className={`mt-8 rounded-3xl border border-border bg-surface p-4 shadow-card ${activeTab === "hosting" ? "" : "hidden"}`}>
+        <section className={`mt-6 ${activeTab === "hosting" ? "" : "hidden"}`}>
           <div className="mb-3 flex items-center justify-between gap-3">
             <div className="flex items-center gap-2">
               <span className="grid h-8 w-8 place-items-center rounded-2xl border border-lime/30 bg-lime/10 text-lime">
@@ -672,7 +590,7 @@ function Profile() {
         </section>
 
         {/* Pickup / Playing */}
-        <section className={`mt-8 rounded-3xl border border-border bg-surface p-4 shadow-card ${activeTab === "games" ? "" : "hidden"}`}>
+        <section className={`mt-6 ${activeTab === "games" ? "" : "hidden"}`}>
           <div className="mb-3 flex items-center justify-between gap-3">
             <div className="flex items-center gap-2">
               <span className="grid h-8 w-8 place-items-center rounded-2xl border border-lime/30 bg-lime/10 text-lime">
@@ -710,7 +628,6 @@ function Profile() {
             </Link>
           )}
         </section>
-
 
         {/* Sports */}
         <div className={`mt-8 ${activeTab === "games" ? "" : "hidden"}`}>
@@ -760,15 +677,9 @@ function Profile() {
           showProgress
         />
 
-
         {/* Reviews tab — inline */}
         <div className={`mt-6 ${activeTab === "reviews" ? "" : "hidden"}`}>
-          <ReviewsSection
-            revieweeId="me"
-            revieweeKind="player"
-            revieweeName={me.name}
-            isOwner
-          />
+          <ReviewsSection revieweeId="me" revieweeKind="player" revieweeName={me.name} isOwner />
         </div>
 
         {/* Follow list sheet */}
@@ -779,7 +690,6 @@ function Profile() {
           displayName={me.name}
           initialTab={followList ?? "followers"}
         />
-
 
         {/* Reviews popup */}
         <Dialog open={reviewsOpen} onOpenChange={setReviewsOpen}>

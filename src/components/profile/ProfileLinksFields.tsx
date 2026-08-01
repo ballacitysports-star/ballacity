@@ -128,7 +128,6 @@ export function ProfileLinksFields({
             {!linkErrors[i] && l.url.trim() && (
               <LinkPreview url={l.url} type={l.type} label={l.label} />
             )}
-
           </div>
         ))}
       </div>
@@ -151,15 +150,7 @@ export function ProfileLinksFields({
   );
 }
 
-function LinkPreview({
-  url,
-  type,
-  label,
-}: {
-  url: string;
-  type: ProfileLinkType;
-  label?: string;
-}) {
+function LinkPreview({ url, type, label }: { url: string; type: ProfileLinkType; label?: string }) {
   const href = normalizeProfileUrl(url);
   let host = "";
   let path = "";
@@ -193,6 +184,5 @@ function LinkPreview({
         <ExternalLink className="h-4 w-4 shrink-0 text-muted-foreground" />
       </a>
     </div>
-
   );
 }

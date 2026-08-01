@@ -31,10 +31,12 @@ export function ProfileSportsFields({
       sports.map((x) => {
         if (x.name !== s) return x;
         const cur = x.positions ?? [];
-        return { ...x, positions: cur.includes(pos) ? cur.filter((p) => p !== pos) : [...cur, pos] };
+        return {
+          ...x,
+          positions: cur.includes(pos) ? cur.filter((p) => p !== pos) : [...cur, pos],
+        };
       }),
     );
-
 
   return (
     <>
@@ -115,7 +117,6 @@ export function ProfileSportsFields({
             })()}
 
             {POSITIONS_BY_SPORT[s.name]?.length > 0 && (
-
               <div className="mt-3">
                 <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1.5">
                   Positions

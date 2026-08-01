@@ -19,7 +19,15 @@ import {
   BadgeCheck,
 } from "lucide-react";
 import { ACCOUNT_TYPE_META, useAccountType } from "@/lib/account-type";
+import { useMyProfile } from "@/lib/user-prefs-store";
+import {
+  SettingsGroup,
+  SettingsLinkRow,
+  SettingsButtonRow,
+  SettingsStaticRow,
+} from "@/components/settings/SettingsRow";
 import type { LucideIcon } from "lucide-react";
+
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { Switch } from "@/components/ui/switch";
@@ -140,7 +148,11 @@ function SettingsHubPage() {
     }
   };
 
-  const themeOptions: Array<{ value: "light" | "dark" | "system"; label: string; Icon: typeof Sun }> = [
+  const themeOptions: Array<{
+    value: "light" | "dark" | "system";
+    label: string;
+    Icon: typeof Sun;
+  }> = [
     { value: "light", label: "Light", Icon: Sun },
     { value: "dark", label: "Dark", Icon: Moon },
     { value: "system", label: "System", Icon: Monitor },
@@ -148,19 +160,18 @@ function SettingsHubPage() {
 
   return (
     <div className="min-h-screen bg-background pb-24">
-      <header className="sticky top-0 z-10 flex items-center gap-3 border-b bg-background/95 px-4 py-3 backdrop-blur">
-        <Link to="/profile" className="rounded-md p-2 hover:bg-muted" aria-label="Back">
+      <header className="sticky top-0 z-10 flex items-center gap-3 border-b border-border bg-background/95 px-2 py-2.5 backdrop-blur">
+        <Link to="/profile" className="rounded-full p-2 hover:bg-surface" aria-label="Back">
           <ArrowLeft className="h-5 w-5" />
         </Link>
-        <h1 className="text-lg font-semibold">Settings</h1>
+        <h1 className="text-lg font-medium">Settings</h1>
       </header>
 
-      <main className="mx-auto max-w-xl px-4 py-4 space-y-6">
-        <section>
-          <h2 className="px-1 pb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-            Appearance
-          </h2>
-          <div className="rounded-xl border bg-card p-3 space-y-3">
+      <main className="mx-auto max-w-xl pb-4">
+        <AccountIdentityRow />
+
+        <SettingsGroup title="Appearance">
+          <SettingsStaticRow>
             <div className="grid grid-cols-3 gap-2" role="radiogroup" aria-label="Theme">
               {themeOptions.map(({ value, label, Icon }) => {
                 const active = theme === value;
@@ -171,10 +182,10 @@ function SettingsHubPage() {
                     role="radio"
                     aria-checked={active}
                     onClick={() => setTheme(value)}
-                    className={`flex flex-col items-center gap-1.5 rounded-lg border px-2 py-3 text-xs font-medium transition ${
+                    className={`flex flex-col items-center gap-1.5 rounded-lg px-2 py-3 text-xs font-medium transition ${
                       active
-                        ? "border-primary bg-primary/10 text-foreground"
-                        : "border-border bg-muted/40 text-muted-foreground hover:text-foreground hover:bg-muted"
+                        ? "bg-surface-2 text-foreground"
+                        : "text-muted-foreground hover:bg-surface hover:text-foreground"
                     }`}
                   >
                     <Icon className="h-4 w-4" />
@@ -183,63 +194,71 @@ function SettingsHubPage() {
                 );
               })}
             </div>
-            <p className="px-1 text-xs text-muted-foreground">
+            <p className="mt-2 text-xs text-muted-foreground">
               {theme === "system"
                 ? `Following your device (currently ${resolved})`
                 : `Using ${theme} theme`}
             </p>
-          </div>
-        </section>
+          </SettingsStaticRow>
+        </SettingsGroup>
 
         <OnboardingDetailsSection />
 
         <MyOrgsSection />
 
         {SECTIONS.map((section) => (
-          <section key={section.title}>
-            <h2 className="px-1 pb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-              {section.title}
-            </h2>
-            <ul className="overflow-hidden rounded-xl border bg-card divide-y">
-              {section.items.map((item) => {
-                const Icon = item.icon;
-                return (
-                  <li key={item.to}>
-                    <Link
-                      to={item.to}
-                      className="flex items-center gap-3 px-4 py-3 hover:bg-muted/50 active:bg-muted"
-                    >
-                      <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-muted">
-                        <Icon className="h-4 w-4" />
-                      </span>
-                      <span className="min-w-0 flex-1">
-                        <span className="block truncate text-sm font-medium">{item.label}</span>
-                        <span className="block truncate text-xs text-muted-foreground">
-                          {item.description}
-                        </span>
-                      </span>
-                      <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
-                    </Link>
-                  </li>
-                );
-              })}
-            </ul>
-          </section>
+          <SettingsGroup key={section.title} title={section.title}>
+            {section.items.map((item) => (
+              <SettingsLinkRow
+                key={item.to}
+                to={item.to}
+                icon={item.icon}
+                label={item.label}
+                description={item.description}
+              />
+            ))}
+          </SettingsGroup>
         ))}
 
-        <section className="space-y-2">
-          <button
-            type="button"
+        <SettingsGroup>
+          <SettingsButtonRow
+            icon={LogOut}
+            label="Sign out"
+            destructive
             onClick={handleSignOut}
-            className="flex w-full items-center justify-center gap-2 rounded-xl border bg-card px-4 py-3 text-sm font-medium text-destructive hover:bg-muted/50 active:bg-muted"
-          >
-            <LogOut className="h-4 w-4" />
-            Sign out
-          </button>
+            trailing={null}
+          />
           <DeleteAccountButton />
-        </section>
-
+        </SettingsGroup>
       </main>
+    </div>
+  );
+}
+
+/** YouTube's account row: avatar, name, handle, chevron to edit. */
+function AccountIdentityRow() {
+  const { user } = useAuth();
+  const me = useMyProfile(user ?? null);
+  if (!user || !me) return null;
+  return (
+    <div className="border-b border-border">
+      <Link
+        to="/profile/edit"
+        className="flex items-center gap-4 px-4 py-4 transition-colors hover:bg-surface active:bg-surface-2"
+      >
+        <span className="grid h-14 w-14 shrink-0 place-items-center overflow-hidden rounded-full bg-surface-2 text-lg font-bold">
+          {me.avatarUrl ? (
+            <img src={me.avatarUrl} alt="" className="h-full w-full object-cover" />
+          ) : (
+            me.avatar
+          )}
+        </span>
+        <span className="min-w-0 flex-1">
+          <span className="block truncate text-base font-medium">{me.name}</span>
+          <span className="block truncate text-sm text-muted-foreground">{me.username}</span>
+        </span>
+        <ChevronRight className="h-5 w-5 shrink-0 text-muted-foreground" aria-hidden />
+      </Link>
     </div>
   );
 }
@@ -249,46 +268,41 @@ function OnboardingDetailsSection() {
   if (loading || !accountType) return null;
   const meta = ACCOUNT_TYPE_META[accountType];
   return (
-    <section>
-      <h2 className="px-1 pb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-        Onboarding details
-      </h2>
-      <div className="overflow-hidden rounded-xl border bg-card">
-        <div className="flex items-center gap-3 px-4 py-3">
-          <span className="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-muted text-lg" aria-hidden>
+    <SettingsGroup title="Onboarding details">
+      <SettingsStaticRow>
+        <div className="flex items-center gap-4">
+          <span
+            className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-surface-2 text-lg"
+            aria-hidden
+          >
             {meta.emoji}
           </span>
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-1.5">
-              <span className="text-sm font-semibold">{meta.label} account</span>
+              <span className="text-sm font-medium">{meta.label} account</span>
               <BadgeCheck className="h-4 w-4 text-primary" aria-hidden />
             </div>
             <p className="text-xs text-muted-foreground">{meta.blurb}</p>
           </div>
         </div>
-        <div className="border-t px-4 py-2.5 text-xs text-muted-foreground">
-          Your account type is locked to <span className="font-medium text-foreground">{meta.label}</span>. To use OpenRun as a different type, create a separate account.
-        </div>
-        <Link
-          to="/onboarding/welcome"
-          search={{ type: accountType }}
-          className="flex items-center gap-3 border-t px-4 py-3 hover:bg-muted/50 active:bg-muted"
-        >
-          <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-muted">
-            <Pencil className="h-4 w-4" />
-          </span>
-          <span className="min-w-0 flex-1">
-            <span className="block truncate text-sm font-medium">Edit onboarding details</span>
-            <span className="block truncate text-xs text-muted-foreground">
-              {accountType === "player"
-                ? "Update your sport, level, location, and radius"
-                : `Revisit your ${meta.label.toLowerCase()} setup steps`}
-            </span>
-          </span>
-          <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
-        </Link>
-      </div>
-    </section>
+        <p className="mt-2.5 text-xs text-muted-foreground">
+          Your account type is locked to{" "}
+          <span className="font-medium text-foreground">{meta.label}</span>. To use OpenRun as a
+          different type, create a separate account.
+        </p>
+      </SettingsStaticRow>
+      <SettingsLinkRow
+        to="/onboarding/welcome"
+        search={{ type: accountType }}
+        icon={Pencil}
+        label="Edit onboarding details"
+        description={
+          accountType === "player"
+            ? "Update your sport, level, location, and radius"
+            : `Revisit your ${meta.label.toLowerCase()} setup steps`
+        }
+      />
+    </SettingsGroup>
   );
 }
 
@@ -316,24 +330,22 @@ function MyOrgsSection() {
   if (!orgs || orgs.length === 0) return null;
 
   return (
-    <section>
-      <h2 className="px-1 pb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-        My gyms
-      </h2>
-      <ul className="overflow-hidden rounded-xl border bg-card divide-y">
+    <SettingsGroup title="My gyms">
+      <ul className="divide-y divide-border">
         {orgs.map((o) => (
-          <li key={o.id} className="flex items-center gap-3 px-4 py-3">
-            <span className="grid h-9 w-9 shrink-0 place-items-center overflow-hidden rounded-lg bg-muted">
+          <li key={o.id} className="flex items-center gap-4 px-4 py-3.5">
+            <span className="grid h-9 w-9 shrink-0 place-items-center overflow-hidden rounded-full bg-surface-2">
               {o.avatar ? (
                 <img src={o.avatar} alt="" className="h-full w-full object-cover" />
               ) : (
-                <Building2 className="h-4 w-4" />
+                <Building2 className="h-4 w-4 text-muted-foreground" />
               )}
             </span>
             <span className="min-w-0 flex-1">
-              <span className="block truncate text-sm font-medium">{o.name}</span>
+              <span className="block truncate text-sm">{o.name}</span>
               <span className="block truncate text-xs text-muted-foreground">@{o.handle}</span>
             </span>
+
             <Link
               to="/orgs/$orgId/edit"
               params={{ orgId: o.id }}
@@ -356,8 +368,8 @@ function MyOrgsSection() {
                 <AlertDialogHeader>
                   <AlertDialogTitle>Delete {o.name}?</AlertDialogTitle>
                   <AlertDialogDescription>
-                    This permanently removes the gym and its memberships. This action
-                    cannot be undone.
+                    This permanently removes the gym and its memberships. This action cannot be
+                    undone.
                   </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
@@ -375,7 +387,7 @@ function MyOrgsSection() {
           </li>
         ))}
       </ul>
-    </section>
+    </SettingsGroup>
   );
 }
 
@@ -399,8 +411,8 @@ function DeleteAccountButton() {
   const blockerHint = !confirmOk
     ? 'Type "DELETE" to confirm'
     : !passwordOk
-    ? "Enter your password to confirm"
-    : "";
+      ? "Enter your password to confirm"
+      : "";
 
   const onDelete = async () => {
     setBusy(true);
@@ -421,40 +433,75 @@ function DeleteAccountButton() {
   };
 
   return (
-    <AlertDialog open={open} onOpenChange={(v) => { setOpen(v); if (!v) { setConfirm(""); setPassword(""); } }}>
+    <AlertDialog
+      open={open}
+      onOpenChange={(v) => {
+        setOpen(v);
+        if (!v) {
+          setConfirm("");
+          setPassword("");
+        }
+      }}
+    >
       <AlertDialogTrigger asChild>
         <button
           type="button"
-          className="flex w-full items-center justify-center gap-2 rounded-xl border border-destructive/40 bg-card px-4 py-3 text-sm font-medium text-destructive hover:bg-destructive/10"
+          className="flex w-full items-center gap-4 px-4 py-3.5 text-left transition-colors hover:bg-surface active:bg-surface-2"
         >
-          <Trash2 className="h-4 w-4" />
-          Delete account
+          <Trash2 className="h-5 w-5 shrink-0 text-destructive" aria-hidden />
+          <span className="flex-1 text-sm text-destructive">Delete account</span>
         </button>
       </AlertDialogTrigger>
+
       <AlertDialogContent>
         <AlertDialogHeader>
           <AlertDialogTitle>Delete your account?</AlertDialogTitle>
           <AlertDialogDescription>
-            This action is permanent and cannot be undone. The following data will be
-            permanently removed:
+            This action is permanent and cannot be undone. The following data will be permanently
+            removed:
           </AlertDialogDescription>
         </AlertDialogHeader>
         <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-3">
           <ul className="space-y-1.5 text-sm text-foreground">
-            <li className="flex gap-2"><span aria-hidden>•</span><span>Your profile, avatar, cover photo, and bio</span></li>
-            <li className="flex gap-2"><span aria-hidden>•</span><span>Teams, trainer profiles, and gym pages you own</span></li>
-            <li className="flex gap-2"><span aria-hidden>•</span><span>Games you've hosted and your participation history</span></li>
-            <li className="flex gap-2"><span aria-hidden>•</span><span>Messages, comments, posts, and reactions</span></li>
-            <li className="flex gap-2"><span aria-hidden>•</span><span>Followers, following, blocks, and reports</span></li>
-            <li className="flex gap-2"><span aria-hidden>•</span><span>Ratings, reviews, and training session requests</span></li>
-            <li className="flex gap-2"><span aria-hidden>•</span><span>Availability, preferences, and saved locations</span></li>
-            <li className="flex gap-2"><span aria-hidden>•</span><span>Login credentials and all connected sign-in methods</span></li>
+            <li className="flex gap-2">
+              <span aria-hidden>•</span>
+              <span>Your profile, avatar, cover photo, and bio</span>
+            </li>
+            <li className="flex gap-2">
+              <span aria-hidden>•</span>
+              <span>Teams, trainer profiles, and gym pages you own</span>
+            </li>
+            <li className="flex gap-2">
+              <span aria-hidden>•</span>
+              <span>Games you've hosted and your participation history</span>
+            </li>
+            <li className="flex gap-2">
+              <span aria-hidden>•</span>
+              <span>Messages, comments, posts, and reactions</span>
+            </li>
+            <li className="flex gap-2">
+              <span aria-hidden>•</span>
+              <span>Followers, following, blocks, and reports</span>
+            </li>
+            <li className="flex gap-2">
+              <span aria-hidden>•</span>
+              <span>Ratings, reviews, and training session requests</span>
+            </li>
+            <li className="flex gap-2">
+              <span aria-hidden>•</span>
+              <span>Availability, preferences, and saved locations</span>
+            </li>
+            <li className="flex gap-2">
+              <span aria-hidden>•</span>
+              <span>Login credentials and all connected sign-in methods</span>
+            </li>
           </ul>
         </div>
         {hasPassword ? (
           <div className="space-y-2">
             <label className="text-xs text-muted-foreground">
-              Re-enter your password for <span className="font-semibold text-foreground">{email}</span>
+              Re-enter your password for{" "}
+              <span className="font-semibold text-foreground">{email}</span>
             </label>
             <Input
               type="password"
@@ -484,7 +531,10 @@ function DeleteAccountButton() {
           <AlertDialogCancel disabled={busy}>Cancel</AlertDialogCancel>
           <AlertDialogAction
             disabled={!canDelete}
-            onClick={(e) => { e.preventDefault(); onDelete(); }}
+            onClick={(e) => {
+              e.preventDefault();
+              onDelete();
+            }}
             className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
           >
             {busy ? "Deleting…" : "Permanently delete account"}
@@ -497,5 +547,3 @@ function DeleteAccountButton() {
     </AlertDialog>
   );
 }
-
-
