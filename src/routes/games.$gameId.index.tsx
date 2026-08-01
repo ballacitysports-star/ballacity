@@ -80,6 +80,7 @@ import { PostEngagement } from "@/components/PostEngagement";
 import { Distance } from "@/components/Distance";
 
 import { useHostedGames, fetchHostedGame, updateHostedGame, deleteHostedGame } from "@/lib/hosted-games-store";
+import { filterTiersForSport, sanitizeSkillForSport, scaleForSport } from "@/lib/sport-levels";
 import type { Game } from "@/lib/sample-data";
 import { PositionsPicker, positionsCleanup } from "@/components/PositionsPicker";
 import { listMyTeams } from "@/lib/teams.functions";
@@ -2363,6 +2364,13 @@ function EditGameModal({
   const [title, setTitle] = useState(game.title);
   const [sport, setSport] = useState<Game["sport"]>(game.sport);
   const [skill, setSkill] = useState<Game["skill"]>(game.skill);
+  // Tier list follows the game's sport, matching the profile scale.
+  const skillOptions = ["All Levels", ...filterTiersForSport(sport)];
+  useEffect(() => {
+    if (skill === "All Levels") return;
+    const kept = sanitizeSkillForSport(sport, skill);
+    if (kept !== skill) setSkill(kept || "All Levels");
+  }, [sport, skill]);
   const [location, setLocation] = useState(game.location);
   const [neighborhood, setNeighborhood] = useState(game.neighborhood ?? "");
   const [dateLocal, setDateLocal] = useState(() => {
@@ -2702,9 +2710,9 @@ function EditGameModal({
           </Field>
 
           {/* Skill chips */}
-          <Field label="Skill level">
+          <Field label={`Skill level · ${scaleForSport(sport).system}`}>
             <div className="flex gap-2 overflow-x-auto scrollbar-hide">
-              {(["All Levels", "Beginner", "Intermediate", "Advanced"] as const).map((s) => (
+              {skillOptions.map((s) => (
                 <button
                   type="button"
                   key={s}

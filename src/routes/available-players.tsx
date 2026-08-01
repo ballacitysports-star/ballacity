@@ -43,6 +43,14 @@ import {
   type PlaceGeo,
 } from "@/lib/availability";
 import { haversineKm } from "@/lib/geo";
+import {
+  filterTiersForSport,
+  formatSportLevel,
+  levelMatchesFilter,
+  resolvePlayerLevel,
+  sanitizeSkillForSport,
+  scaleForSport,
+} from "@/lib/sport-levels";
 
 import { AvailabilitySchedulePicker } from "@/components/availability/AvailabilitySchedulePicker";
 import { useMyBusyBlocks } from "@/lib/availability-conflicts";
@@ -90,7 +98,18 @@ export const Route = createFileRoute("/available-players")({
   component: AvailablePlayersPage,
 });
 
+/** Generic tiers shown when no single sport is selected. */
 const SKILLS = ["All Levels", "Beginner", "Intermediate", "Advanced"] as const;
+
+/**
+ * Skill options for the current sport: the sport's real scale (Flag / 7v7 /
+ * Full contact for Football, MiLB for Baseball, NTRP for Tennis…) so the filter
+ * and the post form read exactly like the profile does.
+ */
+function skillOptionsForSport(sport: string): string[] {
+  return sport ? ["All Levels", ...filterTiersForSport(sport)] : [...SKILLS];
+}
+
 
 type Tab = "browse" | "mine";
 
@@ -111,6 +130,14 @@ function AvailablePlayersPage() {
 
   const [includeAnywhere, setIncludeAnywhere] = useState(true);
   const [skill, setSkill] = useState<string>("All Levels");
+  // A tier from another sport (or a retired Football tier) can never stick when
+  // the sport changes — the profile scale is the source of truth.
+  useEffect(() => {
+    if (skill === "All Levels") return;
+    if (!sport) return;
+    const kept = sanitizeSkillForSport(sport, skill);
+    if (kept !== skill) setSkill(kept || "All Levels");
+  }, [sport, skill]);
   const [window, setWindow] = useState<"any" | "week" | "month" | "custom">("any");
   const [customFrom, setCustomFrom] = useState("");
   const [customTo, setCustomTo] = useState("");
@@ -181,7 +208,7 @@ function AvailablePlayersPage() {
 
   useEffect(() => {
     setList(null);
-  }, [sport, city, includeAnywhere, skill, fromISO, toISO]);
+  }, [sport, city, includeAnywhere, fromISO, toISO]);
 
   const activeFilterCount =
     (skill !== "All Levels" ? 1 : 0) +
@@ -191,16 +218,22 @@ function AvailablePlayersPage() {
 
   const filteredList = useMemo(() => {
     if (!list) return null;
-    if (maxDistance <= 0) return list;
+    const wanted = skill !== "All Levels" ? skill : "";
+    const bySkill = wanted
+      ? list.filter((a) =>
+          levelMatchesFilter(a.author_sport_levels, a.sports, a.skill_level, wanted),
+        )
+      : list;
+    if (maxDistance <= 0) return bySkill;
     const km = miToKm(maxDistance);
-    return list.filter((a) => {
+    return bySkill.filter((a) => {
       // Precise: both the filter city and the post carry Google Places coordinates.
       if (cityGeo && a.lat != null && a.lng != null) {
         return haversineKm(cityGeo, { lat: Number(a.lat), lng: Number(a.lng) }) <= km;
       }
       return (a.travel_radius_km ?? 0) <= km;
     });
-  }, [list, maxDistance, cityGeo]);
+  }, [list, maxDistance, cityGeo, skill]);
 
 
   useEffect(() => {
@@ -209,7 +242,6 @@ function AvailablePlayersPage() {
       sport: sport || undefined,
       city: city.trim() || undefined,
       includeAnywhere: city.trim() ? includeAnywhere : undefined,
-      skill: skill !== "All Levels" ? skill : undefined,
       from: fromISO,
       to: toISO,
     })
@@ -225,7 +257,7 @@ function AvailablePlayersPage() {
     return () => {
       cancelled = true;
     };
-  }, [sport, city, includeAnywhere, skill, fromISO, toISO, refreshKey]);
+  }, [sport, city, includeAnywhere, fromISO, toISO, refreshKey]);
 
   // Realtime: refresh list whenever any availability row changes.
   useEffect(() => {
@@ -471,11 +503,13 @@ function AvailablePlayersPage() {
           </div>
         </FilterSection>
 
-        <FilterSection label="Skill level">
+        <FilterSection
+          label={sport ? `Skill level · ${scaleForSport(sport as any).system}` : "Skill level"}
+        >
           <ChipRow
             value={skill}
             onChange={(v) => setSkill(v)}
-            options={SKILLS.map((s) => ({ value: s, label: s }))}
+            options={skillOptionsForSport(sport).map((s) => ({ value: s, label: s }))}
           />
         </FilterSection>
 
@@ -786,7 +820,9 @@ function AvailabilityCard({
           </span>
         </div>
         <span className="shrink-0 rounded-full bg-lime/15 px-2 py-0.5 text-[10px] font-bold text-lime">
-          {a.skill_level}
+          {formatSportLevel(
+            resolvePlayerLevel(a.author_sport_levels, a.sports[0], a.skill_level),
+          ) ?? a.skill_level}
         </span>
         <button
           type="button"
@@ -959,6 +995,15 @@ function PostAvailabilityDialog({
   const isEdit = !!initial;
   const [sports, setSports] = useState<string[]>(initial?.sports ?? []);
   const [skill, setSkill] = useState<string>(initial?.skill_level ?? "All Levels");
+  // The primary sport drives the tier list, so Football posts offer
+  // Flag / 7v7 / Full contact levels exactly like the profile does.
+  const primarySport = sports[0] ?? "";
+  const skillOptions = skillOptionsForSport(primarySport);
+  useEffect(() => {
+    if (skill === "All Levels" || !primarySport) return;
+    const kept = sanitizeSkillForSport(primarySport, skill);
+    if (kept !== skill) setSkill(kept || "All Levels");
+  }, [primarySport, skill]);
   const [slots, setSlots] = useState<TimeSlot[]>(() => parseTimeSlots(initial?.time_slots ?? []));
   const { data: busy = [] } = useMyBusyBlocks({ excludeAvailabilityId: initial?.id });
   const [city, setCity] = useState(initial?.city ?? "");
@@ -1037,9 +1082,16 @@ function PostAvailabilityDialog({
             </div>
           </div>
           <div>
-            <Label className="mb-2 block">Skill level</Label>
+            <Label className="mb-2 block">
+              Skill level
+              {primarySport && (
+                <span className="ml-1 text-[11px] font-normal text-muted-foreground">
+                  · {scaleForSport(primarySport as any).system}
+                </span>
+              )}
+            </Label>
             <div className="flex flex-wrap gap-2">
-              {SKILLS.map((s) => (
+              {skillOptions.map((s) => (
                 <Chip key={s} active={skill === s} onClick={() => setSkill(s)}>
                   {s}
                 </Chip>
@@ -1515,7 +1567,9 @@ function AvailabilityDetailDialog({
               <div className="flex items-center justify-between gap-2">
                 <p className="font-semibold truncate">{a.author_name}</p>
                 <span className="shrink-0 rounded-full bg-lime/15 px-2 py-0.5 text-[10px] font-bold text-lime">
-                  {a.skill_level}
+                  {formatSportLevel(
+                    resolvePlayerLevel(a.author_sport_levels, a.sports[0], a.skill_level),
+                  ) ?? a.skill_level}
                 </span>
               </div>
               <div className="mt-1 flex flex-wrap gap-1">
