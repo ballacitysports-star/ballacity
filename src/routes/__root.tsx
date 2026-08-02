@@ -159,12 +159,63 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
 
 const THEME_INIT_SCRIPT = `(function(){try{var h=document.documentElement;h.classList.add('dark');h.dataset.theme='dark';h.dataset.themePref='dark';}catch(e){document.documentElement.classList.add('dark');}})();`;
 
+const BOOT_RETRY_KEY = "openrun:boot-retry";
+
+/**
+ * Boot watchdog. Runs as a plain inline script (NOT a React effect) because the
+ * failure it recovers from is "the client entry module never loaded" — in that
+ * state no app code runs at all and the pre-hydration placeholder would sit on
+ * screen forever. Reloads once, then surfaces a retry panel.
+ */
+const BOOT_WATCHDOG_SCRIPT = `(function(){
+  var K=${JSON.stringify(BOOT_RETRY_KEY)};
+  var RE=/dynamically imported module|Importing a module script failed|Loading chunk|error loading dynamically imported module/i;
+  function read(){try{return sessionStorage.getItem(K);}catch(e){return null;}}
+  function write(v){try{sessionStorage.setItem(K,v);}catch(e){}}
+  function booted(){return !!window.__openrun_booted;}
+  function showFailure(){
+    var el=document.getElementById('boot-fallback');
+    if(!el)return;
+    el.innerHTML='<p class="text-sm font-medium text-foreground">We couldn\\'t finish loading</p>'+
+      '<p class="mt-2 text-sm text-muted-foreground">Check your connection, then try again.</p>'+
+      '<div class="mt-5 flex flex-wrap justify-center gap-2">'+
+      '<button type="button" id="boot-retry" class="inline-flex items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground">Try again</button>'+
+      '<a href="/" class="inline-flex items-center justify-center rounded-md border border-input bg-background px-4 py-2 text-sm font-medium text-foreground">Go home</a>'+
+      '</div>';
+    var b=document.getElementById('boot-retry');
+    if(b)b.addEventListener('click',function(){try{sessionStorage.removeItem(K);}catch(e){}window.location.reload();});
+  }
+  function recover(){
+    if(booted())return;
+    if(read()==='1'){showFailure();return;}
+    write('1');
+    window.location.reload();
+  }
+  function onMessage(m){if(m&&RE.test(String(m)))recover();}
+  window.addEventListener('error',function(e){onMessage((e&&(e.message||(e.error&&e.error.message)))||'');});
+  window.addEventListener('unhandledrejection',function(e){
+    var r=e&&e.reason;onMessage((r&&r.message)||(typeof r==='string'?r:''));
+  });
+  setTimeout(recover,8000);
+})();`;
+
+/** Called once the React app is running, so the watchdog stands down. */
+function markAppBooted() {
+  try {
+    (window as unknown as { __openrun_booted?: boolean }).__openrun_booted = true;
+    sessionStorage.removeItem(BOOT_RETRY_KEY);
+  } catch {
+    /* storage unavailable */
+  }
+}
+
 function RootShell({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" className="dark" suppressHydrationWarning>
       <head>
         <HeadContent />
         <script dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
+        <script dangerouslySetInnerHTML={{ __html: BOOT_WATCHDOG_SCRIPT }} />
       </head>
       <body>
         {children}
@@ -173,6 +224,7 @@ function RootShell({ children }: { children: React.ReactNode }) {
     </html>
   );
 }
+
 
 const CHUNK_RELOAD_KEY = "__openrun_chunk_reloaded_at";
 const OAUTH_PROVIDER_KEY = "openrun:oauth-provider";
@@ -458,6 +510,8 @@ function AuthGate({ children }: { children: React.ReactNode }) {
   const [typeStatus, setTypeStatus] = useState<"unknown" | "ok" | "missing">(
     alreadyConfirmed ? "ok" : "unknown",
   );
+  // Bumped after a failed check so the effect re-runs without blanking the page.
+  const [retryTick, setRetryTick] = useState(0);
 
   useEffect(() => {
     if (loading || !user) return;
@@ -466,7 +520,9 @@ function AuthGate({ children }: { children: React.ReactNode }) {
       return;
     }
     let cancelled = false;
-    setTypeStatus("unknown");
+    let retryTimer: number | undefined;
+    // A background retry must not blank an already-rendered page.
+    setTypeStatus((s) => (s === "ok" ? "ok" : "unknown"));
     (async () => {
       // Authoritative server-side guard: inspects auth identities via admin
       // so a social user with stripped provider metadata is still classified
@@ -485,26 +541,40 @@ function AuthGate({ children }: { children: React.ReactNode }) {
       } catch {
         /* fall through to client check */
       }
-      const { data } = await supabase
-        .from("profiles")
-        .select("account_type")
-        .eq("id", user.id)
-        .maybeSingle();
-      if (cancelled) return;
-      const t = (data as { account_type?: string } | null)?.account_type;
-      if (isAccountType(t)) {
-        onboardedUsers.add(user.id);
+      try {
+        const { data, error } = await supabase
+          .from("profiles")
+          .select("account_type")
+          .eq("id", user.id)
+          .maybeSingle();
+        if (cancelled) return;
+        if (error) throw error;
+        const t = (data as { account_type?: string } | null)?.account_type;
+        if (isAccountType(t)) {
+          onboardedUsers.add(user.id);
+          setTypeStatus("ok");
+        } else {
+          setTypeStatus("missing");
+          router.navigate({ to: "/onboarding/account-type", replace: true });
+        }
+      } catch {
+        // Both the server guard and the profile read failed (offline, server
+        // restart). Don't hold the page behind the loader on a network fault —
+        // render what the user asked for and re-check in the background.
+        // `onboardedUsers` stays untouched so the retry is a real re-check.
+        if (cancelled) return;
         setTypeStatus("ok");
-      } else {
-        setTypeStatus("missing");
-        router.navigate({ to: "/onboarding/account-type", replace: true });
+        retryTimer = window.setTimeout(() => setRetryTick((n) => n + 1), 5000);
       }
     })();
+
     return () => {
       cancelled = true;
+      if (retryTimer !== undefined) window.clearTimeout(retryTimer);
     };
     // Intentionally NOT keyed on `pathname`: the check is per user, not per route.
-  }, [user, loading, skipTypeCheck, router]);
+  }, [user, loading, skipTypeCheck, router, retryTick]);
+
 
 
   useEffect(() => {
@@ -542,7 +612,9 @@ function RootComponent() {
   const router = useRouter();
 
   useEffect(() => {
+    markAppBooted();
     const onError = (event: ErrorEvent) => maybeReloadForStaleChunk(event.error ?? event.message);
+
     const onRejection = (event: PromiseRejectionEvent) => maybeReloadForStaleChunk(event.reason);
     window.addEventListener("error", onError);
     window.addEventListener("unhandledrejection", onRejection);
@@ -660,11 +732,20 @@ function RootComponent() {
     <QueryClientProvider client={queryClient}>
       <ClientOnly
         fallback={
-          <div className="grid min-h-dvh place-items-center bg-background">
-            <div className="h-8 w-8 animate-spin rounded-full border-2 border-muted border-t-foreground" />
+          <div className="grid min-h-dvh place-items-center bg-background px-4">
+            <div
+              id="boot-fallback"
+              className="flex max-w-sm flex-col items-center text-center"
+              role="status"
+              aria-live="polite"
+            >
+              <div className="h-8 w-8 animate-spin rounded-full border-2 border-muted border-t-foreground" />
+              <p className="mt-4 text-sm text-muted-foreground">Loading…</p>
+            </div>
           </div>
         }
       >
+
         <AuthGate>
           <Outlet />
         </AuthGate>
