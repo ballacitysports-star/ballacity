@@ -35,16 +35,18 @@ export function ProfileChannelHeader({
   const parts = meta.filter(Boolean);
   return (
     <header>
-      {/* Banner */}
-      <div className="px-3 pt-3">
-        <div className="relative aspect-[6/1] min-h-16 w-full overflow-hidden rounded-xl bg-surface">
-          {bannerUrl && (
-            <img src={bannerUrl} alt="" className="h-full w-full object-cover" loading="lazy" />
-          )}
-          {bannerOverlay && (
-            <div className="absolute right-2 top-2 flex items-center gap-2">{bannerOverlay}</div>
-          )}
-        </div>
+      {/* Banner — full-bleed, 176px tall, heavy fade into the page background */}
+      <div className="relative h-44 w-full overflow-hidden bg-surface">
+        {bannerUrl && (
+          <img src={bannerUrl} alt="" className="h-full w-full object-cover" loading="lazy" />
+        )}
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-0 bg-gradient-to-b from-transparent via-background/60 to-background"
+        />
+        {bannerOverlay && (
+          <div className="absolute right-3 top-3 flex items-center gap-2">{bannerOverlay}</div>
+        )}
       </div>
 
       {/* Identity */}
