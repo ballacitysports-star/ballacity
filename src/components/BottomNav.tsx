@@ -1,5 +1,5 @@
 import { Link, useLocation } from "@tanstack/react-router";
-import { Home, Users, PlusSquare, Heart } from "lucide-react";
+import { Home, Users, Shield, PlusSquare, Heart } from "lucide-react";
 import { MyAvatar } from "@/components/UserAvatar";
 
 type NavItem = {
@@ -12,9 +12,7 @@ type NavItem = {
 };
 
 /**
- * Instagram-style 5-tab bottom bar: Home, Search, Create, Notifications, Profile.
- * Messages moves to the top-right of the Home header (IG pattern); Players /
- * Teams / Trainers stay reachable through the Search tab and existing links.
+ * Instagram-style 6-tab bottom bar: Home, Available Players, Teams, Create, Notifications, Profile.
  */
 const items: NavItem[] = [
   {
@@ -31,8 +29,13 @@ const items: NavItem[] = [
       p.startsWith("/available-players") ||
       p.startsWith("/discover") ||
       p.startsWith("/players") ||
-      p.startsWith("/teams") ||
       p.startsWith("/trainers"),
+  },
+  {
+    to: "/teams",
+    icon: Shield,
+    label: "Teams",
+    match: (p) => p.startsWith("/teams"),
   },
   {
     to: "/create",
