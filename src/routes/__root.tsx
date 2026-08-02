@@ -510,6 +510,8 @@ function AuthGate({ children }: { children: React.ReactNode }) {
   const [typeStatus, setTypeStatus] = useState<"unknown" | "ok" | "missing">(
     alreadyConfirmed ? "ok" : "unknown",
   );
+  // Bumped after a failed check so the effect re-runs without blanking the page.
+  const [retryTick, setRetryTick] = useState(0);
 
   useEffect(() => {
     if (loading || !user) return;
@@ -518,7 +520,9 @@ function AuthGate({ children }: { children: React.ReactNode }) {
       return;
     }
     let cancelled = false;
-    setTypeStatus("unknown");
+    let retryTimer: number | undefined;
+    // A background retry must not blank an already-rendered page.
+    setTypeStatus((s) => (s === "ok" ? "ok" : "unknown"));
     (async () => {
       // Authoritative server-side guard: inspects auth identities via admin
       // so a social user with stripped provider metadata is still classified
@@ -556,21 +560,21 @@ function AuthGate({ children }: { children: React.ReactNode }) {
       } catch {
         // Both the server guard and the profile read failed (offline, server
         // restart). Don't hold the page behind the loader on a network fault —
-        // render what the user asked for and re-check shortly in the
-        // background. `onboardedUsers` stays untouched so the retry still runs.
+        // render what the user asked for and re-check in the background.
+        // `onboardedUsers` stays untouched so the retry is a real re-check.
         if (cancelled) return;
         setTypeStatus("ok");
-        window.setTimeout(() => {
-          if (!cancelled) setTypeStatus("unknown");
-        }, 5000);
+        retryTimer = window.setTimeout(() => setRetryTick((n) => n + 1), 5000);
       }
     })();
 
     return () => {
       cancelled = true;
+      if (retryTimer !== undefined) window.clearTimeout(retryTimer);
     };
     // Intentionally NOT keyed on `pathname`: the check is per user, not per route.
-  }, [user, loading, skipTypeCheck, router]);
+  }, [user, loading, skipTypeCheck, router, retryTick]);
+
 
 
   useEffect(() => {
