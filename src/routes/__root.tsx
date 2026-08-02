@@ -300,6 +300,12 @@ function AuthLoadingFallback({ pending }: { pending: boolean }) {
   );
 }
 
+/**
+ * User ids already confirmed to have completed onboarding in this tab.
+ * Keeps route changes from re-running the guard (and re-showing the loader).
+ */
+const onboardedUsers = new Set<string>();
+
 function AuthGate({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const pathname = router.state.location.pathname;
