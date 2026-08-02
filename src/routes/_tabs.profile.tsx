@@ -630,9 +630,7 @@ function Profile() {
         </section>
 
         {/* Sports */}
-        <div
-          className={`mt-8 ${activeTab === "games" && me.sports.length > 0 ? "" : "hidden"}`}
-        >
+        <div className={`mt-8 ${activeTab === "games" && me.sports.length > 0 ? "" : "hidden"}`}>
           <h2 className="font-display text-sm font-bold uppercase tracking-wider text-muted-foreground mb-2">
             Sports
           </h2>

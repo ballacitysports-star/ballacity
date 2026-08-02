@@ -92,7 +92,6 @@ export function ProfileChannelHeader({
             {actions}
           </div>
         )}
-
       </div>
     </header>
   );
