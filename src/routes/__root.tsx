@@ -712,11 +712,20 @@ function RootComponent() {
     <QueryClientProvider client={queryClient}>
       <ClientOnly
         fallback={
-          <div className="grid min-h-dvh place-items-center bg-background">
-            <div className="h-8 w-8 animate-spin rounded-full border-2 border-muted border-t-foreground" />
+          <div className="grid min-h-dvh place-items-center bg-background px-4">
+            <div
+              id="boot-fallback"
+              className="flex max-w-sm flex-col items-center text-center"
+              role="status"
+              aria-live="polite"
+            >
+              <div className="h-8 w-8 animate-spin rounded-full border-2 border-muted border-t-foreground" />
+              <p className="mt-4 text-sm text-muted-foreground">Loading…</p>
+            </div>
           </div>
         }
       >
+
         <AuthGate>
           <Outlet />
         </AuthGate>
