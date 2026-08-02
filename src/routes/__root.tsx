@@ -594,7 +594,9 @@ function RootComponent() {
   const router = useRouter();
 
   useEffect(() => {
+    markAppBooted();
     const onError = (event: ErrorEvent) => maybeReloadForStaleChunk(event.error ?? event.message);
+
     const onRejection = (event: PromiseRejectionEvent) => maybeReloadForStaleChunk(event.reason);
     window.addEventListener("error", onError);
     window.addEventListener("unhandledrejection", onRejection);
