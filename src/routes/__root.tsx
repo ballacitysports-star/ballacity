@@ -443,13 +443,19 @@ function AuthGate({ children }: { children: React.ReactNode }) {
   // Onboarding completion guard: block rendering of protected routes until we
   // confirm the user has picked an account type. Fresh Google sign-ins would
   // otherwise flash the feed for a moment before the redirect fires.
-  const [typeStatus, setTypeStatus] = useState<"unknown" | "ok" | "missing">("unknown");
-  const skipTypeCheck =
-    isPublic || pathname === "/onboarding/account-type";
+  //
+  // The result is cached per user id for the lifetime of the tab, so ordinary
+  // navigations never re-run the check (which used to blank the screen with
+  // the full-page loader on every route change).
+  const skipTypeCheck = isPublic || pathname === "/onboarding/account-type";
+  const alreadyConfirmed = !!user && onboardedUsers.has(user.id);
+  const [typeStatus, setTypeStatus] = useState<"unknown" | "ok" | "missing">(
+    alreadyConfirmed ? "ok" : "unknown",
+  );
 
   useEffect(() => {
     if (loading || !user) return;
-    if (skipTypeCheck) {
+    if (skipTypeCheck || onboardedUsers.has(user.id)) {
       setTypeStatus("ok");
       return;
     }
@@ -466,6 +472,7 @@ function AuthGate({ children }: { children: React.ReactNode }) {
           setTypeStatus("missing");
           router.navigate({ to: "/onboarding/account-type", replace: true });
         } else {
+          onboardedUsers.add(user.id);
           setTypeStatus("ok");
         }
         return;
@@ -480,6 +487,7 @@ function AuthGate({ children }: { children: React.ReactNode }) {
       if (cancelled) return;
       const t = (data as { account_type?: string } | null)?.account_type;
       if (isAccountType(t)) {
+        onboardedUsers.add(user.id);
         setTypeStatus("ok");
       } else {
         setTypeStatus("missing");
@@ -489,7 +497,9 @@ function AuthGate({ children }: { children: React.ReactNode }) {
     return () => {
       cancelled = true;
     };
-  }, [user, loading, skipTypeCheck, pathname, router]);
+    // Intentionally NOT keyed on `pathname`: the check is per user, not per route.
+  }, [user, loading, skipTypeCheck, router]);
+
 
   useEffect(() => {
     if (user && !isPublic && !isTab) {
