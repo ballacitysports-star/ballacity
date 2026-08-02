@@ -66,6 +66,8 @@ export type AvailabilityContactRequest = {
 export async function listOpenAvailabilities(
   opts: {
     sport?: string;
+    /** Multi-sport filter — a post matches when it lists any of these. */
+    sports?: string[];
     city?: string;
     includeAnywhere?: boolean;
     skill?: string;
@@ -80,7 +82,11 @@ export async function listOpenAvailabilities(
     .eq("status", "open")
     .order("created_at", { ascending: false })
     .limit(100);
-  if (opts.sport) q = q.contains("sports", [opts.sport]);
+  const sportList = Array.from(
+    new Set([...(opts.sports ?? []), ...(opts.sport ? [opts.sport] : [])].filter(Boolean)),
+  );
+  if (sportList.length === 1) q = q.contains("sports", [sportList[0]!]);
+  else if (sportList.length > 1) q = q.overlaps("sports", sportList);
   if (opts.skill && opts.skill !== "All Levels") q = q.eq("skill_level", opts.skill);
   if (opts.city) {
     const pat = `%${opts.city.replace(/[%,()]/g, "")}%`;

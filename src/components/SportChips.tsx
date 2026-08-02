@@ -45,7 +45,7 @@ export function SportChips({
             initial={{ opacity: 0, x: 12 }}
             animate={{ opacity: 1, x: 0 }}
             transition={{ delay: i * 0.03 }}
-            onClick={() => onSelect?.(active ? null : s.name)}
+            onClick={() => onSelect?.(multi ? s.name : active ? null : s.name)}
             className={`shrink-0 inline-flex items-center gap-1.5 rounded-full border px-4 py-2 text-sm font-semibold transition-all ${
               active
                 ? "border-lime bg-lime text-primary-foreground"
