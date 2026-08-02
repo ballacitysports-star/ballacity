@@ -44,13 +44,17 @@ import {
 } from "@/lib/availability";
 import { haversineKm } from "@/lib/geo";
 import {
-  filterTiersForSport,
   formatSportLevel,
-  levelMatchesFilter,
   resolvePlayerLevel,
-  sanitizeSkillForSport,
-  scaleForSport,
 } from "@/lib/sport-levels";
+import { SportSkillLevels } from "@/components/filters/SportSkillLevels";
+import {
+  countSkillSelections,
+  matchesSportSkillFilter,
+  sanitizeSportSkillMap,
+  toggleSport,
+  type SportSkillMap,
+} from "@/lib/sport-filter";
 
 import { AvailabilitySchedulePicker } from "@/components/availability/AvailabilitySchedulePicker";
 import { useMyBusyBlocks } from "@/lib/availability-conflicts";
@@ -119,7 +123,9 @@ function AvailablePlayersPage() {
   const navigate = useNavigate();
   const { post: postParam } = Route.useSearch();
   const [tab, setTab] = useState<Tab>("browse");
-  const [sport, setSport] = useState<string>("");
+  const [sports, setSports] = useState<string[]>([]);
+  const toggleSportFilter = (name: string | null) =>
+    setSports((prev) => toggleSport(prev, name));
   const [city, setCity] = useState("");
   // Google Places details for the typed city — powers accurate distance filtering.
   const [cityGeo, setCityGeo] = useState<PlaceGeo | null>(null);
@@ -129,15 +135,19 @@ function AvailablePlayersPage() {
   };
 
   const [includeAnywhere, setIncludeAnywhere] = useState(true);
-  const [skill, setSkill] = useState<string>("All Levels");
+  // Per-sport skill tiers, keyed by sport name — mirrors the profile editor.
+  const [skills, setSkills] = useState<SportSkillMap>({});
   // A tier from another sport (or a retired Football tier) can never stick when
-  // the sport changes — the profile scale is the source of truth.
+  // the sport selection changes — the profile scale is the source of truth.
   useEffect(() => {
-    if (skill === "All Levels") return;
-    if (!sport) return;
-    const kept = sanitizeSkillForSport(sport, skill);
-    if (kept !== skill) setSkill(kept || "All Levels");
-  }, [sport, skill]);
+    setSkills((prev) => {
+      const next = sanitizeSportSkillMap(prev, sports);
+      const same =
+        Object.keys(next).length === Object.keys(prev).length &&
+        Object.keys(next).every((k) => next[k] === prev[k]);
+      return same ? prev : next;
+    });
+  }, [sports]);
   const [window, setWindow] = useState<"any" | "week" | "month" | "custom">("any");
   const [customFrom, setCustomFrom] = useState("");
   const [customTo, setCustomTo] = useState("");
@@ -208,20 +218,25 @@ function AvailablePlayersPage() {
 
   useEffect(() => {
     setList(null);
-  }, [sport, city, includeAnywhere, fromISO, toISO]);
+  }, [sportsKey, city, includeAnywhere, fromISO, toISO]);
 
   const activeFilterCount =
-    (skill !== "All Levels" ? 1 : 0) +
+    countSkillSelections(skills) +
     (window !== "any" ? 1 : 0) +
     (city.trim() ? 1 : 0) +
     (maxDistance > 0 ? 1 : 0);
 
   const filteredList = useMemo(() => {
     if (!list) return null;
-    const wanted = skill !== "All Levels" ? skill : "";
-    const bySkill = wanted
+    const bySkill = countSkillSelections(skills)
       ? list.filter((a) =>
-          levelMatchesFilter(a.author_sport_levels, a.sports, a.skill_level, wanted),
+          matchesSportSkillFilter(
+            a.author_sport_levels,
+            a.sports,
+            a.skill_level,
+            sports,
+            skills,
+          ),
         )
       : list;
     if (maxDistance <= 0) return bySkill;
@@ -233,13 +248,13 @@ function AvailablePlayersPage() {
       }
       return (a.travel_radius_km ?? 0) <= km;
     });
-  }, [list, maxDistance, cityGeo, skill]);
+  }, [list, maxDistance, cityGeo, sports, skills]);
 
 
   useEffect(() => {
     let cancelled = false;
     listOpenAvailabilities({
-      sport: sport || undefined,
+      sports,
       city: city.trim() || undefined,
       includeAnywhere: city.trim() ? includeAnywhere : undefined,
       from: fromISO,
@@ -257,7 +272,7 @@ function AvailablePlayersPage() {
     return () => {
       cancelled = true;
     };
-  }, [sport, city, includeAnywhere, fromISO, toISO, refreshKey]);
+  }, [sportsKey, city, includeAnywhere, fromISO, toISO, refreshKey]);
 
   // Realtime: refresh list whenever any availability row changes.
   useEffect(() => {
@@ -314,11 +329,15 @@ function AvailablePlayersPage() {
           {/* Sport quick strip */}
           <div className="-mx-4 overflow-x-auto px-4 mb-2">
             <div className="flex gap-2 pb-1">
-              <Chip active={!sport} onClick={() => setSport("")}>
+              <Chip active={sports.length === 0} onClick={() => setSports([])}>
                 All sports
               </Chip>
               {SPORTS.map((s) => (
-                <Chip key={s.name} active={sport === s.name} onClick={() => setSport(s.name)}>
+                <Chip
+                  key={s.name}
+                  active={sports.includes(s.name)}
+                  onClick={() => toggleSportFilter(s.name)}
+                >
                   <span className="mr-1">{s.emoji}</span>
                   {s.name}
                 </Chip>
@@ -478,8 +497,8 @@ function AvailablePlayersPage() {
         onClose={() => setFiltersOpen(false)}
         title="Filter players"
         onReset={() => {
-          setSport("");
-          setSkill("All Levels");
+          setSports([]);
+          setSkills({});
           setWindow("any");
           setCustomFrom("");
           setCustomTo("");
@@ -487,15 +506,19 @@ function AvailablePlayersPage() {
           setIncludeAnywhere(true);
           setMaxDistance(0);
         }}
-        resetDisabled={activeFilterCount === 0 && !sport}
+        resetDisabled={activeFilterCount === 0 && sports.length === 0}
       >
-        <FilterSection label="Sport">
+        <FilterSection label="Sports">
           <div className="flex flex-wrap gap-2">
-            <Chip active={!sport} onClick={() => setSport("")}>
+            <Chip active={sports.length === 0} onClick={() => setSports([])}>
               All sports
             </Chip>
             {SPORTS.map((s) => (
-              <Chip key={s.name} active={sport === s.name} onClick={() => setSport(s.name)}>
+              <Chip
+                key={s.name}
+                active={sports.includes(s.name)}
+                onClick={() => toggleSportFilter(s.name)}
+              >
                 <span className="mr-1">{s.emoji}</span>
                 {s.name}
               </Chip>
@@ -503,14 +526,8 @@ function AvailablePlayersPage() {
           </div>
         </FilterSection>
 
-        <FilterSection
-          label={sport ? `Skill level · ${scaleForSport(sport as any).system}` : "Skill level"}
-        >
-          <ChipRow
-            value={skill}
-            onChange={(v) => setSkill(v)}
-            options={skillOptionsForSport(sport).map((s) => ({ value: s, label: s }))}
-          />
+        <FilterSection label="Skill level">
+          <SportSkillLevels sports={sports} value={skills} onChange={setSkills} />
         </FilterSection>
 
         <FilterSection label="Availability window">
