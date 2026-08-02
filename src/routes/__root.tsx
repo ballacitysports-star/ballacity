@@ -300,6 +300,12 @@ function AuthLoadingFallback({ pending }: { pending: boolean }) {
   );
 }
 
+/**
+ * User ids already confirmed to have completed onboarding in this tab.
+ * Keeps route changes from re-running the guard (and re-showing the loader).
+ */
+const onboardedUsers = new Set<string>();
+
 function AuthGate({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const pathname = router.state.location.pathname;
@@ -443,13 +449,19 @@ function AuthGate({ children }: { children: React.ReactNode }) {
   // Onboarding completion guard: block rendering of protected routes until we
   // confirm the user has picked an account type. Fresh Google sign-ins would
   // otherwise flash the feed for a moment before the redirect fires.
-  const [typeStatus, setTypeStatus] = useState<"unknown" | "ok" | "missing">("unknown");
-  const skipTypeCheck =
-    isPublic || pathname === "/onboarding/account-type";
+  //
+  // The result is cached per user id for the lifetime of the tab, so ordinary
+  // navigations never re-run the check (which used to blank the screen with
+  // the full-page loader on every route change).
+  const skipTypeCheck = isPublic || pathname === "/onboarding/account-type";
+  const alreadyConfirmed = !!user && onboardedUsers.has(user.id);
+  const [typeStatus, setTypeStatus] = useState<"unknown" | "ok" | "missing">(
+    alreadyConfirmed ? "ok" : "unknown",
+  );
 
   useEffect(() => {
     if (loading || !user) return;
-    if (skipTypeCheck) {
+    if (skipTypeCheck || onboardedUsers.has(user.id)) {
       setTypeStatus("ok");
       return;
     }
@@ -466,6 +478,7 @@ function AuthGate({ children }: { children: React.ReactNode }) {
           setTypeStatus("missing");
           router.navigate({ to: "/onboarding/account-type", replace: true });
         } else {
+          onboardedUsers.add(user.id);
           setTypeStatus("ok");
         }
         return;
@@ -480,6 +493,7 @@ function AuthGate({ children }: { children: React.ReactNode }) {
       if (cancelled) return;
       const t = (data as { account_type?: string } | null)?.account_type;
       if (isAccountType(t)) {
+        onboardedUsers.add(user.id);
         setTypeStatus("ok");
       } else {
         setTypeStatus("missing");
@@ -489,7 +503,9 @@ function AuthGate({ children }: { children: React.ReactNode }) {
     return () => {
       cancelled = true;
     };
-  }, [user, loading, skipTypeCheck, pathname, router]);
+    // Intentionally NOT keyed on `pathname`: the check is per user, not per route.
+  }, [user, loading, skipTypeCheck, router]);
+
 
   useEffect(() => {
     if (user && !isPublic && !isTab) {
@@ -503,12 +519,15 @@ function AuthGate({ children }: { children: React.ReactNode }) {
   }, [user, isPublic, isTab]);
 
   if (isPublic) return <>{children}</>;
+  // "Signing you in…" only while an OAuth attempt is actually pending.
+  const oauthPending = typeof window !== "undefined" && !!readSavedOAuthProvider();
   if (loading || verifying || !user) {
-    return <AuthLoadingFallback pending={loading || verifying} />;
+    return <AuthLoadingFallback pending={oauthPending} />;
   }
-  // Hold rendering until the account-type check completes (or redirects).
+  // Hold rendering only on a genuine first check for this user; a cached
+  // "ok" keeps the page mounted across navigations.
   if (!skipTypeCheck && typeStatus !== "ok") {
-    return <AuthLoadingFallback pending={true} />;
+    return <AuthLoadingFallback pending={oauthPending} />;
   }
   return (
     <>
