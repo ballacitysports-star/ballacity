@@ -10,6 +10,12 @@ import { type Sport } from "@/lib/sample-data";
 import { useAllOrgs } from "@/lib/org-store";
 import { OrgCard } from "@/components/OrgCard";
 import { SportChips } from "@/components/SportChips";
+import {
+  matchesSportList,
+  parseSportList,
+  serializeSportList,
+  toggleSport,
+} from "@/lib/sport-filter";
 import { ViewDensityToggle, type ViewMode, type Density } from "@/components/ViewDensityToggle";
 import { TeamsMapView } from "@/components/TeamsMapView";
 import { TrainerActions } from "@/components/TrainerActions";
@@ -440,7 +446,9 @@ function TrainersPage() {
           (sortBy !== "nearest" ? 1 : 0);
         const specialties = sports.length
           ? Array.from(
-              new Set(sports.flatMap((s) => SPORT_CONFIG[s as Sport]?.formats ?? [])),
+              new Set(
+                sports.flatMap((sp) => SPORT_CONFIG[sp as Sport]?.formats ?? ([] as string[])),
+              ),
             )
           : SESSION_TYPES;
         return (
@@ -465,11 +473,11 @@ function TrainersPage() {
             resetDisabled={activeFilterCount === 0}
             sheet={
               <>
-                <FilterSection label="Sport">
+                <FilterSection label="Sports">
                   <SportChips
                     multi
                     selected={sports}
-                    onSelect={(s) => setSport(s as Sport | null)}
+                    onSelect={toggleSportFilter}
                   />
                 </FilterSection>
 
