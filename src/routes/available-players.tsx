@@ -44,8 +44,11 @@ import {
 } from "@/lib/availability";
 import { haversineKm } from "@/lib/geo";
 import {
+  filterTiersForSport,
   formatSportLevel,
   resolvePlayerLevel,
+  sanitizeSkillForSport,
+  scaleForSport,
 } from "@/lib/sport-levels";
 import { SportSkillLevels } from "@/components/filters/SportSkillLevels";
 import {
@@ -171,6 +174,9 @@ function AvailablePlayersPage() {
         : [],
     [allHosted, user?.id],
   );
+
+  // Stable dependency for effects that refetch when the sport set changes.
+  const sportsKey = sports.join(",");
 
   const { fromISO, toISO } = useMemo(() => {
     const iso = (d: Date) => d.toISOString().slice(0, 10);
@@ -371,9 +377,13 @@ function AvailablePlayersPage() {
                 <span aria-hidden className="h-5 w-px shrink-0 bg-border" />
               )}
 
-              {skill !== "All Levels" && (
-                <ActiveChip label={skill} onClear={() => setSkill("All Levels")} />
-              )}
+              {sports.map((sp) => (
+                <ActiveChip
+                  key={sp}
+                  label={skills[sp] ? `${sp} · ${skills[sp]}` : sp}
+                  onClear={() => toggleSportFilter(sp)}
+                />
+              ))}
               {window !== "any" && (
                 <ActiveChip
                   label={
