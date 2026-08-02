@@ -173,15 +173,25 @@ const BOOT_WATCHDOG_SCRIPT = `(function(){
   function read(){try{return sessionStorage.getItem(K);}catch(e){return null;}}
   function write(v){try{sessionStorage.setItem(K,v);}catch(e){}}
   function booted(){return !!window.__openrun_booted;}
-  function showFailure(){
-    var el=document.getElementById('boot-fallback');
-    if(!el)return;
-    el.innerHTML='<p class="text-sm font-medium text-foreground">We couldn\\'t finish loading</p>'+
+  function makeFailureHtml(){
+    return '<p class="text-sm font-medium text-foreground">We couldn\'t finish loading</p>'+
       '<p class="mt-2 text-sm text-muted-foreground">Check your connection, then try again.</p>'+
       '<div class="mt-5 flex flex-wrap justify-center gap-2">'+
       '<button type="button" id="boot-retry" class="inline-flex items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground">Try again</button>'+
       '<a href="/" class="inline-flex items-center justify-center rounded-md border border-input bg-background px-4 py-2 text-sm font-medium text-foreground">Go home</a>'+
       '</div>';
+  }
+  function showFailure(){
+    var el=document.getElementById('boot-fallback');
+    if(el){
+      el.innerHTML=makeFailureHtml();
+    } else {
+      var overlay=document.createElement('div');
+      overlay.id='boot-fallback';
+      overlay.className='fixed inset-0 z-50 grid place-items-center bg-background px-4';
+      overlay.innerHTML='<div class="flex max-w-sm flex-col items-center text-center">'+makeFailureHtml()+'</div>';
+      document.body.appendChild(overlay);
+    }
     var b=document.getElementById('boot-retry');
     if(b)b.addEventListener('click',function(){try{sessionStorage.removeItem(K);}catch(e){}window.location.reload();});
   }
