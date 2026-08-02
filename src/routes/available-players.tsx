@@ -414,7 +414,7 @@ function AvailablePlayersPage() {
                 <button
                   type="button"
                   onClick={() => {
-                    setSkill("All Levels");
+                    setSkills({});
                     setWindow("any");
                     setCustomFrom("");
                     setCustomTo("");
@@ -450,8 +450,8 @@ function AvailablePlayersPage() {
                     variant="outline"
                     className="rounded-full"
                     onClick={() => {
-                      setSport("");
-                      setSkill("All Levels");
+                      setSports([]);
+                      setSkills({});
                       setWindow("any");
                       setCustomFrom("");
                       setCustomTo("");
