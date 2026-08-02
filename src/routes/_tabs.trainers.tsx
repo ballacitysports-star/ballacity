@@ -10,6 +10,12 @@ import { type Sport } from "@/lib/sample-data";
 import { useAllOrgs } from "@/lib/org-store";
 import { OrgCard } from "@/components/OrgCard";
 import { SportChips } from "@/components/SportChips";
+import {
+  matchesSportList,
+  parseSportList,
+  serializeSportList,
+  toggleSport,
+} from "@/lib/sport-filter";
 import { ViewDensityToggle, type ViewMode, type Density } from "@/components/ViewDensityToggle";
 import { TeamsMapView } from "@/components/TeamsMapView";
 import { TrainerActions } from "@/components/TrainerActions";
@@ -110,7 +116,7 @@ function TrainersPage() {
 
   const mode: "trainers" | "gyms" = search.mode === "gyms" ? "gyms" : "trainers";
   const q = search.q;
-  const sport: Sport | null = (search.sport || null) as Sport | null;
+  const sports = useMemo(() => parseSportList(search.sport), [search.sport]);
   const specialty: string = search.specialty || "";
   const venue: string = search.venue || "";
   const orgId: string = search.orgId || "";
@@ -135,7 +141,8 @@ function TrainersPage() {
   const radiusKm = radius > 0 ? (distanceUnit === "km" ? radius : radius * KM_PER_MI) : 0;
 
   const setQ = (v: string) => updateSearch({ q: v });
-  const setSport = (v: Sport | null) => updateSearch({ sport: v ?? "", specialty: "" });
+  const toggleSportFilter = (v: string | null) =>
+    updateSearch({ sport: serializeSportList(toggleSport(sports, v)), specialty: "" });
   const setSpecialty = (v: string) =>
     updateSearch({ specialty: specialty === v ? "" : v });
   const setVenue = (v: string) => updateSearch({ venue: venue === v ? "" : v });
@@ -221,7 +228,7 @@ function TrainersPage() {
     const byVenue = filterTrainersByVenue(orgs, venue);
     const byOrg = orgId ? byVenue.filter((o) => orgMemberIds.has(o.id)) : byVenue;
     const filtered = byOrg
-      .filter((o) => (sport ? o.sports.includes(sport) : true))
+      .filter((o) => matchesSportList(o.sports, sports))
       .filter((o) => {
         if (!specialty) return true;
         const hay = `${o.tagline ?? ""} ${o.name ?? ""}`.toLowerCase();
@@ -275,7 +282,7 @@ function TrainersPage() {
       return a.o.name.localeCompare(b.o.name);
     });
     return withDist;
-  }, [orgs, sport, specialty, venue, orgId, orgMemberIds, q, sortBy, avail, radiusKm, coords]);
+  }, [orgs, sports, specialty, venue, orgId, orgMemberIds, q, sortBy, avail, radiusKm, coords]);
 
   const venueOptions = useMemo(() => {
     const map = new Map<string, { addr: string; primary: boolean; count: number }>();
@@ -430,14 +437,20 @@ function TrainersPage() {
 
       {(() => {
         const activeFilterCount =
-          (sport ? 1 : 0) +
+          (sports.length ? 1 : 0) +
           (specialty ? 1 : 0) +
           (venue ? 1 : 0) +
           (orgId ? 1 : 0) +
           (radius > 0 ? 1 : 0) +
           (avail !== "any" ? 1 : 0) +
           (sortBy !== "nearest" ? 1 : 0);
-        const specialties = sport ? SPORT_CONFIG[sport].formats : SESSION_TYPES;
+        const specialties = sports.length
+          ? Array.from(
+              new Set(
+                sports.flatMap((sp) => SPORT_CONFIG[sp as Sport]?.formats ?? ([] as string[])),
+              ),
+            )
+          : SESSION_TYPES;
         return (
           <FilterBar
             q={q}
@@ -460,10 +473,11 @@ function TrainersPage() {
             resetDisabled={activeFilterCount === 0}
             sheet={
               <>
-                <FilterSection label="Sport">
+                <FilterSection label="Sports">
                   <SportChips
-                    selected={sport}
-                    onSelect={(s) => setSport(s as Sport | null)}
+                    multi
+                    selected={sports}
+                    onSelect={toggleSportFilter}
                   />
                 </FilterSection>
 

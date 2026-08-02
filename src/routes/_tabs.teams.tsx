@@ -4,10 +4,15 @@ import { motion } from "framer-motion";
 import { Megaphone, MapPin } from "lucide-react";
 import { zodValidator, fallback } from "@tanstack/zod-adapter";
 import { z } from "zod";
-import { type Sport } from "@/lib/sample-data";
 import { useAllOrgs } from "@/lib/org-store";
 import { OrgCard } from "@/components/OrgCard";
 import { SportChips } from "@/components/SportChips";
+import {
+  matchesSportList,
+  parseSportList,
+  serializeSportList,
+  toggleSport,
+} from "@/lib/sport-filter";
 import { ViewDensityToggle, type ViewMode, type Density } from "@/components/ViewDensityToggle";
 import { TeamsMapView } from "@/components/TeamsMapView";
 import { FilterBar } from "@/components/FilterBar";
@@ -89,7 +94,8 @@ function TeamsPage() {
   }, [search, navigate]);
 
   const q = search.q;
-  const sport: Sport | null = (search.sport || null) as Sport | null;
+  // `sport` is a comma-separated multi-sport selection.
+  const sports = useMemo(() => parseSportList(search.sport), [search.sport]);
   const sortBy: SortBy =
     search.sort === "followers" || search.sort === "name" ? search.sort : "nearest";
   const avail: "any" | "recruiting" | "weekly" | "casual" =
@@ -100,7 +106,8 @@ function TeamsPage() {
   const density: Density = search.density === "grid" ? "grid" : "list";
 
   const setQ = (v: string) => updateSearch({ q: v });
-  const setSport = (v: Sport | null) => updateSearch({ sport: v ?? "" });
+  const toggleSportFilter = (v: string | null) =>
+    updateSearch({ sport: serializeSportList(toggleSport(sports, v)) });
   const setSortBy = (v: SortBy) => updateSearch({ sort: v });
   const setAvail = (v: "any" | "recruiting" | "weekly" | "casual") => updateSearch({ avail: v });
   const switchView = (v: ViewMode) => updateSearch({ view: v });
@@ -150,7 +157,7 @@ function TeamsPage() {
     };
     const filtered = orgs
       .filter((o) => o.kind === "team")
-      .filter((o) => (sport ? o.sports.includes(sport) : true))
+      .filter((o) => matchesSportList(o.sports, sports))
       .filter((o) => {
         if (avail === "any") return true;
         if (avail === "recruiting") return isRecruiting(o);
@@ -170,7 +177,7 @@ function TeamsPage() {
       return a.o.name.localeCompare(b.o.name);
     });
     return withDist;
-  }, [orgs, sport, q, sortBy, avail]);
+  }, [orgs, sports, q, sortBy, avail]);
 
   const featured =
     orgs.find((o) => o.verified && o.kind === "team") ?? orgs.find((o) => o.kind === "team");
@@ -236,7 +243,7 @@ function TeamsPage() {
 
       {(() => {
         const activeFilterCount =
-          (sport ? 1 : 0) + (avail !== "any" ? 1 : 0) + (sortBy !== "nearest" ? 1 : 0);
+          (sports.length ? 1 : 0) + (avail !== "any" ? 1 : 0) + (sortBy !== "nearest" ? 1 : 0);
         return (
           <FilterBar
             q={q}
@@ -251,11 +258,8 @@ function TeamsPage() {
             resetDisabled={activeFilterCount === 0}
             sheet={
               <>
-                <FilterSection label="Sport">
-                  <SportChips
-                    selected={sport}
-                    onSelect={(s) => setSport(s as Sport | null)}
-                  />
+                <FilterSection label="Sports">
+                  <SportChips multi selected={sports} onSelect={toggleSportFilter} />
                 </FilterSection>
                 <FilterSection label="Availability">
                   <ChipRow

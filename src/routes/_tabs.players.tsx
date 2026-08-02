@@ -69,16 +69,25 @@ import { usePersistedSearch } from "@/hooks/use-persisted-search";
 import { Distance } from "@/components/Distance";
 import { useDistanceUnit } from "@/lib/user-prefs-store";
 import {
-  LEGACY_SKILLS,
   formatSportLevel,
-  levelMatchesFilter,
-  levelsForSport,
   parseSportLevels,
   playerLevelsForSports,
   resolvePlayerLevel,
   sanitizeSkillForSport,
   scaleForSport,
 } from "@/lib/sport-levels";
+import { SportSkillLevels } from "@/components/filters/SportSkillLevels";
+import {
+  countSkillSelections,
+  matchesSportSkillFilter,
+  parseSportList,
+  parseSportSkillMap,
+  sanitizeSportSkillMap,
+  serializeSportList,
+  serializeSportSkillMap,
+  toggleSport,
+  type SportSkillMap,
+} from "@/lib/sport-filter";
 
 
 // URL-persisted Players state. Refreshing or sharing the URL restores the
@@ -104,7 +113,6 @@ export const Route = createFileRoute("/_tabs/players")({
   component: PlayersPage,
 });
 
-const SKILLS = ["All Levels", "Beginner", "Intermediate", "Advanced"] as const;
 
 
 function PlayersPage() {
@@ -138,8 +146,14 @@ function PlayersPage() {
   });
 
   const q = search.q;
-  const sport = search.sport;
-  const skill = search.skill;
+  // `sport` is a comma-separated list; `skill` a per-sport tier map
+  // ("Baseball:Minor AAA|Football:7v7 Elite").
+  const sports = useMemo(() => parseSportList(search.sport), [search.sport]);
+  const sportsKey = sports.join(",");
+  const skills = useMemo(
+    () => parseSportSkillMap(search.skill, sports),
+    [search.skill, sportsKey],
+  );
   const maxDistance = search.dist;
   const ageMin: number | "" = search.ageMin ?? "";
   const ageMax: number | "" = search.ageMax ?? "";
@@ -152,17 +166,22 @@ function PlayersPage() {
   const density: Density = search.density === "grid" ? "grid" : "list";
 
   const setQ = (v: string) => updateSearch({ q: v });
-  const setSport = (v: string) => {
-    // Tiers are sport-specific — drop a skill selection the new sport doesn't have.
-    const nextSkill = sanitizeSkillForSport(v, search.skill);
-    if (v === sport && nextSkill === skill) return;
-    updateSearch({ sport: v, skill: nextSkill }, { push: true });
+  const setSports = (next: string[]) => {
+    // Tiers are sport-specific — drop selections the new sport set doesn't have.
+    const nextSkills = sanitizeSportSkillMap(skills, next);
+    updateSearch(
+      {
+        sport: serializeSportList(next),
+        skill: serializeSportSkillMap(nextSkills, next),
+      },
+      { push: true },
+    );
   };
+  const toggleSportFilter = (name: string | null) => setSports(toggleSport(sports, name));
 
-  const setSkill = (v: string) => {
-    const next = sanitizeSkillForSport(sport, v);
-    if (next === skill) return;
-    updateSearch({ skill: next }, { push: true });
+  const setSkills = (next: SportSkillMap) => {
+    const safe = sanitizeSportSkillMap(next, sports);
+    updateSearch({ skill: serializeSportSkillMap(safe, sports) }, { push: true });
   };
 
 
@@ -229,17 +248,17 @@ function PlayersPage() {
   // localStorage restore, or a saved view. Scrub incompatible tiers out of the
   // URL itself so the chips, the filter count, and the results always agree.
   useEffect(() => {
-    const safe = sanitizeSkillForSport(sport, skill);
-    if (safe !== skill) updateSearch({ skill: safe });
+    const safe = serializeSportSkillMap(sanitizeSportSkillMap(skills, sports), sports);
+    if (safe !== search.skill) updateSearch({ skill: safe });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sport, skill]);
+  }, [sportsKey, search.skill]);
 
 
 
   useEffect(() => {
     let cancelled = false;
     setList(null);
-    listOpenAvailabilities({ sport: sport || undefined })
+    listOpenAvailabilities({ sports })
       .then((rows) => {
         if (!cancelled) setList(rows);
       })
@@ -252,11 +271,14 @@ function PlayersPage() {
     return () => {
       cancelled = true;
     };
-  }, [sport, reloadTick]);
+  }, [sportsKey, reloadTick]);
 
   const ageActive = ageMin !== "" || ageMax !== "";
   const activeFilterCount =
-    (sport ? 1 : 0) + (skill ? 1 : 0) + (maxDistance > 0 ? 1 : 0) + (ageActive ? 1 : 0);
+    (sports.length ? 1 : 0) +
+    countSkillSelections(skills) +
+    (maxDistance > 0 ? 1 : 0) +
+    (ageActive ? 1 : 0);
 
   const filtered = useMemo(() => {
     if (!list) return null;
@@ -290,8 +312,15 @@ function PlayersPage() {
     const hasWeekendDay = (days: string[]) =>
       days.some((d) => /sat|sun/i.test(d));
     return list.filter((a) => {
-      if (sport && !a.sports.some((s) => s.toLowerCase() === sport.toLowerCase())) return false;
-      if (skill && !levelMatchesFilter(a.author_sport_levels, a.sports, a.skill_level, skill))
+      if (
+        !matchesSportSkillFilter(
+          a.author_sport_levels,
+          a.sports,
+          a.skill_level,
+          sports,
+          skills,
+        )
+      )
         return false;
 
       if (maxDistance > 0 && kmToMi(a.travel_radius_km) > maxDistance) return false;
@@ -330,7 +359,8 @@ function PlayersPage() {
       }
       return true;
     });
-  }, [list, q, sport, skill, maxDistance, ageMin, ageMax, includeUnknownAge, when]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [list, q, sportsKey, search.skill, maxDistance, ageMin, ageMax, includeUnknownAge, when]);
 
 
 
@@ -412,8 +442,7 @@ function PlayersPage() {
           </button>
         }
         onReset={() => {
-          setSport("");
-          setSkill("");
+          setSports([]);
           setMaxDistance(0);
           setAgeMin("");
           setAgeMax("");
@@ -421,10 +450,11 @@ function PlayersPage() {
         }}
         sheet={
           <PlayersFilterBody
-            sport={sport}
-            setSport={setSport}
-            skill={skill}
-            setSkill={setSkill}
+            sports={sports}
+            onToggleSport={toggleSportFilter}
+            onClearSports={() => setSports([])}
+            skills={skills}
+            setSkills={setSkills}
             maxDistance={maxDistance}
             setMaxDistance={setMaxDistance}
             ageMin={ageMin}
@@ -440,7 +470,7 @@ function PlayersPage() {
 
       {/* Sport filter chips */}
       <div className="mb-3">
-        <SportChips selected={sport || null} onSelect={(s) => setSport(s ?? "")} />
+        <SportChips multi selected={sports} onSelect={toggleSportFilter} />
       </div>
 
       {/* Availability filter chips */}
@@ -555,10 +585,11 @@ function PlayersPage() {
 }
 
 function PlayersFilterBody({
-  sport,
-  setSport,
-  skill,
-  setSkill,
+  sports,
+  onToggleSport,
+  onClearSports,
+  skills,
+  setSkills,
   maxDistance,
   setMaxDistance,
   ageMin,
@@ -568,10 +599,11 @@ function PlayersFilterBody({
   includeUnknownAge,
   setIncludeUnknownAge,
 }: {
-  sport: string;
-  setSport: (v: string) => void;
-  skill: string;
-  setSkill: (v: string) => void;
+  sports: string[];
+  onToggleSport: (v: string | null) => void;
+  onClearSports: () => void;
+  skills: SportSkillMap;
+  setSkills: (v: SportSkillMap) => void;
   maxDistance: number;
   setMaxDistance: (v: number) => void;
   ageMin: number | "";
@@ -581,11 +613,6 @@ function PlayersFilterBody({
   includeUnknownAge: boolean;
   setIncludeUnknownAge: (v: boolean) => void;
 }) {
-  // Skill tiers mirror the profile: the picked sport's real scale, or the
-  // generic tiers when browsing all sports.
-  const scale = sport ? scaleForSport(sport as any) : null;
-  const SKILLS = sport ? levelsForSport(sport as any) : [...LEGACY_SKILLS];
-
   const unit = useDistanceUnit();
   // Round presets in the viewer's unit; the stored value stays in miles.
   const presets = distancePresets(unit).map((p) => ({
@@ -594,13 +621,17 @@ function PlayersFilterBody({
   }));
   return (
     <>
-      <FilterSection label="Sport (Players)">
+      <FilterSection label="Sports (Players)">
         <div className="flex flex-wrap gap-2">
-          <Chip active={!sport} onClick={() => setSport("")}>
+          <Chip active={sports.length === 0} onClick={onClearSports}>
             All sports
           </Chip>
           {SPORTS.map((s) => (
-            <Chip key={s.name} active={sport === s.name} onClick={() => setSport(s.name)}>
+            <Chip
+              key={s.name}
+              active={sports.includes(s.name)}
+              onClick={() => onToggleSport(s.name)}
+            >
               <span className="mr-1">{s.emoji}</span>
               {s.name}
             </Chip>
@@ -608,22 +639,8 @@ function PlayersFilterBody({
         </div>
       </FilterSection>
 
-      <FilterSection label={scale ? `Skill level · ${scale.system}` : "Skill level"}>
-        <div className="flex flex-wrap gap-2">
-          <Chip active={!skill} onClick={() => setSkill("")}>
-            Any
-          </Chip>
-          {SKILLS.map((s) => (
-            <Chip key={s} active={skill === s} onClick={() => setSkill(s)}>
-              {s}
-            </Chip>
-          ))}
-        </div>
-        {!sport && (
-          <p className="mt-2 text-xs text-muted-foreground">
-            Pick a sport to filter by its own levels.
-          </p>
-        )}
+      <FilterSection label="Skill level">
+        <SportSkillLevels sports={sports} value={skills} onChange={setSkills} />
       </FilterSection>
 
 
