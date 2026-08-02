@@ -159,12 +159,63 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
 
 const THEME_INIT_SCRIPT = `(function(){try{var h=document.documentElement;h.classList.add('dark');h.dataset.theme='dark';h.dataset.themePref='dark';}catch(e){document.documentElement.classList.add('dark');}})();`;
 
+const BOOT_RETRY_KEY = "openrun:boot-retry";
+
+/**
+ * Boot watchdog. Runs as a plain inline script (NOT a React effect) because the
+ * failure it recovers from is "the client entry module never loaded" — in that
+ * state no app code runs at all and the pre-hydration placeholder would sit on
+ * screen forever. Reloads once, then surfaces a retry panel.
+ */
+const BOOT_WATCHDOG_SCRIPT = `(function(){
+  var K=${JSON.stringify(BOOT_RETRY_KEY)};
+  var RE=/dynamically imported module|Importing a module script failed|Loading chunk|error loading dynamically imported module/i;
+  function read(){try{return sessionStorage.getItem(K);}catch(e){return null;}}
+  function write(v){try{sessionStorage.setItem(K,v);}catch(e){}}
+  function booted(){return !!window.__openrun_booted;}
+  function showFailure(){
+    var el=document.getElementById('boot-fallback');
+    if(!el)return;
+    el.innerHTML='<p class="text-sm font-medium text-foreground">We couldn\\'t finish loading</p>'+
+      '<p class="mt-2 text-sm text-muted-foreground">Check your connection, then try again.</p>'+
+      '<div class="mt-5 flex flex-wrap justify-center gap-2">'+
+      '<button type="button" id="boot-retry" class="inline-flex items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground">Try again</button>'+
+      '<a href="/" class="inline-flex items-center justify-center rounded-md border border-input bg-background px-4 py-2 text-sm font-medium text-foreground">Go home</a>'+
+      '</div>';
+    var b=document.getElementById('boot-retry');
+    if(b)b.addEventListener('click',function(){try{sessionStorage.removeItem(K);}catch(e){}window.location.reload();});
+  }
+  function recover(){
+    if(booted())return;
+    if(read()==='1'){showFailure();return;}
+    write('1');
+    window.location.reload();
+  }
+  function onMessage(m){if(m&&RE.test(String(m)))recover();}
+  window.addEventListener('error',function(e){onMessage((e&&(e.message||(e.error&&e.error.message)))||'');});
+  window.addEventListener('unhandledrejection',function(e){
+    var r=e&&e.reason;onMessage((r&&r.message)||(typeof r==='string'?r:''));
+  });
+  setTimeout(recover,5000);
+})();`;
+
+/** Called once the React app is running, so the watchdog stands down. */
+function markAppBooted() {
+  try {
+    (window as unknown as { __openrun_booted?: boolean }).__openrun_booted = true;
+    sessionStorage.removeItem(BOOT_RETRY_KEY);
+  } catch {
+    /* storage unavailable */
+  }
+}
+
 function RootShell({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" className="dark" suppressHydrationWarning>
       <head>
         <HeadContent />
         <script dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
+        <script dangerouslySetInnerHTML={{ __html: BOOT_WATCHDOG_SCRIPT }} />
       </head>
       <body>
         {children}
@@ -173,6 +224,7 @@ function RootShell({ children }: { children: React.ReactNode }) {
     </html>
   );
 }
+
 
 const CHUNK_RELOAD_KEY = "__openrun_chunk_reloaded_at";
 const OAUTH_PROVIDER_KEY = "openrun:oauth-provider";
