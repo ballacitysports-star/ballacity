@@ -196,7 +196,7 @@ const BOOT_WATCHDOG_SCRIPT = `(function(){
   window.addEventListener('unhandledrejection',function(e){
     var r=e&&e.reason;onMessage((r&&r.message)||(typeof r==='string'?r:''));
   });
-  setTimeout(recover,5000);
+  setTimeout(recover,8000);
 })();`;
 
 /** Called once the React app is running, so the watchdog stands down. */
