@@ -8,6 +8,7 @@ import { useUnreadNotificationCount } from "@/lib/notifications";
 import { Logo } from "@/components/Logo";
 import { MyAvatar } from "@/components/UserAvatar";
 import { SportChips } from "@/components/SportChips";
+import { parseSportList, serializeSportList } from "@/lib/sport-filter";
 import { GameCard } from "@/components/GameCard";
 import { GameListRow } from "@/components/GameListRow";
 import { GameCardSkeleton, GameListRowSkeleton } from "@/components/GameCardSkeleton";
@@ -108,8 +109,7 @@ function Feed() {
     hydratedRef.current = true;
     const patch: Partial<typeof DEFAULT_PREFS> = {};
     if (search.sport) {
-      const list = search.sport.split(",").map((s: string) => s.trim()).filter(Boolean) as Sport[];
-      patch.preferredSports = list;
+      patch.preferredSports = parseSportList(search.sport) as Sport[];
     }
     if (search.sort === "nearest" || search.sort === "soonest") patch.sortBy = search.sort;
     if (search.dist !== undefined) patch.maxDistanceMi = search.dist;
@@ -135,7 +135,7 @@ function Feed() {
     if (!hydratedRef.current) return;
     const next: Record<string, unknown> = {};
     if (q) next.q = q;
-    if (prefs.preferredSports.length) next.sport = prefs.preferredSports.join(",");
+    if (prefs.preferredSports.length) next.sport = serializeSportList(prefs.preferredSports);
     if (prefs.sortBy !== DEFAULT_PREFS.sortBy) next.sort = prefs.sortBy;
     if (prefs.maxDistanceMi != null) next.dist = prefs.maxDistanceMi;
     if (positionFilter) next.pos = positionFilter;
@@ -522,7 +522,7 @@ function Feed() {
       )}
 
       <div className="mb-5">
-        <SportChips selected={chipSelected} onSelect={setChipSport} />
+        <SportChips multi selected={chipSelected} onSelect={setChipSport} />
         {chipSelected.length === 1 && POSITIONS_BY_SPORT[chipSelected[0] as Sport]?.length > 0 && (
           <div className="mt-2 flex gap-2 overflow-x-auto scrollbar-hide -mx-4 px-4 pb-1">
             <button
