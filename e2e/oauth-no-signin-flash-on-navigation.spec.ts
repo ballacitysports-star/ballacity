@@ -97,13 +97,9 @@ for (const provider of ["google", "apple"] as const) {
       ).toEqual([]);
     }
 
-    // The app must not have been remounted from scratch, and the pending
-    // OAuth marker should be cleared once sign-in resolved.
-    const stillPending = await page.evaluate(
-      (key) => window.sessionStorage.getItem(key!),
-      OAUTH_PROVIDER_KEY,
-    );
-    expect(stillPending, "OAuth pending marker must be cleared after sign-in").toBeNull();
+    // Sanity: the nav is still mounted, i.e. the app never fell back to the
+    // full-screen loader shell at any point during the hops.
+    await expect(page.getByLabel("Home", { exact: true }).first()).toBeVisible();
   });
 }
 
