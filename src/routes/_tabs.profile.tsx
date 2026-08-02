@@ -326,7 +326,7 @@ function Profile() {
           >
             {follow.following} following
           </button>,
-          `${upcomingGroups.total} games`,
+          `${upcomingGroups.total} game${upcomingGroups.total === 1 ? "" : "s"}`,
         ].filter(Boolean)}
         description={me.bio}
         onOpenAbout={() => setAboutOpen(true)}
