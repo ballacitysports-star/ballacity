@@ -69,10 +69,7 @@ import { usePersistedSearch } from "@/hooks/use-persisted-search";
 import { Distance } from "@/components/Distance";
 import { useDistanceUnit } from "@/lib/user-prefs-store";
 import {
-  LEGACY_SKILLS,
   formatSportLevel,
-  levelMatchesFilter,
-  levelsForSport,
   parseSportLevels,
   playerLevelsForSports,
   resolvePlayerLevel,
@@ -116,7 +113,6 @@ export const Route = createFileRoute("/_tabs/players")({
   component: PlayersPage,
 });
 
-const SKILLS = ["All Levels", "Beginner", "Intermediate", "Advanced"] as const;
 
 
 function PlayersPage() {
