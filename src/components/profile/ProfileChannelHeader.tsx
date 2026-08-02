@@ -76,19 +76,21 @@ export function ProfileChannelHeader({
               <button
                 type="button"
                 onClick={onOpenAbout}
-                className="mt-1 block max-w-full text-left text-[13px] text-muted-foreground"
+                className="mt-1 flex max-w-full items-baseline gap-1 text-left text-[13px] text-muted-foreground"
               >
-                <span className="line-clamp-1 break-words">
+                <span className="line-clamp-1 min-w-0 break-words">
                   {description?.trim() ? description : "Tap for more about this profile"}
                 </span>
-                <span className="text-[13px] font-medium text-foreground">...more</span>
+                <span className="shrink-0 text-[13px] font-medium text-foreground">...more</span>
               </button>
             )}
           </div>
         </div>
 
         {actions && (
-          <div className="scrollbar-hide mt-4 flex gap-2 overflow-x-auto pb-1">{actions}</div>
+          <div className="scrollbar-hide -mx-4 mt-4 flex gap-2 overflow-x-auto px-4 pb-1">
+            {actions}
+          </div>
         )}
       </div>
     </header>

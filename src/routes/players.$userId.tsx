@@ -238,7 +238,7 @@ function PlayerProfilePage() {
           >
             {follow.following} following
           </button>,
-          `${stats.played} games`,
+          `${stats.played} game${stats.played === 1 ? "" : "s"}`,
         ].filter(Boolean)}
         description={bio}
         onOpenAbout={() => setAboutOpen(true)}
