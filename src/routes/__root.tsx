@@ -519,12 +519,15 @@ function AuthGate({ children }: { children: React.ReactNode }) {
   }, [user, isPublic, isTab]);
 
   if (isPublic) return <>{children}</>;
+  // "Signing you in…" only while an OAuth attempt is actually pending.
+  const oauthPending = typeof window !== "undefined" && !!readSavedOAuthProvider();
   if (loading || verifying || !user) {
-    return <AuthLoadingFallback pending={loading || verifying} />;
+    return <AuthLoadingFallback pending={oauthPending} />;
   }
-  // Hold rendering until the account-type check completes (or redirects).
+  // Hold rendering only on a genuine first check for this user; a cached
+  // "ok" keeps the page mounted across navigations.
   if (!skipTypeCheck && typeStatus !== "ok") {
-    return <AuthLoadingFallback pending={true} />;
+    return <AuthLoadingFallback pending={oauthPending} />;
   }
   return (
     <>
