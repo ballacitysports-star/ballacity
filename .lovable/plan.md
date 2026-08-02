@@ -1,33 +1,39 @@
-# Why /players shows a blank spinner instead of the Players screen
+# Make the app recover when the preview tab fails to boot
 
-## What's actually happening
+## Root cause (confirmed)
 
-The screen you're seeing is not the Players page at all — it's the app's pre-startup placeholder: a bare spinner with no text, centered on a black background.
+The screen you saw was not `/players` — it was the app's pre-startup placeholder: an unlabeled spinner on an empty page.
 
-Confirmed from your preview signals and from loading the app directly:
+Dev-server logs show what happened at the exact moment:
 
-- Your tab reported `Failed to fetch dynamically imported module: .../@tanstack/react-start/dist/plugin/default-entry/client.tsx`, and two `/_serverFn/...getOnboardingStatus` calls failed with "Failed to fetch" at the same moment.
-- That module is the app's browser startup entry. When it fails to load, React never takes over the page, so the server-sent placeholder stays on screen forever.
-- The Players route itself is healthy: loading `/players` in a clean browser against the running app renders correctly (signed out it redirects to the sign-in screen as designed), with no console or page errors.
+```text
+12:51:40 AM [vite] (client) new dependencies optimized: @tanstack/router-core, seroval, @tanstack/history, ...
+12:51:40 AM [vite] (client) optimized dependencies changed. reloading
+```
 
-So this is a stale preview tab that was left holding a build that no longer exists, not a broken Players layout. Reloading the tab clears it. The real defect is that when startup fails, the app shows an unlabeled spinner forever with no error and no way out.
+The dev server re-bundled dependencies and asked open tabs to reload. Your tab was mid-load with the previous build's URLs, so its startup module request died — that is the reported `Failed to fetch dynamically imported module: .../@tanstack/react-start/dist/plugin/default-entry/client.tsx`, alongside two `Failed to fetch` calls to `getOnboardingStatus`. React never took over the page, so the placeholder stayed forever.
+
+Loading `/players` in a fresh browser against the same running app works: it renders correctly and, signed out, redirects to the sign-in screen as designed. So the Players route is fine — the defect is that a failed boot leaves a dead, silent spinner with no recovery.
 
 ## The fix
 
-1. Make the pre-startup placeholder self-recovering (`src/routes/__root.tsx`, the `ClientOnly` fallback around line 663):
-   - Give it the same copy and affordances as the auth loader: a "Loading…" label, and after ~6 seconds a message plus "Try again" (reload) and "Go home" buttons.
-   - Attempt one automatic reload if the app has not started after that window, guarded by a `sessionStorage` flag so it can never loop.
-2. Report startup failures instead of swallowing them: listen for the module-load error and surface the retry UI immediately rather than waiting out the timer.
-3. Close the related stall in the onboarding guard (same file, effect at lines 462-507): if both `getOnboardingStatus()` and the fallback profile read fail (offline / server restart), the state stays `"unknown"` and the page is held behind the loader indefinitely. On a hard failure, keep the user on the page they asked for rather than blocking it, and retry the check in the background.
+1. Replace the bare boot placeholder in `src/routes/__root.tsx` (the `ClientOnly` fallback around line 663) with a labeled, self-recovering one:
+   - Shows "Loading…" copy instead of a naked spinner.
+   - If the app has not started within ~5 seconds, reload the page once automatically, guarded by a `sessionStorage` flag so it can never loop.
+   - If it still has not started after that single retry, show "We couldn't finish loading" with "Try again" and "Go home" buttons.
+2. React to the failure directly instead of only timing out: listen for the window `error`/`unhandledrejection` signal that names a failed dynamic import of the app's startup module, and go straight to the retry step.
+3. Clear the retry flag as soon as the app boots, so a normal subsequent visit is unaffected.
+4. Close the matching stall in the onboarding guard (same file, effect around lines 462-507): when both `getOnboardingStatus()` and the fallback profile read fail — exactly what happened here — the state stays `"unknown"` and the loader holds the page indefinitely. On a hard network failure, let the requested page render and retry the check in the background instead of blocking.
 
-No change to the Players route, its layout, or its filters.
+Nothing about the Players route, its layout, or its filters changes.
 
 ## Technical notes
 
-- Files touched: `src/routes/__root.tsx` only.
-- The auto-reload guard key (e.g. `openrun:hydrate-retry`) is cleared once the app starts, so a genuinely broken build shows the manual retry UI instead of reload-looping.
-- Item 3 changes the failure branch only; the existing redirect to `/onboarding/account-type` for users who really have no account type is unchanged.
+- Only `src/routes/__root.tsx` is edited.
+- The auto-reload is bounded to one attempt per tab session (`sessionStorage`), so a genuinely broken build surfaces the manual retry UI rather than reload-looping.
+- Item 4 touches the failure branch only; the redirect to `/onboarding/account-type` for users who genuinely lack an account type is unchanged.
+- This condition is specific to a long-lived tab surviving a dependency re-bundle; the recovery path also covers flaky-network boot failures on the published app.
 
 ## Verification
 
-Reload your preview tab first — `/players` should render the Players list immediately. Then, to confirm the recovery path, simulate a failed startup entry (block that module in devtools) and check the placeholder shows the retry UI and recovers on reload instead of spinning silently.
+Reload your preview tab — `/players` should render the Players screen immediately. Then confirm recovery by blocking the startup module in devtools and loading a protected route: the placeholder should announce loading, retry once, and then offer "Try again" instead of spinning silently.
