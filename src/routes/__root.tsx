@@ -744,7 +744,6 @@ function RootComponent() {
         fallback={
           <div className="grid min-h-dvh place-items-center bg-background px-4">
             <div
-              id="boot-fallback"
               className="flex max-w-sm flex-col items-center text-center"
               role="status"
               aria-live="polite"
