@@ -4,10 +4,18 @@ import { motion } from "framer-motion";
 export function SportChips({
   selected,
   onSelect,
+  multi = false,
 }: {
   /** Single sport, list of sports (multi-select), or null/empty for "All". */
   selected?: string | string[] | null;
+  /**
+   * Called with the tapped sport, or null for "All sports".
+   * In single mode tapping the active chip clears it (null); in multi mode the
+   * sport is always passed through so the caller can toggle it in/out.
+   */
   onSelect?: (sport: string | null) => void;
+  /** Chips toggle sports in and out of a multi-sport selection. */
+  multi?: boolean;
 }) {
   const selectedList = Array.isArray(selected)
     ? selected
@@ -16,6 +24,7 @@ export function SportChips({
       : [];
   const selectedSet = new Set(selectedList);
   const noneSelected = selectedSet.size === 0;
+
   return (
     <div className="flex gap-2 overflow-x-auto scrollbar-hide -mx-4 px-4 pb-1">
       <button
