@@ -537,21 +537,35 @@ function AuthGate({ children }: { children: React.ReactNode }) {
       } catch {
         /* fall through to client check */
       }
-      const { data } = await supabase
-        .from("profiles")
-        .select("account_type")
-        .eq("id", user.id)
-        .maybeSingle();
-      if (cancelled) return;
-      const t = (data as { account_type?: string } | null)?.account_type;
-      if (isAccountType(t)) {
-        onboardedUsers.add(user.id);
+      try {
+        const { data, error } = await supabase
+          .from("profiles")
+          .select("account_type")
+          .eq("id", user.id)
+          .maybeSingle();
+        if (cancelled) return;
+        if (error) throw error;
+        const t = (data as { account_type?: string } | null)?.account_type;
+        if (isAccountType(t)) {
+          onboardedUsers.add(user.id);
+          setTypeStatus("ok");
+        } else {
+          setTypeStatus("missing");
+          router.navigate({ to: "/onboarding/account-type", replace: true });
+        }
+      } catch {
+        // Both the server guard and the profile read failed (offline, server
+        // restart). Don't hold the page behind the loader on a network fault —
+        // render what the user asked for and re-check shortly in the
+        // background. `onboardedUsers` stays untouched so the retry still runs.
+        if (cancelled) return;
         setTypeStatus("ok");
-      } else {
-        setTypeStatus("missing");
-        router.navigate({ to: "/onboarding/account-type", replace: true });
+        window.setTimeout(() => {
+          if (!cancelled) setTypeStatus("unknown");
+        }, 5000);
       }
     })();
+
     return () => {
       cancelled = true;
     };
