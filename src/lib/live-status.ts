@@ -97,6 +97,12 @@ export type JoinGate = {
   reason: string;
   /** True when new joins, position picks and waitlist sign-ups are blocked. */
   locked: boolean;
+  /**
+   * True when joining is blocked but a waitlist sign-up still makes sense
+   * (roster full, host-closed joins, or inside the signup blackout window).
+   * False once the game is in progress or over.
+   */
+  waitlistOpen: boolean;
 };
 
 export function resolveJoinGate(
@@ -114,6 +120,7 @@ export function resolveJoinGate(
       label: "Ended",
       reason: "This game has ended.",
       locked: true,
+      waitlistOpen: false,
     };
   }
   if (liveStatus === "in_progress") {
@@ -123,6 +130,7 @@ export function resolveJoinGate(
       label: "In progress",
       reason: "This game is in progress — signups are closed.",
       locked: true,
+      waitlistOpen: false,
     };
   }
   if (game.joinsClosed) {
@@ -132,6 +140,7 @@ export function resolveJoinGate(
       label: "Signup closed",
       reason: "The host has closed joining for this game.",
       locked: true,
+      waitlistOpen: true,
     };
   }
   const start = new Date(game.date).getTime();
@@ -142,6 +151,7 @@ export function resolveJoinGate(
       label: "Signup closed",
       reason: `Signups closed ${cutoffAmountLabel(cutoffMin)} before start.`,
       locked: true,
+      waitlistOpen: true,
     };
   }
   if (opts.spotsLeft !== undefined && opts.spotsLeft <= 0) {
@@ -151,9 +161,17 @@ export function resolveJoinGate(
       label: "Roster full",
       reason: "The roster is full — no spots left.",
       locked: true,
+      waitlistOpen: true,
     };
   }
-  return { liveStatus, joinState: "open", label: "Open", reason: "", locked: false };
+  return {
+    liveStatus,
+    joinState: "open",
+    label: "Open",
+    reason: "",
+    locked: false,
+    waitlistOpen: false,
+  };
 }
 
 /** Live-updating variant of `resolveJoinGate` (shares the 30s ticker). */
