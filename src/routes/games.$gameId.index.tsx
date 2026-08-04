@@ -1866,30 +1866,68 @@ function GameDetail() {
               <div className="min-w-0">
                 <div className="font-semibold text-sm">Manage game</div>
                 <p className="text-xs text-muted-foreground mt-0.5">
-                  {game.status === "in_progress"
-                    ? "In progress — joining locked."
-                    : game.status === "completed"
+                  {gate.joinState === "in_progress"
+                    ? "In progress — signups locked."
+                    : gate.joinState === "completed"
                       ? "This game has ended."
-                      : game.joinsClosed
+                      : gate.joinState === "closed_by_host"
                         ? "Joining is closed. Reopen to accept more players."
-                        : "Edit details, start the game, or close joining when full."}
+                        : gate.joinState === "closed_cutoff"
+                          ? gate.reason
+                          : "Edit details, start the game, or close joining when full."}
                 </p>
               </div>
               <span
                 className={`shrink-0 inline-flex items-center gap-1 rounded-full px-2 py-1 text-[10px] font-bold uppercase tracking-wider ${
-                  game.status === "in_progress"
+                  gate.joinState === "in_progress"
                     ? "bg-coral/15 text-coral border border-coral/40"
-                    : game.status === "completed"
+                    : gate.joinState === "completed"
                       ? "bg-secondary text-muted-foreground border border-border"
-                      : "bg-lime/15 text-lime border border-lime/40"
+                      : gate.locked
+                        ? "bg-secondary text-muted-foreground border border-border"
+                        : "bg-lime/15 text-lime border border-lime/40"
                 }`}
               >
-                {game.status === "in_progress"
-                  ? "Live"
-                  : game.status === "completed"
+                {gate.joinState === "in_progress"
+                  ? "In progress"
+                  : gate.joinState === "completed"
                     ? "Ended"
-                    : "Scheduled"}
+                    : gate.locked
+                      ? "Signup closed"
+                      : "Scheduled"}
               </span>
+            </div>
+            <div className="mt-3">
+              <label
+                htmlFor="signup-cutoff"
+                className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground"
+              >
+                Signup cutoff
+              </label>
+              <select
+                id="signup-cutoff"
+                value={String(game.signupCutoffMin ?? 0)}
+                onChange={(e) => {
+                  const v = Number(e.target.value) || 0;
+                  void updateHostedGame(game.id, { signupCutoffMin: v } as never).catch(() => {});
+                  toast.success(
+                    v > 0
+                      ? `Signups will close ${cutoffAmountLabel(v)} before start.`
+                      : "Signup cutoff turned off.",
+                  );
+                }}
+                disabled={gate.joinState === "completed"}
+                className="mt-1 w-full rounded-xl border border-border bg-background px-3 py-2 text-sm disabled:opacity-50"
+              >
+                {SIGNUP_CUTOFF_PRESETS.map((p) => (
+                  <option key={p.value} value={p.value}>
+                    {p.label}
+                  </option>
+                ))}
+              </select>
+              <p className="mt-1 text-[11px] text-muted-foreground">
+                New signups stop automatically this long before kickoff. Approved players can still pay.
+              </p>
             </div>
             <div className="mt-3 grid grid-cols-3 gap-2">
               <button
