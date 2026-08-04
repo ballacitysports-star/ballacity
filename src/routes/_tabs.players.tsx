@@ -623,22 +623,48 @@ function PlayersPage() {
                 onContact={() =>
                   user ? setContactFor(a) : toast.error("Sign in to contact this player.")
                 }
+                onOpen={() => openPost(a.id)}
                 onChanged={() => setReloadTick((t) => t + 1)}
               />
             ))}
           </ul>
         </>
       )}
+        </>
+      )}
 
 
-      {postOpen && (
+      {(postOpen || editingPost) && (
         <PostAvailabilityDialog
-          onClose={() => setPostOpen(false)}
-          onPosted={() => {
+          initial={editingPost}
+          onClose={() => {
             setPostOpen(false);
-            setReloadTick((t) => t + 1);
-            toast.success("Availability posted");
+            setEditingPost(null);
           }}
+          onPosted={() => {
+            const wasEdit = !!editingPost;
+            setPostOpen(false);
+            setEditingPost(null);
+            setReloadTick((t) => t + 1);
+            toast.success(wasEdit ? "Availability updated" : "Availability posted");
+          }}
+        />
+      )}
+      {focused && (
+        <AvailabilityDetailDialog
+          a={focused}
+          isMine={user?.id === focused.user_id}
+          canInvite={myUpcomingHosted.length > 0}
+          onContact={() =>
+            user
+              ? setContactFor(focused)
+              : toast.error("Sign in to contact this player.")
+          }
+          onEdit={() => {
+            setEditingPost(focused);
+            closePost();
+          }}
+          onClose={closePost}
         />
       )}
       {contactFor && (
@@ -648,6 +674,7 @@ function PlayersPage() {
           onClose={() => setContactFor(null)}
         />
       )}
+
 
     </div>
   );
