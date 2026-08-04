@@ -70,24 +70,9 @@ export function GameCard({ game, index = 0 }: { game: Game; index?: number }) {
     }
   };
 
-  // Quick-join for free games where the viewer clearly can join: signed in,
-  // spots available, not already joined, not the host, game still scheduled.
-  // Paid or approval-gated games still route through the details page so the
-  // player can review the fee / request-to-join copy before committing.
-  const canQuickJoin =
-    !!user &&
-    !joinedByMe &&
-    game.price === 0 &&
-    spotsLeft > 0 &&
-    liveStatus === "scheduled" &&
-    !game.joinsClosed &&
-    (!hostUserId || hostUserId !== user.id);
-  const quickJoin = (e: React.MouseEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    joinGame(game.id);
-    toast.success(`You're in! See you at ${game.location}.`);
-  };
+  // Every game is request-to-join unless the host turned approval off, so the
+  // card never joins instantly — tapping it opens the game page where the real
+  // request / payment flow and the host's approval settings live.
   const ctaLabel =
     joinedByMe
       ? "You're in"
