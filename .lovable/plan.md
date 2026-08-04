@@ -1,19 +1,23 @@
-# Make the availability card's hero open the player profile
+# Clickable player card with key stats on Available Players
 
-Right now on Available Players only the avatar, the name in the header, and the name in the caption link to a player's profile. The big square hero (the sport emoji block you selected) is not clickable, so tapping the largest part of the card does nothing.
+Right now the big sport square is decorative and the only way to reach a player's profile is the small avatar or name. This makes the card itself the entry point and surfaces the key stats up front.
 
 ## What changes
 
-- The hero square becomes a link to that player's public profile (`/players/{userId}`), same destination as the avatar and name.
-- Add clear affordances so it reads as clickable:
-  - subtle press/hover feedback on the hero
-  - a small "View profile" chip in the hero corner
-  - accessible label so screen readers announce it as "View {name}'s profile"
-- The sport chips overlaid at the bottom of the hero stay purely visual (no nested links), and the action row (like, message, save, edit, remove) keeps working exactly as it does now — those buttons stay outside the link area.
+- The hero square (the sport emoji block) becomes a link to that player's public profile, the same destination as the avatar and name. It gets a subtle press/hover response and a small "View profile" chip in the corner so it reads as tappable.
+- A compact stats strip is added under the hero, above the action row:
+  - skill level for the primary sport (already resolved profile-first, e.g. "Minor AAA")
+  - number of sports they play
+  - home city
+  - travel radius in the viewer's distance unit
+  - next availability window when the post has one
+- A full-width "View full profile" button ends the card, so there is an unmissable path to the profile on mobile.
+- The sport chips over the hero stay decorative (no nested links) and the existing action row (like, message, contact, save, edit, remove) keeps working unchanged — those buttons stay outside the link area.
 
 ## Technical notes
 
-- File: `src/routes/available-players.tsx`, availability card component (hero block around lines 863-889).
-- Wrap the hero `div` in a TanStack `Link to="/players/$userId" params={{ userId: a.user_id }}`, keeping `relative aspect-square` layout classes on the link so the absolute-positioned emoji, gradient, and chips are unchanged.
-- Add `group` + `active:opacity-90 transition` for touch feedback and `aria-label` for the accessible name.
-- No data, query, or backend changes.
+- All changes are in the availability card component in `src/routes/available-players.tsx` (hero block ~lines 863-889, action row, caption).
+- Wrap the hero in a TanStack `Link to="/players/$userId" params={{ userId: a.user_id }}`, moving `relative aspect-square w-full overflow-hidden` onto the link so the absolute emoji, gradient, and chips render identically. Add `group`, `active:opacity-90 transition`, and an `aria-label` of "View {name}'s profile".
+- Stats strip reuses existing helpers: `resolvePlayerLevel` + `formatSportLevel` for the tier, `<Distance km={a.travel_radius_km} />` for radius, and the already-computed `when` string for the window. Rendered as small label/value cells with border separators, no new data fetching.
+- "View full profile" is a `Link` styled with the existing button/pill classes.
+- No query, schema, or backend changes.
