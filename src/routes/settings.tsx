@@ -19,6 +19,7 @@ import {
   BadgeCheck,
 } from "lucide-react";
 import { ACCOUNT_TYPE_META, useAccountType } from "@/lib/account-type";
+import { ProfileSwitcher } from "@/components/ProfileSwitcher";
 import { useMyProfile } from "@/lib/user-prefs-store";
 import {
   SettingsGroup,
