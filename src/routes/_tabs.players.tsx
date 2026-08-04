@@ -42,7 +42,7 @@ import {
 import { MineView } from "@/components/players/MineView";
 import { AvailabilityDetailDialog } from "@/components/players/AvailabilityDetailDialog";
 import { shareAvailability } from "@/components/players/share-availability";
-import { RequestToJoinButton } from "@/components/players/RequestToJoinButton";
+
 
 
 import { AvailabilitySchedulePicker } from "@/components/availability/AvailabilitySchedulePicker";
