@@ -263,6 +263,7 @@ export type HostedGameInput = {
   positionsNeeded?: Record<string, number>;
   teamId?: string;
   orgId?: string;
+  signupCutoffMin?: number;
 
 };
 
@@ -302,6 +303,7 @@ export async function addHostedGame(input: HostedGameInput): Promise<Game> {
     positionsNeeded: input.positionsNeeded ?? {},
     teamId: input.teamId,
     orgId: input.orgId,
+    signupCutoffMin: input.signupCutoffMin ?? 0,
   };
 
 
