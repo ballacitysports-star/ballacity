@@ -444,6 +444,7 @@ export type Database = {
           org_id: string | null
           positions_needed: Json
           price: number
+          signup_cutoff_min: number
           skill: string
           sport: string
           status: string | null
@@ -476,6 +477,7 @@ export type Database = {
           org_id?: string | null
           positions_needed?: Json
           price?: number
+          signup_cutoff_min?: number
           skill?: string
           sport: string
           status?: string | null
@@ -508,6 +510,7 @@ export type Database = {
           org_id?: string | null
           positions_needed?: Json
           price?: number
+          signup_cutoff_min?: number
           skill?: string
           sport?: string
           status?: string | null
