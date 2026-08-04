@@ -1102,6 +1102,16 @@ function AvailabilityCard({
         )}
       </div>
 
+      {!isMine && (
+        <div className="mt-2">
+          <RequestToJoinButton
+            hostUserId={a.user_id}
+            hostName={a.author_name}
+            className="w-full"
+          />
+        </div>
+      )}
+
       <div className="mt-2 flex items-center gap-3">
         <Link
           to="/players/$userId"
@@ -1110,6 +1120,7 @@ function AvailabilityCard({
         >
           <UserRound className="h-3.5 w-3.5" /> View full profile
         </Link>
+
         {!isMine && (
           <>
             <button onClick={onOpen} className="text-xs font-semibold text-muted-foreground">
