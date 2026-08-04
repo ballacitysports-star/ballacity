@@ -114,7 +114,7 @@ test("deep-linking between protected routes after OAuth keeps the app mounted", 
   await installLoaderFlashObserver(page);
 
   // Router-driven navigation (no full page load) across non-tab routes.
-  for (const path of ["/settings", "/profile", "/available-players", "/feed"]) {
+  for (const path of ["/settings", "/profile", "/players", "/feed"]) {
     await page.evaluate((to) => window.history.pushState({}, "", to!), path);
     await page.evaluate(() => window.dispatchEvent(new PopStateEvent("popstate")));
     await page.waitForTimeout(400);
