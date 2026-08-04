@@ -60,16 +60,6 @@ function readInitialSearch(): string {
   return window.location.search;
 }
 const capturedInitialUrl = new URLSearchParams(readInitialSearch());
-let firstLoadConsumed = false;
-function initialUrlParams() {
-  return capturedInitialUrl;
-}
-function isFirstLoadForThisPage() {
-  if (firstLoadConsumed) return false;
-  firstLoadConsumed = true;
-  return true;
-}
-
 function isAtDefaults(search: Record<string, unknown>, defaults: Record<string, unknown>) {
   for (const k of Object.keys(defaults)) {
     const a = search[k];
@@ -102,9 +92,12 @@ export function usePersistedSearch<T extends Record<string, unknown>>(
       // the router canonicalises the live URL to include every default key.
       // On a client-side navigation, "no explicit params" means the arriving
       // state matches the defaults.
-      const hasExplicit = isFirstLoadForThisPage()
-        ? keys.some((k) => initialUrlParams().has(k))
-        : !isAtDefaults(search, defaults as Record<string, unknown>);
+      // An explicit link wins over saved state: either the document was
+      // opened with one of these params, or the state we arrived with is
+      // not simply the route defaults.
+      const hasExplicit =
+        keys.some((k) => capturedInitialUrl.has(k)) ||
+        !isAtDefaults(search, defaults as Record<string, unknown>);
       if (hasExplicit) {
         setHydrated(true);
         return;
