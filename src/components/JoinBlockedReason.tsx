@@ -18,9 +18,12 @@ function iconFor(state: JoinGate["joinState"]) {
 export function JoinBlockedReason({
   gate,
   className = "",
+  waitlistHint = false,
 }: {
   gate: JoinGate;
   className?: string;
+  /** Append where waitlist spots show up once the viewer signs up. */
+  waitlistHint?: boolean;
 }) {
   if (!gate.locked || !gate.reason) return null;
   const Icon = iconFor(gate.joinState);
@@ -32,6 +35,13 @@ export function JoinBlockedReason({
       <Icon className="mt-px h-3.5 w-3.5 shrink-0" />
       <span className="min-w-0">
         <span className="font-semibold text-foreground">Can’t join:</span> {gate.reason}
+        {waitlistHint && gate.waitlistOpen && (
+          <>
+            {" "}
+            Join the waitlist and your spot shows under “Positions needed” on the game page — the
+            host sees you there if a spot opens.
+          </>
+        )}
       </span>
     </p>
   );
