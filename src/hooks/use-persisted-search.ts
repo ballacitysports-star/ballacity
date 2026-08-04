@@ -98,6 +98,7 @@ export function usePersistedSearch<T extends Record<string, unknown>>(
       const hasExplicit =
         keys.some((k) => capturedInitialUrl.has(k)) ||
         !isAtDefaults(search, defaults as Record<string, unknown>);
+      try { window.localStorage.setItem('debug:persist', JSON.stringify({ hasExplicit, init: capturedInitialUrl.toString(), search, keys })); } catch {}
       if (hasExplicit) {
         setHydrated(true);
         return;
