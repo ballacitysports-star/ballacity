@@ -647,6 +647,7 @@ function GameDetail() {
           label: "Roster full",
           reason: "The roster is full — no spots left.",
           locked: true,
+          waitlistOpen: true,
         };
 
   const [confirmAction, setConfirmAction] = useState<"join" | "leave" | null>(null);
@@ -1541,7 +1542,7 @@ function GameDetail() {
 
         {/* Positions needed */}
         {game.positionsNeeded && Object.keys(game.positionsNeeded).length > 0 && (
-          <div>
+          <div id="waitlist" className="scroll-mt-24">
             <div className="flex items-center justify-between mb-2">
               <h2 className="font-display text-sm font-bold uppercase tracking-wider text-muted-foreground">
                 Positions needed
@@ -1555,6 +1556,13 @@ function GameDetail() {
                 View roster
               </button>
             </div>
+            {viewerGate.waitlistOpen && (
+              <p className="mb-2 text-[11px] leading-relaxed text-muted-foreground">
+                {viewerGate.reason} You can still join a waitlist below: pick the position you want
+                and your name is listed there as “waiting”. Waitlist spots appear on this position
+                chip for everyone, and the host pulls from it when a spot frees up.
+              </p>
+            )}
             <div className="flex flex-wrap gap-2">
               {Object.entries(game.positionsNeeded).map(([name, count]) => {
                 const filled = liveRoster.filter((p) => p.position === name).length;
@@ -1575,11 +1583,11 @@ function GameDetail() {
                   spotsLeft > 0 &&
                   !!user;
                 const canWaitlist =
-                  isFull &&
+                  (isFull || viewerGate.waitlistOpen) &&
                   !isHost &&
                   !isConfirmed &&
                   !joined &&
-                  !gate.locked &&
+                  viewerGate.waitlistOpen &&
                   !!user;
                 return (
                   <div key={name} className="inline-flex items-center gap-1">
@@ -2164,7 +2172,7 @@ function GameDetail() {
       <div className="fixed bottom-[calc(env(safe-area-inset-bottom)+6rem)] left-0 right-0 z-30 px-4 pb-[max(env(safe-area-inset-bottom),0.75rem)] pt-3 backdrop-blur-xl bg-background/80 border-t border-border">
         <div className="mx-auto max-w-md">
         {!isHost && !joined && !isPending && !isConfirmed && !isApproved && (
-          <JoinBlockedReason gate={viewerGate} className="mb-2" />
+          <JoinBlockedReason gate={viewerGate} className="mb-2" waitlistHint />
         )}
         <div className="flex items-center gap-2">
           <button

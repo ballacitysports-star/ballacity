@@ -237,7 +237,24 @@ export function GameCard({ game, index = 0 }: { game: Game; index?: number }) {
               </div>
             </div>
           </div>
-          {!joinedByMe && <JoinBlockedReason gate={gate} />}
+          {!joinedByMe && <JoinBlockedReason gate={gate} waitlistHint />}
+          {!joinedByMe && flowStatus === "none" && gate.waitlistOpen && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                navigate({
+                  to: "/games/$gameId",
+                  params: { gameId: game.id },
+                  hash: "waitlist",
+                });
+              }}
+              className="inline-flex w-full items-center justify-center gap-1.5 rounded-xl border border-lime/40 bg-lime/10 px-3 py-1.5 text-[11px] font-bold text-lime transition-colors hover:bg-lime/20"
+            >
+              <Users className="h-3.5 w-3.5" /> Join waitlist
+            </button>
+          )}
           <div className="h-1 overflow-hidden rounded-full bg-secondary">
             <motion.div
               initial={{ width: 0 }}
