@@ -55,16 +55,20 @@ export function usePersistedSearch<T extends Record<string, unknown>>(
     if (startedRef.current) return;
     startedRef.current = true;
     try {
+      const keys = Array.from(new Set([...Object.keys(search), ...Object.keys(defaults)]));
       // An explicit link (shared URL, deep link) always beats saved state.
-      const urlKeys = new URLSearchParams(window.location.search);
-      const keys = Array.from(
-        new Set([...Object.keys(search), ...Object.keys(defaults)]),
-      );
-      const hasExplicit = keys.some((k) => urlKeys.has(k));
+      // On a full page load, look at the URL the document was opened with —
+      // the router canonicalises the live URL to include every default key.
+      // On a client-side navigation, "no explicit params" means the arriving
+      // state matches the defaults.
+      const hasExplicit = isFirstLoadForThisPage()
+        ? keys.some((k) => initialUrlParams().has(k))
+        : !isAtDefaults(search, defaults);
       if (hasExplicit) {
         setHydrated(true);
         return;
       }
+
       const stored = readSnapshot(storageKey);
       if (!stored || Object.keys(stored).length === 0) {
         setHydrated(true);
