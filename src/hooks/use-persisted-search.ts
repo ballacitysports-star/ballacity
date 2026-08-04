@@ -57,7 +57,9 @@ export function usePersistedSearch<T extends Record<string, unknown>>(
     try {
       // An explicit link (shared URL, deep link) always beats saved state.
       const urlKeys = new URLSearchParams(window.location.search);
-      const keys = Object.keys(search);
+      const keys = Array.from(
+        new Set([...Object.keys(search), ...Object.keys(defaults)]),
+      );
       const hasExplicit = keys.some((k) => urlKeys.has(k));
       if (hasExplicit) {
         setHydrated(true);
