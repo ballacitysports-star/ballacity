@@ -39,6 +39,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { BadgeList } from "@/components/BadgeList";
 import { makeBadgeStats } from "@/lib/badges";
+import { ProfileSwitcher } from "@/components/ProfileSwitcher";
 import {
   ProfileChannelHeader,
   ChannelPill,
@@ -288,6 +289,9 @@ function Profile() {
 
   return (
     <div className="mx-auto w-full max-w-md sm:max-w-2xl lg:max-w-4xl">
+      <div className="flex items-center justify-between gap-2 px-4 pt-3">
+        <ProfileSwitcher />
+      </div>
       <ProfileChannelHeader
         bannerUrl={me.coverUrl ?? HERO_IMAGE}
         bannerOverlay={
