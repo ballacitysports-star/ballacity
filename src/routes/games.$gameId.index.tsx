@@ -2406,7 +2406,7 @@ function EditGameModal({
     game.positionsNeeded ?? {},
   );
   const [requiresApproval, setRequiresApproval] = useState<boolean>(
-    !!settings?.requires_approval,
+    settings ? !!settings.requires_approval : true,
   );
   const [acceptedMethodIds, setAcceptedMethodIds] = useState<Set<string>>(
     () => new Set(settings?.accepted_method_ids ?? []),
