@@ -647,6 +647,7 @@ function GameDetail() {
           label: "Roster full",
           reason: "The roster is full — no spots left.",
           locked: true,
+          waitlistOpen: true,
         };
 
   const [confirmAction, setConfirmAction] = useState<"join" | "leave" | null>(null);
