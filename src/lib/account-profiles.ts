@@ -160,10 +160,15 @@ async function fetchMyProfiles(userId: string): Promise<MyProfilesResult> {
   // Player profile always first.
   profiles.sort((a, b) => (a.kind === "player" ? -1 : b.kind === "player" ? 1 : 0));
 
-  const activeId = profile?.active_profile_id ?? profiles[0]?.id ?? null;
+  const defaultId =
+    profile?.default_profile_id && profiles.some((p) => p.id === profile.default_profile_id)
+      ? profile.default_profile_id
+      : null;
+  const activeId = profile?.active_profile_id ?? defaultId ?? profiles[0]?.id ?? null;
   return {
     profiles,
     activeId,
+    defaultId,
     active: profiles.find((p) => p.id === activeId) ?? profiles[0] ?? null,
   };
 }
@@ -180,10 +185,12 @@ export function useMyProfiles() {
     profiles: query.data?.profiles ?? [],
     active: query.data?.active ?? null,
     activeId: query.data?.activeId ?? null,
+    defaultId: query.data?.defaultId ?? null,
     loading: loading || query.isLoading,
     refetch: query.refetch,
   };
 }
+
 
 export function useActiveProfile() {
   const { active, loading } = useMyProfiles();
