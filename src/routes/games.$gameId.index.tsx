@@ -1662,7 +1662,7 @@ function GameDetail() {
                         Join waitlist
                       </button>
                     )}
-                    {canWaitlist && viewerOnWaitlist && (
+                    {viewerOnWaitlist && !isHost && (
                       <button
                         type="button"
                         onClick={async () => {
@@ -1676,15 +1676,52 @@ function GameDetail() {
                         aria-label={`Leave ${name} waitlist`}
                         className="rounded-full border border-coral bg-coral px-2.5 py-1 text-[11px] font-bold text-background hover:opacity-90 active:scale-95 transition"
                       >
-                        On waitlist · tap to leave
+                        Leave waitlist
                       </button>
                     )}
+
                   </div>
                 );
               })}
             </div>
 
+            {(() => {
+              if (!user || isHost) return null;
+              const mine = waitlistEntries.filter((w) => w.userId === user.id);
+              if (mine.length === 0) return null;
+              return (
+                <div className="mt-3 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-coral/40 bg-coral/5 px-3 py-2">
+                  <p className="text-[11px] leading-relaxed text-muted-foreground">
+                    You’re on the waitlist for{" "}
+                    <span className="font-semibold text-foreground">
+                      {mine.map((w) => w.position).join(", ")}
+                    </span>
+                    . We’ll notify you if a spot opens up.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      try {
+                        await Promise.all(mine.map((w) => leaveWaitlist(game.id, w.position)));
+                        toast(
+                          mine.length > 1
+                            ? "Removed from all waitlists for this game."
+                            : `Removed from the ${mine[0]!.position} waitlist.`,
+                        );
+                      } catch (e: any) {
+                        toast.error(e.message ?? "Could not leave waitlist.");
+                      }
+                    }}
+                    aria-label={mine.length > 1 ? "Leave all waitlists" : "Leave waitlist"}
+                    className="rounded-full border border-coral bg-coral px-3 py-1.5 text-[11px] font-bold text-background hover:opacity-90 active:scale-95 transition"
+                  >
+                    {mine.length > 1 ? "Leave all waitlists" : "Leave waitlist"}
+                  </button>
+                </div>
+              );
+            })()}
           </div>
+
         )}
 
         <Sheet open={positionRosterOpen} onOpenChange={setPositionRosterOpen}>
