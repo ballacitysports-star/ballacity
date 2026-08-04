@@ -56,7 +56,10 @@ async function fetchMyProfiles(userId: string): Promise<MyProfilesResult> {
       .order("created_at", { ascending: true }),
     supabase
       .from("profiles")
-      .select("display_name, username, avatar_url, avatar_initials, active_profile_id")
+      .select(
+        "display_name, username, avatar_url, avatar_initials, active_profile_id, default_profile_id",
+      )
+
       .eq("id", userId)
       .maybeSingle(),
   ]);
