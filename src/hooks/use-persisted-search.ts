@@ -41,6 +41,38 @@ function readSnapshot(storageKey: string): Snapshot | null {
   }
 }
 
+// Captured on module load, i.e. before the router rewrites the URL with
+// canonical defaults. Tells apart "user opened a filtered link" from
+// "user opened the plain page".
+let capturedInitialUrl: URLSearchParams | null = null;
+let firstLoadConsumed = false;
+function initialUrlParams() {
+  if (!capturedInitialUrl) {
+    capturedInitialUrl = new URLSearchParams(
+      typeof window === "undefined" ? "" : window.location.search,
+    );
+  }
+  return capturedInitialUrl;
+}
+function isFirstLoadForThisPage() {
+  if (firstLoadConsumed) return false;
+  firstLoadConsumed = true;
+  initialUrlParams();
+  return true;
+}
+
+function isAtDefaults(search: Record<string, unknown>, defaults: Record<string, unknown>) {
+  for (const k of Object.keys(defaults)) {
+    const a = search[k];
+    const b = defaults[k];
+    if (a === b) continue;
+    if (a == null && b == null) continue;
+    return false;
+  }
+  return true;
+}
+
+
 export function usePersistedSearch<T extends Record<string, unknown>>(
   storageKey: string,
   search: T,
