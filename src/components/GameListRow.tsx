@@ -5,7 +5,7 @@ import type { Game } from "@/lib/sample-data";
 import { formatWhen } from "@/lib/format";
 import { useIsJoined } from "@/lib/games-store";
 import { useLiveParticipantCount } from "@/lib/game-participants-store";
-import { useLiveStatus } from "@/lib/live-status";
+import { useJoinGate } from "@/lib/live-status";
 import { Distance } from "@/components/Distance";
 
 const sportEmoji: Record<string, string> = {
@@ -29,20 +29,23 @@ export function GameListRow({ game, index = 0 }: { game: Game; index?: number })
     baseJoined + (joinedByMe && liveCount === undefined ? 1 : 0),
   );
   const spotsLeft = game.maxPlayers - joinedCount;
-  const liveStatus = useLiveStatus(game);
+  const gate = useJoinGate(game);
+  const liveStatus = gate.liveStatus;
 
   const statusLabel =
     liveStatus === "in_progress"
-      ? "Live"
+      ? "In progress"
       : liveStatus === "completed"
         ? "Done"
         : joinedByMe
           ? "Joined"
-          : spotsLeft <= 0
-            ? "Full"
-            : game.price > 0
-              ? `$${game.price}`
-              : "Free";
+          : gate.locked
+            ? "Signup closed"
+            : spotsLeft <= 0
+              ? "Full"
+              : game.price > 0
+                ? `$${game.price}`
+                : "Free";
   const statusTone =
     liveStatus === "in_progress"
       ? "bg-coral text-white"
@@ -50,7 +53,7 @@ export function GameListRow({ game, index = 0 }: { game: Game; index?: number })
         ? "bg-surface border border-border text-muted-foreground"
         : joinedByMe
           ? "bg-lime/15 text-lime border border-lime/40"
-          : spotsLeft <= 0
+          : gate.locked || spotsLeft <= 0
             ? "bg-surface border border-border text-muted-foreground"
             : game.price > 0
               ? "bg-lime-gradient text-primary-foreground"

@@ -85,6 +85,7 @@ type DbRow = {
   equipment: string[] | null;
   status: string | null;
   joins_closed: boolean;
+  signup_cutoff_min?: number | null;
   host_snapshot: { name?: string; username?: string; avatar?: string; rating?: number } | null;
   positions_needed?: Record<string, number> | null;
   team_id?: string | null;
@@ -126,6 +127,7 @@ function rowToGame(r: DbRow): Game {
     equipment: r.equipment ?? [],
     status: (r.status as Game["status"]) ?? undefined,
     joinsClosed: !!r.joins_closed,
+    signupCutoffMin: Number(r.signup_cutoff_min ?? 0) || 0,
     positionsNeeded: (r.positions_needed ?? {}) as Record<string, number>,
     teamId: r.team_id ?? undefined,
     orgId: r.org_id ?? undefined,
@@ -159,6 +161,7 @@ function gameToInsertRow(g: Game): TablesInsert<"hosted_games"> {
     equipment: g.equipment ?? [],
     status: g.status ?? null,
     joins_closed: !!(g as { joinsClosed?: boolean }).joinsClosed,
+    signup_cutoff_min: Number((g as { signupCutoffMin?: number }).signupCutoffMin ?? 0) || 0,
     host_snapshot: (g.host ?? {}) as TablesInsert<"hosted_games">["host_snapshot"],
     positions_needed: (g.positionsNeeded ?? {}) as TablesInsert<"hosted_games">["positions_needed"],
     ...(g.teamId ? { team_id: g.teamId } : {}),
@@ -260,6 +263,7 @@ export type HostedGameInput = {
   positionsNeeded?: Record<string, number>;
   teamId?: string;
   orgId?: string;
+  signupCutoffMin?: number;
 
 };
 
@@ -299,6 +303,7 @@ export async function addHostedGame(input: HostedGameInput): Promise<Game> {
     positionsNeeded: input.positionsNeeded ?? {},
     teamId: input.teamId,
     orgId: input.orgId,
+    signupCutoffMin: input.signupCutoffMin ?? 0,
   };
 
 
@@ -380,6 +385,9 @@ export async function updateHostedGame(
   if (patch.status !== undefined) dbPatch.status = patch.status;
   if ((patch as { joinsClosed?: boolean }).joinsClosed !== undefined) {
     dbPatch.joins_closed = (patch as { joinsClosed?: boolean }).joinsClosed;
+  }
+  if ((patch as { signupCutoffMin?: number }).signupCutoffMin !== undefined) {
+    dbPatch.signup_cutoff_min = Number((patch as { signupCutoffMin?: number }).signupCutoffMin) || 0;
   }
   if (patch.positionsNeeded !== undefined) {
     dbPatch.positions_needed = patch.positionsNeeded as TablesUpdate<"hosted_games">["positions_needed"];

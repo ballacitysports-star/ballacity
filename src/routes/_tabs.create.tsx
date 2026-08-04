@@ -11,9 +11,11 @@ import {
   Home,
   ShieldCheck,
   ImagePlus,
+  Clock3,
 } from "lucide-react";
 import { SPORTS, type Sport, imageFor } from "@/lib/sample-data";
 import { addHostedGame } from "@/lib/hosted-games-store";
+import { SIGNUP_CUTOFF_PRESETS } from "@/lib/live-status";
 import {
   ANY_SKILL,
   filterTiersForSport,
@@ -114,6 +116,7 @@ function Create() {
   const [priv, setPriv] = useState(false);
   const [description, setDescription] = useState("");
   const [requiresApproval, setRequiresApproval] = useState(true);
+  const [signupCutoffMin, setSignupCutoffMin] = useState(0);
   const [publishing, setPublishing] = useState(false);
   const [coverUrl, setCoverUrl] = useState<string | null>(null);
   const [positionsNeeded, setPositionsNeeded] = useState<PositionsNeeded>({});
@@ -370,6 +373,7 @@ function Create() {
                 host: hostSnap,
                 image: coverUrl ?? undefined,
                 positionsNeeded: cleanPositions,
+                signupCutoffMin,
                 teamId: selectedAffiliation?.source === "team" ? selectedAffiliation.id : undefined,
                 orgId: selectedAffiliation?.source === "org" ? selectedAffiliation.id : undefined,
               });
@@ -749,6 +753,30 @@ function Create() {
               Players send a pickup request and you approve or decline each one from the game page.
             </p>
           )}
+          <div className="rounded-2xl border border-border bg-surface px-4 py-3">
+            <label
+              htmlFor="create-signup-cutoff"
+              className="flex items-center gap-2 text-sm font-semibold"
+            >
+              <Clock3 className="h-4 w-4" /> Signup cutoff
+            </label>
+            <select
+              id="create-signup-cutoff"
+              value={String(signupCutoffMin)}
+              onChange={(e) => setSignupCutoffMin(Number(e.target.value) || 0)}
+              className="mt-2 w-full rounded-xl border border-border bg-background px-3 py-2 text-sm outline-none focus:border-lime"
+            >
+              {SIGNUP_CUTOFF_PRESETS.map((p) => (
+                <option key={p.value} value={p.value}>
+                  {p.label}
+                </option>
+              ))}
+            </select>
+            <p className="mt-1 text-[11px] text-muted-foreground">
+              New signups close automatically this long before start. The game then shows
+              "Signup closed", and "In progress" once it starts.
+            </p>
+          </div>
         </Section>
 
         {/* Description */}

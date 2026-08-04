@@ -95,7 +95,7 @@ import { listMyTeams } from "@/lib/teams.functions";
 import { listMyOrgs } from "@/lib/trainer-orgs.functions";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery } from "@tanstack/react-query";
-import { computeLiveStatus } from "@/lib/live-status";
+import { computeLiveStatus, useJoinGate, SIGNUP_CUTOFF_PRESETS, cutoffAmountLabel } from "@/lib/live-status";
 
 import { useAuth } from "@/hooks/use-auth";
 import { useMyProfile } from "@/lib/user-prefs-store";
@@ -633,6 +633,7 @@ function GameDetail() {
   const viewerDelta = viewerCountsAsJoined && liveParticipantCount === undefined ? 1 : 0;
   const effectiveJoined = baseJoined + viewerDelta;
   const spotsLeft = Math.max(0, game.maxPlayers - effectiveJoined);
+  const gate = useJoinGate(game);
 
   const [confirmAction, setConfirmAction] = useState<"join" | "leave" | null>(null);
 
@@ -752,18 +753,14 @@ function GameDetail() {
       }
       return;
     }
-    if (game.status === "in_progress") {
-      toast.error("This game has already started.");
+    // Signup window: started games, host-closed games and the host's blackout
+    // window all block NEW joins. Payment for already-approved players is
+    // handled above and stays available.
+    if (gate.locked) {
+      toast.error(gate.reason);
       return;
     }
-    if (game.status === "completed") {
-      toast.error("This game has ended.");
-      return;
-    }
-    if (game.joinsClosed) {
-      toast.error("The host has closed joining for this game.");
-      return;
-    }
+
     if (spotsLeft <= 0) {
       toast.error("This game is full.");
       return;
@@ -1560,9 +1557,7 @@ function GameDetail() {
                   !isPending &&
                   !requiresApproval &&
                   !isPaid &&
-                  !game.joinsClosed &&
-                  game.status !== "in_progress" &&
-                  game.status !== "completed" &&
+                  !gate.locked &&
                   spotsLeft > 0 &&
                   !!user;
                 const canWaitlist =
@@ -1570,9 +1565,7 @@ function GameDetail() {
                   !isHost &&
                   !isConfirmed &&
                   !joined &&
-                  !game.joinsClosed &&
-                  game.status !== "in_progress" &&
-                  game.status !== "completed" &&
+                  !gate.locked &&
                   !!user;
                 return (
                   <div key={name} className="inline-flex items-center gap-1">
@@ -1873,30 +1866,68 @@ function GameDetail() {
               <div className="min-w-0">
                 <div className="font-semibold text-sm">Manage game</div>
                 <p className="text-xs text-muted-foreground mt-0.5">
-                  {game.status === "in_progress"
-                    ? "In progress — joining locked."
-                    : game.status === "completed"
+                  {gate.joinState === "in_progress"
+                    ? "In progress — signups locked."
+                    : gate.joinState === "completed"
                       ? "This game has ended."
-                      : game.joinsClosed
+                      : gate.joinState === "closed_by_host"
                         ? "Joining is closed. Reopen to accept more players."
-                        : "Edit details, start the game, or close joining when full."}
+                        : gate.joinState === "closed_cutoff"
+                          ? gate.reason
+                          : "Edit details, start the game, or close joining when full."}
                 </p>
               </div>
               <span
                 className={`shrink-0 inline-flex items-center gap-1 rounded-full px-2 py-1 text-[10px] font-bold uppercase tracking-wider ${
-                  game.status === "in_progress"
+                  gate.joinState === "in_progress"
                     ? "bg-coral/15 text-coral border border-coral/40"
-                    : game.status === "completed"
+                    : gate.joinState === "completed"
                       ? "bg-secondary text-muted-foreground border border-border"
-                      : "bg-lime/15 text-lime border border-lime/40"
+                      : gate.locked
+                        ? "bg-secondary text-muted-foreground border border-border"
+                        : "bg-lime/15 text-lime border border-lime/40"
                 }`}
               >
-                {game.status === "in_progress"
-                  ? "Live"
-                  : game.status === "completed"
+                {gate.joinState === "in_progress"
+                  ? "In progress"
+                  : gate.joinState === "completed"
                     ? "Ended"
-                    : "Scheduled"}
+                    : gate.locked
+                      ? "Signup closed"
+                      : "Scheduled"}
               </span>
+            </div>
+            <div className="mt-3">
+              <label
+                htmlFor="signup-cutoff"
+                className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground"
+              >
+                Signup cutoff
+              </label>
+              <select
+                id="signup-cutoff"
+                value={String(game.signupCutoffMin ?? 0)}
+                onChange={(e) => {
+                  const v = Number(e.target.value) || 0;
+                  void updateHostedGame(game.id, { signupCutoffMin: v } as never).catch(() => {});
+                  toast.success(
+                    v > 0
+                      ? `Signups will close ${cutoffAmountLabel(v)} before start.`
+                      : "Signup cutoff turned off.",
+                  );
+                }}
+                disabled={gate.joinState === "completed"}
+                className="mt-1 w-full rounded-xl border border-border bg-background px-3 py-2 text-sm disabled:opacity-50"
+              >
+                {SIGNUP_CUTOFF_PRESETS.map((p) => (
+                  <option key={p.value} value={p.value}>
+                    {p.label}
+                  </option>
+                ))}
+              </select>
+              <p className="mt-1 text-[11px] text-muted-foreground">
+                New signups stop automatically this long before kickoff. Approved players can still pay.
+              </p>
             </div>
             <div className="mt-3 grid grid-cols-3 gap-2">
               <button
@@ -2149,8 +2180,11 @@ function GameDetail() {
             <MessageCircle className="h-5 w-5" />
           </button>
           {!isHost && (() => {
+            // Locked games (started / host-closed / inside the blackout window)
+            // block NEW joins, but keep leave/cancel and payment actions live.
+            const lockedForNewJoin = gate.locked && !joined && !isPending && !isConfirmed && !isApproved;
             const canJoinAction = joined || isPending || isConfirmed || spotsLeft > 0;
-            const buttonDisabled = requesting || processing || !canJoinAction;
+            const buttonDisabled = requesting || processing || !canJoinAction || lockedForNewJoin;
             const hasPaymentAttempt = latestSub?.status === "pending" || latestSub?.status === "rejected";
             const canEnterPaymentFlow = spotsLeft > 0 || joined || hasPaymentAttempt || isApproved;
             const paymentAction = isPaid && !paymentCleared && approvalCleared && canEnterPaymentFlow;
@@ -2231,7 +2265,7 @@ function GameDetail() {
                       ? "bg-surface border border-coral/40 text-coral"
                       : joined
                         ? "bg-surface border border-lime/40 text-lime"
-                        : spotsLeft <= 0
+                        : lockedForNewJoin || spotsLeft <= 0
                           ? "bg-surface border border-border text-muted-foreground"
                           : "bg-lime-gradient text-primary-foreground glow-lime"
                 }`}
@@ -2250,6 +2284,15 @@ function GameDetail() {
                 ) : joined && !isPaid ? (
                   <>
                     <Check className="h-4 w-4" /> You're in · Tap to leave
+                  </>
+                ) : lockedForNewJoin ? (
+                  <>
+                    <Lock className="h-4 w-4" />{" "}
+                    {gate.joinState === "in_progress"
+                      ? "In progress"
+                      : gate.joinState === "completed"
+                        ? "Game ended"
+                        : "Signup closed"}
                   </>
                 ) : spotsLeft <= 0 ? (
                   <>

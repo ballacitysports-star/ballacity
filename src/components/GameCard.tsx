@@ -7,7 +7,7 @@ import type { Game } from "@/lib/sample-data";
 import { formatWhen } from "@/lib/format";
 import { useIsJoined } from "@/lib/games-store";
 import { useLiveParticipantCount } from "@/lib/game-participants-store";
-import { useLiveStatus } from "@/lib/live-status";
+import { useLiveStatus, useJoinGate } from "@/lib/live-status";
 import { getOrCreateDirectConversation } from "@/lib/messages";
 import { useAuth } from "@/hooks/use-auth";
 import { useState } from "react";
@@ -40,6 +40,7 @@ export function GameCard({ game, index = 0 }: { game: Game; index?: number }) {
   const [opening, setOpening] = useState(false);
   const hostUserId = (game as { hostUserId?: string }).hostUserId;
   const liveStatus = useLiveStatus(game);
+  const gate = useJoinGate(game);
   const { status: flowStatus } = useMyFlowStatus(user && isUuid(game.id) ? game.id : undefined);
   const goToHost = (e: React.MouseEvent) => {
     if (!hostUserId) return;
@@ -95,7 +96,7 @@ export function GameCard({ game, index = 0 }: { game: Game; index?: number }) {
               <span>{sportEmoji[game.sport]}</span>
               {game.sport}
             </span>
-            {game.urgent && spotsLeft > 0 && (
+            {game.urgent && spotsLeft > 0 && !gate.locked && (
               <span className="inline-flex items-center gap-1 rounded-full bg-coral-gradient px-2 py-0.5 text-[11px] font-bold text-white">
                 <Zap className="h-3 w-3" /> Needs players
               </span>
@@ -112,9 +113,9 @@ export function GameCard({ game, index = 0 }: { game: Game; index?: number }) {
                 <Flame className="h-3 w-3" /> Trending
               </span>
             )}
-            {liveStatus === "in_progress" && (
+            {gate.joinState === "in_progress" && (
               <span className="inline-flex items-center gap-1 rounded-full bg-coral px-2 py-0.5 text-[11px] font-bold text-white">
-                <span className="h-1.5 w-1.5 rounded-full bg-white animate-pulse" /> Live
+                <span className="h-1.5 w-1.5 rounded-full bg-white animate-pulse" /> In progress
               </span>
             )}
             {liveStatus === "completed" && (
@@ -122,9 +123,12 @@ export function GameCard({ game, index = 0 }: { game: Game; index?: number }) {
                 Completed
               </span>
             )}
-            {game.joinsClosed && liveStatus === "scheduled" && (
-              <span className="inline-flex items-center gap-1 rounded-full bg-background/70 backdrop-blur px-2 py-0.5 text-[11px] font-semibold">
-                <Lock className="h-3 w-3" /> Closed
+            {(gate.joinState === "closed_by_host" || gate.joinState === "closed_cutoff") && (
+              <span
+                className="inline-flex items-center gap-1 rounded-full bg-background/70 backdrop-blur px-2 py-0.5 text-[11px] font-semibold"
+                title={gate.reason}
+              >
+                <Lock className="h-3 w-3" /> Signup closed
               </span>
             )}
           </div>
