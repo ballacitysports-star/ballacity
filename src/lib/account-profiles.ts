@@ -26,7 +26,10 @@ export type MyProfilesResult = {
   profiles: AccountProfile[];
   activeId: string | null;
   active: AccountProfile | null;
+  /** Profile the app starts in on any device / new session. */
+  defaultId: string | null;
 };
+
 
 function initials(name: string): string {
   return (
@@ -53,7 +56,10 @@ async function fetchMyProfiles(userId: string): Promise<MyProfilesResult> {
       .order("created_at", { ascending: true }),
     supabase
       .from("profiles")
-      .select("display_name, username, avatar_url, avatar_initials, active_profile_id")
+      .select(
+        "display_name, username, avatar_url, avatar_initials, active_profile_id, default_profile_id",
+      )
+
       .eq("id", userId)
       .maybeSingle(),
   ]);
@@ -101,7 +107,9 @@ async function fetchMyProfiles(userId: string): Promise<MyProfilesResult> {
     avatar_url?: string | null;
     avatar_initials?: string | null;
     active_profile_id?: string | null;
+    default_profile_id?: string | null;
   } | null;
+
 
   const profiles: AccountProfile[] = [];
   for (const row of list) {
@@ -152,10 +160,15 @@ async function fetchMyProfiles(userId: string): Promise<MyProfilesResult> {
   // Player profile always first.
   profiles.sort((a, b) => (a.kind === "player" ? -1 : b.kind === "player" ? 1 : 0));
 
-  const activeId = profile?.active_profile_id ?? profiles[0]?.id ?? null;
+  const defaultId =
+    profile?.default_profile_id && profiles.some((p) => p.id === profile.default_profile_id)
+      ? profile.default_profile_id
+      : null;
+  const activeId = profile?.active_profile_id ?? defaultId ?? profiles[0]?.id ?? null;
   return {
     profiles,
     activeId,
+    defaultId,
     active: profiles.find((p) => p.id === activeId) ?? profiles[0] ?? null,
   };
 }
@@ -172,10 +185,12 @@ export function useMyProfiles() {
     profiles: query.data?.profiles ?? [],
     active: query.data?.active ?? null,
     activeId: query.data?.activeId ?? null,
+    defaultId: query.data?.defaultId ?? null,
     loading: loading || query.isLoading,
     refetch: query.refetch,
   };
 }
+
 
 export function useActiveProfile() {
   const { active, loading } = useMyProfiles();
@@ -228,6 +243,34 @@ export function useSwitchProfile() {
     },
   });
 }
+
+/**
+ * Stores the profile the app should start in. Saved on the account, so it
+ * applies on every device and every new session. Pass `null` to clear it.
+ */
+export async function setDefaultProfile(profile: AccountProfile | null): Promise<void> {
+  const { data: userRes } = await supabase.auth.getUser();
+  const uid = userRes.user?.id;
+  if (!uid) throw new Error("Not signed in");
+  const { error } = await supabase
+    .from("profiles")
+    .update({ default_profile_id: profile?.id ?? null })
+    .eq("id", uid);
+  if (error) throw error;
+}
+
+export function useSetDefaultProfile() {
+  const qc = useQueryClient();
+  const { user } = useAuth();
+  return useMutation({
+    mutationFn: (profile: AccountProfile | null) => setDefaultProfile(profile),
+    onSuccess: async () => {
+      await qc.invalidateQueries({ queryKey: myProfilesKey(user?.id) });
+    },
+  });
+}
+
+
 
 export function profileTypeLabel(kind: AccountType): string {
   return ACCOUNT_TYPE_META[kind].label;
