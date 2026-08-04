@@ -105,7 +105,12 @@ const playersSearchSchema = z.object({
   when: fallback(z.string(), "any").default("any"),
   view: fallback(z.string(), "list").default("list"),
   density: fallback(z.string(), "list").default("list"),
+  // "browse" (everyone's availability) | "mine" (your posts + requests).
+  tab: fallback(z.string(), "browse").default("browse"),
+  // Deep link to one availability post — opens it in a focused dialog.
+  post: fallback(z.string(), "").default(""),
 });
+
 
 export const Route = createFileRoute("/_tabs/players")({
   head: () => ({ meta: [{ title: "Players — OpenRun" }] }),
