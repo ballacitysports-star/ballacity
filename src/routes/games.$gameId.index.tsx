@@ -95,7 +95,7 @@ import { listMyTeams } from "@/lib/teams.functions";
 import { listMyOrgs } from "@/lib/trainer-orgs.functions";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery } from "@tanstack/react-query";
-import { computeLiveStatus } from "@/lib/live-status";
+import { computeLiveStatus, useJoinGate, SIGNUP_CUTOFF_PRESETS, cutoffAmountLabel } from "@/lib/live-status";
 
 import { useAuth } from "@/hooks/use-auth";
 import { useMyProfile } from "@/lib/user-prefs-store";
@@ -633,6 +633,7 @@ function GameDetail() {
   const viewerDelta = viewerCountsAsJoined && liveParticipantCount === undefined ? 1 : 0;
   const effectiveJoined = baseJoined + viewerDelta;
   const spotsLeft = Math.max(0, game.maxPlayers - effectiveJoined);
+  const gate = useJoinGate(game);
 
   const [confirmAction, setConfirmAction] = useState<"join" | "leave" | null>(null);
 
