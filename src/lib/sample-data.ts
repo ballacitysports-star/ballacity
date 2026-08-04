@@ -77,6 +77,8 @@ export type Game = {
   equipment: string[];
   status?: "scheduled" | "in_progress" | "completed";
   joinsClosed?: boolean;
+  /** Minutes before start when signups close automatically. 0 = off. */
+  signupCutoffMin?: number;
   positionsNeeded?: Record<string, number>;
   teamId?: string;
   orgId?: string;
