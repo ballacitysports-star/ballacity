@@ -139,39 +139,51 @@ export function AvailabilityDetailDialog({
             </Button>
           </DialogFooter>
         ) : (
-          <div className="mt-3 grid grid-cols-2 gap-2">
-            <Button variant="outline" onClick={handleMessage} className="rounded-full">
-              <MessageCircle className="h-4 w-4 mr-1" /> Message
-            </Button>
-            <Button variant="outline" onClick={onContact} className="rounded-full">
-              {canInvite ? (
-                <>
-                  <Ticket className="h-4 w-4 mr-1" /> Invite
-                </>
-              ) : (
-                <>
-                  <Send className="h-4 w-4 mr-1" /> Contact
-                </>
-              )}
-            </Button>
-            <Button
-              variant="outline"
-              onClick={() => {
-                onClose();
-                navigate({ to: "/pickup" });
-              }}
-              className="rounded-full"
-            >
-              <Search className="h-4 w-4 mr-1" /> Find a game
-            </Button>
-            <Button
-              variant="outline"
-              onClick={() => shareAvailability(a.id)}
-              className="rounded-full"
-            >
-              <Share2 className="h-4 w-4 mr-1" /> Share
-            </Button>
-          </div>
+          <>
+            <div className="mt-3">
+              <RequestToJoinButton
+                hostUserId={a.user_id}
+                hostName={a.author_name}
+                size="default"
+                className="w-full"
+                onNavigate={onClose}
+              />
+            </div>
+            <div className="mt-2 grid grid-cols-2 gap-2">
+              <Button variant="outline" onClick={handleMessage} className="rounded-full">
+                <MessageCircle className="h-4 w-4 mr-1" /> Message
+              </Button>
+              <Button variant="outline" onClick={onContact} className="rounded-full">
+                {canInvite ? (
+                  <>
+                    <Ticket className="h-4 w-4 mr-1" /> Invite
+                  </>
+                ) : (
+                  <>
+                    <Send className="h-4 w-4 mr-1" /> Contact
+                  </>
+                )}
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  onClose();
+                  navigate({ to: "/pickup" });
+                }}
+                className="rounded-full"
+              >
+                <Search className="h-4 w-4 mr-1" /> Find a game
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => shareAvailability(a.id)}
+                className="rounded-full"
+              >
+                <Share2 className="h-4 w-4 mr-1" /> Share
+              </Button>
+            </div>
+          </>
+
         )}
       </DialogContent>
     </Dialog>
