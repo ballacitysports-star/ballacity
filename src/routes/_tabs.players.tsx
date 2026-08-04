@@ -1104,15 +1104,8 @@ function AvailabilityCard({
         )}
       </div>
 
-      {!isMine && (
-        <div className="mt-2">
-          <RequestToJoinButton
-            hostUserId={a.user_id}
-            hostName={a.author_name}
-            className="w-full"
-          />
-        </div>
-      )}
+
+
 
       <div className="mt-2 flex items-center gap-3">
         <Link
