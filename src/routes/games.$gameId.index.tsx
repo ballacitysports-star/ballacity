@@ -1662,7 +1662,7 @@ function GameDetail() {
                         Join waitlist
                       </button>
                     )}
-                    {canWaitlist && viewerOnWaitlist && (
+                    {viewerOnWaitlist && !isHost && (
                       <button
                         type="button"
                         onClick={async () => {
@@ -1676,9 +1676,10 @@ function GameDetail() {
                         aria-label={`Leave ${name} waitlist`}
                         className="rounded-full border border-coral bg-coral px-2.5 py-1 text-[11px] font-bold text-background hover:opacity-90 active:scale-95 transition"
                       >
-                        On waitlist · tap to leave
+                        Leave waitlist
                       </button>
                     )}
+
                   </div>
                 );
               })}
