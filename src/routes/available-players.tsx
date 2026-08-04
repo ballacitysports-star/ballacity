@@ -1026,7 +1026,15 @@ function AvailabilityCard({
             {a.note}
           </p>
         )}
+        <Link
+          to="/players/$userId"
+          params={{ userId: a.user_id }}
+          className="mt-3 flex h-10 w-full items-center justify-center rounded-full border border-border bg-surface text-sm font-semibold transition-colors hover:border-lime/60 hover:text-lime"
+        >
+          View full profile
+        </Link>
       </div>
+
     </article>
   );
 }
