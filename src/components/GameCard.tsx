@@ -15,6 +15,7 @@ import { toast } from "sonner";
 import { useMyFlowStatus, isUuid } from "@/lib/game-flow-status";
 import { PlayerFlowPill } from "@/components/PlayerFlowPill";
 import { Distance } from "@/components/Distance";
+import { JoinBlockedReason } from "@/components/JoinBlockedReason";
 
 const sportEmoji: Record<string, string> = {
   Basketball: "🏀",
@@ -40,7 +41,7 @@ export function GameCard({ game, index = 0 }: { game: Game; index?: number }) {
   const [opening, setOpening] = useState(false);
   const hostUserId = (game as { hostUserId?: string }).hostUserId;
   const liveStatus = useLiveStatus(game);
-  const gate = useJoinGate(game);
+  const gate = useJoinGate(game, { spotsLeft });
   const { status: flowStatus } = useMyFlowStatus(user && isUuid(game.id) ? game.id : undefined);
   const goToHost = (e: React.MouseEvent) => {
     if (!hostUserId) return;
@@ -123,12 +124,14 @@ export function GameCard({ game, index = 0 }: { game: Game; index?: number }) {
                 Completed
               </span>
             )}
-            {(gate.joinState === "closed_by_host" || gate.joinState === "closed_cutoff") && (
+            {(gate.joinState === "closed_by_host" ||
+              gate.joinState === "closed_cutoff" ||
+              gate.joinState === "roster_full") && (
               <span
                 className="inline-flex items-center gap-1 rounded-full bg-background/70 backdrop-blur px-2 py-0.5 text-[11px] font-semibold"
                 title={gate.reason}
               >
-                <Lock className="h-3 w-3" /> Signup closed
+                <Lock className="h-3 w-3" /> {gate.label}
               </span>
             )}
           </div>
@@ -234,6 +237,7 @@ export function GameCard({ game, index = 0 }: { game: Game; index?: number }) {
               </div>
             </div>
           </div>
+          {!joinedByMe && <JoinBlockedReason gate={gate} />}
           <div className="h-1 overflow-hidden rounded-full bg-secondary">
             <motion.div
               initial={{ width: 0 }}
