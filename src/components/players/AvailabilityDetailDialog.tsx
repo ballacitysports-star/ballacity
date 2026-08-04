@@ -27,7 +27,7 @@ import { formatAvailabilityWindow } from "@/lib/availability-timeslots";
 import type { AvailabilityWithAuthor } from "@/lib/availability";
 import { getOrCreateDirectConversation } from "@/lib/messages";
 import { shareAvailability } from "./share-availability";
-import { RequestToJoinButton } from "./RequestToJoinButton";
+
 
 
 /**
