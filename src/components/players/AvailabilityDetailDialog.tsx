@@ -142,15 +142,6 @@ export function AvailabilityDetailDialog({
           </DialogFooter>
         ) : (
           <>
-            <div className="mt-3">
-              <RequestToJoinButton
-                hostUserId={a.user_id}
-                hostName={a.author_name}
-                size="default"
-                className="w-full"
-                onNavigate={onClose}
-              />
-            </div>
             <div className="mt-2 grid grid-cols-2 gap-2">
               <Button variant="outline" onClick={handleMessage} className="rounded-full">
                 <MessageCircle className="h-4 w-4 mr-1" /> Message
