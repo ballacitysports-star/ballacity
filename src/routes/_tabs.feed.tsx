@@ -286,7 +286,9 @@ function Feed() {
     return out;
   }, [q, hosted]);
 
-  const urgent = filtered.filter((g) => g.urgent);
+  const isFull = (g: typeof GAMES[number]) => g.joined >= g.maxPlayers;
+
+  const urgent = filtered.filter((g) => g.urgent && !isFull(g));
   const activeFilterCount =
     (prefs.preferredSports.length > 0 ? 1 : 0) +
     (prefs.maxDistanceMi != null ? 1 : 0) +
