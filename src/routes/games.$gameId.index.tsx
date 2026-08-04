@@ -601,7 +601,9 @@ function GameDetail() {
 
   const fee = Number(settings?.entry_fee ?? game.price);
   const isPaid = fee > 0;
-  const requiresApproval = !!settings?.requires_approval;
+  // Host approval is the default. A game whose host hasn't saved settings yet
+  // is treated as request-to-join; hosts can opt out in game settings.
+  const requiresApproval = settings ? !!settings.requires_approval : true;
   const latestSub = mySubs[0];
   const isApproved = myReq?.status === "approved";
   const isRequestPending = myReq?.status === "pending";
@@ -769,14 +771,17 @@ function GameDetail() {
     // Approval gate takes priority over payment: on games that require
     // approval, players must be approved before they can pay.
     if (requiresApproval && !isApproved) {
-      if (!settings) {
-        toast.error("Host hasn't enabled approvals yet.");
+      // The settings row is optional: hosts who never opened game settings
+      // still get request-to-join, so fall back to the game's host id.
+      const requestHostId = settings?.host_id ?? game.hostUserId ?? null;
+      if (!requestHostId) {
+        toast.error("This host can't take requests yet.");
         return;
       }
       // Invite-link integrity: if the URL claims invite=1, `from` must be present
       // and must match the actual host. Otherwise the link is missing context or
       // has been tampered with — refuse to send the request.
-      if (isInvite && (!inviteFrom || inviteFrom !== settings.host_id)) {
+      if (isInvite && (!inviteFrom || inviteFrom !== requestHostId)) {
         toast.error("This invite link is invalid or has been tampered with.");
         return;
       }
@@ -803,7 +808,7 @@ function GameDetail() {
         id: `optimistic:${crypto.randomUUID()}`,
         game_id: game.id,
         player_id: user?.id ?? "",
-        host_id: settings.host_id,
+        host_id: requestHostId,
         status: "pending",
         message: null,
         reviewer_notes: null,
@@ -813,13 +818,13 @@ function GameDetail() {
       setMyReq(optimistic);
       try {
         const wasRejected = prevReq?.status === "rejected";
-        const created = await createJoinRequest({ game_id: game.id, host_id: settings.host_id });
+        const created = await createJoinRequest({ game_id: game.id, host_id: requestHostId });
         // Swap synthetic row for the authoritative one.
         setMyReq(created);
         const isResubmit = wasRejected || (created.attempt_count ?? 1) > 1;
         // Fire notification off the critical path — failure must not stall the UI.
         void createNotification({
-          user_id: settings.host_id,
+          user_id: requestHostId,
           type: isResubmit ? "join_resubmitted" : "join_request",
           title: isResubmit
             ? `Resubmitted request: ${game.title}`
@@ -1978,7 +1983,7 @@ function GameDetail() {
                 ))}
               </div>
             </div>
-          ) : settings?.requires_approval ? (
+          ) : requiresApproval ? (
             <div className="rounded-2xl border border-dashed border-border bg-surface/40 p-3 text-xs text-muted-foreground">
               No pickup requests yet. You'll see them here as players ask to join.
             </div>
@@ -2401,7 +2406,7 @@ function EditGameModal({
     game.positionsNeeded ?? {},
   );
   const [requiresApproval, setRequiresApproval] = useState<boolean>(
-    !!settings?.requires_approval,
+    settings ? !!settings.requires_approval : true,
   );
   const [acceptedMethodIds, setAcceptedMethodIds] = useState<Set<string>>(
     () => new Set(settings?.accepted_method_ids ?? []),

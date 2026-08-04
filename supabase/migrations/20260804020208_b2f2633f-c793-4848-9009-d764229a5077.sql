@@ -1,0 +1,1 @@
+ALTER TABLE public.game_payment_settings ALTER COLUMN requires_approval SET DEFAULT true;
