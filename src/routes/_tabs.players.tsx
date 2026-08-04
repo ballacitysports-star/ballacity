@@ -197,10 +197,17 @@ function PlayersPage() {
   // Fold any legacy localStorage keys into the new snapshot BEFORE the
   // persistence hook restores, so the migration can't be overwritten.
   migrateLegacyPlayersFilters();
-  const { hydrated } = usePersistedSearch("openrun:players-search", search, "/players", {
+  // `post` and `tab` are navigation state, not view preferences — keep them out
+  // of the saved snapshot so a shared post link never sticks around.
+  const persistedSearch = useMemo(() => {
+    const { post: _post, tab: _tab, ...rest } = search;
+    return rest;
+  }, [search]);
+  const { hydrated } = usePersistedSearch("openrun:players-search", persistedSearch, "/players", {
     q: "", sport: "", skill: "", dist: 0, ageMin: undefined, ageMax: undefined,
     unknownAge: true, when: "any", view: "list", density: "list",
   });
+
 
 
   const q = search.q;
