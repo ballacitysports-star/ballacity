@@ -1137,23 +1137,36 @@ function fmtDate(iso: string) {
 }
 
 function PostAvailabilityDialog({
+  initial,
   onClose,
   onPosted,
 }: {
+  /** When set, the dialog edits this existing post instead of creating one. */
+  initial?: PlayerAvailability | null;
   onClose: () => void;
   onPosted: () => void;
 }) {
   const myProfile = useMyProfile();
-  const [sports, setSports] = useState<string[]>([]);
+  const isEdit = !!initial;
+  const [sports, setSports] = useState<string[]>(initial?.sports ?? []);
   // Per-sport tiers, mirroring the profile editor. Keyed by sport name.
-  const [levels, setLevels] = useState<Record<string, string>>({});
+  const [levels, setLevels] = useState<Record<string, string>>(() =>
+    initial && initial.sports.length && initial.skill_level
+      ? { [initial.sports[0]]: initial.skill_level }
+      : {},
+  );
 
-  const [slots, setSlots] = useState<TimeSlot[]>([]);
+  const [slots, setSlots] = useState<TimeSlot[]>(() =>
+    initial ? parseTimeSlots(initial.time_slots ?? []) : [],
+  );
   const { data: busy = [] } = useMyBusyBlocks();
-  const [city, setCity] = useState("");
+  const [city, setCity] = useState(initial?.city ?? "");
   const unit = useDistanceUnit();
-  const [radius, setRadius] = useState(25); // in the viewer's unit
-  const [note, setNote] = useState("");
+  const [radius, setRadius] = useState(() => {
+    const km = initial?.travel_radius_km ?? 40.2336;
+    return Math.round(unit === "km" ? km : kmToMi(km));
+  }); // in the viewer's unit
+  const [note, setNote] = useState(initial?.note ?? "");
   const [saving, setSaving] = useState(false);
   const toggle = (arr: string[], v: string) =>
     arr.includes(v) ? arr.filter((x) => x !== v) : [...arr, v];
@@ -1165,7 +1178,7 @@ function PostAvailabilityDialog({
     }
     setSaving(true);
     try {
-      await createAvailability({
+      const payload = {
         sports,
         // The primary sport's tier is what the text column stores.
         skill_level: (sports.length ? levels[sports[0]] : "") || "All Levels",
@@ -1175,7 +1188,9 @@ function PostAvailabilityDialog({
         city,
         travel_radius_km: unit === "km" ? radius : miToKm(radius),
         note,
-      });
+      };
+      if (initial) await updateAvailability(initial.id, payload);
+      else await createAvailability(payload);
       onPosted();
     } catch (e: any) {
       toast.error(e.message);
@@ -1183,6 +1198,7 @@ function PostAvailabilityDialog({
       setSaving(false);
     }
   };
+
 
   return (
     <Dialog open onOpenChange={(o) => !o && onClose()}>
