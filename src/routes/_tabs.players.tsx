@@ -924,14 +924,17 @@ function AvailabilityCard({
   isMine,
   hasHostedGames,
   onContact,
+  onOpen,
   onChanged,
 }: {
   a: AvailabilityWithAuthor;
   isMine: boolean;
   hasHostedGames: boolean;
   onContact: () => void;
+  onOpen: () => void;
   onChanged: () => void;
 }) {
+
   const navigate = useNavigate();
   const when = formatWindow(a);
 
