@@ -27,6 +27,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { listTrainerOrgs, createTrainerOrg, requestToJoinTrainerOrg } from "@/lib/trainer-orgs.functions";
 import { autocompletePlaces, getPlaceDetails } from "@/lib/places.functions";
 import { toast } from "sonner";
+import { setActiveProfileByRef } from "@/lib/account-profiles";
 
 const STEP_LABELS = ["Basics", "Expertise", "Where", "Availability"] as const;
 const SKILL_LABELS = ["Beginner", "Recreational", "Intermediate", "Advanced", "Pro"] as const;
@@ -355,6 +356,7 @@ export function CreateTrainerWizard() {
           toast.message("Profile published — couldn't create the org. Add it from your profile.");
         }
       }
+      await setActiveProfileByRef("trainer", saved.id).catch(() => {});
       clearDraft();
       toast.success("Trainer profile published");
       nav({ to: "/trainers/$trainerId", params: { trainerId: saved.id } });
