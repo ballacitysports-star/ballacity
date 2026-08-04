@@ -258,11 +258,52 @@ function PlayersPage() {
   const switchView = (v: ViewMode) => updateSearch({ view: v });
   const switchDensity = (d: Density) => updateSearch({ density: d });
 
-  
+
   const [list, setList] = useState<AvailabilityWithAuthor[] | null>(null);
   const [postOpen, setPostOpen] = useState(false);
+  const [editingPost, setEditingPost] = useState<PlayerAvailability | null>(null);
   const [contactFor, setContactFor] = useState<AvailabilityWithAuthor | null>(null);
   const [reloadTick, setReloadTick] = useState(0);
+
+  const tab: "browse" | "mine" = search.tab === "mine" ? "mine" : "browse";
+  const setTab = (v: "browse" | "mine") => updateSearch({ tab: v }, { push: true });
+
+  // Focused post (`/players?post=<id>`) — shared links open the dialog even
+  // when the post isn't in the current filtered list.
+  const focusedId = search.post;
+  const [focused, setFocused] = useState<AvailabilityWithAuthor | null>(null);
+  const openPost = (id: string) => updateSearch({ post: id }, { push: true });
+  const closePost = () => updateSearch({ post: "" }, { push: true });
+
+  useEffect(() => {
+    if (!focusedId) {
+      setFocused(null);
+      return;
+    }
+    let cancelled = false;
+    const known = list?.find((a) => a.id === focusedId) ?? null;
+    if (known) {
+      setFocused(known);
+      return;
+    }
+    getAvailabilityById(focusedId)
+      .then((row) => {
+        if (cancelled) return;
+        if (row) setFocused(row);
+        else {
+          toast.error("That availability post is no longer available.");
+          updateSearch({ post: "" });
+        }
+      })
+      .catch((e) => {
+        if (!cancelled) toast.error(e.message || "Couldn't load that post");
+      });
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [focusedId, list]);
+
 
   // Legacy localStorage keys are folded into the new snapshot above, before
   // the persistence hook runs (see migrateLegacyPlayersFilters).
