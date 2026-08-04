@@ -1,12 +1,16 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 
+export type WaitlistStatus = "waiting" | "approved" | "declined";
+
 export type WaitlistEntry = {
   id: string;
   gameId: string;
   position: string;
   userId: string;
   createdAt: string;
+  status: WaitlistStatus;
+  reviewedAt: string | null;
 };
 
 type Row = {
@@ -15,6 +19,8 @@ type Row = {
   position: string;
   user_id: string;
   created_at: string;
+  status?: string | null;
+  reviewed_at?: string | null;
 };
 
 function toEntry(r: Row): WaitlistEntry {
@@ -24,6 +30,8 @@ function toEntry(r: Row): WaitlistEntry {
     position: r.position,
     userId: r.user_id,
     createdAt: r.created_at,
+    status: (r.status as WaitlistStatus | null) ?? "waiting",
+    reviewedAt: r.reviewed_at ?? null,
   };
 }
 
@@ -49,7 +57,7 @@ export function useGameWaitlist(gameId: string | undefined): {
     const load = async () => {
       const { data, error } = await supabase
         .from("game_position_waitlist")
-        .select("id, game_id, position, user_id, created_at")
+        .select("id, game_id, position, user_id, created_at, status, reviewed_at")
         .eq("game_id", gameId)
         .order("created_at", { ascending: true });
       if (cancelled) return;
@@ -75,6 +83,19 @@ export function useGameWaitlist(gameId: string | undefined): {
           setEntries((prev) =>
             prev.some((e) => e.id === row.id) ? prev : [...prev, toEntry(row)],
           );
+        },
+      )
+      .on(
+        "postgres_changes",
+        {
+          event: "UPDATE",
+          schema: "public",
+          table: "game_position_waitlist",
+          filter: `game_id=eq.${gameId}`,
+        },
+        (payload) => {
+          const row = payload.new as Row;
+          setEntries((prev) => prev.map((e) => (e.id === row.id ? toEntry(row) : e)));
         },
       )
       .on(
@@ -129,4 +150,54 @@ export async function leaveWaitlist(gameId: string, position: string): Promise<v
     .eq("game_id", gameId)
     .eq("position", position)
     .eq("user_id", uid);
+}
+
+/** Host action: approve or decline a waitlist entry as slots free up. */
+export async function reviewWaitlistEntry(
+  entryId: string,
+  status: Exclude<WaitlistStatus, "waiting">,
+): Promise<void> {
+  const { data } = await supabase.auth.getUser();
+  const uid = data.user?.id;
+  if (!uid) throw new Error("Sign in to review the waitlist.");
+  const { error } = await supabase
+    .from("game_position_waitlist")
+    .update({ status, reviewed_at: new Date().toISOString(), reviewed_by: uid })
+    .eq("id", entryId);
+  if (error) throw error;
+}
+
+/** The signed-in user's waitlist entries across all games, with status. */
+export function useMyWaitlist(): { entries: WaitlistEntry[]; loading: boolean } {
+  const [entries, setEntries] = useState<WaitlistEntry[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    const load = async () => {
+      const { data: auth } = await supabase.auth.getUser();
+      const uid = auth.user?.id;
+      if (!uid) {
+        if (!cancelled) {
+          setEntries([]);
+          setLoading(false);
+        }
+        return;
+      }
+      const { data, error } = await supabase
+        .from("game_position_waitlist")
+        .select("id, game_id, position, user_id, created_at, status, reviewed_at")
+        .eq("user_id", uid)
+        .order("created_at", { ascending: false });
+      if (cancelled) return;
+      if (!error && data) setEntries((data as Row[]).map(toEntry));
+      setLoading(false);
+    };
+    void load();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  return { entries, loading };
 }
