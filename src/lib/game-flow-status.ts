@@ -101,7 +101,9 @@ export function computePlayerFlowStatus(input: {
   isJoined: boolean;
 }): PlayerFlowStatus {
   const { joinRequest, submissions, settings, isJoined } = input;
-  const requiresApproval = !!settings?.requires_approval;
+  // Host approval is the default: a game with no saved settings row is
+  // treated as request-to-join.
+  const requiresApproval = settings ? !!settings.requires_approval : true;
   const isPaid = !!settings && Number(settings.entry_fee ?? 0) > 0;
   const latest = submissions[0] ?? null;
 
