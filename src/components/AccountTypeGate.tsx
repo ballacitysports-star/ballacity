@@ -1,12 +1,12 @@
 import { Link } from "@tanstack/react-router";
-import { useAccountType, type AccountType, ACCOUNT_TYPE_META } from "@/lib/account-type";
+import { useAuth } from "@/hooks/use-auth";
+import { ACCOUNT_TYPE_META, type AccountType } from "@/lib/account-type";
 
 /**
- * Wraps a linked-profile creation flow (team, trainer, gym) and only
- * renders it when the signed-in user's account_type matches. Account
- * type is permanent and chosen at signup, so a mismatch means the user
- * is on the wrong page — direct them to sign up with a different email
- * instead of offering an in-app switcher.
+ * Wraps a linked-profile creation flow (team, trainer, gym). Accounts can now
+ * hold several profiles at once — a personal player profile plus any number of
+ * team, trainer, and gym profiles — so this no longer gates on account type.
+ * It only makes sure the visitor is signed in.
  */
 export function AccountTypeGate({
   requires,
@@ -15,26 +15,25 @@ export function AccountTypeGate({
   requires: AccountType;
   children: React.ReactNode;
 }) {
-  const { accountType, loading } = useAccountType();
+  const { user, loading } = useAuth();
   if (loading) return null;
-  if (accountType === requires) return <>{children}</>;
+  if (user) return <>{children}</>;
 
-  const currentLabel = accountType ? ACCOUNT_TYPE_META[accountType].label : "another type";
   const requiredLabel = ACCOUNT_TYPE_META[requires].label;
   return (
     <div className="mx-auto w-full max-w-md p-6">
       <div className="rounded-2xl border border-border bg-surface p-5 text-sm">
-        <div className="font-display text-lg font-bold">This is a {requiredLabel} page</div>
+        <div className="font-display text-lg font-bold">Sign in to add a {requiredLabel}</div>
         <p className="mt-2 text-muted-foreground">
-          Your account is a {currentLabel}. Each account can only be one type. To create a{" "}
-          {requiredLabel} profile, sign up with a different email address.
+          {requiredLabel} profiles are added to your account. Sign in and you can switch between
+          all of your profiles anytime.
         </p>
         <div className="mt-4 flex gap-2">
           <Link
-            to="/profile"
+            to="/auth"
             className="rounded-full bg-lime px-4 py-2 text-sm font-bold text-primary-foreground"
           >
-            Back to profile
+            Sign in
           </Link>
         </div>
       </div>
