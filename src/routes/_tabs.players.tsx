@@ -13,7 +13,10 @@ import {
   Inbox,
   Loader2,
   Ticket,
+  Share2,
+  UserRound,
 } from "lucide-react";
+
 import { ViewDensityToggle, type ViewMode, type Density } from "@/components/ViewDensityToggle";
 import { PlayersMapView } from "@/components/PlayersMapView";
 import { NearbyPlayersPanel } from "@/components/NearbyPlayersPanel";
