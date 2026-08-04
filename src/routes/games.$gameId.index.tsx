@@ -988,7 +988,7 @@ function GameDetail() {
             <span className="rounded-full bg-background/70 backdrop-blur px-3 py-1 text-xs font-semibold">
               {formatSkillValue(game.sport, game.skill)}
             </span>
-            {game.urgent && (
+            {game.urgent && spotsLeft > 0 && (
               <span className="rounded-full bg-coral-gradient px-3 py-1 text-xs font-bold text-white">
                 ⚡ {spotsLeft} spots left
               </span>
