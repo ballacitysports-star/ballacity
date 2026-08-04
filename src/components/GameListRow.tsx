@@ -41,13 +41,11 @@ export function GameListRow({ game, index = 0 }: { game: Game; index?: number })
           ? "Joined"
           : gate.locked
             ? "Signup closed"
-            : joinedByMe
-          ? "Joined"
-          : spotsLeft <= 0
-            ? "Full"
-            : game.price > 0
-              ? `$${game.price}`
-              : "Free";
+            : spotsLeft <= 0
+              ? "Full"
+              : game.price > 0
+                ? `$${game.price}`
+                : "Free";
   const statusTone =
     liveStatus === "in_progress"
       ? "bg-coral text-white"
@@ -55,11 +53,7 @@ export function GameListRow({ game, index = 0 }: { game: Game; index?: number })
         ? "bg-surface border border-border text-muted-foreground"
         : joinedByMe
           ? "bg-lime/15 text-lime border border-lime/40"
-          : gate.locked
-            ? "bg-surface border border-border text-muted-foreground"
-            : joinedByMe
-          ? "bg-lime/15 text-lime border border-lime/40"
-          : spotsLeft <= 0
+          : gate.locked || spotsLeft <= 0
             ? "bg-surface border border-border text-muted-foreground"
             : game.price > 0
               ? "bg-lime-gradient text-primary-foreground"
