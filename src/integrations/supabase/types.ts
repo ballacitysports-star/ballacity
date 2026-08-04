@@ -14,6 +14,30 @@ export type Database = {
   }
   public: {
     Tables: {
+      account_profiles: {
+        Row: {
+          created_at: string
+          id: string
+          kind: string
+          ref_id: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          kind: string
+          ref_id?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          kind?: string
+          ref_id?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       auth_signin_events: {
         Row: {
           browser: string | null
@@ -1137,6 +1161,7 @@ export type Database = {
       profiles: {
         Row: {
           account_type: string | null
+          active_profile_id: string | null
           avatar_initials: string | null
           avatar_url: string | null
           bio: string | null
@@ -1156,6 +1181,7 @@ export type Database = {
         }
         Insert: {
           account_type?: string | null
+          active_profile_id?: string | null
           avatar_initials?: string | null
           avatar_url?: string | null
           bio?: string | null
@@ -1175,6 +1201,7 @@ export type Database = {
         }
         Update: {
           account_type?: string | null
+          active_profile_id?: string | null
           avatar_initials?: string | null
           avatar_url?: string | null
           bio?: string | null
