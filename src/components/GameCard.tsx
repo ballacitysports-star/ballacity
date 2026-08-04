@@ -1,6 +1,6 @@
 import { Link, useNavigate } from "@tanstack/react-router";
 import { motion } from "framer-motion";
-import { MapPin, Users, Clock, Zap, Lock, Flame, MessageCircle, Check, CreditCard } from "lucide-react";
+import { MapPin, Users, Clock, Zap, Lock, Flame, MessageCircle } from "lucide-react";
 import { UserAvatar } from "@/components/UserAvatar";
 import { SpotsPill } from "@/components/SpotsPill";
 import type { Game } from "@/lib/sample-data";
