@@ -107,7 +107,9 @@ async function fetchMyProfiles(userId: string): Promise<MyProfilesResult> {
     avatar_url?: string | null;
     avatar_initials?: string | null;
     active_profile_id?: string | null;
+    default_profile_id?: string | null;
   } | null;
+
 
   const profiles: AccountProfile[] = [];
   for (const row of list) {
