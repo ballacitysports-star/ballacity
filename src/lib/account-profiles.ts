@@ -244,6 +244,34 @@ export function useSwitchProfile() {
   });
 }
 
+/**
+ * Stores the profile the app should start in. Saved on the account, so it
+ * applies on every device and every new session. Pass `null` to clear it.
+ */
+export async function setDefaultProfile(profile: AccountProfile | null): Promise<void> {
+  const { data: userRes } = await supabase.auth.getUser();
+  const uid = userRes.user?.id;
+  if (!uid) throw new Error("Not signed in");
+  const { error } = await supabase
+    .from("profiles")
+    .update({ default_profile_id: profile?.id ?? null })
+    .eq("id", uid);
+  if (error) throw error;
+}
+
+export function useSetDefaultProfile() {
+  const qc = useQueryClient();
+  const { user } = useAuth();
+  return useMutation({
+    mutationFn: (profile: AccountProfile | null) => setDefaultProfile(profile),
+    onSuccess: async () => {
+      await qc.invalidateQueries({ queryKey: myProfilesKey(user?.id) });
+    },
+  });
+}
+
+
+
 export function profileTypeLabel(kind: AccountType): string {
   return ACCOUNT_TYPE_META[kind].label;
 }
