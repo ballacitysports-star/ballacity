@@ -26,7 +26,10 @@ export type MyProfilesResult = {
   profiles: AccountProfile[];
   activeId: string | null;
   active: AccountProfile | null;
+  /** Profile the app starts in on any device / new session. */
+  defaultId: string | null;
 };
+
 
 function initials(name: string): string {
   return (
