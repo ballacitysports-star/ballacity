@@ -52,6 +52,7 @@ import {
 } from "@/lib/trainer-orgs.functions";
 import { useQuery } from "@tanstack/react-query";
 import { toast } from "sonner";
+import { setActiveProfileByRef } from "@/lib/account-profiles";
 
 const ACCENTS = [
   { name: "Lime", hex: "#a3ff12" },
@@ -297,6 +298,7 @@ export function CreateOrgWizard({ kind }: { kind: OrgKind }) {
     };
     try {
       const saved = await addOrg(org);
+      await setActiveProfileByRef(isCoach ? "trainer" : "team", saved.id).catch(() => {});
       if (isCoach) {
         // Best-effort org linkage — failures don't roll back the profile.
         try {

@@ -1,6 +1,7 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 import { toast } from "sonner";
+import { setActiveProfileByRef } from "@/lib/account-profiles";
 import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
 import { useEffect } from "react";
@@ -64,6 +65,7 @@ function CreateOrg() {
         },
       });
 
+      await setActiveProfileByRef("gym", id).catch(() => {});
       clearDraft();
       toast.success("Gym created");
       navigate({ to: "/orgs/$orgId", params: { orgId: id } });

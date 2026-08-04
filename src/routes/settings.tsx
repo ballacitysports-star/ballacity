@@ -19,6 +19,7 @@ import {
   BadgeCheck,
 } from "lucide-react";
 import { ACCOUNT_TYPE_META, useAccountType } from "@/lib/account-type";
+import { ProfileSwitcher } from "@/components/ProfileSwitcher";
 import { useMyProfile } from "@/lib/user-prefs-store";
 import {
   SettingsGroup,
@@ -268,7 +269,7 @@ function OnboardingDetailsSection() {
   if (loading || !accountType) return null;
   const meta = ACCOUNT_TYPE_META[accountType];
   return (
-    <SettingsGroup title="Onboarding details">
+    <SettingsGroup title="Your profiles">
       <SettingsStaticRow>
         <div className="flex items-center gap-4">
           <span
@@ -279,16 +280,18 @@ function OnboardingDetailsSection() {
           </span>
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-1.5">
-              <span className="text-sm font-medium">{meta.label} account</span>
+              <span className="text-sm font-medium">Acting as {meta.label}</span>
               <BadgeCheck className="h-4 w-4 text-primary" aria-hidden />
             </div>
             <p className="text-xs text-muted-foreground">{meta.blurb}</p>
           </div>
         </div>
+        <div className="mt-3">
+          <ProfileSwitcher />
+        </div>
         <p className="mt-2.5 text-xs text-muted-foreground">
-          Your account type is locked to{" "}
-          <span className="font-medium text-foreground">{meta.label}</span>. To use OpenRun as a
-          different type, create a separate account.
+          Your player profile is always yours. Add team, trainer, and gym profiles and switch
+          between them anytime — the whole app follows the profile you pick.
         </p>
       </SettingsStaticRow>
       <SettingsLinkRow
@@ -305,6 +308,7 @@ function OnboardingDetailsSection() {
     </SettingsGroup>
   );
 }
+
 
 function MyOrgsSection() {
   const qc = useQueryClient();

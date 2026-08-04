@@ -96,10 +96,11 @@ function OnboardingAccountTypePage() {
     <div className="min-h-screen bg-background px-4 py-10">
       <div className="mx-auto max-w-lg space-y-6">
         <AccountTypePicker value={choice} onChange={setChoice} />
-        <div className="rounded-lg border border-amber-500/40 bg-amber-500/10 p-3 text-xs text-amber-200">
-          Your account type is permanent. To use OpenRun as a different type,
-          sign up again with a separate email.
+        <div className="rounded-lg border border-border bg-surface p-3 text-xs text-muted-foreground">
+          This is just your starting point. You can add team, trainer, and gym profiles later and
+          switch between them anytime.
         </div>
+
         <div className="flex flex-col gap-2">
           <button
             type="button"
