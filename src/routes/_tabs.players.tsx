@@ -140,10 +140,14 @@ function PlayersPage() {
       search: (prev: PlayersSearch) => ({ ...prev, ...patch }),
       replace: !opts?.push,
     });
-  usePersistedSearch("openrun:players-search", search, "/players", {
-    q: "", sport: "", skill: "", dist: 0, unknownAge: true, when: "any",
-    view: "list", density: "list",
+  // Fold any legacy localStorage keys into the new snapshot BEFORE the
+  // persistence hook restores, so the migration can't be overwritten.
+  migrateLegacyPlayersFilters();
+  const { hydrated } = usePersistedSearch("openrun:players-search", search, "/players", {
+    q: "", sport: "", skill: "", dist: 0, ageMin: undefined, ageMax: undefined,
+    unknownAge: true, when: "any", view: "list", density: "list",
   });
+
 
   const q = search.q;
   // `sport` is a comma-separated list; `skill` a per-sport tier map
