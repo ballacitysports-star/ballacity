@@ -601,7 +601,9 @@ function GameDetail() {
 
   const fee = Number(settings?.entry_fee ?? game.price);
   const isPaid = fee > 0;
-  const requiresApproval = !!settings?.requires_approval;
+  // Host approval is the default. A game whose host hasn't saved settings yet
+  // is treated as request-to-join; hosts can opt out in game settings.
+  const requiresApproval = settings ? !!settings.requires_approval : true;
   const latestSub = mySubs[0];
   const isApproved = myReq?.status === "approved";
   const isRequestPending = myReq?.status === "pending";
