@@ -1557,9 +1557,7 @@ function GameDetail() {
                   !isPending &&
                   !requiresApproval &&
                   !isPaid &&
-                  !game.joinsClosed &&
-                  game.status !== "in_progress" &&
-                  game.status !== "completed" &&
+                  !gate.locked &&
                   spotsLeft > 0 &&
                   !!user;
                 const canWaitlist =
@@ -1567,9 +1565,7 @@ function GameDetail() {
                   !isHost &&
                   !isConfirmed &&
                   !joined &&
-                  !game.joinsClosed &&
-                  game.status !== "in_progress" &&
-                  game.status !== "completed" &&
+                  !gate.locked &&
                   !!user;
                 return (
                   <div key={name} className="inline-flex items-center gap-1">
