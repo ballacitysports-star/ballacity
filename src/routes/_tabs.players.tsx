@@ -1038,11 +1038,46 @@ function AvailabilityCard({
         </div>
       </div>
 
+      {/* Key stats strip — the player-card summary from the old page. */}
+      <dl className="mt-3 grid grid-cols-3 gap-2 rounded-xl border border-border bg-background/40 p-2 text-center">
+        {[
+          {
+            label: "Level",
+            value:
+              formatSportLevel(
+                resolvePlayerLevel(a.author_sport_levels, a.sports[0] ?? null, a.skill_level),
+              ) || "—",
+          },
+          { label: "Sports", value: a.sports.length ? String(a.sports.length) : "Any" },
+          { label: "Travels", value: <Distance km={a.travel_radius_km} /> },
+        ].map((s) => (
+          <div key={s.label}>
+            <dt className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground">
+              {s.label}
+            </dt>
+            <dd className="truncate text-xs font-semibold">{s.value}</dd>
+          </div>
+        ))}
+      </dl>
+
       <div className="mt-3 flex gap-2">
         {isMine ? (
-          <Button variant="outline" size="sm" className="rounded-full" onClick={handleDelete}>
-            <X className="h-4 w-4 mr-1" /> Remove
-          </Button>
+          <>
+            <Button variant="outline" size="sm" className="rounded-full" onClick={onOpen}>
+              Open
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              className="rounded-full"
+              onClick={() => shareAvailability(a.id)}
+            >
+              <Share2 className="h-4 w-4 mr-1" /> Share
+            </Button>
+            <Button variant="outline" size="sm" className="rounded-full" onClick={handleDelete}>
+              <X className="h-4 w-4 mr-1" /> Remove
+            </Button>
+          </>
         ) : (
           <>
             <Button
@@ -1066,6 +1101,30 @@ function AvailabilityCard({
           </>
         )}
       </div>
+
+      <div className="mt-2 flex items-center gap-3">
+        <Link
+          to="/players/$userId"
+          params={{ userId: a.user_id }}
+          className="inline-flex items-center gap-1 text-xs font-semibold text-lime"
+        >
+          <UserRound className="h-3.5 w-3.5" /> View full profile
+        </Link>
+        {!isMine && (
+          <>
+            <button onClick={onOpen} className="text-xs font-semibold text-muted-foreground">
+              Open post
+            </button>
+            <button
+              onClick={() => shareAvailability(a.id)}
+              className="inline-flex items-center gap-1 text-xs font-semibold text-muted-foreground"
+            >
+              <Share2 className="h-3.5 w-3.5" /> Share
+            </button>
+          </>
+        )}
+      </div>
+
     </li>
   );
 }
