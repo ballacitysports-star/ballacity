@@ -77,10 +77,16 @@ export function cutoffAmountLabel(min: number | undefined): string {
 
 export type JoinState =
   | "open"
+  | "roster_full"
   | "closed_cutoff"
   | "closed_by_host"
   | "in_progress"
   | "completed";
+
+export type JoinGateOptions = {
+  /** Remaining spots on the roster. Omit when unknown. */
+  spotsLeft?: number;
+};
 
 export type JoinGate = {
   liveStatus: LiveStatus;
@@ -93,7 +99,11 @@ export type JoinGate = {
   locked: boolean;
 };
 
-export function resolveJoinGate(game: Game, now: number = Date.now()): JoinGate {
+export function resolveJoinGate(
+  game: Game,
+  now: number = Date.now(),
+  opts: JoinGateOptions = {},
+): JoinGate {
   const liveStatus = computeLiveStatus(game, now);
   const cutoffMin = Number((game as { signupCutoffMin?: number }).signupCutoffMin ?? 0);
 
@@ -134,20 +144,32 @@ export function resolveJoinGate(game: Game, now: number = Date.now()): JoinGate 
       locked: true,
     };
   }
+  if (opts.spotsLeft !== undefined && opts.spotsLeft <= 0) {
+    return {
+      liveStatus,
+      joinState: "roster_full",
+      label: "Roster full",
+      reason: "The roster is full — no spots left.",
+      locked: true,
+    };
+  }
   return { liveStatus, joinState: "open", label: "Open", reason: "", locked: false };
 }
 
 /** Live-updating variant of `resolveJoinGate` (shares the 30s ticker). */
-export function useJoinGate(game: Game): JoinGate {
-  const [gate, setGate] = useState<JoinGate>(() => resolveJoinGate(game));
+export function useJoinGate(game: Game, opts: JoinGateOptions = {}): JoinGate {
+  const spotsLeft = opts.spotsLeft;
+  const [gate, setGate] = useState<JoinGate>(() =>
+    resolveJoinGate(game, Date.now(), { spotsLeft }),
+  );
   useEffect(() => {
     ensureTicker();
-    const cb = () => setGate(resolveJoinGate(game));
+    const cb = () => setGate(resolveJoinGate(game, Date.now(), { spotsLeft }));
     cb();
     tickListeners.add(cb);
     return () => {
       tickListeners.delete(cb);
     };
-  }, [game]);
+  }, [game, spotsLeft]);
   return gate;
 }
