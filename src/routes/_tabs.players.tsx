@@ -13,7 +13,10 @@ import {
   Inbox,
   Loader2,
   Ticket,
+  Share2,
+  UserRound,
 } from "lucide-react";
+
 import { ViewDensityToggle, type ViewMode, type Density } from "@/components/ViewDensityToggle";
 import { PlayersMapView } from "@/components/PlayersMapView";
 import { NearbyPlayersPanel } from "@/components/NearbyPlayersPanel";
@@ -30,10 +33,16 @@ import {
   createAvailability,
   createContactRequest,
   deleteAvailability,
+  getAvailabilityById,
   listOpenAvailabilities,
+  updateAvailability,
   type PlayerAvailability,
   type ExistingRequestSummary,
 } from "@/lib/availability";
+import { MineView } from "@/components/players/MineView";
+import { AvailabilityDetailDialog } from "@/components/players/AvailabilityDetailDialog";
+import { shareAvailability } from "@/components/players/share-availability";
+
 import { AvailabilitySchedulePicker } from "@/components/availability/AvailabilitySchedulePicker";
 import { useMyBusyBlocks } from "@/lib/availability-conflicts";
 import {
@@ -105,7 +114,12 @@ const playersSearchSchema = z.object({
   when: fallback(z.string(), "any").default("any"),
   view: fallback(z.string(), "list").default("list"),
   density: fallback(z.string(), "list").default("list"),
+  // "browse" (everyone's availability) | "mine" (your posts + requests).
+  tab: fallback(z.string(), "browse").default("browse"),
+  // Deep link to one availability post — opens it in a focused dialog.
+  post: fallback(z.string(), "").default(""),
 });
+
 
 export const Route = createFileRoute("/_tabs/players")({
   head: () => ({ meta: [{ title: "Players — OpenRun" }] }),
@@ -183,10 +197,17 @@ function PlayersPage() {
   // Fold any legacy localStorage keys into the new snapshot BEFORE the
   // persistence hook restores, so the migration can't be overwritten.
   migrateLegacyPlayersFilters();
-  const { hydrated } = usePersistedSearch("openrun:players-search", search, "/players", {
+  // `post` and `tab` are navigation state, not view preferences — keep them out
+  // of the saved snapshot so a shared post link never sticks around.
+  const persistedSearch = useMemo(() => {
+    const { post: _post, tab: _tab, ...rest } = search;
+    return rest;
+  }, [search]);
+  const { hydrated } = usePersistedSearch("openrun:players-search", persistedSearch, "/players", {
     q: "", sport: "", skill: "", dist: 0, ageMin: undefined, ageMax: undefined,
     unknownAge: true, when: "any", view: "list", density: "list",
   });
+
 
 
   const q = search.q;
@@ -237,11 +258,52 @@ function PlayersPage() {
   const switchView = (v: ViewMode) => updateSearch({ view: v });
   const switchDensity = (d: Density) => updateSearch({ density: d });
 
-  
+
   const [list, setList] = useState<AvailabilityWithAuthor[] | null>(null);
   const [postOpen, setPostOpen] = useState(false);
+  const [editingPost, setEditingPost] = useState<PlayerAvailability | null>(null);
   const [contactFor, setContactFor] = useState<AvailabilityWithAuthor | null>(null);
   const [reloadTick, setReloadTick] = useState(0);
+
+  const tab: "browse" | "mine" = search.tab === "mine" ? "mine" : "browse";
+  const setTab = (v: "browse" | "mine") => updateSearch({ tab: v }, { push: true });
+
+  // Focused post (`/players?post=<id>`) — shared links open the dialog even
+  // when the post isn't in the current filtered list.
+  const focusedId = search.post;
+  const [focused, setFocused] = useState<AvailabilityWithAuthor | null>(null);
+  const openPost = (id: string) => updateSearch({ post: id }, { push: true });
+  const closePost = () => updateSearch({ post: "" }, { push: true });
+
+  useEffect(() => {
+    if (!focusedId) {
+      setFocused(null);
+      return;
+    }
+    let cancelled = false;
+    const known = list?.find((a) => a.id === focusedId) ?? null;
+    if (known) {
+      setFocused(known);
+      return;
+    }
+    getAvailabilityById(focusedId)
+      .then((row) => {
+        if (cancelled) return;
+        if (row) setFocused(row);
+        else {
+          toast.error("That availability post is no longer available.");
+          updateSearch({ post: "" });
+        }
+      })
+      .catch((e) => {
+        if (!cancelled) toast.error(e.message || "Couldn't load that post");
+      });
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [focusedId, list]);
+
 
   // Legacy localStorage keys are folded into the new snapshot above, before
   // the persistence hook runs (see migrateLegacyPlayersFilters).
@@ -417,12 +479,46 @@ function PlayersPage() {
         </p>
       </motion.div>
 
+      {/* Browse everyone's availability, or manage your own posts/requests. */}
+      <div className="mb-4 flex gap-2">
+        {(
+          [
+            { id: "browse", label: "Browse" },
+            { id: "mine", label: "Mine" },
+          ] as const
+        ).map((t) => (
+          <button
+            key={t.id}
+            onClick={() => setTab(t.id)}
+            aria-pressed={tab === t.id}
+            className={`rounded-full border px-4 py-1.5 text-xs font-bold transition-colors ${
+              tab === t.id
+                ? "border-lime bg-lime text-primary-foreground"
+                : "border-border bg-surface text-muted-foreground"
+            }`}
+          >
+            {t.label}
+          </button>
+        ))}
+      </div>
+
+      {tab === "mine" ? (
+        <div className="pb-6">
+          <MineView
+            user={user ? { id: user.id } : null}
+            onEdit={(m) => setEditingPost(m)}
+            refreshKey={reloadTick}
+          />
+        </div>
+      ) : (
+        <>
       <NearbyPlayersPanel
         players={list}
         mySports={profile?.sports?.map((s) => s.name)}
         myCity={profile?.city}
         currentUserId={user?.id ?? null}
       />
+
 
       <ViewDensityToggle
         view={viewMode}
@@ -561,22 +657,48 @@ function PlayersPage() {
                 onContact={() =>
                   user ? setContactFor(a) : toast.error("Sign in to contact this player.")
                 }
+                onOpen={() => openPost(a.id)}
                 onChanged={() => setReloadTick((t) => t + 1)}
               />
             ))}
           </ul>
         </>
       )}
+        </>
+      )}
 
 
-      {postOpen && (
+      {(postOpen || editingPost) && (
         <PostAvailabilityDialog
-          onClose={() => setPostOpen(false)}
-          onPosted={() => {
+          initial={editingPost}
+          onClose={() => {
             setPostOpen(false);
-            setReloadTick((t) => t + 1);
-            toast.success("Availability posted");
+            setEditingPost(null);
           }}
+          onPosted={() => {
+            const wasEdit = !!editingPost;
+            setPostOpen(false);
+            setEditingPost(null);
+            setReloadTick((t) => t + 1);
+            toast.success(wasEdit ? "Availability updated" : "Availability posted");
+          }}
+        />
+      )}
+      {focused && (
+        <AvailabilityDetailDialog
+          a={focused}
+          isMine={user?.id === focused.user_id}
+          canInvite={myUpcomingHosted.length > 0}
+          onContact={() =>
+            user
+              ? setContactFor(focused)
+              : toast.error("Sign in to contact this player.")
+          }
+          onEdit={() => {
+            setEditingPost(focused);
+            closePost();
+          }}
+          onClose={closePost}
         />
       )}
       {contactFor && (
@@ -586,6 +708,7 @@ function PlayersPage() {
           onClose={() => setContactFor(null)}
         />
       )}
+
 
     </div>
   );
@@ -801,14 +924,17 @@ function AvailabilityCard({
   isMine,
   hasHostedGames,
   onContact,
+  onOpen,
   onChanged,
 }: {
   a: AvailabilityWithAuthor;
   isMine: boolean;
   hasHostedGames: boolean;
   onContact: () => void;
+  onOpen: () => void;
   onChanged: () => void;
 }) {
+
   const navigate = useNavigate();
   const when = formatWindow(a);
 
@@ -912,11 +1038,46 @@ function AvailabilityCard({
         </div>
       </div>
 
+      {/* Key stats strip — the player-card summary from the old page. */}
+      <dl className="mt-3 grid grid-cols-3 gap-2 rounded-xl border border-border bg-background/40 p-2 text-center">
+        {[
+          {
+            label: "Level",
+            value:
+              formatSportLevel(
+                resolvePlayerLevel(a.author_sport_levels, a.sports[0] ?? null, a.skill_level),
+              ) || "—",
+          },
+          { label: "Sports", value: a.sports.length ? String(a.sports.length) : "Any" },
+          { label: "Travels", value: <Distance km={a.travel_radius_km} /> },
+        ].map((s) => (
+          <div key={s.label}>
+            <dt className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground">
+              {s.label}
+            </dt>
+            <dd className="truncate text-xs font-semibold">{s.value}</dd>
+          </div>
+        ))}
+      </dl>
+
       <div className="mt-3 flex gap-2">
         {isMine ? (
-          <Button variant="outline" size="sm" className="rounded-full" onClick={handleDelete}>
-            <X className="h-4 w-4 mr-1" /> Remove
-          </Button>
+          <>
+            <Button variant="outline" size="sm" className="rounded-full" onClick={onOpen}>
+              Open
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              className="rounded-full"
+              onClick={() => shareAvailability(a.id)}
+            >
+              <Share2 className="h-4 w-4 mr-1" /> Share
+            </Button>
+            <Button variant="outline" size="sm" className="rounded-full" onClick={handleDelete}>
+              <X className="h-4 w-4 mr-1" /> Remove
+            </Button>
+          </>
         ) : (
           <>
             <Button
@@ -940,6 +1101,30 @@ function AvailabilityCard({
           </>
         )}
       </div>
+
+      <div className="mt-2 flex items-center gap-3">
+        <Link
+          to="/players/$userId"
+          params={{ userId: a.user_id }}
+          className="inline-flex items-center gap-1 text-xs font-semibold text-lime"
+        >
+          <UserRound className="h-3.5 w-3.5" /> View full profile
+        </Link>
+        {!isMine && (
+          <>
+            <button onClick={onOpen} className="text-xs font-semibold text-muted-foreground">
+              Open post
+            </button>
+            <button
+              onClick={() => shareAvailability(a.id)}
+              className="inline-flex items-center gap-1 text-xs font-semibold text-muted-foreground"
+            >
+              <Share2 className="h-3.5 w-3.5" /> Share
+            </button>
+          </>
+        )}
+      </div>
+
     </li>
   );
 }
@@ -952,23 +1137,36 @@ function fmtDate(iso: string) {
 }
 
 function PostAvailabilityDialog({
+  initial,
   onClose,
   onPosted,
 }: {
+  /** When set, the dialog edits this existing post instead of creating one. */
+  initial?: PlayerAvailability | null;
   onClose: () => void;
   onPosted: () => void;
 }) {
   const myProfile = useMyProfile();
-  const [sports, setSports] = useState<string[]>([]);
+  const isEdit = !!initial;
+  const [sports, setSports] = useState<string[]>(initial?.sports ?? []);
   // Per-sport tiers, mirroring the profile editor. Keyed by sport name.
-  const [levels, setLevels] = useState<Record<string, string>>({});
+  const [levels, setLevels] = useState<Record<string, string>>(() =>
+    initial && initial.sports.length && initial.skill_level
+      ? { [initial.sports[0]]: initial.skill_level }
+      : {},
+  );
 
-  const [slots, setSlots] = useState<TimeSlot[]>([]);
+  const [slots, setSlots] = useState<TimeSlot[]>(() =>
+    initial ? parseTimeSlots(initial.time_slots ?? []) : [],
+  );
   const { data: busy = [] } = useMyBusyBlocks();
-  const [city, setCity] = useState("");
+  const [city, setCity] = useState(initial?.city ?? "");
   const unit = useDistanceUnit();
-  const [radius, setRadius] = useState(25); // in the viewer's unit
-  const [note, setNote] = useState("");
+  const [radius, setRadius] = useState(() => {
+    const km = initial?.travel_radius_km ?? 40.2336;
+    return Math.round(unit === "km" ? km : kmToMi(km));
+  }); // in the viewer's unit
+  const [note, setNote] = useState(initial?.note ?? "");
   const [saving, setSaving] = useState(false);
   const toggle = (arr: string[], v: string) =>
     arr.includes(v) ? arr.filter((x) => x !== v) : [...arr, v];
@@ -980,7 +1178,7 @@ function PostAvailabilityDialog({
     }
     setSaving(true);
     try {
-      await createAvailability({
+      const payload = {
         sports,
         // The primary sport's tier is what the text column stores.
         skill_level: (sports.length ? levels[sports[0]] : "") || "All Levels",
@@ -990,7 +1188,9 @@ function PostAvailabilityDialog({
         city,
         travel_radius_km: unit === "km" ? radius : miToKm(radius),
         note,
-      });
+      };
+      if (initial) await updateAvailability(initial.id, payload);
+      else await createAvailability(payload);
       onPosted();
     } catch (e: any) {
       toast.error(e.message);
@@ -999,11 +1199,12 @@ function PostAvailabilityDialog({
     }
   };
 
+
   return (
     <Dialog open onOpenChange={(o) => !o && onClose()}>
       <DialogContent className="max-w-md max-h-[90dvh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Post availability</DialogTitle>
+          <DialogTitle>{isEdit ? "Edit availability" : "Post availability"}</DialogTitle>
         </DialogHeader>
         <div className="space-y-4">
           <div>
@@ -1117,7 +1318,9 @@ function PostAvailabilityDialog({
             disabled={saving}
             className="bg-lime-gradient text-primary-foreground"
           >
-            {saving && <Loader2 className="h-4 w-4 mr-1 animate-spin" />}Post
+            {saving && <Loader2 className="h-4 w-4 mr-1 animate-spin" />}
+            {isEdit ? "Save" : "Post"}
+
           </Button>
         </DialogFooter>
       </DialogContent>

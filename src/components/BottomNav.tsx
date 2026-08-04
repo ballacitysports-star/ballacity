@@ -22,15 +22,13 @@ const items: NavItem[] = [
     match: (p) => p === "/feed" || p === "/" || p === "/pickup",
   },
   {
-    to: "/available-players",
+    to: "/players",
     icon: Users,
-    label: "Available Players",
+    label: "Players",
     match: (p) =>
-      p.startsWith("/available-players") ||
-      p.startsWith("/discover") ||
-      p.startsWith("/players") ||
-      p.startsWith("/trainers"),
+      p.startsWith("/players") || p.startsWith("/discover") || p.startsWith("/trainers"),
   },
+
   {
     to: "/teams",
     icon: Shield,

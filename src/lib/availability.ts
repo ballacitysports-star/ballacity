@@ -262,7 +262,7 @@ async function notifyInterestedOnEdit(availabilityId: string) {
         type: "availability_updated",
         title: `${editorName} updated their availability`,
         body: "Tap to see the new details.",
-        link: `/available-players?post=${availabilityId}`,
+        link: `/players?post=${availabilityId}`,
       }),
     ),
   );

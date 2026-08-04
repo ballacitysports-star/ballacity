@@ -2,7 +2,7 @@ import { test, expect, type Page } from "@playwright/test";
 
 /**
  * OAuth returns where `document.referrer` is NOT `/` (e.g. user tapped a
- * "Sign in" CTA from a deep link like `/available-players` or `/trainers`).
+ * "Sign in" CTA from a deep link like `/players` or `/trainers`).
  *
  * - Brand-new user (profile.account_type === null) MUST still land on
  *   `/onboarding/account-type` with pending state preserved.
@@ -24,8 +24,8 @@ test.skip(
 const PROVIDERS = ["google", "apple"] as const;
 const PENDING_KEY = "openrun.pending_account_type";
 const NEXT_KEY = "openrun:oauth-next";
-const NEXT_PATH = "/available-players?src=non-root-referrer-e2e";
-const REFERRER_PATH = "/available-players";
+const NEXT_PATH = "/players?src=non-root-referrer-e2e";
+const REFERRER_PATH = "/players";
 
 function stubAccountType(page: Page, accountType: string | null) {
   return page.route(/\/rest\/v1\/profiles\?[^ ]*select=account_type/, async (route) => {
@@ -126,7 +126,7 @@ test.describe("OAuth from /auth with non-root referrer", () => {
         // Must NOT bounce to `/` and must NOT go to onboarding.
         await expect(page).toHaveURL(
           new RegExp(
-            "/available-players(?:[?#/].*)?$".replace(/\//g, "\\/"),
+            "/players(?:[?#/].*)?$".replace(/\//g, "\\/"),
           ),
           { timeout: 15_000 },
         );
