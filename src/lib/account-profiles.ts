@@ -175,7 +175,11 @@ async function fetchMyProfiles(userId: string): Promise<MyProfilesResult> {
   const staleDefault = !!profile?.default_profile_id && !defaultId;
   const staleActive = !!profile?.active_profile_id && profile.active_profile_id !== activeId;
   if ((staleDefault || staleActive) && active) {
-    const patch: Record<string, unknown> = {};
+    const patch: {
+      default_profile_id?: string | null;
+      active_profile_id?: string | null;
+      account_type?: string | null;
+    } = {};
     if (staleDefault) patch.default_profile_id = null;
     if (staleActive) {
       patch.active_profile_id = active.id;
