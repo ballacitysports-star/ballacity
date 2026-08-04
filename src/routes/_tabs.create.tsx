@@ -11,6 +11,7 @@ import {
   Home,
   ShieldCheck,
   ImagePlus,
+  Clock3,
 } from "lucide-react";
 import { SPORTS, type Sport, imageFor } from "@/lib/sample-data";
 import { addHostedGame } from "@/lib/hosted-games-store";
