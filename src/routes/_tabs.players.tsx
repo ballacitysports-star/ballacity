@@ -42,7 +42,7 @@ import {
 import { MineView } from "@/components/players/MineView";
 import { AvailabilityDetailDialog } from "@/components/players/AvailabilityDetailDialog";
 import { shareAvailability } from "@/components/players/share-availability";
-import { RequestToJoinButton } from "@/components/players/RequestToJoinButton";
+
 
 
 import { AvailabilitySchedulePicker } from "@/components/availability/AvailabilitySchedulePicker";
@@ -1104,15 +1104,8 @@ function AvailabilityCard({
         )}
       </div>
 
-      {!isMine && (
-        <div className="mt-2">
-          <RequestToJoinButton
-            hostUserId={a.user_id}
-            hostName={a.author_name}
-            className="w-full"
-          />
-        </div>
-      )}
+
+
 
       <div className="mt-2 flex items-center gap-3">
         <Link
