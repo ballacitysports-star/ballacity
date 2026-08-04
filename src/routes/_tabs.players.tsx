@@ -1,5 +1,5 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { zodValidator, fallback } from "@tanstack/zod-adapter";
 import { z } from "zod";
 import {
@@ -113,6 +113,46 @@ export const Route = createFileRoute("/_tabs/players")({
   component: PlayersPage,
 });
 
+// One-time upgrade of the pre-snapshot localStorage keys into the single
+// "openrun:players-search" snapshot that usePersistedSearch reads. Runs at
+// most once per page load and before the first restore.
+let legacyMigrationDone = false;
+function migrateLegacyPlayersFilters() {
+  if (legacyMigrationDone) return;
+  legacyMigrationDone = true;
+  if (typeof window === "undefined") return;
+  try {
+    const rawF = window.localStorage.getItem("openrun.playersFilters.v1");
+    const rawV = window.localStorage.getItem("openrun:players-view");
+    const rawD = window.localStorage.getItem("openrun:players-density");
+    if (!rawF && !rawV && !rawD) return;
+    const patch: Record<string, unknown> = {};
+    if (rawF) {
+      const f = JSON.parse(rawF) as Record<string, unknown>;
+      if (typeof f.q === "string" && f.q) patch.q = f.q;
+      if (typeof f.sport === "string" && f.sport) patch.sport = f.sport;
+      if (typeof f.skill === "string" && f.skill) {
+        // A tier saved under an older sport scale must not survive the restore.
+        patch.skill = sanitizeSkillForSport(typeof f.sport === "string" ? f.sport : "", f.skill);
+      }
+      if (typeof f.maxDistance === "number" && f.maxDistance > 0) patch.dist = f.maxDistance;
+      if (typeof f.ageMin === "number") patch.ageMin = f.ageMin;
+      if (typeof f.ageMax === "number") patch.ageMax = f.ageMax;
+      if (typeof f.includeUnknownAge === "boolean") patch.unknownAge = f.includeUnknownAge;
+    }
+    if (rawV === "map" || rawV === "list") patch.view = rawV;
+    if (rawD === "grid" || rawD === "list") patch.density = rawD;
+    window.localStorage.removeItem("openrun.playersFilters.v1");
+    window.localStorage.removeItem("openrun:players-view");
+    window.localStorage.removeItem("openrun:players-density");
+    if (Object.keys(patch).length === 0) return;
+    // Never clobber an existing new-format snapshot.
+    if (window.localStorage.getItem("openrun:players-search")) return;
+    window.localStorage.setItem("openrun:players-search", JSON.stringify({ v: 2, s: patch }));
+  } catch {
+    // ignore
+  }
+}
 
 
 function PlayersPage() {
@@ -140,10 +180,14 @@ function PlayersPage() {
       search: (prev: PlayersSearch) => ({ ...prev, ...patch }),
       replace: !opts?.push,
     });
-  usePersistedSearch("openrun:players-search", search, "/players", {
-    q: "", sport: "", skill: "", dist: 0, unknownAge: true, when: "any",
-    view: "list", density: "list",
+  // Fold any legacy localStorage keys into the new snapshot BEFORE the
+  // persistence hook restores, so the migration can't be overwritten.
+  migrateLegacyPlayersFilters();
+  const { hydrated } = usePersistedSearch("openrun:players-search", search, "/players", {
+    q: "", sport: "", skill: "", dist: 0, ageMin: undefined, ageMax: undefined,
+    unknownAge: true, when: "any", view: "list", density: "list",
   });
+
 
   const q = search.q;
   // `sport` is a comma-separated list; `skill` a per-sport tier map
@@ -199,50 +243,9 @@ function PlayersPage() {
   const [contactFor, setContactFor] = useState<AvailabilityWithAuthor | null>(null);
   const [reloadTick, setReloadTick] = useState(0);
 
-  // One-time migration: hydrate URL from previously-persisted localStorage
-  // when the URL has no relevant params, then drop the old keys.
-  const migratedRef = useRef(false);
-  useEffect(() => {
-    if (migratedRef.current) return;
-    migratedRef.current = true;
-    if (typeof window === "undefined") return;
-    try {
-      const hasSearch = window.location.search.length > 1;
-      const rawF = window.localStorage.getItem("openrun.playersFilters.v1");
-      const rawV = window.localStorage.getItem("openrun:players-view");
-      const rawD = window.localStorage.getItem("openrun:players-density");
-      if (!hasSearch && (rawF || rawV || rawD)) {
-        const patch: Partial<typeof search> = {};
-        if (rawF) {
-          const f = JSON.parse(rawF) as Record<string, unknown>;
-          if (typeof f.q === "string" && f.q) patch.q = f.q;
-          if (typeof f.sport === "string" && f.sport) patch.sport = f.sport;
-          if (typeof f.skill === "string" && f.skill) {
-            // A tier saved under an older sport scale must not survive the restore.
-            patch.skill = sanitizeSkillForSport(
-              typeof f.sport === "string" ? f.sport : "",
-              f.skill,
-            );
-          }
-          if (typeof f.maxDistance === "number" && f.maxDistance > 0) patch.dist = f.maxDistance;
-          if (typeof f.ageMin === "number") patch.ageMin = f.ageMin;
-          if (typeof f.ageMax === "number") patch.ageMax = f.ageMax;
-          if (typeof f.includeUnknownAge === "boolean") patch.unknownAge = f.includeUnknownAge;
-        }
-        if (rawV === "map" || rawV === "list") patch.view = rawV;
-        if (rawD === "grid" || rawD === "list") patch.density = rawD;
-        if (Object.keys(patch).length > 0) {
-          navigate({ search: (prev: PlayersSearch) => ({ ...prev, ...patch }), replace: true });
-        }
-      }
-      window.localStorage.removeItem("openrun.playersFilters.v1");
-      window.localStorage.removeItem("openrun:players-view");
-      window.localStorage.removeItem("openrun:players-density");
-    } catch {
-      // ignore
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  // Legacy localStorage keys are folded into the new snapshot above, before
+  // the persistence hook runs (see migrateLegacyPlayersFilters).
+
 
   // Any skill/sport pair can also arrive from a pasted URL, a browser refresh,
   // localStorage restore, or a saved view. Scrub incompatible tiers out of the
@@ -256,6 +259,9 @@ function PlayersPage() {
 
 
   useEffect(() => {
+    // Hold off until the saved view is restored, so the first fetch already
+    // uses the user's sports rather than the empty defaults.
+    if (!hydrated) return;
     let cancelled = false;
     setList(null);
     listOpenAvailabilities({ sports })
@@ -271,7 +277,8 @@ function PlayersPage() {
     return () => {
       cancelled = true;
     };
-  }, [sportsKey, reloadTick]);
+  }, [sportsKey, reloadTick, hydrated]);
+
 
   const ageActive = ageMin !== "" || ageMax !== "";
   const activeFilterCount =
