@@ -44,9 +44,22 @@ function readSnapshot(storageKey: string): Snapshot | null {
 // Captured on module load, i.e. before the router rewrites the URL with
 // canonical defaults. Tells apart "user opened a filtered link" from
 // "user opened the plain page".
-const capturedInitialUrl = new URLSearchParams(
-  typeof window === "undefined" ? "" : window.location.search,
-);
+function readInitialSearch(): string {
+  if (typeof window === "undefined") return "";
+  try {
+    // The navigation timing entry keeps the URL the document was opened
+    // with, even after the router rewrites the query string with canonical
+    // defaults (which happens before lazily-loaded route chunks run).
+    const nav = performance.getEntriesByType("navigation")[0] as
+      | { name?: string }
+      | undefined;
+    if (nav?.name) return new URL(nav.name).search;
+  } catch {
+    /* fall through */
+  }
+  return window.location.search;
+}
+const capturedInitialUrl = new URLSearchParams(readInitialSearch());
 let firstLoadConsumed = false;
 function initialUrlParams() {
   return capturedInitialUrl;
@@ -80,7 +93,6 @@ export function usePersistedSearch<T extends Record<string, unknown>>(
   const [hydrated, setHydrated] = useState(false);
 
   useIsomorphicLayoutEffect(() => {
-    try { window.localStorage.setItem('debug:enter', storageKey + ':' + String(startedRef.current)); } catch {}
     if (startedRef.current) return;
     startedRef.current = true;
     try {
@@ -93,7 +105,6 @@ export function usePersistedSearch<T extends Record<string, unknown>>(
       const hasExplicit = isFirstLoadForThisPage()
         ? keys.some((k) => initialUrlParams().has(k))
         : !isAtDefaults(search, defaults as Record<string, unknown>);
-      window.localStorage.setItem('debug:persist', JSON.stringify({ storageKey, hasExplicit, at: Date.now() }));
       if (hasExplicit) {
         setHydrated(true);
         return;
@@ -124,8 +135,7 @@ export function usePersistedSearch<T extends Record<string, unknown>>(
       } else {
         setHydrated(true);
       }
-    } catch (e) {
-      try { window.localStorage.setItem('debug:err', String(e)); } catch {}
+    } catch {
       setHydrated(true);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
