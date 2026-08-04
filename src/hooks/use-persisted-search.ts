@@ -80,6 +80,7 @@ export function usePersistedSearch<T extends Record<string, unknown>>(
   const [hydrated, setHydrated] = useState(false);
 
   useIsomorphicLayoutEffect(() => {
+    try { window.localStorage.setItem('debug:enter', storageKey + ':' + String(startedRef.current)); } catch {}
     if (startedRef.current) return;
     startedRef.current = true;
     try {
@@ -123,7 +124,8 @@ export function usePersistedSearch<T extends Record<string, unknown>>(
       } else {
         setHydrated(true);
       }
-    } catch {
+    } catch (e) {
+      try { window.localStorage.setItem('debug:err', String(e)); } catch {}
       setHydrated(true);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
