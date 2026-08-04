@@ -113,6 +113,46 @@ export const Route = createFileRoute("/_tabs/players")({
   component: PlayersPage,
 });
 
+// One-time upgrade of the pre-snapshot localStorage keys into the single
+// "openrun:players-search" snapshot that usePersistedSearch reads. Runs at
+// most once per page load and before the first restore.
+let legacyMigrationDone = false;
+function migrateLegacyPlayersFilters() {
+  if (legacyMigrationDone) return;
+  legacyMigrationDone = true;
+  if (typeof window === "undefined") return;
+  try {
+    const rawF = window.localStorage.getItem("openrun.playersFilters.v1");
+    const rawV = window.localStorage.getItem("openrun:players-view");
+    const rawD = window.localStorage.getItem("openrun:players-density");
+    if (!rawF && !rawV && !rawD) return;
+    const patch: Record<string, unknown> = {};
+    if (rawF) {
+      const f = JSON.parse(rawF) as Record<string, unknown>;
+      if (typeof f.q === "string" && f.q) patch.q = f.q;
+      if (typeof f.sport === "string" && f.sport) patch.sport = f.sport;
+      if (typeof f.skill === "string" && f.skill) {
+        // A tier saved under an older sport scale must not survive the restore.
+        patch.skill = sanitizeSkillForSport(typeof f.sport === "string" ? f.sport : "", f.skill);
+      }
+      if (typeof f.maxDistance === "number" && f.maxDistance > 0) patch.dist = f.maxDistance;
+      if (typeof f.ageMin === "number") patch.ageMin = f.ageMin;
+      if (typeof f.ageMax === "number") patch.ageMax = f.ageMax;
+      if (typeof f.includeUnknownAge === "boolean") patch.unknownAge = f.includeUnknownAge;
+    }
+    if (rawV === "map" || rawV === "list") patch.view = rawV;
+    if (rawD === "grid" || rawD === "list") patch.density = rawD;
+    window.localStorage.removeItem("openrun.playersFilters.v1");
+    window.localStorage.removeItem("openrun:players-view");
+    window.localStorage.removeItem("openrun:players-density");
+    if (Object.keys(patch).length === 0) return;
+    // Never clobber an existing new-format snapshot.
+    if (window.localStorage.getItem("openrun:players-search")) return;
+    window.localStorage.setItem("openrun:players-search", JSON.stringify({ v: 2, s: patch }));
+  } catch {
+    // ignore
+  }
+}
 
 
 function PlayersPage() {
