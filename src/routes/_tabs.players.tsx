@@ -1204,7 +1204,7 @@ function PostAvailabilityDialog({
     <Dialog open onOpenChange={(o) => !o && onClose()}>
       <DialogContent className="max-w-md max-h-[90dvh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Post availability</DialogTitle>
+          <DialogTitle>{isEdit ? "Edit availability" : "Post availability"}</DialogTitle>
         </DialogHeader>
         <div className="space-y-4">
           <div>
