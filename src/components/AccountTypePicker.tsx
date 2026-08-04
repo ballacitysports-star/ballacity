@@ -3,8 +3,9 @@ import { ACCOUNT_TYPE_META, ACCOUNT_TYPES, type AccountType } from "@/lib/accoun
 export function AccountTypePicker({
   value,
   onChange,
-  title = "How will you use OpenRun?",
-  subtitle = "Pick the account type that fits you. This can't be changed later.",
+  title = "Where do you want to start?",
+  subtitle = "Pick what fits you now. You can add team, trainer, and gym profiles later and switch between them anytime.",
+
 }: {
   value: AccountType | null;
   onChange: (t: AccountType) => void;
