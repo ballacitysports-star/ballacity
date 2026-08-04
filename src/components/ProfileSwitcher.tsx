@@ -41,8 +41,9 @@ function Avatar({ profile, size = 8 }: { profile: AccountProfile; size?: number 
  * team, trainer, or gym profiles. The player profile is always present.
  */
 export function ProfileSwitcher({ className }: { className?: string }) {
-  const { profiles, active, loading } = useMyProfiles();
+  const { profiles, active, defaultId, loading } = useMyProfiles();
   const switcher = useSwitchProfile();
+  const setDefault = useSetDefaultProfile();
 
   if (loading || !active) return null;
 
@@ -61,36 +62,75 @@ export function ProfileSwitcher({ className }: { className?: string }) {
         </span>
         <ChevronsUpDown className="h-3.5 w-3.5 shrink-0 text-muted-foreground" aria-hidden />
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="start" className="w-72">
+      <DropdownMenuContent align="start" className="w-80">
         <DropdownMenuLabel>Your profiles</DropdownMenuLabel>
         {profiles.map((p) => {
           const meta = ACCOUNT_TYPE_META[p.kind];
           const isActive = p.id === active.id;
+          const isDefault = p.id === defaultId;
           return (
-            <DropdownMenuItem
-              key={p.id}
-              className="gap-2"
-              onSelect={() => {
-                if (isActive) return;
-                switcher.mutate(p, {
-                  onSuccess: () => toast.success(`Switched to ${p.name}`),
-                  onError: (e) =>
-                    toast.error(e instanceof Error ? e.message : "Could not switch profile"),
-                });
-              }}
-            >
-              <Avatar profile={p} />
-              <span className="min-w-0 flex-1">
-                <span className="block truncate text-sm font-medium">{p.name}</span>
-                <span className="block truncate text-xs text-muted-foreground">
-                  {meta.label}
-                  {p.handle ? ` · ${p.handle}` : ""}
+            <div key={p.id} className="flex items-center gap-1 pr-1">
+              <DropdownMenuItem
+                className="min-w-0 flex-1 gap-2"
+                onSelect={() => {
+                  if (isActive) return;
+                  switcher.mutate(p, {
+                    onSuccess: () => toast.success(`Switched to ${p.name}`),
+                    onError: (e) =>
+                      toast.error(e instanceof Error ? e.message : "Could not switch profile"),
+                  });
+                }}
+              >
+                <Avatar profile={p} />
+                <span className="min-w-0 flex-1">
+                  <span className="flex items-center gap-1.5">
+                    <span className="truncate text-sm font-medium">{p.name}</span>
+                    {isDefault && (
+                      <span className="shrink-0 rounded-full bg-surface-2 px-1.5 py-0.5 text-[10px] font-bold text-muted-foreground">
+                        Default
+                      </span>
+                    )}
+                  </span>
+                  <span className="block truncate text-xs text-muted-foreground">
+                    {meta.label}
+                    {p.handle ? ` · ${p.handle}` : ""}
+                  </span>
                 </span>
-              </span>
-              {isActive && <Check className="h-4 w-4 text-primary" aria-hidden />}
-            </DropdownMenuItem>
+                {isActive && <Check className="h-4 w-4 shrink-0 text-primary" aria-hidden />}
+              </DropdownMenuItem>
+              <button
+                type="button"
+                aria-label={isDefault ? `Clear default profile` : `Set ${p.name} as default`}
+                aria-pressed={isDefault}
+                disabled={setDefault.isPending}
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  setDefault.mutate(isDefault ? null : p, {
+                    onSuccess: () =>
+                      toast.success(
+                        isDefault ? "Default profile cleared" : `${p.name} is now your default`,
+                      ),
+                    onError: (err) =>
+                      toast.error(
+                        err instanceof Error ? err.message : "Could not save default profile",
+                      ),
+                  });
+                }}
+                className="grid h-8 w-8 shrink-0 place-items-center rounded-full transition-colors hover:bg-surface-2 disabled:opacity-50"
+              >
+                <Star
+                  className={`h-4 w-4 ${isDefault ? "fill-primary text-primary" : "text-muted-foreground"}`}
+                  aria-hidden
+                />
+              </button>
+            </div>
           );
         })}
+        <p className="px-2 py-1.5 text-[11px] text-muted-foreground">
+          The starred profile is the one you start in on every device.
+        </p>
+
         <DropdownMenuSeparator />
         <DropdownMenuLabel>Add a profile</DropdownMenuLabel>
         {ADDABLE.map((kind) => (
