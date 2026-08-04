@@ -399,8 +399,9 @@ function AuthPage() {
           <>
             <AccountTypePicker value={accountType} onChange={setAccountType} />
             <p className="text-center text-xs text-muted-foreground">
-              This is permanent. To use a different account type, sign up with a different email.
+              You can add team, trainer, and gym profiles later and switch between them anytime.
             </p>
+
             <button
               onClick={() => {
                 if (!accountType) {
