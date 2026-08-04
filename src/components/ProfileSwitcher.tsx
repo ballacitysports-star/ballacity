@@ -1,5 +1,5 @@
 import { Link } from "@tanstack/react-router";
-import { Check, ChevronsUpDown, Plus } from "lucide-react";
+import { Check, ChevronsUpDown, Plus, Star } from "lucide-react";
 import { toast } from "sonner";
 import {
   DropdownMenu,
@@ -13,9 +13,11 @@ import { ACCOUNT_TYPE_META, type AccountType } from "@/lib/account-type";
 import {
   addProfileRoute,
   useMyProfiles,
+  useSetDefaultProfile,
   useSwitchProfile,
   type AccountProfile,
 } from "@/lib/account-profiles";
+
 
 const ADDABLE: Exclude<AccountType, "player">[] = ["team", "trainer", "gym"];
 
