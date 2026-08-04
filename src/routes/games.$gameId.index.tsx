@@ -37,6 +37,7 @@ import { useLiveParticipantCount } from "@/lib/game-participants-store";
 import { useLiveParticipants } from "@/lib/game-roster";
 import { useGameRealtimeChannels } from "@/lib/game-realtime";
 import { useGameWaitlist, joinWaitlist, leaveWaitlist } from "@/lib/waitlist-store";
+import { WaitlistManager, WaitlistStatusPill } from "@/components/WaitlistManager";
 import {
   Sheet,
   SheetContent,
@@ -1662,6 +1663,12 @@ function GameDetail() {
                         Join waitlist
                       </button>
                     )}
+                    {viewerOnWaitlist && !isHost && (() => {
+                      const mineHere = posWaitlist.find((w) => w.userId === user!.id);
+                      return mineHere && mineHere.status !== "waiting" ? (
+                        <WaitlistStatusPill status={mineHere.status} />
+                      ) : null;
+                    })()}
                     {viewerOnWaitlist && !isHost && (
                       <button
                         type="button"
@@ -1773,11 +1780,13 @@ function GameDetail() {
                         ))}
                       </div>
                     )}
-                    {posWait.length > 0 && (
-                      <div className="mt-2 pt-2 border-t border-border/60 text-[11px] text-coral font-semibold">
-                        {posWait.length} on waitlist
-                      </div>
-                    )}
+                    <WaitlistManager
+                      entries={posWait}
+                      isHost={isHost}
+                      gameTitle={game.title}
+                      gameId={game.id}
+                      spotsLeft={remaining}
+                    />
                   </div>
                 );
               })}

@@ -291,6 +291,9 @@ export type Database = {
           game_id: string
           id: string
           position: string
+          reviewed_at: string | null
+          reviewed_by: string | null
+          status: string
           user_id: string
         }
         Insert: {
@@ -298,6 +301,9 @@ export type Database = {
           game_id: string
           id?: string
           position: string
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
           user_id: string
         }
         Update: {
@@ -305,6 +311,9 @@ export type Database = {
           game_id?: string
           id?: string
           position?: string
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
           user_id?: string
         }
         Relationships: []

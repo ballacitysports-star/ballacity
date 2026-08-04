@@ -46,6 +46,7 @@ import {
 } from "@/components/profile/ProfileChannelHeader";
 import { ProfileAboutSheet, AboutBlock, AboutStats } from "@/components/profile/ProfileAboutSheet";
 import { ChannelTabs } from "@/components/profile/ChannelTabs";
+import { MyWaitlistCard } from "@/components/MyWaitlistCard";
 
 export const Route = createFileRoute("/_tabs/profile")({
   head: () => ({ meta: [{ title: "Profile — OpenRun" }] }),
@@ -628,6 +629,10 @@ function Profile() {
             </Link>
           )}
         </section>
+
+        <div className={activeTab === "games" ? "" : "hidden"}>
+          <MyWaitlistCard />
+        </div>
 
         {/* Sports */}
         <div className={`mt-8 ${activeTab === "games" && me.sports.length > 0 ? "" : "hidden"}`}>
