@@ -1169,6 +1169,7 @@ export type Database = {
           city: string | null
           cover_url: string | null
           created_at: string
+          default_profile_id: string | null
           display_name: string
           graduating_class: number | null
           id: string
@@ -1189,6 +1190,7 @@ export type Database = {
           city?: string | null
           cover_url?: string | null
           created_at?: string
+          default_profile_id?: string | null
           display_name?: string
           graduating_class?: number | null
           id: string
@@ -1209,6 +1211,7 @@ export type Database = {
           city?: string | null
           cover_url?: string | null
           created_at?: string
+          default_profile_id?: string | null
           display_name?: string
           graduating_class?: number | null
           id?: string
@@ -1219,7 +1222,15 @@ export type Database = {
           updated_at?: string
           username?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "profiles_default_profile_id_fkey"
+            columns: ["default_profile_id"]
+            isOneToOne: false
+            referencedRelation: "account_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       purchases: {
         Row: {
