@@ -752,18 +752,14 @@ function GameDetail() {
       }
       return;
     }
-    if (game.status === "in_progress") {
-      toast.error("This game has already started.");
+    // Signup window: started games, host-closed games and the host's blackout
+    // window all block NEW joins. Payment for already-approved players is
+    // handled above and stays available.
+    if (gate.locked) {
+      toast.error(gate.reason);
       return;
     }
-    if (game.status === "completed") {
-      toast.error("This game has ended.");
-      return;
-    }
-    if (game.joinsClosed) {
-      toast.error("The host has closed joining for this game.");
-      return;
-    }
+
     if (spotsLeft <= 0) {
       toast.error("This game is full.");
       return;
