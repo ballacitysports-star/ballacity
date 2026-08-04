@@ -113,7 +113,7 @@ function Create() {
   const [indoor, setIndoor] = useState(false);
   const [priv, setPriv] = useState(false);
   const [description, setDescription] = useState("");
-  const [requiresApproval, setRequiresApproval] = useState(false);
+  const [requiresApproval, setRequiresApproval] = useState(true);
   const [publishing, setPublishing] = useState(false);
   const [coverUrl, setCoverUrl] = useState<string | null>(null);
   const [positionsNeeded, setPositionsNeeded] = useState<PositionsNeeded>({});
