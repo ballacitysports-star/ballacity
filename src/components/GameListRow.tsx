@@ -29,7 +29,7 @@ export function GameListRow({ game, index = 0 }: { game: Game; index?: number })
     baseJoined + (joinedByMe && liveCount === undefined ? 1 : 0),
   );
   const spotsLeft = game.maxPlayers - joinedCount;
-  const gate = useJoinGate(game);
+  const gate = useJoinGate(game, { spotsLeft });
   const liveStatus = gate.liveStatus;
 
   const statusLabel =
@@ -40,10 +40,8 @@ export function GameListRow({ game, index = 0 }: { game: Game; index?: number })
         : joinedByMe
           ? "Joined"
           : gate.locked
-            ? "Signup closed"
-            : spotsLeft <= 0
-              ? "Full"
-              : game.price > 0
+            ? gate.label
+            : game.price > 0
                 ? `$${game.price}`
                 : "Free";
   const statusTone =

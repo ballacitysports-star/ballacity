@@ -96,6 +96,8 @@ import { listMyOrgs } from "@/lib/trainer-orgs.functions";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery } from "@tanstack/react-query";
 import { computeLiveStatus, useJoinGate, SIGNUP_CUTOFF_PRESETS, cutoffAmountLabel } from "@/lib/live-status";
+import type { JoinGate } from "@/lib/live-status";
+import { JoinBlockedReason } from "@/components/JoinBlockedReason";
 
 import { useAuth } from "@/hooks/use-auth";
 import { useMyProfile } from "@/lib/user-prefs-store";
@@ -634,6 +636,18 @@ function GameDetail() {
   const effectiveJoined = baseJoined + viewerDelta;
   const spotsLeft = Math.max(0, game.maxPlayers - effectiveJoined);
   const gate = useJoinGate(game);
+  // Display-only gate for the viewer: adds "roster full" on top of the
+  // schedule/host gates so the CTA can always explain why joining is blocked.
+  const viewerGate: JoinGate =
+    gate.locked || spotsLeft > 0
+      ? gate
+      : {
+          liveStatus: gate.liveStatus,
+          joinState: "roster_full",
+          label: "Roster full",
+          reason: "The roster is full — no spots left.",
+          locked: true,
+        };
 
   const [confirmAction, setConfirmAction] = useState<"join" | "leave" | null>(null);
 
@@ -2148,7 +2162,11 @@ function GameDetail() {
 
       {/* Sticky CTA */}
       <div className="fixed bottom-[calc(env(safe-area-inset-bottom)+6rem)] left-0 right-0 z-30 px-4 pb-[max(env(safe-area-inset-bottom),0.75rem)] pt-3 backdrop-blur-xl bg-background/80 border-t border-border">
-        <div className="mx-auto max-w-md flex items-center gap-2">
+        <div className="mx-auto max-w-md">
+        {!isHost && !joined && !isPending && !isConfirmed && !isApproved && (
+          <JoinBlockedReason gate={viewerGate} className="mb-2" />
+        )}
+        <div className="flex items-center gap-2">
           <button
             disabled={messaging}
             onClick={async () => {
@@ -2315,6 +2333,7 @@ function GameDetail() {
               </motion.button>
             );
           })()}
+        </div>
         </div>
       </div>
 
