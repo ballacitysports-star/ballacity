@@ -92,6 +92,7 @@ export function usePersistedSearch<T extends Record<string, unknown>>(
       const hasExplicit = isFirstLoadForThisPage()
         ? keys.some((k) => initialUrlParams().has(k))
         : !isAtDefaults(search, defaults as Record<string, unknown>);
+      console.log('[persist]', storageKey, { hasExplicit, snap: window.localStorage.getItem(storageKey) });
       if (hasExplicit) {
         setHydrated(true);
         return;
