@@ -479,12 +479,46 @@ function PlayersPage() {
         </p>
       </motion.div>
 
+      {/* Browse everyone's availability, or manage your own posts/requests. */}
+      <div className="mb-4 flex gap-2">
+        {(
+          [
+            { id: "browse", label: "Browse" },
+            { id: "mine", label: "Mine" },
+          ] as const
+        ).map((t) => (
+          <button
+            key={t.id}
+            onClick={() => setTab(t.id)}
+            aria-pressed={tab === t.id}
+            className={`rounded-full border px-4 py-1.5 text-xs font-bold transition-colors ${
+              tab === t.id
+                ? "border-lime bg-lime text-primary-foreground"
+                : "border-border bg-surface text-muted-foreground"
+            }`}
+          >
+            {t.label}
+          </button>
+        ))}
+      </div>
+
+      {tab === "mine" ? (
+        <div className="pb-6">
+          <MineView
+            user={user ? { id: user.id } : null}
+            onEdit={(m) => setEditingPost(m)}
+            refreshKey={reloadTick}
+          />
+        </div>
+      ) : (
+        <>
       <NearbyPlayersPanel
         players={list}
         mySports={profile?.sports?.map((s) => s.name)}
         myCity={profile?.city}
         currentUserId={user?.id ?? null}
       />
+
 
       <ViewDensityToggle
         view={viewMode}
