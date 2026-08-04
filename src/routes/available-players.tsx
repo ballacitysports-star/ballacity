@@ -861,10 +861,18 @@ function AvailabilityCard({
       </header>
 
       {/* Hero */}
-      <div className="relative aspect-square w-full overflow-hidden bg-ig-gradient">
+      <Link
+        to="/players/$userId"
+        params={{ userId: a.user_id }}
+        aria-label={`View ${a.author_name}'s profile`}
+        className="group relative block aspect-square w-full overflow-hidden bg-ig-gradient transition active:opacity-90"
+      >
         <div className="absolute inset-0 grid place-items-center">
           <span className="text-[9rem] leading-none drop-shadow-lg">{primaryEmoji}</span>
         </div>
+        <span className="absolute right-3 top-3 rounded-full bg-black/50 px-2.5 py-1 text-[10px] font-bold text-white backdrop-blur transition group-hover:bg-black/70">
+          View profile
+        </span>
         <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/70 via-black/30 to-transparent p-4">
           <div className="flex flex-wrap gap-1.5">
             {a.sports.length === 0 ? (
@@ -886,7 +894,52 @@ function AvailabilityCard({
             )}
           </div>
         </div>
+      </Link>
+
+      {/* Key stats */}
+      <div className="grid grid-cols-2 divide-x divide-border border-y border-border sm:grid-cols-4">
+        <div className="px-3 py-2">
+          <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+            Level
+          </p>
+          <p className="truncate text-xs font-semibold">
+            {formatSportLevel(
+              resolvePlayerLevel(a.author_sport_levels, a.sports[0], a.skill_level),
+            ) ?? a.skill_level}
+          </p>
+        </div>
+        <div className="px-3 py-2">
+          <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+            Sports
+          </p>
+          <p className="truncate text-xs font-semibold">
+            {a.sports.length === 0 ? "Any" : `${a.sports.length}`}
+          </p>
+        </div>
+        <div className="px-3 py-2">
+          <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+            City
+          </p>
+          <p className="truncate text-xs font-semibold">{a.city || "Anywhere"}</p>
+        </div>
+        <div className="px-3 py-2">
+          <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+            Travels
+          </p>
+          <p className="truncate text-xs font-semibold">
+            <Distance km={a.travel_radius_km} />
+          </p>
+        </div>
+        {when && (
+          <div className="col-span-2 border-t border-border px-3 py-2 sm:col-span-4">
+            <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+              Next window
+            </p>
+            <p className="truncate text-xs font-semibold">{when}</p>
+          </div>
+        )}
       </div>
+
 
       {/* Action row */}
       <div className="flex items-center gap-1 px-3 pt-2">
@@ -973,7 +1026,15 @@ function AvailabilityCard({
             {a.note}
           </p>
         )}
+        <Link
+          to="/players/$userId"
+          params={{ userId: a.user_id }}
+          className="mt-3 flex h-10 w-full items-center justify-center rounded-full border border-border bg-surface text-sm font-semibold transition-colors hover:border-lime/60 hover:text-lime"
+        >
+          View full profile
+        </Link>
       </div>
+
     </article>
   );
 }
