@@ -808,7 +808,7 @@ function GameDetail() {
         id: `optimistic:${crypto.randomUUID()}`,
         game_id: game.id,
         player_id: user?.id ?? "",
-        host_id: settings.host_id,
+        host_id: requestHostId,
         status: "pending",
         message: null,
         reviewer_notes: null,
@@ -818,13 +818,13 @@ function GameDetail() {
       setMyReq(optimistic);
       try {
         const wasRejected = prevReq?.status === "rejected";
-        const created = await createJoinRequest({ game_id: game.id, host_id: settings.host_id });
+        const created = await createJoinRequest({ game_id: game.id, host_id: requestHostId });
         // Swap synthetic row for the authoritative one.
         setMyReq(created);
         const isResubmit = wasRejected || (created.attempt_count ?? 1) > 1;
         // Fire notification off the critical path — failure must not stall the UI.
         void createNotification({
-          user_id: settings.host_id,
+          user_id: requestHostId,
           type: isResubmit ? "join_resubmitted" : "join_request",
           title: isResubmit
             ? `Resubmitted request: ${game.title}`
