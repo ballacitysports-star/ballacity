@@ -5,7 +5,7 @@ import { UserAvatar } from "@/components/UserAvatar";
 import { SpotsPill } from "@/components/SpotsPill";
 import type { Game } from "@/lib/sample-data";
 import { formatWhen } from "@/lib/format";
-import { joinGame, useIsJoined } from "@/lib/games-store";
+import { useIsJoined } from "@/lib/games-store";
 import { useLiveParticipantCount } from "@/lib/game-participants-store";
 import { useLiveStatus } from "@/lib/live-status";
 import { getOrCreateDirectConversation } from "@/lib/messages";
@@ -70,24 +70,9 @@ export function GameCard({ game, index = 0 }: { game: Game; index?: number }) {
     }
   };
 
-  // Quick-join for free games where the viewer clearly can join: signed in,
-  // spots available, not already joined, not the host, game still scheduled.
-  // Paid or approval-gated games still route through the details page so the
-  // player can review the fee / request-to-join copy before committing.
-  const canQuickJoin =
-    !!user &&
-    !joinedByMe &&
-    game.price === 0 &&
-    spotsLeft > 0 &&
-    liveStatus === "scheduled" &&
-    !game.joinsClosed &&
-    (!hostUserId || hostUserId !== user.id);
-  const quickJoin = (e: React.MouseEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    joinGame(game.id);
-    toast.success(`You're in! See you at ${game.location}.`);
-  };
+  // Every game is request-to-join unless the host turned approval off, so the
+  // card never joins instantly — tapping it opens the game page where the real
+  // request / payment flow and the host's approval settings live.
   const ctaLabel =
     joinedByMe
       ? "You're in"
@@ -100,7 +85,7 @@ export function GameCard({ game, index = 0 }: { game: Game; index?: number }) {
             : game.price > 0
               ? `Pay $${game.price}`
               : user
-                ? "Join free"
+                ? "Request to join"
                 : "Sign in to join";
 
   return (
@@ -270,35 +255,25 @@ export function GameCard({ game, index = 0 }: { game: Game; index?: number }) {
               className={`h-full rounded-full ${spotsLeft <= 2 ? "bg-coral-gradient" : "bg-lime-gradient"}`}
             />
           </div>
-          {canQuickJoin ? (
-            <button
-              type="button"
-              onClick={quickJoin}
-              className="mt-1 w-full rounded-2xl bg-lime-gradient py-2 text-xs font-bold text-primary-foreground glow-lime inline-flex items-center justify-center gap-1"
-            >
-              {ctaLabel}
-            </button>
-          ) : (
-            <div
-              className={`mt-1 w-full rounded-2xl py-2 text-xs font-bold inline-flex items-center justify-center gap-1 ${
-                joinedByMe
-                  ? "bg-lime/15 border border-lime/40 text-lime"
-                  : spotsLeft <= 0 || liveStatus === "completed"
-                    ? "border border-border bg-surface text-muted-foreground"
-                    : liveStatus === "in_progress"
-                      ? "bg-coral/15 border border-coral/40 text-coral"
-                      : game.price > 0
-                        ? "bg-lime-gradient text-primary-foreground glow-lime"
-                        : "border border-border bg-surface text-foreground"
-              }`}
-            >
-              {joinedByMe && <Check className="h-3.5 w-3.5" />}
-              {!joinedByMe && game.price > 0 && spotsLeft > 0 && liveStatus === "scheduled" && (
-                <CreditCard className="h-3.5 w-3.5" />
-              )}
-              {ctaLabel}
-            </div>
-          )}
+          <div
+            className={`mt-1 w-full rounded-2xl py-2 text-xs font-bold inline-flex items-center justify-center gap-1 ${
+              joinedByMe
+                ? "bg-lime/15 border border-lime/40 text-lime"
+                : spotsLeft <= 0 || liveStatus === "completed"
+                  ? "border border-border bg-surface text-muted-foreground"
+                  : liveStatus === "in_progress"
+                    ? "bg-coral/15 border border-coral/40 text-coral"
+                    : game.price > 0
+                      ? "bg-lime-gradient text-primary-foreground glow-lime"
+                      : "border border-border bg-surface text-foreground"
+            }`}
+          >
+            {joinedByMe && <Check className="h-3.5 w-3.5" />}
+            {!joinedByMe && game.price > 0 && spotsLeft > 0 && liveStatus === "scheduled" && (
+              <CreditCard className="h-3.5 w-3.5" />
+            )}
+            {ctaLabel}
+          </div>
         </div>
       </Link>
     </motion.div>
