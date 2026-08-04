@@ -85,7 +85,7 @@ export function GameCard({ game, index = 0 }: { game: Game; index?: number }) {
             : game.price > 0
               ? `Pay $${game.price}`
               : user
-                ? "Join free"
+                ? "Request to join"
                 : "Sign in to join";
 
   return (
