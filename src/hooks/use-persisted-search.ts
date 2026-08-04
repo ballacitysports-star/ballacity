@@ -41,25 +41,11 @@ function readSnapshot(storageKey: string): Snapshot | null {
   }
 }
 
-// Captured on module load, i.e. before the router rewrites the URL with
-// canonical defaults. Tells apart "user opened a filtered link" from
-// "user opened the plain page".
-function readInitialSearch(): string {
-  if (typeof window === "undefined") return "";
-  try {
-    // The navigation timing entry keeps the URL the document was opened
-    // with, even after the router rewrites the query string with canonical
-    // defaults (which happens before lazily-loaded route chunks run).
-    const nav = performance.getEntriesByType("navigation")[0] as
-      | { name?: string }
-      | undefined;
-    if (nav?.name) return new URL(nav.name).search;
-  } catch {
-    /* fall through */
-  }
-  return window.location.search;
-}
-const capturedInitialUrl = new URLSearchParams(readInitialSearch());
+// Note: the initial URL cannot be used to detect an explicit link — the
+// router canonicalises the query string (adding every default key) before
+// route code runs, so an "explicit params" test against the URL always
+// passes. Instead, saved state is restored only when the state we arrive
+// with is exactly the route defaults.
 function isAtDefaults(search: Record<string, unknown>, defaults: Record<string, unknown>) {
   for (const k of Object.keys(defaults)) {
     const a = search[k];
@@ -92,13 +78,9 @@ export function usePersistedSearch<T extends Record<string, unknown>>(
       // the router canonicalises the live URL to include every default key.
       // On a client-side navigation, "no explicit params" means the arriving
       // state matches the defaults.
-      // An explicit link wins over saved state: either the document was
-      // opened with one of these params, or the state we arrived with is
-      // not simply the route defaults.
-      const hasExplicit =
-        keys.some((k) => capturedInitialUrl.has(k)) ||
-        !isAtDefaults(search, defaults as Record<string, unknown>);
-      try { window.localStorage.setItem('debug:persist', JSON.stringify({ hasExplicit, init: capturedInitialUrl.toString(), search, keys })); } catch {}
+      // Anything other than the plain defaults is a deliberate link or an
+      // in-session state, and always wins over the saved snapshot.
+      const hasExplicit = !isAtDefaults(search, defaults as Record<string, unknown>);
       if (hasExplicit) {
         setHydrated(true);
         return;
