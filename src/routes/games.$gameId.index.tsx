@@ -771,14 +771,17 @@ function GameDetail() {
     // Approval gate takes priority over payment: on games that require
     // approval, players must be approved before they can pay.
     if (requiresApproval && !isApproved) {
-      if (!settings) {
-        toast.error("Host hasn't enabled approvals yet.");
+      // The settings row is optional: hosts who never opened game settings
+      // still get request-to-join, so fall back to the game's host id.
+      const requestHostId = settings?.host_id ?? game.hostUserId ?? null;
+      if (!requestHostId) {
+        toast.error("This host can't take requests yet.");
         return;
       }
       // Invite-link integrity: if the URL claims invite=1, `from` must be present
       // and must match the actual host. Otherwise the link is missing context or
       // has been tampered with — refuse to send the request.
-      if (isInvite && (!inviteFrom || inviteFrom !== settings.host_id)) {
+      if (isInvite && (!inviteFrom || inviteFrom !== requestHostId)) {
         toast.error("This invite link is invalid or has been tampered with.");
         return;
       }
