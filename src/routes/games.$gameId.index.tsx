@@ -1983,7 +1983,7 @@ function GameDetail() {
                 ))}
               </div>
             </div>
-          ) : settings?.requires_approval ? (
+          ) : requiresApproval ? (
             <div className="rounded-2xl border border-dashed border-border bg-surface/40 p-3 text-xs text-muted-foreground">
               No pickup requests yet. You'll see them here as players ask to join.
             </div>
