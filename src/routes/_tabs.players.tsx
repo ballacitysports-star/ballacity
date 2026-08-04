@@ -33,10 +33,16 @@ import {
   createAvailability,
   createContactRequest,
   deleteAvailability,
+  getAvailabilityById,
   listOpenAvailabilities,
+  updateAvailability,
   type PlayerAvailability,
   type ExistingRequestSummary,
 } from "@/lib/availability";
+import { MineView } from "@/components/players/MineView";
+import { AvailabilityDetailDialog } from "@/components/players/AvailabilityDetailDialog";
+import { shareAvailability } from "@/components/players/share-availability";
+
 import { AvailabilitySchedulePicker } from "@/components/availability/AvailabilitySchedulePicker";
 import { useMyBusyBlocks } from "@/lib/availability-conflicts";
 import {
