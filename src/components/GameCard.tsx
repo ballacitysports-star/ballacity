@@ -70,23 +70,6 @@ export function GameCard({ game, index = 0 }: { game: Game; index?: number }) {
     }
   };
 
-  // Every game is request-to-join unless the host turned approval off, so the
-  // card never joins instantly — tapping it opens the game page where the real
-  // request / payment flow and the host's approval settings live.
-  const ctaLabel =
-    joinedByMe
-      ? "You're in"
-      : liveStatus === "completed"
-        ? "Completed"
-        : liveStatus === "in_progress"
-          ? "Live now"
-          : spotsLeft <= 0
-            ? "Full"
-            : game.price > 0
-              ? `Pay $${game.price}`
-              : user
-                ? "Request to join"
-                : "Sign in to join";
 
   return (
     <motion.div
@@ -254,25 +237,6 @@ export function GameCard({ game, index = 0 }: { game: Game; index?: number }) {
               transition={{ duration: 0.8, delay: 0.1 + index * 0.05 }}
               className={`h-full rounded-full ${spotsLeft <= 2 ? "bg-coral-gradient" : "bg-lime-gradient"}`}
             />
-          </div>
-          <div
-            className={`mt-1 w-full rounded-2xl py-2 text-xs font-bold inline-flex items-center justify-center gap-1 ${
-              joinedByMe
-                ? "bg-lime/15 border border-lime/40 text-lime"
-                : spotsLeft <= 0 || liveStatus === "completed"
-                  ? "border border-border bg-surface text-muted-foreground"
-                  : liveStatus === "in_progress"
-                    ? "bg-coral/15 border border-coral/40 text-coral"
-                    : game.price > 0
-                      ? "bg-lime-gradient text-primary-foreground glow-lime"
-                      : "border border-border bg-surface text-foreground"
-            }`}
-          >
-            {joinedByMe && <Check className="h-3.5 w-3.5" />}
-            {!joinedByMe && game.price > 0 && spotsLeft > 0 && liveStatus === "scheduled" && (
-              <CreditCard className="h-3.5 w-3.5" />
-            )}
-            {ctaLabel}
           </div>
         </div>
       </Link>
