@@ -259,6 +259,9 @@ function PlayersPage() {
 
 
   useEffect(() => {
+    // Hold off until the saved view is restored, so the first fetch already
+    // uses the user's sports rather than the empty defaults.
+    if (!hydrated) return;
     let cancelled = false;
     setList(null);
     listOpenAvailabilities({ sports })
@@ -274,7 +277,8 @@ function PlayersPage() {
     return () => {
       cancelled = true;
     };
-  }, [sportsKey, reloadTick]);
+  }, [sportsKey, reloadTick, hydrated]);
+
 
   const ageActive = ageMin !== "" || ageMax !== "";
   const activeFilterCount =
