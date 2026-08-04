@@ -2180,8 +2180,11 @@ function GameDetail() {
             <MessageCircle className="h-5 w-5" />
           </button>
           {!isHost && (() => {
+            // Locked games (started / host-closed / inside the blackout window)
+            // block NEW joins, but keep leave/cancel and payment actions live.
+            const lockedForNewJoin = gate.locked && !joined && !isPending && !isConfirmed && !isApproved;
             const canJoinAction = joined || isPending || isConfirmed || spotsLeft > 0;
-            const buttonDisabled = requesting || processing || !canJoinAction;
+            const buttonDisabled = requesting || processing || !canJoinAction || lockedForNewJoin;
             const hasPaymentAttempt = latestSub?.status === "pending" || latestSub?.status === "rejected";
             const canEnterPaymentFlow = spotsLeft > 0 || joined || hasPaymentAttempt || isApproved;
             const paymentAction = isPaid && !paymentCleared && approvalCleared && canEnterPaymentFlow;
@@ -2262,7 +2265,7 @@ function GameDetail() {
                       ? "bg-surface border border-coral/40 text-coral"
                       : joined
                         ? "bg-surface border border-lime/40 text-lime"
-                        : spotsLeft <= 0
+                        : lockedForNewJoin || spotsLeft <= 0
                           ? "bg-surface border border-border text-muted-foreground"
                           : "bg-lime-gradient text-primary-foreground glow-lime"
                 }`}
@@ -2281,6 +2284,15 @@ function GameDetail() {
                 ) : joined && !isPaid ? (
                   <>
                     <Check className="h-4 w-4" /> You're in · Tap to leave
+                  </>
+                ) : lockedForNewJoin ? (
+                  <>
+                    <Lock className="h-4 w-4" />{" "}
+                    {gate.joinState === "in_progress"
+                      ? "In progress"
+                      : gate.joinState === "completed"
+                        ? "Game ended"
+                        : "Signup closed"}
                   </>
                 ) : spotsLeft <= 0 ? (
                   <>
