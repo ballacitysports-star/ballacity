@@ -5,7 +5,7 @@ import { UserAvatar } from "@/components/UserAvatar";
 import { SpotsPill } from "@/components/SpotsPill";
 import type { Game } from "@/lib/sample-data";
 import { formatWhen } from "@/lib/format";
-import { joinGame, useIsJoined } from "@/lib/games-store";
+import { useIsJoined } from "@/lib/games-store";
 import { useLiveParticipantCount } from "@/lib/game-participants-store";
 import { useLiveStatus } from "@/lib/live-status";
 import { getOrCreateDirectConversation } from "@/lib/messages";
