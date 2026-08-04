@@ -160,18 +160,38 @@ async function fetchMyProfiles(userId: string): Promise<MyProfilesResult> {
   // Player profile always first.
   profiles.sort((a, b) => (a.kind === "player" ? -1 : b.kind === "player" ? 1 : 0));
 
-  const defaultId =
-    profile?.default_profile_id && profiles.some((p) => p.id === profile.default_profile_id)
-      ? profile.default_profile_id
-      : null;
-  const activeId = profile?.active_profile_id ?? defaultId ?? profiles[0]?.id ?? null;
-  return {
-    profiles,
-    activeId,
-    defaultId,
-    active: profiles.find((p) => p.id === activeId) ?? profiles[0] ?? null,
-  };
+  const exists = (id: string | null | undefined) => !!id && profiles.some((p) => p.id === id);
+
+  // A starred default (or the active profile) can disappear when the linked
+  // team/trainer/gym is deleted. Fall back to the player profile so no page
+  // ends up rendering with a dangling profile id, and repair the account row.
+  const fallback = profiles.find((p) => p.kind === "player") ?? profiles[0] ?? null;
+  const defaultId = exists(profile?.default_profile_id) ? profile!.default_profile_id! : null;
+  const activeId = exists(profile?.active_profile_id)
+    ? profile!.active_profile_id!
+    : (defaultId ?? fallback?.id ?? null);
+  const active = profiles.find((p) => p.id === activeId) ?? fallback;
+
+  const staleDefault = !!profile?.default_profile_id && !defaultId;
+  const staleActive = !!profile?.active_profile_id && profile.active_profile_id !== activeId;
+  if ((staleDefault || staleActive) && active) {
+    const patch: {
+      default_profile_id?: string | null;
+      active_profile_id?: string | null;
+      account_type?: string | null;
+    } = {};
+    if (staleDefault) patch.default_profile_id = null;
+    if (staleActive) {
+      patch.active_profile_id = active.id;
+      patch.account_type = active.kind;
+    }
+    // Best-effort self-heal; the returned values above already reflect it.
+    await supabase.from("profiles").update(patch).eq("id", userId);
+  }
+
+  return { profiles, activeId, defaultId, active };
 }
+
 
 export function useMyProfiles() {
   const { user, loading } = useAuth();
