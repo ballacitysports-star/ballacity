@@ -73,8 +73,11 @@ function Create() {
     name: string;
     kind?: "team" | "coach";
   };
+  // Trainer profiles can't host: games are published under a team or gym only.
   const affiliations: Affiliation[] = [
-    ...myTeams.map((t) => ({ source: "team" as const, id: t.id, name: t.name, kind: t.kind })),
+    ...myTeams
+      .filter((t) => t.kind !== "coach")
+      .map((t) => ({ source: "team" as const, id: t.id, name: t.name, kind: t.kind })),
     ...myOrgs.map((o) => ({ source: "org" as const, id: o.id, name: o.name })),
   ];
   const affiliationsLoading = myTeamsQuery.isLoading || myOrgsQuery.isLoading;
@@ -96,10 +99,9 @@ function Create() {
     if (preferred) setSelectedAffiliation((cur) => cur ?? preferred);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [affiliations.length, affiliationsLoading, activeRefId]);
-  const affiliationLabel = (a: Affiliation) =>
-    a.source === "org" ? "Gym" : a.kind === "coach" ? "Trainer" : "Team";
-  const affiliationShortLabel = (a: Affiliation) =>
-    a.source === "org" ? "Gym" : a.kind === "coach" ? "Trainer" : "Team";
+  const affiliationLabel = (a: Affiliation) => (a.source === "org" ? "Gym" : "Team");
+  const affiliationShortLabel = affiliationLabel;
+
   const [sport, setSport] = useState<Sport>("Basketball");
 
   const [title, setTitle] = useState("");
@@ -240,7 +242,7 @@ function Create() {
     );
   }
 
-  // Gate: games are always published under a team, trainer, or gym profile.
+  // Gate: games are always published under a team or gym profile.
   if (affiliationsLoading) {
     return (
       <div className="mx-auto w-full max-w-md sm:max-w-2xl lg:max-w-4xl px-4 pt-6">
@@ -262,25 +264,19 @@ function Create() {
         <div className="rounded-2xl border border-border bg-surface p-6 text-center space-y-4">
           <ShieldCheck className="h-8 w-8 mx-auto text-lime" />
           <div>
-            <h2 className="font-display text-lg font-bold">Host as a team, trainer, or gym</h2>
+            <h2 className="font-display text-lg font-bold">Host as a team or gym</h2>
             <p className="text-sm text-muted-foreground mt-1">
-              Games are published under an organization profile so players know who they're
-              joining. Add a team, trainer, or gym profile to your account to start hosting — your
-              player profile stays as it is.
+              Games are published under a team or gym profile so players know who they're joining.
+              Add a team or gym profile to your account to start hosting — your player and trainer
+              profiles stay as they are.
             </p>
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
             <Link
               to="/teams/create"
               className="rounded-2xl bg-lime-gradient py-3 font-bold text-primary-foreground glow-lime"
             >
               Create a team
-            </Link>
-            <Link
-              to="/trainers/create"
-              className="rounded-2xl border border-border bg-background py-3 font-bold"
-            >
-              Create a trainer profile
             </Link>
             <Link
               to="/orgs/create"
@@ -293,6 +289,7 @@ function Create() {
       </div>
     );
   }
+
 
 
 
@@ -319,7 +316,7 @@ function Create() {
             return;
           }
           if (!selectedAffiliation) {
-            toast.error("Pick which team, trainer, or gym profile you're hosting as");
+            toast.error("Pick which team or gym profile you're hosting as");
             hostAsRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
             hostAsRef.current?.querySelector<HTMLButtonElement>("button")?.focus();
             return;
@@ -489,7 +486,7 @@ function Create() {
               </div>
               {!selectedAffiliation && (
                 <p className="mt-2 px-1 text-[11px] text-muted-foreground">
-                  Pick the team, trainer, or gym profile you're hosting as to continue.
+                  Pick the team or gym profile you're hosting as to continue.
                 </p>
               )}
             </>
@@ -816,7 +813,7 @@ function Create() {
           {publishing
             ? "Publishing…"
             : !selectedAffiliation
-              ? "Choose a team, trainer, or gym profile to continue"
+              ? "Choose a team or gym profile to continue"
               : "Publish game"}
         </motion.button>
         <p className="text-center text-xs text-muted-foreground pb-6">
