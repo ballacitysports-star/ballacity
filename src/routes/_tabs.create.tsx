@@ -78,17 +78,24 @@ function Create() {
     ...myOrgs.map((o) => ({ source: "org" as const, id: o.id, name: o.name })),
   ];
   const affiliationsLoading = myTeamsQuery.isLoading || myOrgsQuery.isLoading;
+  const { active: activeProfile } = useMyProfiles();
+  const activeRefId = activeProfile && activeProfile.kind !== "player" ? activeProfile.refId : null;
   const [selectedAffiliation, setSelectedAffiliation] = useState<Affiliation | null>(null);
   const hostAsRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (affiliationsLoading) return;
-    if (affiliations.length === 1) {
-      setSelectedAffiliation((cur) => cur ?? affiliations[0]);
-    } else if (affiliations.length === 0) {
+    if (affiliations.length === 0) {
       setSelectedAffiliation(null);
+      return;
     }
+    // Prefer the profile the app is currently acting as, then fall back to the
+    // only affiliation the account owns.
+    const preferred =
+      (activeRefId ? affiliations.find((a) => a.id === activeRefId) : undefined) ??
+      (affiliations.length === 1 ? affiliations[0] : undefined);
+    if (preferred) setSelectedAffiliation((cur) => cur ?? preferred);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [affiliations.length, affiliationsLoading]);
+  }, [affiliations.length, affiliationsLoading, activeRefId]);
   const affiliationLabel = (a: Affiliation) =>
     a.source === "org" ? "Gym" : a.kind === "coach" ? "Trainer" : "Team";
   const affiliationShortLabel = (a: Affiliation) =>
