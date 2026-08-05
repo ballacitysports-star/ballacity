@@ -489,7 +489,7 @@ function Create() {
               </div>
               {!selectedAffiliation && (
                 <p className="mt-2 px-1 text-[11px] text-muted-foreground">
-                  Pick who you're hosting as to continue.
+                  Pick the team, trainer, or gym profile you're hosting as to continue.
                 </p>
               )}
             </>
