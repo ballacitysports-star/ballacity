@@ -242,7 +242,7 @@ function Create() {
     );
   }
 
-  // Gate: games are always published under a team, trainer, or gym profile.
+  // Gate: games are always published under a team or gym profile.
   // Gate: games are always published under a team or gym profile.
   if (affiliationsLoading) {
     return (
@@ -317,7 +317,7 @@ function Create() {
             return;
           }
           if (!selectedAffiliation) {
-            toast.error("Pick which team, trainer, or gym profile you're hosting as");
+            toast.error("Pick which team or gym profile you're hosting as");
             hostAsRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
             hostAsRef.current?.querySelector<HTMLButtonElement>("button")?.focus();
             return;
@@ -487,7 +487,7 @@ function Create() {
               </div>
               {!selectedAffiliation && (
                 <p className="mt-2 px-1 text-[11px] text-muted-foreground">
-                  Pick the team, trainer, or gym profile you're hosting as to continue.
+                  Pick the team or gym profile you're hosting as to continue.
                 </p>
               )}
             </>
@@ -814,7 +814,7 @@ function Create() {
           {publishing
             ? "Publishing…"
             : !selectedAffiliation
-              ? "Choose a team, trainer, or gym profile to continue"
+              ? "Choose a team or gym profile to continue"
               : "Publish game"}
         </motion.button>
         <p className="text-center text-xs text-muted-foreground pb-6">
