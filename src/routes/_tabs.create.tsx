@@ -243,7 +243,6 @@ function Create() {
   }
 
   // Gate: games are always published under a team or gym profile.
-  // Gate: games are always published under a team or gym profile.
   if (affiliationsLoading) {
     return (
       <div className="mx-auto w-full max-w-md sm:max-w-2xl lg:max-w-4xl px-4 pt-6">
