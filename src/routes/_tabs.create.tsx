@@ -240,7 +240,7 @@ function Create() {
     );
   }
 
-  // Gate: must have at least one team/club before hosting.
+  // Gate: games are always published under a team, trainer, or gym profile.
   if (affiliationsLoading) {
     return (
       <div className="mx-auto w-full max-w-md sm:max-w-2xl lg:max-w-4xl px-4 pt-6">
@@ -262,17 +262,25 @@ function Create() {
         <div className="rounded-2xl border border-border bg-surface p-6 text-center space-y-4">
           <ShieldCheck className="h-8 w-8 mx-auto text-lime" />
           <div>
-            <h2 className="font-display text-lg font-bold">Create a team or club first</h2>
+            <h2 className="font-display text-lg font-bold">Host as a team, trainer, or gym</h2>
             <p className="text-sm text-muted-foreground mt-1">
-              Games are hosted under a team or club so players know who they're joining.
+              Games are published under an organization profile so players know who they're
+              joining. Add a team, trainer, or gym profile to your account to start hosting — your
+              player profile stays as it is.
             </p>
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
             <Link
               to="/teams/create"
               className="rounded-2xl bg-lime-gradient py-3 font-bold text-primary-foreground glow-lime"
             >
               Create a team
+            </Link>
+            <Link
+              to="/trainers/create"
+              className="rounded-2xl border border-border bg-background py-3 font-bold"
+            >
+              Create a trainer profile
             </Link>
             <Link
               to="/orgs/create"
@@ -285,6 +293,7 @@ function Create() {
       </div>
     );
   }
+
 
 
   return (
