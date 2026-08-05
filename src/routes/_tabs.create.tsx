@@ -29,6 +29,7 @@ import { reverseGeocode } from "@/lib/geocode.functions";
 import { listMyTeams } from "@/lib/teams.functions";
 import { listMyOrgs } from "@/lib/trainer-orgs.functions";
 import { useQuery } from "@tanstack/react-query";
+import { useMyProfiles } from "@/lib/account-profiles";
 
 import { toast } from "sonner";
 import { LocationAutocomplete } from "@/components/LocationAutocomplete";
@@ -77,17 +78,24 @@ function Create() {
     ...myOrgs.map((o) => ({ source: "org" as const, id: o.id, name: o.name })),
   ];
   const affiliationsLoading = myTeamsQuery.isLoading || myOrgsQuery.isLoading;
+  const { active: activeProfile } = useMyProfiles();
+  const activeRefId = activeProfile && activeProfile.kind !== "player" ? activeProfile.refId : null;
   const [selectedAffiliation, setSelectedAffiliation] = useState<Affiliation | null>(null);
   const hostAsRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (affiliationsLoading) return;
-    if (affiliations.length === 1) {
-      setSelectedAffiliation((cur) => cur ?? affiliations[0]);
-    } else if (affiliations.length === 0) {
+    if (affiliations.length === 0) {
       setSelectedAffiliation(null);
+      return;
     }
+    // Prefer the profile the app is currently acting as, then fall back to the
+    // only affiliation the account owns.
+    const preferred =
+      (activeRefId ? affiliations.find((a) => a.id === activeRefId) : undefined) ??
+      (affiliations.length === 1 ? affiliations[0] : undefined);
+    if (preferred) setSelectedAffiliation((cur) => cur ?? preferred);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [affiliations.length, affiliationsLoading]);
+  }, [affiliations.length, affiliationsLoading, activeRefId]);
   const affiliationLabel = (a: Affiliation) =>
     a.source === "org" ? "Gym" : a.kind === "coach" ? "Trainer" : "Team";
   const affiliationShortLabel = (a: Affiliation) =>
@@ -232,7 +240,7 @@ function Create() {
     );
   }
 
-  // Gate: must have at least one team/club before hosting.
+  // Gate: games are always published under a team, trainer, or gym profile.
   if (affiliationsLoading) {
     return (
       <div className="mx-auto w-full max-w-md sm:max-w-2xl lg:max-w-4xl px-4 pt-6">
@@ -254,17 +262,25 @@ function Create() {
         <div className="rounded-2xl border border-border bg-surface p-6 text-center space-y-4">
           <ShieldCheck className="h-8 w-8 mx-auto text-lime" />
           <div>
-            <h2 className="font-display text-lg font-bold">Create a team or club first</h2>
+            <h2 className="font-display text-lg font-bold">Host as a team, trainer, or gym</h2>
             <p className="text-sm text-muted-foreground mt-1">
-              Games are hosted under a team or club so players know who they're joining.
+              Games are published under an organization profile so players know who they're
+              joining. Add a team, trainer, or gym profile to your account to start hosting — your
+              player profile stays as it is.
             </p>
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
             <Link
               to="/teams/create"
               className="rounded-2xl bg-lime-gradient py-3 font-bold text-primary-foreground glow-lime"
             >
               Create a team
+            </Link>
+            <Link
+              to="/trainers/create"
+              className="rounded-2xl border border-border bg-background py-3 font-bold"
+            >
+              Create a trainer profile
             </Link>
             <Link
               to="/orgs/create"
@@ -277,6 +293,7 @@ function Create() {
       </div>
     );
   }
+
 
 
   return (
@@ -302,7 +319,7 @@ function Create() {
             return;
           }
           if (!selectedAffiliation) {
-            toast.error("Pick which team or club you're hosting as");
+            toast.error("Pick which team, trainer, or gym profile you're hosting as");
             hostAsRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
             hostAsRef.current?.querySelector<HTMLButtonElement>("button")?.focus();
             return;
@@ -472,7 +489,7 @@ function Create() {
               </div>
               {!selectedAffiliation && (
                 <p className="mt-2 px-1 text-[11px] text-muted-foreground">
-                  Pick who you're hosting as to continue.
+                  Pick the team, trainer, or gym profile you're hosting as to continue.
                 </p>
               )}
             </>
@@ -799,7 +816,7 @@ function Create() {
           {publishing
             ? "Publishing…"
             : !selectedAffiliation
-              ? "Choose a team or club to continue"
+              ? "Choose a team, trainer, or gym profile to continue"
               : "Publish game"}
         </motion.button>
         <p className="text-center text-xs text-muted-foreground pb-6">
