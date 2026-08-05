@@ -73,8 +73,11 @@ function Create() {
     name: string;
     kind?: "team" | "coach";
   };
+  // Trainer profiles can't host: games are published under a team or gym only.
   const affiliations: Affiliation[] = [
-    ...myTeams.map((t) => ({ source: "team" as const, id: t.id, name: t.name, kind: t.kind })),
+    ...myTeams
+      .filter((t) => t.kind !== "coach")
+      .map((t) => ({ source: "team" as const, id: t.id, name: t.name, kind: t.kind })),
     ...myOrgs.map((o) => ({ source: "org" as const, id: o.id, name: o.name })),
   ];
   const affiliationsLoading = myTeamsQuery.isLoading || myOrgsQuery.isLoading;
@@ -96,10 +99,9 @@ function Create() {
     if (preferred) setSelectedAffiliation((cur) => cur ?? preferred);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [affiliations.length, affiliationsLoading, activeRefId]);
-  const affiliationLabel = (a: Affiliation) =>
-    a.source === "org" ? "Gym" : a.kind === "coach" ? "Trainer" : "Team";
-  const affiliationShortLabel = (a: Affiliation) =>
-    a.source === "org" ? "Gym" : a.kind === "coach" ? "Trainer" : "Team";
+  const affiliationLabel = (a: Affiliation) => (a.source === "org" ? "Gym" : "Team");
+  const affiliationShortLabel = affiliationLabel;
+
   const [sport, setSport] = useState<Sport>("Basketball");
 
   const [title, setTitle] = useState("");
