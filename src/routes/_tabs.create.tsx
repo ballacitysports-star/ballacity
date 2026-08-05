@@ -816,7 +816,7 @@ function Create() {
           {publishing
             ? "Publishing…"
             : !selectedAffiliation
-              ? "Choose a team or club to continue"
+              ? "Choose a team, trainer, or gym profile to continue"
               : "Publish game"}
         </motion.button>
         <p className="text-center text-xs text-muted-foreground pb-6">
