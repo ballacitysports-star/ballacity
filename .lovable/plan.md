@@ -1,24 +1,22 @@
-# Host a game without creating a team or club
+# Hosting stays tied to a team, trainer, or gym profile
 
-Right now the Host a game screen blocks you with "Create a team or club first" unless you already own a team, trainer, or gym record — and even when you do, you must pick one before the form unlocks. This changes hosting so any profile can host directly.
+Games are always hosted by an organization profile. A player-only account can't host until it adds a team, trainer, or gym profile. The current screen already blocks hosting, but its wording only mentions "team or club" and it doesn't reflect the new multi-profile model.
 
 ## What changes
 
-- The "Create a team or club first" blocking screen is removed. Anyone signed in can open the full Host a game form.
-- "Host as" always includes your active profile at the top (your player profile, or the team / trainer / gym you're currently acting as), followed by any other teams, trainers, or gyms you own.
-- Your active profile is preselected by default, so the form is usable immediately with no extra step.
-- The publish button no longer says "Choose a team or club to continue"; it reads "Publish game" as soon as a host is selected (which is always the case).
-- Games hosted as your player profile show you as the host; games hosted as a team/trainer/gym stay attributed to that profile exactly as today.
-- Optional "Create a team" / "Create a club or gym" links stay available as a small hint under "Host as" instead of a blocking screen.
+- The gate on Host a game stays, but reads clearly: "Host as a team, trainer, or gym" with the explanation that games are published under an organization profile so players know who they're joining.
+- The gate offers all three create paths: Create a team, Create a trainer profile, Create a club / gym.
+- The gate only appears when the account truly owns no team, trainer, or gym profile. Owning any one of them (even if the active profile is the player profile) unlocks the form.
+- "Host as" lists every team, trainer, and gym you own, labeled by type, and preselects your currently active profile when it is one of them (instead of only auto-selecting when there's exactly one).
+- Publish button and helper text refer to "team, trainer, or gym profile" instead of "team or club".
 
 ## Technical section
 
 In `src/routes/_tabs.create.tsx`:
 
-- Extend the `Affiliation` type with a `source: "self"` variant carrying the signed-in user's display name from `useMyProfile`, and read the active profile via `useMyProfiles`/active-profile helpers in `src/lib/account-profiles.ts` so the active team/trainer/gym is ordered first.
-- Build `affiliations` as `[selfOrActiveProfile, ...myTeams, ...myOrgs]`, de-duplicating the active profile when it also appears in the team/org lists.
-- Delete the `affiliations.length === 0` early-return block and initialize `selectedAffiliation` to the first entry once loading finishes.
-- On submit, keep `teamId`/`orgId` undefined for the `self` source, and keep passing `hostUserId` + the resolved snapshot from `resolveHostSnapshot` so host attribution is the personal profile.
-- Drop the disabled `fieldset` guard and the "Choose a team or club to continue" submit label; keep the required-selection styling only if the selection is ever cleared.
+- Keep the `affiliations.length === 0` early return; update its copy and add a third link to `/trainers/create`.
+- Distinguish trainer from team in the empty-state and chips using the existing `kind === "coach"` mapping already present in `affiliationLabel`.
+- Use `useMyProfiles()` from `src/lib/account-profiles.ts` to read the active profile, and in the auto-select effect prefer the affiliation whose id matches `active.refId` (when `active.kind` is team/trainer/gym); otherwise fall back to the single-affiliation auto-select already in place.
+- Update the submit button label and the disabled-state hint strings.
 
-No database or server-function changes are needed: `hosted_games.team_id` and `org_id` are already nullable and `host_id` is the real owner.
+No database or server-function changes: hosted games already carry `team_id` / `org_id` plus `host_id`.
