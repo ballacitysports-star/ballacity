@@ -27,7 +27,6 @@ import {
 import { useServerFn } from "@tanstack/react-start";
 import { reverseGeocode } from "@/lib/geocode.functions";
 import { listMyTeams } from "@/lib/teams.functions";
-import { listMyOrgs } from "@/lib/trainer-orgs.functions";
 import { useQuery } from "@tanstack/react-query";
 import { useMyProfiles } from "@/lib/account-profiles";
 
@@ -232,7 +231,7 @@ function Create() {
     );
   }
 
-  // Gate: games are always published under a team or gym profile.
+  // Gate: games are always published under a team profile.
   if (affiliationsLoading) {
     return (
       <div className="mx-auto w-full max-w-md sm:max-w-2xl lg:max-w-4xl px-4 pt-6">
@@ -300,7 +299,7 @@ function Create() {
             return;
           }
           if (!selectedAffiliation) {
-            toast.error("Pick which team or gym profile you're hosting as");
+            toast.error("Pick which team profile you're hosting as");
             hostAsRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
             hostAsRef.current?.querySelector<HTMLButtonElement>("button")?.focus();
             return;
@@ -471,7 +470,7 @@ function Create() {
               </div>
               {!selectedAffiliation && (
                 <p className="mt-2 px-1 text-[11px] text-muted-foreground">
-                  Pick the team or gym profile you're hosting as to continue.
+                  Pick the team profile you're hosting as to continue.
                 </p>
               )}
             </>
@@ -798,7 +797,7 @@ function Create() {
           {publishing
             ? "Publishing…"
             : !selectedAffiliation
-              ? "Choose a team or gym profile to continue"
+              ? "Choose a team profile to continue"
               : "Publish game"}
         </motion.button>
         <p className="text-center text-xs text-muted-foreground pb-6">
