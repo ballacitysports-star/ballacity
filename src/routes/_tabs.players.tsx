@@ -40,6 +40,8 @@ import {
   type ExistingRequestSummary,
 } from "@/lib/availability";
 import { MineView } from "@/components/players/MineView";
+import { useAvailabilityGate, availabilityGateMessage } from "@/lib/availability-gate";
+import { AvailabilityRequiredNotice } from "@/components/availability/AvailabilityRequiredNotice";
 import { AvailabilityDetailDialog } from "@/components/players/AvailabilityDetailDialog";
 import { shareAvailability } from "@/components/players/share-availability";
 
@@ -266,6 +268,13 @@ function PlayersPage() {
   const [editingPost, setEditingPost] = useState<PlayerAvailability | null>(null);
   const [contactFor, setContactFor] = useState<AvailabilityWithAuthor | null>(null);
   const [reloadTick, setReloadTick] = useState(0);
+  // Availability lives on the player profile — gate posting on having one.
+  const availGate = useAvailabilityGate();
+  const [gateOpen, setGateOpen] = useState(false);
+  const openPostFlow = () => {
+    if (availGate.canPost) setPostOpen(true);
+    else setGateOpen(true);
+  };
 
   const tab: "browse" | "mine" = search.tab === "mine" ? "mine" : "browse";
   const setTab = (v: "browse" | "mine") => updateSearch({ tab: v }, { push: true });
@@ -505,7 +514,10 @@ function PlayersPage() {
       </div>
 
       {tab === "mine" ? (
-        <div className="pb-6">
+        <div className="space-y-3 pb-6">
+          {!availGate.loading && !availGate.canPost && (
+            <AvailabilityRequiredNotice reason={availGate.reason} onSwitched={() => setPostOpen(true)} />
+          )}
           <MineView
             user={user ? { id: user.id } : null}
             onEdit={(m) => setEditingPost(m)}
@@ -537,9 +549,8 @@ function PlayersPage() {
         sheetTitle="Filter players"
         rightExtra={
           <button
-            onClick={() =>
-              user ? setPostOpen(true) : toast.error("Sign in to post your availability.")
-            }
+            onClick={openPostFlow}
+
             className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-lime-gradient text-primary-foreground glow-lime"
             aria-label="Post availability"
           >
@@ -621,7 +632,7 @@ function PlayersPage() {
           cta={
             user ? (
               <Button
-                onClick={() => setPostOpen(true)}
+                onClick={openPostFlow}
                 className="rounded-full bg-lime-gradient text-primary-foreground"
               >
                 Post availability
@@ -669,6 +680,20 @@ function PlayersPage() {
         </>
       )}
 
+      <Dialog open={gateOpen} onOpenChange={(o) => !o && setGateOpen(false)}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Post availability</DialogTitle>
+          </DialogHeader>
+          <AvailabilityRequiredNotice
+            reason={availGate.reason}
+            onSwitched={() => {
+              setGateOpen(false);
+              setPostOpen(true);
+            }}
+          />
+        </DialogContent>
+      </Dialog>
 
       {(postOpen || editingPost) && (
         <PostAvailabilityDialog
@@ -1153,6 +1178,7 @@ function PostAvailabilityDialog({
   onPosted: () => void;
 }) {
   const myProfile = useMyProfile();
+  const gate = useAvailabilityGate();
   const isEdit = !!initial;
   const [sports, setSports] = useState<string[]>(initial?.sports ?? []);
   // Per-sport tiers, mirroring the profile editor. Keyed by sport name.
@@ -1178,6 +1204,11 @@ function PostAvailabilityDialog({
     arr.includes(v) ? arr.filter((x) => x !== v) : [...arr, v];
 
   const save = async () => {
+    // Belt-and-braces: a stale dialog or deep link can't bypass the gate.
+    if (!gate.loading && !gate.canPost) {
+      toast.error(availabilityGateMessage(gate.reason));
+      return;
+    }
     if (sports.length === 0 && !note.trim()) {
       toast.error("Pick at least one sport or add a note.");
       return;

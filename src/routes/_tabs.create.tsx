@@ -34,6 +34,8 @@ import { toast } from "sonner";
 import { LocationAutocomplete } from "@/components/LocationAutocomplete";
 import { useMyProfile } from "@/lib/user-prefs-store";
 import { useAuth } from "@/hooks/use-auth";
+import { useAvailabilityGate } from "@/lib/availability-gate";
+import { AvailabilityPromptBanner } from "@/components/availability/AvailabilityPromptDialog";
 import { upsertGamePaymentSettings } from "@/lib/payments";
 import { ImageUploader } from "@/components/ImageUploader";
 import { PositionsPicker, positionsCleanup, type PositionsNeeded } from "@/components/PositionsPicker";
@@ -117,6 +119,8 @@ function Create() {
   const [requiresApproval, setRequiresApproval] = useState(true);
   const [signupCutoffMin, setSignupCutoffMin] = useState(0);
   const [publishing, setPublishing] = useState(false);
+  // Nudge hosts to keep their own player availability up to date.
+  const hostAvailGate = useAvailabilityGate();
   const [coverUrl, setCoverUrl] = useState<string | null>(null);
   const [positionsNeeded, setPositionsNeeded] = useState<PositionsNeeded>({});
   const [repeatRange, setRepeatRange] = useState(false);
@@ -287,6 +291,10 @@ function Create() {
         </Link>
         <h1 className="font-display text-2xl font-bold">Host a game</h1>
       </div>
+
+      {!hostAvailGate.loading && !hostAvailGate.hasOpenAvailability && (
+        <AvailabilityPromptBanner className="mb-4" />
+      )}
 
 
       <form
