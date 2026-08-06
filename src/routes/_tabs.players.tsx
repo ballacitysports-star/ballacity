@@ -680,6 +680,20 @@ function PlayersPage() {
         </>
       )}
 
+      <Dialog open={gateOpen} onOpenChange={(o) => !o && setGateOpen(false)}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Post availability</DialogTitle>
+          </DialogHeader>
+          <AvailabilityRequiredNotice
+            reason={availGate.reason}
+            onSwitched={() => {
+              setGateOpen(false);
+              setPostOpen(true);
+            }}
+          />
+        </DialogContent>
+      </Dialog>
 
       {(postOpen || editingPost) && (
         <PostAvailabilityDialog
