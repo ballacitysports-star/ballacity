@@ -1178,6 +1178,7 @@ function PostAvailabilityDialog({
   onPosted: () => void;
 }) {
   const myProfile = useMyProfile();
+  const gate = useAvailabilityGate();
   const isEdit = !!initial;
   const [sports, setSports] = useState<string[]>(initial?.sports ?? []);
   // Per-sport tiers, mirroring the profile editor. Keyed by sport name.
