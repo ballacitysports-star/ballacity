@@ -117,6 +117,8 @@ function Create() {
   const [requiresApproval, setRequiresApproval] = useState(true);
   const [signupCutoffMin, setSignupCutoffMin] = useState(0);
   const [publishing, setPublishing] = useState(false);
+  // Nudge hosts to keep their own player availability up to date.
+  const hostAvailGate = useAvailabilityGate();
   const [coverUrl, setCoverUrl] = useState<string | null>(null);
   const [positionsNeeded, setPositionsNeeded] = useState<PositionsNeeded>({});
   const [repeatRange, setRepeatRange] = useState(false);
