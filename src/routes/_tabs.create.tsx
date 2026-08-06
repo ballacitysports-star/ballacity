@@ -288,6 +288,10 @@ function Create() {
         <h1 className="font-display text-2xl font-bold">Host a game</h1>
       </div>
 
+      {!hostAvailGate.loading && !hostAvailGate.hasOpenAvailability && (
+        <AvailabilityPromptBanner className="mb-4" />
+      )}
+
 
       <form
         onSubmit={async (e) => {
