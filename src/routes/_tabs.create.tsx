@@ -52,37 +52,26 @@ function Create() {
   const { user } = useAuth();
   const profile = useMyProfile(user);
   const fetchMyTeams = useServerFn(listMyTeams);
-  const fetchMyOrgs = useServerFn(listMyOrgs);
   const myTeamsQuery = useQuery({
     queryKey: ["my-teams", user?.id ?? "anon"],
     queryFn: () => fetchMyTeams(),
     enabled: !!user,
     staleTime: 30_000,
   });
-  const myOrgsQuery = useQuery({
-    queryKey: ["my-orgs", user?.id ?? "anon"],
-    queryFn: () => fetchMyOrgs(),
-    enabled: !!user,
-    staleTime: 30_000,
-  });
   const myTeams = myTeamsQuery.data ?? [];
-  const myOrgs = myOrgsQuery.data ?? [];
   type Affiliation = {
-    source: "team" | "org";
+    source: "team";
     id: string;
     name: string;
     kind?: "team" | "coach";
   };
-  // Trainer profiles can't host: games are published under a team or gym only.
-  const affiliations: Affiliation[] = [
-    ...myTeams
-      .filter((t) => t.kind !== "coach")
-      .map((t) => ({ source: "team" as const, id: t.id, name: t.name, kind: t.kind })),
-    ...myOrgs.map((o) => ({ source: "org" as const, id: o.id, name: o.name })),
-  ];
-  const affiliationsLoading = myTeamsQuery.isLoading || myOrgsQuery.isLoading;
+  // Games are always published under a team profile the account owns.
+  const affiliations: Affiliation[] = myTeams
+    .filter((t) => t.kind !== "coach")
+    .map((t) => ({ source: "team" as const, id: t.id, name: t.name, kind: t.kind }));
+  const affiliationsLoading = myTeamsQuery.isLoading;
   const { active: activeProfile } = useMyProfiles();
-  const activeRefId = activeProfile && activeProfile.kind !== "player" ? activeProfile.refId : null;
+  const activeRefId = activeProfile && activeProfile.kind === "team" ? activeProfile.refId : null;
   const [selectedAffiliation, setSelectedAffiliation] = useState<Affiliation | null>(null);
   const hostAsRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -91,16 +80,17 @@ function Create() {
       setSelectedAffiliation(null);
       return;
     }
-    // Prefer the profile the app is currently acting as, then fall back to the
-    // only affiliation the account owns.
+    // Prefer the team the app is currently acting as, then fall back to the
+    // only team the account owns.
     const preferred =
       (activeRefId ? affiliations.find((a) => a.id === activeRefId) : undefined) ??
       (affiliations.length === 1 ? affiliations[0] : undefined);
     if (preferred) setSelectedAffiliation((cur) => cur ?? preferred);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [affiliations.length, affiliationsLoading, activeRefId]);
-  const affiliationLabel = (a: Affiliation) => (a.source === "org" ? "Gym" : "Team");
+  const affiliationLabel = (_a: Affiliation) => "Team";
   const affiliationShortLabel = affiliationLabel;
+
 
   const [sport, setSport] = useState<Sport>("Basketball");
 
