@@ -549,9 +549,8 @@ function PlayersPage() {
         sheetTitle="Filter players"
         rightExtra={
           <button
-            onClick={() =>
-              user ? setPostOpen(true) : toast.error("Sign in to post your availability.")
-            }
+            onClick={openPostFlow}
+
             className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-lime-gradient text-primary-foreground glow-lime"
             aria-label="Post availability"
           >
