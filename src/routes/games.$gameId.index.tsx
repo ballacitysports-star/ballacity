@@ -2424,6 +2424,17 @@ function GameDetail() {
         />
       )}
 
+      <AvailabilityPromptDialog
+        open={availPromptOpen}
+        onClose={() => setAvailPromptOpen(false)}
+        onContinue={() => {
+          const pos = pendingJoinRef.current ?? undefined;
+          pendingJoinRef.current = null;
+          void handleJoin(pos);
+        }}
+      />
+
+
       <AlertDialog
         open={confirmAction !== null}
         onOpenChange={(open) => {
