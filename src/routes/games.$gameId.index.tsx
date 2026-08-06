@@ -101,6 +101,11 @@ import type { JoinGate } from "@/lib/live-status";
 import { JoinBlockedReason } from "@/components/JoinBlockedReason";
 
 import { useAuth } from "@/hooks/use-auth";
+import { useAvailabilityGate } from "@/lib/availability-gate";
+import {
+  AvailabilityPromptDialog,
+  availabilityPromptDismissed,
+} from "@/components/availability/AvailabilityPromptDialog";
 import { useMyProfile } from "@/lib/user-prefs-store";
 import { getOrCreateDirectConversation } from "@/lib/messages";
 import { createNotification } from "@/lib/notifications";
