@@ -246,6 +246,24 @@ function EditProfile() {
     const { saveProfileRow } = await import("@/lib/profile-payload");
     await saveProfileRow(supabase, profilePayload);
 
+    // Mirror sports / skill level / location onto my open availability posts.
+    const { syncAvailabilitiesFromProfile } = await import("@/lib/availability-sync");
+    const syncedPosts = await syncAvailabilitiesFromProfile({
+      sports,
+      city: trimmedCity,
+      searchRadiusMi,
+    });
+    if (syncedPosts > 0) {
+      await queryClient.invalidateQueries({ queryKey: ["my-availabilities"] });
+      await queryClient.invalidateQueries({ queryKey: ["availabilities"] });
+      toast.success(
+        syncedPosts === 1
+          ? "Updated your availability post to match"
+          : `Updated ${syncedPosts} availability posts to match`,
+      );
+    }
+
+
 
     // Onboarding skips its write when the fingerprint matches its last save.
     // Clearing it here keeps the two screens in sync: re-entering onboarding
