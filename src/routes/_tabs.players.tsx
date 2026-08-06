@@ -40,7 +40,7 @@ import {
   type ExistingRequestSummary,
 } from "@/lib/availability";
 import { MineView } from "@/components/players/MineView";
-import { useAvailabilityGate } from "@/lib/availability-gate";
+import { useAvailabilityGate, availabilityGateMessage } from "@/lib/availability-gate";
 import { AvailabilityRequiredNotice } from "@/components/availability/AvailabilityRequiredNotice";
 import { AvailabilityDetailDialog } from "@/components/players/AvailabilityDetailDialog";
 import { shareAvailability } from "@/components/players/share-availability";
