@@ -378,8 +378,9 @@ function Create() {
                 image: coverUrl ?? undefined,
                 positionsNeeded: cleanPositions,
                 signupCutoffMin,
-                teamId: selectedAffiliation?.source === "team" ? selectedAffiliation.id : undefined,
-                orgId: selectedAffiliation?.source === "org" ? selectedAffiliation.id : undefined,
+                teamId: selectedAffiliation?.id,
+                orgId: undefined,
+
               });
 
               if (!firstGameId) firstGameId = game.id;
