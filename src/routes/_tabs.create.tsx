@@ -34,6 +34,8 @@ import { toast } from "sonner";
 import { LocationAutocomplete } from "@/components/LocationAutocomplete";
 import { useMyProfile } from "@/lib/user-prefs-store";
 import { useAuth } from "@/hooks/use-auth";
+import { useAvailabilityGate } from "@/lib/availability-gate";
+import { AvailabilityPromptBanner } from "@/components/availability/AvailabilityPromptDialog";
 import { upsertGamePaymentSettings } from "@/lib/payments";
 import { ImageUploader } from "@/components/ImageUploader";
 import { PositionsPicker, positionsCleanup, type PositionsNeeded } from "@/components/PositionsPicker";
