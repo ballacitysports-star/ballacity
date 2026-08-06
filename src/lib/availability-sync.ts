@@ -1,4 +1,3 @@
-import { supabase } from "@/integrations/supabase/client";
 import { miToKm } from "@/lib/distance";
 import { levelTiers, serializeSkillTiers, ANY_SKILL, type SportLevel } from "@/lib/sport-levels";
 import { listMyAvailabilities, updateAvailability, type PlayerAvailability } from "@/lib/availability";
@@ -88,6 +87,3 @@ export async function syncAvailabilitiesFromProfile(
     return 0;
   }
 }
-
-/** Silences the supabase import lint when tree-shaken in tests. */
-export const __availabilitySyncClient = supabase;
