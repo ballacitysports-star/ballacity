@@ -632,7 +632,7 @@ function PlayersPage() {
           cta={
             user ? (
               <Button
-                onClick={() => setPostOpen(true)}
+                onClick={openPostFlow}
                 className="rounded-full bg-lime-gradient text-primary-foreground"
               >
                 Post availability
