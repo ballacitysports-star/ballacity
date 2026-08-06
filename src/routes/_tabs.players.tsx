@@ -514,7 +514,10 @@ function PlayersPage() {
       </div>
 
       {tab === "mine" ? (
-        <div className="pb-6">
+        <div className="space-y-3 pb-6">
+          {!availGate.loading && !availGate.canPost && (
+            <AvailabilityRequiredNotice reason={availGate.reason} onSwitched={() => setPostOpen(true)} />
+          )}
           <MineView
             user={user ? { id: user.id } : null}
             onEdit={(m) => setEditingPost(m)}
