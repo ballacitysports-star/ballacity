@@ -266,6 +266,13 @@ function PlayersPage() {
   const [editingPost, setEditingPost] = useState<PlayerAvailability | null>(null);
   const [contactFor, setContactFor] = useState<AvailabilityWithAuthor | null>(null);
   const [reloadTick, setReloadTick] = useState(0);
+  // Availability lives on the player profile — gate posting on having one.
+  const availGate = useAvailabilityGate();
+  const [gateOpen, setGateOpen] = useState(false);
+  const openPostFlow = () => {
+    if (availGate.canPost) setPostOpen(true);
+    else setGateOpen(true);
+  };
 
   const tab: "browse" | "mine" = search.tab === "mine" ? "mine" : "browse";
   const setTab = (v: "browse" | "mine") => updateSearch({ tab: v }, { push: true });
