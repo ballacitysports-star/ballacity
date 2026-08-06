@@ -652,6 +652,10 @@ function GameDetail() {
         };
 
   const [confirmAction, setConfirmAction] = useState<"join" | "leave" | null>(null);
+  // Availability nudge before joining (soft — never blocks).
+  const availGate = useAvailabilityGate();
+  const [availPromptOpen, setAvailPromptOpen] = useState(false);
+  const pendingJoinRef = useRef<string | null>(null);
 
   const executeJoinAction = async (preselectedPosition?: string) => {
     // Expired invite → block all join actions and steer to discovery.
