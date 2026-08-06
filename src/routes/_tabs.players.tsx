@@ -1204,6 +1204,11 @@ function PostAvailabilityDialog({
     arr.includes(v) ? arr.filter((x) => x !== v) : [...arr, v];
 
   const save = async () => {
+    // Belt-and-braces: a stale dialog or deep link can't bypass the gate.
+    if (!gate.loading && !gate.canPost) {
+      toast.error(availabilityGateMessage(gate.reason));
+      return;
+    }
     if (sports.length === 0 && !note.trim()) {
       toast.error("Pick at least one sport or add a note.");
       return;
