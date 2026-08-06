@@ -886,6 +886,19 @@ function GameDetail() {
   };
 
   const handleJoin = async (preselectedPosition?: string) => {
+    // Soft prompt: first join attempt without any open player availability.
+    if (
+      !isHost &&
+      !viewerCountsAsJoined &&
+      !isPending &&
+      !availGate.loading &&
+      !availGate.hasOpenAvailability &&
+      !availabilityPromptDismissed()
+    ) {
+      pendingJoinRef.current = preselectedPosition ?? null;
+      setAvailPromptOpen(true);
+      return;
+    }
     setProcessing(true);
     try {
       await executeJoinAction(preselectedPosition);
@@ -893,6 +906,7 @@ function GameDetail() {
       setProcessing(false);
     }
   };
+
 
   const viewerPending =
     !isHost && requiresApproval && myReq?.status === "pending" && !viewerCountsAsJoined;
