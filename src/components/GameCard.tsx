@@ -20,7 +20,7 @@ import { JoinBlockedReason } from "@/components/JoinBlockedReason";
 const sportEmoji: Record<string, string> = {
   Basketball: "🏀",
   Soccer: "⚽",
-  Pickleball: "🥒",
+  Pickleball: "🏓",
   Volleyball: "🏐",
   Tennis: "🎾",
   "Football": "🏈",
