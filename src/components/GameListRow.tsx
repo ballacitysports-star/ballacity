@@ -11,7 +11,7 @@ import { Distance } from "@/components/Distance";
 const sportEmoji: Record<string, string> = {
   Basketball: "🏀",
   Soccer: "⚽",
-  Pickleball: "🥒",
+  Pickleball: "🏓",
   Volleyball: "🏐",
   Tennis: "🎾",
   Football: "🏈",

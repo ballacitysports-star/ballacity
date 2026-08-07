@@ -24,7 +24,7 @@ import {
 const sportEmoji: Record<string, string> = {
   Basketball: "🏀",
   Soccer: "⚽",
-  Pickleball: "🥒",
+  Pickleball: "🏓",
   Volleyball: "🏐",
   Tennis: "🎾",
   Football: "🏈",
