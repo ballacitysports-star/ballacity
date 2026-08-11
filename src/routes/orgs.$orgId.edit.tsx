@@ -1,4 +1,5 @@
 import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
+import { pageHead } from "@/lib/seo";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -20,8 +21,14 @@ import { useAutosave } from "@/hooks/use-autosave";
 import { SaveStatus } from "@/components/SaveStatus";
 
 export const Route = createFileRoute("/orgs/$orgId/edit")({
+  head: () =>
+    pageHead({
+      title: "Edit gym — OpenRun",
+      description:
+      "Update your gym's details, hours, amenities, and photos.",
+      noindex: true,
+    }),
   ssr: false,
-  head: () => ({ meta: [{ title: "Edit gym — OpenRun" }] }),
   component: EditOrg,
   errorComponent: ({ error }) => (
     <div className="p-8 text-sm text-coral">{error.message}</div>

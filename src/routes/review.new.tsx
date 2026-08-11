@@ -1,4 +1,5 @@
 import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
+import { pageHead } from "@/lib/seo";
 import { useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import { ArrowLeft, Star, Check, Lock, Globe, ShieldCheck } from "lucide-react";
@@ -26,7 +27,13 @@ const isKind = (v: unknown): v is ReviewerKind =>
   v === "player" || v === "trainer" || v === "team" || v === "host";
 
 export const Route = createFileRoute("/review/new")({
-  head: () => ({ meta: [{ title: "Write a review — OpenRun" }] }),
+  head: () =>
+    pageHead({
+      title: "Write a review — OpenRun",
+      description:
+      "Rate and review a player, team, trainer, or gym you played with.",
+      noindex: true,
+    }),
   validateSearch: (s: Record<string, unknown>): Search => ({
     revieweeId: typeof s.revieweeId === "string" ? s.revieweeId : "me",
     revieweeKind: isKind(s.revieweeKind) ? s.revieweeKind : "player",

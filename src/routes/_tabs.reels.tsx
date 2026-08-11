@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { pageHead } from "@/lib/seo";
 import { useEffect, useRef, useState } from "react";
 import { Sparkles, Upload, Video, Lock, Loader2, AlertTriangle, ExternalLink } from "lucide-react";
 import { toast } from "sonner";
@@ -11,6 +12,14 @@ import { getStripeEnvironment } from "@/lib/stripe";
 import { createPortalSession } from "@/utils/payments.functions";
 
 export const Route = createFileRoute("/_tabs/reels")({
+  head: () =>
+    pageHead({
+      path: "/reels",
+      title: "Highlight reels — OpenRun",
+      description:
+      "Turn your game footage into AI-edited highlight reels you can share.",
+      noindex: true,
+    }),
   component: ReelsPage,
 });
 

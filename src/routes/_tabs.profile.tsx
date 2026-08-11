@@ -1,4 +1,5 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { pageHead } from "@/lib/seo";
 import { zodValidator, fallback } from "@tanstack/zod-adapter";
 import { z } from "zod";
 import { formatSportLevel } from "@/lib/sport-levels";
@@ -52,7 +53,14 @@ import { ChannelTabs } from "@/components/profile/ChannelTabs";
 import { MyWaitlistCard } from "@/components/MyWaitlistCard";
 
 export const Route = createFileRoute("/_tabs/profile")({
-  head: () => ({ meta: [{ title: "Profile — OpenRun" }] }),
+  head: () =>
+    pageHead({
+      path: "/profile",
+      title: "Your profile — OpenRun",
+      description:
+      "Your OpenRun profile: sports, skill levels, availability, games, and reviews.",
+      noindex: true,
+    }),
   // URL-persisted requests filter (all/host/player).
   validateSearch: zodValidator(z.object({ req: fallback(z.string(), "").default("") })),
   component: ProfileRoute,

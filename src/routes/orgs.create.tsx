@@ -1,4 +1,5 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { pageHead } from "@/lib/seo";
 import { useState } from "react";
 import { toast } from "sonner";
 import { setActiveProfileByRef, myProfilesKey } from "@/lib/account-profiles";
@@ -16,12 +17,17 @@ import { FinishSetupNotice } from "@/components/FinishSetupNotice";
 const DRAFT_KEY = "openrun:draft:create-org";
 
 export const Route = createFileRoute("/orgs/create")({
+  head: () =>
+    pageHead({
+      path: "/orgs/create",
+      title: "Create a gym profile — OpenRun",
+      description:
+      "List your gym on OpenRun with hours, amenities, photos, and location.",
+      noindex: true,
+    }),
   ssr: false,
   validateSearch: (search: Record<string, unknown>): { finish?: number } => ({
     finish: search.finish ? 1 : undefined,
-  }),
-  head: () => ({
-    meta: [{ title: "Create gym — OpenRun" }],
   }),
   component: () => (
     <AccountTypeGate requires="gym">

@@ -1,24 +1,18 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { pageHead } from "@/lib/seo";
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { Building2, Plus, Search, ShieldCheck } from "lucide-react";
 import { listTrainerOrgs } from "@/lib/trainer-orgs.functions";
 
 export const Route = createFileRoute("/orgs/")({
-  head: () => ({
-    meta: [
-      { title: "Gyms & organizations — OpenRun" },
-      {
-        name: "description",
-        content: "Browse gyms and training organizations on OpenRun.",
-      },
-      { property: "og:title", content: "Gyms & organizations — OpenRun" },
-      {
-        property: "og:description",
-        content: "Browse gyms and training organizations on OpenRun.",
-      },
-    ],
-  }),
+  head: () =>
+    pageHead({
+      path: "/orgs",
+      title: "Gyms & training organizations — OpenRun",
+      description:
+      "Browse gyms, courts, and training organizations on OpenRun. See hours, amenities, and member reviews.",
+    }),
   component: OrgsIndex,
 });
 

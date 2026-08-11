@@ -1,4 +1,5 @@
 import { createFileRoute, Link, useNavigate, notFound } from "@tanstack/react-router";
+import { pageHead } from "@/lib/seo";
 import { useEffect, useMemo, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -45,11 +46,14 @@ import { useAutosave } from "@/hooks/use-autosave";
 import { SaveStatus } from "@/components/SaveStatus";
 
 export const Route = createFileRoute("/teams/$teamId/edit")({
+  head: () =>
+    pageHead({
+      title: "Edit team — OpenRun",
+      description:
+      "Update your team's details, roster, venues, and availability.",
+      noindex: true,
+    }),
   ssr: false,
-  head: ({ params }) => {
-    const o = getOrgById(params.teamId);
-    return { meta: [{ title: o ? `Edit ${o.name} — OpenRun` : "Edit — OpenRun" }, { name: "robots", content: "noindex" }] };
-  },
   component: EditOrg,
   pendingComponent: () => (
     <div className="mx-auto max-w-md px-6 pt-24 text-center text-muted-foreground">

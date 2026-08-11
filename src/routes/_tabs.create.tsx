@@ -1,4 +1,5 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { pageHead } from "@/lib/seo";
 import { useEffect, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import {
@@ -44,7 +45,14 @@ import { PositionsPicker, positionsCleanup, type PositionsNeeded } from "@/compo
 
 
 export const Route = createFileRoute("/_tabs/create")({
-  head: () => ({ meta: [{ title: "Host a game — OpenRun" }] }),
+  head: () =>
+    pageHead({
+      path: "/create",
+      title: "Host a game — OpenRun",
+      description:
+      "Set up a pickup game: sport, venue, time, spots, and entry fee.",
+      noindex: true,
+    }),
   component: Create,
 });
 

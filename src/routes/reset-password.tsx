@@ -1,11 +1,19 @@
 import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
+import { pageHead } from "@/lib/seo";
 import { useEffect, useState } from "react";
 import { ArrowLeft } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 
 export const Route = createFileRoute("/reset-password")({
-  head: () => ({ meta: [{ title: "Reset password — OpenRun" }] }),
+  head: () =>
+    pageHead({
+      path: "/reset-password",
+      title: "Reset your password — OpenRun",
+      description:
+      "Set a new password for your OpenRun account.",
+      noindex: true,
+    }),
   component: ResetPasswordPage,
 });
 

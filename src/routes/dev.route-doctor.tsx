@@ -1,4 +1,5 @@
 import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
+import { pageHead } from "@/lib/seo";
 import { useEffect, useMemo, useState } from "react";
 import { ArrowLeft, CheckCircle2, RotateCcw, Search, Trash2, XCircle } from "lucide-react";
 
@@ -11,24 +12,14 @@ import {
 } from "@/lib/route-doctor";
 
 export const Route = createFileRoute("/dev/route-doctor")({
-  head: () => ({
-    meta: [
-      { title: "Route Doctor — 404 diagnostics | OpenRun" },
-      {
-        name: "description",
-        content:
-          "Reproduce broken links, test any path against the app's routes, and see recent 404s captured in this browser.",
-      },
-      { property: "og:title", content: "Route Doctor — 404 diagnostics" },
-      {
-        property: "og:description",
-        content: "Test any path against the app's routes and inspect recent 404s.",
-      },
-      { property: "og:type", content: "website" },
-      { name: "twitter:card", content: "summary" },
-      { name: "robots", content: "noindex" },
-    ],
-  }),
+  head: () =>
+    pageHead({
+      path: "/dev/route-doctor",
+      title: "Route Doctor — OpenRun",
+      description:
+      "Reproduce broken links, test any path against the app's routes, and see recent 404s.",
+      noindex: true,
+    }),
   component: RouteDoctorPage,
 });
 

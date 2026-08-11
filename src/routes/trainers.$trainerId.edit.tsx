@@ -1,19 +1,18 @@
 import { createFileRoute, Link, notFound } from "@tanstack/react-router";
+import { pageHead } from "@/lib/seo";
 import { ensureOrgById, getOrgById } from "@/lib/org-store";
 import type { Org } from "@/lib/sample-data";
 import { EditOrgScreen } from "./teams.$teamId.edit";
 
 export const Route = createFileRoute("/trainers/$trainerId/edit")({
+  head: () =>
+    pageHead({
+      title: "Edit trainer profile — OpenRun",
+      description:
+      "Update your trainer details, session types, and availability.",
+      noindex: true,
+    }),
   ssr: false,
-  head: ({ params }) => {
-    const o = getOrgById(params.trainerId);
-    return {
-      meta: [
-        { title: o ? `Edit ${o.name} — OpenRun` : "Edit — OpenRun" },
-        { name: "robots", content: "noindex" },
-      ],
-    };
-  },
   loader: async ({ params }) => {
     const org = await ensureOrgById(params.trainerId);
     if (!org) throw notFound();

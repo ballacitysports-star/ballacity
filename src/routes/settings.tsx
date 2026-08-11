@@ -1,4 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { pageHead } from "@/lib/seo";
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
 import {
   ArrowLeft,
@@ -54,16 +55,15 @@ import {
 } from "@/components/ui/alert-dialog";
 
 export const Route = createFileRoute("/settings")({
+  head: () =>
+    pageHead({
+      path: "/settings",
+      title: "Settings — OpenRun",
+      description:
+      "Manage your account, profiles, notifications, privacy, and security settings.",
+      noindex: true,
+    }),
   component: SettingsHubPage,
-  head: () => ({
-    meta: [
-      { title: "Settings" },
-      {
-        name: "description",
-        content: "Manage your account, notifications, and security settings.",
-      },
-    ],
-  }),
 });
 
 type Item = {

@@ -1,4 +1,5 @@
 import { createFileRoute, Link, notFound, useNavigate } from "@tanstack/react-router";
+import { pageHead } from "@/lib/seo";
 import { useEffect, useState } from "react";
 import { ArrowLeft, Check, ShieldAlert } from "lucide-react";
 import { toast } from "sonner";
@@ -14,14 +15,18 @@ import {
 import { LegalNotice } from "@/components/LegalNotice";
 
 export const Route = createFileRoute("/games/$gameId/payment-setup")({
+  head: () =>
+    pageHead({
+      title: "Payment setup — OpenRun",
+      description:
+      "Set the entry fee, accepted payment methods, and refund policy for your game.",
+      noindex: true,
+    }),
   loader: ({ params }) => {
     const game = GAMES.find((g) => g.id === params.gameId);
     if (!game) throw notFound();
     return { game };
   },
-  head: ({ loaderData }) => ({
-    meta: [{ title: `Payment setup — ${loaderData?.game.title ?? "game"}` }],
-  }),
   notFoundComponent: () => <div className="p-6 text-sm">Game not found.</div>,
   errorComponent: ({ reset }) => (
     <div className="p-6">

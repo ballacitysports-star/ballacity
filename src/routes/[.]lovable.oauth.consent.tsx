@@ -1,4 +1,5 @@
 import { createFileRoute, redirect } from "@tanstack/react-router";
+import { pageHead } from "@/lib/seo";
 import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -27,6 +28,13 @@ function oauth(): OAuthNs {
 }
 
 export const Route = createFileRoute("/.lovable/oauth/consent")({
+  head: () =>
+    pageHead({
+      title: "Authorize access — OpenRun",
+      description:
+      "Review and approve access for a connected application.",
+      noindex: true,
+    }),
   ssr: false,
   validateSearch: (s: Record<string, unknown>) => ({
     authorization_id: typeof s.authorization_id === "string" ? s.authorization_id : "",

@@ -1,4 +1,5 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { pageHead } from "@/lib/seo";
 import {
   ArrowLeft,
   Check,
@@ -52,7 +53,14 @@ import { useMyProfiles } from "@/lib/account-profiles";
 import { SaveStatus } from "@/components/SaveStatus";
 
 export const Route = createFileRoute("/profile/edit")({
-  head: () => ({ meta: [{ title: "Edit profile — OpenRun" }] }),
+  head: () =>
+    pageHead({
+      path: "/profile/edit",
+      title: "Edit your profile — OpenRun",
+      description:
+      "Update your sports, skill levels, photos, location, and links.",
+      noindex: true,
+    }),
   component: EditProfile,
 });
 

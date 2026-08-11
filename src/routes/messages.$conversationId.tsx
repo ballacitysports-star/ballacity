@@ -1,4 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { pageHead } from "@/lib/seo";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowLeft,
@@ -35,7 +36,13 @@ import { UserAvatar } from "@/components/UserAvatar";
 import { supabase } from "@/integrations/supabase/client";
 
 export const Route = createFileRoute("/messages/$conversationId")({
-  head: () => ({ meta: [{ title: "Chat — OpenRun" }] }),
+  head: () =>
+    pageHead({
+      title: "Chat — OpenRun",
+      description:
+      "A private OpenRun conversation.",
+      noindex: true,
+    }),
   component: Thread,
 });
 

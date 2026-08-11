@@ -1,4 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { pageHead } from "@/lib/seo";
 import type { User } from "@supabase/supabase-js";
 import { useEffect, useRef, useState } from "react";
 import { ArrowLeft } from "lucide-react";
@@ -19,7 +20,14 @@ import {
 } from "@/lib/account-type";
 
 export const Route = createFileRoute("/auth")({
-  head: () => ({ meta: [{ title: "Sign in — OpenRun" }] }),
+  head: () =>
+    pageHead({
+      path: "/auth",
+      title: "Sign in — OpenRun",
+      description:
+      "Sign in or create an OpenRun account to join and host pickup games.",
+      noindex: true,
+    }),
   validateSearch: (s: Record<string, unknown>) => {
     const next = sanitizeNextPath(s.next);
     return next ? { next } : {};

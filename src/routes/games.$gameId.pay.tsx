@@ -1,4 +1,5 @@
 import { createFileRoute, Link, notFound, useNavigate } from "@tanstack/react-router";
+import { pageHead } from "@/lib/seo";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ArrowLeft, ExternalLink, Upload, ShieldCheck, Clock, X, Check, CircleDashed, AlertCircle, RotateCw, Film, Image as ImageIcon, Trash2 } from "lucide-react";
 import { toast } from "sonner";
@@ -84,6 +85,13 @@ function launchExternalPayment(url: string) {
 }
 
 export const Route = createFileRoute("/games/$gameId/pay")({
+  head: () =>
+    pageHead({
+      title: "Pay for your spot — OpenRun",
+      description:
+      "Submit payment for your approved spot in this game.",
+      noindex: true,
+    }),
   validateSearch: (search: Record<string, unknown>) => {
     const out: { invite?: true; from?: string } = {};
     if (search.invite === "1" || search.invite === 1 || search.invite === true) out.invite = true;
@@ -93,9 +101,6 @@ export const Route = createFileRoute("/games/$gameId/pay")({
   loader: ({ params }) => ({
     gameId: params.gameId,
     game: GAMES.find((g) => g.id === params.gameId) ?? null,
-  }),
-  head: ({ loaderData }) => ({
-    meta: [{ title: `Pay for ${loaderData?.game?.title ?? "game"} — OpenRun` }],
   }),
   notFoundComponent: () => <div className="p-6 text-center text-sm">Game not found.</div>,
   errorComponent: ({ reset }) => (

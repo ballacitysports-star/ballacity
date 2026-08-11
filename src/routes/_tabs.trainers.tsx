@@ -1,4 +1,5 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { pageHead } from "@/lib/seo";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import { Megaphone, GraduationCap, MapPin, Building2 } from "lucide-react";
@@ -87,16 +88,14 @@ const trainersSearchSchema = z.object({
 
 
 export const Route = createFileRoute("/_tabs/trainers")({
-  head: () => ({
-    meta: [
-      { title: "Trainers & coaches — OpenRun" },
-      { name: "description", content: "Find and book trainers and coaches near you. Filter by sport, availability, and distance." },
-      { property: "og:title", content: "Trainers & coaches — OpenRun" },
-      { property: "og:description", content: "Find and book trainers and coaches near you." },
-      { property: "og:type", content: "website" },
-      { name: "twitter:card", content: "summary" },
-    ],
-  }),
+  head: () =>
+    pageHead({
+      path: "/trainers",
+      title: "Trainers & coaches — OpenRun",
+      description:
+      "Find and book trainers and coaches near you by sport, availability, and distance.",
+      noindex: true,
+    }),
   validateSearch: zodValidator(trainersSearchSchema),
   component: TrainersPage,
 });

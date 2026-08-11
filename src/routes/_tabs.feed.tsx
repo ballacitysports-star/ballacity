@@ -1,4 +1,5 @@
 import { createFileRoute, Link, useNavigate, useRouter } from "@tanstack/react-router";
+import { pageHead } from "@/lib/seo";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Loader2, RefreshCw } from "lucide-react";
 import { Bell, MessageCircle, MapPin } from "lucide-react";
@@ -51,7 +52,14 @@ const feedSearchSchema = z.object({
 });
 
 export const Route = createFileRoute("/_tabs/feed")({
-  head: () => ({ meta: [{ title: "Feed — OpenRun" }] }),
+  head: () =>
+    pageHead({
+      path: "/feed",
+      title: "Your feed — OpenRun",
+      description:
+      "Games, teams, and trainers picked for your sports, skill level, and distance.",
+      noindex: true,
+    }),
   validateSearch: zodValidator(feedSearchSchema),
   component: Feed,
 });

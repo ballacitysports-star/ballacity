@@ -1,4 +1,5 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { pageHead } from "@/lib/seo";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import { Megaphone, MapPin } from "lucide-react";
@@ -46,16 +47,14 @@ const teamsSearchSchema = z.object({
 });
 
 export const Route = createFileRoute("/_tabs/teams")({
-  head: () => ({
-    meta: [
-      { title: "Teams & clubs — OpenRun" },
-      { name: "description", content: "Discover teams and clubs near you. Follow squads, find tryouts, join open runs." },
-      { property: "og:title", content: "Teams & clubs — OpenRun" },
-      { property: "og:description", content: "Discover teams and clubs near you." },
-      { property: "og:type", content: "website" },
-      { name: "twitter:card", content: "summary" },
-    ],
-  }),
+  head: () =>
+    pageHead({
+      path: "/teams",
+      title: "Teams & clubs — OpenRun",
+      description:
+      "Discover teams and clubs near you. Follow squads, find tryouts, and join open runs.",
+      noindex: true,
+    }),
   validateSearch: zodValidator(teamsSearchSchema),
   component: TeamsPage,
 });

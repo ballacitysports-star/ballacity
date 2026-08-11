@@ -1,4 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { pageHead } from "@/lib/seo";
 import { ArrowLeft, Bell, BellOff, Check } from "lucide-react";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
@@ -16,6 +17,14 @@ import {
 } from "@/lib/notification-prefs";
 
 export const Route = createFileRoute("/account/notifications")({
+  head: () =>
+    pageHead({
+      path: "/account/notifications",
+      title: "Notification settings — OpenRun",
+      description:
+      "Choose which OpenRun notifications you get by push, email, and in-app.",
+      noindex: true,
+    }),
   component: NotificationSettingsPage,
 });
 

@@ -1,4 +1,5 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { pageHead } from "@/lib/seo";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
@@ -30,8 +31,15 @@ import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/admin/location-analytics")({
+  head: () =>
+    pageHead({
+      path: "/admin/location-analytics",
+      title: "Location analytics — OpenRun admin",
+      description:
+      "Internal analytics for location permission denials.",
+      noindex: true,
+    }),
   ssr: false,
-  head: () => ({ meta: [{ title: "Admin · Location Denial Analytics" }] }),
   component: LocationAnalyticsPage,
 });
 

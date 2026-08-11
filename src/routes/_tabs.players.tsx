@@ -1,4 +1,5 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { pageHead } from "@/lib/seo";
 import { useEffect, useMemo, useState } from "react";
 import { zodValidator, fallback } from "@tanstack/zod-adapter";
 import { z } from "zod";
@@ -126,7 +127,14 @@ const playersSearchSchema = z.object({
 
 
 export const Route = createFileRoute("/_tabs/players")({
-  head: () => ({ meta: [{ title: "Players — OpenRun" }] }),
+  head: () =>
+    pageHead({
+      path: "/players",
+      title: "Players near you — OpenRun",
+      description:
+      "Find available players and teammates nearby by sport, skill tier, and availability.",
+      noindex: true,
+    }),
   validateSearch: zodValidator(playersSearchSchema),
   component: PlayersPage,
 });

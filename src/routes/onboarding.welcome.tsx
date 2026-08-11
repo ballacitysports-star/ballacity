@@ -1,4 +1,5 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { pageHead } from "@/lib/seo";
 import { useEffect, useRef, useState } from "react";
 import { z } from "zod";
 import { toast } from "sonner";
@@ -32,7 +33,14 @@ const searchSchema = z.object({
 });
 
 export const Route = createFileRoute("/onboarding/welcome")({
-  head: () => ({ meta: [{ title: "Welcome — OpenRun" }] }),
+  head: () =>
+    pageHead({
+      path: "/onboarding/welcome",
+      title: "Set up your profile — OpenRun",
+      description:
+      "Add your sports, skill levels, location, and availability to finish setting up OpenRun.",
+      noindex: true,
+    }),
   validateSearch: searchSchema,
   component: OnboardingWelcomePage,
 });

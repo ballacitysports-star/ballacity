@@ -1,4 +1,5 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { pageHead } from "@/lib/seo";
 import { useEffect, useState } from "react";
 import {
   ArrowLeft,
@@ -38,7 +39,14 @@ import { zodValidator, fallback } from "@tanstack/zod-adapter";
 import { z } from "zod";
 
 export const Route = createFileRoute("/payments")({
-  head: () => ({ meta: [{ title: "Payments — OpenRun" }] }),
+  head: () =>
+    pageHead({
+      path: "/payments",
+      title: "Payments — OpenRun",
+      description:
+      "Manage payment methods, verify player payments, and review requests.",
+      noindex: true,
+    }),
   // URL-persisted state: top tab (methods/verify/requests) plus verify-panel
   // and requests-panel filters. Refresh or share preserves the exact view.
   validateSearch: zodValidator(

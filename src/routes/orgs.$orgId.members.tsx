@@ -1,4 +1,5 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { pageHead } from "@/lib/seo";
 import { useEffect, useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
@@ -18,13 +19,14 @@ import {
 } from "@/lib/trainer-orgs.functions";
 
 export const Route = createFileRoute("/orgs/$orgId/members")({
+  head: () =>
+    pageHead({
+      title: "Manage gym members — OpenRun",
+      description:
+      "Review requests and manage members of your gym.",
+      noindex: true,
+    }),
   ssr: false,
-  head: () => ({
-    meta: [
-      { title: "Manage members — OpenRun" },
-      { name: "robots", content: "noindex" },
-    ],
-  }),
   component: MembersPage,
   errorComponent: ({ error }) => (
     <div className="p-8 text-sm text-coral">{error.message}</div>

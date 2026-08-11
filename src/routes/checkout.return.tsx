@@ -1,7 +1,16 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { pageHead } from "@/lib/seo";
 import { CheckCircle2 } from "lucide-react";
 
 export const Route = createFileRoute("/checkout/return")({
+  head: () =>
+    pageHead({
+      path: "/checkout/return",
+      title: "Checkout complete — OpenRun",
+      description:
+      "Your OpenRun purchase confirmation and next steps.",
+      noindex: true,
+    }),
   validateSearch: (search: Record<string, unknown>): { session_id?: string } => ({
     session_id: typeof search.session_id === "string" ? search.session_id : undefined,
   }),
