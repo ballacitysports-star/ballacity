@@ -157,7 +157,6 @@ export const Route = createFileRoute("/api/public/og")({
           );
         } catch (err) {
 
-        } catch (err) {
           return new Response(`OG render failed: ${(err as Error).message}`, {
             status: 500,
             headers: { "Cache-Control": "no-store" },
