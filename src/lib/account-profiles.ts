@@ -230,6 +230,7 @@ export function useMyProfiles() {
     active: query.data?.active ?? null,
     activeId: query.data?.activeId ?? null,
     defaultId: query.data?.defaultId ?? null,
+    pendingKind: query.data?.pendingKind ?? null,
     loading: loading || query.isLoading,
     refetch: query.refetch,
   };
@@ -343,6 +344,28 @@ export function profileTypeLabel(kind: AccountType): string {
 }
 
 /** Route for adding another profile of a given type. */
+/**
+ * Escape hatch out of an unfinished team/trainer/gym registration: turns the
+ * account back into a plain player account and activates the player profile.
+ */
+export async function continueAsPlayer(): Promise<void> {
+  const { data: userRes } = await supabase.auth.getUser();
+  const uid = userRes.user?.id;
+  if (!uid) throw new Error("Not signed in");
+  const { data } = await supabase
+    .from("account_profiles")
+    .select("id")
+    .eq("user_id", uid)
+    .eq("kind", "player")
+    .maybeSingle();
+  const playerId = (data as { id?: string } | null)?.id ?? null;
+  const { error } = await supabase
+    .from("profiles")
+    .update({ account_type: "player", ...(playerId ? { active_profile_id: playerId } : {}) })
+    .eq("id", uid);
+  if (error) throw error;
+}
+
 export function addProfileRoute(kind: Exclude<AccountType, "player">): string {
   return kind === "team" ? "/teams/create" : kind === "trainer" ? "/trainers/create" : "/orgs/create";
 }
