@@ -29,8 +29,8 @@ type ViewModel = {
   bio: string | null;
   sports: string[];
   members: number | null;
-  editTo: { to: string; params: Record<string, string> };
-  publicTo: { to: string; params: Record<string, string> };
+  editTo: { to: string; params: Record<string, string | undefined> };
+  publicTo: { to: string; params: Record<string, string | undefined> };
 };
 
 /**
@@ -66,10 +66,8 @@ export function ActiveProfileView({ profile }: { profile: AccountProfile }) {
   }, [hosted, isGym, refId]);
 
   const reviews = useReviewsFor(refId);
-  const rep = useMemo(
-    () => computeReputation(reviews, isGym ? "gym" : profile.kind === "trainer" ? "coach" : "team"),
-    [reviews, isGym, profile.kind],
-  );
+  const revieweeKind: "trainer" | "team" = profile.kind === "trainer" ? "trainer" : "team";
+  const rep = useMemo(() => computeReputation(reviews, revieweeKind), [reviews, revieweeKind]);
 
   const [tab, setTab] = useState<"games" | "reviews">("games");
   const [aboutOpen, setAboutOpen] = useState(false);
@@ -242,7 +240,7 @@ export function ActiveProfileView({ profile }: { profile: AccountProfile }) {
               <Star className="h-3.5 w-3.5" /> {rep.count} review{rep.count === 1 ? "" : "s"}
             </p>
           )}
-          <ReviewsSection subjectId={refId} />
+          <ReviewsSection revieweeId={refId} revieweeKind={revieweeKind} revieweeName={vm.name} isOwner />
         </section>
       </div>
     </>
