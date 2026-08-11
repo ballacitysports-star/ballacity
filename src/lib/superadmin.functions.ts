@@ -551,13 +551,15 @@ export const superadminModerate = createServerFn({ method: "POST" })
         break;
     }
 
-    const { data: before } = await admin
+    const db = admin as any;
+    const { data: before } = await db
       .from(cfg.table)
       .select(cfg.select)
       .eq(cfg.idCol, data.id)
       .maybeSingle();
 
-    const { error } = await admin.from(cfg.table).update(patch as any).eq(cfg.idCol, data.id);
+    const { error } = await db.from(cfg.table).update(patch as any).eq(cfg.idCol, data.id);
+
     if (error) throw new Error(error.message);
 
     await writeAudit(admin, context.userId, {
