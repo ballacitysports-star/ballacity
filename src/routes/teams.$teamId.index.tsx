@@ -1,4 +1,5 @@
 import { createFileRoute, Link, notFound, redirect } from "@tanstack/react-router";
+import { pageHead } from "@/lib/seo";
 import { motion } from "framer-motion";
 import { useEffect, useMemo, useState } from "react";
 import { zodValidator, fallback } from "@tanstack/zod-adapter";
@@ -43,8 +44,28 @@ import {
 
 export const Route = createFileRoute("/teams/$teamId/")({
   head: ({ loaderData, params }) => {
-    const o = loaderData ?? ORGS.find((x) => x.id === params.teamId);
-    return { meta: [{ title: o ? `${(o as Org).name} — OpenRun` : "Team — OpenRun" }] };
+    const o = (loaderData ?? ORGS.find((x) => x.id === params.teamId)) as Org | undefined;
+    const name = o?.name ?? "Team";
+    return pageHead({
+      path: `/teams/${params.teamId}`,
+      title: `${name} — Team on OpenRun`,
+      description: (
+        o?.bio ||
+        o?.tagline ||
+        `Follow ${name} on OpenRun: roster, games, tryouts, and reviews.`
+      ).slice(0, 155),
+      image: o?.cover?.startsWith("http") ? o.cover : null,
+      jsonLd: o
+        ? {
+            "@context": "https://schema.org",
+            "@type": "SportsTeam",
+            name: o.name,
+            sport: o.sports?.join(", "),
+            address: o.city ?? undefined,
+            url: `https://open-run-connect.lovable.app/teams/${params.teamId}`,
+          }
+        : undefined,
+    });
   },
   // URL-persisted view: active tab (posts/about/games), post-kind filter,
   // and reviews modal. Refreshing or sharing the URL restores the same view.

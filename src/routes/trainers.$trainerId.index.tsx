@@ -1,4 +1,5 @@
 import { createFileRoute, Link, notFound, redirect } from "@tanstack/react-router";
+import { pageHead } from "@/lib/seo";
 import { motion } from "framer-motion";
 import { useEffect, useMemo, useState } from "react";
 import { zodValidator, fallback } from "@tanstack/zod-adapter";
@@ -52,32 +53,30 @@ export const Route = createFileRoute("/trainers/$trainerId/")({
     }),
   ),
 
-  head: ({ loaderData }) => {
+  head: ({ loaderData, params }) => {
     const o = loaderData as Org | undefined;
-    if (!o) {
-      return {
-        meta: [
-          { title: "Trainer — OpenRun" },
-          { name: "robots", content: "noindex" },
-        ],
-      };
-    }
-    const desc = (o.bio || o.tagline || `Book ${o.name} on OpenRun.`).slice(0, 155);
-    return {
-      meta: [
-        { title: `${o.name} — Trainer on OpenRun` },
-        { name: "description", content: desc },
-        { property: "og:title", content: `${o.name} — Trainer on OpenRun` },
-        { property: "og:description", content: desc },
-        ...(o.cover?.startsWith("http")
-          ? [
-              { property: "og:image", content: o.cover },
-              { name: "twitter:image", content: o.cover },
-              { name: "twitter:card", content: "summary_large_image" },
-            ]
-          : []),
-      ],
-    };
+    const name = o?.name ?? "Trainer";
+    return pageHead({
+      path: `/trainers/${params.trainerId}`,
+      title: `${name} — Trainer on OpenRun`,
+      description: (
+        o?.bio ||
+        o?.tagline ||
+        `Book sessions with ${name} on OpenRun: session types, venues, and availability.`
+      ).slice(0, 155),
+      image: o?.cover?.startsWith("http") ? o.cover : null,
+      noindex: !o,
+      jsonLd: o
+        ? {
+            "@context": "https://schema.org",
+            "@type": "Person",
+            name: o.name,
+            jobTitle: "Coach",
+            address: o.city ?? undefined,
+            url: `https://open-run-connect.lovable.app/trainers/${params.trainerId}`,
+          }
+        : undefined,
+    });
   },
   loader: async ({ params }) => {
     const org = await ensureOrgById(params.trainerId);

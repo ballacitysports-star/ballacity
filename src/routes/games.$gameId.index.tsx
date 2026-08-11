@@ -1,4 +1,5 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { pageHead } from "@/lib/seo";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   ArrowLeft,
@@ -171,15 +172,29 @@ export const Route = createFileRoute("/games/$gameId/")({
   loader: ({ params }) => {
     return { gameId: params.gameId };
   },
-  head: ({ loaderData }) => {
+  head: ({ loaderData, params }) => {
     const game = loaderData ? GAMES.find((g) => g.id === loaderData.gameId) : undefined;
-    return {
-      meta: [
-        { title: `${game?.title ?? "Game"} — OpenRun` },
-        { name: "description", content: game?.description },
-        { property: "og:image", content: game?.image },
-      ],
-    };
+    const name = game?.title ?? "Pickup game";
+    return pageHead({
+      path: `/games/${params.gameId}`,
+      title: `${name} — OpenRun`,
+      description: (
+        game?.description ?? "See the details for this pickup game and request to join on OpenRun."
+      ).slice(0, 155),
+      ogType: "article",
+      image: game?.image ?? null,
+      jsonLd: game
+        ? {
+            "@context": "https://schema.org",
+            "@type": "SportsEvent",
+            name: game.title,
+            startDate: game.date,
+            location: { "@type": "Place", name: game.location, address: game.neighborhood },
+            sport: game.sport,
+            url: `https://open-run-connect.lovable.app/games/${params.gameId}`,
+          }
+        : undefined,
+    });
   },
   notFoundComponent: () => (
     <div className="min-h-dvh grid place-items-center px-6 text-center">

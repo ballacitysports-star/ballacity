@@ -1,4 +1,5 @@
 import { createFileRoute, Link, notFound } from "@tanstack/react-router";
+import { pageHead } from "@/lib/seo";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { useAuth } from "@/hooks/use-auth";
@@ -43,17 +44,29 @@ import {
 } from "@/lib/trainer-orgs.functions";
 
 export const Route = createFileRoute("/orgs/$orgId")({
-  head: ({ loaderData }) => {
+  head: ({ loaderData, params }) => {
     const o = (loaderData as Awaited<ReturnType<typeof getTrainerOrg>> | undefined) ?? null;
-    if (!o?.org) {
-      return { meta: [{ title: "Gym — OpenRun" }, { name: "robots", content: "noindex" }] };
-    }
-    return {
-      meta: [
-        { title: `${o.org.name} — Gym on OpenRun` },
-        { name: "description", content: (o.org.bio || `${o.org.name} on OpenRun.`).slice(0, 155) },
-      ],
-    };
+    const org = o?.org;
+    const name = org?.name ?? "Gym";
+    return pageHead({
+      path: `/orgs/${params.orgId}`,
+      title: `${name} — Gym on OpenRun`,
+      description: (
+        org?.bio || `${name} on OpenRun: hours, amenities, trainers, and member reviews.`
+      ).slice(0, 155),
+      image: org?.cover_url?.startsWith("http") ? org.cover_url : null,
+      noindex: !org,
+      jsonLd: org
+        ? {
+            "@context": "https://schema.org",
+            "@type": "SportsActivityLocation",
+            name: org.name,
+            address: org.address ?? org.city ?? undefined,
+            telephone: org.phone ?? undefined,
+            url: `https://open-run-connect.lovable.app/orgs/${params.orgId}`,
+          }
+        : undefined,
+    });
   },
   loader: async ({ params }) => {
     const res = await getTrainerOrg({ data: { id: params.orgId } });

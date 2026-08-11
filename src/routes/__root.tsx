@@ -124,21 +124,27 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1, viewport-fit=cover" },
-      { title: "OpenRun — Pickup sports, on demand" },
+      { title: "OpenRun" },
       {
         name: "description",
-        content:
-          "Find and host pickup sports games near you. Basketball, soccer, pickleball, tennis and more — join a game in seconds.",
+        content: "OpenRun — pickup sports games, teams, trainers, and gyms near you.",
       },
       { name: "author", content: "OpenRun" },
-      { property: "og:title", content: "OpenRun — Pickup sports, on demand" },
-      {
-        property: "og:description",
-        content: "Find and host pickup sports games near you in seconds.",
-      },
+      { property: "og:site_name", content: "OpenRun" },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
       { name: "twitter:site", content: "@Lovable" },
+    ],
+    scripts: [
+      {
+        type: "application/ld+json",
+        children: JSON.stringify({
+          "@context": "https://schema.org",
+          "@type": "WebSite",
+          name: "OpenRun",
+          url: "https://open-run-connect.lovable.app",
+        }),
+      },
     ],
     links: [
       { rel: "preconnect", href: "https://fonts.googleapis.com" },
