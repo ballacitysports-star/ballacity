@@ -48,7 +48,7 @@ import {
 } from "@/components/profile/ProfileLinksFields";
 
 import { useAutosave } from "@/hooks/use-autosave";
-import { useAccountType } from "@/lib/account-type";
+import { useMyProfiles } from "@/lib/account-profiles";
 import { SaveStatus } from "@/components/SaveStatus";
 
 export const Route = createFileRoute("/profile/edit")({
@@ -70,8 +70,8 @@ function EditProfile() {
   const profileUser = user ?? confirmedUser;
   const profile = useMyProfile(profileUser);
   const prefs = useFeedPrefs();
-  const { accountType, loading: accountTypeLoading } = useAccountType();
-  const showOrgs = !accountTypeLoading && accountType !== null && accountType !== "player";
+  const { active: activeProfile, loading: accountTypeLoading } = useMyProfiles();
+  const showOrgs = !accountTypeLoading && !!activeProfile && activeProfile.kind !== "player";
   const nav = useNavigate();
 
   const [name, setName] = useState(profile?.name ?? "");
