@@ -2131,7 +2131,7 @@ export type Database = {
       unsend_message: { Args: { _id: string }; Returns: undefined }
     }
     Enums: {
-      app_role: "admin" | "moderator"
+      app_role: "admin" | "moderator" | "superadmin"
       trainer_org_role: "owner" | "admin" | "member"
     }
     CompositeTypes: {
@@ -2260,7 +2260,7 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
-      app_role: ["admin", "moderator"],
+      app_role: ["admin", "moderator", "superadmin"],
       trainer_org_role: ["owner", "admin", "member"],
     },
   },
