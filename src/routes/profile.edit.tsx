@@ -112,15 +112,10 @@ function EditProfile() {
   const markDirty = () => setIsDirty(true);
 
   const [preferredSports, setPreferredSports] = useState<Sport[]>(prefs.preferredSports);
-  const [sections, setSections] = useState(prefs.sections);
 
   const toggleSport = (s: Sport) => {
     markDirty();
     setPreferredSports((prev) => (prev.includes(s) ? prev.filter((x) => x !== s) : [...prev, s]));
-  };
-  const toggleSection = (k: keyof typeof sections) => {
-    markDirty();
-    setSections((prev) => ({ ...prev, [k]: !prev[k] }));
   };
 
   useEffect(() => {
