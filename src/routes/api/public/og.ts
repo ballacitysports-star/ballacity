@@ -65,6 +65,30 @@ function template(opts: {
   </div>`;
 }
 
+/** Cache for a day in the browser, a year at the edge; previews are immutable per URL. */
+const CACHE_CONTROL = "public, max-age=86400, s-maxage=31536000, stale-while-revalidate=604800, stale-if-error=604800, immutable";
+
+/** Bump when the card design changes so old ETags stop matching. */
+const OG_VERSION = "v1";
+
+async function etagFor(parts: string) {
+  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(parts));
+  const hex = Array.from(new Uint8Array(digest))
+    .slice(0, 16)
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
+  return `"${OG_VERSION}-${hex}"`;
+}
+
+const matchesEtag = (header: string | null, etag: string) => {
+  if (!header) return false;
+  if (header.trim() === "*") return true;
+  return header
+    .split(",")
+    .map((t) => t.trim().replace(/^W\//, ""))
+    .includes(etag);
+};
+
 export const Route = createFileRoute("/api/public/og")({
   server: {
     handlers: {
@@ -80,17 +104,35 @@ export const Route = createFileRoute("/api/public/og")({
           .filter(Boolean)
           .slice(0, 3);
 
+        const etag = await etagFor(
+          JSON.stringify([OG_VERSION, kindKey in KINDS ? kindKey : "page", title, subtitle, meta]),
+        );
+
+        const cacheHeaders = {
+          "Cache-Control": CACHE_CONTROL,
+          ETag: etag,
+          Vary: "Accept-Encoding",
+        };
+
+        if (matchesEtag(request.headers.get("if-none-match"), etag)) {
+          return new Response(null, { status: 304, headers: cacheHeaders });
+        }
+
         try {
           return new ImageResponse(htmlToReact(template({ kind, title, subtitle, meta })), {
             width: OG_WIDTH,
             height: OG_HEIGHT,
             format: "png",
-            headers: { "Cache-Control": "public, max-age=3600, s-maxage=86400" },
+            headers: { ...cacheHeaders, "Content-Type": "image/png" },
           });
         } catch (err) {
-          return new Response(`OG render failed: ${(err as Error).message}`, { status: 500 });
+          return new Response(`OG render failed: ${(err as Error).message}`, {
+            status: 500,
+            headers: { "Cache-Control": "no-store" },
+          });
         }
       },
     },
   },
 });
+
