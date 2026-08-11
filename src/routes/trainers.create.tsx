@@ -1,12 +1,26 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { CreateTrainerWizard } from "@/components/create/CreateTrainerWizard";
 import { AccountTypeGate } from "@/components/AccountTypeGate";
+import { FinishSetupNotice } from "@/components/FinishSetupNotice";
 
 export const Route = createFileRoute("/trainers/create")({
+  validateSearch: (search: Record<string, unknown>): { finish?: number } => ({
+    finish: search.finish ? 1 : undefined,
+  }),
   head: () => ({ meta: [{ title: "Create a trainer profile — OpenRun" }] }),
-  component: () => (
+  component: CreateTrainerPage,
+});
+
+function CreateTrainerPage() {
+  const { finish } = Route.useSearch();
+  return (
     <AccountTypeGate requires="trainer">
+      {finish ? (
+        <div className="mx-auto w-full max-w-md p-4 pb-0 sm:max-w-2xl lg:max-w-5xl">
+          <FinishSetupNotice kind="trainer" />
+        </div>
+      ) : null}
       <CreateTrainerWizard />
     </AccountTypeGate>
-  ),
-});
+  );
+}
