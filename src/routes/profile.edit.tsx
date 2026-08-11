@@ -112,15 +112,10 @@ function EditProfile() {
   const markDirty = () => setIsDirty(true);
 
   const [preferredSports, setPreferredSports] = useState<Sport[]>(prefs.preferredSports);
-  const [sections, setSections] = useState(prefs.sections);
 
   const toggleSport = (s: Sport) => {
     markDirty();
     setPreferredSports((prev) => (prev.includes(s) ? prev.filter((x) => x !== s) : [...prev, s]));
-  };
-  const toggleSection = (k: keyof typeof sections) => {
-    markDirty();
-    setSections((prev) => ({ ...prev, [k]: !prev[k] }));
   };
 
   useEffect(() => {
@@ -215,7 +210,7 @@ function EditProfile() {
       links: cleanedLinks,
     });
     // Keep the feed's distance filter aligned with the profile preference.
-    setFeedPrefs({ ...prefs, preferredSports, sections, maxDistanceMi: searchRadiusMi });
+    setFeedPrefs({ ...prefs, preferredSports, maxDistanceMi: searchRadiusMi });
 
     // Persist publicly visible fields so other users can see them.
     const { supabase } = await import("@/integrations/supabase/client");
@@ -291,7 +286,6 @@ function EditProfile() {
       sports,
       links,
       preferredSports,
-      sections,
     },
     enabled: !!profileUser,
     validate,
@@ -306,7 +300,6 @@ function EditProfile() {
   const reset = () => {
     markDirty();
     setPreferredSports(DEFAULT_PREFS.preferredSports);
-    setSections(DEFAULT_PREFS.sections);
   };
 
   return (
@@ -649,19 +642,6 @@ function EditProfile() {
           })}
         </div>
 
-        <div className="text-xs text-muted-foreground mb-2">Sections to show</div>
-        <div className="space-y-2">
-          <Toggle
-            label="Needs players now (urgent)"
-            checked={sections.showUrgent}
-            onChange={() => toggleSection("showUrgent")}
-          />
-          <Toggle
-            label='"For you" list'
-            checked={sections.showForYou}
-            onChange={() => toggleSection("showForYou")}
-          />
-        </div>
         <p className="mt-3 text-xs text-muted-foreground">
           Price, distance and “my games” filters now live in the feed's filter sheet, where you can
           also save them as reusable views.
