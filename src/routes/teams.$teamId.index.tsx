@@ -1,5 +1,5 @@
 import { createFileRoute, Link, notFound, redirect } from "@tanstack/react-router";
-import { pageHead } from "@/lib/seo";
+import { pageHead, ogImageUrl } from "@/lib/seo";
 import { motion } from "framer-motion";
 import { useEffect, useMemo, useState } from "react";
 import { zodValidator, fallback } from "@tanstack/zod-adapter";
@@ -60,7 +60,12 @@ export const Route = createFileRoute("/teams/$teamId/")({
         o?.tagline ||
         `Follow ${name} on OpenRun: roster, games, tryouts, and reviews.`
       ).slice(0, 155),
-      image: o?.cover?.startsWith("http") ? o.cover : null,
+      image: ogImageUrl({
+        kind: "team",
+        title: name,
+        subtitle: o?.tagline ?? o?.city ?? "Team on OpenRun",
+        meta: [o?.sports?.[0], o?.city, "Roster & games"],
+      }),
       jsonLd: o
         ? {
             "@context": "https://schema.org",

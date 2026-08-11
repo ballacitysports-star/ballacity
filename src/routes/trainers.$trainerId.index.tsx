@@ -1,5 +1,5 @@
 import { createFileRoute, Link, notFound, redirect } from "@tanstack/react-router";
-import { pageHead } from "@/lib/seo";
+import { pageHead, ogImageUrl } from "@/lib/seo";
 import { motion } from "framer-motion";
 import { useEffect, useMemo, useState } from "react";
 import { zodValidator, fallback } from "@tanstack/zod-adapter";
@@ -64,7 +64,12 @@ export const Route = createFileRoute("/trainers/$trainerId/")({
         o?.tagline ||
         `Book sessions with ${name} on OpenRun: session types, venues, and availability.`
       ).slice(0, 155),
-      image: o?.cover?.startsWith("http") ? o.cover : null,
+      image: ogImageUrl({
+        kind: "trainer",
+        title: name,
+        subtitle: o?.tagline ?? o?.city ?? "Trainer on OpenRun",
+        meta: [o?.sports?.[0], o?.city, "Book a session"],
+      }),
       noindex: !o,
       jsonLd: o
         ? {
