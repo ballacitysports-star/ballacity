@@ -18,7 +18,8 @@ import {
   UserCog,
   BadgeCheck,
 } from "lucide-react";
-import { ACCOUNT_TYPE_META, useAccountType } from "@/lib/account-type";
+import { ACCOUNT_TYPE_META } from "@/lib/account-type";
+import { useMyProfiles } from "@/lib/account-profiles";
 import { ProfileSwitcher } from "@/components/ProfileSwitcher";
 import { useMyProfile } from "@/lib/user-prefs-store";
 import {
@@ -265,7 +266,10 @@ function AccountIdentityRow() {
 }
 
 function OnboardingDetailsSection() {
-  const { accountType, loading } = useAccountType();
+  // Derived from the active profile so the section follows a profile switch
+  // immediately (the account_type read has its own state and would go stale).
+  const { active, loading } = useMyProfiles();
+  const accountType = active?.kind ?? null;
   if (loading || !accountType) return null;
   const meta = ACCOUNT_TYPE_META[accountType];
   return (
