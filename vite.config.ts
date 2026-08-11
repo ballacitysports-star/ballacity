@@ -15,6 +15,10 @@ export default defineConfig({
     server: { entry: "server" },
   },
   vite: {
-    plugins: [mcpPlugin()],
+    // vite-plugin-wasm lets the OG image renderer (workers-og: yoga + resvg wasm)
+    // load its wasm modules in dev and in the Worker build.
+    plugins: [mcpPlugin(), wasm()],
+    ssr: { noExternal: ["workers-og"] },
+    optimizeDeps: { exclude: ["workers-og"] },
   },
 });
