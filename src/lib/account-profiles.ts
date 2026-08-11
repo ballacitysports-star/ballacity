@@ -199,7 +199,15 @@ export function useMyProfiles() {
     queryKey: myProfilesKey(user?.id),
     queryFn: () => fetchMyProfiles(user!.id),
     enabled: !!user && !loading,
-    staleTime: 30_000,
+    // The active profile decides what Settings, profile edit and the Profile
+    // tab render, so it must never be served from a stale window: refetch on
+    // every mount and when the tab regains focus (a switch can happen on
+    // another device or in another tab). Cached data still renders instantly,
+    // so this only trades a background request for correctness.
+    staleTime: 0,
+    refetchOnMount: "always",
+    refetchOnWindowFocus: true,
+    placeholderData: (prev) => prev,
   });
   return {
     profiles: query.data?.profiles ?? [],
@@ -210,6 +218,7 @@ export function useMyProfiles() {
     refetch: query.refetch,
   };
 }
+
 
 
 export function useActiveProfile() {
@@ -255,14 +264,35 @@ export async function setActiveProfileByRef(kind: AccountType, refId: string): P
 export function useSwitchProfile() {
   const qc = useQueryClient();
   const { user } = useAuth();
+  const key = myProfilesKey(user?.id);
   return useMutation({
     mutationFn: (profile: AccountProfile) => setActiveProfile(profile),
+    // Write the new active profile into the cache before the refetch lands so
+    // Settings, profile edit and the Profile tab flip over on the same tick.
+    onMutate: (profile) => {
+      const prev = qc.getQueryData<MyProfilesResult>(key);
+      if (prev) {
+        qc.setQueryData<MyProfilesResult>(key, {
+          ...prev,
+          activeId: profile.id,
+          active: prev.profiles.find((p) => p.id === profile.id) ?? profile,
+        });
+      }
+      return { prev };
+    },
+    onError: (_e, _profile, ctx) => {
+      if (ctx?.prev) qc.setQueryData(key, ctx.prev);
+    },
     onSuccess: async () => {
-      await qc.invalidateQueries({ queryKey: myProfilesKey(user?.id) });
-      await qc.invalidateQueries();
+      // `refetchType: "all"` also refreshes queries that are currently
+      // unmounted (Settings / profile edit when opened from another tab), so
+      // they never mount with pre-switch data.
+      await qc.invalidateQueries({ queryKey: key });
+      await qc.invalidateQueries({ refetchType: "all" });
     },
   });
 }
+
 
 /**
  * Stores the profile the app should start in. Saved on the account, so it

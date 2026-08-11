@@ -1,7 +1,8 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 import { toast } from "sonner";
-import { setActiveProfileByRef } from "@/lib/account-profiles";
+import { setActiveProfileByRef, myProfilesKey } from "@/lib/account-profiles";
+import { useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
 import { useEffect } from "react";
@@ -27,6 +28,7 @@ export const Route = createFileRoute("/orgs/create")({
 
 function CreateOrg() {
   const navigate = useNavigate();
+  const qc = useQueryClient();
   const [userId, setUserId] = useState<string | null>(null);
   const [value, setValue] = useState<OrgFormValue>(() => ({
     ...emptyOrgForm(),
@@ -66,6 +68,9 @@ function CreateOrg() {
       });
 
       await setActiveProfileByRef("gym", id).catch(() => {});
+      // Drop cached profile lists so Settings / profile edit pick the new
+      // active profile up on their next mount instead of the pre-create one.
+      await qc.invalidateQueries({ queryKey: myProfilesKey(userId), refetchType: "all" });
       clearDraft();
       toast.success("Gym created");
       navigate({ to: "/orgs/$orgId", params: { orgId: id } });
