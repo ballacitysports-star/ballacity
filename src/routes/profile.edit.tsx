@@ -210,7 +210,7 @@ function EditProfile() {
       links: cleanedLinks,
     });
     // Keep the feed's distance filter aligned with the profile preference.
-    setFeedPrefs({ ...prefs, preferredSports, sections, maxDistanceMi: searchRadiusMi });
+    setFeedPrefs({ ...prefs, preferredSports, maxDistanceMi: searchRadiusMi });
 
     // Persist publicly visible fields so other users can see them.
     const { supabase } = await import("@/integrations/supabase/client");
