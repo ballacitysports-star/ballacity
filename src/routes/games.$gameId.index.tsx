@@ -1036,7 +1036,7 @@ function GameDetail() {
 
       {/* Tabs: Overview / Payments */}
       {isPaid && (
-        <div className="mx-auto w-full max-w-md sm:max-w-2xl lg:max-w-4xl px-4 mt-4">
+        <div className="page-shell mt-4">
           <div className="flex gap-1 rounded-full border border-border bg-surface p-1 text-xs">
             <button
               type="button"
@@ -1078,7 +1078,7 @@ function GameDetail() {
       )}
 
       {isPaid && activeTab === "payments" && (
-        <div className="mx-auto w-full max-w-md sm:max-w-2xl lg:max-w-4xl px-4 mt-4">
+        <div className="page-shell mt-4">
           {isHost ? (
             <HostPaymentsPanel
               gameId={game.id}
@@ -1091,7 +1091,7 @@ function GameDetail() {
         </div>
       )}
 
-      <div className={`mx-auto w-full max-w-md sm:max-w-2xl lg:max-w-4xl px-4 mt-5 space-y-5 ${isPaid && activeTab !== "overview" ? "hidden" : ""}`}>
+      <div className={`page-shell mt-5 space-y-5 ${isPaid && activeTab !== "overview" ? "hidden" : ""}`}>
         {/* Invite deep-link banner */}
         {isInvite &&
           !isHost &&
@@ -1479,7 +1479,7 @@ function GameDetail() {
         {/* Host reviews popup */}
         <Dialog open={reviewsOpen} onOpenChange={setReviewsOpen}>
           <DialogContent
-            className="max-h-[90dvh] overflow-y-auto p-0 sm:max-w-xl"
+            className="max-h-[90dvh] w-[min(100%,40rem)] overflow-y-auto p-0"
             aria-labelledby="host-reviews-title"
             aria-describedby="host-reviews-desc"
           >
@@ -1755,7 +1755,7 @@ function GameDetail() {
         )}
 
         <Sheet open={positionRosterOpen} onOpenChange={setPositionRosterOpen}>
-          <SheetContent side="right" className="w-full sm:max-w-md overflow-y-auto">
+          <SheetContent side="right" className="w-[min(100%,28rem)] overflow-y-auto">
             <SheetHeader>
               <SheetTitle>Roster by position</SheetTitle>
               <SheetDescription>
@@ -1950,7 +1950,7 @@ function GameDetail() {
 
       {/* Host controls */}
       {isHost && (
-        <div className={`mx-auto w-full max-w-md sm:max-w-2xl lg:max-w-4xl px-4 mt-4 space-y-3 ${isPaid && activeTab !== "overview" ? "hidden" : ""}`}>
+        <div className={`page-shell mt-4 space-y-3 ${isPaid && activeTab !== "overview" ? "hidden" : ""}`}>
           {/* Manage game: edit, start, close joining */}
           <div className="rounded-2xl border border-border bg-surface p-3">
             <div className="flex items-center justify-between gap-2">
@@ -2239,7 +2239,7 @@ function GameDetail() {
 
       {/* Sticky CTA */}
       <div className="fixed bottom-[calc(env(safe-area-inset-bottom)+6rem)] left-0 right-0 z-30 px-4 pb-[max(env(safe-area-inset-bottom),0.75rem)] pt-3 backdrop-blur-xl bg-background/80 border-t border-border">
-        <div className="mx-auto max-w-md">
+        <div className="mx-auto w-[min(100%,28rem)]">
         {!isHost && !joined && !isPending && !isConfirmed && !isApproved && (
           <JoinBlockedReason gate={viewerGate} className="mb-2" waitlistHint />
         )}
@@ -2694,7 +2694,7 @@ function EditGameModal({
       role="dialog"
       aria-modal="true"
     >
-      <div className="w-full max-w-md rounded-2xl border border-border bg-surface p-4 max-h-[85vh] overflow-y-auto">
+      <div className="w-[min(100%,40rem)] rounded-2xl border border-border bg-surface p-4 max-h-[85vh] overflow-y-auto">
         <div className="flex items-center justify-between">
           <h2 className="font-display text-lg font-bold">Edit game</h2>
           <button

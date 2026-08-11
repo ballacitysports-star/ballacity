@@ -165,6 +165,13 @@ html.light {
   }
 }
 
+@utility page-shell {
+  margin-inline: auto;
+  width: 100%;
+  max-width: min(100%, 72rem);
+  padding-inline: clamp(0.75rem, 4vw, 2rem);
+}
+
 @layer utilities {
   .glow-lime { box-shadow: var(--shadow-glow-primary); }
   .glow-coral { box-shadow: var(--shadow-glow-secondary); }
