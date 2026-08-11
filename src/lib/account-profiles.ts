@@ -199,7 +199,15 @@ export function useMyProfiles() {
     queryKey: myProfilesKey(user?.id),
     queryFn: () => fetchMyProfiles(user!.id),
     enabled: !!user && !loading,
-    staleTime: 30_000,
+    // The active profile decides what Settings, profile edit and the Profile
+    // tab render, so it must never be served from a stale window: refetch on
+    // every mount and when the tab regains focus (a switch can happen on
+    // another device or in another tab). Cached data still renders instantly,
+    // so this only trades a background request for correctness.
+    staleTime: 0,
+    refetchOnMount: "always",
+    refetchOnWindowFocus: true,
+    placeholderData: (prev) => prev,
   });
   return {
     profiles: query.data?.profiles ?? [],
@@ -210,6 +218,7 @@ export function useMyProfiles() {
     refetch: query.refetch,
   };
 }
+
 
 
 export function useActiveProfile() {
