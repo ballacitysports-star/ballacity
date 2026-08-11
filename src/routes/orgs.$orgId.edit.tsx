@@ -1,4 +1,5 @@
 import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
+import { pageHead } from "@/lib/seo";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -20,15 +21,16 @@ import { useAutosave } from "@/hooks/use-autosave";
 import { SaveStatus } from "@/components/SaveStatus";
 
 export const Route = createFileRoute("/orgs/$orgId/edit")({
+  head: () =>
+    pageHead({
+      title: "Edit gym — OpenRun",
+      description: "Update your gym's details, hours, amenities, and photos.",
+      noindex: true,
+    }),
   ssr: false,
-  head: () => ({ meta: [{ title: "Edit gym — OpenRun" }] }),
   component: EditOrg,
-  errorComponent: ({ error }) => (
-    <div className="p-8 text-sm text-coral">{error.message}</div>
-  ),
-  notFoundComponent: () => (
-    <div className="p-8 text-sm text-muted-foreground">Gym not found.</div>
-  ),
+  errorComponent: ({ error }) => <div className="p-8 text-sm text-coral">{error.message}</div>,
+  notFoundComponent: () => <div className="p-8 text-sm text-muted-foreground">Gym not found.</div>,
 });
 
 type Member = {
@@ -133,7 +135,6 @@ function EditOrg() {
     }
   }, [orgQ.data, value]);
 
-
   const isOwner = !!userId && orgQ.data?.owner_id === userId;
   const isAdmin =
     isOwner ||
@@ -190,9 +191,7 @@ function EditOrg() {
     return (
       <div className="mx-auto max-w-md p-8 text-center space-y-3">
         <ShieldCheck className="mx-auto h-8 w-8 text-muted-foreground" />
-        <p className="text-sm text-muted-foreground">
-          Only owners and admins can edit this gym.
-        </p>
+        <p className="text-sm text-muted-foreground">Only owners and admins can edit this gym.</p>
         <Link
           to="/orgs/$orgId"
           params={{ orgId }}
@@ -243,9 +242,7 @@ function EditOrg() {
 
       <header>
         <h1 className="font-display text-3xl font-bold">Edit gym.</h1>
-        <p className="text-sm text-muted-foreground mt-1">
-          Update details, branding, and members.
-        </p>
+        <p className="text-sm text-muted-foreground mt-1">Update details, branding, and members.</p>
         <SaveStatus {...autosave} className="mt-2" />
       </header>
 
@@ -269,7 +266,8 @@ function EditOrg() {
           </span>
         </div>
         <p className="text-[11px] text-muted-foreground">
-          Trainers linked to this gym. Owners can promote to admin, demote to member, or transfer ownership.
+          Trainers linked to this gym. Owners can promote to admin, demote to member, or transfer
+          ownership.
         </p>
         {membersQ.isLoading ? (
           <div className="text-xs text-muted-foreground">Loading…</div>
@@ -370,9 +368,7 @@ function EditOrg() {
           <ul className="space-y-2">
             {(genericMembersQ.data ?? []).map((m) => {
               const name = m.profile?.display_name || "Member";
-              const initials =
-                m.profile?.avatar_initials ||
-                name.slice(0, 2).toUpperCase();
+              const initials = m.profile?.avatar_initials || name.slice(0, 2).toUpperCase();
               return (
                 <li
                   key={m.id}
@@ -380,7 +376,11 @@ function EditOrg() {
                 >
                   <div className="grid h-9 w-9 place-items-center overflow-hidden rounded-full bg-lime-gradient text-xs font-bold text-primary-foreground">
                     {m.profile?.avatar_url ? (
-                      <img src={m.profile.avatar_url} alt="" className="h-full w-full object-cover" />
+                      <img
+                        src={m.profile.avatar_url}
+                        alt=""
+                        className="h-full w-full object-cover"
+                      />
                     ) : (
                       initials
                     )}

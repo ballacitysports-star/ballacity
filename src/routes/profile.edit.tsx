@@ -1,14 +1,6 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import {
-  ArrowLeft,
-  Check,
-  Plus,
-  Users,
-  Trophy,
-  BarChart3,
-  CreditCard,
-  Video,
-} from "lucide-react";
+import { pageHead } from "@/lib/seo";
+import { ArrowLeft, Check, Plus, Users, Trophy, BarChart3, CreditCard, Video } from "lucide-react";
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import type { User } from "@supabase/supabase-js";
@@ -52,7 +44,13 @@ import { useMyProfiles } from "@/lib/account-profiles";
 import { SaveStatus } from "@/components/SaveStatus";
 
 export const Route = createFileRoute("/profile/edit")({
-  head: () => ({ meta: [{ title: "Edit profile — OpenRun" }] }),
+  head: () =>
+    pageHead({
+      path: "/profile/edit",
+      title: "Edit your profile — OpenRun",
+      description: "Update your sports, skill levels, photos, location, and links.",
+      noindex: true,
+    }),
   component: EditProfile,
 });
 
@@ -113,8 +111,6 @@ function EditProfile() {
 
   const markDirty = () => setIsDirty(true);
 
-
-
   const [preferredSports, setPreferredSports] = useState<Sport[]>(prefs.preferredSports);
   const [sections, setSections] = useState(prefs.sections);
 
@@ -126,9 +122,6 @@ function EditProfile() {
     markDirty();
     setSections((prev) => ({ ...prev, [k]: !prev[k] }));
   };
-
-
-
 
   useEffect(() => {
     if (user) setConfirmedUser(user);
@@ -181,8 +174,6 @@ function EditProfile() {
   }
 
   const linkErrors = links.map((l) => validateProfileUrl(l.url));
-
-
 
   const gradNum = graduatingClass.trim() ? parseInt(graduatingClass, 10) : NaN;
   const currentYear = new Date().getFullYear();
@@ -263,8 +254,6 @@ function EditProfile() {
       );
     }
 
-
-
     // Onboarding skips its write when the fingerprint matches its last save.
     // Clearing it here keeps the two screens in sync: re-entering onboarding
     // after editing here always persists the values it shows.
@@ -286,8 +275,6 @@ function EditProfile() {
       },
     });
   };
-
-
 
   const autosave = useAutosave({
     value: {
@@ -343,7 +330,6 @@ function EditProfile() {
         </button>
       </div>
 
-
       <Section title="Basics">
         <ProfileBasicsFields
           userId={profileUser?.id}
@@ -381,7 +367,6 @@ function EditProfile() {
         <ProfileLocationFields
           showCity={false}
           value={{ city, searchRadiusMi }}
-
           onChange={(patch) => {
             markDirty();
             if ("city" in patch) setCity(patch.city!);
@@ -411,116 +396,130 @@ function EditProfile() {
         />
       </Section>
 
-
       {showOrgs && (
-      <Section
-        title="My organizations"
-        right={
-          <div className="flex items-center gap-1.5">
-            <Link
-              to="/teams/create"
-              className="inline-flex items-center gap-1 rounded-full border border-border bg-surface px-2.5 py-1 text-xs font-bold hover:border-lime/40"
-            >
-              <Plus className="h-3 w-3" /> Team
-            </Link>
-            <Link
-              to="/trainers/create"
-              className="inline-flex items-center gap-1 rounded-full border border-border bg-surface px-2.5 py-1 text-xs font-bold hover:border-lime/40"
-            >
-              <Plus className="h-3 w-3" /> Trainer
-            </Link>
-            <Link
-              to="/orgs/create"
-              className="inline-flex items-center gap-1 rounded-full border border-border bg-surface px-2.5 py-1 text-xs font-bold hover:border-lime/40"
-            >
-              <Plus className="h-3 w-3" /> Gym
-            </Link>
-          </div>
-        }
-      >
-        {(() => {
-          const myGyms = allGyms.filter((g) => g.owner_id === profileUser?.id);
-          const isEmpty = myOrgs.length === 0 && myGyms.length === 0;
-          if (isEmpty) {
+        <Section
+          title="My organizations"
+          right={
+            <div className="flex items-center gap-1.5">
+              <Link
+                to="/teams/create"
+                className="inline-flex items-center gap-1 rounded-full border border-border bg-surface px-2.5 py-1 text-xs font-bold hover:border-lime/40"
+              >
+                <Plus className="h-3 w-3" /> Team
+              </Link>
+              <Link
+                to="/trainers/create"
+                className="inline-flex items-center gap-1 rounded-full border border-border bg-surface px-2.5 py-1 text-xs font-bold hover:border-lime/40"
+              >
+                <Plus className="h-3 w-3" /> Trainer
+              </Link>
+              <Link
+                to="/orgs/create"
+                className="inline-flex items-center gap-1 rounded-full border border-border bg-surface px-2.5 py-1 text-xs font-bold hover:border-lime/40"
+              >
+                <Plus className="h-3 w-3" /> Gym
+              </Link>
+            </div>
+          }
+        >
+          {(() => {
+            const myGyms = allGyms.filter((g) => g.owner_id === profileUser?.id);
+            const isEmpty = myOrgs.length === 0 && myGyms.length === 0;
+            if (isEmpty) {
+              return (
+                <div className="rounded-3xl border border-dashed border-border bg-surface/40 p-5 text-center">
+                  <div className="mx-auto grid h-12 w-12 place-items-center rounded-2xl bg-lime/15 text-lime mb-2">
+                    <Users className="h-6 w-6" />
+                  </div>
+                  <div className="font-display text-base font-bold">
+                    Start a team, trainer, or gym
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Post tryouts, run pickups, build your following.
+                  </p>
+                  <div className="mt-4 grid grid-cols-3 gap-2">
+                    <Link
+                      to="/teams/create"
+                      className="rounded-2xl bg-lime-gradient py-2.5 text-xs font-bold text-primary-foreground glow-lime"
+                    >
+                      Team
+                    </Link>
+                    <Link
+                      to="/trainers/create"
+                      className="rounded-2xl border border-border bg-surface py-2.5 text-xs font-bold hover:border-lime/40"
+                    >
+                      Trainer
+                    </Link>
+                    <Link
+                      to="/orgs/create"
+                      className="rounded-2xl border border-border bg-surface py-2.5 text-xs font-bold hover:border-lime/40"
+                    >
+                      Gym
+                    </Link>
+                  </div>
+                </div>
+              );
+            }
             return (
-              <div className="rounded-3xl border border-dashed border-border bg-surface/40 p-5 text-center">
-                <div className="mx-auto grid h-12 w-12 place-items-center rounded-2xl bg-lime/15 text-lime mb-2">
-                  <Users className="h-6 w-6" />
-                </div>
-                <div className="font-display text-base font-bold">Start a team, trainer, or gym</div>
-                <p className="text-xs text-muted-foreground mt-1">
-                  Post tryouts, run pickups, build your following.
-                </p>
-                <div className="mt-4 grid grid-cols-3 gap-2">
-                  <Link
-                    to="/teams/create"
-                    className="rounded-2xl bg-lime-gradient py-2.5 text-xs font-bold text-primary-foreground glow-lime"
-                  >
-                    Team
-                  </Link>
-                  <Link
-                    to="/trainers/create"
-                    className="rounded-2xl border border-border bg-surface py-2.5 text-xs font-bold hover:border-lime/40"
-                  >
-                    Trainer
-                  </Link>
-                  <Link
-                    to="/orgs/create"
-                    className="rounded-2xl border border-border bg-surface py-2.5 text-xs font-bold hover:border-lime/40"
-                  >
-                    Gym
-                  </Link>
-                </div>
+              <div className="space-y-3">
+                {myOrgs.map((o, i) => (
+                  <OrgCard key={o.id} org={o} index={i} />
+                ))}
+                {myGyms.map((g) => {
+                  const img = g.cover_url || g.avatar_url || null;
+                  const isImg =
+                    typeof g.avatar === "string" && /^(https?:\/\/|\/|data:)/i.test(g.avatar);
+                  return (
+                    <Link
+                      key={g.id}
+                      to="/orgs/$orgId"
+                      params={{ orgId: g.id }}
+                      className="flex items-center gap-3 rounded-2xl border border-border bg-surface p-3 hover:border-lime/40 transition-colors"
+                    >
+                      <div className="relative grid h-12 w-12 shrink-0 place-items-center overflow-hidden rounded-xl bg-lime/15 text-lime">
+                        {g.avatar_url ? (
+                          <img
+                            src={g.avatar_url}
+                            alt=""
+                            className="absolute inset-0 h-full w-full object-cover"
+                          />
+                        ) : isImg ? (
+                          <img
+                            src={g.avatar as string}
+                            alt=""
+                            className="absolute inset-0 h-full w-full object-cover"
+                          />
+                        ) : img ? (
+                          <img
+                            src={img}
+                            alt=""
+                            className="absolute inset-0 h-full w-full object-cover"
+                          />
+                        ) : (
+                          <Dumbbell className="h-5 w-5" />
+                        )}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2">
+                          <div className="font-semibold text-sm truncate">{g.name}</div>
+                          <span className="rounded-full bg-lime/15 px-1.5 py-0.5 text-[10px] font-bold text-lime">
+                            Gym
+                          </span>
+                        </div>
+                        <div className="text-xs text-muted-foreground truncate">
+                          @{g.handle}
+                          {g.city ? ` · ${g.city}` : ""}
+                        </div>
+                      </div>
+                      <div className="text-lime text-xs font-bold">→</div>
+                    </Link>
+                  );
+                })}
               </div>
             );
-          }
-          return (
-            <div className="space-y-3">
-              {myOrgs.map((o, i) => (
-                <OrgCard key={o.id} org={o} index={i} />
-              ))}
-              {myGyms.map((g) => {
-                const img = g.cover_url || g.avatar_url || null;
-                const isImg = typeof g.avatar === "string" && /^(https?:\/\/|\/|data:)/i.test(g.avatar);
-                return (
-                  <Link
-                    key={g.id}
-                    to="/orgs/$orgId"
-                    params={{ orgId: g.id }}
-                    className="flex items-center gap-3 rounded-2xl border border-border bg-surface p-3 hover:border-lime/40 transition-colors"
-                  >
-                    <div className="relative grid h-12 w-12 shrink-0 place-items-center overflow-hidden rounded-xl bg-lime/15 text-lime">
-                      {g.avatar_url ? (
-                        <img src={g.avatar_url} alt="" className="absolute inset-0 h-full w-full object-cover" />
-                      ) : isImg ? (
-                        <img src={g.avatar as string} alt="" className="absolute inset-0 h-full w-full object-cover" />
-                      ) : img ? (
-                        <img src={img} alt="" className="absolute inset-0 h-full w-full object-cover" />
-                      ) : (
-                        <Dumbbell className="h-5 w-5" />
-                      )}
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-2">
-                        <div className="font-semibold text-sm truncate">{g.name}</div>
-                        <span className="rounded-full bg-lime/15 px-1.5 py-0.5 text-[10px] font-bold text-lime">
-                          Gym
-                        </span>
-                      </div>
-                      <div className="text-xs text-muted-foreground truncate">
-                        @{g.handle}{g.city ? ` · ${g.city}` : ""}
-                      </div>
-                    </div>
-                    <div className="text-lime text-xs font-bold">→</div>
-                  </Link>
-                );
-              })}
-            </div>
-          );
-        })()}
-      </Section>
+          })()}
+        </Section>
       )}
-
 
       <Section title="Reviews">
         <Link
@@ -667,7 +666,6 @@ function EditProfile() {
           Price, distance and “my games” filters now live in the feed's filter sheet, where you can
           also save them as reusable views.
         </p>
-
       </Section>
 
       <div className="mt-6 flex items-center justify-between gap-3">
@@ -682,6 +680,3 @@ function EditProfile() {
     </div>
   );
 }
-
-
-

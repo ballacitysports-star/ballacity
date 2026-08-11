@@ -1,4 +1,5 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { pageHead } from "@/lib/seo";
 import { useEffect, useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
@@ -18,20 +19,16 @@ import {
 } from "@/lib/trainer-orgs.functions";
 
 export const Route = createFileRoute("/orgs/$orgId/members")({
+  head: () =>
+    pageHead({
+      title: "Manage gym members — OpenRun",
+      description: "Review requests and manage members of your gym.",
+      noindex: true,
+    }),
   ssr: false,
-  head: () => ({
-    meta: [
-      { title: "Manage members — OpenRun" },
-      { name: "robots", content: "noindex" },
-    ],
-  }),
   component: MembersPage,
-  errorComponent: ({ error }) => (
-    <div className="p-8 text-sm text-coral">{error.message}</div>
-  ),
-  notFoundComponent: () => (
-    <div className="p-8 text-sm text-muted-foreground">Gym not found.</div>
-  ),
+  errorComponent: ({ error }) => <div className="p-8 text-sm text-coral">{error.message}</div>,
+  notFoundComponent: () => <div className="p-8 text-sm text-muted-foreground">Gym not found.</div>,
 });
 
 function MembersPage() {
@@ -110,9 +107,7 @@ function MembersPage() {
     return (
       <div className="mx-auto max-w-md p-8 text-center space-y-3">
         <Shield className="mx-auto h-8 w-8 text-muted-foreground" />
-        <p className="text-sm text-muted-foreground">
-          Only owners and admins can manage members.
-        </p>
+        <p className="text-sm text-muted-foreground">Only owners and admins can manage members.</p>
         <Link
           to="/orgs/$orgId"
           params={{ orgId }}
@@ -273,9 +268,7 @@ function MembersPage() {
           <h2 className="text-xs uppercase tracking-wider font-bold text-muted-foreground">
             Pending requests
           </h2>
-          <span className="text-[11px] text-muted-foreground">
-            {(requestsQ.data ?? []).length}
-          </span>
+          <span className="text-[11px] text-muted-foreground">{(requestsQ.data ?? []).length}</span>
         </div>
         {requestsQ.isLoading ? (
           <div className="text-xs text-muted-foreground">Loading…</div>
@@ -333,9 +326,7 @@ function MembersPage() {
           <h2 className="text-xs uppercase tracking-wider font-bold text-muted-foreground">
             Members
           </h2>
-          <span className="text-[11px] text-muted-foreground">
-            {(membersQ.data ?? []).length}
-          </span>
+          <span className="text-[11px] text-muted-foreground">{(membersQ.data ?? []).length}</span>
         </div>
         {membersQ.isLoading ? (
           <div className="text-xs text-muted-foreground">Loading…</div>
@@ -367,9 +358,7 @@ function MembersPage() {
                   <div className="flex items-center gap-1">
                     <select
                       value={roleValue}
-                      onChange={(e) =>
-                        onSetRole(m.user_id, e.target.value as "admin" | "member")
-                      }
+                      onChange={(e) => onSetRole(m.user_id, e.target.value as "admin" | "member")}
                       className="rounded-lg border border-border bg-surface px-2 py-1 text-xs"
                     >
                       <option value="member">member</option>

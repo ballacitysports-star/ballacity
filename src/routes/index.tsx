@@ -1,4 +1,5 @@
 import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
+import { pageHead } from "@/lib/seo";
 import { motion } from "framer-motion";
 import { ArrowRight, MapPin, Sparkles, Trophy, Users, Video, Zap } from "lucide-react";
 import { useEffect } from "react";
@@ -13,29 +14,26 @@ import { isAccountType } from "@/lib/account-type";
 import { supabase } from "@/integrations/supabase/client";
 
 export const Route = createFileRoute("/")({
-  head: () => ({
-    meta: [
-      { title: "OpenRun — Pickup sports, on demand" },
-      {
-        name: "description",
-        content:
-          "Find and host pickup sports games near you. Basketball, soccer, pickleball, tennis and more — join a game in seconds.",
+  head: () =>
+    pageHead({
+      path: "/",
+      title: "OpenRun — Pickup sports games near you",
+      description:
+        "Find and host pickup sports games near you. Basketball, soccer, pickleball, tennis and more — join a game in seconds.",
+      jsonLd: {
+        "@context": "https://schema.org",
+        "@type": "WebSite",
+        name: "OpenRun",
+        url: "https://open-run-connect.lovable.app",
       },
-      { property: "og:title", content: "OpenRun — Pickup sports, on demand" },
-      {
-        property: "og:description",
-        content: "Find and host pickup sports games near you in seconds.",
-      },
-    ],
-  }),
+    }),
   component: Landing,
 });
 
 function Landing() {
   const router = useRouter();
   const { user, loading } = useAuth();
-  const hasStoredSession =
-    typeof window !== "undefined" ? !!readStoredSupabaseSession() : false;
+  const hasStoredSession = typeof window !== "undefined" ? !!readStoredSupabaseSession() : false;
 
   useEffect(() => {
     if (loading || !user) return;

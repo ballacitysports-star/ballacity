@@ -1,24 +1,18 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { pageHead } from "@/lib/seo";
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { Building2, Plus, Search, ShieldCheck } from "lucide-react";
 import { listTrainerOrgs } from "@/lib/trainer-orgs.functions";
 
 export const Route = createFileRoute("/orgs/")({
-  head: () => ({
-    meta: [
-      { title: "Gyms & organizations — OpenRun" },
-      {
-        name: "description",
-        content: "Browse gyms and training organizations on OpenRun.",
-      },
-      { property: "og:title", content: "Gyms & organizations — OpenRun" },
-      {
-        property: "og:description",
-        content: "Browse gyms and training organizations on OpenRun.",
-      },
-    ],
-  }),
+  head: () =>
+    pageHead({
+      path: "/orgs",
+      title: "Gyms & training organizations — OpenRun",
+      description:
+        "Browse gyms, courts, and training organizations on OpenRun. See hours, amenities, and member reviews.",
+    }),
   component: OrgsIndex,
 });
 
@@ -83,7 +77,11 @@ function OrgsIndex() {
               >
                 <div className="grid h-14 w-14 shrink-0 place-items-center overflow-hidden rounded-2xl border border-border bg-lime-gradient font-display text-base font-bold text-primary-foreground">
                   {(o as { avatar_url?: string | null }).avatar_url ? (
-                    <img src={(o as { avatar_url: string }).avatar_url} alt="" className="h-full w-full object-cover" />
+                    <img
+                      src={(o as { avatar_url: string }).avatar_url}
+                      alt=""
+                      className="h-full w-full object-cover"
+                    />
                   ) : o.avatar && (o.avatar.startsWith("http") || o.avatar.startsWith("/")) ? (
                     <img src={o.avatar} alt="" className="h-full w-full object-cover" />
                   ) : (

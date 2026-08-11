@@ -1,4 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { pageHead } from "@/lib/seo";
 import { ArrowLeft, Package } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/use-auth";
@@ -7,12 +8,12 @@ import { PaymentTestModeBanner } from "@/components/PaymentTestModeBanner";
 import { MERCH_ITEMS } from "@/lib/catalog";
 
 export const Route = createFileRoute("/shop")({
-  head: () => ({
-    meta: [
-      { title: "Shop — OpenRun" },
-      { name: "description", content: "OpenRun merch: tees, hoodies, and snapback hats." },
-    ],
-  }),
+  head: () =>
+    pageHead({
+      path: "/shop",
+      title: "Shop — OpenRun",
+      description: "OpenRun gear and merch for players, teams, and trainers.",
+    }),
   component: ShopPage,
 });
 

@@ -1,4 +1,5 @@
 import { createFileRoute, Link, useNavigate, notFound } from "@tanstack/react-router";
+import { pageHead } from "@/lib/seo";
 import { useEffect, useMemo, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -16,7 +17,12 @@ import {
 } from "lucide-react";
 import { SPORTS, HERO_IMAGE, type Sport, type Org } from "@/lib/sample-data";
 import { getOrgById, ensureOrgById, updateOrg, deleteOrg, isMyOrg } from "@/lib/org-store";
-import { validateSlots, validateOverrides, validateRules, type DayOverride } from "@/lib/availability-slots";
+import {
+  validateSlots,
+  validateOverrides,
+  validateRules,
+  type DayOverride,
+} from "@/lib/availability-slots";
 import type { AvailabilityRule } from "@/lib/availability-resolve";
 import { AvailabilityCalendar } from "@/components/AvailabilityCalendar";
 import { AvailabilityRulesEditor } from "@/components/AvailabilityRulesEditor";
@@ -45,11 +51,13 @@ import { useAutosave } from "@/hooks/use-autosave";
 import { SaveStatus } from "@/components/SaveStatus";
 
 export const Route = createFileRoute("/teams/$teamId/edit")({
+  head: () =>
+    pageHead({
+      title: "Edit team — OpenRun",
+      description: "Update your team's details, roster, venues, and availability.",
+      noindex: true,
+    }),
   ssr: false,
-  head: ({ params }) => {
-    const o = getOrgById(params.teamId);
-    return { meta: [{ title: o ? `Edit ${o.name} — OpenRun` : "Edit — OpenRun" }, { name: "robots", content: "noindex" }] };
-  },
   component: EditOrg,
   pendingComponent: () => (
     <div className="mx-auto max-w-md px-6 pt-24 text-center text-muted-foreground">
@@ -58,7 +66,9 @@ export const Route = createFileRoute("/teams/$teamId/edit")({
   ),
   errorComponent: ({ error }) => (
     <div className="mx-auto max-w-md px-6 pt-24 text-center">
-      <p className="text-muted-foreground">{error instanceof Error ? error.message : "Couldn't open editor."}</p>
+      <p className="text-muted-foreground">
+        {error instanceof Error ? error.message : "Couldn't open editor."}
+      </p>
       <Link
         to="/teams"
         className="mt-4 inline-block rounded-full bg-lime px-4 py-2 text-sm font-bold text-primary-foreground"
@@ -108,7 +118,10 @@ function initials(name: string) {
 }
 
 function slugifyHandle(name: string) {
-  return name.toLowerCase().replace(/[^a-z0-9_]+/g, "").slice(0, 20);
+  return name
+    .toLowerCase()
+    .replace(/[^a-z0-9_]+/g, "")
+    .slice(0, 20);
 }
 
 type OrgChoice = {
@@ -148,7 +161,9 @@ export function EditOrgScreen({ org }: { org: Org }) {
   const [homeCourt, setHomeCourt] = useState(org.homeCourt ?? "");
   const [wins, setWins] = useState(org.record?.w ?? 1);
   const [losses, setLosses] = useState(org.record?.l ?? 0);
-  const [staff, setStaff] = useState<{ name: string; role: string; avatar: string }[]>(org.staff ?? []);
+  const [staff, setStaff] = useState<{ name: string; role: string; avatar: string }[]>(
+    org.staff ?? [],
+  );
   const [staffName, setStaffName] = useState("");
   const [staffRole, setStaffRole] = useState("");
 
@@ -169,8 +184,10 @@ export function EditOrgScreen({ org }: { org: Org }) {
   const [verifiedVenues, setVerifiedVenues] = useState<Set<string>>(
     () => new Set((org.venueAddresses ?? []).map((v) => v.trim().toLowerCase()).filter(Boolean)),
   );
-  const [venueGeoMap, setVenueGeoMap] = useState<Record<string, { placeId: string; lat: number; lng: number }>>(
-    () => Object.fromEntries(
+  const [venueGeoMap, setVenueGeoMap] = useState<
+    Record<string, { placeId: string; lat: number; lng: number }>
+  >(() =>
+    Object.fromEntries(
       (org.venueGeo ?? []).map((g) => [
         g.address.trim().toLowerCase(),
         { placeId: g.placeId, lat: g.lat, lng: g.lng },
@@ -195,7 +212,10 @@ export function EditOrgScreen({ org }: { org: Org }) {
     staleTime: 30_000,
   });
   useEffect(() => {
-    const m = membership.data as { role: string; org: { id: string; name: string } } | null | undefined;
+    const m = membership.data as
+      | { role: string; org: { id: string; name: string } }
+      | null
+      | undefined;
     if (!m || !m.org) return;
     setInitialOrgId(m.org.id);
     setOrgChoice({ mode: "existing", orgId: m.org.id, name: m.org.name });
@@ -213,7 +233,9 @@ export function EditOrgScreen({ org }: { org: Org }) {
   const { coords: userCoords, status: geoStatus, request: requestUserLocation } = useUserLocation();
   const [orgSearchDebounced, setOrgSearchDebounced] = useState("");
   const [placesSessionToken, setPlacesSessionToken] = useState<string>(() =>
-    typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).slice(2),
+    typeof crypto !== "undefined" && crypto.randomUUID
+      ? crypto.randomUUID()
+      : Math.random().toString(36).slice(2),
   );
   useEffect(() => {
     const t = window.setTimeout(() => setOrgSearchDebounced(orgSearch.trim()), 250);
@@ -256,7 +278,9 @@ export function EditOrgScreen({ org }: { org: Org }) {
     });
     const tokenAtPick = placesSessionToken;
     setPlacesSessionToken(
-      typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).slice(2),
+      typeof crypto !== "undefined" && crypto.randomUUID
+        ? crypto.randomUUID()
+        : Math.random().toString(36).slice(2),
     );
     try {
       const details = await placesDetails({ data: { placeId: id, sessionToken: tokenAtPick } });
@@ -367,7 +391,8 @@ export function EditOrgScreen({ org }: { org: Org }) {
     availabilityOverrides: kind === "coach" ? overrides : undefined,
     availabilityRules: kind === "coach" ? rules : undefined,
     timezone: kind === "coach" ? timezone : undefined,
-    venueAddresses: kind === "coach" ? venueAddresses.filter((a) => a.trim().length > 0) : undefined,
+    venueAddresses:
+      kind === "coach" ? venueAddresses.filter((a) => a.trim().length > 0) : undefined,
     primaryVenue:
       kind === "coach"
         ? primaryVenue && venueAddresses.map((v) => v.trim()).includes(primaryVenue.trim())
@@ -389,15 +414,21 @@ export function EditOrgScreen({ org }: { org: Org }) {
 
       if (nextMode === "existing" && orgChoice.orgId && orgChoice.orgId !== currentId) {
         if (currentId) {
-          try { await leaveOrg({ data: { orgId: currentId, trainerId: org.id } }); }
-          catch (e) { console.warn("[edit-org] leave failed", e); }
+          try {
+            await leaveOrg({ data: { orgId: currentId, trainerId: org.id } });
+          } catch (e) {
+            console.warn("[edit-org] leave failed", e);
+          }
         }
         await joinOrg({ data: { orgId: orgChoice.orgId, trainerId: org.id } });
         newId = orgChoice.orgId;
       } else if (nextMode === "new" && orgChoice.name) {
         if (currentId) {
-          try { await leaveOrg({ data: { orgId: currentId, trainerId: org.id } }); }
-          catch (e) { console.warn("[edit-org] leave failed", e); }
+          try {
+            await leaveOrg({ data: { orgId: currentId, trainerId: org.id } });
+          } catch (e) {
+            console.warn("[edit-org] leave failed", e);
+          }
         }
         const baseSlug = slugifyHandle(orgChoice.name);
         const suffix = Date.now().toString(36).slice(-4);
@@ -429,7 +460,6 @@ export function EditOrgScreen({ org }: { org: Org }) {
     }
   }
 
-
   function validateOrg(): string | null {
     if (!name.trim()) return "name is required";
     if (kind === "coach" && slotsError) return slotsError.message;
@@ -459,30 +489,34 @@ export function EditOrgScreen({ org }: { org: Org }) {
       ratePerHour: kind === "coach" ? rate : undefined,
       sessionTypes: kind === "coach" ? sessionTypes : undefined,
       skillRange: kind === "coach" ? { min: skillMin, max: skillMax } : undefined,
-      availabilitySlots: kind === "coach"
-        ? slots
-            .filter((s) => s.start && s.end && s.end > s.start)
-            .map((s) => ({
-              ...s,
-              venue:
-                s.venue && venueAddresses.map((v) => v.trim()).includes(s.venue.trim())
-                  ? s.venue.trim()
-                  : undefined,
-            }))
-        : undefined,
+      availabilitySlots:
+        kind === "coach"
+          ? slots
+              .filter((s) => s.start && s.end && s.end > s.start)
+              .map((s) => ({
+                ...s,
+                venue:
+                  s.venue && venueAddresses.map((v) => v.trim()).includes(s.venue.trim())
+                    ? s.venue.trim()
+                    : undefined,
+              }))
+          : undefined,
       availabilityOverrides: kind === "coach" ? overrides : undefined,
       availabilityRules: kind === "coach" ? rules : undefined,
       timezone: kind === "coach" ? timezone : undefined,
-      venueAddresses: kind === "coach"
-        ? venueAddresses.map((a) => a.trim()).filter((a) => a.length > 0)
-        : undefined,
+      venueAddresses:
+        kind === "coach"
+          ? venueAddresses.map((a) => a.trim()).filter((a) => a.length > 0)
+          : undefined,
       verifiedVenues: kind === "coach" ? Array.from(verifiedVenues) : undefined,
-      venueGeo: kind === "coach" ? buildVenueGeo(venueAddresses, verifiedVenues, venueGeoMap) : undefined,
-      primaryVenue: kind === "coach"
-        ? primaryVenue && venueAddresses.map((v) => v.trim()).includes(primaryVenue.trim())
-          ? primaryVenue.trim()
-          : null
-        : undefined,
+      venueGeo:
+        kind === "coach" ? buildVenueGeo(venueAddresses, verifiedVenues, venueGeoMap) : undefined,
+      primaryVenue:
+        kind === "coach"
+          ? primaryVenue && venueAddresses.map((v) => v.trim()).includes(primaryVenue.trim())
+            ? primaryVenue.trim()
+            : null
+          : undefined,
       league: kind === "team" ? league : undefined,
       record: kind === "team" ? { w: wins, l: losses } : undefined,
       homeCourt: kind === "team" ? homeCourt : undefined,
@@ -493,10 +527,35 @@ export function EditOrgScreen({ org }: { org: Org }) {
 
   const autosave = useAutosave({
     value: {
-      name, handle, tagline, city, founded, sports, cover, computedAvatar, accent, bio,
-      achievements, credentials, rate, sessionTypes, skillMin, skillMax, slots, overrides,
-      rules, timezone, venueAddresses, verifiedVenues: Array.from(verifiedVenues), venueGeoMap,
-      primaryVenue, league, wins, losses, homeCourt, staff,
+      name,
+      handle,
+      tagline,
+      city,
+      founded,
+      sports,
+      cover,
+      computedAvatar,
+      accent,
+      bio,
+      achievements,
+      credentials,
+      rate,
+      sessionTypes,
+      skillMin,
+      skillMax,
+      slots,
+      overrides,
+      rules,
+      timezone,
+      venueAddresses,
+      verifiedVenues: Array.from(verifiedVenues),
+      venueGeoMap,
+      primaryVenue,
+      league,
+      wins,
+      losses,
+      homeCourt,
+      staff,
     },
     validate: validateOrg,
     save: persistOrg,
@@ -504,7 +563,10 @@ export function EditOrgScreen({ org }: { org: Org }) {
 
   async function save() {
     const invalid = validateOrg();
-    if (invalid) { alert(invalid); return; }
+    if (invalid) {
+      alert(invalid);
+      return;
+    }
     try {
       await autosave.flush();
       if (kind === "coach") await applyOrgChoiceChange();
@@ -532,7 +594,10 @@ export function EditOrgScreen({ org }: { org: Org }) {
   }
   function addStaff() {
     if (!staffName.trim() || !staffRole.trim()) return;
-    setStaff((s) => [...s, { name: staffName.trim(), role: staffRole.trim(), avatar: initials(staffName) }]);
+    setStaff((s) => [
+      ...s,
+      { name: staffName.trim(), role: staffRole.trim(), avatar: initials(staffName) },
+    ]);
     setStaffName("");
     setStaffRole("");
   }
@@ -704,7 +769,12 @@ export function EditOrgScreen({ org }: { org: Org }) {
               </Section>
 
               <Section title="City">
-                <LocationAutocomplete value={city} onChange={setCity} placeholder="Brooklyn, NY" mode="city" />
+                <LocationAutocomplete
+                  value={city}
+                  onChange={setCity}
+                  placeholder="Brooklyn, NY"
+                  mode="city"
+                />
               </Section>
 
               <Section title="Tagline (optional)">
@@ -715,7 +785,9 @@ export function EditOrgScreen({ org }: { org: Org }) {
                   placeholder="One line that sums you up"
                   className="w-full rounded-2xl border border-border bg-surface px-4 py-3 text-sm outline-none focus:border-lime"
                 />
-                <div className="text-right text-[10px] text-muted-foreground">{tagline.length}/80</div>
+                <div className="text-right text-[10px] text-muted-foreground">
+                  {tagline.length}/80
+                </div>
               </Section>
 
               <Section title="Year founded">
@@ -747,8 +819,14 @@ export function EditOrgScreen({ org }: { org: Org }) {
                   pathPrefix={user?.id ?? org.id}
                   value={customCover ? cover : ""}
                   fallback={cover}
-                  onChange={(url) => { setCover(url); setCustomCover(true); }}
-                  onClear={() => { setCover(HERO_IMAGE); setCustomCover(false); }}
+                  onChange={(url) => {
+                    setCover(url);
+                    setCustomCover(true);
+                  }}
+                  onClear={() => {
+                    setCover(HERO_IMAGE);
+                    setCustomCover(false);
+                  }}
                   presets={sports.length ? sports : undefined}
                 />
               </Section>
@@ -768,7 +846,11 @@ export function EditOrgScreen({ org }: { org: Org }) {
               </Section>
 
               <Section title="Session types (optional)">
-                <ChipPicker options={SESSION_TYPES} selected={sessionTypes} onToggle={toggleSessionType} />
+                <ChipPicker
+                  options={SESSION_TYPES}
+                  selected={sessionTypes}
+                  onToggle={toggleSessionType}
+                />
               </Section>
 
               <Section title="Credentials">
@@ -816,7 +898,9 @@ export function EditOrgScreen({ org }: { org: Org }) {
                   <div className="flex items-center justify-between rounded-2xl border border-lime/40 bg-lime/10 px-3 py-2.5">
                     <div className="min-w-0">
                       <div className="text-[10px] uppercase tracking-wider text-lime font-bold">
-                        {initialOrgId === orgChoice.orgId ? "Current organization" : "Join request on save"}
+                        {initialOrgId === orgChoice.orgId
+                          ? "Current organization"
+                          : "Join request on save"}
                       </div>
                       <div className="truncate text-sm font-bold">{orgChoice.name}</div>
                     </div>
@@ -832,7 +916,9 @@ export function EditOrgScreen({ org }: { org: Org }) {
                 ) : orgChoice.mode === "new" && orgChoice.name ? (
                   <div className="flex items-center justify-between rounded-2xl border border-coral/40 bg-coral/10 px-3 py-2.5">
                     <div className="min-w-0">
-                      <div className="text-[10px] uppercase tracking-wider text-coral font-bold">You'll own this new org</div>
+                      <div className="text-[10px] uppercase tracking-wider text-coral font-bold">
+                        You'll own this new org
+                      </div>
                       <div className="truncate text-sm font-bold">{orgChoice.name}</div>
                     </div>
                     <button
@@ -861,45 +947,55 @@ export function EditOrgScreen({ org }: { org: Org }) {
                           <button
                             key={o.id}
                             type="button"
-                            onClick={() => setOrgChoice({ mode: "existing", orgId: o.id, name: o.name })}
+                            onClick={() =>
+                              setOrgChoice({ mode: "existing", orgId: o.id, name: o.name })
+                            }
                             className="flex w-full items-center justify-between rounded-2xl border border-border bg-surface px-3 py-2.5 text-left hover:border-lime"
                           >
                             <div className="min-w-0">
                               <div className="truncate text-sm font-bold">{o.name}</div>
                               <div className="text-[11px] text-muted-foreground">
-                                @{o.handle}{o.city ? ` · ${o.city}` : ""}
+                                @{o.handle}
+                                {o.city ? ` · ${o.city}` : ""}
                               </div>
                             </div>
                             <Plus className="h-4 w-4 text-lime shrink-0" />
                           </button>
                         ))}
-                        {orgResults.data && orgResults.data.length === 0 && !orgResults.isLoading && (
-                          <div className="text-[11px] text-muted-foreground">No match on OpenRun.</div>
-                        )}
-                        {placesResults.data?.suggestions && placesResults.data.suggestions.length > 0 && (
-                          <>
-                            <div className="pt-1 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-                              From Google
+                        {orgResults.data &&
+                          orgResults.data.length === 0 &&
+                          !orgResults.isLoading && (
+                            <div className="text-[11px] text-muted-foreground">
+                              No match on OpenRun.
                             </div>
-                            {placesResults.data.suggestions.map((s) => (
-                              <button
-                                key={s.id}
-                                type="button"
-                                onClick={() => pickPlaceAsNewOrg(s.id, s.primary, s.secondary)}
-                                className="flex w-full items-start gap-2 rounded-2xl border border-border bg-surface px-3 py-2.5 text-left hover:border-lime"
-                              >
-                                <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-coral" />
-                                <div className="min-w-0 flex-1">
-                                  <div className="truncate text-sm font-bold">{s.primary}</div>
-                                  {s.secondary && (
-                                    <div className="truncate text-[11px] text-muted-foreground">{s.secondary}</div>
-                                  )}
-                                </div>
-                                <Plus className="h-4 w-4 text-lime shrink-0" />
-                              </button>
-                            ))}
-                          </>
-                        )}
+                          )}
+                        {placesResults.data?.suggestions &&
+                          placesResults.data.suggestions.length > 0 && (
+                            <>
+                              <div className="pt-1 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                                From Google
+                              </div>
+                              {placesResults.data.suggestions.map((s) => (
+                                <button
+                                  key={s.id}
+                                  type="button"
+                                  onClick={() => pickPlaceAsNewOrg(s.id, s.primary, s.secondary)}
+                                  className="flex w-full items-start gap-2 rounded-2xl border border-border bg-surface px-3 py-2.5 text-left hover:border-lime"
+                                >
+                                  <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-coral" />
+                                  <div className="min-w-0 flex-1">
+                                    <div className="truncate text-sm font-bold">{s.primary}</div>
+                                    {s.secondary && (
+                                      <div className="truncate text-[11px] text-muted-foreground">
+                                        {s.secondary}
+                                      </div>
+                                    )}
+                                  </div>
+                                  <Plus className="h-4 w-4 text-lime shrink-0" />
+                                </button>
+                              ))}
+                            </>
+                          )}
                         {placesResults.isLoading && (
                           <div className="text-[11px] text-muted-foreground">Searching Google…</div>
                         )}
@@ -945,7 +1041,9 @@ export function EditOrgScreen({ org }: { org: Org }) {
                   </div>
                   <div className="grid grid-cols-2 gap-2">
                     <label className="rounded-xl border border-border bg-background/60 px-3 py-2">
-                      <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Min</div>
+                      <div className="text-[10px] uppercase tracking-wider text-muted-foreground">
+                        Min
+                      </div>
                       <select
                         value={skillMin}
                         onChange={(e) => {
@@ -956,12 +1054,16 @@ export function EditOrgScreen({ org }: { org: Org }) {
                         className="w-full bg-transparent text-sm font-bold outline-none"
                       >
                         {SKILL_LABELS.map((l, i) => (
-                          <option key={l} value={i + 1}>{l}</option>
+                          <option key={l} value={i + 1}>
+                            {l}
+                          </option>
                         ))}
                       </select>
                     </label>
                     <label className="rounded-xl border border-border bg-background/60 px-3 py-2">
-                      <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Max</div>
+                      <div className="text-[10px] uppercase tracking-wider text-muted-foreground">
+                        Max
+                      </div>
                       <select
                         value={skillMax}
                         onChange={(e) => {
@@ -972,7 +1074,9 @@ export function EditOrgScreen({ org }: { org: Org }) {
                         className="w-full bg-transparent text-sm font-bold outline-none"
                       >
                         {SKILL_LABELS.map((l, i) => (
-                          <option key={l} value={i + 1}>{l}</option>
+                          <option key={l} value={i + 1}>
+                            {l}
+                          </option>
                         ))}
                       </select>
                     </label>
@@ -1052,7 +1156,10 @@ export function EditOrgScreen({ org }: { org: Org }) {
                   overrides={overrides}
                   venues={venueAddresses
                     .map((v) => v.trim())
-                    .filter((v, idx, arr) => v && verifiedVenues.has(v.toLowerCase()) && arr.indexOf(v) === idx)}
+                    .filter(
+                      (v, idx, arr) =>
+                        v && verifiedVenues.has(v.toLowerCase()) && arr.indexOf(v) === idx,
+                    )}
                   primaryVenue={primaryVenue}
                   timezone={timezone}
                   onWeeklyChange={setSlots}
@@ -1060,13 +1167,19 @@ export function EditOrgScreen({ org }: { org: Org }) {
                 />
               </Section>
 
-              <Section title="Recurring rules (optional)" hint="For patterns like every other Tuesday.">
+              <Section
+                title="Recurring rules (optional)"
+                hint="For patterns like every other Tuesday."
+              >
                 <AvailabilityRulesEditor
                   value={rules}
                   onChange={setRules}
                   venues={venueAddresses
                     .map((v) => v.trim())
-                    .filter((v, idx, arr) => v && verifiedVenues.has(v.toLowerCase()) && arr.indexOf(v) === idx)}
+                    .filter(
+                      (v, idx, arr) =>
+                        v && verifiedVenues.has(v.toLowerCase()) && arr.indexOf(v) === idx,
+                    )}
                 />
               </Section>
             </div>
@@ -1113,7 +1226,8 @@ export function EditOrgScreen({ org }: { org: Org }) {
                   <OrgCard org={handlePreview} />
                 </div>
                 <div className="mt-2 inline-flex items-center gap-1.5 text-[11px] text-muted-foreground">
-                  <Sparkles className="h-3 w-3 text-lime" /> This is how players will see you in feeds.
+                  <Sparkles className="h-3 w-3 text-lime" /> This is how players will see you in
+                  feeds.
                 </div>
               </Section>
 
@@ -1164,11 +1278,18 @@ export function EditOrgScreen({ org }: { org: Org }) {
                   placeholder="One line that sums you up"
                   className="w-full rounded-2xl border border-border bg-surface px-4 py-3 text-sm outline-none focus:border-lime"
                 />
-                <div className="text-right text-[10px] text-muted-foreground">{tagline.length}/80</div>
+                <div className="text-right text-[10px] text-muted-foreground">
+                  {tagline.length}/80
+                </div>
               </Section>
 
               <Section title="City">
-                <LocationAutocomplete value={city} onChange={setCity} placeholder="Brooklyn, NY" mode="city" />
+                <LocationAutocomplete
+                  value={city}
+                  onChange={setCity}
+                  placeholder="Brooklyn, NY"
+                  mode="city"
+                />
               </Section>
 
               <Section title="Sports">
@@ -1278,7 +1399,9 @@ export function EditOrgScreen({ org }: { org: Org }) {
               <Section title="Record (optional)">
                 <div className="grid grid-cols-2 gap-2">
                   <label className="rounded-2xl border border-border bg-surface px-4 py-3">
-                    <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Wins</div>
+                    <div className="text-[10px] uppercase tracking-wider text-muted-foreground">
+                      Wins
+                    </div>
                     <input
                       type="number"
                       min={0}
@@ -1288,7 +1411,9 @@ export function EditOrgScreen({ org }: { org: Org }) {
                     />
                   </label>
                   <label className="rounded-2xl border border-border bg-surface px-4 py-3">
-                    <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Losses</div>
+                    <div className="text-[10px] uppercase tracking-wider text-muted-foreground">
+                      Losses
+                    </div>
                     <input
                       type="number"
                       min={0}
@@ -1341,7 +1466,11 @@ export function EditOrgScreen({ org }: { org: Org }) {
                             }}
                           />
                           {hasCustomAvatar ? (
-                            <img src={m.avatar} alt="" className="h-10 w-10 rounded-full object-cover" />
+                            <img
+                              src={m.avatar}
+                              alt=""
+                              className="h-10 w-10 rounded-full object-cover"
+                            />
                           ) : (
                             <div className="grid h-10 w-10 place-items-center rounded-full bg-secondary text-xs font-bold">
                               {m.avatar}
@@ -1452,8 +1581,14 @@ export function EditOrgScreen({ org }: { org: Org }) {
                   pathPrefix={user?.id ?? org.id}
                   value={customCover ? cover : ""}
                   fallback={cover}
-                  onChange={(url) => { setCover(url); setCustomCover(true); }}
-                  onClear={() => { setCover(HERO_IMAGE); setCustomCover(false); }}
+                  onChange={(url) => {
+                    setCover(url);
+                    setCustomCover(true);
+                  }}
+                  onClear={() => {
+                    setCover(HERO_IMAGE);
+                    setCustomCover(false);
+                  }}
                   presets={sports.length ? sports : undefined}
                 />
               </Section>
@@ -1463,7 +1598,8 @@ export function EditOrgScreen({ org }: { org: Org }) {
                   <OrgCard org={handlePreview} />
                 </div>
                 <div className="mt-2 inline-flex items-center gap-1.5 text-[11px] text-muted-foreground">
-                  <Sparkles className="h-3 w-3 text-lime" /> This is how players will see you in feeds.
+                  <Sparkles className="h-3 w-3 text-lime" /> This is how players will see you in
+                  feeds.
                 </div>
               </Section>
 
@@ -1523,11 +1659,21 @@ export function EditOrgScreen({ org }: { org: Org }) {
   );
 }
 
-function Section({ title, hint, children }: { title: string; hint?: string; children: React.ReactNode }) {
+function Section({
+  title,
+  hint,
+  children,
+}: {
+  title: string;
+  hint?: string;
+  children: React.ReactNode;
+}) {
   return (
     <div>
       <div className="mb-2 flex items-baseline justify-between gap-2">
-        <div className="text-xs font-bold uppercase tracking-wider text-muted-foreground">{title}</div>
+        <div className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+          {title}
+        </div>
         {hint && <div className="text-[10px] text-muted-foreground text-right">{hint}</div>}
       </div>
       <div className="space-y-2">{children}</div>
@@ -1575,7 +1721,9 @@ type VenueSectionProps = {
   verifiedVenues: Set<string>;
   setVerifiedVenues: React.Dispatch<React.SetStateAction<Set<string>>>;
   venueGeoMap: Record<string, { placeId: string; lat: number; lng: number }>;
-  setVenueGeoMap: React.Dispatch<React.SetStateAction<Record<string, { placeId: string; lat: number; lng: number }>>>;
+  setVenueGeoMap: React.Dispatch<
+    React.SetStateAction<Record<string, { placeId: string; lat: number; lng: number }>>
+  >;
   primaryVenue: string | null;
   setPrimaryVenue: React.Dispatch<React.SetStateAction<string | null>>;
   setSlots: React.Dispatch<React.SetStateAction<NonNullable<Org["availabilitySlots"]>>>;
@@ -1638,7 +1786,9 @@ function VenueSection({
                       if (prevTrim) {
                         setSlots((cur) =>
                           cur.map((s) =>
-                            s.venue?.trim() === prevTrim ? { ...s, venue: v.trim() || undefined } : s,
+                            s.venue?.trim() === prevTrim
+                              ? { ...s, venue: v.trim() || undefined }
+                              : s,
                           ),
                         );
                       }
@@ -1731,7 +1881,12 @@ function VenueSection({
               {(() => {
                 const geo = venueGeoMap[trimmed.toLowerCase()];
                 return trimmed && geo && !rowError ? (
-                  <VenueMapPreview address={trimmed} lat={geo.lat} lng={geo.lng} placeId={geo.placeId} />
+                  <VenueMapPreview
+                    address={trimmed}
+                    lat={geo.lat}
+                    lng={geo.lng}
+                    placeId={geo.placeId}
+                  />
                 ) : null;
               })()}
             </div>

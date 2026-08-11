@@ -1,4 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { pageHead } from "@/lib/seo";
 import { Check, Loader2, ArrowLeft, ExternalLink } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/use-auth";
@@ -11,16 +12,13 @@ import { createPortalSession } from "@/utils/payments.functions";
 import { useState } from "react";
 
 export const Route = createFileRoute("/plans")({
-  head: () => ({
-    meta: [
-      { title: "Plans & Subscriptions — OpenRun" },
-      {
-        name: "description",
-        content:
-          "Choose a subscription: host games, build a team, or generate unlimited AI highlight reels.",
-      },
-    ],
-  }),
+  head: () =>
+    pageHead({
+      path: "/plans",
+      title: "Plans & subscriptions — OpenRun",
+      description:
+        "Compare OpenRun plans: host games, run a team, and generate unlimited AI highlight reels.",
+    }),
   component: PlansPage,
 });
 

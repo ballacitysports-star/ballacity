@@ -1,4 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { pageHead } from "@/lib/seo";
 import { useEffect, useMemo, useState } from "react";
 import { ArrowLeft, MessageCircle, Bell, Check, X as XIcon } from "lucide-react";
 import { zodValidator, fallback } from "@tanstack/zod-adapter";
@@ -22,8 +23,14 @@ const searchSchema = z.object({
 type TopTab = "messages" | "alerts";
 
 export const Route = createFileRoute("/messages/")({
+  head: () =>
+    pageHead({
+      path: "/messages",
+      title: "Inbox — OpenRun",
+      description: "Your OpenRun conversations with players, teams, trainers, and gyms.",
+      noindex: true,
+    }),
   validateSearch: zodValidator(searchSchema),
-  head: () => ({ meta: [{ title: "Inbox — OpenRun" }] }),
   component: MessagesInbox,
 });
 

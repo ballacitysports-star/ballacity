@@ -1,4 +1,5 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { pageHead } from "@/lib/seo";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
@@ -42,8 +43,14 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 
 export const Route = createFileRoute("/admin")({
+  head: () =>
+    pageHead({
+      path: "/admin",
+      title: "Admin — OpenRun",
+      description: "Internal OpenRun administration tools.",
+      noindex: true,
+    }),
   ssr: false,
-  head: () => ({ meta: [{ title: "Admin · Panel" }] }),
   component: AdminPage,
 });
 

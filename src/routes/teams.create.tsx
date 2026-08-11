@@ -1,13 +1,20 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { pageHead } from "@/lib/seo";
 import { CreateOrgWizard } from "@/components/CreateOrgWizard";
 import { AccountTypeGate } from "@/components/AccountTypeGate";
 import { FinishSetupNotice } from "@/components/FinishSetupNotice";
 
 export const Route = createFileRoute("/teams/create")({
+  head: () =>
+    pageHead({
+      path: "/teams/create",
+      title: "Create a team profile — OpenRun",
+      description: "Set up your team on OpenRun to host games and manage your roster.",
+      noindex: true,
+    }),
   validateSearch: (search: Record<string, unknown>): { finish?: number } => ({
     finish: search.finish ? 1 : undefined,
   }),
-  head: () => ({ meta: [{ title: "Create a team — OpenRun" }] }),
   component: CreateTeamPage,
 });
 

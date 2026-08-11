@@ -1,4 +1,5 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { pageHead } from "@/lib/seo";
 import { motion } from "framer-motion";
 import { Trophy, ArrowUpDown } from "lucide-react";
 import { zodValidator, fallback } from "@tanstack/zod-adapter";
@@ -15,7 +16,12 @@ import { ReputationBadge } from "@/components/ReputationBadge";
 import { useMemo } from "react";
 
 export const Route = createFileRoute("/reviews")({
-  head: () => ({ meta: [{ title: "Reviews Dashboard — OpenRun" }] }),
+  head: () =>
+    pageHead({
+      title: "Reviews & reputation — OpenRun",
+      description: "Read and manage reviews for players, teams, trainers, and gyms across OpenRun.",
+      noindex: true,
+    }),
   // URL-persisted filter + sort so refresh/share preserves the view.
   validateSearch: zodValidator(
     z.object({
@@ -95,7 +101,7 @@ function ReviewsDashboard() {
   const search = Route.useSearch();
   const navigate = useNavigate({ from: "/reviews" });
   const filter: RevieweeKind | "all" = (search.filter || "all") as RevieweeKind | "all";
-  const sort: Sort = ((search.sort as Sort) || "trust");
+  const sort: Sort = (search.sort as Sort) || "trust";
   const setFilter = (v: RevieweeKind | "all") =>
     navigate({ search: (p: any) => ({ ...p, filter: v === "all" ? "" : v }), replace: true });
   const setSort = (v: Sort) =>

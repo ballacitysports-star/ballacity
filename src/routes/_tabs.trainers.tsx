@@ -1,4 +1,5 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { pageHead } from "@/lib/seo";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import { Megaphone, GraduationCap, MapPin, Building2 } from "lucide-react";
@@ -42,9 +43,7 @@ function availabilityScore(o: {
   const pn = o.positionsNeeded;
   const isBooking =
     !!pn &&
-    Object.values(pn).some((byPos) =>
-      Object.values(byPos ?? {}).some((n) => Number(n) > 0),
-    );
+    Object.values(pn).some((byPos) => Object.values(byPos ?? {}).some((n) => Number(n) > 0));
   const c = (o.cadence ?? "").toLowerCase();
   if (isBooking) return 0;
   if (/on.?demand/.test(c)) return 1;
@@ -85,18 +84,15 @@ const trainersSearchSchema = z.object({
   density: fallback(z.string(), "list").default("list"),
 });
 
-
 export const Route = createFileRoute("/_tabs/trainers")({
-  head: () => ({
-    meta: [
-      { title: "Trainers & coaches — OpenRun" },
-      { name: "description", content: "Find and book trainers and coaches near you. Filter by sport, availability, and distance." },
-      { property: "og:title", content: "Trainers & coaches — OpenRun" },
-      { property: "og:description", content: "Find and book trainers and coaches near you." },
-      { property: "og:type", content: "website" },
-      { name: "twitter:card", content: "summary" },
-    ],
-  }),
+  head: () =>
+    pageHead({
+      path: "/trainers",
+      title: "Trainers & coaches — OpenRun",
+      description:
+        "Find and book trainers and coaches near you by sport, availability, and distance.",
+      noindex: true,
+    }),
   validateSearch: zodValidator(trainersSearchSchema),
   component: TrainersPage,
 });
@@ -110,8 +106,17 @@ function TrainersPage() {
   const updateSearch = (patch: Partial<TrainersSearch>) =>
     navigate({ search: (prev: TrainersSearch) => ({ ...prev, ...patch }), replace: true });
   usePersistedSearch("openrun:trainers-search", search, "/trainers", {
-    q: "", mode: "trainers", sport: "", specialty: "", venue: "", orgId: "",
-    radius: 0, avail: "any", sort: "nearest", view: "list", density: "list",
+    q: "",
+    mode: "trainers",
+    sport: "",
+    specialty: "",
+    venue: "",
+    orgId: "",
+    radius: 0,
+    avail: "any",
+    sort: "nearest",
+    view: "list",
+    density: "list",
   });
 
   const mode: "trainers" | "gyms" = search.mode === "gyms" ? "gyms" : "trainers";
@@ -143,8 +148,7 @@ function TrainersPage() {
   const setQ = (v: string) => updateSearch({ q: v });
   const toggleSportFilter = (v: string | null) =>
     updateSearch({ sport: serializeSportList(toggleSport(sports, v)), specialty: "" });
-  const setSpecialty = (v: string) =>
-    updateSearch({ specialty: specialty === v ? "" : v });
+  const setSpecialty = (v: string) => updateSearch({ specialty: specialty === v ? "" : v });
   const setVenue = (v: string) => updateSearch({ venue: venue === v ? "" : v });
   const setOrgId = (v: string) => updateSearch({ orgId: orgId === v ? "" : v });
 
@@ -211,14 +215,14 @@ function TrainersPage() {
   }, [trainerSig]);
 
   const list = useMemo(() => {
-    const isBooking = (o: typeof orgs[number]) => {
+    const isBooking = (o: (typeof orgs)[number]) => {
       const pn = o.positionsNeeded;
       if (!pn) return false;
       return Object.values(pn).some((byPos) =>
         Object.values(byPos ?? {}).some((n) => Number(n) > 0),
       );
     };
-    const cadenceMatches = (o: typeof orgs[number], target: "weekly" | "casual") => {
+    const cadenceMatches = (o: (typeof orgs)[number], target: "weekly" | "casual") => {
       const c = (o.cadence ?? "").toLowerCase();
       if (!c) return false;
       if (target === "weekly") return /week|multiple|daily/.test(c);
@@ -311,7 +315,6 @@ function TrainersPage() {
     });
   }, [orgs]);
 
-
   const featured =
     orgs.find((o) => o.verified && o.kind === "coach") ?? orgs.find((o) => o.kind === "coach");
 
@@ -342,8 +345,8 @@ function TrainersPage() {
             </>
           ) : profile?.city ? (
             <>
-              <MapPin className="h-3.5 w-3.5 text-lime" /> Nearest to {profile.city} ·{" "}
-              {list.length} {list.length === 1 ? "result" : "results"}
+              <MapPin className="h-3.5 w-3.5 text-lime" /> Nearest to {profile.city} · {list.length}{" "}
+              {list.length === 1 ? "result" : "results"}
             </>
           ) : (
             <>
@@ -359,10 +362,12 @@ function TrainersPage() {
 
       {/* Trainers / Gyms tabs */}
       <div className="mb-4 inline-flex rounded-full border border-border bg-surface p-1 text-xs font-bold">
-        {([
-          { id: "trainers", label: "Trainers", Icon: GraduationCap },
-          { id: "gyms", label: "Gyms", Icon: Building2 },
-        ] as const).map((t) => {
+        {(
+          [
+            { id: "trainers", label: "Trainers", Icon: GraduationCap },
+            { id: "gyms", label: "Gyms", Icon: Building2 },
+          ] as const
+        ).map((t) => {
           const active = mode === t.id;
           return (
             <button
@@ -402,21 +407,14 @@ function TrainersPage() {
             <span className="inline-flex w-fit items-center gap-1 rounded-full bg-lime/15 px-2 py-0.5 text-[10px] font-bold text-lime uppercase tracking-wider">
               <Megaphone className="h-3 w-3" /> Booking · clinics open
             </span>
-            <div className="mt-1 font-display text-xl font-bold">
-              {featured.name} · Now Booking
-            </div>
+            <div className="mt-1 font-display text-xl font-bold">{featured.name} · Now Booking</div>
             <div className="text-xs text-muted-foreground">{featured.tagline}</div>
           </div>
         </motion.div>
       )}
 
       {mode === "gyms" ? (
-        <GymsView
-          gyms={gymsList}
-          q={q}
-          onQ={setQ}
-          isLoading={orgsListQuery.isLoading}
-        />
+        <GymsView gyms={gymsList} q={q} onQ={setQ} isLoading={orgsListQuery.isLoading} />
       ) : (
         <TrainersView />
       )}
@@ -426,284 +424,275 @@ function TrainersPage() {
   function TrainersView() {
     return (
       <>
+        <ViewDensityToggle
+          view={viewMode}
+          onViewChange={switchView}
+          density={density}
+          onDensityChange={switchDensity}
+        />
 
+        {(() => {
+          const activeFilterCount =
+            (sports.length ? 1 : 0) +
+            (specialty ? 1 : 0) +
+            (venue ? 1 : 0) +
+            (orgId ? 1 : 0) +
+            (radius > 0 ? 1 : 0) +
+            (avail !== "any" ? 1 : 0) +
+            (sortBy !== "nearest" ? 1 : 0);
+          const specialties = sports.length
+            ? Array.from(
+                new Set(
+                  sports.flatMap((sp) => SPORT_CONFIG[sp as Sport]?.formats ?? ([] as string[])),
+                ),
+              )
+            : SESSION_TYPES;
+          return (
+            <FilterBar
+              q={q}
+              onQChange={setQ}
+              searchPlaceholder="Search trainers, sport, credential"
+              activeFilterCount={activeFilterCount}
+              create={{ to: "/trainers/create", label: "Create trainer profile" }}
+              sheetTitle="Filter trainers"
+              onReset={() =>
+                updateSearch({
+                  sport: "",
+                  specialty: "",
+                  venue: "",
+                  orgId: "",
+                  radius: 0,
+                  avail: "any",
+                  sort: "nearest",
+                })
+              }
+              resetDisabled={activeFilterCount === 0}
+              sheet={
+                <>
+                  <FilterSection label="Sports">
+                    <SportChips multi selected={sports} onSelect={toggleSportFilter} />
+                  </FilterSection>
 
-      <ViewDensityToggle
-        view={viewMode}
-        onViewChange={switchView}
-        density={density}
-        onDensityChange={switchDensity}
-      />
+                  <FilterSection label="Specialty">
+                    <div className="flex flex-wrap gap-2">
+                      {specialties.map((s) => {
+                        const active = specialty === s;
+                        return (
+                          <button
+                            key={s}
+                            onClick={() => setSpecialty(s)}
+                            className={`whitespace-nowrap rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors ${
+                              active
+                                ? "border-lime bg-lime text-primary-foreground"
+                                : "border-border bg-background text-muted-foreground"
+                            }`}
+                          >
+                            {s}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </FilterSection>
 
-      {(() => {
-        const activeFilterCount =
-          (sports.length ? 1 : 0) +
-          (specialty ? 1 : 0) +
-          (venue ? 1 : 0) +
-          (orgId ? 1 : 0) +
-          (radius > 0 ? 1 : 0) +
-          (avail !== "any" ? 1 : 0) +
-          (sortBy !== "nearest" ? 1 : 0);
-        const specialties = sports.length
-          ? Array.from(
-              new Set(
-                sports.flatMap((sp) => SPORT_CONFIG[sp as Sport]?.formats ?? ([] as string[])),
-              ),
-            )
-          : SESSION_TYPES;
-        return (
-          <FilterBar
-            q={q}
-            onQChange={setQ}
-            searchPlaceholder="Search trainers, sport, credential"
-            activeFilterCount={activeFilterCount}
-            create={{ to: "/trainers/create", label: "Create trainer profile" }}
-            sheetTitle="Filter trainers"
-            onReset={() =>
-              updateSearch({
-                sport: "",
-                specialty: "",
-                venue: "",
-                orgId: "",
-                radius: 0,
-                avail: "any",
-                sort: "nearest",
-              })
-            }
-            resetDisabled={activeFilterCount === 0}
-            sheet={
-              <>
-                <FilterSection label="Sports">
-                  <SportChips
-                    multi
-                    selected={sports}
-                    onSelect={toggleSportFilter}
-                  />
-                </FilterSection>
-
-                <FilterSection label="Specialty">
-                  <div className="flex flex-wrap gap-2">
-                    {specialties.map((s) => {
-                      const active = specialty === s;
-                      return (
+                  {venueOptions.length > 0 && (
+                    <FilterSection label="Venue">
+                      <div className="flex flex-wrap gap-2">
                         <button
-                          key={s}
-                          onClick={() => setSpecialty(s)}
-                          className={`whitespace-nowrap rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors ${
-                            active
+                          onClick={() => setVenue("")}
+                          className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors ${
+                            !venue
                               ? "border-lime bg-lime text-primary-foreground"
                               : "border-border bg-background text-muted-foreground"
                           }`}
                         >
-                          {s}
+                          Any venue
                         </button>
-                      );
-                    })}
-                  </div>
-                </FilterSection>
-
-                {venueOptions.length > 0 && (
-                  <FilterSection label="Venue">
-                    <div className="flex flex-wrap gap-2">
-                      <button
-                        onClick={() => setVenue("")}
-                        className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors ${
-                          !venue
-                            ? "border-lime bg-lime text-primary-foreground"
-                            : "border-border bg-background text-muted-foreground"
-                        }`}
-                      >
-                        Any venue
-                      </button>
-                      {venueOptions.map((v) => {
-                        const active = venue.trim().toLowerCase() === v.addr.toLowerCase();
-                        const short = v.addr.split(",")[0];
-                        return (
-                          <button
-                            key={v.addr}
-                            onClick={() => setVenue(v.addr)}
-                            title={v.addr}
-                            className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors ${
-                              active
-                                ? "border-lime bg-lime text-primary-foreground"
-                                : "border-border bg-background text-muted-foreground"
-                            }`}
-                          >
-                            {v.primary ? "★ " : ""}
-                            {short}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </FilterSection>
-                )}
-
-                {(orgsListQuery.data ?? []).length > 0 && (
-                  <FilterSection label="Gym">
-                    <div className="flex flex-wrap gap-2">
-                      <button
-                        onClick={() => setOrgId("")}
-                        className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors ${
-                          !orgId
-                            ? "border-lime bg-lime text-primary-foreground"
-                            : "border-border bg-background text-muted-foreground"
-                        }`}
-                      >
-                        Any org
-                      </button>
-                      {(orgsListQuery.data ?? []).map((o) => {
-                        const active = orgId === o.id;
-                        return (
-                          <button
-                            key={o.id}
-                            onClick={() => setOrgId(o.id)}
-                            title={o.name}
-                            className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors ${
-                              active
-                                ? "border-lime bg-lime text-primary-foreground"
-                                : "border-border bg-background text-muted-foreground"
-                            }`}
-                          >
-                            {o.verified ? "✓ " : ""}
-                            {o.name}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </FilterSection>
-                )}
-
-                <FilterSection
-                  label="Distance"
-                  hint={radius > 0 ? `Within ${radius} ${unitLabel}` : "Any distance"}
-                >
-                  <Slider
-                    value={[radius]}
-                    min={0}
-                    max={100}
-                    step={1}
-                    onValueChange={(v) => {
-                      const nv = Math.round(v[0] ?? 0);
-                      setRadius(nv);
-                      if (nv > 0 && geoStatus !== "granted" && geoStatus !== "prompting") {
-                        requestLocation();
-                      }
-                    }}
-                    aria-label="Distance radius"
-                  />
-                  {radius > 0 && geoStatus !== "granted" && (
-                    <div className="mt-2 flex items-center justify-between gap-2 text-[11px]">
-                      <span className="text-muted-foreground">
-                        {geoStatus === "denied" || geoStatus === "unsupported"
-                          ? "Location unavailable — enable location to filter by distance."
-                          : "Share your location to filter by distance."}
-                      </span>
-                      <button
-                        onClick={requestLocation}
-                        className="whitespace-nowrap rounded-full border border-lime bg-lime/10 px-2.5 py-1 text-[11px] font-bold text-lime"
-                      >
-                        {geoStatus === "prompting" ? "Locating…" : "Use my location"}
-                      </button>
-                    </div>
+                        {venueOptions.map((v) => {
+                          const active = venue.trim().toLowerCase() === v.addr.toLowerCase();
+                          const short = v.addr.split(",")[0];
+                          return (
+                            <button
+                              key={v.addr}
+                              onClick={() => setVenue(v.addr)}
+                              title={v.addr}
+                              className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors ${
+                                active
+                                  ? "border-lime bg-lime text-primary-foreground"
+                                  : "border-border bg-background text-muted-foreground"
+                              }`}
+                            >
+                              {v.primary ? "★ " : ""}
+                              {short}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </FilterSection>
                   )}
-                </FilterSection>
 
-                <FilterSection label="Availability">
-                  <ChipRow
-                    value={avail}
-                    onChange={setAvail}
-                    options={[
-                      { value: "any", label: "Any time" },
-                      { value: "recruiting", label: "Booking now" },
-                      { value: "soon", label: "This week" },
-                      { value: "weekly", label: "Weekly+" },
-                      { value: "casual", label: "Casual" },
-                    ]}
-                  />
-                </FilterSection>
+                  {(orgsListQuery.data ?? []).length > 0 && (
+                    <FilterSection label="Gym">
+                      <div className="flex flex-wrap gap-2">
+                        <button
+                          onClick={() => setOrgId("")}
+                          className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors ${
+                            !orgId
+                              ? "border-lime bg-lime text-primary-foreground"
+                              : "border-border bg-background text-muted-foreground"
+                          }`}
+                        >
+                          Any org
+                        </button>
+                        {(orgsListQuery.data ?? []).map((o) => {
+                          const active = orgId === o.id;
+                          return (
+                            <button
+                              key={o.id}
+                              onClick={() => setOrgId(o.id)}
+                              title={o.name}
+                              className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors ${
+                                active
+                                  ? "border-lime bg-lime text-primary-foreground"
+                                  : "border-border bg-background text-muted-foreground"
+                              }`}
+                            >
+                              {o.verified ? "✓ " : ""}
+                              {o.name}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </FilterSection>
+                  )}
 
-                <FilterSection label="Sort">
-                  <ChipRow
-                    value={sortBy}
-                    onChange={setSortBy}
-                    options={[
-                      { value: "nearest", label: "Nearest" },
-                      { value: "soonest", label: "Soonest available" },
-                      { value: "followers", label: "Most followers" },
-                      { value: "name", label: "Name A–Z" },
-                    ]}
-                  />
-                </FilterSection>
-              </>
-            }
-          />
-        );
-      })()}
-
-      <div className="mb-4 flex items-center justify-between gap-2 text-xs text-muted-foreground">
-        <span>
-          {list.length} {list.length === 1 ? "result" : "results"}
-        </span>
-        <span>Sorted by {sortBy}</span>
-      </div>
-
-
-      {viewMode === "map" ? (
-        <TeamsMapView orgs={list.map((x) => x.o)} kind="coach" />
-      ) : (
-        <div
-          className={
-            density === "grid"
-              ? "grid grid-cols-1 sm:grid-cols-2 gap-3 pb-6"
-              : "space-y-3 pb-6"
-          }
-        >
-          {list.map(({ o, dist, score, minKm }, i) => {
-            const distLabel =
-              radiusKm > 0 && coords && minKm != null
-                ? distanceUnit === "km"
-                  ? `${minKm.toFixed(1)} km`
-                  : `${(minKm * MI_PER_KM).toFixed(1)} mi`
-                : `${dist} mi`;
-            const venueOffered =
-              !!venue &&
-              (o.venueAddresses ?? []).some(
-                (a) => a.trim().toLowerCase() === venue.trim().toLowerCase(),
-              );
-            const cardSearch = venueOffered ? { venue } : undefined;
-            return (
-              <div key={o.id} className="relative">
-                <OrgCard org={o} index={i} search={cardSearch} />
-                <div className="pointer-events-none absolute top-3 right-3 flex flex-col items-end gap-1">
-                  <span className="rounded-full bg-background/70 backdrop-blur px-2 py-0.5 text-[10px] font-bold text-foreground">
-                    {distLabel}
-                  </span>
-                  <span
-                    className={`rounded-full backdrop-blur px-2 py-0.5 text-[10px] font-bold ${
-                      score === 0
-                        ? "bg-lime text-primary-foreground"
-                        : score <= 2
-                          ? "bg-lime/20 text-lime"
-                          : "bg-background/70 text-muted-foreground"
-                    }`}
+                  <FilterSection
+                    label="Distance"
+                    hint={radius > 0 ? `Within ${radius} ${unitLabel}` : "Any distance"}
                   >
-                    {availabilityLabel(score)}
-                  </span>
-                </div>
-                <TrainerActions org={o} defaultVenue={venue || null} />
-              </div>
-            );
-          })}
-          {list.length === 0 && (
-            <div className="rounded-2xl border border-border bg-surface p-8 text-center text-muted-foreground sm:col-span-2">
-              <div className="inline-flex items-center gap-2">
-                <GraduationCap className="h-4 w-4 text-lime" />
-                No trainers match.
-              </div>
-            </div>
-          )}
+                    <Slider
+                      value={[radius]}
+                      min={0}
+                      max={100}
+                      step={1}
+                      onValueChange={(v) => {
+                        const nv = Math.round(v[0] ?? 0);
+                        setRadius(nv);
+                        if (nv > 0 && geoStatus !== "granted" && geoStatus !== "prompting") {
+                          requestLocation();
+                        }
+                      }}
+                      aria-label="Distance radius"
+                    />
+                    {radius > 0 && geoStatus !== "granted" && (
+                      <div className="mt-2 flex items-center justify-between gap-2 text-[11px]">
+                        <span className="text-muted-foreground">
+                          {geoStatus === "denied" || geoStatus === "unsupported"
+                            ? "Location unavailable — enable location to filter by distance."
+                            : "Share your location to filter by distance."}
+                        </span>
+                        <button
+                          onClick={requestLocation}
+                          className="whitespace-nowrap rounded-full border border-lime bg-lime/10 px-2.5 py-1 text-[11px] font-bold text-lime"
+                        >
+                          {geoStatus === "prompting" ? "Locating…" : "Use my location"}
+                        </button>
+                      </div>
+                    )}
+                  </FilterSection>
+
+                  <FilterSection label="Availability">
+                    <ChipRow
+                      value={avail}
+                      onChange={setAvail}
+                      options={[
+                        { value: "any", label: "Any time" },
+                        { value: "recruiting", label: "Booking now" },
+                        { value: "soon", label: "This week" },
+                        { value: "weekly", label: "Weekly+" },
+                        { value: "casual", label: "Casual" },
+                      ]}
+                    />
+                  </FilterSection>
+
+                  <FilterSection label="Sort">
+                    <ChipRow
+                      value={sortBy}
+                      onChange={setSortBy}
+                      options={[
+                        { value: "nearest", label: "Nearest" },
+                        { value: "soonest", label: "Soonest available" },
+                        { value: "followers", label: "Most followers" },
+                        { value: "name", label: "Name A–Z" },
+                      ]}
+                    />
+                  </FilterSection>
+                </>
+              }
+            />
+          );
+        })()}
+
+        <div className="mb-4 flex items-center justify-between gap-2 text-xs text-muted-foreground">
+          <span>
+            {list.length} {list.length === 1 ? "result" : "results"}
+          </span>
+          <span>Sorted by {sortBy}</span>
         </div>
-      )}
+
+        {viewMode === "map" ? (
+          <TeamsMapView orgs={list.map((x) => x.o)} kind="coach" />
+        ) : (
+          <div
+            className={
+              density === "grid" ? "grid grid-cols-1 sm:grid-cols-2 gap-3 pb-6" : "space-y-3 pb-6"
+            }
+          >
+            {list.map(({ o, dist, score, minKm }, i) => {
+              const distLabel =
+                radiusKm > 0 && coords && minKm != null
+                  ? distanceUnit === "km"
+                    ? `${minKm.toFixed(1)} km`
+                    : `${(minKm * MI_PER_KM).toFixed(1)} mi`
+                  : `${dist} mi`;
+              const venueOffered =
+                !!venue &&
+                (o.venueAddresses ?? []).some(
+                  (a) => a.trim().toLowerCase() === venue.trim().toLowerCase(),
+                );
+              const cardSearch = venueOffered ? { venue } : undefined;
+              return (
+                <div key={o.id} className="relative">
+                  <OrgCard org={o} index={i} search={cardSearch} />
+                  <div className="pointer-events-none absolute top-3 right-3 flex flex-col items-end gap-1">
+                    <span className="rounded-full bg-background/70 backdrop-blur px-2 py-0.5 text-[10px] font-bold text-foreground">
+                      {distLabel}
+                    </span>
+                    <span
+                      className={`rounded-full backdrop-blur px-2 py-0.5 text-[10px] font-bold ${
+                        score === 0
+                          ? "bg-lime text-primary-foreground"
+                          : score <= 2
+                            ? "bg-lime/20 text-lime"
+                            : "bg-background/70 text-muted-foreground"
+                      }`}
+                    >
+                      {availabilityLabel(score)}
+                    </span>
+                  </div>
+                  <TrainerActions org={o} defaultVenue={venue || null} />
+                </div>
+              );
+            })}
+            {list.length === 0 && (
+              <div className="rounded-2xl border border-border bg-surface p-8 text-center text-muted-foreground sm:col-span-2">
+                <div className="inline-flex items-center gap-2">
+                  <GraduationCap className="h-4 w-4 text-lime" />
+                  No trainers match.
+                </div>
+              </div>
+            )}
+          </div>
+        )}
       </>
     );
   }
@@ -736,13 +725,8 @@ function GymsView({
         searchPlaceholder="Search gyms by name, handle, city"
         create={{ to: "/orgs/create", label: "Create a gym or organization" }}
         sheetTitle="Filter gyms"
-        sheet={
-          <div className="text-sm text-muted-foreground">
-            More gym filters coming soon.
-          </div>
-        }
+        sheet={<div className="text-sm text-muted-foreground">More gym filters coming soon.</div>}
       />
-
 
       {isLoading ? (
         <div className="rounded-2xl border border-border bg-surface p-8 text-center text-sm text-muted-foreground">
@@ -785,7 +769,9 @@ function GymsView({
                   {g.city ? <> · {g.city}</> : null}
                 </div>
                 {g.bio && (
-                  <div className="mt-0.5 line-clamp-1 text-xs text-muted-foreground/80">{g.bio}</div>
+                  <div className="mt-0.5 line-clamp-1 text-xs text-muted-foreground/80">
+                    {g.bio}
+                  </div>
                 )}
               </div>
             </Link>
@@ -795,4 +781,3 @@ function GymsView({
     </>
   );
 }
-

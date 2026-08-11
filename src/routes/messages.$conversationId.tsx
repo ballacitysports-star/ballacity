@@ -1,4 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { pageHead } from "@/lib/seo";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowLeft,
@@ -35,7 +36,12 @@ import { UserAvatar } from "@/components/UserAvatar";
 import { supabase } from "@/integrations/supabase/client";
 
 export const Route = createFileRoute("/messages/$conversationId")({
-  head: () => ({ meta: [{ title: "Chat — OpenRun" }] }),
+  head: () =>
+    pageHead({
+      title: "Chat — OpenRun",
+      description: "A private OpenRun conversation.",
+      noindex: true,
+    }),
   component: Thread,
 });
 
@@ -157,7 +163,8 @@ function Thread() {
           const r = payload.new as MessageReaction;
           setReactions((prev) =>
             prev.some(
-              (x) => x.message_id === r.message_id && x.user_id === r.user_id && x.emoji === r.emoji,
+              (x) =>
+                x.message_id === r.message_id && x.user_id === r.user_id && x.emoji === r.emoji,
             )
               ? prev
               : [...prev, r],
@@ -172,11 +179,7 @@ function Thread() {
           setReactions((prev) =>
             prev.filter(
               (x) =>
-                !(
-                  x.message_id === r.message_id &&
-                  x.user_id === r.user_id &&
-                  x.emoji === r.emoji
-                ),
+                !(x.message_id === r.message_id && x.user_id === r.user_id && x.emoji === r.emoji),
             ),
           );
         },
@@ -460,9 +463,7 @@ function Thread() {
                   {parent && (
                     <div
                       className={`mb-1 text-[11px] rounded-lg px-2.5 py-1.5 border-l-2 ${
-                        mine
-                          ? "border-lime bg-surface/60 mr-1"
-                          : "border-border bg-surface/60 ml-1"
+                        mine ? "border-lime bg-surface/60 mr-1" : "border-border bg-surface/60 ml-1"
                       }`}
                     >
                       <div className="opacity-70 mb-0.5">
@@ -471,7 +472,8 @@ function Thread() {
                       <div className="opacity-80 truncate">
                         {parent.deleted_at
                           ? "Unsent message"
-                          : parent.body || (parent.attachment_name ? `📎 ${parent.attachment_name}` : "")}
+                          : parent.body ||
+                            (parent.attachment_name ? `📎 ${parent.attachment_name}` : "")}
                       </div>
                     </div>
                   )}
@@ -591,9 +593,7 @@ function Thread() {
                             key={emoji}
                             onClick={() => toggleReaction(m.id, emoji)}
                             className={`flex items-center gap-1 rounded-full border px-1.5 py-0.5 text-[11px] ${
-                              mineRx
-                                ? "border-lime bg-lime/10"
-                                : "border-border bg-surface"
+                              mineRx ? "border-lime bg-lime/10" : "border-border bg-surface"
                             }`}
                           >
                             <span>{emoji}</span>

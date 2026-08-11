@@ -1,4 +1,5 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { pageHead } from "@/lib/seo";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   ArrowLeft,
@@ -12,7 +13,6 @@ import {
   Star,
   Check,
   CreditCard,
-  
   X as XIcon,
   Pencil,
   Play,
@@ -80,7 +80,12 @@ import { HostPaymentsPanel, PlayerPaymentsPanel } from "@/components/GamePayment
 import { PostEngagement } from "@/components/PostEngagement";
 import { Distance } from "@/components/Distance";
 
-import { useHostedGames, fetchHostedGame, updateHostedGame, deleteHostedGame } from "@/lib/hosted-games-store";
+import {
+  useHostedGames,
+  fetchHostedGame,
+  updateHostedGame,
+  deleteHostedGame,
+} from "@/lib/hosted-games-store";
 import {
   ANY_SKILL,
   filterTiersForSport,
@@ -96,7 +101,12 @@ import { listMyTeams } from "@/lib/teams.functions";
 import { listMyOrgs } from "@/lib/trainer-orgs.functions";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery } from "@tanstack/react-query";
-import { computeLiveStatus, useJoinGate, SIGNUP_CUTOFF_PRESETS, cutoffAmountLabel } from "@/lib/live-status";
+import {
+  computeLiveStatus,
+  useJoinGate,
+  SIGNUP_CUTOFF_PRESETS,
+  cutoffAmountLabel,
+} from "@/lib/live-status";
 import type { JoinGate } from "@/lib/live-status";
 import { JoinBlockedReason } from "@/components/JoinBlockedReason";
 
@@ -111,12 +121,7 @@ import { getOrCreateDirectConversation } from "@/lib/messages";
 import { createNotification } from "@/lib/notifications";
 import { supabase } from "@/integrations/supabase/client";
 import { useCanReview } from "@/lib/transactions";
-import {
-  blockUser,
-  unblockUser,
-  isUserBlocked,
-  useBlockedUsers,
-} from "@/lib/blocked-users-store";
+import { blockUser, unblockUser, isUserBlocked, useBlockedUsers } from "@/lib/blocked-users-store";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -167,19 +172,32 @@ export const Route = createFileRoute("/games/$gameId/")({
     return out;
   },
 
-
   loader: ({ params }) => {
     return { gameId: params.gameId };
   },
-  head: ({ loaderData }) => {
+  head: ({ loaderData, params }) => {
     const game = loaderData ? GAMES.find((g) => g.id === loaderData.gameId) : undefined;
-    return {
-      meta: [
-        { title: `${game?.title ?? "Game"} — OpenRun` },
-        { name: "description", content: game?.description },
-        { property: "og:image", content: game?.image },
-      ],
-    };
+    const name = game?.title ?? "Pickup game";
+    return pageHead({
+      path: `/games/${params.gameId}`,
+      title: `${name} — OpenRun`,
+      description: (
+        game?.description ?? "See the details for this pickup game and request to join on OpenRun."
+      ).slice(0, 155),
+      ogType: "article",
+      image: game?.image ?? null,
+      jsonLd: game
+        ? {
+            "@context": "https://schema.org",
+            "@type": "SportsEvent",
+            name: game.title,
+            startDate: game.date,
+            location: { "@type": "Place", name: game.location, address: game.neighborhood },
+            sport: game.sport,
+            url: `https://open-run-connect.lovable.app/games/${params.gameId}`,
+          }
+        : undefined,
+    });
   },
   notFoundComponent: () => (
     <div className="min-h-dvh grid place-items-center px-6 text-center">
@@ -219,7 +237,6 @@ function formatCooldownLabel(ms: number): string {
   return s ? `${m}m ${s}s` : `${m}m`;
 }
 
-
 function GameDetail() {
   const { gameId } = Route.useLoaderData();
   const { invite: isInvite, from: inviteFrom, exp: inviteExp, expInvalid } = Route.useSearch();
@@ -232,11 +249,25 @@ function GameDetail() {
     () => hosted.find((g) => g.id === gameId) ?? remoteGame ?? GAMES.find((g) => g.id === gameId),
     [hosted, remoteGame, gameId],
   );
-  const { invite: _iv, from: _fr, exp: _ex, expInvalid: _ei, tab: urlTab, modal: urlModal } = Route.useSearch();
-  void _iv; void _fr; void _ex; void _ei;
+  const {
+    invite: _iv,
+    from: _fr,
+    exp: _ex,
+    expInvalid: _ei,
+    tab: urlTab,
+    modal: urlModal,
+  } = Route.useSearch();
+  void _iv;
+  void _fr;
+  void _ex;
+  void _ei;
   const joined = useIsJoined(gameId);
   const liveParticipantCount = useLiveParticipantCount(gameId);
-  const { participants: liveRoster, refetch: refetchRoster, removeLocal: removeRosterLocal } = useLiveParticipants(gameId);
+  const {
+    participants: liveRoster,
+    refetch: refetchRoster,
+    removeLocal: removeRosterLocal,
+  } = useLiveParticipants(gameId);
   const { entries: waitlistEntries } = useGameWaitlist(gameId);
   const nav = useNavigate();
   const { user } = useAuth();
@@ -257,7 +288,10 @@ function GameDetail() {
   // Deep-link writers: mirror UI state into the URL so refresh/share re-opens
   // the same tab or modal. Only one modal can be encoded at a time.
   const updateSearch = useCallback(
-    (patch: { tab?: "overview" | "payments" | null; modal?: "reviews" | "positions" | "edit" | null }) => {
+    (patch: {
+      tab?: "overview" | "payments" | null;
+      modal?: "reviews" | "positions" | "edit" | null;
+    }) => {
       nav({
         to: "/games/$gameId",
         params: { gameId },
@@ -278,25 +312,39 @@ function GameDetail() {
     },
     [nav, gameId],
   );
-  const setActiveTab = useCallback((t: "overview" | "payments") => {
-    _setActiveTab(t);
-    updateSearch({ tab: t });
-  }, [updateSearch]);
-  const setEditOpen = useCallback((v: boolean) => {
-    _setEditOpen(v);
-    updateSearch({ modal: v ? "edit" : null });
-  }, [updateSearch]);
-  const setReviewsOpen = useCallback((v: boolean) => {
-    _setReviewsOpen(v);
-    updateSearch({ modal: v ? "reviews" : null });
-  }, [updateSearch]);
-  const setPositionRosterOpen = useCallback((v: boolean) => {
-    _setPositionRosterOpen(v);
-    updateSearch({ modal: v ? "positions" : null });
-  }, [updateSearch]);
+  const setActiveTab = useCallback(
+    (t: "overview" | "payments") => {
+      _setActiveTab(t);
+      updateSearch({ tab: t });
+    },
+    [updateSearch],
+  );
+  const setEditOpen = useCallback(
+    (v: boolean) => {
+      _setEditOpen(v);
+      updateSearch({ modal: v ? "edit" : null });
+    },
+    [updateSearch],
+  );
+  const setReviewsOpen = useCallback(
+    (v: boolean) => {
+      _setReviewsOpen(v);
+      updateSearch({ modal: v ? "reviews" : null });
+    },
+    [updateSearch],
+  );
+  const setPositionRosterOpen = useCallback(
+    (v: boolean) => {
+      _setPositionRosterOpen(v);
+      updateSearch({ modal: v ? "positions" : null });
+    },
+    [updateSearch],
+  );
 
   // Follow URL changes (back/forward, external link updates) into state.
-  useEffect(() => { _setActiveTab(urlTab ?? "overview"); }, [urlTab]);
+  useEffect(() => {
+    _setActiveTab(urlTab ?? "overview");
+  }, [urlTab]);
   useEffect(() => {
     _setEditOpen(urlModal === "edit");
     _setPositionRosterOpen(urlModal === "positions");
@@ -314,7 +362,6 @@ function GameDetail() {
     return () => clearInterval(t);
   }, [cooldownMs > 0]);
 
-
   // effectiveJoined is computed below, after settings/myReq/isHost resolve.
   // Placeholder removed — see definition near line 161.
   // Ownership is locked to the original host's auth user id.
@@ -325,7 +372,6 @@ function GameDetail() {
   const ownsViaGame = !!(user && game?.hostUserId && user.id === game.hostUserId);
   const hostsThisGame = ownsViaDb || ownsViaGame;
   const isHost = hostsThisGame;
-  
 
   const hostReviews = useReviewsFor(hostIdFor(game?.host.username ?? ""));
   const hostRep = useMemo(() => computeReputation(hostReviews, "host"), [hostReviews]);
@@ -371,17 +417,12 @@ function GameDetail() {
   // undo function the caller runs on server error so the UI reverts to the
   // pre-tap state. Realtime `join_requests:host:*` events reconcile with
   // authoritative rows on success; we don't need a manual refetch.
-  const applyOptimisticReview = (
-    reqId: string,
-    status: "approved" | "rejected",
-  ): (() => void) => {
+  const applyOptimisticReview = (reqId: string, status: "approved" | "rejected"): (() => void) => {
     let snapshot: JoinRequest[] = [];
     setHostRequests((prev) => {
       snapshot = prev;
       return prev.map((r) =>
-        r.id === reqId
-          ? { ...r, status, reviewed_at: new Date().toISOString() }
-          : r,
+        r.id === reqId ? { ...r, status, reviewed_at: new Date().toISOString() } : r,
       );
     });
     return () => setHostRequests(snapshot);
@@ -425,8 +466,6 @@ function GameDetail() {
       refreshHostRequests();
     }
   };
-
-
 
   useEffect(() => {
     if (GAMES.some((g) => g.id === gameId) || hosted.some((g) => g.id === gameId)) {
@@ -492,7 +531,6 @@ function GameDetail() {
     },
   });
 
-
   // Event-driven fallback: refetch when the tab regains focus or becomes
   // visible (covers the case where the realtime socket was suspended while
   // the tab was backgrounded). No polling interval — updates are driven by
@@ -548,7 +586,6 @@ function GameDetail() {
       sub.subscription.unsubscribe();
     };
   }, []);
-
 
   // Realtime: surface in-app toasts as other players join or leave.
   // Compares snapshots of the live roster and skips the viewer's own
@@ -637,7 +674,7 @@ function GameDetail() {
   // cached `game.joined` counter until hydration completes. When we already
   // have the live count, the viewer is already reflected in it — don't
   // double-count them.
-  const baseJoined = liveParticipantCount ?? (game.joined ?? 0);
+  const baseJoined = liveParticipantCount ?? game.joined ?? 0;
   const viewerDelta = viewerCountsAsJoined && liveParticipantCount === undefined ? 1 : 0;
   const effectiveJoined = baseJoined + viewerDelta;
   const spotsLeft = Math.max(0, game.maxPlayers - effectiveJoined);
@@ -732,7 +769,10 @@ function GameDetail() {
             .delete()
             .eq("game_id", game.id)
             .eq("user_id", user.id)
-            .then(() => undefined, () => undefined);
+            .then(
+              () => undefined,
+              () => undefined,
+            );
         }
         toast("You left the game.");
         // Notify host in real time that a player left.
@@ -857,7 +897,9 @@ function GameDetail() {
           link: `/games/${game.id}`,
         }).catch(() => {});
         toast.success(
-          isResubmit ? "Request resubmitted. The host will review it." : "Request sent. The host will review it.",
+          isResubmit
+            ? "Request resubmitted. The host will review it."
+            : "Request sent. The host will review it.",
         );
       } catch (e: any) {
         setMyReq(prevReq);
@@ -871,7 +913,9 @@ function GameDetail() {
       const search: { invite?: true; from?: string } = {};
       if (isInvite) search.invite = true;
       if (inviteFrom) search.from = inviteFrom;
-      const feeLabel = `$${Number(settings?.entry_fee ?? game.price ?? 0).toFixed(2).replace(/\.00$/, "")}`;
+      const feeLabel = `$${Number(settings?.entry_fee ?? game.price ?? 0)
+        .toFixed(2)
+        .replace(/\.00$/, "")}`;
       toast.info(`Payment required to secure your spot`, {
         description: `Send ${feeLabel} to the host — your spot locks in once they verify.`,
         duration: 6000,
@@ -916,7 +960,6 @@ function GameDetail() {
     }
   };
 
-
   const viewerPending =
     !isHost && requiresApproval && myReq?.status === "pending" && !viewerCountsAsJoined;
   const hostPendingReqs = isHost ? hostRequests.filter((r) => r.status === "pending") : [];
@@ -954,9 +997,7 @@ function GameDetail() {
   // count, so a host removal that drops the roster to 0 doesn't leave ghost
   // avatars behind derived from the stale `game.joined` value.
   const rosterHydrated = liveParticipantCount !== undefined;
-  const placeholderCount = rosterHydrated
-    ? 0
-    : Math.max(0, (game.joined ?? 0) - liveRoster.length);
+  const placeholderCount = rosterHydrated ? 0 : Math.max(0, (game.joined ?? 0) - liveRoster.length);
   const placeholderOthers: RosterEntry[] = Array.from({ length: placeholderCount }, (_, i) => ({
     kind: "player" as const,
     initials: ["MC", "AG", "JK", "RC", "TB", "SO", "PN", "DP", "EL", "VM"][i % 10],
@@ -1080,18 +1121,16 @@ function GameDetail() {
       {isPaid && activeTab === "payments" && (
         <div className="page-shell mt-4">
           {isHost ? (
-            <HostPaymentsPanel
-              gameId={game.id}
-              gameTitle={game.title}
-              settings={settings}
-            />
+            <HostPaymentsPanel gameId={game.id} gameTitle={game.title} settings={settings} />
           ) : (
             <PlayerPaymentsPanel gameId={game.id} settings={settings} />
           )}
         </div>
       )}
 
-      <div className={`page-shell mt-5 space-y-5 ${isPaid && activeTab !== "overview" ? "hidden" : ""}`}>
+      <div
+        className={`page-shell mt-5 space-y-5 ${isPaid && activeTab !== "overview" ? "hidden" : ""}`}
+      >
         {/* Invite deep-link banner */}
         {isInvite &&
           !isHost &&
@@ -1163,178 +1202,194 @@ function GameDetail() {
             Driven by the shared useMyFlowStatus so paid games always show
             "Payment due" (or the matching payment stage) until the host
             verifies the payment — never "You're approved / on the roster". */}
-        {!isHost && requiresApproval && myReq && (() => {
-          // Paid games: pick copy from the shared flow status so this banner
-          // can't disagree with the pill / PaymentRequiredBanner / pay page.
-          if (isPaid) {
-            const paidCopy: Record<string, { title: string; body: string; tone: "warn" | "info" | "ok" | "bad" | "muted" }> = {
-              requested: {
-                title: "Waiting for host approval",
-                body: "Your spot isn't held until the host approves. You'll get a notification when they respond.",
-                tone: "warn",
-              },
-              payment_pending: {
-                title: "Payment due",
-                body: "Submit payment to lock your spot on the roster.",
-                tone: "warn",
-              },
-              payment_submitted: {
-                title: "Payment sent — waiting on host to confirm",
-                body: "The host is reviewing your proof. You'll be confirmed once they verify.",
-                tone: "info",
-              },
-              payment_rejected: {
-                title: "Payment declined — resubmit to keep your spot",
-                body: myReq.reviewer_notes || "The host couldn't verify your last payment. Send new proof to lock your spot.",
-                tone: "bad",
-              },
-              payment_verified: {
-                title: "Payment confirmed — you're on the roster",
-                body: "You're all set. See you at the game!",
-                tone: "ok",
-              },
-              confirmed: {
-                title: "Payment confirmed — you're on the roster",
-                body: "You're all set. See you at the game!",
-                tone: "ok",
-              },
-              rejected: {
-                title: "Request declined",
-                body: capReached
-                  ? `${myReq.reviewer_notes ? `${myReq.reviewer_notes} · ` : ""}You've reached the ${JOIN_RESUBMIT_MAX_ATTEMPTS}-attempt limit for this game. Message the host instead.`
-                  : cooldownMs > 0
-                    ? `${myReq.reviewer_notes ? `${myReq.reviewer_notes} · ` : ""}You can resubmit in ${formatCooldownLabel(cooldownMs)}.`
-                    : `${myReq.reviewer_notes ? `${myReq.reviewer_notes} · ` : ""}You can send another request or message the host.`,
-                tone: "muted",
-              },
-            };
-            const entry = paidCopy[myFlowStatus];
-            if (!entry) return null;
-            const toneClass =
-              entry.tone === "warn"
-                ? "border-coral/40 bg-coral/10"
-                : entry.tone === "bad"
-                  ? "border-destructive/50 bg-destructive/10"
+        {!isHost &&
+          requiresApproval &&
+          myReq &&
+          (() => {
+            // Paid games: pick copy from the shared flow status so this banner
+            // can't disagree with the pill / PaymentRequiredBanner / pay page.
+            if (isPaid) {
+              const paidCopy: Record<
+                string,
+                { title: string; body: string; tone: "warn" | "info" | "ok" | "bad" | "muted" }
+              > = {
+                requested: {
+                  title: "Waiting for host approval",
+                  body: "Your spot isn't held until the host approves. You'll get a notification when they respond.",
+                  tone: "warn",
+                },
+                payment_pending: {
+                  title: "Payment due",
+                  body: "Submit payment to lock your spot on the roster.",
+                  tone: "warn",
+                },
+                payment_submitted: {
+                  title: "Payment sent — waiting on host to confirm",
+                  body: "The host is reviewing your proof. You'll be confirmed once they verify.",
+                  tone: "info",
+                },
+                payment_rejected: {
+                  title: "Payment declined — resubmit to keep your spot",
+                  body:
+                    myReq.reviewer_notes ||
+                    "The host couldn't verify your last payment. Send new proof to lock your spot.",
+                  tone: "bad",
+                },
+                payment_verified: {
+                  title: "Payment confirmed — you're on the roster",
+                  body: "You're all set. See you at the game!",
+                  tone: "ok",
+                },
+                confirmed: {
+                  title: "Payment confirmed — you're on the roster",
+                  body: "You're all set. See you at the game!",
+                  tone: "ok",
+                },
+                rejected: {
+                  title: "Request declined",
+                  body: capReached
+                    ? `${myReq.reviewer_notes ? `${myReq.reviewer_notes} · ` : ""}You've reached the ${JOIN_RESUBMIT_MAX_ATTEMPTS}-attempt limit for this game. Message the host instead.`
+                    : cooldownMs > 0
+                      ? `${myReq.reviewer_notes ? `${myReq.reviewer_notes} · ` : ""}You can resubmit in ${formatCooldownLabel(cooldownMs)}.`
+                      : `${myReq.reviewer_notes ? `${myReq.reviewer_notes} · ` : ""}You can send another request or message the host.`,
+                  tone: "muted",
+                },
+              };
+              const entry = paidCopy[myFlowStatus];
+              if (!entry) return null;
+              const toneClass =
+                entry.tone === "warn"
+                  ? "border-coral/40 bg-coral/10"
+                  : entry.tone === "bad"
+                    ? "border-destructive/50 bg-destructive/10"
+                    : entry.tone === "ok"
+                      ? "border-lime/40 bg-lime/10"
+                      : entry.tone === "info"
+                        ? "border-lime/40 bg-lime/5"
+                        : "border-border bg-surface";
+              const Icon =
+                entry.tone === "warn" || entry.tone === "info"
+                  ? Clock
                   : entry.tone === "ok"
-                    ? "border-lime/40 bg-lime/10"
-                    : entry.tone === "info"
-                      ? "border-lime/40 bg-lime/5"
-                      : "border-border bg-surface";
-            const Icon =
-              entry.tone === "warn" || entry.tone === "info"
-                ? Clock
-                : entry.tone === "ok"
-                  ? Check
-                  : entry.tone === "bad"
-                    ? XIcon
-                    : XIcon;
-            const iconColor =
-              entry.tone === "warn"
-                ? "text-coral"
-                : entry.tone === "ok"
-                  ? "text-lime"
-                  : entry.tone === "bad"
-                    ? "text-destructive"
-                    : entry.tone === "info"
-                      ? "text-lime"
-                      : "text-muted-foreground";
+                    ? Check
+                    : entry.tone === "bad"
+                      ? XIcon
+                      : XIcon;
+              const iconColor =
+                entry.tone === "warn"
+                  ? "text-coral"
+                  : entry.tone === "ok"
+                    ? "text-lime"
+                    : entry.tone === "bad"
+                      ? "text-destructive"
+                      : entry.tone === "info"
+                        ? "text-lime"
+                        : "text-muted-foreground";
+              return (
+                <div
+                  className={`rounded-2xl border p-4 flex items-start gap-3 ${toneClass}`}
+                  role="status"
+                  aria-live="polite"
+                >
+                  <Icon className={`h-5 w-5 shrink-0 mt-0.5 ${iconColor}`} />
+                  <div className="min-w-0">
+                    <div className="font-display text-sm font-bold">{entry.title}</div>
+                    <p className="text-xs text-muted-foreground mt-0.5">{entry.body}</p>
+                  </div>
+                </div>
+              );
+            }
+
+            // Free games: original approval-only copy (no payment stage exists).
             return (
               <div
-                className={`rounded-2xl border p-4 flex items-start gap-3 ${toneClass}`}
+                className={`rounded-2xl border p-4 flex items-start gap-3 ${
+                  myReq.status === "pending"
+                    ? "border-coral/40 bg-coral/10"
+                    : myReq.status === "approved"
+                      ? "border-lime/40 bg-lime/10"
+                      : "border-border bg-surface"
+                }`}
                 role="status"
                 aria-live="polite"
               >
-                <Icon className={`h-5 w-5 shrink-0 mt-0.5 ${iconColor}`} />
+                {myReq.status === "pending" ? (
+                  <Clock className="h-5 w-5 text-coral shrink-0 mt-0.5" />
+                ) : myReq.status === "approved" ? (
+                  <Check className="h-5 w-5 text-lime shrink-0 mt-0.5" />
+                ) : (
+                  <XIcon className="h-5 w-5 text-muted-foreground shrink-0 mt-0.5" />
+                )}
                 <div className="min-w-0">
-                  <div className="font-display text-sm font-bold">{entry.title}</div>
-                  <p className="text-xs text-muted-foreground mt-0.5">{entry.body}</p>
+                  <div className="font-display text-sm font-bold">
+                    {myReq.status === "pending"
+                      ? "Waiting for host approval"
+                      : myReq.status === "approved"
+                        ? "You're approved — see you there!"
+                        : "Request declined"}
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    {myReq.status === "pending"
+                      ? "Your spot isn't held until the host approves. You'll get a notification when they respond."
+                      : myReq.status === "approved"
+                        ? "The host approved your request. You're on the roster."
+                        : capReached
+                          ? `${myReq.reviewer_notes ? `${myReq.reviewer_notes} · ` : ""}You've reached the ${JOIN_RESUBMIT_MAX_ATTEMPTS}-attempt limit for this game. Message the host instead.`
+                          : cooldownMs > 0
+                            ? `${myReq.reviewer_notes ? `${myReq.reviewer_notes} · ` : ""}You can resubmit in ${formatCooldownLabel(cooldownMs)}.`
+                            : `${myReq.reviewer_notes ? `${myReq.reviewer_notes} · ` : ""}You can send another request or message the host.`}
+                  </p>
                 </div>
               </div>
             );
-          }
-
-          // Free games: original approval-only copy (no payment stage exists).
-          return (
-            <div
-              className={`rounded-2xl border p-4 flex items-start gap-3 ${
-                myReq.status === "pending"
-                  ? "border-coral/40 bg-coral/10"
-                  : myReq.status === "approved"
-                    ? "border-lime/40 bg-lime/10"
-                    : "border-border bg-surface"
-              }`}
-              role="status"
-              aria-live="polite"
-            >
-              {myReq.status === "pending" ? (
-                <Clock className="h-5 w-5 text-coral shrink-0 mt-0.5" />
-              ) : myReq.status === "approved" ? (
-                <Check className="h-5 w-5 text-lime shrink-0 mt-0.5" />
-              ) : (
-                <XIcon className="h-5 w-5 text-muted-foreground shrink-0 mt-0.5" />
-              )}
-              <div className="min-w-0">
-                <div className="font-display text-sm font-bold">
-                  {myReq.status === "pending"
-                    ? "Waiting for host approval"
-                    : myReq.status === "approved"
-                      ? "You're approved — see you there!"
-                      : "Request declined"}
-                </div>
-                <p className="text-xs text-muted-foreground mt-0.5">
-                  {myReq.status === "pending"
-                    ? "Your spot isn't held until the host approves. You'll get a notification when they respond."
-                    : myReq.status === "approved"
-                      ? "The host approved your request. You're on the roster."
-                      : capReached
-                        ? `${myReq.reviewer_notes ? `${myReq.reviewer_notes} · ` : ""}You've reached the ${JOIN_RESUBMIT_MAX_ATTEMPTS}-attempt limit for this game. Message the host instead.`
-                        : cooldownMs > 0
-                          ? `${myReq.reviewer_notes ? `${myReq.reviewer_notes} · ` : ""}You can resubmit in ${formatCooldownLabel(cooldownMs)}.`
-                          : `${myReq.reviewer_notes ? `${myReq.reviewer_notes} · ` : ""}You can send another request or message the host.`}
-                </p>
-              </div>
-            </div>
-          );
-        })()}
+          })()}
 
         {/* Compact "Your status" strip for paid games — driven by shared flow
             status so it never disagrees with the banner above. Shown for any
             paid-flow state so an approved-but-unpaid player sees "Payment due"
             here too, not just after they've submitted proof. */}
-        {!isHost && isPaid && (() => {
-          const stripCopy: Partial<Record<string, { text: string; tone: "warn" | "info" | "ok" | "bad" }>> = {
-            payment_pending: { text: "Payment due — submit payment to lock your spot", tone: "warn" },
-            payment_submitted: { text: "Payment sent — waiting on host to confirm", tone: "info" },
-            payment_rejected: { text: "Payment declined — resubmit below", tone: "bad" },
-            payment_verified: { text: "Payment verified — you're on the roster", tone: "ok" },
-            confirmed: { text: "Payment verified — you're on the roster", tone: "ok" },
-          };
-          const entry = stripCopy[myFlowStatus];
-          if (!entry) return null;
-          const toneClass =
-            entry.tone === "ok"
-              ? "border-lime/40 bg-lime/10 text-lime"
-              : entry.tone === "warn"
-                ? "border-coral/40 bg-coral/10 text-coral"
-                : entry.tone === "info"
-                  ? "border-lime/30 bg-lime/5 text-lime"
-                  : "border-destructive/50 bg-destructive/10 text-destructive";
-          return (
-            <div
-              className={`flex items-center gap-3 rounded-2xl border px-4 py-2.5 text-xs ${toneClass}`}
-              role="status"
-              aria-live="polite"
-              data-testid="your-status-strip"
-              data-status={myFlowStatus}
-            >
-              <span className="font-bold uppercase tracking-wider">Your status</span>
-              <span className="text-foreground/80">·</span>
-              <span className="font-semibold">{entry.text}</span>
-            </div>
-          );
-        })()}
-
-
+        {!isHost &&
+          isPaid &&
+          (() => {
+            const stripCopy: Partial<
+              Record<string, { text: string; tone: "warn" | "info" | "ok" | "bad" }>
+            > = {
+              payment_pending: {
+                text: "Payment due — submit payment to lock your spot",
+                tone: "warn",
+              },
+              payment_submitted: {
+                text: "Payment sent — waiting on host to confirm",
+                tone: "info",
+              },
+              payment_rejected: { text: "Payment declined — resubmit below", tone: "bad" },
+              payment_verified: { text: "Payment verified — you're on the roster", tone: "ok" },
+              confirmed: { text: "Payment verified — you're on the roster", tone: "ok" },
+            };
+            const entry = stripCopy[myFlowStatus];
+            if (!entry) return null;
+            const toneClass =
+              entry.tone === "ok"
+                ? "border-lime/40 bg-lime/10 text-lime"
+                : entry.tone === "warn"
+                  ? "border-coral/40 bg-coral/10 text-coral"
+                  : entry.tone === "info"
+                    ? "border-lime/30 bg-lime/5 text-lime"
+                    : "border-destructive/50 bg-destructive/10 text-destructive";
+            return (
+              <div
+                className={`flex items-center gap-3 rounded-2xl border px-4 py-2.5 text-xs ${toneClass}`}
+                role="status"
+                aria-live="polite"
+                data-testid="your-status-strip"
+                data-status={myFlowStatus}
+              >
+                <span className="font-bold uppercase tracking-wider">Your status</span>
+                <span className="text-foreground/80">·</span>
+                <span className="font-semibold">{entry.text}</span>
+              </div>
+            );
+          })()}
 
         {/* Meta */}
         <div className="grid grid-cols-2 gap-2">
@@ -1528,10 +1583,10 @@ function GameDetail() {
           <PostEngagement subjectType="game" subjectId={game.id} />
         </div>
 
-
-
         {/* Payment settings summary */}
-        {(settings?.payment_deadline || settings?.refund_policy || settings?.payment_instructions) && (
+        {(settings?.payment_deadline ||
+          settings?.refund_policy ||
+          settings?.payment_instructions) && (
           <div className="rounded-3xl border border-border bg-surface p-4">
             <div className="flex items-center gap-2 mb-3">
               <CreditCard className="h-4 w-4 text-lime" />
@@ -1593,8 +1648,7 @@ function GameDetail() {
                 const remaining = Math.max(0, count - filled);
                 const isFull = remaining === 0;
                 const posWaitlist = waitlistEntries.filter((w) => w.position === name);
-                const viewerOnWaitlist =
-                  !!user && posWaitlist.some((w) => w.userId === user.id);
+                const viewerOnWaitlist = !!user && posWaitlist.some((w) => w.userId === user.id);
                 const canJoinAs =
                   !isFull &&
                   !isHost &&
@@ -1686,12 +1740,14 @@ function GameDetail() {
                         Join waitlist
                       </button>
                     )}
-                    {viewerOnWaitlist && !isHost && (() => {
-                      const mineHere = posWaitlist.find((w) => w.userId === user!.id);
-                      return mineHere && mineHere.status !== "waiting" ? (
-                        <WaitlistStatusPill status={mineHere.status} />
-                      ) : null;
-                    })()}
+                    {viewerOnWaitlist &&
+                      !isHost &&
+                      (() => {
+                        const mineHere = posWaitlist.find((w) => w.userId === user!.id);
+                        return mineHere && mineHere.status !== "waiting" ? (
+                          <WaitlistStatusPill status={mineHere.status} />
+                        ) : null;
+                      })()}
                     {viewerOnWaitlist && !isHost && (
                       <button
                         type="button"
@@ -1709,7 +1765,6 @@ function GameDetail() {
                         Leave waitlist
                       </button>
                     )}
-
                   </div>
                 );
               })}
@@ -1751,7 +1806,6 @@ function GameDetail() {
               );
             })()}
           </div>
-
         )}
 
         <Sheet open={positionRosterOpen} onOpenChange={setPositionRosterOpen}>
@@ -1778,9 +1832,7 @@ function GameDetail() {
                       <div className="font-display font-bold">{name}</div>
                       <span
                         className={`rounded-full px-2 py-0.5 text-[10px] font-bold tabular-nums ${
-                          isFull
-                            ? "bg-secondary text-muted-foreground"
-                            : "bg-lime/20 text-lime"
+                          isFull ? "bg-secondary text-muted-foreground" : "bg-lime/20 text-lime"
                         }`}
                       >
                         {isFull ? "Filled" : `${remaining} of ${count} left`}
@@ -1843,12 +1895,20 @@ function GameDetail() {
           </SheetContent>
         </Sheet>
 
-
         {/* Players */}
         <div>
           <div className="flex items-center justify-between mb-2 gap-2">
             <h2 className="font-display text-sm font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-2 flex-wrap">
-              <span>Roster (<span key={effectiveJoined} className="inline-block motion-safe:animate-scale-in tabular-nums">{effectiveJoined}</span>/{game.maxPlayers})</span>
+              <span>
+                Roster (
+                <span
+                  key={effectiveJoined}
+                  className="inline-block motion-safe:animate-scale-in tabular-nums"
+                >
+                  {effectiveJoined}
+                </span>
+                /{game.maxPlayers})
+              </span>
               <SpotsPill spotsLeft={spotsLeft} maxPlayers={game.maxPlayers} />
               {(viewerPending || pendingCount > 0) && (
                 <span className="inline-flex items-center gap-1 rounded-full border border-coral/40 bg-coral/10 px-2 py-0.5 text-[10px] font-bold text-coral normal-case tracking-normal">
@@ -1870,11 +1930,9 @@ function GameDetail() {
                     onOptimistic={applyOptimisticReview}
                     index={i}
                   />
-
                 );
               }
-              const isRealPlayer =
-                p.kind === "player" && !!p.userId && !p.isMe && !!p.displayName;
+              const isRealPlayer = p.kind === "player" && !!p.userId && !p.isMe && !!p.displayName;
               const chip = (
                 <motion.div
                   key={i}
@@ -1950,7 +2008,9 @@ function GameDetail() {
 
       {/* Host controls */}
       {isHost && (
-        <div className={`page-shell mt-4 space-y-3 ${isPaid && activeTab !== "overview" ? "hidden" : ""}`}>
+        <div
+          className={`page-shell mt-4 space-y-3 ${isPaid && activeTab !== "overview" ? "hidden" : ""}`}
+        >
           {/* Manage game: edit, start, close joining */}
           <div className="rounded-2xl border border-border bg-surface p-3">
             <div className="flex items-center justify-between gap-2">
@@ -2017,7 +2077,8 @@ function GameDetail() {
                 ))}
               </select>
               <p className="mt-1 text-[11px] text-muted-foreground">
-                New signups stop automatically this long before kickoff. Approved players can still pay.
+                New signups stop automatically this long before kickoff. Approved players can still
+                pay.
               </p>
             </div>
             <div className="mt-3 grid grid-cols-3 gap-2">
@@ -2036,7 +2097,10 @@ function GameDetail() {
                     void updateHostedGame(game.id, { status: "completed" }).catch(() => {});
                     toast.success("Game marked as ended.");
                   } else {
-                    void updateHostedGame(game.id, { status: "in_progress", joinsClosed: true }).catch(() => {});
+                    void updateHostedGame(game.id, {
+                      status: "in_progress",
+                      joinsClosed: true,
+                    }).catch(() => {});
                     toast.success("Game started. Have fun!");
                   }
                 }}
@@ -2053,7 +2117,6 @@ function GameDetail() {
                   void updateHostedGame(game.id, { joinsClosed: next }).catch(() => {});
                   toast.success(next ? "Joining closed." : "Joining reopened.");
                 }}
-
                 disabled={game.status !== "scheduled" && game.status !== undefined}
                 className="inline-flex flex-col items-center justify-center gap-1 rounded-xl border border-border bg-background py-2.5 text-xs font-semibold disabled:opacity-50"
               >
@@ -2086,7 +2149,6 @@ function GameDetail() {
             </button>
           </div>
 
-
           {hostRequests.length > 0 ? (
             <div>
               <h2 className="font-display text-sm font-bold uppercase tracking-wider text-muted-foreground mb-2">
@@ -2101,7 +2163,6 @@ function GameDetail() {
                     gameTitle={game.title}
                     onOptimistic={applyOptimisticReview}
                   />
-
                 ))}
               </div>
             </div>
@@ -2132,7 +2193,8 @@ function GameDetail() {
               const rosterFromLive = liveRoster.filter((p) => !approvedIds.has(p.userId));
               const fallbackPlaceholderCount =
                 liveRoster.length === 0 ? (liveParticipantCount ?? game.joined ?? 0) : 0;
-              const totalConfirmed = approvedReqs.length + Math.max(rosterFromLive.length, fallbackPlaceholderCount);
+              const totalConfirmed =
+                approvedReqs.length + Math.max(rosterFromLive.length, fallbackPlaceholderCount);
               return (
                 <>
                   <h2 className="font-display text-sm font-bold uppercase tracking-wider text-muted-foreground mb-2">
@@ -2153,7 +2215,6 @@ function GameDetail() {
                             feeRequired={isPaid}
                             onOptimistic={applyOptimisticReview}
                           />
-
                         ))}
                         {rosterFromLive.map((p) => {
                           const canRemove = isHost && user && p.userId !== user.id;
@@ -2234,183 +2295,189 @@ function GameDetail() {
         </div>
       )}
 
-
-
-
       {/* Sticky CTA */}
       <div className="fixed bottom-[calc(env(safe-area-inset-bottom)+6rem)] left-0 right-0 z-30 px-4 pb-[max(env(safe-area-inset-bottom),0.75rem)] pt-3 backdrop-blur-xl bg-background/80 border-t border-border">
         <div className="mx-auto w-[min(100%,28rem)]">
-        {!isHost && !joined && !isPending && !isConfirmed && !isApproved && (
-          <JoinBlockedReason gate={viewerGate} className="mb-2" waitlistHint />
-        )}
-        <div className="flex items-center gap-2">
-          <button
-            disabled={messaging}
-            onClick={async () => {
-              if (!user) {
-                nav({ to: "/auth" });
-                return;
-              }
-              const hostUid = settings?.host_id;
-              if (!hostUid) {
-                toast.error("This host can't be messaged yet.");
-                return;
-              }
-              if (hostUid === user.id) {
-                nav({ to: "/messages" });
-                return;
-              }
-              setMessaging(true);
-              try {
-                const cid = await getOrCreateDirectConversation(hostUid, game.id);
-                nav({ to: "/messages/$conversationId", params: { conversationId: cid } });
-              } catch (e: any) {
-                toast.error(e.message);
-              } finally {
-                setMessaging(false);
-              }
-            }}
-            className="grid h-12 w-12 place-items-center rounded-2xl border border-border bg-surface disabled:opacity-50"
-          >
-            <MessageCircle className="h-5 w-5" />
-          </button>
-          {!isHost && (() => {
-            // Locked games (started / host-closed / inside the blackout window)
-            // block NEW joins, but keep leave/cancel and payment actions live.
-            const lockedForNewJoin = gate.locked && !joined && !isPending && !isConfirmed && !isApproved;
-            const canJoinAction = joined || isPending || isConfirmed || spotsLeft > 0;
-            const buttonDisabled = requesting || processing || !canJoinAction || lockedForNewJoin;
-            const hasPaymentAttempt = latestSub?.status === "pending" || latestSub?.status === "rejected";
-            const canEnterPaymentFlow = spotsLeft > 0 || joined || hasPaymentAttempt || isApproved;
-            const paymentAction = isPaid && !paymentCleared && approvalCleared && canEnterPaymentFlow;
-            const paymentSearch: { invite?: true; from?: string } = {};
-            if (isInvite) paymentSearch.invite = true;
-            if (inviteFrom) paymentSearch.from = inviteFrom;
-            const paymentCtaLabel =
-              latestSub?.status === "pending"
-                ? "Payment pending · View status"
-                : latestSub?.status === "rejected"
-                  ? "Payment rejected · Pay again"
-                  : `Pay host · $${fee.toFixed(2)}`;
-            const LiveSpots = () => (
-              <span
-                className="inline-flex items-baseline"
-                aria-live="polite"
-                aria-atomic="true"
-                aria-label={`${spotsLeft} spot${spotsLeft === 1 ? "" : "s"} left`}
-              >
-                <AnimatePresence mode="popLayout" initial={false}>
-                  <motion.span
-                    key={spotsLeft}
-                    initial={{ y: -6, opacity: 0 }}
-                    animate={{ y: 0, opacity: 1 }}
-                    exit={{ y: 6, opacity: 0 }}
-                    transition={{ duration: 0.18 }}
-                    className="tabular-nums"
+          {!isHost && !joined && !isPending && !isConfirmed && !isApproved && (
+            <JoinBlockedReason gate={viewerGate} className="mb-2" waitlistHint />
+          )}
+          <div className="flex items-center gap-2">
+            <button
+              disabled={messaging}
+              onClick={async () => {
+                if (!user) {
+                  nav({ to: "/auth" });
+                  return;
+                }
+                const hostUid = settings?.host_id;
+                if (!hostUid) {
+                  toast.error("This host can't be messaged yet.");
+                  return;
+                }
+                if (hostUid === user.id) {
+                  nav({ to: "/messages" });
+                  return;
+                }
+                setMessaging(true);
+                try {
+                  const cid = await getOrCreateDirectConversation(hostUid, game.id);
+                  nav({ to: "/messages/$conversationId", params: { conversationId: cid } });
+                } catch (e: any) {
+                  toast.error(e.message);
+                } finally {
+                  setMessaging(false);
+                }
+              }}
+              className="grid h-12 w-12 place-items-center rounded-2xl border border-border bg-surface disabled:opacity-50"
+            >
+              <MessageCircle className="h-5 w-5" />
+            </button>
+            {!isHost &&
+              (() => {
+                // Locked games (started / host-closed / inside the blackout window)
+                // block NEW joins, but keep leave/cancel and payment actions live.
+                const lockedForNewJoin =
+                  gate.locked && !joined && !isPending && !isConfirmed && !isApproved;
+                const canJoinAction = joined || isPending || isConfirmed || spotsLeft > 0;
+                const buttonDisabled =
+                  requesting || processing || !canJoinAction || lockedForNewJoin;
+                const hasPaymentAttempt =
+                  latestSub?.status === "pending" || latestSub?.status === "rejected";
+                const canEnterPaymentFlow =
+                  spotsLeft > 0 || joined || hasPaymentAttempt || isApproved;
+                const paymentAction =
+                  isPaid && !paymentCleared && approvalCleared && canEnterPaymentFlow;
+                const paymentSearch: { invite?: true; from?: string } = {};
+                if (isInvite) paymentSearch.invite = true;
+                if (inviteFrom) paymentSearch.from = inviteFrom;
+                const paymentCtaLabel =
+                  latestSub?.status === "pending"
+                    ? "Payment pending · View status"
+                    : latestSub?.status === "rejected"
+                      ? "Payment rejected · Pay again"
+                      : `Pay host · $${fee.toFixed(2)}`;
+                const LiveSpots = () => (
+                  <span
+                    className="inline-flex items-baseline"
+                    aria-live="polite"
+                    aria-atomic="true"
+                    aria-label={`${spotsLeft} spot${spotsLeft === 1 ? "" : "s"} left`}
                   >
-                    {spotsLeft}
-                  </motion.span>
-                </AnimatePresence>
-                <span className="ml-1">spot{spotsLeft === 1 ? "" : "s"} left</span>
-              </span>
-            );
-            if (paymentAction) {
-              return (
-                <motion.div whileTap={{ scale: 0.97 }} className="flex-1">
-                  <Link
-                    to="/games/$gameId/pay"
-                    params={{ gameId: game.id }}
-                    search={paymentSearch}
-                    className="flex w-full items-center justify-center gap-2 rounded-2xl bg-lime-gradient py-3.5 font-bold text-primary-foreground glow-lime transition-colors"
+                    <AnimatePresence mode="popLayout" initial={false}>
+                      <motion.span
+                        key={spotsLeft}
+                        initial={{ y: -6, opacity: 0 }}
+                        animate={{ y: 0, opacity: 1 }}
+                        exit={{ y: 6, opacity: 0 }}
+                        transition={{ duration: 0.18 }}
+                        className="tabular-nums"
+                      >
+                        {spotsLeft}
+                      </motion.span>
+                    </AnimatePresence>
+                    <span className="ml-1">spot{spotsLeft === 1 ? "" : "s"} left</span>
+                  </span>
+                );
+                if (paymentAction) {
+                  return (
+                    <motion.div whileTap={{ scale: 0.97 }} className="flex-1">
+                      <Link
+                        to="/games/$gameId/pay"
+                        params={{ gameId: game.id }}
+                        search={paymentSearch}
+                        className="flex w-full items-center justify-center gap-2 rounded-2xl bg-lime-gradient py-3.5 font-bold text-primary-foreground glow-lime transition-colors"
+                      >
+                        <CreditCard className="h-4 w-4" /> {paymentCtaLabel}
+                      </Link>
+                    </motion.div>
+                  );
+                }
+                return (
+                  <motion.button
+                    whileTap={{ scale: 0.97 }}
+                    onClick={() => {
+                      const wantsLeave = isConfirmed || (joined && !isPaid);
+                      const wantsFreeJoin =
+                        !isConfirmed &&
+                        !joined &&
+                        !isPending &&
+                        spotsLeft > 0 &&
+                        !(requiresApproval && !isApproved) &&
+                        !isPaid;
+                      if (wantsLeave) {
+                        setConfirmAction("leave");
+                        return;
+                      }
+                      if (wantsFreeJoin) {
+                        setConfirmAction("join");
+                        return;
+                      }
+                      void handleJoin();
+                    }}
+                    disabled={buttonDisabled}
+                    aria-live="polite"
+                    aria-disabled={buttonDisabled}
+                    className={`flex-1 rounded-2xl py-3.5 font-bold inline-flex items-center justify-center gap-2 transition-colors disabled:opacity-60 disabled:cursor-not-allowed ${
+                      isConfirmed
+                        ? "bg-lime/15 border border-lime/40 text-lime"
+                        : isPending
+                          ? "bg-surface border border-coral/40 text-coral"
+                          : joined
+                            ? "bg-surface border border-lime/40 text-lime"
+                            : lockedForNewJoin || spotsLeft <= 0
+                              ? "bg-surface border border-border text-muted-foreground"
+                              : "bg-lime-gradient text-primary-foreground glow-lime"
+                    }`}
                   >
-                    <CreditCard className="h-4 w-4" /> {paymentCtaLabel}
-                  </Link>
-                </motion.div>
-              );
-            }
-            return (
-              <motion.button
-                whileTap={{ scale: 0.97 }}
-                onClick={() => {
-                  const wantsLeave = isConfirmed || (joined && !isPaid);
-                  const wantsFreeJoin =
-                    !isConfirmed &&
-                    !joined &&
-                    !isPending &&
-                    spotsLeft > 0 &&
-                    !(requiresApproval && !isApproved) &&
-                    !isPaid;
-                  if (wantsLeave) {
-                    setConfirmAction("leave");
-                    return;
-                  }
-                  if (wantsFreeJoin) {
-                    setConfirmAction("join");
-                    return;
-                  }
-                  void handleJoin();
-                }}
-                disabled={buttonDisabled}
-                aria-live="polite"
-                aria-disabled={buttonDisabled}
-                className={`flex-1 rounded-2xl py-3.5 font-bold inline-flex items-center justify-center gap-2 transition-colors disabled:opacity-60 disabled:cursor-not-allowed ${
-                  isConfirmed
-                    ? "bg-lime/15 border border-lime/40 text-lime"
-                    : isPending
-                      ? "bg-surface border border-coral/40 text-coral"
-                      : joined
-                        ? "bg-surface border border-lime/40 text-lime"
-                        : lockedForNewJoin || spotsLeft <= 0
-                          ? "bg-surface border border-border text-muted-foreground"
-                          : "bg-lime-gradient text-primary-foreground glow-lime"
-                }`}
-              >
-                {isConfirmed ? (
-                  <>
-                    <Check className="h-4 w-4" /> Confirmed · Tap to leave
-                  </>
-                ) : isPending ? (
-                  <>
-                    <Clock className="h-4 w-4" />{" "}
-                    {latestSub?.status === "pending"
-                      ? "Payment pending · Tap to withdraw"
-                      : "Request pending · Tap to cancel"}
-                  </>
-                ) : joined && !isPaid ? (
-                  <>
-                    <Check className="h-4 w-4" /> You're in · Tap to leave
-                  </>
-                ) : lockedForNewJoin ? (
-                  <>
-                    <Lock className="h-4 w-4" />{" "}
-                    {gate.joinState === "in_progress"
-                      ? "In progress"
-                      : gate.joinState === "completed"
-                        ? "Game ended"
-                        : "Signup closed"}
-                  </>
-                ) : spotsLeft <= 0 ? (
-                  <>
-                    <span className="inline-block h-2 w-2 rounded-full bg-coral animate-pulse" aria-hidden />
-                    Full · Waiting for a spot
-                  </>
-                ) : requiresApproval && !isApproved ? (
-                  <>
-                    Request to join · <LiveSpots />
-                  </>
-                ) : isPaid ? (
-                  <>
-                    <CreditCard className="h-4 w-4" /> Pay host · ${fee.toFixed(2)}
-                  </>
-                ) : (
-                  <>
-                    Join free · <LiveSpots />
-                  </>
-                )}
-              </motion.button>
-            );
-          })()}
-        </div>
+                    {isConfirmed ? (
+                      <>
+                        <Check className="h-4 w-4" /> Confirmed · Tap to leave
+                      </>
+                    ) : isPending ? (
+                      <>
+                        <Clock className="h-4 w-4" />{" "}
+                        {latestSub?.status === "pending"
+                          ? "Payment pending · Tap to withdraw"
+                          : "Request pending · Tap to cancel"}
+                      </>
+                    ) : joined && !isPaid ? (
+                      <>
+                        <Check className="h-4 w-4" /> You're in · Tap to leave
+                      </>
+                    ) : lockedForNewJoin ? (
+                      <>
+                        <Lock className="h-4 w-4" />{" "}
+                        {gate.joinState === "in_progress"
+                          ? "In progress"
+                          : gate.joinState === "completed"
+                            ? "Game ended"
+                            : "Signup closed"}
+                      </>
+                    ) : spotsLeft <= 0 ? (
+                      <>
+                        <span
+                          className="inline-block h-2 w-2 rounded-full bg-coral animate-pulse"
+                          aria-hidden
+                        />
+                        Full · Waiting for a spot
+                      </>
+                    ) : requiresApproval && !isApproved ? (
+                      <>
+                        Request to join · <LiveSpots />
+                      </>
+                    ) : isPaid ? (
+                      <>
+                        <CreditCard className="h-4 w-4" /> Pay host · ${fee.toFixed(2)}
+                      </>
+                    ) : (
+                      <>
+                        Join free · <LiveSpots />
+                      </>
+                    )}
+                  </motion.button>
+                );
+              })()}
+          </div>
         </div>
       </div>
 
@@ -2433,7 +2500,6 @@ function GameDetail() {
           void handleJoin(pos);
         }}
       />
-
 
       <AlertDialog
         open={confirmAction !== null}
@@ -2589,9 +2655,19 @@ function EditGameModal({
     enabled: !!user && !hasStarted,
     staleTime: 30_000,
   });
-  type EditAffiliation = { source: "team" | "org"; id: string; name: string; kind?: "team" | "coach" };
+  type EditAffiliation = {
+    source: "team" | "org";
+    id: string;
+    name: string;
+    kind?: "team" | "coach";
+  };
   const editAffiliations: EditAffiliation[] = [
-    ...(myTeamsQuery.data ?? []).map((t) => ({ source: "team" as const, id: t.id, name: t.name, kind: t.kind })),
+    ...(myTeamsQuery.data ?? []).map((t) => ({
+      source: "team" as const,
+      id: t.id,
+      name: t.name,
+      kind: t.kind,
+    })),
     ...(myOrgsQuery.data ?? []).map((o) => ({ source: "org" as const, id: o.id, name: o.name })),
   ];
   const affLabel = (a: EditAffiliation) =>
@@ -2625,7 +2701,6 @@ function EditGameModal({
       cancel = true;
     };
   }, []);
-
 
   const save = async () => {
     if (saving) return;
@@ -3103,7 +3178,6 @@ function EditGameModal({
             </Field>
           )}
 
-
           <Field label="Description">
             <textarea
               value={description}
@@ -3114,11 +3188,7 @@ function EditGameModal({
           </Field>
 
           <Field label="Positions needed">
-            <PositionsPicker
-              sport={sport}
-              value={positionsNeeded}
-              onChange={setPositionsNeeded}
-            />
+            <PositionsPicker sport={sport} value={positionsNeeded} onChange={setPositionsNeeded} />
           </Field>
         </div>
         <BlockedUsersSection hostId={hostId} />
@@ -3185,7 +3255,15 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
   );
 }
 
-function Meta({ icon, label, value }: { icon: React.ReactNode; label: string; value: React.ReactNode }) {
+function Meta({
+  icon,
+  label,
+  value,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  value: React.ReactNode;
+}) {
   return (
     <div className="rounded-2xl border border-border bg-surface p-3">
       <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-wider text-muted-foreground">
@@ -3207,10 +3285,7 @@ function BlockedUsersSection({ hostId }: { hostId: string }) {
     if (missing.length === 0) return;
     let cancel = false;
     (async () => {
-      const { data } = await supabase
-        .from("profiles")
-        .select("id, display_name")
-        .in("id", missing);
+      const { data } = await supabase.from("profiles").select("id, display_name").in("id", missing);
       if (cancel || !data) return;
       const next: Record<string, string> = {};
       (data as { id: string; display_name: string | null }[]).forEach((r) => {
@@ -3400,7 +3475,11 @@ function RosterPlayerRow({
         });
       }
       toast.success(
-        next === "verified" ? "Payment verified." : next === "rejected" ? "Payment rejected." : "Marked unpaid.",
+        next === "verified"
+          ? "Payment verified."
+          : next === "rejected"
+            ? "Payment rejected."
+            : "Marked unpaid.",
       );
     } catch (e: any) {
       setLatestSub(prev);
@@ -3445,8 +3524,6 @@ function RosterPlayerRow({
       setBusy(false);
     }
   };
-
-
 
   const viewProof = async () => {
     if (!latestSub?.screenshot_path) return;
@@ -3518,8 +3595,6 @@ function RosterPlayerRow({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [latestSub?.id, latestSub?.status]);
 
-
-
   const remove = async () => {
     if (!confirm(`Remove ${name} from ${gameTitle}?`)) return;
     setBusy(true);
@@ -3577,8 +3652,6 @@ function RosterPlayerRow({
     }
   };
 
-
-
   const fmt = (n: number) => (n > 0 ? n.toFixed(1) : "—");
   const paymentChip = !feeRequired
     ? null
@@ -3609,7 +3682,6 @@ function RosterPlayerRow({
           </div>
         </div>
         <div className="flex flex-col gap-1.5">
-
           <button
             type="button"
             onClick={remove}
@@ -3740,7 +3812,7 @@ function RosterPlayerRow({
                 const change =
                   ev.from_status && ev.to_status
                     ? `${ev.from_status} → ${ev.to_status}`
-                    : ev.to_status ?? ev.action;
+                    : (ev.to_status ?? ev.action);
                 const label =
                   ev.action === "submitted"
                     ? "Player submitted payment"
@@ -3780,7 +3852,6 @@ function RosterPlayerRow({
     </div>
   );
 }
-
 
 function HostRequestRow({
   req,
@@ -3839,8 +3910,6 @@ function HostRequestRow({
     if (raw === null) return null;
     return raw.trim().slice(0, 500);
   };
-
-
 
   return (
     <div
@@ -3976,8 +4045,6 @@ function HostPendingChip({
     if (raw === null) return null;
     return raw.trim().slice(0, 500);
   };
-
-
 
   return (
     <div className="relative">

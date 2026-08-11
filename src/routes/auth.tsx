@@ -1,4 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { pageHead } from "@/lib/seo";
 import type { User } from "@supabase/supabase-js";
 import { useEffect, useRef, useState } from "react";
 import { ArrowLeft } from "lucide-react";
@@ -19,7 +20,13 @@ import {
 } from "@/lib/account-type";
 
 export const Route = createFileRoute("/auth")({
-  head: () => ({ meta: [{ title: "Sign in — OpenRun" }] }),
+  head: () =>
+    pageHead({
+      path: "/auth",
+      title: "Sign in — OpenRun",
+      description: "Sign in or create an OpenRun account to join and host pickup games.",
+      noindex: true,
+    }),
   validateSearch: (s: Record<string, unknown>) => {
     const next = sanitizeNextPath(s.next);
     return next ? { next } : {};
@@ -28,7 +35,6 @@ export const Route = createFileRoute("/auth")({
 });
 
 function AuthPage() {
-  
   const { next } = Route.useSearch();
   const { user, loading } = useAuth();
   const [mode, setMode] = useState<"signin" | "signup">("signin");
@@ -43,10 +49,12 @@ function AuthPage() {
   // Monotonic token: bumping it cancels any in-flight session poll.
   const waitingRef = useRef(0);
 
-  useEffect(() => () => {
-    waitingRef.current += 1;
-  }, []);
-
+  useEffect(
+    () => () => {
+      waitingRef.current += 1;
+    },
+    [],
+  );
 
   const needsAccountType = async (currentUser: User | null | undefined) => {
     if (!currentUser) return false;
@@ -104,7 +112,10 @@ function AuthPage() {
       if (!cancelled && data.session) void goPostAuth(data.session.user);
     });
     const { data: sub } = supabase.auth.onAuthStateChange((event, session) => {
-      if (session && (event === "SIGNED_IN" || event === "INITIAL_SESSION" || event === "TOKEN_REFRESHED")) {
+      if (
+        session &&
+        (event === "SIGNED_IN" || event === "INITIAL_SESSION" || event === "TOKEN_REFRESHED")
+      ) {
         void goPostAuth(session.user);
       }
     });
@@ -227,7 +238,9 @@ function AuthPage() {
     const ua = navigator.userAgent;
     const isIOS = /iPad|iPhone|iPod/.test(ua);
     const isIOSChrome = isIOS && /CriOS/.test(ua);
-    const isInAppWebview = /(FBAN|FBAV|Instagram|Line|Twitter|LinkedInApp|Snapchat|TikTok)/i.test(ua);
+    const isInAppWebview = /(FBAN|FBAV|Instagram|Line|Twitter|LinkedInApp|Snapchat|TikTok)/i.test(
+      ua,
+    );
 
     const browserGuidance = isIOSChrome
       ? "In iOS Chrome, tap the ••• menu → Settings → Content Settings → Block Pop-ups → off. Or open this page in Safari."
@@ -272,8 +285,7 @@ function AuthPage() {
       trackSigninEvent("failure", { provider, errorMessage: raw });
       if (/vendor|provider|external_provider|oauth/i.test(raw)) {
         toast.error(`${providerLabel} sign-in was rejected by the provider`, {
-          description:
-            "Please retry from this screen. Your account setup choice is still saved.",
+          description: "Please retry from this screen. Your account setup choice is still saved.",
           action: {
             label: "Retry",
             onClick: () => oauth(provider, { isRetry: true }),
@@ -290,7 +302,6 @@ function AuthPage() {
     // "Sign in was cancelled". That signal is NOT proof of failure — keep
     // waiting for a session before showing anything scary. Classification
     // lives in @/lib/oauth-outcome so it can be unit-tested.
-
 
     const waitForSession = (raw: string) => {
       waitingRef.current += 1;
@@ -345,7 +356,6 @@ function AuthPage() {
       }
     };
 
-
     promise
       .then((result) => {
         if (result?.error) {
@@ -370,7 +380,6 @@ function AuthPage() {
         if (!waiting) setBusy(false);
       });
   };
-
 
   return (
     <div className="mx-auto max-w-md min-h-screen flex flex-col pb-12">
@@ -487,8 +496,6 @@ function AuthPage() {
                 Waiting for {waitingProvider} to finish… keep this tab open.
               </p>
             ) : null}
-
-
 
             <div className="flex items-center gap-3 text-[10px] uppercase tracking-wider text-muted-foreground">
               <div className="h-px flex-1 bg-border" /> or <div className="h-px flex-1 bg-border" />

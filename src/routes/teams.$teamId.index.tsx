@@ -1,4 +1,5 @@
 import { createFileRoute, Link, notFound, redirect } from "@tanstack/react-router";
+import { pageHead } from "@/lib/seo";
 import { motion } from "framer-motion";
 import { useEffect, useMemo, useState } from "react";
 import { zodValidator, fallback } from "@tanstack/zod-adapter";
@@ -17,7 +18,14 @@ import {
   Plus,
   Pencil,
 } from "lucide-react";
-import { ORGS, GAMES, POST_KIND_META, type PostKind, type Org, type OrgPost } from "@/lib/sample-data";
+import {
+  ORGS,
+  GAMES,
+  POST_KIND_META,
+  type PostKind,
+  type Org,
+  type OrgPost,
+} from "@/lib/sample-data";
 import { isMyOrg, ensureOrgById } from "@/lib/org-store";
 import { PostCard } from "@/components/PostCard";
 import { PostDetailsDialog } from "@/components/PostDetailsDialog";
@@ -40,11 +48,30 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 
-
 export const Route = createFileRoute("/teams/$teamId/")({
   head: ({ loaderData, params }) => {
-    const o = loaderData ?? ORGS.find((x) => x.id === params.teamId);
-    return { meta: [{ title: o ? `${(o as Org).name} — OpenRun` : "Team — OpenRun" }] };
+    const o = (loaderData ?? ORGS.find((x) => x.id === params.teamId)) as Org | undefined;
+    const name = o?.name ?? "Team";
+    return pageHead({
+      path: `/teams/${params.teamId}`,
+      title: `${name} — Team on OpenRun`,
+      description: (
+        o?.bio ||
+        o?.tagline ||
+        `Follow ${name} on OpenRun: roster, games, tryouts, and reviews.`
+      ).slice(0, 155),
+      image: o?.cover?.startsWith("http") ? o.cover : null,
+      jsonLd: o
+        ? {
+            "@context": "https://schema.org",
+            "@type": "SportsTeam",
+            name: o.name,
+            sport: o.sports?.join(", "),
+            address: o.city ?? undefined,
+            url: `https://open-run-connect.lovable.app/teams/${params.teamId}`,
+          }
+        : undefined,
+    });
   },
   // URL-persisted view: active tab (posts/about/games), post-kind filter,
   // and reviews modal. Refreshing or sharing the URL restores the same view.
@@ -87,8 +114,6 @@ export const Route = createFileRoute("/teams/$teamId/")({
     return org;
   },
 });
-
-
 
 const FILTERS: { key: PostKind | "all"; label: string }[] = [
   { key: "all", label: "All posts" },
@@ -260,7 +285,11 @@ function TeamPage() {
             ))}
             {org.skillRange && (
               <span className="rounded-full border border-lime/40 bg-lime/10 px-2.5 py-1 text-xs font-semibold text-lime">
-                {["Beginner", "Recreational", "Intermediate", "Advanced", "Pro"][org.skillRange.min - 1]}
+                {
+                  ["Beginner", "Recreational", "Intermediate", "Advanced", "Pro"][
+                    org.skillRange.min - 1
+                  ]
+                }
                 {org.skillRange.min !== org.skillRange.max &&
                   ` – ${["Beginner", "Recreational", "Intermediate", "Advanced", "Pro"][org.skillRange.max - 1]}`}
               </span>
@@ -517,7 +546,8 @@ function TeamPage() {
             <DialogHeader className="sr-only">
               <DialogTitle id="team-reviews-title">Reviews for {org.name}</DialogTitle>
               <DialogDescription id="team-reviews-desc">
-                Browse, filter, and sort reviews left for this {org.kind === "coach" ? "trainer" : "team"}. Press Escape to close.
+                Browse, filter, and sort reviews left for this{" "}
+                {org.kind === "coach" ? "trainer" : "team"}. Press Escape to close.
               </DialogDescription>
             </DialogHeader>
             <div className="p-4">
@@ -532,11 +562,7 @@ function TeamPage() {
         </Dialog>
 
         {canEdit && (
-          <CreatePostSheet
-            teamId={org.id}
-            open={composerOpen}
-            onOpenChange={setComposerOpen}
-          />
+          <CreatePostSheet teamId={org.id} open={composerOpen} onOpenChange={setComposerOpen} />
         )}
       </div>
       <PostDetailsDialog
@@ -548,7 +574,6 @@ function TeamPage() {
     </div>
   );
 }
-
 
 function Stat({ label, value, icon }: { label: string; value: string; icon: React.ReactNode }) {
   return (

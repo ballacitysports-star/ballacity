@@ -1,4 +1,5 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { pageHead } from "@/lib/seo";
 import { useEffect, useState } from "react";
 import { ArrowLeft, ShieldCheck } from "lucide-react";
 import { toast } from "sonner";
@@ -6,7 +7,13 @@ import type { User } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
 
 export const Route = createFileRoute("/account/security")({
-  head: () => ({ meta: [{ title: "Account security — OpenRun" }] }),
+  head: () =>
+    pageHead({
+      path: "/account/security",
+      title: "Security — OpenRun",
+      description: "Manage sign-in methods, password, and connected accounts.",
+      noindex: true,
+    }),
   component: AccountSecurityPage,
 });
 

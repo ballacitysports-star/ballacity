@@ -1,4 +1,5 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { pageHead } from "@/lib/seo";
 import { useEffect, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import {
@@ -38,13 +39,20 @@ import { useAvailabilityGate } from "@/lib/availability-gate";
 import { AvailabilityPromptBanner } from "@/components/availability/AvailabilityPromptDialog";
 import { upsertGamePaymentSettings } from "@/lib/payments";
 import { ImageUploader } from "@/components/ImageUploader";
-import { PositionsPicker, positionsCleanup, type PositionsNeeded } from "@/components/PositionsPicker";
-
-
-
+import {
+  PositionsPicker,
+  positionsCleanup,
+  type PositionsNeeded,
+} from "@/components/PositionsPicker";
 
 export const Route = createFileRoute("/_tabs/create")({
-  head: () => ({ meta: [{ title: "Host a game — OpenRun" }] }),
+  head: () =>
+    pageHead({
+      path: "/create",
+      title: "Host a game — OpenRun",
+      description: "Set up a pickup game: sport, venue, time, spots, and entry fee.",
+      noindex: true,
+    }),
   component: Create,
 });
 
@@ -91,7 +99,6 @@ function Create() {
   }, [affiliations.length, affiliationsLoading, activeRefId]);
   const affiliationLabel = (_a: Affiliation) => "Team";
   const affiliationShortLabel = affiliationLabel;
-
 
   const [sport, setSport] = useState<Sport>("Basketball");
 
@@ -141,8 +148,6 @@ function Create() {
     }
     return out;
   })();
-
-
 
   useEffect(() => {
     const nextCity = profile?.city?.trim() ?? "";
@@ -249,7 +254,10 @@ function Create() {
     return (
       <div className="mx-auto w-full max-w-md sm:max-w-2xl lg:max-w-4xl px-4 pt-6">
         <div className="flex items-center gap-3 mb-5">
-          <Link to="/feed" className="grid h-10 w-10 place-items-center rounded-full border border-border bg-surface">
+          <Link
+            to="/feed"
+            className="grid h-10 w-10 place-items-center rounded-full border border-border bg-surface"
+          >
             <ArrowLeft className="h-5 w-5" />
           </Link>
           <h1 className="font-display text-2xl font-bold">Host a game</h1>
@@ -271,14 +279,10 @@ function Create() {
               Create a team
             </Link>
           </div>
-
         </div>
       </div>
     );
   }
-
-
-
 
   return (
     <div className="mx-auto w-full max-w-md sm:max-w-2xl lg:max-w-4xl px-4 pt-6">
@@ -295,7 +299,6 @@ function Create() {
       {!hostAvailGate.loading && !hostAvailGate.hasOpenAvailability && (
         <AvailabilityPromptBanner className="mb-4" />
       )}
-
 
       <form
         onSubmit={async (e) => {
@@ -328,9 +331,7 @@ function Create() {
               dates = rangeDates.map((d) => new Date(`${d}T${t}`).toISOString());
             } else {
               dates = [
-                when
-                  ? new Date(when).toISOString()
-                  : new Date(Date.now() + 3600_000).toISOString(),
+                when ? new Date(when).toISOString() : new Date(Date.now() + 3600_000).toISOString(),
               ];
             }
 
@@ -381,7 +382,6 @@ function Create() {
                 signupCutoffMin,
                 teamId: selectedAffiliation?.id,
                 orgId: undefined,
-
               });
 
               if (!firstGameId) firstGameId = game.id;
@@ -433,56 +433,56 @@ function Create() {
               ) : undefined
             }
           >
-          {affiliations.length === 1 ? (
-            <div className="flex items-center justify-between rounded-2xl border border-border bg-surface px-4 py-3">
-              <div className="flex items-center gap-2 min-w-0">
-                <span className="grid h-8 w-8 place-items-center rounded-full bg-lime/10 text-lime text-sm font-bold shrink-0">
-                  {(affiliations[0].name || "?").slice(0, 1).toUpperCase()}
-                </span>
-                <div className="min-w-0">
-                  <div className="text-sm font-semibold truncate">{affiliations[0].name}</div>
-                  <div className="text-[11px] uppercase tracking-wider text-muted-foreground">
-                    {affiliationLabel(affiliations[0])}
+            {affiliations.length === 1 ? (
+              <div className="flex items-center justify-between rounded-2xl border border-border bg-surface px-4 py-3">
+                <div className="flex items-center gap-2 min-w-0">
+                  <span className="grid h-8 w-8 place-items-center rounded-full bg-lime/10 text-lime text-sm font-bold shrink-0">
+                    {(affiliations[0].name || "?").slice(0, 1).toUpperCase()}
+                  </span>
+                  <div className="min-w-0">
+                    <div className="text-sm font-semibold truncate">{affiliations[0].name}</div>
+                    <div className="text-[11px] uppercase tracking-wider text-muted-foreground">
+                      {affiliationLabel(affiliations[0])}
+                    </div>
                   </div>
                 </div>
+                <span className="text-[11px] text-muted-foreground">Auto-selected</span>
               </div>
-              <span className="text-[11px] text-muted-foreground">Auto-selected</span>
-            </div>
-          ) : (
-            <>
-              <div className="flex gap-2 overflow-x-auto scrollbar-hide -mx-1 px-1">
-                {affiliations.map((a) => {
-                  const active =
-                    selectedAffiliation?.source === a.source && selectedAffiliation.id === a.id;
-                  return (
-                    <button
-                      type="button"
-                      key={`${a.source}:${a.id}`}
-                      onClick={() => setSelectedAffiliation(a)}
-                      className={`shrink-0 flex items-center gap-2 rounded-full border px-3 py-2 text-sm font-semibold ${
-                        active
-                          ? "border-lime bg-lime/10 text-lime"
-                          : "border-border bg-surface text-muted-foreground"
-                      }`}
-                    >
-                      <span className="grid h-6 w-6 place-items-center rounded-full bg-background text-xs font-bold">
-                        {(a.name || "?").slice(0, 1).toUpperCase()}
-                      </span>
-                      <span className="truncate max-w-[10rem]">{a.name}</span>
-                      <span className="text-[10px] uppercase tracking-wider opacity-70">
-                        {affiliationShortLabel(a)}
-                      </span>
-                    </button>
-                  );
-                })}
-              </div>
-              {!selectedAffiliation && (
-                <p className="mt-2 px-1 text-[11px] text-muted-foreground">
-                  Pick the team profile you're hosting as to continue.
-                </p>
-              )}
-            </>
-          )}
+            ) : (
+              <>
+                <div className="flex gap-2 overflow-x-auto scrollbar-hide -mx-1 px-1">
+                  {affiliations.map((a) => {
+                    const active =
+                      selectedAffiliation?.source === a.source && selectedAffiliation.id === a.id;
+                    return (
+                      <button
+                        type="button"
+                        key={`${a.source}:${a.id}`}
+                        onClick={() => setSelectedAffiliation(a)}
+                        className={`shrink-0 flex items-center gap-2 rounded-full border px-3 py-2 text-sm font-semibold ${
+                          active
+                            ? "border-lime bg-lime/10 text-lime"
+                            : "border-border bg-surface text-muted-foreground"
+                        }`}
+                      >
+                        <span className="grid h-6 w-6 place-items-center rounded-full bg-background text-xs font-bold">
+                          {(a.name || "?").slice(0, 1).toUpperCase()}
+                        </span>
+                        <span className="truncate max-w-[10rem]">{a.name}</span>
+                        <span className="text-[10px] uppercase tracking-wider opacity-70">
+                          {affiliationShortLabel(a)}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+                {!selectedAffiliation && (
+                  <p className="mt-2 px-1 text-[11px] text-muted-foreground">
+                    Pick the team profile you're hosting as to continue.
+                  </p>
+                )}
+              </>
+            )}
           </Section>
         </div>
 
@@ -492,327 +492,321 @@ function Create() {
             !selectedAffiliation ? "opacity-50 pointer-events-none" : ""
           }`}
         >
-
-
-        <Section title="Sport">
-
-          <div className="grid grid-cols-3 gap-2">
-            {SPORTS.map((s) => {
-              const active = sport === s.name;
-              return (
-                <button
-                  type="button"
-                  key={s.name}
-                  onClick={() => { setSport(s.name); setPositionsNeeded({}); }}
-                  className={`flex flex-col items-center gap-1 rounded-2xl border px-2 py-3 text-xs font-semibold transition-all ${
-                    active
-                      ? "border-lime bg-lime/10 text-lime"
-                      : "border-border bg-surface text-muted-foreground"
-                  }`}
-                >
-                  <span className="text-2xl">{s.emoji}</span>
-                  <span>{s.name}</span>
-                </button>
-              );
-            })}
-          </div>
-        </Section>
-
-        {/* Cover photo */}
-        <Section title="Cover photo" icon={<ImagePlus className="h-4 w-4" />}>
-          <ImageUploader
-            kind="cover"
-            bucket="game-covers"
-            pathPrefix={user?.id}
-            value={coverUrl ?? ""}
-            fallback={imageFor(sport)}
-            onChange={setCoverUrl}
-            onClear={() => setCoverUrl(null)}
-            presets={[sport]}
-            allowBgRemoval={false}
-          />
-        </Section>
-
-
-
-        {/* Title */}
-        <Section title="Game title">
-          <input
-            required
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            placeholder="Friday Night Run · 5v5 Full Court"
-            className="w-full rounded-2xl border border-border bg-surface px-4 py-3 text-sm outline-none focus:border-lime"
-          />
-        </Section>
-
-        {/* Date */}
-        <Section title={repeatRange ? "Time" : "When"} icon={<Calendar className="h-4 w-4" />}>
-          {repeatRange ? (
-            <input
-              type="time"
-              value={when.includes("T") ? when.split("T")[1] : when}
-              onChange={(e) => setWhen(e.target.value)}
-              className="w-full rounded-2xl border border-border bg-surface px-4 py-3 text-sm outline-none focus:border-lime [color-scheme:dark]"
-            />
-          ) : (
-            <input
-              type="datetime-local"
-              value={when}
-              onChange={(e) => setWhen(e.target.value)}
-              className="w-full rounded-2xl border border-border bg-surface px-4 py-3 text-sm outline-none focus:border-lime [color-scheme:dark]"
-            />
-          )}
-          <div className="rounded-2xl border border-border bg-surface px-4 py-3">
-            <div className="flex items-center justify-between">
-              <span className="text-sm font-medium">Repeat on multiple days</span>
-              <button
-                type="button"
-                onClick={() => setRepeatRange((v) => !v)}
-                className={`relative h-6 w-10 rounded-full transition-colors ${repeatRange ? "bg-lime" : "bg-secondary"}`}
-                aria-label="Toggle date range"
-              >
-                <motion.span
-                  layout
-                  transition={{ type: "spring", stiffness: 500, damping: 30 }}
-                  className="absolute top-0.5 h-5 w-5 rounded-full bg-background shadow"
-                  style={{ left: repeatRange ? "calc(100% - 1.375rem)" : "0.125rem" }}
-                />
-              </button>
+          <Section title="Sport">
+            <div className="grid grid-cols-3 gap-2">
+              {SPORTS.map((s) => {
+                const active = sport === s.name;
+                return (
+                  <button
+                    type="button"
+                    key={s.name}
+                    onClick={() => {
+                      setSport(s.name);
+                      setPositionsNeeded({});
+                    }}
+                    className={`flex flex-col items-center gap-1 rounded-2xl border px-2 py-3 text-xs font-semibold transition-all ${
+                      active
+                        ? "border-lime bg-lime/10 text-lime"
+                        : "border-border bg-surface text-muted-foreground"
+                    }`}
+                  >
+                    <span className="text-2xl">{s.emoji}</span>
+                    <span>{s.name}</span>
+                  </button>
+                );
+              })}
             </div>
-            {repeatRange && (
-              <div className="mt-3 space-y-2">
-                <div className="grid grid-cols-2 gap-2">
-                  <label className="text-xs text-muted-foreground">
-                    Start date
-                    <input
-                      type="date"
-                      value={rangeStart}
-                      onChange={(e) => setRangeStart(e.target.value)}
-                      className="mt-1 w-full rounded-xl border border-border bg-background px-3 py-2 text-sm outline-none focus:border-lime [color-scheme:dark]"
-                    />
-                  </label>
-                  <label className="text-xs text-muted-foreground">
-                    End date
-                    <input
-                      type="date"
-                      value={rangeEnd}
-                      min={rangeStart || undefined}
-                      onChange={(e) => setRangeEnd(e.target.value)}
-                      className="mt-1 w-full rounded-xl border border-border bg-background px-3 py-2 text-sm outline-none focus:border-lime [color-scheme:dark]"
-                    />
-                  </label>
-                </div>
-                <p className="text-[11px] text-muted-foreground">
-                  {rangeDates.length > 0
-                    ? `Will create ${rangeDates.length} game${rangeDates.length === 1 ? "" : "s"}, one per day at the time above.`
-                    : "Pick start and end dates (max 60 days)."}
-                </p>
-              </div>
+          </Section>
+
+          {/* Cover photo */}
+          <Section title="Cover photo" icon={<ImagePlus className="h-4 w-4" />}>
+            <ImageUploader
+              kind="cover"
+              bucket="game-covers"
+              pathPrefix={user?.id}
+              value={coverUrl ?? ""}
+              fallback={imageFor(sport)}
+              onChange={setCoverUrl}
+              onClear={() => setCoverUrl(null)}
+              presets={[sport]}
+              allowBgRemoval={false}
+            />
+          </Section>
+
+          {/* Title */}
+          <Section title="Game title">
+            <input
+              required
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              placeholder="Friday Night Run · 5v5 Full Court"
+              className="w-full rounded-2xl border border-border bg-surface px-4 py-3 text-sm outline-none focus:border-lime"
+            />
+          </Section>
+
+          {/* Date */}
+          <Section title={repeatRange ? "Time" : "When"} icon={<Calendar className="h-4 w-4" />}>
+            {repeatRange ? (
+              <input
+                type="time"
+                value={when.includes("T") ? when.split("T")[1] : when}
+                onChange={(e) => setWhen(e.target.value)}
+                className="w-full rounded-2xl border border-border bg-surface px-4 py-3 text-sm outline-none focus:border-lime [color-scheme:dark]"
+              />
+            ) : (
+              <input
+                type="datetime-local"
+                value={when}
+                onChange={(e) => setWhen(e.target.value)}
+                className="w-full rounded-2xl border border-border bg-surface px-4 py-3 text-sm outline-none focus:border-lime [color-scheme:dark]"
+              />
             )}
-          </div>
-        </Section>
-
-        {/* Venue address */}
-        <Section title="Venue address" icon={<MapPin className="h-4 w-4" />}>
-          <LocationAutocomplete
-            value={location}
-            onChange={handleLocationChange}
-            placeholder="Search court, park or venue"
-          />
-          {profile?.city && (
-            <p className="px-1 text-[11px] text-muted-foreground">
-              Pre-filled from your profile city — refine with search above.
-            </p>
-          )}
-        </Section>
-
-        {/* Skill */}
-        <Section title={`Skill level · ${scaleForSport(sport).system}`}>
-          <div className="flex gap-2 overflow-x-auto scrollbar-hide">
-            {skillOptions.map((s) => {
-              const active =
-                s === ANY_SKILL
-                  ? selectedSkillTiers.length === 0
-                  : selectedSkillTiers.includes(s);
-              return (
+            <div className="rounded-2xl border border-border bg-surface px-4 py-3">
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-medium">Repeat on multiple days</span>
                 <button
                   type="button"
-                  key={s}
-                  aria-pressed={active}
-                  onClick={() =>
-                    setSkill(s === ANY_SKILL ? ANY_SKILL : toggleSkillTier(sport, skill, s))
-                  }
-                  className={`shrink-0 rounded-full border px-4 py-2 text-sm font-semibold ${
-                    active
-                      ? "border-lime bg-lime text-primary-foreground"
-                      : "border-border bg-surface text-muted-foreground"
-                  }`}
+                  onClick={() => setRepeatRange((v) => !v)}
+                  className={`relative h-6 w-10 rounded-full transition-colors ${repeatRange ? "bg-lime" : "bg-secondary"}`}
+                  aria-label="Toggle date range"
                 >
-                  {s}
-                </button>
-              );
-            })}
-          </div>
-          {skillMulti && (
-            <p className="mt-2 px-1 text-[11px] text-muted-foreground">
-              Pick a level in each format you welcome — selections combine (e.g. "Flag Rec ·
-              7v7 Elite").
-            </p>
-          )}
-        </Section>
-
-        {/* Positions needed */}
-        <Section title="Positions needed">
-          <PositionsPicker
-            sport={sport}
-            value={positionsNeeded}
-            onChange={setPositionsNeeded}
-          />
-        </Section>
-
-        {/* Players */}
-        <Section title="Max players" icon={<Users className="h-4 w-4" />}>
-          <div className="rounded-2xl border border-border bg-surface p-4">
-            <div className="flex items-center justify-between mb-3">
-              <span className="text-sm text-muted-foreground">Total spots</span>
-              <span className="font-display text-2xl font-bold text-lime">{size}</span>
-            </div>
-            <input
-              type="range"
-              min={2}
-              max={30}
-              value={size}
-              onChange={(e) => setSize(+e.target.value)}
-              className="w-full accent-lime"
-            />
-          </div>
-        </Section>
-
-        {/* Toggles */}
-        <Section title="Details">
-          <div className="rounded-2xl border border-border bg-surface px-4 py-3">
-            <div className="flex items-center justify-between">
-              <span className="flex items-center gap-2.5 text-sm">
-                <DollarSign
-                  className={`h-4 w-4 ${price > 0 ? "text-lime" : "text-muted-foreground"}`}
-                />
-                <span className="font-medium">Paid game</span>
-              </span>
-              <button
-                type="button"
-                onClick={() => setPrice(price > 0 ? 0 : 10)}
-                className={`relative h-6 w-10 rounded-full transition-colors ${price > 0 ? "bg-lime" : "bg-secondary"}`}
-                aria-label="Toggle paid game"
-              >
-                <motion.span
-                  layout
-                  transition={{ type: "spring", stiffness: 500, damping: 30 }}
-                  className="absolute top-0.5 h-5 w-5 rounded-full bg-background shadow"
-                  style={{ left: price > 0 ? "calc(100% - 1.375rem)" : "0.125rem" }}
-                />
-              </button>
-            </div>
-            {price > 0 && (
-              <div className="mt-3 flex items-center gap-2">
-                <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                  Entry fee
-                </span>
-                <div className="relative flex-1">
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">
-                    $
-                  </span>
-                  <input
-                    type="number"
-                    min={1}
-                    step="0.01"
-                    value={price}
-                    onChange={(e) => setPrice(Math.max(0, Number(e.target.value) || 0))}
-                    className="w-full rounded-xl border border-border bg-background pl-7 pr-3 py-2 text-sm outline-none focus:border-lime"
+                  <motion.span
+                    layout
+                    transition={{ type: "spring", stiffness: 500, damping: 30 }}
+                    className="absolute top-0.5 h-5 w-5 rounded-full bg-background shadow"
+                    style={{ left: repeatRange ? "calc(100% - 1.375rem)" : "0.125rem" }}
                   />
-                </div>
-                <span className="text-xs text-muted-foreground">per player</span>
+                </button>
               </div>
+              {repeatRange && (
+                <div className="mt-3 space-y-2">
+                  <div className="grid grid-cols-2 gap-2">
+                    <label className="text-xs text-muted-foreground">
+                      Start date
+                      <input
+                        type="date"
+                        value={rangeStart}
+                        onChange={(e) => setRangeStart(e.target.value)}
+                        className="mt-1 w-full rounded-xl border border-border bg-background px-3 py-2 text-sm outline-none focus:border-lime [color-scheme:dark]"
+                      />
+                    </label>
+                    <label className="text-xs text-muted-foreground">
+                      End date
+                      <input
+                        type="date"
+                        value={rangeEnd}
+                        min={rangeStart || undefined}
+                        onChange={(e) => setRangeEnd(e.target.value)}
+                        className="mt-1 w-full rounded-xl border border-border bg-background px-3 py-2 text-sm outline-none focus:border-lime [color-scheme:dark]"
+                      />
+                    </label>
+                  </div>
+                  <p className="text-[11px] text-muted-foreground">
+                    {rangeDates.length > 0
+                      ? `Will create ${rangeDates.length} game${rangeDates.length === 1 ? "" : "s"}, one per day at the time above.`
+                      : "Pick start and end dates (max 60 days)."}
+                  </p>
+                </div>
+              )}
+            </div>
+          </Section>
+
+          {/* Venue address */}
+          <Section title="Venue address" icon={<MapPin className="h-4 w-4" />}>
+            <LocationAutocomplete
+              value={location}
+              onChange={handleLocationChange}
+              placeholder="Search court, park or venue"
+            />
+            {profile?.city && (
+              <p className="px-1 text-[11px] text-muted-foreground">
+                Pre-filled from your profile city — refine with search above.
+              </p>
             )}
-          </div>
-          <Toggle
-            icon={<Home className="h-4 w-4" />}
-            label="Indoor venue"
-            value={indoor}
-            onChange={setIndoor}
-          />
-          <Toggle
-            icon={<Lock className="h-4 w-4" />}
-            label="Private (invite only)"
-            value={priv}
-            onChange={setPriv}
-          />
-          <Toggle
-            icon={<ShieldCheck className="h-4 w-4" />}
-            label="Require my approval to join"
-            value={requiresApproval}
-            onChange={setRequiresApproval}
-            right={user ? undefined : "Sign in"}
-          />
-          {requiresApproval && (
-            <p className="px-1 text-[11px] text-muted-foreground">
-              Players send a pickup request and you approve or decline each one from the game page.
-            </p>
-          )}
-          <div className="rounded-2xl border border-border bg-surface px-4 py-3">
-            <label
-              htmlFor="create-signup-cutoff"
-              className="flex items-center gap-2 text-sm font-semibold"
-            >
-              <Clock3 className="h-4 w-4" /> Signup cutoff
-            </label>
-            <select
-              id="create-signup-cutoff"
-              value={String(signupCutoffMin)}
-              onChange={(e) => setSignupCutoffMin(Number(e.target.value) || 0)}
-              className="mt-2 w-full rounded-xl border border-border bg-background px-3 py-2 text-sm outline-none focus:border-lime"
-            >
-              {SIGNUP_CUTOFF_PRESETS.map((p) => (
-                <option key={p.value} value={p.value}>
-                  {p.label}
-                </option>
-              ))}
-            </select>
-            <p className="mt-1 text-[11px] text-muted-foreground">
-              New signups close automatically this long before start. The game then shows
-              "Signup closed", and "In progress" once it starts.
-            </p>
-          </div>
-        </Section>
+          </Section>
 
-        {/* Description */}
-        <Section title="Description">
-          <textarea
-            rows={4}
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
-            placeholder="Format, vibe, what to bring..."
-            className="w-full rounded-2xl border border-border bg-surface px-4 py-3 text-sm outline-none focus:border-lime resize-none"
-          />
-        </Section>
+          {/* Skill */}
+          <Section title={`Skill level · ${scaleForSport(sport).system}`}>
+            <div className="flex gap-2 overflow-x-auto scrollbar-hide">
+              {skillOptions.map((s) => {
+                const active =
+                  s === ANY_SKILL
+                    ? selectedSkillTiers.length === 0
+                    : selectedSkillTiers.includes(s);
+                return (
+                  <button
+                    type="button"
+                    key={s}
+                    aria-pressed={active}
+                    onClick={() =>
+                      setSkill(s === ANY_SKILL ? ANY_SKILL : toggleSkillTier(sport, skill, s))
+                    }
+                    className={`shrink-0 rounded-full border px-4 py-2 text-sm font-semibold ${
+                      active
+                        ? "border-lime bg-lime text-primary-foreground"
+                        : "border-border bg-surface text-muted-foreground"
+                    }`}
+                  >
+                    {s}
+                  </button>
+                );
+              })}
+            </div>
+            {skillMulti && (
+              <p className="mt-2 px-1 text-[11px] text-muted-foreground">
+                Pick a level in each format you welcome — selections combine (e.g. "Flag Rec · 7v7
+                Elite").
+              </p>
+            )}
+          </Section>
 
-        <motion.button
-          whileTap={{ scale: 0.98 }}
-          type="submit"
-          disabled={publishing || !selectedAffiliation}
-          className="w-full rounded-2xl bg-lime-gradient py-4 font-bold text-primary-foreground glow-lime disabled:opacity-60"
-        >
-          {publishing
-            ? "Publishing…"
-            : !selectedAffiliation
-              ? "Choose a team profile to continue"
-              : "Publish game"}
-        </motion.button>
-        <p className="text-center text-xs text-muted-foreground pb-6">
-          Hosting is free. Pro hosts get unlimited games + analytics.
-        </p>
+          {/* Positions needed */}
+          <Section title="Positions needed">
+            <PositionsPicker sport={sport} value={positionsNeeded} onChange={setPositionsNeeded} />
+          </Section>
+
+          {/* Players */}
+          <Section title="Max players" icon={<Users className="h-4 w-4" />}>
+            <div className="rounded-2xl border border-border bg-surface p-4">
+              <div className="flex items-center justify-between mb-3">
+                <span className="text-sm text-muted-foreground">Total spots</span>
+                <span className="font-display text-2xl font-bold text-lime">{size}</span>
+              </div>
+              <input
+                type="range"
+                min={2}
+                max={30}
+                value={size}
+                onChange={(e) => setSize(+e.target.value)}
+                className="w-full accent-lime"
+              />
+            </div>
+          </Section>
+
+          {/* Toggles */}
+          <Section title="Details">
+            <div className="rounded-2xl border border-border bg-surface px-4 py-3">
+              <div className="flex items-center justify-between">
+                <span className="flex items-center gap-2.5 text-sm">
+                  <DollarSign
+                    className={`h-4 w-4 ${price > 0 ? "text-lime" : "text-muted-foreground"}`}
+                  />
+                  <span className="font-medium">Paid game</span>
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setPrice(price > 0 ? 0 : 10)}
+                  className={`relative h-6 w-10 rounded-full transition-colors ${price > 0 ? "bg-lime" : "bg-secondary"}`}
+                  aria-label="Toggle paid game"
+                >
+                  <motion.span
+                    layout
+                    transition={{ type: "spring", stiffness: 500, damping: 30 }}
+                    className="absolute top-0.5 h-5 w-5 rounded-full bg-background shadow"
+                    style={{ left: price > 0 ? "calc(100% - 1.375rem)" : "0.125rem" }}
+                  />
+                </button>
+              </div>
+              {price > 0 && (
+                <div className="mt-3 flex items-center gap-2">
+                  <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                    Entry fee
+                  </span>
+                  <div className="relative flex-1">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">
+                      $
+                    </span>
+                    <input
+                      type="number"
+                      min={1}
+                      step="0.01"
+                      value={price}
+                      onChange={(e) => setPrice(Math.max(0, Number(e.target.value) || 0))}
+                      className="w-full rounded-xl border border-border bg-background pl-7 pr-3 py-2 text-sm outline-none focus:border-lime"
+                    />
+                  </div>
+                  <span className="text-xs text-muted-foreground">per player</span>
+                </div>
+              )}
+            </div>
+            <Toggle
+              icon={<Home className="h-4 w-4" />}
+              label="Indoor venue"
+              value={indoor}
+              onChange={setIndoor}
+            />
+            <Toggle
+              icon={<Lock className="h-4 w-4" />}
+              label="Private (invite only)"
+              value={priv}
+              onChange={setPriv}
+            />
+            <Toggle
+              icon={<ShieldCheck className="h-4 w-4" />}
+              label="Require my approval to join"
+              value={requiresApproval}
+              onChange={setRequiresApproval}
+              right={user ? undefined : "Sign in"}
+            />
+            {requiresApproval && (
+              <p className="px-1 text-[11px] text-muted-foreground">
+                Players send a pickup request and you approve or decline each one from the game
+                page.
+              </p>
+            )}
+            <div className="rounded-2xl border border-border bg-surface px-4 py-3">
+              <label
+                htmlFor="create-signup-cutoff"
+                className="flex items-center gap-2 text-sm font-semibold"
+              >
+                <Clock3 className="h-4 w-4" /> Signup cutoff
+              </label>
+              <select
+                id="create-signup-cutoff"
+                value={String(signupCutoffMin)}
+                onChange={(e) => setSignupCutoffMin(Number(e.target.value) || 0)}
+                className="mt-2 w-full rounded-xl border border-border bg-background px-3 py-2 text-sm outline-none focus:border-lime"
+              >
+                {SIGNUP_CUTOFF_PRESETS.map((p) => (
+                  <option key={p.value} value={p.value}>
+                    {p.label}
+                  </option>
+                ))}
+              </select>
+              <p className="mt-1 text-[11px] text-muted-foreground">
+                New signups close automatically this long before start. The game then shows "Signup
+                closed", and "In progress" once it starts.
+              </p>
+            </div>
+          </Section>
+
+          {/* Description */}
+          <Section title="Description">
+            <textarea
+              rows={4}
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              placeholder="Format, vibe, what to bring..."
+              className="w-full rounded-2xl border border-border bg-surface px-4 py-3 text-sm outline-none focus:border-lime resize-none"
+            />
+          </Section>
+
+          <motion.button
+            whileTap={{ scale: 0.98 }}
+            type="submit"
+            disabled={publishing || !selectedAffiliation}
+            className="w-full rounded-2xl bg-lime-gradient py-4 font-bold text-primary-foreground glow-lime disabled:opacity-60"
+          >
+            {publishing
+              ? "Publishing…"
+              : !selectedAffiliation
+                ? "Choose a team profile to continue"
+                : "Publish game"}
+          </motion.button>
+          <p className="text-center text-xs text-muted-foreground pb-6">
+            Hosting is free. Pro hosts get unlimited games + analytics.
+          </p>
         </fieldset>
-
       </form>
     </div>
   );
@@ -840,7 +834,6 @@ function Section({
     </div>
   );
 }
-
 
 function Toggle({
   icon,

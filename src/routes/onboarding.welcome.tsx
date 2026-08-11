@@ -1,11 +1,19 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { pageHead } from "@/lib/seo";
 import { useEffect, useRef, useState } from "react";
 import { z } from "zod";
 import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/use-auth";
 import { useAccountType, type AccountType } from "@/lib/account-type";
-import { getFeedPrefsSnapshot, setFeedPrefs, setProfileOverrides, useMyProfileState, useDistanceUnit, type ProfileLink } from "@/lib/user-prefs-store";
+import {
+  getFeedPrefsSnapshot,
+  setFeedPrefs,
+  setProfileOverrides,
+  useMyProfileState,
+  useDistanceUnit,
+  type ProfileLink,
+} from "@/lib/user-prefs-store";
 import { clampDistanceMi, kmToMi, miToKm } from "@/lib/distance";
 import { ProfileLocationFields } from "@/components/profile/ProfileLocationFields";
 import { Section, validateBirthday } from "@/components/profile/ProfileFormPrimitives";
@@ -13,10 +21,7 @@ import {
   ProfileBasicsFields,
   type ProfileBasicsValue,
 } from "@/components/profile/ProfileBasicsFields";
-import {
-  ProfileSportsFields,
-  type SportEntry,
-} from "@/components/profile/ProfileSportsFields";
+import { ProfileSportsFields, type SportEntry } from "@/components/profile/ProfileSportsFields";
 import {
   ProfileLinksFields,
   cleanProfileLinks,
@@ -25,14 +30,19 @@ import {
 import { useAutosave } from "@/hooks/use-autosave";
 import { SaveStatus } from "@/components/SaveStatus";
 
-
-
 const searchSchema = z.object({
   type: z.enum(["player", "team", "trainer", "gym"]).optional(),
 });
 
 export const Route = createFileRoute("/onboarding/welcome")({
-  head: () => ({ meta: [{ title: "Welcome — OpenRun" }] }),
+  head: () =>
+    pageHead({
+      path: "/onboarding/welcome",
+      title: "Set up your profile — OpenRun",
+      description:
+        "Add your sports, skill levels, location, and availability to finish setting up OpenRun.",
+      noindex: true,
+    }),
   validateSearch: searchSchema,
   component: OnboardingWelcomePage,
 });
@@ -48,7 +58,10 @@ const NEXT_STEPS: Record<
     cta: "Create team profile",
     goto: "/teams/create",
     steps: [
-      { title: "Team profile", body: "Name, sport, colors, and a cover image so players recognize you." },
+      {
+        title: "Team profile",
+        body: "Name, sport, colors, and a cover image so players recognize you.",
+      },
       { title: "Roster & positions", body: "Add players and mark open spots you need to fill." },
       { title: "Host your first game", body: "Publish pickups, tryouts, or practices in seconds." },
     ],
@@ -58,9 +71,18 @@ const NEXT_STEPS: Record<
     cta: "Create trainer profile",
     goto: "/trainers/create",
     steps: [
-      { title: "Your sport & credentials", body: "Pick a primary sport, add certifications, and describe your style." },
-      { title: "Venues & availability", body: "Add locations and weekly windows so athletes can book you." },
-      { title: "Accept sessions", body: "Approve or decline requests and message athletes directly." },
+      {
+        title: "Your sport & credentials",
+        body: "Pick a primary sport, add certifications, and describe your style.",
+      },
+      {
+        title: "Venues & availability",
+        body: "Add locations and weekly windows so athletes can book you.",
+      },
+      {
+        title: "Accept sessions",
+        body: "Approve or decline requests and message athletes directly.",
+      },
     ],
   },
   gym: {
@@ -143,7 +165,6 @@ function OnboardingWizard({ type }: { type: AccountType }) {
   const inFlightRef = useRef<Promise<boolean> | null>(null);
   const savedFingerprintRef = useRef<string | null>(null);
 
-
   // Prefill from the same profile store Edit profile uses so returning users edit
   // rather than re-enter. We wait for `profileLoaded` because until the saved row
   // resolves the store returns auth-derived fallbacks (email local-part as name,
@@ -178,12 +199,12 @@ function OnboardingWizard({ type }: { type: AccountType }) {
     setPrefilled(true);
   }, [profile, profileLoaded, prefilled]);
 
-
   const requestLocation = () => {
     if (typeof navigator === "undefined" || !navigator.geolocation) {
       setGeo({
         kind: "unavailable",
-        message: "Your browser doesn't support location. You can still set your radius manually below.",
+        message:
+          "Your browser doesn't support location. You can still set your radius manually below.",
       });
       return;
     }
@@ -210,7 +231,8 @@ function OnboardingWizard({ type }: { type: AccountType }) {
         } else if (err.code === 2) {
           setGeo({
             kind: "denied",
-            message: "We couldn't determine your position. Check your connection or GPS and try again.",
+            message:
+              "We couldn't determine your position. Check your connection or GPS and try again.",
             canRetry: true,
           });
         } else if (err.code === 3) {
@@ -263,7 +285,9 @@ function OnboardingWizard({ type }: { type: AccountType }) {
     const gradNum = basics.graduatingClass.trim() ? parseInt(basics.graduatingClass, 10) : NaN;
     const currentYear = new Date().getFullYear();
     const gradClean =
-      Number.isFinite(gradNum) && gradNum >= 1950 && gradNum <= currentYear + 15 ? gradNum : undefined;
+      Number.isFinite(gradNum) && gradNum >= 1950 && gradNum <= currentYear + 15
+        ? gradNum
+        : undefined;
     if (basics.graduatingClass.trim() && gradClean === undefined) {
       toast.error("Graduating class must be a valid year");
       setStep(0);
@@ -315,7 +339,6 @@ function OnboardingWizard({ type }: { type: AccountType }) {
         links: cleanedLinks,
       });
 
-
       // Idempotency: skip the write entirely when this exact row was already
       // saved for this user (double taps, retries after a remount, back/next).
       const fingerprint = profileRowFingerprint(row);
@@ -339,8 +362,6 @@ function OnboardingWizard({ type }: { type: AccountType }) {
           /* ignore */
         }
       }
-
-
 
       try {
         localStorage.setItem("openrun.default_radius_km", String(radius));
@@ -395,8 +416,6 @@ function OnboardingWizard({ type }: { type: AccountType }) {
     inFlightRef.current = p;
     return p;
   };
-
-
 
   const autosave = useAutosave({
     value: { basics, sports, links, radius },
@@ -490,7 +509,6 @@ function OnboardingWizard({ type }: { type: AccountType }) {
 
       {step === locationStep && (
         <Section title="Location">
-
           <p className="mb-3 text-xs text-muted-foreground">
             We use your location to show nearby games. You can also skip and set a radius manually.
           </p>

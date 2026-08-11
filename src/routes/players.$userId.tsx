@@ -1,4 +1,5 @@
 import { createFileRoute, Link, useNavigate, Navigate } from "@tanstack/react-router";
+import { pageHead } from "@/lib/seo";
 import { useEffect, useMemo, useState } from "react";
 import {
   ArrowLeft,
@@ -44,7 +45,20 @@ import {
 } from "@/components/ui/dialog";
 
 export const Route = createFileRoute("/players/$userId")({
-  head: () => ({ meta: [{ title: "Player profile — OpenRun" }] }),
+  head: ({ params }) => ({
+    ...pageHead({
+      path: `/players/${params.userId}`,
+      title: "Player profile — OpenRun",
+      description:
+        "See this player's sports, skill levels, availability, badges, and reviews on OpenRun.",
+      ogType: "profile",
+      jsonLd: {
+        "@context": "https://schema.org",
+        "@type": "ProfilePage",
+        url: `https://open-run-connect.lovable.app/players/${params.userId}`,
+      },
+    }),
+  }),
   component: PlayerProfilePage,
 });
 

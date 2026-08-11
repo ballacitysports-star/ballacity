@@ -1,8 +1,21 @@
 import { createFileRoute, Link, notFound } from "@tanstack/react-router";
+import { pageHead } from "@/lib/seo";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { useAuth } from "@/hooks/use-auth";
-import { Building2, MapPin, Users, ShieldCheck, Check, X, LogIn, UserPlus, Clock, Crown, UserMinus } from "lucide-react";
+import {
+  Building2,
+  MapPin,
+  Users,
+  ShieldCheck,
+  Check,
+  X,
+  LogIn,
+  UserPlus,
+  Clock,
+  Crown,
+  UserMinus,
+} from "lucide-react";
 import { VenueMapPreview } from "@/components/VenueMapPreview";
 import { OrgListingHeader, type OrgListingRow } from "@/components/org/OrgListingHeader";
 import { GymReviews } from "@/components/org/GymReviews";
@@ -22,7 +35,6 @@ import { toast } from "sonner";
 import {
   getTrainerOrg,
   getTrainerOrgContact,
-
   listJoinRequestsForOrg,
   reviewJoinRequest,
   listMyTrainerProfiles,
@@ -43,17 +55,28 @@ import {
 } from "@/lib/trainer-orgs.functions";
 
 export const Route = createFileRoute("/orgs/$orgId")({
-  head: ({ loaderData }) => {
+  head: ({ loaderData, params }) => {
     const o = (loaderData as Awaited<ReturnType<typeof getTrainerOrg>> | undefined) ?? null;
-    if (!o?.org) {
-      return { meta: [{ title: "Gym — OpenRun" }, { name: "robots", content: "noindex" }] };
-    }
-    return {
-      meta: [
-        { title: `${o.org.name} — Gym on OpenRun` },
-        { name: "description", content: (o.org.bio || `${o.org.name} on OpenRun.`).slice(0, 155) },
-      ],
-    };
+    const org = o?.org;
+    const name = org?.name ?? "Gym";
+    return pageHead({
+      path: `/orgs/${params.orgId}`,
+      title: `${name} — Gym on OpenRun`,
+      description: (
+        org?.bio || `${name} on OpenRun: hours, amenities, trainers, and member reviews.`
+      ).slice(0, 155),
+      image: org?.cover_url?.startsWith("http") ? org.cover_url : null,
+      noindex: !org,
+      jsonLd: org
+        ? {
+            "@context": "https://schema.org",
+            "@type": "SportsActivityLocation",
+            name: org.name,
+            address: org.address ?? org.city ?? undefined,
+            url: `https://open-run-connect.lovable.app/orgs/${params.orgId}`,
+          }
+        : undefined,
+    });
   },
   loader: async ({ params }) => {
     const res = await getTrainerOrg({ data: { id: params.orgId } });
@@ -96,13 +119,19 @@ function OrgPage() {
     trainer_id: string;
     user_id: string;
     role: string;
-    teams?: { id: string; name: string; handle: string; avatar: string | null; city: string | null; sports: string[] | null } | null;
+    teams?: {
+      id: string;
+      name: string;
+      handle: string;
+      avatar: string | null;
+      city: string | null;
+      sports: string[] | null;
+    } | null;
   }>;
   const myMembership = auth.user ? members.find((m) => m.user_id === auth.user!.id) : null;
   const isOwner = !!auth.user && !!org && org.owner_id === auth.user.id;
   const isAdmin =
     isOwner || (!!myMembership && (myMembership.role === "owner" || myMembership.role === "admin"));
-
 
   const gymReviews = useGymReviews(orgId);
   const reviewSummary = summarizeGymReviews(gymReviews.data ?? []);
@@ -130,7 +159,6 @@ function OrgPage() {
     <div className="mx-auto w-full max-w-md sm:max-w-2xl lg:max-w-4xl p-4 pb-40 space-y-6">
       <OrgListingHeader
         org={(orgWithContact ?? org) as unknown as OrgListingRow}
-
         memberCount={members.length}
         isAdmin={isAdmin}
         isOwner={isOwner}
@@ -146,8 +174,6 @@ function OrgPage() {
       <div id="gym-reviews">
         <GymReviews orgId={orgId} orgName={org.name} isAdmin={isAdmin} />
       </div>
-
-
 
       <section className="rounded-2xl border border-border/60 bg-surface p-4">
         <h2 className="text-sm font-semibold mb-3 flex items-center gap-2">
@@ -202,7 +228,9 @@ function OrgPage() {
                   className="flex items-center justify-between rounded-xl border border-border/50 bg-background px-3 py-2"
                 >
                   <div className="min-w-0">
-                    <div className="text-sm font-medium truncate">{r.trainer?.name ?? r.trainer_id}</div>
+                    <div className="text-sm font-medium truncate">
+                      {r.trainer?.name ?? r.trainer_id}
+                    </div>
                     {r.message && (
                       <div className="text-[11px] text-muted-foreground truncate">{r.message}</div>
                     )}
@@ -338,7 +366,9 @@ function MembershipCta({
           variant="secondary"
           onClick={async () => {
             try {
-              await respondToTrainerOrgInvite({ data: { inviteId: pendingInvite.id, action: "accept" } });
+              await respondToTrainerOrgInvite({
+                data: { inviteId: pendingInvite.id, action: "accept" },
+              });
               toast.success("Joined gym");
               invalidate();
             } catch (e) {
@@ -353,7 +383,9 @@ function MembershipCta({
           variant="ghost"
           onClick={async () => {
             try {
-              await respondToTrainerOrgInvite({ data: { inviteId: pendingInvite.id, action: "decline" } });
+              await respondToTrainerOrgInvite({
+                data: { inviteId: pendingInvite.id, action: "decline" },
+              });
               invalidate();
             } catch (e) {
               toast.error(e instanceof Error ? e.message : "Failed");
@@ -479,7 +511,11 @@ function MembersSection({ orgId, isAdmin }: { orgId: string; isAdmin: boolean })
                 >
                   <div className="flex h-9 w-9 items-center justify-center rounded-full bg-lime/15 text-sm font-semibold overflow-hidden">
                     {m.profile?.avatar_url ? (
-                      <img src={m.profile.avatar_url} alt="" className="h-full w-full object-cover" />
+                      <img
+                        src={m.profile.avatar_url}
+                        alt=""
+                        className="h-full w-full object-cover"
+                      />
                     ) : (
                       initials
                     )}
@@ -700,7 +736,11 @@ function AdminMemberRequests({ orgId }: { orgId: string }) {
                 <div className="flex items-center gap-3 min-w-0 flex-1">
                   <div className="flex h-9 w-9 items-center justify-center rounded-full bg-lime/15 text-sm font-semibold overflow-hidden">
                     {r.profile?.avatar_url ? (
-                      <img src={r.profile.avatar_url} alt="" className="h-full w-full object-cover" />
+                      <img
+                        src={r.profile.avatar_url}
+                        alt=""
+                        className="h-full w-full object-cover"
+                      />
                     ) : (
                       initials
                     )}
@@ -729,7 +769,9 @@ function AdminMemberRequests({ orgId }: { orgId: string }) {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Deny request</DialogTitle>
-            <DialogDescription>Optionally include a reason. The requester will see it.</DialogDescription>
+            <DialogDescription>
+              Optionally include a reason. The requester will see it.
+            </DialogDescription>
           </DialogHeader>
           <Textarea
             value={reason}
