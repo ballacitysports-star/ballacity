@@ -44,10 +44,24 @@ export function pageHead(input: PageHeadInput) {
   ];
   if (url) meta.push({ property: "og:url", content: url });
   if (absoluteImage) {
-    meta.push({ property: "og:image", content: absoluteImage });
-    meta.push({ name: "twitter:image", content: absoluteImage });
+    // Generated cards come in several presets: serve 1200x630 to OpenGraph
+    // consumers and the sharper 1600x900 render to Twitter/X.
+    const isGenerated = absoluteImage.includes("/api/public/og");
+    const ogImage = isGenerated ? withOgSize(absoluteImage, "og") : absoluteImage;
+    const twitterImage = isGenerated ? withOgSize(absoluteImage, "wide") : absoluteImage;
+    meta.push({ property: "og:image", content: ogImage });
+    meta.push({ property: "og:image:secure_url", content: ogImage });
+    meta.push({ property: "og:image:type", content: isGenerated ? "image/png" : "image/jpeg" });
+    if (isGenerated) {
+      meta.push({ property: "og:image:width", content: String(OG_IMAGE_SIZES.og.width) });
+      meta.push({ property: "og:image:height", content: String(OG_IMAGE_SIZES.og.height) });
+    }
+    meta.push({ property: "og:image:alt", content: title });
+    meta.push({ name: "twitter:image", content: twitterImage });
+    meta.push({ name: "twitter:image:alt", content: title });
   }
   if (noindex) meta.push({ name: "robots", content: "noindex, nofollow" });
+
 
   const head: {
     meta: MetaTag[];
@@ -72,16 +86,41 @@ export function pageHead(input: PageHeadInput) {
  */
 export type OgCardKind = "game" | "player" | "team" | "trainer" | "venue" | "page";
 
+/** Output presets served by /api/public/og. */
+export const OG_IMAGE_SIZES = {
+  og: { width: 1200, height: 630 },
+  wide: { width: 1600, height: 900 },
+  square: { width: 1200, height: 1200 },
+} as const;
+
+export type OgImageSize = keyof typeof OG_IMAGE_SIZES;
+
 export function ogImageUrl(input: {
   kind: OgCardKind;
   title: string;
   subtitle?: string | null;
   /** Up to 3 short facts rendered as chips. */
   meta?: (string | null | undefined)[];
+  /** Output dimensions; defaults to the 1200x630 OpenGraph preset. */
+  size?: OgImageSize;
 }) {
   const params = new URLSearchParams({ kind: input.kind, title: input.title.slice(0, 90) });
   if (input.subtitle) params.set("subtitle", input.subtitle.slice(0, 120));
   const meta = (input.meta ?? []).filter((m): m is string => Boolean(m && m.trim())).slice(0, 3);
   if (meta.length) params.set("meta", meta.join("|"));
+  params.set("size", input.size ?? "og");
   return `${SITE_URL}/api/public/og?${params.toString()}`;
+}
+
+
+/** Swap the `size` preset on a generated card URL. */
+export function withOgSize(imageUrl: string, size: OgImageSize) {
+  try {
+    const parsed = new URL(imageUrl, SITE_URL);
+    if (!parsed.pathname.startsWith("/api/public/og")) return imageUrl;
+    parsed.searchParams.set("size", size);
+    return parsed.toString();
+  } catch {
+    return imageUrl;
+  }
 }

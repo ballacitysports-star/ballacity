@@ -5,14 +5,24 @@ import { htmlToReact } from "@cf-wasm/og/html-to-react";
 /**
  * Dynamic OpenGraph / Twitter card renderer.
  *
- * GET /api/public/og?kind=game&title=...&subtitle=...&meta=a|b|c
+ * GET /api/public/og?kind=game&title=...&subtitle=...&meta=a|b|c&size=og
+ *
+ * `size` picks the output dimensions:
+ *   og   -> 1200x630  (Facebook / LinkedIn / iMessage, og:image)
+ *   wide -> 1600x900  (Twitter/X summary_large_image, crisper on retina)
+ *   square -> 1200x1200 (fallback for square crops)
  *
  * Public on purpose: social crawlers are unauthenticated. It only renders the
  * text passed in the query string, so there is nothing privileged to leak.
  */
 
-const OG_WIDTH = 1200;
-const OG_HEIGHT = 630;
+export const OG_SIZES = {
+  og: { width: 1200, height: 630 },
+  wide: { width: 1600, height: 900 },
+  square: { width: 1200, height: 1200 },
+} as const;
+
+type SizeKey = keyof typeof OG_SIZES;
 
 const KINDS: Record<string, { label: string; accent: string }> = {
   game: { label: "Pickup game", accent: "#C2F542" },
@@ -37,33 +47,39 @@ function template(opts: {
   title: string;
   subtitle: string;
   meta: string[];
+  width: number;
+  height: number;
 }) {
-  const { kind, title, subtitle, meta } = opts;
+  const { kind, title, subtitle, meta, width, height } = opts;
+  // Scale every dimension off the 1200x630 base so each preset stays identical
+  // in composition, just rendered at higher pixel density / aspect ratio.
+  const s = (n: number) => Math.round(n * (width / 1200));
   const chips = meta
     .map(
       (m) =>
-        `<div style="display:flex;padding:8px 22px;border-radius:999px;background:#1A2118;border:2px solid #2A331F;color:#E8EDE6;font-size:28px;">${esc(m)}</div>`,
+        `<div style="display:flex;padding:${s(8)}px ${s(22)}px;border-radius:999px;background:#1A2118;border:${Math.max(2, s(2))}px solid #2A331F;color:#E8EDE6;font-size:${s(28)}px;">${esc(m)}</div>`,
     )
     .join("");
 
-  return `<div style="display:flex;flex-direction:column;justify-content:space-between;width:${OG_WIDTH}px;height:${OG_HEIGHT}px;padding:72px;background:#0C0F0B;font-family:sans-serif;">
+  return `<div style="display:flex;flex-direction:column;justify-content:space-between;width:${width}px;height:${height}px;padding:${s(72)}px;background:#0C0F0B;font-family:sans-serif;">
     <div style="display:flex;align-items:center;justify-content:space-between;">
       <div style="display:flex;align-items:center;">
-        <div style="display:flex;width:56px;height:56px;border-radius:16px;background:${kind.accent};"></div>
-        <div style="display:flex;margin-left:20px;color:#F4F7F2;font-size:40px;font-weight:700;">OpenRun</div>
+        <div style="display:flex;width:${s(56)}px;height:${s(56)}px;border-radius:${s(16)}px;background:${kind.accent};"></div>
+        <div style="display:flex;margin-left:${s(20)}px;color:#F4F7F2;font-size:${s(40)}px;font-weight:700;">OpenRun</div>
       </div>
-      <div style="display:flex;padding:12px 26px;border-radius:999px;background:${kind.accent};color:#0C0F0B;font-size:26px;font-weight:700;">${esc(kind.label)}</div>
+      <div style="display:flex;padding:${s(12)}px ${s(26)}px;border-radius:999px;background:${kind.accent};color:#0C0F0B;font-size:${s(26)}px;font-weight:700;">${esc(kind.label)}</div>
     </div>
     <div style="display:flex;flex-direction:column;">
-      <div style="display:flex;color:#FFFFFF;font-size:${title.length > 40 ? 62 : 80}px;font-weight:700;line-height:1.05;">${esc(title)}</div>
-      ${subtitle ? `<div style="display:flex;margin-top:24px;color:#A7B3A2;font-size:34px;line-height:1.25;">${esc(subtitle)}</div>` : ""}
+      <div style="display:flex;color:#FFFFFF;font-size:${s(title.length > 40 ? 62 : 80)}px;font-weight:700;line-height:1.05;">${esc(title)}</div>
+      ${subtitle ? `<div style="display:flex;margin-top:${s(24)}px;color:#A7B3A2;font-size:${s(34)}px;line-height:1.25;">${esc(subtitle)}</div>` : ""}
     </div>
     <div style="display:flex;align-items:center;justify-content:space-between;">
-      <div style="display:flex;gap:16px;max-width:800px;overflow:hidden;">${chips}</div>
-      <div style="display:flex;flex-shrink:0;margin-left:32px;color:#6F7C6B;font-size:26px;white-space:nowrap;">open-run-connect.lovable.app</div>
+      <div style="display:flex;gap:${s(16)}px;max-width:${s(800)}px;overflow:hidden;">${chips}</div>
+      <div style="display:flex;flex-shrink:0;margin-left:${s(32)}px;color:#6F7C6B;font-size:${s(26)}px;white-space:nowrap;">open-run-connect.lovable.app</div>
     </div>
   </div>`;
 }
+
 
 /** Cache for a day in the browser, a year at the edge; previews are immutable per URL. */
 const CACHE_CONTROL = "public, max-age=86400, s-maxage=31536000, stale-while-revalidate=604800, stale-if-error=604800, immutable";
@@ -104,8 +120,19 @@ export const Route = createFileRoute("/api/public/og")({
           .filter(Boolean)
           .slice(0, 3);
 
+        const sizeParam = (url.searchParams.get("size") ?? "og").toLowerCase();
+        const sizeKey: SizeKey = sizeParam in OG_SIZES ? (sizeParam as SizeKey) : "og";
+        const { width, height } = OG_SIZES[sizeKey];
+
         const etag = await etagFor(
-          JSON.stringify([OG_VERSION, kindKey in KINDS ? kindKey : "page", title, subtitle, meta]),
+          JSON.stringify([
+            OG_VERSION,
+            kindKey in KINDS ? kindKey : "page",
+            sizeKey,
+            title,
+            subtitle,
+            meta,
+          ]),
         );
 
         const cacheHeaders = {
@@ -119,13 +146,17 @@ export const Route = createFileRoute("/api/public/og")({
         }
 
         try {
-          return new ImageResponse(htmlToReact(template({ kind, title, subtitle, meta })), {
-            width: OG_WIDTH,
-            height: OG_HEIGHT,
-            format: "png",
-            headers: { ...cacheHeaders, "Content-Type": "image/png" },
-          });
+          return new ImageResponse(
+            htmlToReact(template({ kind, title, subtitle, meta, width, height })),
+            {
+              width,
+              height,
+              format: "png",
+              headers: { ...cacheHeaders, "Content-Type": "image/png" },
+            },
+          );
         } catch (err) {
+
           return new Response(`OG render failed: ${(err as Error).message}`, {
             status: 500,
             headers: { "Cache-Control": "no-store" },
