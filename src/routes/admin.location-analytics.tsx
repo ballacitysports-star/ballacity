@@ -35,8 +35,7 @@ export const Route = createFileRoute("/admin/location-analytics")({
     pageHead({
       path: "/admin/location-analytics",
       title: "Location analytics — OpenRun admin",
-      description:
-      "Internal analytics for location permission denials.",
+      description: "Internal analytics for location permission denials.",
       noindex: true,
     }),
   ssr: false,

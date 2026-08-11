@@ -1,7 +1,21 @@
 import { createFileRoute, Link, notFound, useNavigate } from "@tanstack/react-router";
 import { pageHead } from "@/lib/seo";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ArrowLeft, ExternalLink, Upload, ShieldCheck, Clock, X, Check, CircleDashed, AlertCircle, RotateCw, Film, Image as ImageIcon, Trash2 } from "lucide-react";
+import {
+  ArrowLeft,
+  ExternalLink,
+  Upload,
+  ShieldCheck,
+  Clock,
+  X,
+  Check,
+  CircleDashed,
+  AlertCircle,
+  RotateCw,
+  Film,
+  Image as ImageIcon,
+  Trash2,
+} from "lucide-react";
 import { toast } from "sonner";
 import { GAMES } from "@/lib/sample-data";
 import { useAuth } from "@/hooks/use-auth";
@@ -88,8 +102,7 @@ export const Route = createFileRoute("/games/$gameId/pay")({
   head: () =>
     pageHead({
       title: "Pay for your spot — OpenRun",
-      description:
-      "Submit payment for your approved spot in this game.",
+      description: "Submit payment for your approved spot in this game.",
       noindex: true,
     }),
   validateSearch: (search: Record<string, unknown>) => {
@@ -128,12 +141,9 @@ function PayPage() {
   // the viewer is on the pay screen. Falls back to the static snapshot on
   // sample games and during hydration so nothing briefly flashes to zero.
   const liveCount = useLiveParticipantCount(game?.id);
-  
+
   const maxPlayers = game?.maxPlayers ?? 0;
-  const effectiveJoined = Math.min(
-    maxPlayers,
-    liveCount ?? game?.joined ?? 0,
-  );
+  const effectiveJoined = Math.min(maxPlayers, liveCount ?? game?.joined ?? 0);
   const spotsLeft = Math.max(0, maxPlayers - effectiveJoined);
   const justFilledDuringPay = liveCount !== undefined && spotsLeft <= 0;
   const nav = useNavigate();
@@ -204,9 +214,7 @@ function PayPage() {
     let cancelled = false;
     setLookupTimedOut(false);
     setRemoteGame(null);
-    const timeout = new Promise<null>((resolve) =>
-      window.setTimeout(() => resolve(null), 8000),
-    );
+    const timeout = new Promise<null>((resolve) => window.setTimeout(() => resolve(null), 8000));
     Promise.race([fetchHostedGame(gameId), timeout])
       .then((found) => {
         if (!cancelled) setRemoteGame(found ?? null);
@@ -235,10 +243,7 @@ function PayPage() {
       Promise.race([
         p,
         new Promise<T>((_, reject) =>
-          window.setTimeout(
-            () => reject(new Error(`[pay] ${label} timed out after 6s`)),
-            6000,
-          ),
+          window.setTimeout(() => reject(new Error(`[pay] ${label} timed out after 6s`)), 6000),
         ),
       ]);
     (async () => {
@@ -299,7 +304,8 @@ function PayPage() {
     // Resume a payment where the player previously bounced out to Venmo/etc.
     if (typeof window !== "undefined") {
       const resumed = methods.find(
-        (method) => window.sessionStorage.getItem(externalPaymentResumeKey(gameId, method.id)) === "1",
+        (method) =>
+          window.sessionStorage.getItem(externalPaymentResumeKey(gameId, method.id)) === "1",
       );
       if (resumed) {
         setPicked(resumed);
@@ -369,7 +375,8 @@ function PayPage() {
           nextLatest.status !== prevLatest.status
         ) {
           if (nextLatest.status === "verified") toast.success("Payment verified by host!");
-          if (nextLatest.status === "rejected") toast.error("Host rejected your payment — try again.");
+          if (nextLatest.status === "rejected")
+            toast.error("Host rejected your payment — try again.");
         }
         return subs;
       });
@@ -461,7 +468,12 @@ function PayPage() {
           <div className="text-xs text-muted-foreground truncate">{game.location}</div>
         </div>
         <PayFlowPillHeader gameId={gameId} />
-        <LeaveFlowButton gameId={gameId} gameTitle={game.title} variant="link" navigateTo={`/games/${game.id}`} />
+        <LeaveFlowButton
+          gameId={gameId}
+          gameTitle={game.title}
+          variant="link"
+          navigateTo={`/games/${game.id}`}
+        />
       </div>
 
       <PayFlowStepper gameId={gameId} />
@@ -509,19 +521,30 @@ function PayPage() {
       {/* Approval / payment stage badge — driven by shared flow status so
           paid games show "Payment due" (etc.) rather than "Approved — you
           can pay now" until the host actually verifies the payment. */}
-      <PayApprovalIndicator gameId={gameId} isPaid={Number(fee) > 0} requiresApproval={requiresApproval} />
-
+      <PayApprovalIndicator
+        gameId={gameId}
+        isPaid={Number(fee) > 0}
+        requiresApproval={requiresApproval}
+      />
 
       {/* Two-step progress (Pay → Confirm) */}
       {showStepper && (
         <div aria-label="Payment progress" className="flex items-center gap-2 text-xs">
           <StepDot active={currentStep === "pay"} done={currentStep === "confirm"} n={1} />
-          <span className={currentStep === "pay" ? "font-bold text-foreground" : "text-muted-foreground"}>
+          <span
+            className={
+              currentStep === "pay" ? "font-bold text-foreground" : "text-muted-foreground"
+            }
+          >
             Pay the host
           </span>
           <span className="flex-1 h-px bg-border" />
           <StepDot active={currentStep === "confirm"} done={false} n={2} />
-          <span className={currentStep === "confirm" ? "font-bold text-foreground" : "text-muted-foreground"}>
+          <span
+            className={
+              currentStep === "confirm" ? "font-bold text-foreground" : "text-muted-foreground"
+            }
+          >
             Confirm
           </span>
         </div>
@@ -569,9 +592,7 @@ function PayPage() {
         </div>
       ) : fetchTimedOut ? (
         <div className="rounded-2xl border border-dashed border-coral/40 bg-coral/5 p-5 text-center space-y-2">
-          <div className="text-sm text-muted-foreground">
-            Couldn't reach the payment service.
-          </div>
+          <div className="text-sm text-muted-foreground">Couldn't reach the payment service.</div>
           <button
             type="button"
             onClick={() => setFetchAttempt((n) => n + 1)}
@@ -705,42 +726,47 @@ function PaymentStatusTimeline({
 
   // Three canonical steps; the third splits into verified vs rejected.
   type StepState = "done" | "current" | "upcoming" | "failed";
-  const steps: { key: string; label: string; hint: string; state: StepState; at?: string | null }[] =
-    [
-      {
-        key: "submitted",
-        label: "Proof submitted",
-        hint: "You sent payment details to the host.",
-        state: "done",
-        at: latest.submitted_at,
-      },
-      {
-        key: "review",
-        label: "Host reviewing",
-        hint: isPending
-          ? "Waiting on the host to confirm your payment."
-          : "Host reviewed your submission.",
-        state: isPending ? "current" : "done",
-        at: isPending ? null : latest.reviewed_at,
-      },
-      isRejected
-        ? {
-            key: "rejected",
-            label: "Rejected — try again",
-            hint: latest.reviewer_notes || "Host couldn't verify this payment.",
-            state: "failed",
-            at: latest.reviewed_at,
-          }
-        : {
-            key: "verified",
-            label: "Payment verified",
-            hint: isVerified
-              ? latest.reviewer_notes || "You're all set — see you at the game."
-              : "You'll be confirmed once the host verifies.",
-            state: isVerified ? "done" : "upcoming",
-            at: isVerified ? latest.reviewed_at : null,
-          },
-    ];
+  const steps: {
+    key: string;
+    label: string;
+    hint: string;
+    state: StepState;
+    at?: string | null;
+  }[] = [
+    {
+      key: "submitted",
+      label: "Proof submitted",
+      hint: "You sent payment details to the host.",
+      state: "done",
+      at: latest.submitted_at,
+    },
+    {
+      key: "review",
+      label: "Host reviewing",
+      hint: isPending
+        ? "Waiting on the host to confirm your payment."
+        : "Host reviewed your submission.",
+      state: isPending ? "current" : "done",
+      at: isPending ? null : latest.reviewed_at,
+    },
+    isRejected
+      ? {
+          key: "rejected",
+          label: "Rejected — try again",
+          hint: latest.reviewer_notes || "Host couldn't verify this payment.",
+          state: "failed",
+          at: latest.reviewed_at,
+        }
+      : {
+          key: "verified",
+          label: "Payment verified",
+          hint: isVerified
+            ? latest.reviewer_notes || "You're all set — see you at the game."
+            : "You'll be confirmed once the host verifies.",
+          state: isVerified ? "done" : "upcoming",
+          at: isVerified ? latest.reviewed_at : null,
+        },
+  ];
 
   return (
     <div
@@ -987,31 +1013,28 @@ function PaymentInstructionsAndProof({
     }, 250);
   };
 
-  const uploadFile = useCallback(
-    async (f: File) => {
-      setUploadState("uploading");
-      setUploadError(null);
-      startProgressTick();
-      try {
-        const path = await uploadProofScreenshot(f);
-        stopProgressTick();
-        setUploadProgress(100);
-        setUploadedPath(path);
-        setUploadState("success");
-        toast.success("Proof uploaded — ready to submit.");
-      } catch (err: unknown) {
-        stopProgressTick();
-        setUploadProgress(0);
-        setUploadedPath(null);
-        setUploadState("error");
-        const msg =
-          err instanceof Error ? err.message : "Upload failed. Check your connection and retry.";
-        setUploadError(msg);
-        toast.error(`Upload failed: ${msg}`);
-      }
-    },
-    [],
-  );
+  const uploadFile = useCallback(async (f: File) => {
+    setUploadState("uploading");
+    setUploadError(null);
+    startProgressTick();
+    try {
+      const path = await uploadProofScreenshot(f);
+      stopProgressTick();
+      setUploadProgress(100);
+      setUploadedPath(path);
+      setUploadState("success");
+      toast.success("Proof uploaded — ready to submit.");
+    } catch (err: unknown) {
+      stopProgressTick();
+      setUploadProgress(0);
+      setUploadedPath(null);
+      setUploadState("error");
+      const msg =
+        err instanceof Error ? err.message : "Upload failed. Check your connection and retry.";
+      setUploadError(msg);
+      toast.error(`Upload failed: ${msg}`);
+    }
+  }, []);
 
   const pickFile = (f: File | null) => {
     if (!f) return;
@@ -1023,9 +1046,7 @@ function PaymentInstructionsAndProof({
       return;
     }
     if (f.size > MAX_UPLOAD_BYTES) {
-      toast.error(
-        `File is too large (${(f.size / (1024 * 1024)).toFixed(1)} MB). Max is 20 MB.`,
-      );
+      toast.error(`File is too large (${(f.size / (1024 * 1024)).toFixed(1)} MB). Max is 20 MB.`);
       return;
     }
     if (previewUrl) URL.revokeObjectURL(previewUrl);
@@ -1049,9 +1070,6 @@ function PaymentInstructionsAndProof({
     setUploadProgress(0);
     if (fileInputRef.current) fileInputRef.current.value = "";
   };
-
-
-
 
   const submitProof = async () => {
     if (submitting) return;
@@ -1211,7 +1229,6 @@ function PaymentInstructionsAndProof({
         onSubmit={submit}
         className="rounded-2xl border border-border bg-surface p-4 space-y-3"
       >
-
         <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
           I have paid — submit proof
         </h3>
@@ -1435,9 +1452,7 @@ function ProofUploader({
               <div className="truncate font-semibold text-foreground">{file.name}</div>
               <div className="text-[11px] text-muted-foreground">
                 {isVideo ? "Video" : "Image"} · {sizeMb} MB
-                {uploadState === "success" && (
-                  <span className="ml-1 text-lime">· Uploaded</span>
-                )}
+                {uploadState === "success" && <span className="ml-1 text-lime">· Uploaded</span>}
                 {uploadState === "uploading" && (
                   <span className="ml-1 text-muted-foreground">· Uploading…</span>
                 )}
@@ -1497,9 +1512,7 @@ function ProofUploader({
               </div>
               <div className="flex items-center justify-between text-[10px] text-muted-foreground">
                 <span>{Math.round(uploadProgress)}%</span>
-                <span>
-                  {uploadState === "success" ? "Ready to submit" : "Keep this tab open"}
-                </span>
+                <span>{uploadState === "success" ? "Ready to submit" : "Keep this tab open"}</span>
               </div>
             </div>
           )}
@@ -1544,7 +1557,11 @@ function PayFlowStepper({ gameId }: { gameId: string }) {
   const { status } = useMyFlowStatus(gameId);
   if (status === "none" || status === "rejected") return null;
   const currentIdx = FLOW_STEPS.indexOf(
-    status === "confirmed" ? "payment_verified" : status === "payment_rejected" ? "payment_pending" : status,
+    status === "confirmed"
+      ? "payment_verified"
+      : status === "payment_rejected"
+        ? "payment_pending"
+        : status,
   );
   return (
     <ol
@@ -1592,17 +1609,31 @@ function PayApprovalIndicator({
   // Nothing to show before the viewer has any relationship to the game.
   if (status === "none") return null;
 
-  const paid: Partial<Record<typeof status, { label: string; tone: "warn" | "info" | "ok" | "bad"; icon: "clock" | "shield" | "x" }>> = {
+  const paid: Partial<
+    Record<
+      typeof status,
+      { label: string; tone: "warn" | "info" | "ok" | "bad"; icon: "clock" | "shield" | "x" }
+    >
+  > = {
     requested: { label: "Waiting for host to approve you", tone: "warn", icon: "clock" },
     payment_pending: { label: "Payment due", tone: "warn", icon: "clock" },
     payment_submitted: { label: "Payment sent — waiting on host", tone: "info", icon: "clock" },
     payment_rejected: { label: "Payment declined — resubmit", tone: "bad", icon: "x" },
-    payment_verified: { label: "Payment confirmed — you're on the roster", tone: "ok", icon: "shield" },
+    payment_verified: {
+      label: "Payment confirmed — you're on the roster",
+      tone: "ok",
+      icon: "shield",
+    },
     confirmed: { label: "Payment confirmed — you're on the roster", tone: "ok", icon: "shield" },
     rejected: { label: "Request declined", tone: "bad", icon: "x" },
   };
 
-  const free: Partial<Record<typeof status, { label: string; tone: "warn" | "ok" | "bad"; icon: "clock" | "shield" | "x" }>> = {
+  const free: Partial<
+    Record<
+      typeof status,
+      { label: string; tone: "warn" | "ok" | "bad"; icon: "clock" | "shield" | "x" }
+    >
+  > = {
     requested: { label: "Waiting for host to approve you", tone: "warn", icon: "clock" },
     confirmed: { label: "Approved — see you at the game", tone: "ok", icon: "shield" },
     rejected: { label: "Request declined", tone: "bad", icon: "x" },
@@ -1631,9 +1662,11 @@ function PayApprovalIndicator({
       aria-atomic="true"
       className={`inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-bold ${toneClass}`}
     >
-      <Icon className={`h-3.5 w-3.5 ${entry.icon === "clock" && entry.tone === "warn" ? "animate-pulse" : ""}`} aria-hidden="true" />
+      <Icon
+        className={`h-3.5 w-3.5 ${entry.icon === "clock" && entry.tone === "warn" ? "animate-pulse" : ""}`}
+        aria-hidden="true"
+      />
       <span>{entry.label}</span>
     </div>
   );
 }
-

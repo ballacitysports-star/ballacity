@@ -17,8 +17,7 @@ export const Route = createFileRoute("/onboarding/account-type")({
     pageHead({
       path: "/onboarding/account-type",
       title: "Choose your profile type — OpenRun",
-      description:
-      "Start as a player, team, trainer, or gym — you can add more profiles later.",
+      description: "Start as a player, team, trainer, or gym — you can add more profiles later.",
       noindex: true,
     }),
   component: OnboardingAccountTypePage,

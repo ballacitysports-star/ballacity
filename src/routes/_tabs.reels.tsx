@@ -16,8 +16,7 @@ export const Route = createFileRoute("/_tabs/reels")({
     pageHead({
       path: "/reels",
       title: "Highlight reels — OpenRun",
-      description:
-      "Turn your game footage into AI-edited highlight reels you can share.",
+      description: "Turn your game footage into AI-edited highlight reels you can share.",
       noindex: true,
     }),
   component: ReelsPage,

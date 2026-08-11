@@ -11,7 +11,7 @@ export const Route = createFileRoute("/orgs/")({
       path: "/orgs",
       title: "Gyms & training organizations — OpenRun",
       description:
-      "Browse gyms, courts, and training organizations on OpenRun. See hours, amenities, and member reviews.",
+        "Browse gyms, courts, and training organizations on OpenRun. See hours, amenities, and member reviews.",
     }),
   component: OrgsIndex,
 });
@@ -77,7 +77,11 @@ function OrgsIndex() {
               >
                 <div className="grid h-14 w-14 shrink-0 place-items-center overflow-hidden rounded-2xl border border-border bg-lime-gradient font-display text-base font-bold text-primary-foreground">
                   {(o as { avatar_url?: string | null }).avatar_url ? (
-                    <img src={(o as { avatar_url: string }).avatar_url} alt="" className="h-full w-full object-cover" />
+                    <img
+                      src={(o as { avatar_url: string }).avatar_url}
+                      alt=""
+                      className="h-full w-full object-cover"
+                    />
                   ) : o.avatar && (o.avatar.startsWith("http") || o.avatar.startsWith("/")) ? (
                     <img src={o.avatar} alt="" className="h-full w-full object-cover" />
                   ) : (

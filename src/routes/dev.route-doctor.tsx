@@ -17,7 +17,7 @@ export const Route = createFileRoute("/dev/route-doctor")({
       path: "/dev/route-doctor",
       title: "Route Doctor — OpenRun",
       description:
-      "Reproduce broken links, test any path against the app's routes, and see recent 404s.",
+        "Reproduce broken links, test any path against the app's routes, and see recent 404s.",
       noindex: true,
     }),
   component: RouteDoctorPage,
@@ -48,10 +48,7 @@ function RouteDoctorPage() {
       .sort((a, b) => a.pattern.localeCompare(b.pattern));
   }, [router]);
 
-  const result = useMemo(
-    () => (path.trim() ? diagnosePath(path, routes) : null),
-    [path, routes],
-  );
+  const result = useMemo(() => (path.trim() ? diagnosePath(path, routes) : null), [path, routes]);
 
   const visibleRoutes = useMemo(
     () =>
@@ -211,9 +208,7 @@ function RouteDoctorPage() {
 
         {/* Route inventory */}
         <section className="mt-4 rounded-xl border border-border bg-surface p-4">
-          <h2 className="text-sm font-medium text-foreground">
-            Known routes ({routes.length})
-          </h2>
+          <h2 className="text-sm font-medium text-foreground">Known routes ({routes.length})</h2>
           <input
             value={filter}
             onChange={(e) => setFilter(e.target.value)}

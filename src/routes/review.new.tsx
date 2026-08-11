@@ -30,8 +30,7 @@ export const Route = createFileRoute("/review/new")({
   head: () =>
     pageHead({
       title: "Write a review — OpenRun",
-      description:
-      "Rate and review a player, team, trainer, or gym you played with.",
+      description: "Rate and review a player, team, trainer, or gym you played with.",
       noindex: true,
     }),
   validateSearch: (s: Record<string, unknown>): Search => ({

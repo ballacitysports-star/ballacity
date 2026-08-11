@@ -19,7 +19,13 @@ import { useFeedPrefsSync } from "@/hooks/use-feed-prefs-sync";
 import { GAMES, SPORTS, POSITIONS_BY_SPORT, type Sport } from "@/lib/sample-data";
 import { useHostedGames } from "@/lib/hosted-games-store";
 import { useJoinedGameIds } from "@/lib/games-store";
-import { useFeedPrefs, setFeedPrefs, DEFAULT_PREFS, DEFAULT_FILTERS, useMyProfile } from "@/lib/user-prefs-store";
+import {
+  useFeedPrefs,
+  setFeedPrefs,
+  DEFAULT_PREFS,
+  DEFAULT_FILTERS,
+  useMyProfile,
+} from "@/lib/user-prefs-store";
 import { clearScrollRestore, useScrollRestore } from "@/hooks/use-scroll-restore";
 import { motion } from "framer-motion";
 import { zodValidator, fallback } from "@tanstack/zod-adapter";
@@ -30,7 +36,6 @@ import { listRecentTeamPosts } from "@/lib/team-posts.functions";
 import { PostCard } from "@/components/PostCard";
 import { PostDetailsDialog, type PostDetailsTeam } from "@/components/PostDetailsDialog";
 import type { OrgPost, PostKind } from "@/lib/sample-data";
-
 
 // URL-persisted feed state. Refreshing or sharing the URL preserves search
 // text, sport chip, sort, distance cap, position, view/density toggles, and
@@ -56,20 +61,18 @@ export const Route = createFileRoute("/_tabs/feed")({
     pageHead({
       path: "/feed",
       title: "Your feed — OpenRun",
-      description:
-      "Games, teams, and trainers picked for your sports, skill level, and distance.",
+      description: "Games, teams, and trainers picked for your sports, skill level, and distance.",
       noindex: true,
     }),
   validateSearch: zodValidator(feedSearchSchema),
   component: Feed,
 });
 
-
 function Feed() {
   const search = Route.useSearch();
   const navigate = useNavigate({ from: "/feed" });
   const [q, setQ] = useState(search.q ?? "");
-  
+
   const [viewMode, setViewMode] = useState<"list" | "map">(() => {
     if (search.view === "list" || search.view === "map") return search.view;
     if (typeof window === "undefined") return "list";
@@ -77,7 +80,11 @@ function Feed() {
   });
   const switchView = (m: "list" | "map") => {
     setViewMode(m);
-    try { localStorage.setItem("openrun:play-view", m); } catch { /* ignore */ }
+    try {
+      localStorage.setItem("openrun:play-view", m);
+    } catch {
+      /* ignore */
+    }
   };
   const [density, setDensity] = useState<"grid" | "list">(() => {
     if (search.density === "grid" || search.density === "list") return search.density;
@@ -86,16 +93,23 @@ function Feed() {
   });
   const switchDensity = (d: "grid" | "list") => {
     setDensity(d);
-    try { localStorage.setItem("openrun:feed-density", d); } catch { /* ignore */ }
+    try {
+      localStorage.setItem("openrun:feed-density", d);
+    } catch {
+      /* ignore */
+    }
   };
-  const listContainerClass = density === "list"
-    ? "flex flex-col gap-2"
-    : "grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3";
-  const emptyColSpan = density === "list" ? "" : "sm:col-span-2 lg:col-span-3";
-  const renderGame = (g: typeof GAMES[number], i: number) =>
+  const listContainerClass =
     density === "list"
-      ? <GameListRow key={g.id} game={g} index={i} />
-      : <GameCard key={g.id} game={g} index={i} />;
+      ? "flex flex-col gap-2"
+      : "grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3";
+  const emptyColSpan = density === "list" ? "" : "sm:col-span-2 lg:col-span-3";
+  const renderGame = (g: (typeof GAMES)[number], i: number) =>
+    density === "list" ? (
+      <GameListRow key={g.id} game={g} index={i} />
+    ) : (
+      <GameCard key={g.id} game={g} index={i} />
+    );
   const renderSkeletons = (count: number) => {
     const Skel = density === "list" ? GameListRowSkeleton : GameCardSkeleton;
     return Array.from({ length: count }, (_, i) => <Skel key={`sk-${i}`} />);
@@ -131,7 +145,10 @@ function Feed() {
       ["freeOnly", search.free],
       ["paidOnly", search.paid],
     ] as const) {
-      if (typeof v === "boolean") { (sec as any)[k] = v; secTouched = true; }
+      if (typeof v === "boolean") {
+        (sec as any)[k] = v;
+        secTouched = true;
+      }
     }
     if (secTouched) patch.sections = sec;
     if (Object.keys(patch).length > 0) setFeedPrefs({ ...prefs, ...patch });
@@ -201,10 +218,7 @@ function Feed() {
       lastPage.length < TEAM_POSTS_PAGE ? undefined : allPages.length * TEAM_POSTS_PAGE,
     staleTime: 30_000,
   });
-  const teamPosts = useMemo(
-    () => (teamPostsQuery.data?.pages ?? []).flat(),
-    [teamPostsQuery.data],
-  );
+  const teamPosts = useMemo(() => (teamPostsQuery.data?.pages ?? []).flat(), [teamPostsQuery.data]);
   const setChipSport = (s: string | null) => {
     if (s === null) {
       setFeedPrefs({ ...prefs, preferredSports: [] });
@@ -234,9 +248,7 @@ function Feed() {
       .filter((g) => (prefs.moneyFilter === "free" ? g.price === 0 : true))
       .filter((g) => (prefs.moneyFilter === "paid" ? g.price > 0 : true))
 
-      .filter((g) =>
-        prefs.maxDistanceMi != null ? g.distanceMi <= prefs.maxDistanceMi : true,
-      )
+      .filter((g) => (prefs.maxDistanceMi != null ? g.distanceMi <= prefs.maxDistanceMi : true))
       .filter((g) =>
         q
           ? (
@@ -294,7 +306,7 @@ function Feed() {
     return out;
   }, [q, hosted]);
 
-  const isFull = (g: typeof GAMES[number]) => g.joined >= g.maxPlayers;
+  const isFull = (g: (typeof GAMES)[number]) => g.joined >= g.maxPlayers;
 
   const urgent = filtered.filter((g) => g.urgent && !isFull(g));
   const activeFilterCount =
@@ -308,7 +320,9 @@ function Feed() {
   // viewport so tablets/desktops fill their wider grids in one batch.
   const PAGE_SIZE = 12;
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
-  const [openPost, setOpenPost] = useState<{ post: OrgPost; team: PostDetailsTeam | null } | null>(null);
+  const [openPost, setOpenPost] = useState<{ post: OrgPost; team: PostDetailsTeam | null } | null>(
+    null,
+  );
 
   const sentinelRef = useRef<HTMLDivElement | null>(null);
   const filterKey = `${q}|${JSON.stringify(prefs)}|${hosted.length}`;
@@ -457,7 +471,6 @@ function Feed() {
         </div>
       </div>
 
-
       <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="mb-4">
         <h1 className="font-display text-3xl font-bold leading-tight">Tonight's run.</h1>
         <p className="text-muted-foreground text-sm inline-flex items-center gap-1">
@@ -485,200 +498,162 @@ function Feed() {
         onDensityChange={(d) => switchDensity(d)}
       />
 
-
-
       {viewMode === "map" ? (
         <PlayMapView
           items={filtered}
           getHref={(g) => ({ to: "/games/$gameId", params: { gameId: g.id } })}
         />
-
       ) : (
-      <>
-      <div className="relative mb-4">
-        <FilterBar
-          q={q}
-          onQChange={setQ}
-          searchPlaceholder="Search games, courts, players"
-          activeFilterCount={activeFilterCount}
-          create={{ to: "/create", label: "Create game" }}
-          sheetTitle="Feed filters"
-          sheet={<FeedPreferencesBody />}
-          onReset={() =>
-            setFeedPrefs({ ...prefs, ...DEFAULT_FILTERS, activeViewId: null })
-          }
-        />
-        {q && suggestions.length > 0 && (
-          <div className="absolute left-0 right-14 top-full mt-1 z-20 rounded-2xl border border-border bg-surface shadow-lg overflow-hidden">
-            {suggestions.map((s, idx) => (
-              <button
-                key={`${s.label}-${idx}`}
-                onClick={() => setQ(s.label)}
-                className="w-full text-left px-4 py-2.5 text-sm hover:bg-background border-b border-border last:border-b-0"
-              >
-                <div className="font-semibold truncate">{s.label}</div>
-                <div className="text-xs text-muted-foreground truncate">{s.sub}</div>
-              </button>
-            ))}
-          </div>
-        )}
-      </div>
-
-
-      {prefs.savedViews.length > 0 && (
-        <div className="mb-3">
-          <FeedViewsRow compact />
-        </div>
-      )}
-
-      <div className="mb-5">
-        <SportChips multi selected={chipSelected} onSelect={setChipSport} />
-        {chipSelected.length === 1 && POSITIONS_BY_SPORT[chipSelected[0] as Sport]?.length > 0 && (
-          <div className="mt-2 flex gap-2 overflow-x-auto scrollbar-hide -mx-4 px-4 pb-1">
-            <button
-              onClick={() => setPositionFilter(null)}
-              className={`shrink-0 rounded-full border px-3 py-1.5 text-xs font-semibold transition-all ${
-                !positionFilter
-                  ? "border-lime bg-lime text-primary-foreground"
-                  : "border-border bg-surface text-muted-foreground"
-              }`}
-            >
-              Any position
-            </button>
-            {POSITIONS_BY_SPORT[chipSelected[0] as Sport].map((p) => {
-              const active = positionFilter === p;
-              return (
-                <button
-                  key={p}
-                  onClick={() => setPositionFilter(active ? null : p)}
-                  className={`shrink-0 rounded-full border px-3 py-1.5 text-xs font-semibold transition-all ${
-                    active
-                      ? "border-lime bg-lime text-primary-foreground"
-                      : "border-border bg-surface text-foreground hover:border-lime/40"
-                  }`}
-                >
-                  {p}
-                </button>
-              );
-            })}
-          </div>
-        )}
-      </div>
-
-      {teamPosts.length > 0 && (
-        <section className="mb-6">
-          <div className="flex items-center justify-between mb-2">
-            <h2 className="font-display text-sm font-bold uppercase tracking-wider text-muted-foreground">
-              From teams
-            </h2>
-            <Link to="/teams" className="text-xs font-semibold text-lime">
-              See all
-            </Link>
-          </div>
-          <div className="flex flex-col gap-3">
-            {teamPosts.map((p, i) => {
-              const orgPost: OrgPost = {
-                id: p.id,
-                kind: p.kind as PostKind,
-                title: p.title,
-                body: p.body,
-                date: p.eventDate ?? p.createdAt,
-                postedAt: p.createdAt,
-                location: p.location ?? undefined,
-                price: p.price ?? undefined,
-                pinned: p.pinned,
-              };
-              return (
-                <div key={p.id}>
-                  <Link
-                    to="/teams/$teamId"
-                    params={{ teamId: p.teamId }}
-                    className="mb-1 flex items-center gap-2 text-xs font-semibold"
+        <>
+          <div className="relative mb-4">
+            <FilterBar
+              q={q}
+              onQChange={setQ}
+              searchPlaceholder="Search games, courts, players"
+              activeFilterCount={activeFilterCount}
+              create={{ to: "/create", label: "Create game" }}
+              sheetTitle="Feed filters"
+              sheet={<FeedPreferencesBody />}
+              onReset={() => setFeedPrefs({ ...prefs, ...DEFAULT_FILTERS, activeViewId: null })}
+            />
+            {q && suggestions.length > 0 && (
+              <div className="absolute left-0 right-14 top-full mt-1 z-20 rounded-2xl border border-border bg-surface shadow-lg overflow-hidden">
+                {suggestions.map((s, idx) => (
+                  <button
+                    key={`${s.label}-${idx}`}
+                    onClick={() => setQ(s.label)}
+                    className="w-full text-left px-4 py-2.5 text-sm hover:bg-background border-b border-border last:border-b-0"
                   >
-                    <span className="grid h-6 w-6 place-items-center rounded-full bg-lime/10 text-lime text-[10px] font-bold">
-                      {(p.teamName || "?").slice(0, 1).toUpperCase()}
-                    </span>
-                    <span className="truncate">{p.teamName}</span>
-                    {p.teamSports?.[0] && (
-                      <span className="text-muted-foreground">· {p.teamSports[0]}</span>
-                    )}
-                  </Link>
-                  <PostCard
-                    post={orgPost}
-                    index={i}
-                    onClick={() =>
-                      setOpenPost({
-                        post: orgPost,
-                        team: { id: p.teamId, name: p.teamName ?? "", sport: p.teamSports?.[0] },
-                      })
-                    }
-                  />
-
-                </div>
-              );
-            })}
-            {teamPostsQuery.hasNextPage && (
-              <div className="flex justify-center pt-1">
-                <button
-                  type="button"
-                  onClick={() => teamPostsQuery.fetchNextPage()}
-                  disabled={teamPostsQuery.isFetchingNextPage}
-                  className="inline-flex items-center gap-2 rounded-full border border-border bg-surface px-4 py-2 text-sm font-semibold disabled:opacity-60"
-                >
-                  {teamPostsQuery.isFetchingNextPage ? (
-                    <>
-                      <Loader2 className="h-4 w-4 animate-spin" /> Loading
-                    </>
-                  ) : (
-                    "Load more"
-                  )}
-                </button>
-              </div>
-
-            )}
-          </div>
-        </section>
-      )}
-
-      {q ? (
-
-        <>
-          <h2 className="font-display text-sm font-bold uppercase tracking-wider text-muted-foreground mb-2">
-            {filtered.length} result{filtered.length === 1 ? "" : "s"} for "{q}"
-          </h2>
-          <div className={listContainerClass}>
-            {refreshing && filtered.length === 0
-              ? renderSkeletons(density === "list" ? 6 : 3)
-              : visible.map((g, i) => renderGame(g, i))}
-            {hasMore && !refreshing && renderSkeletons(density === "list" ? 4 : 3)}
-            {!refreshing && filtered.length === 0 && (
-              <div className={`${emptyColSpan} rounded-2xl border border-border bg-surface p-8 text-center text-muted-foreground`}>
-                No games match "{q}".
+                    <div className="font-semibold truncate">{s.label}</div>
+                    <div className="text-xs text-muted-foreground truncate">{s.sub}</div>
+                  </button>
+                ))}
               </div>
             )}
           </div>
-          <InfiniteSentinel ref={sentinelRef} hasMore={hasMore} total={filtered.length} />
-        </>
-      ) : (
-        <>
-          {prefs.sections.showUrgent && urgent.length > 0 && (
-            <div className="mb-6">
-              <div className="flex items-center justify-between mb-2">
-                <h2 className="font-display text-sm font-bold uppercase tracking-wider text-coral">
-                  ⚡ Needs players now
-                </h2>
-                <span className="text-xs text-muted-foreground">{urgent.length} games</span>
-              </div>
-              <div className={listContainerClass}>
-                {urgent.map((g, i) => renderGame(g, i))}
-              </div>
+
+          {prefs.savedViews.length > 0 && (
+            <div className="mb-3">
+              <FeedViewsRow compact />
             </div>
           )}
 
-          {prefs.sections.showForYou && (
+          <div className="mb-5">
+            <SportChips multi selected={chipSelected} onSelect={setChipSport} />
+            {chipSelected.length === 1 &&
+              POSITIONS_BY_SPORT[chipSelected[0] as Sport]?.length > 0 && (
+                <div className="mt-2 flex gap-2 overflow-x-auto scrollbar-hide -mx-4 px-4 pb-1">
+                  <button
+                    onClick={() => setPositionFilter(null)}
+                    className={`shrink-0 rounded-full border px-3 py-1.5 text-xs font-semibold transition-all ${
+                      !positionFilter
+                        ? "border-lime bg-lime text-primary-foreground"
+                        : "border-border bg-surface text-muted-foreground"
+                    }`}
+                  >
+                    Any position
+                  </button>
+                  {POSITIONS_BY_SPORT[chipSelected[0] as Sport].map((p) => {
+                    const active = positionFilter === p;
+                    return (
+                      <button
+                        key={p}
+                        onClick={() => setPositionFilter(active ? null : p)}
+                        className={`shrink-0 rounded-full border px-3 py-1.5 text-xs font-semibold transition-all ${
+                          active
+                            ? "border-lime bg-lime text-primary-foreground"
+                            : "border-border bg-surface text-foreground hover:border-lime/40"
+                        }`}
+                      >
+                        {p}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+          </div>
+
+          {teamPosts.length > 0 && (
+            <section className="mb-6">
+              <div className="flex items-center justify-between mb-2">
+                <h2 className="font-display text-sm font-bold uppercase tracking-wider text-muted-foreground">
+                  From teams
+                </h2>
+                <Link to="/teams" className="text-xs font-semibold text-lime">
+                  See all
+                </Link>
+              </div>
+              <div className="flex flex-col gap-3">
+                {teamPosts.map((p, i) => {
+                  const orgPost: OrgPost = {
+                    id: p.id,
+                    kind: p.kind as PostKind,
+                    title: p.title,
+                    body: p.body,
+                    date: p.eventDate ?? p.createdAt,
+                    postedAt: p.createdAt,
+                    location: p.location ?? undefined,
+                    price: p.price ?? undefined,
+                    pinned: p.pinned,
+                  };
+                  return (
+                    <div key={p.id}>
+                      <Link
+                        to="/teams/$teamId"
+                        params={{ teamId: p.teamId }}
+                        className="mb-1 flex items-center gap-2 text-xs font-semibold"
+                      >
+                        <span className="grid h-6 w-6 place-items-center rounded-full bg-lime/10 text-lime text-[10px] font-bold">
+                          {(p.teamName || "?").slice(0, 1).toUpperCase()}
+                        </span>
+                        <span className="truncate">{p.teamName}</span>
+                        {p.teamSports?.[0] && (
+                          <span className="text-muted-foreground">· {p.teamSports[0]}</span>
+                        )}
+                      </Link>
+                      <PostCard
+                        post={orgPost}
+                        index={i}
+                        onClick={() =>
+                          setOpenPost({
+                            post: orgPost,
+                            team: {
+                              id: p.teamId,
+                              name: p.teamName ?? "",
+                              sport: p.teamSports?.[0],
+                            },
+                          })
+                        }
+                      />
+                    </div>
+                  );
+                })}
+                {teamPostsQuery.hasNextPage && (
+                  <div className="flex justify-center pt-1">
+                    <button
+                      type="button"
+                      onClick={() => teamPostsQuery.fetchNextPage()}
+                      disabled={teamPostsQuery.isFetchingNextPage}
+                      className="inline-flex items-center gap-2 rounded-full border border-border bg-surface px-4 py-2 text-sm font-semibold disabled:opacity-60"
+                    >
+                      {teamPostsQuery.isFetchingNextPage ? (
+                        <>
+                          <Loader2 className="h-4 w-4 animate-spin" /> Loading
+                        </>
+                      ) : (
+                        "Load more"
+                      )}
+                    </button>
+                  </div>
+                )}
+              </div>
+            </section>
+          )}
+
+          {q ? (
             <>
               <h2 className="font-display text-sm font-bold uppercase tracking-wider text-muted-foreground mb-2">
-                For you
+                {filtered.length} result{filtered.length === 1 ? "" : "s"} for "{q}"
               </h2>
               <div className={listContainerClass}>
                 {refreshing && filtered.length === 0
@@ -686,23 +661,59 @@ function Feed() {
                   : visible.map((g, i) => renderGame(g, i))}
                 {hasMore && !refreshing && renderSkeletons(density === "list" ? 4 : 3)}
                 {!refreshing && filtered.length === 0 && (
-                  <div className={`${emptyColSpan} rounded-2xl border border-border bg-surface p-8 text-center text-muted-foreground space-y-3`}>
-                    <div>No games match your filters.</div>
-                    <button
-                      onClick={() => setFeedPrefs(DEFAULT_PREFS)}
-                      className="inline-flex rounded-full bg-lime px-4 py-2 text-sm font-bold text-primary-foreground"
-                    >
-                      Clear filters
-                    </button>
+                  <div
+                    className={`${emptyColSpan} rounded-2xl border border-border bg-surface p-8 text-center text-muted-foreground`}
+                  >
+                    No games match "{q}".
                   </div>
                 )}
               </div>
               <InfiniteSentinel ref={sentinelRef} hasMore={hasMore} total={filtered.length} />
             </>
+          ) : (
+            <>
+              {prefs.sections.showUrgent && urgent.length > 0 && (
+                <div className="mb-6">
+                  <div className="flex items-center justify-between mb-2">
+                    <h2 className="font-display text-sm font-bold uppercase tracking-wider text-coral">
+                      ⚡ Needs players now
+                    </h2>
+                    <span className="text-xs text-muted-foreground">{urgent.length} games</span>
+                  </div>
+                  <div className={listContainerClass}>{urgent.map((g, i) => renderGame(g, i))}</div>
+                </div>
+              )}
+
+              {prefs.sections.showForYou && (
+                <>
+                  <h2 className="font-display text-sm font-bold uppercase tracking-wider text-muted-foreground mb-2">
+                    For you
+                  </h2>
+                  <div className={listContainerClass}>
+                    {refreshing && filtered.length === 0
+                      ? renderSkeletons(density === "list" ? 6 : 3)
+                      : visible.map((g, i) => renderGame(g, i))}
+                    {hasMore && !refreshing && renderSkeletons(density === "list" ? 4 : 3)}
+                    {!refreshing && filtered.length === 0 && (
+                      <div
+                        className={`${emptyColSpan} rounded-2xl border border-border bg-surface p-8 text-center text-muted-foreground space-y-3`}
+                      >
+                        <div>No games match your filters.</div>
+                        <button
+                          onClick={() => setFeedPrefs(DEFAULT_PREFS)}
+                          className="inline-flex rounded-full bg-lime px-4 py-2 text-sm font-bold text-primary-foreground"
+                        >
+                          Clear filters
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                  <InfiniteSentinel ref={sentinelRef} hasMore={hasMore} total={filtered.length} />
+                </>
+              )}
+            </>
           )}
         </>
-      )}
-      </>
       )}
 
       <PostDetailsDialog
@@ -714,7 +725,6 @@ function Feed() {
     </div>
   );
 }
-
 
 function PullIndicator({
   offset,

@@ -125,8 +125,11 @@ function TrainerPage() {
   const setReviewsOpen = (v: boolean) =>
     navigate({ to: ".", search: { ...search, modal: v ? "reviews" : "" }, replace: true });
   const setSelectedVenue = (v: string) =>
-    navigate({ to: ".", search: { ...search, venue: selectedVenue === v ? "" : v }, replace: true });
-
+    navigate({
+      to: ".",
+      search: { ...search, venue: selectedVenue === v ? "" : v },
+      replace: true,
+    });
 
   const [bookOpen, setBookOpen] = useState(false);
   const [bookPrefill, setBookPrefill] = useState<BookPrefill | null>(null);
@@ -148,7 +151,12 @@ function TrainerPage() {
       .channel(`trainer-org-link:${org.id}`)
       .on(
         "postgres_changes",
-        { event: "*", schema: "public", table: "trainer_org_members", filter: `trainer_id=eq.${org.id}` },
+        {
+          event: "*",
+          schema: "public",
+          table: "trainer_org_members",
+          filter: `trainer_id=eq.${org.id}`,
+        },
         () => {
           qc.invalidateQueries({ queryKey: ["trainer-org-for-trainer", org.id] });
           qc.invalidateQueries({ queryKey: ["trainer-org-memberships", org.id] });
@@ -156,7 +164,12 @@ function TrainerPage() {
       )
       .on(
         "postgres_changes",
-        { event: "*", schema: "public", table: "trainer_org_join_requests", filter: `trainer_id=eq.${org.id}` },
+        {
+          event: "*",
+          schema: "public",
+          table: "trainer_org_join_requests",
+          filter: `trainer_id=eq.${org.id}`,
+        },
         () => {
           qc.invalidateQueries({ queryKey: ["trainer-org-for-trainer", org.id] });
         },
@@ -515,8 +528,10 @@ function TrainerPage() {
                           return 0;
                         })
                         .map((addr) => {
-                          const active = selectedVenue.trim().toLowerCase() === addr.trim().toLowerCase();
-                          const isPrimary = !!org.primaryVenue && addr.trim() === org.primaryVenue.trim();
+                          const active =
+                            selectedVenue.trim().toLowerCase() === addr.trim().toLowerCase();
+                          const isPrimary =
+                            !!org.primaryVenue && addr.trim() === org.primaryVenue.trim();
                           const short = addr.split(",")[0];
                           return (
                             <button
@@ -547,7 +562,8 @@ function TrainerPage() {
                       return 0;
                     })
                     .map((addr, i) => {
-                      const isPrimary = !!org.primaryVenue && addr.trim() === org.primaryVenue.trim();
+                      const isPrimary =
+                        !!org.primaryVenue && addr.trim() === org.primaryVenue.trim();
                       const dimmed =
                         selectedVenue &&
                         selectedVenue.trim().toLowerCase() !== addr.trim().toLowerCase();
@@ -611,12 +627,8 @@ function TrainerPage() {
                   venueFilter={selectedVenue || null}
                   trainerTz={org.timezone ?? null}
                 />
-
-
               </Section>
             )}
-
-
 
             <Section
               title={

@@ -46,8 +46,6 @@ import { AvailabilityRequiredNotice } from "@/components/availability/Availabili
 import { AvailabilityDetailDialog } from "@/components/players/AvailabilityDetailDialog";
 import { shareAvailability } from "@/components/players/share-availability";
 
-
-
 import { AvailabilitySchedulePicker } from "@/components/availability/AvailabilitySchedulePicker";
 import { useMyBusyBlocks } from "@/lib/availability-conflicts";
 import {
@@ -103,7 +101,6 @@ import {
   type SportSkillMap,
 } from "@/lib/sport-filter";
 
-
 // URL-persisted Players state. Refreshing or sharing the URL restores the
 // exact view: search text, sport chip, skill, distance cap, age range,
 // when-filter, and the view/density toggles. Invalid values silently
@@ -125,14 +122,13 @@ const playersSearchSchema = z.object({
   post: fallback(z.string(), "").default(""),
 });
 
-
 export const Route = createFileRoute("/_tabs/players")({
   head: () =>
     pageHead({
       path: "/players",
       title: "Players near you — OpenRun",
       description:
-      "Find available players and teammates nearby by sport, skill tier, and availability.",
+        "Find available players and teammates nearby by sport, skill tier, and availability.",
       noindex: true,
     }),
   validateSearch: zodValidator(playersSearchSchema),
@@ -180,7 +176,6 @@ function migrateLegacyPlayersFilters() {
   }
 }
 
-
 function PlayersPage() {
   const { user } = useAuth();
   const profile = useMyProfile(user);
@@ -216,21 +211,24 @@ function PlayersPage() {
     return rest;
   }, [search]);
   const { hydrated } = usePersistedSearch("openrun:players-search", persistedSearch, "/players", {
-    q: "", sport: "", skill: "", dist: 0, ageMin: undefined, ageMax: undefined,
-    unknownAge: true, when: "any", view: "list", density: "list",
+    q: "",
+    sport: "",
+    skill: "",
+    dist: 0,
+    ageMin: undefined,
+    ageMax: undefined,
+    unknownAge: true,
+    when: "any",
+    view: "list",
+    density: "list",
   });
-
-
 
   const q = search.q;
   // `sport` is a comma-separated list; `skill` a per-sport tier map
   // ("Baseball:Minor AAA|Football:7v7 Elite").
   const sports = useMemo(() => parseSportList(search.sport), [search.sport]);
   const sportsKey = sports.join(",");
-  const skills = useMemo(
-    () => parseSportSkillMap(search.skill, sports),
-    [search.skill, sportsKey],
-  );
+  const skills = useMemo(() => parseSportSkillMap(search.skill, sports), [search.skill, sportsKey]);
   const maxDistance = search.dist;
   const ageMin: number | "" = search.ageMin ?? "";
   const ageMax: number | "" = search.ageMax ?? "";
@@ -261,7 +259,6 @@ function PlayersPage() {
     updateSearch({ skill: serializeSportSkillMap(safe, sports) }, { push: true });
   };
 
-
   const setMaxDistance = (v: number) => updateSearch({ dist: v });
   const setAgeMin = (v: number | "") => updateSearch({ ageMin: v === "" ? undefined : v });
   const setAgeMax = (v: number | "") => updateSearch({ ageMax: v === "" ? undefined : v });
@@ -269,7 +266,6 @@ function PlayersPage() {
   const setWhen = (v: "any" | "today" | "week" | "weekend") => updateSearch({ when: v });
   const switchView = (v: ViewMode) => updateSearch({ view: v });
   const switchDensity = (d: Density) => updateSearch({ density: d });
-
 
   const [list, setList] = useState<AvailabilityWithAuthor[] | null>(null);
   const [postOpen, setPostOpen] = useState(false);
@@ -323,10 +319,8 @@ function PlayersPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [focusedId, list]);
 
-
   // Legacy localStorage keys are folded into the new snapshot above, before
   // the persistence hook runs (see migrateLegacyPlayersFilters).
-
 
   // Any skill/sport pair can also arrive from a pasted URL, a browser refresh,
   // localStorage restore, or a saved view. Scrub incompatible tiers out of the
@@ -336,8 +330,6 @@ function PlayersPage() {
     if (safe !== search.skill) updateSearch({ skill: safe });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sportsKey, search.skill]);
-
-
 
   useEffect(() => {
     // Hold off until the saved view is restored, so the first fetch already
@@ -359,7 +351,6 @@ function PlayersPage() {
       cancelled = true;
     };
   }, [sportsKey, reloadTick, hydrated]);
-
 
   const ageActive = ageMin !== "" || ageMax !== "";
   const activeFilterCount =
@@ -385,7 +376,9 @@ function PlayersPage() {
     const dow = now.getDay(); // 0=Sun … 6=Sat
     const daysUntilSat = (6 - dow + 7) % 7;
     const satISO = new Date(now.getTime() + daysUntilSat * 86400_000).toISOString().slice(0, 10);
-    const sunISO = new Date(now.getTime() + (daysUntilSat + 1) * 86400_000).toISOString().slice(0, 10);
+    const sunISO = new Date(now.getTime() + (daysUntilSat + 1) * 86400_000)
+      .toISOString()
+      .slice(0, 10);
     const overlaps = (start: string | null, end: string | null, from: string, to: string) => {
       const s = start ?? from;
       const e = end ?? to;
@@ -397,18 +390,9 @@ function PlayersPage() {
       if (slots.length > 0) return slotsHitRange(slots, from, to);
       return overlaps(a.starts_on, a.ends_on, from, to);
     };
-    const hasWeekendDay = (days: string[]) =>
-      days.some((d) => /sat|sun/i.test(d));
+    const hasWeekendDay = (days: string[]) => days.some((d) => /sat|sun/i.test(d));
     return list.filter((a) => {
-      if (
-        !matchesSportSkillFilter(
-          a.author_sport_levels,
-          a.sports,
-          a.skill_level,
-          sports,
-          skills,
-        )
-      )
+      if (!matchesSportSkillFilter(a.author_sport_levels, a.sports, a.skill_level, sports, skills))
         return false;
 
       if (maxDistance > 0 && kmToMi(a.travel_radius_km) > maxDistance) return false;
@@ -450,12 +434,8 @@ function PlayersPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [list, q, sportsKey, search.skill, maxDistance, ageMin, ageMax, includeUnknownAge, when]);
 
-
-
-
   return (
     <div className="mx-auto w-full max-w-md sm:max-w-2xl lg:max-w-4xl px-4 pt-6">
-
       <div className="flex items-center justify-between mb-5">
         <Logo />
         <div className="flex items-center gap-2">
@@ -476,7 +456,6 @@ function PlayersPage() {
           </Link>
         </div>
       </div>
-
 
       <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="mb-4">
         <h1 className="font-display text-3xl font-bold leading-tight">Players ready to run.</h1>
@@ -524,7 +503,10 @@ function PlayersPage() {
       {tab === "mine" ? (
         <div className="space-y-3 pb-6">
           {!availGate.loading && !availGate.canPost && (
-            <AvailabilityRequiredNotice reason={availGate.reason} onSwitched={() => setPostOpen(true)} />
+            <AvailabilityRequiredNotice
+              reason={availGate.reason}
+              onSwitched={() => setPostOpen(true)}
+            />
           )}
           <MineView
             user={user ? { id: user.id } : null}
@@ -534,157 +516,155 @@ function PlayersPage() {
         </div>
       ) : (
         <>
-      <NearbyPlayersPanel
-        players={list}
-        mySports={profile?.sports?.map((s) => s.name)}
-        myCity={profile?.city}
-        currentUserId={user?.id ?? null}
-      />
-
-
-      <ViewDensityToggle
-        view={viewMode}
-        onViewChange={switchView}
-        density={density}
-        onDensityChange={switchDensity}
-      />
-
-      <FilterBar
-        q={q}
-        onQChange={setQ}
-        searchPlaceholder="Search name, city, sport"
-        activeFilterCount={activeFilterCount}
-        sheetTitle="Filter players"
-        rightExtra={
-          <button
-            onClick={openPostFlow}
-
-            className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-lime-gradient text-primary-foreground glow-lime"
-            aria-label="Post availability"
-          >
-            <Plus className="h-5 w-5" strokeWidth={2.5} />
-          </button>
-        }
-        onReset={() => {
-          setSports([]);
-          setMaxDistance(0);
-          setAgeMin("");
-          setAgeMax("");
-          setIncludeUnknownAge(true);
-        }}
-        sheet={
-          <PlayersFilterBody
-            sports={sports}
-            onToggleSport={toggleSportFilter}
-            onClearSports={() => setSports([])}
-            skills={skills}
-            setSkills={setSkills}
-            maxDistance={maxDistance}
-            setMaxDistance={setMaxDistance}
-            ageMin={ageMin}
-            setAgeMin={setAgeMin}
-            ageMax={ageMax}
-            setAgeMax={setAgeMax}
-            includeUnknownAge={includeUnknownAge}
-            setIncludeUnknownAge={setIncludeUnknownAge}
+          <NearbyPlayersPanel
+            players={list}
+            mySports={profile?.sports?.map((s) => s.name)}
+            myCity={profile?.city}
+            currentUserId={user?.id ?? null}
           />
-        }
-      />
 
+          <ViewDensityToggle
+            view={viewMode}
+            onViewChange={switchView}
+            density={density}
+            onDensityChange={switchDensity}
+          />
 
-      {/* Sport filter chips */}
-      <div className="mb-3">
-        <SportChips multi selected={sports} onSelect={toggleSportFilter} />
-      </div>
-
-      {/* Availability filter chips */}
-      <div className="-mx-4 overflow-x-auto px-4 mb-4">
-        <div className="flex gap-2 pb-1">
-          {([
-            { id: "any", label: "Anytime" },
-            { id: "today", label: "Today" },
-            { id: "week", label: "This week" },
-            { id: "weekend", label: "Weekend" },
-          ] as const).map((w) => {
-            const active = when === w.id;
-            return (
+          <FilterBar
+            q={q}
+            onQChange={setQ}
+            searchPlaceholder="Search name, city, sport"
+            activeFilterCount={activeFilterCount}
+            sheetTitle="Filter players"
+            rightExtra={
               <button
-                key={w.id}
-                onClick={() => setWhen(w.id)}
-                className={`whitespace-nowrap rounded-full border px-3.5 py-1.5 text-xs font-semibold transition-colors ${
-                  active
-                    ? "border-lime bg-lime text-primary-foreground"
-                    : "border-border bg-surface text-muted-foreground"
-                }`}
-              >
-                {w.label}
-              </button>
-            );
-          })}
-        </div>
-      </div>
-
-
-      {viewMode === "map" ? (
-        <PlayersMapView players={filtered ?? []} />
-      ) : filtered === null ? (
-        <LoadingRows />
-      ) : filtered.length === 0 ? (
-        <EmptyState
-          title={list && list.length > 0 ? "No matches" : "No one's posted yet"}
-          body={
-            list && list.length > 0
-              ? "Try a different search or sport."
-              : "Be the first — share when you're free and where you'll travel."
-          }
-          cta={
-            user ? (
-              <Button
                 onClick={openPostFlow}
-                className="rounded-full bg-lime-gradient text-primary-foreground"
+                className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-lime-gradient text-primary-foreground glow-lime"
+                aria-label="Post availability"
               >
-                Post availability
-              </Button>
-            ) : (
-              <Link
-                to="/auth"
-                className="inline-flex rounded-full bg-lime-gradient px-5 py-2.5 text-sm font-bold text-primary-foreground"
-              >
-                Sign in
-              </Link>
-            )
-          }
-        />
-      ) : (
-        <>
-          <div className="mb-2 flex items-center justify-between gap-2">
-            <h2 className="font-display text-sm font-bold uppercase tracking-wider text-muted-foreground">
-              {filtered.length} player{filtered.length === 1 ? "" : "s"} available
-            </h2>
-          </div>
-          <ul
-            className={
-              density === "grid"
-                ? "grid grid-cols-1 sm:grid-cols-2 gap-3 pb-6"
-                : "space-y-3 pb-6"
+                <Plus className="h-5 w-5" strokeWidth={2.5} />
+              </button>
             }
-          >
-            {filtered.map((a) => (
-              <AvailabilityCard
-                key={a.id}
-                a={a}
-                isMine={user?.id === a.user_id}
-                hasHostedGames={myUpcomingHosted.length > 0}
-                onContact={() =>
-                  user ? setContactFor(a) : toast.error("Sign in to contact this player.")
-                }
-                onOpen={() => openPost(a.id)}
-                onChanged={() => setReloadTick((t) => t + 1)}
+            onReset={() => {
+              setSports([]);
+              setMaxDistance(0);
+              setAgeMin("");
+              setAgeMax("");
+              setIncludeUnknownAge(true);
+            }}
+            sheet={
+              <PlayersFilterBody
+                sports={sports}
+                onToggleSport={toggleSportFilter}
+                onClearSports={() => setSports([])}
+                skills={skills}
+                setSkills={setSkills}
+                maxDistance={maxDistance}
+                setMaxDistance={setMaxDistance}
+                ageMin={ageMin}
+                setAgeMin={setAgeMin}
+                ageMax={ageMax}
+                setAgeMax={setAgeMax}
+                includeUnknownAge={includeUnknownAge}
+                setIncludeUnknownAge={setIncludeUnknownAge}
               />
-            ))}
-          </ul>
-        </>
-      )}
+            }
+          />
+
+          {/* Sport filter chips */}
+          <div className="mb-3">
+            <SportChips multi selected={sports} onSelect={toggleSportFilter} />
+          </div>
+
+          {/* Availability filter chips */}
+          <div className="-mx-4 overflow-x-auto px-4 mb-4">
+            <div className="flex gap-2 pb-1">
+              {(
+                [
+                  { id: "any", label: "Anytime" },
+                  { id: "today", label: "Today" },
+                  { id: "week", label: "This week" },
+                  { id: "weekend", label: "Weekend" },
+                ] as const
+              ).map((w) => {
+                const active = when === w.id;
+                return (
+                  <button
+                    key={w.id}
+                    onClick={() => setWhen(w.id)}
+                    className={`whitespace-nowrap rounded-full border px-3.5 py-1.5 text-xs font-semibold transition-colors ${
+                      active
+                        ? "border-lime bg-lime text-primary-foreground"
+                        : "border-border bg-surface text-muted-foreground"
+                    }`}
+                  >
+                    {w.label}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {viewMode === "map" ? (
+            <PlayersMapView players={filtered ?? []} />
+          ) : filtered === null ? (
+            <LoadingRows />
+          ) : filtered.length === 0 ? (
+            <EmptyState
+              title={list && list.length > 0 ? "No matches" : "No one's posted yet"}
+              body={
+                list && list.length > 0
+                  ? "Try a different search or sport."
+                  : "Be the first — share when you're free and where you'll travel."
+              }
+              cta={
+                user ? (
+                  <Button
+                    onClick={openPostFlow}
+                    className="rounded-full bg-lime-gradient text-primary-foreground"
+                  >
+                    Post availability
+                  </Button>
+                ) : (
+                  <Link
+                    to="/auth"
+                    className="inline-flex rounded-full bg-lime-gradient px-5 py-2.5 text-sm font-bold text-primary-foreground"
+                  >
+                    Sign in
+                  </Link>
+                )
+              }
+            />
+          ) : (
+            <>
+              <div className="mb-2 flex items-center justify-between gap-2">
+                <h2 className="font-display text-sm font-bold uppercase tracking-wider text-muted-foreground">
+                  {filtered.length} player{filtered.length === 1 ? "" : "s"} available
+                </h2>
+              </div>
+              <ul
+                className={
+                  density === "grid"
+                    ? "grid grid-cols-1 sm:grid-cols-2 gap-3 pb-6"
+                    : "space-y-3 pb-6"
+                }
+              >
+                {filtered.map((a) => (
+                  <AvailabilityCard
+                    key={a.id}
+                    a={a}
+                    isMine={user?.id === a.user_id}
+                    hasHostedGames={myUpcomingHosted.length > 0}
+                    onContact={() =>
+                      user ? setContactFor(a) : toast.error("Sign in to contact this player.")
+                    }
+                    onOpen={() => openPost(a.id)}
+                    onChanged={() => setReloadTick((t) => t + 1)}
+                  />
+                ))}
+              </ul>
+            </>
+          )}
         </>
       )}
 
@@ -725,9 +705,7 @@ function PlayersPage() {
           isMine={user?.id === focused.user_id}
           canInvite={myUpcomingHosted.length > 0}
           onContact={() =>
-            user
-              ? setContactFor(focused)
-              : toast.error("Sign in to contact this player.")
+            user ? setContactFor(focused) : toast.error("Sign in to contact this player.")
           }
           onEdit={() => {
             setEditingPost(focused);
@@ -743,8 +721,6 @@ function PlayersPage() {
           onClose={() => setContactFor(null)}
         />
       )}
-
-
     </div>
   );
 }
@@ -808,7 +784,6 @@ function PlayersFilterBody({
         <SportSkillLevels sports={sports} value={skills} onChange={setSkills} />
       </FilterSection>
 
-
       <FilterSection label="Max travel distance">
         <div className="flex flex-wrap gap-2">
           <Chip active={maxDistance === 0} onClick={() => setMaxDistance(0)}>
@@ -870,11 +845,51 @@ function PlayersFilterBody({
           >
             Any age
           </Chip>
-          <Chip active={ageMin === 13 && ageMax === 17} onClick={() => { setAgeMin(13); setAgeMax(17); }}>13–17</Chip>
-          <Chip active={ageMin === 18 && ageMax === 24} onClick={() => { setAgeMin(18); setAgeMax(24); }}>18–24</Chip>
-          <Chip active={ageMin === 25 && ageMax === 34} onClick={() => { setAgeMin(25); setAgeMax(34); }}>25–34</Chip>
-          <Chip active={ageMin === 35 && ageMax === 49} onClick={() => { setAgeMin(35); setAgeMax(49); }}>35–49</Chip>
-          <Chip active={ageMin === 50 && ageMax === ""} onClick={() => { setAgeMin(50); setAgeMax(""); }}>50+</Chip>
+          <Chip
+            active={ageMin === 13 && ageMax === 17}
+            onClick={() => {
+              setAgeMin(13);
+              setAgeMax(17);
+            }}
+          >
+            13–17
+          </Chip>
+          <Chip
+            active={ageMin === 18 && ageMax === 24}
+            onClick={() => {
+              setAgeMin(18);
+              setAgeMax(24);
+            }}
+          >
+            18–24
+          </Chip>
+          <Chip
+            active={ageMin === 25 && ageMax === 34}
+            onClick={() => {
+              setAgeMin(25);
+              setAgeMax(34);
+            }}
+          >
+            25–34
+          </Chip>
+          <Chip
+            active={ageMin === 35 && ageMax === 49}
+            onClick={() => {
+              setAgeMin(35);
+              setAgeMax(49);
+            }}
+          >
+            35–49
+          </Chip>
+          <Chip
+            active={ageMin === 50 && ageMax === ""}
+            onClick={() => {
+              setAgeMin(50);
+              setAgeMax("");
+            }}
+          >
+            50+
+          </Chip>
         </div>
         <label className="flex items-center gap-2 mt-3 text-xs text-muted-foreground cursor-pointer select-none">
           <input
@@ -890,7 +905,6 @@ function PlayersFilterBody({
     </>
   );
 }
-
 
 function BellLink() {
   const unread = useUnreadNotificationCount();
@@ -969,7 +983,6 @@ function AvailabilityCard({
   onOpen: () => void;
   onChanged: () => void;
 }) {
-
   const navigate = useNavigate();
   const when = formatWindow(a);
 
@@ -1137,9 +1150,6 @@ function AvailabilityCard({
         )}
       </div>
 
-
-
-
       <div className="mt-2 flex items-center gap-3">
         <Link
           to="/players/$userId"
@@ -1163,7 +1173,6 @@ function AvailabilityCard({
           </>
         )}
       </div>
-
     </li>
   );
 }
@@ -1244,7 +1253,6 @@ function PostAvailabilityDialog({
     }
   };
 
-
   return (
     <Dialog open onOpenChange={(o) => !o && onClose()}>
       <DialogContent className="max-w-md max-h-[90dvh] overflow-y-auto">
@@ -1278,9 +1286,7 @@ function PostAvailabilityDialog({
             </div>
           </div>
           {sports.length === 0 ? (
-            <p className="text-xs text-muted-foreground">
-              Pick a sport to set your level for it.
-            </p>
+            <p className="text-xs text-muted-foreground">Pick a sport to set your level for it.</p>
           ) : (
             sports.map((name) => {
               const scale = scaleForSport(name as any);
@@ -1308,9 +1314,7 @@ function PostAvailabilityDialog({
                       </Chip>
                     ))}
                   </div>
-                  {scale.hint && (
-                    <p className="mt-1 text-xs text-muted-foreground">{scale.hint}</p>
-                  )}
+                  {scale.hint && <p className="mt-1 text-xs text-muted-foreground">{scale.hint}</p>}
                 </div>
               );
             })
@@ -1365,7 +1369,6 @@ function PostAvailabilityDialog({
           >
             {saving && <Loader2 className="h-4 w-4 mr-1 animate-spin" />}
             {isEdit ? "Save" : "Post"}
-
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -1458,8 +1461,6 @@ function ContactDialog({
           onLoaded={(s: ExistingRequestSummary) => setExistingStatus(s.status)}
           onCancelled={() => setExistingStatus("none")}
         />
-
-
 
         {isInvite && (
           <div className="space-y-2">

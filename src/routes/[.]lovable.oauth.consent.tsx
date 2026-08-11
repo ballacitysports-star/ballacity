@@ -31,8 +31,7 @@ export const Route = createFileRoute("/.lovable/oauth/consent")({
   head: () =>
     pageHead({
       title: "Authorize access — OpenRun",
-      description:
-      "Review and approve access for a connected application.",
+      description: "Review and approve access for a connected application.",
       noindex: true,
     }),
   ssr: false,
@@ -120,7 +119,10 @@ function Consent() {
         </ul>
       )}
       {error && (
-        <p role="alert" className="mt-4 rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">
+        <p
+          role="alert"
+          className="mt-4 rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive"
+        >
           {error}
         </p>
       )}

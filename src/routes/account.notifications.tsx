@@ -21,8 +21,7 @@ export const Route = createFileRoute("/account/notifications")({
     pageHead({
       path: "/account/notifications",
       title: "Notification settings — OpenRun",
-      description:
-      "Choose which OpenRun notifications you get by push, email, and in-app.",
+      description: "Choose which OpenRun notifications you get by push, email, and in-app.",
       noindex: true,
     }),
   component: NotificationSettingsPage,

@@ -21,14 +21,9 @@ import { useNotificationPush } from "@/lib/notifications";
 import { useOneSignal } from "@/lib/onesignal";
 import { logAuthGateDecision, readStoredSupabaseSession } from "@/lib/authgate-log";
 import { clearLastVisited, rememberLastVisited } from "@/lib/last-visited";
-import {
-  clearPendingAccountType,
-  isAccountType,
-  readPendingAccountType,
-} from "@/lib/account-type";
+import { clearPendingAccountType, isAccountType, readPendingAccountType } from "@/lib/account-type";
 import { getOnboardingStatus } from "@/lib/onboarding.functions";
 import { logNotFound } from "@/lib/route-doctor";
-
 
 function NotFoundComponent() {
   const router = useRouter();
@@ -81,8 +76,6 @@ function NotFoundComponent() {
     </div>
   );
 }
-
-
 
 function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
   console.error(error);
@@ -241,7 +234,6 @@ function RootShell({ children }: { children: React.ReactNode }) {
   );
 }
 
-
 const CHUNK_RELOAD_KEY = "__openrun_chunk_reloaded_at";
 const OAUTH_PROVIDER_KEY = "openrun:oauth-provider";
 
@@ -298,7 +290,6 @@ const TAB_PATHS = [
   "/notifications",
   "/reels",
 ];
-
 
 /**
  * Same-origin, safe next-path filter used by both the auth redirect
@@ -392,7 +383,12 @@ function AuthGate({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     if (loading) {
-      logAuthGateDecision("verify-start", { pathname, loading, hasUser: !!user, extra: { phase: "waiting-for-useAuth" } });
+      logAuthGateDecision("verify-start", {
+        pathname,
+        loading,
+        hasUser: !!user,
+        extra: { phase: "waiting-for-useAuth" },
+      });
       return;
     }
     if (user) {
@@ -426,7 +422,10 @@ function AuthGate({ children }: { children: React.ReactNode }) {
           pathname,
           loading,
           hasUser: true,
-          extra: { durationMs: Math.round(performance.now() - t0), userId: first.data.session.user.id },
+          extra: {
+            durationMs: Math.round(performance.now() - t0),
+            userId: first.data.session.user.id,
+          },
         });
         setVerifying(false);
         return;
@@ -591,8 +590,6 @@ function AuthGate({ children }: { children: React.ReactNode }) {
     // Intentionally NOT keyed on `pathname`: the check is per user, not per route.
   }, [user, loading, skipTypeCheck, router, retryTick]);
 
-
-
   useEffect(() => {
     if (user && !isPublic && !isTab) {
       document.body.style.paddingBottom = "calc(env(safe-area-inset-bottom) + 6rem)";
@@ -686,9 +683,7 @@ function RootComponent() {
         const clientProvider = session.user.app_metadata?.provider;
         const savedProvider = readSavedOAuthProvider();
         const clientIsOAuth =
-          clientProvider === "google" ||
-          clientProvider === "apple" ||
-          !!savedProvider;
+          clientProvider === "google" || clientProvider === "apple" || !!savedProvider;
         // Backend guard: authoritative check via getOnboardingStatus. Even if
         // provider metadata was stripped from the session, the server inspects
         // linked identities and can still classify the user as social.
@@ -733,7 +728,6 @@ function RootComponent() {
               router.navigate({ to: "/onboarding/account-type", replace: true });
             }
           });
-
       }
     });
     return () => {
@@ -760,7 +754,6 @@ function RootComponent() {
           </div>
         }
       >
-
         <AuthGate>
           <Outlet />
         </AuthGate>

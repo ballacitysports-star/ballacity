@@ -7,8 +7,7 @@ export const Route = createFileRoute("/_tabs/notifications")({
     pageHead({
       path: "/notifications",
       title: "Notifications — OpenRun",
-      description:
-      "Join requests, approvals, messages, and game updates in one place.",
+      description: "Join requests, approvals, messages, and game updates in one place.",
       noindex: true,
     }),
   beforeLoad: () => {

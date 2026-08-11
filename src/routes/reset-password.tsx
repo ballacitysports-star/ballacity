@@ -10,8 +10,7 @@ export const Route = createFileRoute("/reset-password")({
     pageHead({
       path: "/reset-password",
       title: "Reset your password — OpenRun",
-      description:
-      "Set a new password for your OpenRun account.",
+      description: "Set a new password for your OpenRun account.",
       noindex: true,
     }),
   component: ResetPasswordPage,

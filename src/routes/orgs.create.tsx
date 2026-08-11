@@ -21,8 +21,7 @@ export const Route = createFileRoute("/orgs/create")({
     pageHead({
       path: "/orgs/create",
       title: "Create a gym profile — OpenRun",
-      description:
-      "List your gym on OpenRun with hours, amenities, photos, and location.",
+      description: "List your gym on OpenRun with hours, amenities, photos, and location.",
       noindex: true,
     }),
   ssr: false,

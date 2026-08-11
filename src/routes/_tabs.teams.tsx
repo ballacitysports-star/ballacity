@@ -23,7 +23,6 @@ import { useAuth } from "@/hooks/use-auth";
 import { usePersistedSearch } from "@/hooks/use-persisted-search";
 import { Distance } from "@/components/Distance";
 
-
 type SortBy = "nearest" | "followers" | "name";
 
 // Deterministic pseudo-distance (miles) from a string, so sort order is stable.
@@ -52,7 +51,7 @@ export const Route = createFileRoute("/_tabs/teams")({
       path: "/teams",
       title: "Teams & clubs — OpenRun",
       description:
-      "Discover teams and clubs near you. Follow squads, find tryouts, and join open runs.",
+        "Discover teams and clubs near you. Follow squads, find tryouts, and join open runs.",
       noindex: true,
     }),
   validateSearch: zodValidator(teamsSearchSchema),
@@ -68,7 +67,13 @@ function TeamsPage() {
   const updateSearch = (patch: Partial<TeamsSearch>) =>
     navigate({ search: (prev: TeamsSearch) => ({ ...prev, ...patch }), replace: true });
   usePersistedSearch("openrun:teams-search", search, "/teams", {
-    q: "", kind: "team", sport: "", avail: "any", sort: "nearest", view: "list", density: "list",
+    q: "",
+    kind: "team",
+    sport: "",
+    avail: "any",
+    sort: "nearest",
+    view: "list",
+    density: "list",
   });
 
   // Legacy /teams?kind=coach → redirect to /trainers preserving other params.
@@ -141,14 +146,14 @@ function TeamsPage() {
   const orgs = useAllOrgs();
 
   const list = useMemo(() => {
-    const isRecruiting = (o: typeof orgs[number]) => {
+    const isRecruiting = (o: (typeof orgs)[number]) => {
       const pn = o.positionsNeeded;
       if (!pn) return false;
       return Object.values(pn).some((byPos) =>
         Object.values(byPos ?? {}).some((n) => Number(n) > 0),
       );
     };
-    const cadenceMatches = (o: typeof orgs[number], target: "weekly" | "casual") => {
+    const cadenceMatches = (o: (typeof orgs)[number], target: "weekly" | "casual") => {
       const c = (o.cadence ?? "").toLowerCase();
       if (!c) return false;
       if (target === "weekly") return /week|multiple|daily/.test(c);
@@ -188,8 +193,8 @@ function TeamsPage() {
         <p className="text-muted-foreground text-sm inline-flex items-center gap-1">
           {profile?.city ? (
             <>
-              <MapPin className="h-3.5 w-3.5 text-lime" /> Nearest to {profile.city} ·{" "}
-              {list.length} {list.length === 1 ? "result" : "results"}
+              <MapPin className="h-3.5 w-3.5 text-lime" /> Nearest to {profile.city} · {list.length}{" "}
+              {list.length === 1 ? "result" : "results"}
             </>
           ) : (
             <>
@@ -251,9 +256,7 @@ function TeamsPage() {
             activeFilterCount={activeFilterCount}
             create={{ to: "/teams/create", label: "Create team" }}
             sheetTitle="Filter teams"
-            onReset={() =>
-              updateSearch({ sport: "", avail: "any", sort: "nearest" })
-            }
+            onReset={() => updateSearch({ sport: "", avail: "any", sort: "nearest" })}
             resetDisabled={activeFilterCount === 0}
             sheet={
               <>
@@ -293,18 +296,18 @@ function TeamsPage() {
         <span>
           {list.length} {list.length === 1 ? "result" : "results"}
         </span>
-        <span>Sorted by {sortBy === "nearest" ? "nearest" : sortBy === "followers" ? "followers" : "name"}</span>
+        <span>
+          Sorted by{" "}
+          {sortBy === "nearest" ? "nearest" : sortBy === "followers" ? "followers" : "name"}
+        </span>
       </div>
-
 
       {viewMode === "map" ? (
         <TeamsMapView orgs={list.map((x) => x.o)} kind="team" />
       ) : (
         <div
           className={
-            density === "grid"
-              ? "grid grid-cols-1 sm:grid-cols-2 gap-3 pb-6"
-              : "space-y-3 pb-6"
+            density === "grid" ? "grid grid-cols-1 sm:grid-cols-2 gap-3 pb-6" : "space-y-3 pb-6"
           }
         >
           {list.map(({ o, dist }, i) => (

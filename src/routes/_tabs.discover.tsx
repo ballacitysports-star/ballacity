@@ -9,7 +9,7 @@ export const Route = createFileRoute("/_tabs/discover")({
       path: "/discover",
       title: "Discover games — OpenRun",
       description:
-      "Search nearby pickup games on a map or in a list and filter by sport, skill, and time.",
+        "Search nearby pickup games on a map or in a list and filter by sport, skill, and time.",
       noindex: true,
     }),
   beforeLoad: () => {

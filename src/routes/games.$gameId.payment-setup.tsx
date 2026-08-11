@@ -18,8 +18,7 @@ export const Route = createFileRoute("/games/$gameId/payment-setup")({
   head: () =>
     pageHead({
       title: "Payment setup — OpenRun",
-      description:
-      "Set the entry fee, accepted payment methods, and refund policy for your game.",
+      description: "Set the entry fee, accepted payment methods, and refund policy for your game.",
       noindex: true,
     }),
   loader: ({ params }) => {

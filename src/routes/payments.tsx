@@ -43,8 +43,7 @@ export const Route = createFileRoute("/payments")({
     pageHead({
       path: "/payments",
       title: "Payments — OpenRun",
-      description:
-      "Manage payment methods, verify player payments, and review requests.",
+      description: "Manage payment methods, verify player payments, and review requests.",
       noindex: true,
     }),
   // URL-persisted state: top tab (methods/verify/requests) plus verify-panel
@@ -439,7 +438,9 @@ function VerifyPanel() {
             {s === "pending" && pendingCount > 0 && (
               <span
                 className={`rounded-full px-1.5 py-[1px] text-[10px] font-extrabold ${
-                  filter === s ? "bg-primary-foreground/20 text-primary-foreground" : "bg-coral/15 text-coral"
+                  filter === s
+                    ? "bg-primary-foreground/20 text-primary-foreground"
+                    : "bg-coral/15 text-coral"
                 }`}
               >
                 {pendingCount}

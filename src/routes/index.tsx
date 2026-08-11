@@ -19,8 +19,13 @@ export const Route = createFileRoute("/")({
       path: "/",
       title: "OpenRun — Pickup sports games near you",
       description:
-      "Find and host pickup sports games near you. Basketball, soccer, pickleball, tennis and more — join a game in seconds.",
-      jsonLd: {"@context": "https://schema.org", "@type": "WebSite", "name": "OpenRun", "url": "https://open-run-connect.lovable.app"},
+        "Find and host pickup sports games near you. Basketball, soccer, pickleball, tennis and more — join a game in seconds.",
+      jsonLd: {
+        "@context": "https://schema.org",
+        "@type": "WebSite",
+        name: "OpenRun",
+        url: "https://open-run-connect.lovable.app",
+      },
     }),
   component: Landing,
 });
@@ -28,8 +33,7 @@ export const Route = createFileRoute("/")({
 function Landing() {
   const router = useRouter();
   const { user, loading } = useAuth();
-  const hasStoredSession =
-    typeof window !== "undefined" ? !!readStoredSupabaseSession() : false;
+  const hasStoredSession = typeof window !== "undefined" ? !!readStoredSupabaseSession() : false;
 
   useEffect(() => {
     if (loading || !user) return;

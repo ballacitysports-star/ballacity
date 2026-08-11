@@ -11,8 +11,7 @@ export const Route = createFileRoute("/account/security")({
     pageHead({
       path: "/account/security",
       title: "Security — OpenRun",
-      description:
-      "Manage sign-in methods, password, and connected accounts.",
+      description: "Manage sign-in methods, password, and connected accounts.",
       noindex: true,
     }),
   component: AccountSecurityPage,

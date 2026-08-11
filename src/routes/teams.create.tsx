@@ -9,8 +9,7 @@ export const Route = createFileRoute("/teams/create")({
     pageHead({
       path: "/teams/create",
       title: "Create a team profile — OpenRun",
-      description:
-      "Set up your team on OpenRun to host games and manage your roster.",
+      description: "Set up your team on OpenRun to host games and manage your roster.",
       noindex: true,
     }),
   validateSearch: (search: Record<string, unknown>): { finish?: number } => ({

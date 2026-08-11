@@ -18,7 +18,14 @@ import {
   Plus,
   Pencil,
 } from "lucide-react";
-import { ORGS, GAMES, POST_KIND_META, type PostKind, type Org, type OrgPost } from "@/lib/sample-data";
+import {
+  ORGS,
+  GAMES,
+  POST_KIND_META,
+  type PostKind,
+  type Org,
+  type OrgPost,
+} from "@/lib/sample-data";
 import { isMyOrg, ensureOrgById } from "@/lib/org-store";
 import { PostCard } from "@/components/PostCard";
 import { PostDetailsDialog } from "@/components/PostDetailsDialog";
@@ -40,7 +47,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-
 
 export const Route = createFileRoute("/teams/$teamId/")({
   head: ({ loaderData, params }) => {
@@ -108,8 +114,6 @@ export const Route = createFileRoute("/teams/$teamId/")({
     return org;
   },
 });
-
-
 
 const FILTERS: { key: PostKind | "all"; label: string }[] = [
   { key: "all", label: "All posts" },
@@ -281,7 +285,11 @@ function TeamPage() {
             ))}
             {org.skillRange && (
               <span className="rounded-full border border-lime/40 bg-lime/10 px-2.5 py-1 text-xs font-semibold text-lime">
-                {["Beginner", "Recreational", "Intermediate", "Advanced", "Pro"][org.skillRange.min - 1]}
+                {
+                  ["Beginner", "Recreational", "Intermediate", "Advanced", "Pro"][
+                    org.skillRange.min - 1
+                  ]
+                }
                 {org.skillRange.min !== org.skillRange.max &&
                   ` – ${["Beginner", "Recreational", "Intermediate", "Advanced", "Pro"][org.skillRange.max - 1]}`}
               </span>
@@ -538,7 +546,8 @@ function TeamPage() {
             <DialogHeader className="sr-only">
               <DialogTitle id="team-reviews-title">Reviews for {org.name}</DialogTitle>
               <DialogDescription id="team-reviews-desc">
-                Browse, filter, and sort reviews left for this {org.kind === "coach" ? "trainer" : "team"}. Press Escape to close.
+                Browse, filter, and sort reviews left for this{" "}
+                {org.kind === "coach" ? "trainer" : "team"}. Press Escape to close.
               </DialogDescription>
             </DialogHeader>
             <div className="p-4">
@@ -553,11 +562,7 @@ function TeamPage() {
         </Dialog>
 
         {canEdit && (
-          <CreatePostSheet
-            teamId={org.id}
-            open={composerOpen}
-            onOpenChange={setComposerOpen}
-          />
+          <CreatePostSheet teamId={org.id} open={composerOpen} onOpenChange={setComposerOpen} />
         )}
       </div>
       <PostDetailsDialog
@@ -569,7 +574,6 @@ function TeamPage() {
     </div>
   );
 }
-
 
 function Stat({ label, value, icon }: { label: string; value: string; icon: React.ReactNode }) {
   return (

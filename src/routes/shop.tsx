@@ -12,8 +12,7 @@ export const Route = createFileRoute("/shop")({
     pageHead({
       path: "/shop",
       title: "Shop — OpenRun",
-      description:
-      "OpenRun gear and merch for players, teams, and trainers.",
+      description: "OpenRun gear and merch for players, teams, and trainers.",
     }),
   component: ShopPage,
 });

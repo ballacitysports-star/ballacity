@@ -17,7 +17,7 @@ export const Route = createFileRoute("/plans")({
       path: "/plans",
       title: "Plans & subscriptions — OpenRun",
       description:
-      "Compare OpenRun plans: host games, run a team, and generate unlimited AI highlight reels.",
+        "Compare OpenRun plans: host games, run a team, and generate unlimited AI highlight reels.",
     }),
   component: PlansPage,
 });

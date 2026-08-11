@@ -7,8 +7,7 @@ export const Route = createFileRoute("/checkout/return")({
     pageHead({
       path: "/checkout/return",
       title: "Checkout complete — OpenRun",
-      description:
-      "Your OpenRun purchase confirmation and next steps.",
+      description: "Your OpenRun purchase confirmation and next steps.",
       noindex: true,
     }),
   validateSearch: (search: Record<string, unknown>): { session_id?: string } => ({

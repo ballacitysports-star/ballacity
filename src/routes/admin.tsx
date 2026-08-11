@@ -47,8 +47,7 @@ export const Route = createFileRoute("/admin")({
     pageHead({
       path: "/admin",
       title: "Admin — OpenRun",
-      description:
-      "Internal OpenRun administration tools.",
+      description: "Internal OpenRun administration tools.",
       noindex: true,
     }),
   ssr: false,

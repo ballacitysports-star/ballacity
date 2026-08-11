@@ -27,8 +27,7 @@ export const Route = createFileRoute("/messages/")({
     pageHead({
       path: "/messages",
       title: "Inbox — OpenRun",
-      description:
-      "Your OpenRun conversations with players, teams, trainers, and gyms.",
+      description: "Your OpenRun conversations with players, teams, trainers, and gyms.",
       noindex: true,
     }),
   validateSearch: zodValidator(searchSchema),

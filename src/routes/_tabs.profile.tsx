@@ -57,8 +57,7 @@ export const Route = createFileRoute("/_tabs/profile")({
     pageHead({
       path: "/profile",
       title: "Your profile — OpenRun",
-      description:
-      "Your OpenRun profile: sports, skill levels, availability, games, and reviews.",
+      description: "Your OpenRun profile: sports, skill levels, availability, games, and reviews.",
       noindex: true,
     }),
   // URL-persisted requests filter (all/host/player).

@@ -59,8 +59,7 @@ export const Route = createFileRoute("/settings")({
     pageHead({
       path: "/settings",
       title: "Settings — OpenRun",
-      description:
-      "Manage your account, profiles, notifications, privacy, and security settings.",
+      description: "Manage your account, profiles, notifications, privacy, and security settings.",
       noindex: true,
     }),
   component: SettingsHubPage,
@@ -331,7 +330,6 @@ function OnboardingDetailsSection() {
     </SettingsGroup>
   );
 }
-
 
 function MyOrgsSection() {
   const qc = useQueryClient();

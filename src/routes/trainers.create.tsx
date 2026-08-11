@@ -9,8 +9,7 @@ export const Route = createFileRoute("/trainers/create")({
     pageHead({
       path: "/trainers/create",
       title: "Create a trainer profile — OpenRun",
-      description:
-      "Set up your trainer profile to offer sessions and manage availability.",
+      description: "Set up your trainer profile to offer sessions and manage availability.",
       noindex: true,
     }),
   validateSearch: (search: Record<string, unknown>): { finish?: number } => ({
