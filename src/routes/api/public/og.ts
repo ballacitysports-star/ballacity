@@ -59,8 +59,8 @@ function template(opts: {
       ${subtitle ? `<div style="display:flex;margin-top:24px;color:#A7B3A2;font-size:34px;line-height:1.25;">${esc(subtitle)}</div>` : ""}
     </div>
     <div style="display:flex;align-items:center;justify-content:space-between;">
-      <div style="display:flex;gap:16px;">${chips}</div>
-      <div style="display:flex;color:#6F7C6B;font-size:26px;">open-run-connect.lovable.app</div>
+      <div style="display:flex;gap:16px;max-width:800px;overflow:hidden;">${chips}</div>
+      <div style="display:flex;flex-shrink:0;margin-left:32px;color:#6F7C6B;font-size:26px;white-space:nowrap;">open-run-connect.lovable.app</div>
     </div>
   </div>`;
 }
