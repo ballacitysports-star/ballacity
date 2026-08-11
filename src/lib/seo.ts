@@ -44,10 +44,24 @@ export function pageHead(input: PageHeadInput) {
   ];
   if (url) meta.push({ property: "og:url", content: url });
   if (absoluteImage) {
-    meta.push({ property: "og:image", content: absoluteImage });
-    meta.push({ name: "twitter:image", content: absoluteImage });
+    // Generated cards come in several presets: serve 1200x630 to OpenGraph
+    // consumers and the sharper 1600x900 render to Twitter/X.
+    const isGenerated = absoluteImage.includes("/api/public/og");
+    const ogImage = isGenerated ? withOgSize(absoluteImage, "og") : absoluteImage;
+    const twitterImage = isGenerated ? withOgSize(absoluteImage, "wide") : absoluteImage;
+    meta.push({ property: "og:image", content: ogImage });
+    meta.push({ property: "og:image:secure_url", content: ogImage });
+    meta.push({ property: "og:image:type", content: isGenerated ? "image/png" : "image/jpeg" });
+    if (isGenerated) {
+      meta.push({ property: "og:image:width", content: String(OG_IMAGE_SIZES.og.width) });
+      meta.push({ property: "og:image:height", content: String(OG_IMAGE_SIZES.og.height) });
+    }
+    meta.push({ property: "og:image:alt", content: title });
+    meta.push({ name: "twitter:image", content: twitterImage });
+    meta.push({ name: "twitter:image:alt", content: title });
   }
   if (noindex) meta.push({ name: "robots", content: "noindex, nofollow" });
+
 
   const head: {
     meta: MetaTag[];
