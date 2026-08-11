@@ -6,10 +6,10 @@ import { pageHead } from "@/lib/seo";
 export const Route = createFileRoute("/pickup")({
   head: () =>
     pageHead({
-      path: "/pickup",
       title: "Pickup games — OpenRun",
       description:
       "Browse open pickup runs by sport, skill level, and distance, then request to join in a tap.",
+      noindex: true,
     }),
   beforeLoad: () => {
     throw redirect({ to: "/feed", replace: true });
