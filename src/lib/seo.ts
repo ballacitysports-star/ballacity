@@ -72,16 +72,29 @@ export function pageHead(input: PageHeadInput) {
  */
 export type OgCardKind = "game" | "player" | "team" | "trainer" | "venue" | "page";
 
+/** Output presets served by /api/public/og. */
+export const OG_IMAGE_SIZES = {
+  og: { width: 1200, height: 630 },
+  wide: { width: 1600, height: 900 },
+  square: { width: 1200, height: 1200 },
+} as const;
+
+export type OgImageSize = keyof typeof OG_IMAGE_SIZES;
+
 export function ogImageUrl(input: {
   kind: OgCardKind;
   title: string;
   subtitle?: string | null;
   /** Up to 3 short facts rendered as chips. */
   meta?: (string | null | undefined)[];
+  /** Output dimensions; defaults to the 1200x630 OpenGraph preset. */
+  size?: OgImageSize;
 }) {
   const params = new URLSearchParams({ kind: input.kind, title: input.title.slice(0, 90) });
   if (input.subtitle) params.set("subtitle", input.subtitle.slice(0, 120));
   const meta = (input.meta ?? []).filter((m): m is string => Boolean(m && m.trim())).slice(0, 3);
   if (meta.length) params.set("meta", meta.join("|"));
+  params.set("size", input.size ?? "og");
   return `${SITE_URL}/api/public/og?${params.toString()}`;
 }
+
