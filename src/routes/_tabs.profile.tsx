@@ -40,6 +40,8 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { BadgeList } from "@/components/BadgeList";
 import { makeBadgeStats } from "@/lib/badges";
 import { ProfileSwitcher } from "@/components/ProfileSwitcher";
+import { useMyProfiles } from "@/lib/account-profiles";
+import { ActiveProfileView } from "@/components/profile/ActiveProfileView";
 import {
   ProfileChannelHeader,
   ChannelPill,
@@ -53,10 +55,29 @@ export const Route = createFileRoute("/_tabs/profile")({
   head: () => ({ meta: [{ title: "Profile — OpenRun" }] }),
   // URL-persisted requests filter (all/host/player).
   validateSearch: zodValidator(z.object({ req: fallback(z.string(), "").default("") })),
-  component: Profile,
+  component: ProfileRoute,
 });
 
-function Profile() {
+/**
+ * The Profile tab follows the account's active profile: the personal player
+ * profile renders the player view, a team/trainer/gym renders that profile.
+ */
+function ProfileRoute() {
+  const { active, loading } = useMyProfiles();
+  if (!loading && active && active.kind !== "player") {
+    return (
+      <div className="mx-auto w-full max-w-md sm:max-w-2xl lg:max-w-4xl">
+        <div className="flex items-center justify-between gap-2 px-4 pt-3">
+          <ProfileSwitcher />
+        </div>
+        <ActiveProfileView profile={active} />
+      </div>
+    );
+  }
+  return <PlayerProfile />;
+}
+
+function PlayerProfile() {
   const myReviews = useReviewsFor("me");
   const myRep = useMemo(() => computeReputation(myReviews, "player"), [myReviews]);
   const { user, loading } = useAuth();
