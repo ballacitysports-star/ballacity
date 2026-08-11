@@ -112,3 +112,15 @@ export function ogImageUrl(input: {
   return `${SITE_URL}/api/public/og?${params.toString()}`;
 }
 
+
+/** Swap the `size` preset on a generated card URL. */
+export function withOgSize(imageUrl: string, size: OgImageSize) {
+  try {
+    const parsed = new URL(imageUrl, SITE_URL);
+    if (!parsed.pathname.startsWith("/api/public/og")) return imageUrl;
+    parsed.searchParams.set("size", size);
+    return parsed.toString();
+  } catch {
+    return imageUrl;
+  }
+}
