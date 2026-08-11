@@ -64,3 +64,24 @@ export function pageHead(input: PageHeadInput) {
   }
   return head;
 }
+
+/**
+ * Build an absolute URL for the dynamically rendered share card
+ * (`/api/public/og`). Used by games, profiles, teams, trainers, and venues so
+ * every link preview shares one visual template.
+ */
+export type OgCardKind = "game" | "player" | "team" | "trainer" | "venue" | "page";
+
+export function ogImageUrl(input: {
+  kind: OgCardKind;
+  title: string;
+  subtitle?: string | null;
+  /** Up to 3 short facts rendered as chips. */
+  meta?: (string | null | undefined)[];
+}) {
+  const params = new URLSearchParams({ kind: input.kind, title: input.title.slice(0, 90) });
+  if (input.subtitle) params.set("subtitle", input.subtitle.slice(0, 120));
+  const meta = (input.meta ?? []).filter((m): m is string => Boolean(m && m.trim())).slice(0, 3);
+  if (meta.length) params.set("meta", meta.join("|"));
+  return `${SITE_URL}/api/public/og?${params.toString()}`;
+}
