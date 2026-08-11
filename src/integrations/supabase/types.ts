@@ -38,6 +38,72 @@ export type Database = {
         }
         Relationships: []
       }
+      admin_audit_log: {
+        Row: {
+          action: string
+          actor_id: string | null
+          after: Json | null
+          before: Json | null
+          created_at: string
+          id: string
+          reason: string | null
+          target_id: string | null
+          target_type: string
+        }
+        Insert: {
+          action: string
+          actor_id?: string | null
+          after?: Json | null
+          before?: Json | null
+          created_at?: string
+          id?: string
+          reason?: string | null
+          target_id?: string | null
+          target_type: string
+        }
+        Update: {
+          action?: string
+          actor_id?: string | null
+          after?: Json | null
+          before?: Json | null
+          created_at?: string
+          id?: string
+          reason?: string | null
+          target_id?: string | null
+          target_type?: string
+        }
+        Relationships: []
+      }
+      app_settings: {
+        Row: {
+          created_at: string
+          description: string | null
+          is_public: boolean
+          key: string
+          updated_at: string
+          updated_by: string | null
+          value: Json
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          is_public?: boolean
+          key: string
+          updated_at?: string
+          updated_by?: string | null
+          value?: Json
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          is_public?: boolean
+          key?: string
+          updated_at?: string
+          updated_by?: string | null
+          value?: Json
+        }
+        Relationships: []
+      }
       auth_signin_events: {
         Row: {
           browser: string | null
@@ -461,6 +527,7 @@ export type Database = {
           distance_mi: number
           duration: string
           equipment: string[]
+          hidden_at: string | null
           host_id: string
           host_snapshot: Json
           id: string
@@ -494,6 +561,7 @@ export type Database = {
           distance_mi?: number
           duration?: string
           equipment?: string[]
+          hidden_at?: string | null
           host_id: string
           host_snapshot?: Json
           id: string
@@ -527,6 +595,7 @@ export type Database = {
           distance_mi?: number
           duration?: string
           equipment?: string[]
+          hidden_at?: string | null
           host_id?: string
           host_snapshot?: Json
           id?: string
@@ -1038,6 +1107,7 @@ export type Database = {
           created_at: string
           ends_on: string | null
           formatted_address: string | null
+          hidden_at: string | null
           id: string
           lat: number | null
           lng: number | null
@@ -1059,6 +1129,7 @@ export type Database = {
           created_at?: string
           ends_on?: string | null
           formatted_address?: string | null
+          hidden_at?: string | null
           id?: string
           lat?: number | null
           lng?: number | null
@@ -1080,6 +1151,7 @@ export type Database = {
           created_at?: string
           ends_on?: string | null
           formatted_address?: string | null
+          hidden_at?: string | null
           id?: string
           lat?: number | null
           lng?: number | null
@@ -1104,6 +1176,7 @@ export type Database = {
           body: string
           created_at: string
           deleted_at: string | null
+          hidden_at: string | null
           id: string
           subject_id: string
           subject_type: string
@@ -1114,6 +1187,7 @@ export type Database = {
           body: string
           created_at?: string
           deleted_at?: string | null
+          hidden_at?: string | null
           id?: string
           subject_id: string
           subject_type: string
@@ -1124,6 +1198,7 @@ export type Database = {
           body?: string
           created_at?: string
           deleted_at?: string | null
+          hidden_at?: string | null
           id?: string
           subject_id?: string
           subject_type?: string
@@ -1177,6 +1252,8 @@ export type Database = {
           search_radius_mi: number | null
           sport: string | null
           sport_levels: Json
+          suspended_at: string | null
+          suspended_reason: string | null
           updated_at: string
           username: string | null
         }
@@ -1198,6 +1275,8 @@ export type Database = {
           search_radius_mi?: number | null
           sport?: string | null
           sport_levels?: Json
+          suspended_at?: string | null
+          suspended_reason?: string | null
           updated_at?: string
           username?: string | null
         }
@@ -1219,6 +1298,8 @@ export type Database = {
           search_radius_mi?: number | null
           sport?: string | null
           sport_levels?: Json
+          suspended_at?: string | null
+          suspended_reason?: string | null
           updated_at?: string
           username?: string | null
         }
@@ -1427,6 +1508,7 @@ export type Database = {
           created_at: string
           event_date: string | null
           formatted_address: string | null
+          hidden_at: string | null
           id: string
           kind: string
           lat: number | null
@@ -1447,6 +1529,7 @@ export type Database = {
           created_at?: string
           event_date?: string | null
           formatted_address?: string | null
+          hidden_at?: string | null
           id?: string
           kind: string
           lat?: number | null
@@ -1467,6 +1550,7 @@ export type Database = {
           created_at?: string
           event_date?: string | null
           formatted_address?: string | null
+          hidden_at?: string | null
           id?: string
           kind?: string
           lat?: number | null
@@ -1512,6 +1596,7 @@ export type Database = {
           formats: Json
           founded: number | null
           handle: string
+          hidden_at: string | null
           home_court: string | null
           id: string
           kind: string
@@ -1559,6 +1644,7 @@ export type Database = {
           formats?: Json
           founded?: number | null
           handle: string
+          hidden_at?: string | null
           home_court?: string | null
           id: string
           kind: string
@@ -1606,6 +1692,7 @@ export type Database = {
           formats?: Json
           founded?: number | null
           handle?: string
+          hidden_at?: string | null
           home_court?: string | null
           id?: string
           kind?: string
@@ -1796,6 +1883,7 @@ export type Database = {
           email: string | null
           geo: Json | null
           handle: string
+          hidden_at: string | null
           hours: Json
           id: string
           name: string
@@ -1821,6 +1909,7 @@ export type Database = {
           email?: string | null
           geo?: Json | null
           handle: string
+          hidden_at?: string | null
           hours?: Json
           id?: string
           name: string
@@ -1846,6 +1935,7 @@ export type Database = {
           email?: string | null
           geo?: Json | null
           handle?: string
+          hidden_at?: string | null
           hours?: Json
           id?: string
           name?: string
@@ -2100,6 +2190,7 @@ export type Database = {
         Returns: boolean
       }
       is_org_member: { Args: { _org: string; _user: string }; Returns: boolean }
+      is_superadmin: { Args: { _user_id: string }; Returns: boolean }
       is_trainer_org_admin: {
         Args: { _org: string; _user: string }
         Returns: boolean
