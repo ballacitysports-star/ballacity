@@ -120,8 +120,19 @@ export const Route = createFileRoute("/api/public/og")({
           .filter(Boolean)
           .slice(0, 3);
 
+        const sizeParam = (url.searchParams.get("size") ?? "og").toLowerCase();
+        const sizeKey: SizeKey = sizeParam in OG_SIZES ? (sizeParam as SizeKey) : "og";
+        const { width, height } = OG_SIZES[sizeKey];
+
         const etag = await etagFor(
-          JSON.stringify([OG_VERSION, kindKey in KINDS ? kindKey : "page", title, subtitle, meta]),
+          JSON.stringify([
+            OG_VERSION,
+            kindKey in KINDS ? kindKey : "page",
+            sizeKey,
+            title,
+            subtitle,
+            meta,
+          ]),
         );
 
         const cacheHeaders = {
@@ -135,12 +146,17 @@ export const Route = createFileRoute("/api/public/og")({
         }
 
         try {
-          return new ImageResponse(htmlToReact(template({ kind, title, subtitle, meta })), {
-            width: OG_WIDTH,
-            height: OG_HEIGHT,
-            format: "png",
-            headers: { ...cacheHeaders, "Content-Type": "image/png" },
-          });
+          return new ImageResponse(
+            htmlToReact(template({ kind, title, subtitle, meta, width, height })),
+            {
+              width,
+              height,
+              format: "png",
+              headers: { ...cacheHeaders, "Content-Type": "image/png" },
+            },
+          );
+        } catch (err) {
+
         } catch (err) {
           return new Response(`OG render failed: ${(err as Error).message}`, {
             status: 500,
