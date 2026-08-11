@@ -1,0 +1,1 @@
+GRANT SELECT (active_profile_id, default_profile_id) ON public.profiles TO authenticated;
