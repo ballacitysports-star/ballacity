@@ -11,11 +11,15 @@ import { OrgForm, emptyOrgForm, type OrgFormValue } from "@/components/OrgForm";
 import { AccountTypeGate } from "@/components/AccountTypeGate";
 import { loadDraft, useDraftPersistence } from "@/components/create/useDraftPersistence";
 import { SaveStatus } from "@/components/SaveStatus";
+import { FinishSetupNotice } from "@/components/FinishSetupNotice";
 
 const DRAFT_KEY = "openrun:draft:create-org";
 
 export const Route = createFileRoute("/orgs/create")({
   ssr: false,
+  validateSearch: (search: Record<string, unknown>): { finish?: number } => ({
+    finish: search.finish ? 1 : undefined,
+  }),
   head: () => ({
     meta: [{ title: "Create gym — OpenRun" }],
   }),
@@ -27,6 +31,7 @@ export const Route = createFileRoute("/orgs/create")({
 });
 
 function CreateOrg() {
+  const { finish } = Route.useSearch();
   const navigate = useNavigate();
   const qc = useQueryClient();
   const [userId, setUserId] = useState<string | null>(null);
@@ -83,6 +88,7 @@ function CreateOrg() {
 
   return (
     <div className="mx-auto w-full max-w-md sm:max-w-2xl lg:max-w-5xl p-4 pb-40 space-y-4">
+      {finish ? <FinishSetupNotice kind="gym" /> : null}
       <header>
         <h1 className="font-display text-3xl font-bold">Create gym.</h1>
         <p className="text-sm text-muted-foreground mt-1">

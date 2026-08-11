@@ -28,7 +28,15 @@ export type MyProfilesResult = {
   active: AccountProfile | null;
   /** Profile the app starts in on any device / new session. */
   defaultId: string | null;
+  /**
+   * Set when the account registered as a team, trainer, or gym during
+   * onboarding but never finished creating that profile. Until it exists the
+   * app would silently fall back to the player profile, so surfaces label the
+   * registered type as "setup incomplete" and the tabs route into setup.
+   */
+  pendingKind: Exclude<AccountType, "player"> | null;
 };
+
 
 
 function initials(name: string): string {
@@ -57,7 +65,7 @@ async function fetchMyProfiles(userId: string): Promise<MyProfilesResult> {
     supabase
       .from("profiles")
       .select(
-        "display_name, username, avatar_url, avatar_initials, active_profile_id, default_profile_id",
+        "display_name, username, avatar_url, avatar_initials, active_profile_id, default_profile_id, account_type",
       )
 
       .eq("id", userId)
@@ -108,6 +116,7 @@ async function fetchMyProfiles(userId: string): Promise<MyProfilesResult> {
     avatar_initials?: string | null;
     active_profile_id?: string | null;
     default_profile_id?: string | null;
+    account_type?: string | null;
   } | null;
 
 
@@ -189,7 +198,14 @@ async function fetchMyProfiles(userId: string): Promise<MyProfilesResult> {
     await supabase.from("profiles").update(patch).eq("id", userId);
   }
 
-  return { profiles, activeId, defaultId, active };
+  // Registered as a team/trainer/gym but that profile was never created.
+  const registered = profile?.account_type;
+  const pendingKind =
+    isAccountType(registered) && registered !== "player" && !profiles.some((p) => p.kind === registered)
+      ? (registered as Exclude<AccountType, "player">)
+      : null;
+
+  return { profiles, activeId, defaultId, active, pendingKind };
 }
 
 
@@ -214,6 +230,7 @@ export function useMyProfiles() {
     active: query.data?.active ?? null,
     activeId: query.data?.activeId ?? null,
     defaultId: query.data?.defaultId ?? null,
+    pendingKind: query.data?.pendingKind ?? null,
     loading: loading || query.isLoading,
     refetch: query.refetch,
   };
@@ -327,6 +344,28 @@ export function profileTypeLabel(kind: AccountType): string {
 }
 
 /** Route for adding another profile of a given type. */
+/**
+ * Escape hatch out of an unfinished team/trainer/gym registration: turns the
+ * account back into a plain player account and activates the player profile.
+ */
+export async function continueAsPlayer(): Promise<void> {
+  const { data: userRes } = await supabase.auth.getUser();
+  const uid = userRes.user?.id;
+  if (!uid) throw new Error("Not signed in");
+  const { data } = await supabase
+    .from("account_profiles")
+    .select("id")
+    .eq("user_id", uid)
+    .eq("kind", "player")
+    .maybeSingle();
+  const playerId = (data as { id?: string } | null)?.id ?? null;
+  const { error } = await supabase
+    .from("profiles")
+    .update({ account_type: "player", ...(playerId ? { active_profile_id: playerId } : {}) })
+    .eq("id", uid);
+  if (error) throw error;
+}
+
 export function addProfileRoute(kind: Exclude<AccountType, "player">): string {
   return kind === "team" ? "/teams/create" : kind === "trainer" ? "/trainers/create" : "/orgs/create";
 }

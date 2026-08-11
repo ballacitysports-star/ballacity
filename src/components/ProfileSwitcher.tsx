@@ -41,11 +41,30 @@ function Avatar({ profile, size = 8 }: { profile: AccountProfile; size?: number 
  * team, trainer, or gym profiles. The player profile is always present.
  */
 export function ProfileSwitcher({ className }: { className?: string }) {
-  const { profiles, active, defaultId, loading } = useMyProfiles();
+  const { profiles, active, defaultId, pendingKind, loading } = useMyProfiles();
   const switcher = useSwitchProfile();
   const setDefault = useSetDefaultProfile();
 
   if (loading || !active) return null;
+
+  // Registered as a team/trainer/gym without finishing setup: label the
+  // registered type instead of the player profile we fall back to.
+  if (pendingKind) {
+    const pendingMeta = ACCOUNT_TYPE_META[pendingKind];
+    return (
+      <Link
+        to={addProfileRoute(pendingKind)}
+        search={{ finish: 1 } as never}
+        className={`inline-flex max-w-full items-center gap-2 rounded-full border border-border bg-surface px-3 py-1.5 text-xs font-bold transition-colors hover:bg-surface-2 ${className ?? ""}`}
+      >
+        <span aria-hidden>{pendingMeta.emoji}</span>
+        <span className="truncate">{pendingMeta.label}</span>
+        <span className="rounded-full bg-surface-2 px-1.5 py-0.5 text-[10px] font-bold text-muted-foreground">
+          Setup incomplete
+        </span>
+      </Link>
+    );
+  }
 
   const activeMeta = ACCOUNT_TYPE_META[active.kind];
 

@@ -19,7 +19,7 @@ import {
   BadgeCheck,
 } from "lucide-react";
 import { ACCOUNT_TYPE_META } from "@/lib/account-type";
-import { useMyProfiles } from "@/lib/account-profiles";
+import { addProfileRoute, useMyProfiles } from "@/lib/account-profiles";
 import { ProfileSwitcher } from "@/components/ProfileSwitcher";
 import { useMyProfile } from "@/lib/user-prefs-store";
 import {
@@ -268,8 +268,10 @@ function AccountIdentityRow() {
 function OnboardingDetailsSection() {
   // Derived from the active profile so the section follows a profile switch
   // immediately (the account_type read has its own state and would go stale).
-  const { active, loading } = useMyProfiles();
-  const accountType = active?.kind ?? null;
+  const { active, pendingKind, loading } = useMyProfiles();
+  // An unfinished team/trainer/gym registration has no profile to act as yet;
+  // show the type they registered as rather than silently saying "Player".
+  const accountType = pendingKind ?? active?.kind ?? null;
   if (loading || !accountType) return null;
   const meta = ACCOUNT_TYPE_META[accountType];
   return (
@@ -284,10 +286,27 @@ function OnboardingDetailsSection() {
           </span>
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-1.5">
-              <span className="text-sm font-medium">Acting as {meta.label}</span>
-              <BadgeCheck className="h-4 w-4 text-primary" aria-hidden />
+              <span className="text-sm font-medium">
+                {pendingKind ? `Registered as ${meta.label}` : `Acting as ${meta.label}`}
+              </span>
+              {pendingKind ? (
+                <span className="rounded-full bg-surface-2 px-1.5 py-0.5 text-[10px] font-bold text-muted-foreground">
+                  Setup incomplete
+                </span>
+              ) : (
+                <BadgeCheck className="h-4 w-4 text-primary" aria-hidden />
+              )}
             </div>
             <p className="text-xs text-muted-foreground">{meta.blurb}</p>
+            {pendingKind && (
+              <Link
+                to={addProfileRoute(pendingKind)}
+                search={{ finish: 1 } as never}
+                className="mt-1.5 inline-block text-xs font-bold text-foreground underline underline-offset-2"
+              >
+                Finish {meta.label.toLowerCase()} setup
+              </Link>
+            )}
           </div>
         </div>
         <div className="mt-3">

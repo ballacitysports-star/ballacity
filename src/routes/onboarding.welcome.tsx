@@ -426,7 +426,7 @@ function OnboardingWizard({ type }: { type: AccountType }) {
     }
 
     if (isLast) {
-      if (nextCfg) nav({ to: nextCfg.goto });
+      if (nextCfg) nav({ to: nextCfg.goto, search: { finish: 1 } as never });
       else nav({ to: "/feed" });
       return;
     }
