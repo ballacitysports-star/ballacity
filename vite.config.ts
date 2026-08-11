@@ -6,7 +6,6 @@
 // You can pass additional config via defineConfig({ vite: { ... } }) if needed.
 import { defineConfig } from "@lovable.dev/vite-tanstack-config";
 import { mcpPlugin } from "@lovable.dev/mcp-js/stacks/tanstack/vite";
-import wasm from "vite-plugin-wasm";
 
 // Redirect TanStack Start's bundled server entry to src/server.ts (our SSR error wrapper).
 // @cloudflare/vite-plugin builds from this — wrangler.jsonc main alone is insufficient.
@@ -15,10 +14,6 @@ export default defineConfig({
     server: { entry: "server" },
   },
   vite: {
-    // vite-plugin-wasm lets the OG image renderer (workers-og: yoga + resvg wasm)
-    // load its wasm modules in dev and in the Worker build.
-    plugins: [mcpPlugin(), wasm()],
-    ssr: { noExternal: ["workers-og"] },
-    optimizeDeps: { exclude: ["workers-og"] },
+    plugins: [mcpPlugin()],
   },
 });
