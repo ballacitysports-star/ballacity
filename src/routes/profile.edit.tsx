@@ -286,7 +286,6 @@ function EditProfile() {
       sports,
       links,
       preferredSports,
-      sections,
     },
     enabled: !!profileUser,
     validate,
