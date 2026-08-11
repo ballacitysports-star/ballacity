@@ -101,7 +101,11 @@ function OgPreviewPage() {
       return {
         size,
         absolute,
-        src: `${toLocalImage(absolute)}${nonce ? `&_r=${nonce}` : ""}`,
+        src: (() => {
+          const local = toLocalImage(absolute);
+          if (!nonce) return local;
+          return `${local}${local.includes("?") ? "&" : "?"}_r=${nonce}`;
+        })(),
         ...OG_IMAGE_SIZES[size],
       };
     });
