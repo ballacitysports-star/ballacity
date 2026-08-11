@@ -642,19 +642,6 @@ function EditProfile() {
           })}
         </div>
 
-        <div className="text-xs text-muted-foreground mb-2">Sections to show</div>
-        <div className="space-y-2">
-          <Toggle
-            label="Needs players now (urgent)"
-            checked={sections.showUrgent}
-            onChange={() => toggleSection("showUrgent")}
-          />
-          <Toggle
-            label='"For you" list'
-            checked={sections.showForYou}
-            onChange={() => toggleSection("showForYou")}
-          />
-        </div>
         <p className="mt-3 text-xs text-muted-foreground">
           Price, distance and “my games” filters now live in the feed's filter sheet, where you can
           also save them as reusable views.
