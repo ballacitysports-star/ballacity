@@ -22,12 +22,12 @@ import { AvailabilityRulesEditor } from "@/components/AvailabilityRulesEditor";
 import type { AvailabilityRule } from "@/lib/availability-resolve";
 import { loadDraft, useDraftPersistence } from "@/components/create/useDraftPersistence";
 import { SaveStatus } from "@/components/SaveStatus";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { listTrainerOrgs, createTrainerOrg, requestToJoinTrainerOrg } from "@/lib/trainer-orgs.functions";
 import { autocompletePlaces, getPlaceDetails } from "@/lib/places.functions";
 import { toast } from "sonner";
-import { setActiveProfileByRef } from "@/lib/account-profiles";
+import { setActiveProfileByRef, myProfilesKey } from "@/lib/account-profiles";
 
 const STEP_LABELS = ["Basics", "Expertise", "Where", "Availability"] as const;
 const SKILL_LABELS = ["Beginner", "Recreational", "Intermediate", "Advanced", "Pro"] as const;
@@ -133,6 +133,7 @@ function initialDraft(): Draft {
 export function CreateTrainerWizard() {
   const nav = useNavigate();
   const { user } = useAuth();
+  const qc = useQueryClient();
 
 
   const [draft, setDraft] = useState<Draft>(() => {
@@ -357,6 +358,7 @@ export function CreateTrainerWizard() {
         }
       }
       await setActiveProfileByRef("trainer", saved.id).catch(() => {});
+      await qc.invalidateQueries({ queryKey: myProfilesKey(user?.id), refetchType: "all" });
       clearDraft();
       toast.success("Trainer profile published");
       nav({ to: "/trainers/$trainerId", params: { trainerId: saved.id } });

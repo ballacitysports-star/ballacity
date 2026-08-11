@@ -50,9 +50,9 @@ import {
   createTrainerOrg,
   requestToJoinTrainerOrg,
 } from "@/lib/trainer-orgs.functions";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { setActiveProfileByRef } from "@/lib/account-profiles";
+import { setActiveProfileByRef, myProfilesKey } from "@/lib/account-profiles";
 
 const ACCENTS = [
   { name: "Lime", hex: "#a3ff12" },
@@ -78,6 +78,7 @@ function initials(name: string) {
 export function CreateOrgWizard({ kind }: { kind: OrgKind }) {
   const nav = useNavigate();
   const { user } = useAuth();
+  const qc = useQueryClient();
   const isCoach = kind === "coach";
   const backHref = isCoach ? "/trainers" : "/teams";
   const [step, setStep] = useState(0);
@@ -299,6 +300,7 @@ export function CreateOrgWizard({ kind }: { kind: OrgKind }) {
     try {
       const saved = await addOrg(org);
       await setActiveProfileByRef(isCoach ? "trainer" : "team", saved.id).catch(() => {});
+      await qc.invalidateQueries({ queryKey: myProfilesKey(user?.id), refetchType: "all" });
       if (isCoach) {
         // Best-effort org linkage — failures don't roll back the profile.
         try {
