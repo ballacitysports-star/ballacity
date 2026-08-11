@@ -1,5 +1,5 @@
 import { createFileRoute, Link, useNavigate, Navigate } from "@tanstack/react-router";
-import { pageHead } from "@/lib/seo";
+import { pageHead, ogImageUrl } from "@/lib/seo";
 import { useEffect, useMemo, useState } from "react";
 import {
   ArrowLeft,
@@ -52,6 +52,12 @@ export const Route = createFileRoute("/players/$userId")({
       description:
         "See this player's sports, skill levels, availability, badges, and reviews on OpenRun.",
       ogType: "profile",
+      image: ogImageUrl({
+        kind: "player",
+        title: "Player profile",
+        subtitle: "Sports, availability, badges, and reviews",
+        meta: ["OpenRun player"],
+      }),
       jsonLd: {
         "@context": "https://schema.org",
         "@type": "ProfilePage",

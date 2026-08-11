@@ -1,5 +1,5 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { pageHead } from "@/lib/seo";
+import { pageHead, ogImageUrl } from "@/lib/seo";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   ArrowLeft,
@@ -185,7 +185,12 @@ export const Route = createFileRoute("/games/$gameId/")({
         game?.description ?? "See the details for this pickup game and request to join on OpenRun."
       ).slice(0, 155),
       ogType: "article",
-      image: game?.image ?? null,
+      image: ogImageUrl({
+        kind: "game",
+        title: name,
+        subtitle: game ? [game.sport, game.neighborhood ?? game.location].filter(Boolean).join(" • ") : "Pickup game on OpenRun",
+        meta: game ? [formatWhen(game.date), game.location, game.price ? `$${game.price}` : "Free"] : [],
+      }),
       jsonLd: game
         ? {
             "@context": "https://schema.org",

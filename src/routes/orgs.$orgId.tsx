@@ -1,5 +1,5 @@
 import { createFileRoute, Link, notFound } from "@tanstack/react-router";
-import { pageHead } from "@/lib/seo";
+import { pageHead, ogImageUrl } from "@/lib/seo";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { useAuth } from "@/hooks/use-auth";
@@ -65,7 +65,12 @@ export const Route = createFileRoute("/orgs/$orgId")({
       description: (
         org?.bio || `${name} on OpenRun: hours, amenities, trainers, and member reviews.`
       ).slice(0, 155),
-      image: org?.cover_url?.startsWith("http") ? org.cover_url : null,
+      image: ogImageUrl({
+        kind: "venue",
+        title: name,
+        subtitle: org?.city ?? org?.address ?? "Gym on OpenRun",
+        meta: [org?.city, "Hours & amenities", "Member reviews"],
+      }),
       noindex: !org,
       jsonLd: org
         ? {
