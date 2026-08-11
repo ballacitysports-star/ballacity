@@ -18,10 +18,10 @@ import { useMemo } from "react";
 export const Route = createFileRoute("/reviews")({
   head: () =>
     pageHead({
-      path: "/reviews",
       title: "Reviews & reputation — OpenRun",
       description:
       "Read and manage reviews for players, teams, trainers, and gyms across OpenRun.",
+      noindex: true,
     }),
   // URL-persisted filter + sort so refresh/share preserves the view.
   validateSearch: zodValidator(
