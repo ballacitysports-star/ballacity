@@ -65,7 +65,7 @@ async function fetchMyProfiles(userId: string): Promise<MyProfilesResult> {
     supabase
       .from("profiles")
       .select(
-        "display_name, username, avatar_url, avatar_initials, active_profile_id, default_profile_id",
+        "display_name, username, avatar_url, avatar_initials, active_profile_id, default_profile_id, account_type",
       )
 
       .eq("id", userId)
@@ -116,6 +116,7 @@ async function fetchMyProfiles(userId: string): Promise<MyProfilesResult> {
     avatar_initials?: string | null;
     active_profile_id?: string | null;
     default_profile_id?: string | null;
+    account_type?: string | null;
   } | null;
 
 
@@ -197,7 +198,14 @@ async function fetchMyProfiles(userId: string): Promise<MyProfilesResult> {
     await supabase.from("profiles").update(patch).eq("id", userId);
   }
 
-  return { profiles, activeId, defaultId, active };
+  // Registered as a team/trainer/gym but that profile was never created.
+  const registered = profile?.account_type;
+  const pendingKind =
+    isAccountType(registered) && registered !== "player" && !profiles.some((p) => p.kind === registered)
+      ? (registered as Exclude<AccountType, "player">)
+      : null;
+
+  return { profiles, activeId, defaultId, active, pendingKind };
 }
 
 
