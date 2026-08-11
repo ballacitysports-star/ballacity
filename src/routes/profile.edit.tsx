@@ -300,7 +300,6 @@ function EditProfile() {
   const reset = () => {
     markDirty();
     setPreferredSports(DEFAULT_PREFS.preferredSports);
-    setSections(DEFAULT_PREFS.sections);
   };
 
   return (
