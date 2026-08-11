@@ -1,13 +1,14 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { ImageResponse } from "workers-og";
+import { ImageResponse } from "@cf-wasm/og";
+import { htmlToReact } from "@cf-wasm/og/html-to-react";
 
 /**
  * Dynamic OpenGraph / Twitter card renderer.
  *
  * GET /api/public/og?kind=game&title=...&subtitle=...&meta=a|b|c
  *
- * Public on purpose: social crawlers are unauthenticated. It only renders text
- * passed in the query string, so there is nothing privileged to leak.
+ * Public on purpose: social crawlers are unauthenticated. It only renders the
+ * text passed in the query string, so there is nothing privileged to leak.
  */
 
 const OG_WIDTH = 1200;
@@ -41,28 +42,25 @@ function template(opts: {
   const chips = meta
     .map(
       (m) =>
-        `<div style="display:flex;padding:10px 22px;border-radius:999px;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.14);color:#E8EDE6;font-size:30px;">${esc(m)}</div>`,
+        `<div style="display:flex;padding:8px 22px;border-radius:999px;background:#1A2118;border:2px solid #2A331F;color:#E8EDE6;font-size:28px;">${esc(m)}</div>`,
     )
     .join("");
 
-  return `
-  <div style="display:flex;flex-direction:column;justify-content:space-between;width:${OG_WIDTH}px;height:${OG_HEIGHT}px;padding:72px;background:#0C0F0B;">
+  return `<div style="display:flex;flex-direction:column;justify-content:space-between;width:${OG_WIDTH}px;height:${OG_HEIGHT}px;padding:72px;background:#0C0F0B;font-family:sans-serif;">
     <div style="display:flex;align-items:center;justify-content:space-between;">
       <div style="display:flex;align-items:center;">
         <div style="display:flex;width:56px;height:56px;border-radius:16px;background:${kind.accent};"></div>
         <div style="display:flex;margin-left:20px;color:#F4F7F2;font-size:40px;font-weight:700;">OpenRun</div>
       </div>
-      <div style="display:flex;padding:12px 26px;border-radius:999px;background:${kind.accent};color:#0C0F0B;font-size:28px;font-weight:700;">${esc(kind.label)}</div>
+      <div style="display:flex;padding:12px 26px;border-radius:999px;background:${kind.accent};color:#0C0F0B;font-size:26px;font-weight:700;">${esc(kind.label)}</div>
     </div>
-
     <div style="display:flex;flex-direction:column;">
-      <div style="display:flex;color:#FFFFFF;font-size:${title.length > 40 ? 68 : 84}px;font-weight:700;line-height:1.05;">${esc(title)}</div>
-      ${subtitle ? `<div style="display:flex;margin-top:24px;color:#A7B3A2;font-size:36px;line-height:1.25;">${esc(subtitle)}</div>` : ""}
+      <div style="display:flex;color:#FFFFFF;font-size:${title.length > 40 ? 62 : 80}px;font-weight:700;line-height:1.05;">${esc(title)}</div>
+      ${subtitle ? `<div style="display:flex;margin-top:24px;color:#A7B3A2;font-size:34px;line-height:1.25;">${esc(subtitle)}</div>` : ""}
     </div>
-
     <div style="display:flex;align-items:center;justify-content:space-between;">
-      <div style="display:flex;">${chips}</div>
-      <div style="display:flex;color:#6F7C6B;font-size:28px;">open-run-connect.lovable.app</div>
+      <div style="display:flex;gap:16px;">${chips}</div>
+      <div style="display:flex;color:#6F7C6B;font-size:26px;">open-run-connect.lovable.app</div>
     </div>
   </div>`;
 }
@@ -83,13 +81,11 @@ export const Route = createFileRoute("/api/public/og")({
           .slice(0, 3);
 
         try {
-          return new ImageResponse(template({ kind, title, subtitle, meta }), {
+          return new ImageResponse(htmlToReact(template({ kind, title, subtitle, meta })), {
             width: OG_WIDTH,
             height: OG_HEIGHT,
             format: "png",
-            headers: {
-              "Cache-Control": "public, max-age=3600, s-maxage=86400",
-            },
+            headers: { "Cache-Control": "public, max-age=3600, s-maxage=86400" },
           });
         } catch (err) {
           return new Response(`OG render failed: ${(err as Error).message}`, { status: 500 });
