@@ -37,6 +37,7 @@ import { Route as AccountNotificationsRouteImport } from './routes/account.notif
 import { Route as AccountSecurityRouteImport } from './routes/account.security'
 import { Route as AdminLocationAnalyticsRouteImport } from './routes/admin.location-analytics'
 import { Route as CheckoutReturnRouteImport } from './routes/checkout.return'
+import { Route as DevOgPreviewRouteImport } from './routes/dev.og-preview'
 import { Route as DevRouteDoctorRouteImport } from './routes/dev.route-doctor'
 import { Route as GamesGameIdRouteImport } from './routes/games.$gameId'
 import { Route as MessagesIndexRouteImport } from './routes/messages.index'
@@ -205,6 +206,11 @@ const AdminLocationAnalyticsRoute = AdminLocationAnalyticsRouteImport.update({
 const CheckoutReturnRoute = CheckoutReturnRouteImport.update({
   id: '/checkout/return',
   path: '/checkout/return',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DevOgPreviewRoute = DevOgPreviewRouteImport.update({
+  id: '/dev/og-preview',
+  path: '/dev/og-preview',
   getParentRoute: () => rootRouteImport,
 } as any)
 const DevRouteDoctorRoute = DevRouteDoctorRouteImport.update({
@@ -378,6 +384,7 @@ export interface FileRoutesByFullPath {
   '/account/security': typeof AccountSecurityRoute
   '/admin/location-analytics': typeof AdminLocationAnalyticsRoute
   '/checkout/return': typeof CheckoutReturnRoute
+  '/dev/og-preview': typeof DevOgPreviewRoute
   '/dev/route-doctor': typeof DevRouteDoctorRoute
   '/games/$gameId': typeof GamesGameIdRouteWithChildren
   '/messages/$conversationId': typeof MessagesConversationIdRoute
@@ -435,6 +442,7 @@ export interface FileRoutesByTo {
   '/account/security': typeof AccountSecurityRoute
   '/admin/location-analytics': typeof AdminLocationAnalyticsRoute
   '/checkout/return': typeof CheckoutReturnRoute
+  '/dev/og-preview': typeof DevOgPreviewRoute
   '/dev/route-doctor': typeof DevRouteDoctorRoute
   '/messages/$conversationId': typeof MessagesConversationIdRoute
   '/onboarding/account-type': typeof OnboardingAccountTypeRoute
@@ -493,6 +501,7 @@ export interface FileRoutesById {
   '/account/security': typeof AccountSecurityRoute
   '/admin/location-analytics': typeof AdminLocationAnalyticsRoute
   '/checkout/return': typeof CheckoutReturnRoute
+  '/dev/og-preview': typeof DevOgPreviewRoute
   '/dev/route-doctor': typeof DevRouteDoctorRoute
   '/games/$gameId': typeof GamesGameIdRouteWithChildren
   '/messages/$conversationId': typeof MessagesConversationIdRoute
@@ -552,6 +561,7 @@ export interface FileRouteTypes {
     | '/account/security'
     | '/admin/location-analytics'
     | '/checkout/return'
+    | '/dev/og-preview'
     | '/dev/route-doctor'
     | '/games/$gameId'
     | '/messages/$conversationId'
@@ -609,6 +619,7 @@ export interface FileRouteTypes {
     | '/account/security'
     | '/admin/location-analytics'
     | '/checkout/return'
+    | '/dev/og-preview'
     | '/dev/route-doctor'
     | '/messages/$conversationId'
     | '/onboarding/account-type'
@@ -666,6 +677,7 @@ export interface FileRouteTypes {
     | '/account/security'
     | '/admin/location-analytics'
     | '/checkout/return'
+    | '/dev/og-preview'
     | '/dev/route-doctor'
     | '/games/$gameId'
     | '/messages/$conversationId'
@@ -715,6 +727,7 @@ export interface RootRouteChildren {
   AccountNotificationsRoute: typeof AccountNotificationsRoute
   AccountSecurityRoute: typeof AccountSecurityRoute
   CheckoutReturnRoute: typeof CheckoutReturnRoute
+  DevOgPreviewRoute: typeof DevOgPreviewRoute
   DevRouteDoctorRoute: typeof DevRouteDoctorRoute
   GamesGameIdRoute: typeof GamesGameIdRouteWithChildren
   MessagesConversationIdRoute: typeof MessagesConversationIdRoute
@@ -936,6 +949,13 @@ declare module '@tanstack/react-router' {
       path: '/checkout/return'
       fullPath: '/checkout/return'
       preLoaderRoute: typeof CheckoutReturnRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/dev/og-preview': {
+      id: '/dev/og-preview'
+      path: '/dev/og-preview'
+      fullPath: '/dev/og-preview'
+      preLoaderRoute: typeof DevOgPreviewRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/dev/route-doctor': {
@@ -1223,6 +1243,7 @@ const rootRouteChildren: RootRouteChildren = {
   AccountNotificationsRoute: AccountNotificationsRoute,
   AccountSecurityRoute: AccountSecurityRoute,
   CheckoutReturnRoute: CheckoutReturnRoute,
+  DevOgPreviewRoute: DevOgPreviewRoute,
   DevRouteDoctorRoute: DevRouteDoctorRoute,
   GamesGameIdRoute: GamesGameIdRouteWithChildren,
   MessagesConversationIdRoute: MessagesConversationIdRoute,
