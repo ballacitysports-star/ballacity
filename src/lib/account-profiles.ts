@@ -28,7 +28,15 @@ export type MyProfilesResult = {
   active: AccountProfile | null;
   /** Profile the app starts in on any device / new session. */
   defaultId: string | null;
+  /**
+   * Set when the account registered as a team, trainer, or gym during
+   * onboarding but never finished creating that profile. Until it exists the
+   * app would silently fall back to the player profile, so surfaces label the
+   * registered type as "setup incomplete" and the tabs route into setup.
+   */
+  pendingKind: Exclude<AccountType, "player"> | null;
 };
+
 
 
 function initials(name: string): string {
