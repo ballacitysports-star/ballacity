@@ -1,5 +1,5 @@
+import type { CSSProperties } from "react";
 import { Link, useNavigate } from "@tanstack/react-router";
-import { motion } from "framer-motion";
 import { MapPin, Users, Clock, Zap, Lock, Flame, MessageCircle } from "lucide-react";
 import { UserAvatar } from "@/components/UserAvatar";
 import { SpotsPill } from "@/components/SpotsPill";
@@ -74,11 +74,7 @@ export function GameCard({ game, index = 0 }: { game: Game; index?: number }) {
 
 
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 16 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ delay: index * 0.05, type: "spring", stiffness: 180, damping: 22 }}
-    >
+    <div className="enter-up" style={{ "--enter-delay": `${index * 50}ms` } as CSSProperties}>
       <Link
         to="/games/$gameId"
         params={{ gameId: game.id }}
@@ -256,15 +252,18 @@ export function GameCard({ game, index = 0 }: { game: Game; index?: number }) {
             </button>
           )}
           <div className="h-1 overflow-hidden rounded-full bg-secondary">
-            <motion.div
-              initial={{ width: 0 }}
-              animate={{ width: `${fillPct}%` }}
-              transition={{ duration: 0.8, delay: 0.1 + index * 0.05 }}
-              className={`h-full rounded-full ${spotsLeft <= 2 ? "bg-coral-gradient" : "bg-lime-gradient"}`}
+            <div
+              className={`grow-x h-full rounded-full ${spotsLeft <= 2 ? "bg-coral-gradient" : "bg-lime-gradient"}`}
+              style={
+                {
+                  width: `${fillPct}%`,
+                  "--enter-delay": `${100 + index * 50}ms`,
+                } as CSSProperties
+              }
             />
           </div>
         </div>
       </Link>
-    </motion.div>
+    </div>
   );
 }
