@@ -15,13 +15,13 @@ import {
 } from "./sport-levels";
 
 const raw = {
-  Baseball: { system: "MiLB", tier: "Minor AAA" },
+  Baseball: { system: "Level", tier: "College / Adult Competitive" },
   Tennis: { system: "NTRP", tier: "3.5" },
 };
 
 describe("resolvePlayerLevel", () => {
   it("prefers the profile tier over the post's generic level", () => {
-    expect(formatSportLevel(resolvePlayerLevel(raw, "Baseball", "Advanced"))).toBe("Minor AAA");
+    expect(formatSportLevel(resolvePlayerLevel(raw, "Baseball", "Advanced"))).toBe("College / Adult Competitive");
   });
   it("falls back to the post level when the profile has none", () => {
     expect(formatSportLevel(resolvePlayerLevel(raw, "Soccer", "Beginner"))).toBe("Beginner");
@@ -44,7 +44,7 @@ describe("playerLevelsForSports", () => {
 
 describe("levelMatchesFilter", () => {
   it("matches a profile tier even when the post says otherwise", () => {
-    expect(levelMatchesFilter(raw, ["Baseball"], "Advanced", "Minor AAA")).toBe(true);
+    expect(levelMatchesFilter(raw, ["Baseball"], "Advanced", "College / Adult Competitive")).toBe(true);
   });
   it("does not match the post level when the profile has a tier", () => {
     expect(levelMatchesFilter(raw, ["Baseball"], "Advanced", "Advanced")).toBe(false);
@@ -59,7 +59,7 @@ describe("levelMatchesFilter", () => {
 
 describe("levelsForSport", () => {
   it("gives sport-specific tiers", () => {
-    expect(levelsForSport("Baseball" as any)).toContain("Minor AAA");
+    expect(levelsForSport("Baseball" as any)).toContain("College / Adult Competitive");
     expect(levelsForSport("Tennis" as any)).toContain("3.5");
   });
 });
@@ -100,28 +100,30 @@ describe("Football formats", () => {
   it("gives every format the same sub-level ladder", () => {
     for (const g of scale.groups!) {
       expect(g.tiers).toEqual([
+        `${g.label} Casual`,
         `${g.label} Rec`,
         `${g.label} Competitive`,
-        `${g.label} Showcase / Travel`,
-        `${g.label} Elite`,
+        `${g.label} Travel / Showcase`,
       ]);
     }
   });
 
   it("keeps a valid football tier in the skill filter", () => {
-    expect(sanitizeSkillForSport("Football", "Full contact Elite")).toBe("Full contact Elite");
+    expect(sanitizeSkillForSport("Football", "Full contact Travel / Showcase")).toBe(
+      "Full contact Travel / Showcase",
+    );
     expect(sanitizeSkillForSport("Football", "7v7 Competitive")).toBe("7v7 Competitive");
   });
 
   it("drops a tier that belongs to another sport", () => {
-    expect(sanitizeSkillForSport("Football", "Minor AAA")).toBe("");
+    expect(sanitizeSkillForSport("Football", "College / Adult Competitive")).toBe("");
   });
 
   it("migrates retired football tiers forward", () => {
     expect(sanitizeSkillForSport("Football", "High School")).toBe("Full contact Competitive");
     expect(
       formatSportLevel(resolvePlayerLevel({ Football: { system: "Level", tier: "Semi-Pro" } }, "Football")),
-    ).toBe("Full contact Elite");
+    ).toBe("Full contact Travel / Showcase");
   });
 
   it("leaves other sports' High School tier alone", () => {
