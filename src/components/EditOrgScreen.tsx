@@ -90,10 +90,6 @@ type OrgChoice = {
   geo?: { lat: number; lng: number } | null;
 };
 
-function EditOrg() {
-  const org = Route.useLoaderData() as Org;
-  return <EditOrgScreen org={org} />;
-}
 
 export function EditOrgScreen({ org }: { org: Org }) {
   const nav = useNavigate();
