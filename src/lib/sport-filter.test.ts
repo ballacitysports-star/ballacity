@@ -44,15 +44,15 @@ describe("per-sport skill map", () => {
   });
 
   it("reads a legacy flat value onto the first selected sport", () => {
-    expect(parseSportSkillMap("Rec", ["Baseball", "Tennis"])).toEqual({ Baseball: "Rec" });
+    expect(parseSportSkillMap("Rec", ["Baseball", "Tennis"])).toEqual({ Baseball: "Rec League" });
   });
 
   it("keeps Football multi-select and single-select elsewhere", () => {
     let map = toggleSportSkillTier({}, "Football", "Flag Rec");
-    map = toggleSportSkillTier(map, "Football", "7v7 Elite");
-    expect(map.Football).toBe("Flag Rec · 7v7 Elite");
+    map = toggleSportSkillTier(map, "Football", "7v7 Travel / Showcase");
+    expect(map.Football).toBe("Flag Rec · 7v7 Travel / Showcase");
     map = toggleSportSkillTier(map, "Football", "Flag Rec");
-    expect(map.Football).toBe("7v7 Elite");
+    expect(map.Football).toBe("7v7 Travel / Showcase");
 
     let t = toggleSportSkillTier({}, "Tennis", "3.5");
     t = toggleSportSkillTier(t, "Tennis", "4.0");
