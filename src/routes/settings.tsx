@@ -20,7 +20,7 @@ import {
   BadgeCheck,
 } from "lucide-react";
 import { ACCOUNT_TYPE_META } from "@/lib/account-type";
-import { addProfileRoute, useMyProfiles } from "@/lib/account-profiles";
+import { useMyProfiles } from "@/lib/account-profiles";
 import { ProfileSwitcher } from "@/components/ProfileSwitcher";
 import { useMyProfile } from "@/lib/user-prefs-store";
 import {
@@ -203,7 +203,7 @@ function SettingsHubPage() {
           </SettingsStaticRow>
         </SettingsGroup>
 
-        <OnboardingDetailsSection />
+        <ProfileIdentitySection />
 
         <MyOrgsSection />
 
@@ -264,7 +264,7 @@ function AccountIdentityRow() {
   );
 }
 
-function OnboardingDetailsSection() {
+function ProfileIdentitySection() {
   // Derived from the active profile so the section follows a profile switch
   // immediately (the account_type read has its own state and would go stale).
   const { active, pendingKind, loading } = useMyProfiles();
@@ -297,15 +297,6 @@ function OnboardingDetailsSection() {
               )}
             </div>
             <p className="text-xs text-muted-foreground">{meta.blurb}</p>
-            {pendingKind && (
-              <Link
-                to={addProfileRoute(pendingKind)}
-                search={{ finish: 1 } as never}
-                className="mt-1.5 inline-block text-xs font-bold text-foreground underline underline-offset-2"
-              >
-                Finish {meta.label.toLowerCase()} setup
-              </Link>
-            )}
           </div>
         </div>
         <div className="mt-3">
