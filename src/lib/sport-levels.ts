@@ -29,23 +29,19 @@ export type SportScale = {
 /** Generic fallback used by any sport without a curated scale. */
 export const GENERIC_SCALE: SportScale = {
   system: "Self-rated",
-  tiers: ["Beginner", "Intermediate", "Advanced", "Pro"],
+  tiers: ["Beginner", "Casual", "Intermediate", "Advanced"],
 };
 
 const BALL_TIERS = [
-  "Rec",
-  "Little League",
+  "Casual / Pickup",
+  "Rec League",
+  "Little League / Youth",
   "High School",
   "Travel / Showcase",
-  "College",
-  "Minor A",
-  "Minor AA",
-  "Minor AAA",
-  "Major",
-  "National",
+  "College / Adult Competitive",
 ];
 /** Shared sub-level ladder used by every football format. */
-const FOOTBALL_SUB_TIERS = ["Rec", "Competitive", "Showcase / Travel", "Elite"] as const;
+const FOOTBALL_SUB_TIERS = ["Casual", "Rec", "Competitive", "Travel / Showcase"] as const;
 const FOOTBALL_FORMATS = ["Flag", "7v7", "Full contact"] as const;
 
 const FOOTBALL_GROUPS = FOOTBALL_FORMATS.map((format) => ({
@@ -55,19 +51,76 @@ const FOOTBALL_GROUPS = FOOTBALL_FORMATS.map((format) => ({
 
 const FOOTBALL_TIERS = FOOTBALL_GROUPS.flatMap((g) => g.tiers);
 
-/** Retired Football tiers mapped forward to the format-prefixed ladder. */
-const LEGACY_TIER_ALIASES: Record<string, string> = {
+/**
+ * Retired tiers mapped forward to the current amateur ladders, so stored
+ * profiles, posts, saved presets and shared URLs keep matching.
+ */
+const FOOTBALL_TIER_ALIASES: Record<string, string> = {
   "High School": "Full contact Competitive",
-  College: "Full contact Showcase / Travel",
-  "Semi-Pro": "Full contact Elite",
+  College: "Full contact Travel / Showcase",
+  "Semi-Pro": "Full contact Travel / Showcase",
+  ...Object.fromEntries(
+    FOOTBALL_FORMATS.flatMap((f) => [
+      [`${f} Elite`, `${f} Travel / Showcase`],
+      [`${f} Showcase / Travel`, `${f} Travel / Showcase`],
+    ]),
+  ),
 };
 
+const BALL_TIER_ALIASES: Record<string, string> = {
+  Rec: "Rec League",
+  "Little League": "Little League / Youth",
+  College: "College / Adult Competitive",
+  "Minor A": "College / Adult Competitive",
+  "Minor AA": "College / Adult Competitive",
+  "Minor AAA": "College / Adult Competitive",
+  Major: "College / Adult Competitive",
+  National: "College / Adult Competitive",
+};
+
+const COURT_FIELD_ALIASES: Record<string, string> = {
+  Rec: "Rec League",
+  College: "College / Adult Competitive",
+  "Semi-Pro": "College / Adult Competitive",
+  Pro: "College / Adult Competitive",
+};
+
+const VOLLEYBALL_ALIASES: Record<string, string> = {
+  Rec: "Rec (B)",
+  B: "Rec (B)",
+  BB: "Intermediate (BB)",
+  A: "Advanced (A)",
+  AA: "Competitive (AA)",
+  Open: "Competitive (AA)",
+};
+
+const TIER_ALIASES_BY_SPORT: Record<string, Record<string, string>> = {
+  Football: FOOTBALL_TIER_ALIASES,
+  Baseball: BALL_TIER_ALIASES,
+  Softball: BALL_TIER_ALIASES,
+  Basketball: COURT_FIELD_ALIASES,
+  Soccer: COURT_FIELD_ALIASES,
+  Volleyball: VOLLEYBALL_ALIASES,
+  Tennis: { "5.5": "5.0", "6.0": "5.0", "7.0": "5.0" },
+  Pickleball: { "5.5": "5.0", "6.0": "5.0" },
+  Running: { "6:00/mi": "7:00/mi or faster", "sub-6:00/mi": "7:00/mi or faster" },
+};
+
+/** Applied for any sport (and for sport-less generic values). */
+const GENERIC_TIER_ALIASES: Record<string, string> = { Pro: "Advanced" };
+
 export const LEVELS_BY_SPORT: Record<Sport, SportScale> = {
-  Baseball: { system: "MiLB", tiers: BALL_TIERS, hint: "Highest level you've played." },
-  Softball: { system: "MiLB", tiers: BALL_TIERS, hint: "Highest level you've played." },
+  Baseball: { system: "Level", tiers: BALL_TIERS, hint: "Highest level you've played." },
+  Softball: { system: "Level", tiers: BALL_TIERS, hint: "Highest level you've played." },
   Basketball: {
     system: "Level",
-    tiers: ["Rec", "High School", "AAU / Travel", "College", "Semi-Pro", "Pro"],
+    tiers: [
+      "Casual / Pickup",
+      "Rec League",
+      "High School",
+      "AAU / Travel",
+      "College / Adult Competitive",
+    ],
   },
   Football: {
     system: "Level",
@@ -79,25 +132,35 @@ export const LEVELS_BY_SPORT: Record<Sport, SportScale> = {
 
   Soccer: {
     system: "Level",
-    tiers: ["Rec", "High School", "Club / Travel", "College", "Semi-Pro", "Pro"],
+    tiers: [
+      "Casual / Pickup",
+      "Rec League",
+      "High School",
+      "Club / Travel",
+      "College / Adult Competitive",
+    ],
   },
   Tennis: {
     system: "NTRP",
-    tiers: ["1.5", "2.0", "2.5", "3.0", "3.5", "4.0", "4.5", "5.0", "5.5", "6.0", "7.0"],
+    tiers: ["1.5", "2.0", "2.5", "3.0", "3.5", "4.0", "4.5", "5.0"],
     hint: "USTA NTRP rating.",
   },
   Pickleball: {
     system: "DUPR",
-    tiers: ["2.0", "2.5", "3.0", "3.5", "4.0", "4.5", "5.0", "5.5", "6.0"],
+    tiers: ["2.0", "2.5", "3.0", "3.5", "4.0", "4.5", "5.0"],
     hint: "DUPR rating.",
   },
-  Volleyball: { system: "USAV", tiers: ["Rec", "B", "BB", "A", "AA", "Open"] },
+  Volleyball: {
+    system: "USAV",
+    tiers: ["Casual / Pickup", "Rec (B)", "Intermediate (BB)", "Advanced (A)", "Competitive (AA)"],
+  },
   Running: {
     system: "Pace",
-    tiers: ["10:00+/mi", "9:00/mi", "8:00/mi", "7:00/mi", "6:00/mi", "sub-6:00/mi"],
+    tiers: ["12:00+/mi", "11:00/mi", "10:00/mi", "9:00/mi", "8:00/mi", "7:00/mi or faster"],
     hint: "Typical race pace.",
   },
 };
+
 
 export function scaleForSport(sport: Sport): SportScale {
   return LEVELS_BY_SPORT[sport] ?? GENERIC_SCALE;
