@@ -316,17 +316,6 @@ function OnboardingDetailsSection() {
           between them anytime — the whole app follows the profile you pick.
         </p>
       </SettingsStaticRow>
-      <SettingsLinkRow
-        to="/onboarding/welcome"
-        search={{ type: accountType }}
-        icon={Pencil}
-        label="Edit onboarding details"
-        description={
-          accountType === "player"
-            ? "Update your sport, level, location, and radius"
-            : `Revisit your ${meta.label.toLowerCase()} setup steps`
-        }
-      />
     </SettingsGroup>
   );
 }
