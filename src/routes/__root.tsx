@@ -168,6 +168,8 @@ const BOOT_RETRY_KEY = "openrun:boot-retry";
  */
 const BOOT_WATCHDOG_SCRIPT = `(function(){
   var K=${JSON.stringify(BOOT_RETRY_KEY)};
+  var START=Date.now();
+  var TIMEOUT=30000;
   var RE=/dynamically imported module|Importing a module script failed|Loading chunk|error loading dynamically imported module/i;
   function read(){try{return sessionStorage.getItem(K);}catch(e){return null;}}
   function write(v){try{sessionStorage.setItem(K,v);}catch(e){}}
@@ -194,18 +196,26 @@ const BOOT_WATCHDOG_SCRIPT = `(function(){
     var b=document.getElementById('boot-retry');
     if(b)b.addEventListener('click',function(){try{sessionStorage.removeItem(K);}catch(e){}window.location.reload();});
   }
-  function recover(){
+  function recover(force){
     if(booted())return;
+    if(!force&&document.readyState!=='complete'){
+      setTimeout(function(){recover(false);},5000);
+      return;
+    }
+    if(!force&&Date.now()-START<TIMEOUT){
+      setTimeout(function(){recover(false);},TIMEOUT-(Date.now()-START));
+      return;
+    }
     if(read()==='1'){showFailure();return;}
     write('1');
     window.location.reload();
   }
-  function onMessage(m){if(m&&RE.test(String(m)))recover();}
+  function onMessage(m){if(m&&RE.test(String(m)))recover(true);}
   window.addEventListener('error',function(e){onMessage((e&&(e.message||(e.error&&e.error.message)))||'');});
   window.addEventListener('unhandledrejection',function(e){
     var r=e&&e.reason;onMessage((r&&r.message)||(typeof r==='string'?r:''));
   });
-  setTimeout(recover,8000);
+  setTimeout(function(){recover(false);},TIMEOUT);
 })();`;
 
 /** Called once the React app is running, so the watchdog stands down. */
