@@ -223,8 +223,8 @@ export function toggleSportTier(
 
 /** Maps a retired tier onto its current equivalent for a sport. */
 export function migrateTier(sport: string | null | undefined, tier: string): string {
-  if (sport !== "Football") return tier;
-  return LEGACY_TIER_ALIASES[tier] ?? tier;
+  const bySport = sport ? TIER_ALIASES_BY_SPORT[sport] : undefined;
+  return bySport?.[tier] ?? GENERIC_TIER_ALIASES[tier] ?? tier;
 }
 
 /** Reads the `profiles.sport_levels` jsonb map into typed entries. */
