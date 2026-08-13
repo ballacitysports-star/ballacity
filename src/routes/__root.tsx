@@ -24,6 +24,7 @@ import { clearLastVisited, rememberLastVisited } from "@/lib/last-visited";
 import { clearPendingAccountType, isAccountType, readPendingAccountType } from "@/lib/account-type";
 import { getOnboardingStatus } from "@/lib/onboarding.functions";
 import { logNotFound } from "@/lib/route-doctor";
+import { ErrorFallback, GlobalErrorBoundary } from "@/components/GlobalErrorBoundary";
 
 function NotFoundComponent() {
   const router = useRouter();
@@ -747,9 +748,11 @@ function RootComponent() {
           </div>
         }
       >
-        <AuthGate>
-          <Outlet />
-        </AuthGate>
+        <GlobalErrorBoundary scope="root">
+          <AuthGate>
+            <Outlet />
+          </AuthGate>
+        </GlobalErrorBoundary>
       </ClientOnly>
       <Toaster position="top-center" richColors />
       <ClientOnly fallback={null}>
