@@ -225,7 +225,7 @@ function PlayersPage() {
 
   const q = search.q;
   // `sport` is a comma-separated list; `skill` a per-sport tier map
-  // ("Baseball:Minor AAA|Football:7v7 Elite").
+  // ("Baseball:College / Adult Competitive|Football:7v7 Travel / Showcase").
   const sports = useMemo(() => parseSportList(search.sport), [search.sport]);
   const sportsKey = sports.join(",");
   const skills = useMemo(() => parseSportSkillMap(search.skill, sports), [search.skill, sportsKey]);

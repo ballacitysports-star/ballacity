@@ -29,9 +29,9 @@ describe("sport list params", () => {
 describe("per-sport skill map", () => {
   it("round-trips per-sport tiers", () => {
     const sports = ["Baseball", "Tennis"];
-    const raw = "Baseball:Minor AAA|Tennis:3.5";
+    const raw = "Baseball:College / Adult Competitive|Tennis:3.5";
     const map = parseSportSkillMap(raw, sports);
-    expect(map).toEqual({ Baseball: "Minor AAA", Tennis: "3.5" });
+    expect(map).toEqual({ Baseball: "College / Adult Competitive", Tennis: "3.5" });
     expect(serializeSportSkillMap(map, sports)).toBe(raw);
   });
 
@@ -44,15 +44,15 @@ describe("per-sport skill map", () => {
   });
 
   it("reads a legacy flat value onto the first selected sport", () => {
-    expect(parseSportSkillMap("Rec", ["Baseball", "Tennis"])).toEqual({ Baseball: "Rec" });
+    expect(parseSportSkillMap("Rec", ["Baseball", "Tennis"])).toEqual({ Baseball: "Rec League" });
   });
 
   it("keeps Football multi-select and single-select elsewhere", () => {
     let map = toggleSportSkillTier({}, "Football", "Flag Rec");
-    map = toggleSportSkillTier(map, "Football", "7v7 Elite");
-    expect(map.Football).toBe("Flag Rec · 7v7 Elite");
+    map = toggleSportSkillTier(map, "Football", "7v7 Travel / Showcase");
+    expect(map.Football).toBe("Flag Rec · 7v7 Travel / Showcase");
     map = toggleSportSkillTier(map, "Football", "Flag Rec");
-    expect(map.Football).toBe("7v7 Elite");
+    expect(map.Football).toBe("7v7 Travel / Showcase");
 
     let t = toggleSportSkillTier({}, "Tennis", "3.5");
     t = toggleSportSkillTier(t, "Tennis", "4.0");
@@ -63,7 +63,7 @@ describe("per-sport skill map", () => {
 
 describe("matching", () => {
   const levels = {
-    Baseball: { system: "MiLB", tier: "Minor AAA" },
+    Baseball: { system: "Level", tier: "College / Adult Competitive" },
     Tennis: { system: "NTRP", tier: "3.0" },
   };
 
@@ -73,7 +73,7 @@ describe("matching", () => {
   });
 
   it("ORs across selected sports and only constrains sports with a tier", () => {
-    const skills = { Baseball: "Minor AAA", Tennis: "4.5" };
+    const skills = { Baseball: "College / Adult Competitive", Tennis: "4.5" };
     // Baseball matches even though the Tennis tier does not.
     expect(
       matchesSportSkillFilter(levels, ["Baseball", "Tennis"], null, ["Baseball", "Tennis"], skills),
@@ -81,7 +81,7 @@ describe("matching", () => {
     expect(matchesSportSkillFilter(levels, ["Tennis"], null, ["Tennis"], skills)).toBe(false);
     // Sports without a picked tier are unconstrained.
     expect(
-      matchesSportSkillFilter(levels, ["Tennis"], null, ["Tennis"], { Baseball: "Minor AAA" }),
+      matchesSportSkillFilter(levels, ["Tennis"], null, ["Tennis"], { Baseball: "College / Adult Competitive" }),
     ).toBe(true);
   });
 

@@ -14,7 +14,7 @@ import {
  *
  * URL/localStorage format:
  *  - `sport=Baseball,Football`            — comma separated list
- *  - `skill=Baseball:Minor AAA|Football:7v7 Elite · Flag Rec`
+ *  - `skill=Baseball:College / Adult Competitive|Football:7v7 Travel / Showcase · Flag Rec`
  *                                         — per-sport tiers, "|" between sports
  *  - `skill=Advanced`                     — legacy flat value; applies to the
  *                                           first selected sport
