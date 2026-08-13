@@ -106,10 +106,7 @@ test("unusable persisted session exits the loader and redirects to sign-in", asy
     window.localStorage.setItem(
       key,
       JSON.stringify({
-        access_token: "unusable-session",
-        refresh_token: "unusable-refresh",
         expires_at: Math.floor(Date.now() / 1000) + 3600,
-        user: { id: "00000000-0000-0000-0000-000000000000" },
       }),
     );
   }, STORAGE_KEY!);
