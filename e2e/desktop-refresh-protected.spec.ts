@@ -13,11 +13,6 @@ import { test, expect, type Page } from "@playwright/test";
 const SESSION_JSON = process.env.LOVABLE_BROWSER_SUPABASE_SESSION_JSON;
 const STORAGE_KEY = process.env.LOVABLE_BROWSER_SUPABASE_STORAGE_KEY;
 
-test.skip(
-  !SESSION_JSON || !STORAGE_KEY,
-  "Requires a signed-in Supabase session (LOVABLE_BROWSER_SUPABASE_* env vars).",
-);
-
 // Routes that render themselves (no app-level redirect). Keep in sync
 // with the mobile spec and with new protected top-level pages.
 const PROTECTED_ROUTES = [
@@ -42,6 +37,10 @@ async function restoreSession(page: Page) {
 
 for (const route of PROTECTED_ROUTES) {
   test(`refresh on ${route} stays on ${route} (desktop)`, async ({ page }) => {
+    test.skip(
+      !SESSION_JSON || !STORAGE_KEY,
+      "Requires a signed-in Supabase session (LOVABLE_BROWSER_SUPABASE_* env vars).",
+    );
     // Slow the token endpoint slightly so any hydration race surfaces
     // instead of finishing before AuthGate's first tick.
     await page.route(/\/auth\/v1\/(token|user)\b/, async (route) => {
@@ -86,6 +85,7 @@ for (const route of PROTECTED_ROUTES) {
 }
 
 test("signed-out refresh on a protected route still redirects to /auth", async ({ page }) => {
+  test.skip(!STORAGE_KEY, "Requires the managed auth storage key.");
   // Sanity check: the guard should still send unauthenticated users to
   // /auth?next=/feed. This ensures the "stay on page" fix didn't over-correct.
   await page.goto("/", { waitUntil: "domcontentloaded" });
@@ -100,6 +100,7 @@ test("signed-out refresh on a protected route still redirects to /auth", async (
 });
 
 test("unusable persisted session exits the loader and redirects to sign-in", async ({ page }) => {
+  test.skip(!STORAGE_KEY, "Requires the managed auth storage key.");
   await page.goto("/", { waitUntil: "domcontentloaded" });
   await page.evaluate((key) => {
     window.localStorage.setItem(
