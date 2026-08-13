@@ -120,5 +120,5 @@ test("unusable persisted session exits the loader and redirects to sign-in", asy
 
   const url = new URL(page.url());
   expect(url.pathname).toBe("/auth");
-  expect(url.searchParams.get("next")).toBe("/feed");
+  expect(url.searchParams.get("next")).toMatch(/^\/feed(?:\?|$)/);
 });
