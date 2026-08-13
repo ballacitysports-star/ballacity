@@ -142,8 +142,10 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
 
 const THEME_INIT_SCRIPT = `(function(){try{var h=document.documentElement;h.classList.add('dark');h.dataset.theme='dark';h.dataset.themePref='dark';}catch(e){document.documentElement.classList.add('dark');}})();`;
 
-const BOOT_RETRY_KEY = "openrun:boot-retry";
+const BOOT_RETRY_KEY = "openrun:boot-retry-at";
 const BOOT_TIMEOUT_MS = 20_000;
+const BOOT_HARD_TIMEOUT_MS = 45_000;
+const BOOT_PROGRESS_GRACE_MS = 8_000;
 
 /**
  * Boot watchdog. Runs as a plain inline script (NOT a React effect) because the
@@ -154,7 +156,12 @@ const BOOT_TIMEOUT_MS = 20_000;
 const BOOT_WATCHDOG_SCRIPT = `(function(){
   var K=${JSON.stringify(BOOT_RETRY_KEY)};
   var START=Date.now();
-  var TIMEOUT=${BOOT_TIMEOUT_MS};
+  var previousAttempt=Number((function(){try{return sessionStorage.getItem(K)||'0';}catch(e){return '0';}})());
+  var TIMEOUT=previousAttempt&&START-previousAttempt<120000?8000:${BOOT_TIMEOUT_MS};
+  var HARD_TIMEOUT=${BOOT_HARD_TIMEOUT_MS};
+  var PROGRESS_GRACE=${BOOT_PROGRESS_GRACE_MS};
+  var lastResourceCount=0;
+  var lastProgressAt=START;
   var RE=/dynamically imported module|Importing a module script failed|Loading chunk|error loading dynamically imported module/i;
   function read(){try{return sessionStorage.getItem(K);}catch(e){return null;}}
   function write(v){try{sessionStorage.setItem(K,v);}catch(e){}}
@@ -164,6 +171,7 @@ const BOOT_WATCHDOG_SCRIPT = `(function(){
       '<p class="mt-2 text-sm text-muted-foreground">Check your connection, then try again.</p>'+
       '<div class="mt-5 flex flex-wrap justify-center gap-2">'+
       '<button type="button" id="boot-retry" class="inline-flex items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground">Try again</button>'+
+      '<a href="/auth" class="inline-flex items-center justify-center rounded-md border border-input bg-background px-4 py-2 text-sm font-medium text-foreground">Sign in again</a>'+
       '<a href="/" class="inline-flex items-center justify-center rounded-md border border-input bg-background px-4 py-2 text-sm font-medium text-foreground">Go home</a>'+
       '</div>';
   }
@@ -184,16 +192,28 @@ const BOOT_WATCHDOG_SCRIPT = `(function(){
   function recover(force){
     if(booted())return;
     if(!force){showFailure();return;}
-    if(read()==='1'){showFailure();return;}
-    write('1');
+    var attemptedAt=Number(read()||'0');
+    if(attemptedAt&&Date.now()-attemptedAt<120000){showFailure();return;}
+    write(String(Date.now()));
     window.location.reload();
+  }
+  function resourceCount(){try{return performance.getEntriesByType('resource').length;}catch(e){return 0;}}
+  function checkProgress(){
+    if(booted())return;
+    var now=Date.now();
+    var count=resourceCount();
+    if(count>lastResourceCount){lastResourceCount=count;lastProgressAt=now;}
+    if(now-START>=HARD_TIMEOUT){recover(true);return;}
+    if(now-START>=TIMEOUT&&now-lastProgressAt>=PROGRESS_GRACE){recover(true);return;}
+    setTimeout(checkProgress,1000);
   }
   function onMessage(m){if(m&&RE.test(String(m)))recover(true);}
   window.addEventListener('error',function(e){onMessage((e&&(e.message||(e.error&&e.error.message)))||'');});
   window.addEventListener('unhandledrejection',function(e){
     var r=e&&e.reason;onMessage((r&&r.message)||(typeof r==='string'?r:''));
   });
-  setTimeout(function(){recover(false);},TIMEOUT);
+  lastResourceCount=resourceCount();
+  setTimeout(checkProgress,1000);
 })();`;
 
 /** Called once the React app is running, so the watchdog stands down. */
@@ -222,7 +242,6 @@ function RootShell({ children }: { children: React.ReactNode }) {
   );
 }
 
-const CHUNK_RELOAD_KEY = "__openrun_chunk_reloaded_at";
 const OAUTH_PROVIDER_KEY = "openrun:oauth-provider";
 const AUTH_SESSION_CHECK_TIMEOUT_MS = 5_000;
 const ONBOARDING_CHECK_TIMEOUT_MS = 5_000;
@@ -293,9 +312,9 @@ function isChunkLoadError(reason: unknown): boolean {
 function maybeReloadForStaleChunk(reason: unknown) {
   if (!isChunkLoadError(reason)) return;
   try {
-    const last = Number(sessionStorage.getItem(CHUNK_RELOAD_KEY) ?? "0");
-    if (Date.now() - last < 10_000) return; // avoid reload loops
-    sessionStorage.setItem(CHUNK_RELOAD_KEY, String(Date.now()));
+    const last = Number(sessionStorage.getItem(BOOT_RETRY_KEY) ?? "0");
+    if (last && Date.now() - last < 120_000) return;
+    sessionStorage.setItem(BOOT_RETRY_KEY, String(Date.now()));
   } catch {
     // ignore storage errors
   }

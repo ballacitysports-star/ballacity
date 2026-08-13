@@ -61,7 +61,7 @@ function isChunkLoadMessage(message: string): boolean {
   );
 }
 
-const CHUNK_RELOAD_KEY = "openrun:boundary-chunk-reload";
+const BOOT_RETRY_KEY = "openrun:boot-retry-at";
 
 interface Props {
   children: ReactNode;
@@ -94,9 +94,9 @@ export class GlobalErrorBoundary extends Component<Props, State> {
     // the new build instead of showing a failure screen.
     if (typeof window !== "undefined" && isChunkLoadMessage(error.message ?? "")) {
       try {
-        const last = Number(sessionStorage.getItem(CHUNK_RELOAD_KEY) ?? "0");
-        if (Date.now() - last > 10_000) {
-          sessionStorage.setItem(CHUNK_RELOAD_KEY, String(Date.now()));
+        const last = Number(sessionStorage.getItem(BOOT_RETRY_KEY) ?? "0");
+        if (!last || Date.now() - last > 120_000) {
+          sessionStorage.setItem(BOOT_RETRY_KEY, String(Date.now()));
           window.location.reload();
         }
       } catch {
