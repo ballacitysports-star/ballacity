@@ -20,7 +20,7 @@ import {
   BadgeCheck,
 } from "lucide-react";
 import { ACCOUNT_TYPE_META } from "@/lib/account-type";
-import { addProfileRoute, useMyProfiles } from "@/lib/account-profiles";
+import { useMyProfiles } from "@/lib/account-profiles";
 import { ProfileSwitcher } from "@/components/ProfileSwitcher";
 import { useMyProfile } from "@/lib/user-prefs-store";
 import {
