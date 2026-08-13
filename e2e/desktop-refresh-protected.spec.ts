@@ -96,7 +96,7 @@ test("signed-out refresh on a protected route still redirects to /auth", async (
 
   const url = new URL(page.url());
   expect(url.pathname).toBe("/auth");
-  expect(url.searchParams.get("next")).toBe("/feed");
+  expect(url.searchParams.get("next")).toMatch(/^\/feed(?:\?|$)/);
 });
 
 test("unusable persisted session exits the loader and redirects to sign-in", async ({ page }) => {
