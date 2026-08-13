@@ -143,7 +143,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
 const THEME_INIT_SCRIPT = `(function(){try{var h=document.documentElement;h.classList.add('dark');h.dataset.theme='dark';h.dataset.themePref='dark';}catch(e){document.documentElement.classList.add('dark');}})();`;
 
 const BOOT_RETRY_KEY = "openrun:boot-retry";
-const BOOT_TIMEOUT_MS = 8_000;
+const BOOT_TIMEOUT_MS = 20_000;
 
 /**
  * Boot watchdog. Runs as a plain inline script (NOT a React effect) because the
@@ -183,14 +183,7 @@ const BOOT_WATCHDOG_SCRIPT = `(function(){
   }
   function recover(force){
     if(booted())return;
-    if(!force&&document.readyState!=='complete'){
-      setTimeout(function(){recover(false);},5000);
-      return;
-    }
-    if(!force&&Date.now()-START<TIMEOUT){
-      setTimeout(function(){recover(false);},TIMEOUT-(Date.now()-START));
-      return;
-    }
+    if(!force){showFailure();return;}
     if(read()==='1'){showFailure();return;}
     write('1');
     window.location.reload();
@@ -232,6 +225,26 @@ function RootShell({ children }: { children: React.ReactNode }) {
 const CHUNK_RELOAD_KEY = "__openrun_chunk_reloaded_at";
 const OAUTH_PROVIDER_KEY = "openrun:oauth-provider";
 const AUTH_SESSION_CHECK_TIMEOUT_MS = 5_000;
+const ONBOARDING_CHECK_TIMEOUT_MS = 5_000;
+
+function withDeadline<T>(operation: PromiseLike<T>, timeoutMs: number): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timeoutId = window.setTimeout(
+      () => reject(new Error("Operation timed out")),
+      timeoutMs,
+    );
+    Promise.resolve(operation).then(
+      (value) => {
+        window.clearTimeout(timeoutId);
+        resolve(value);
+      },
+      (error) => {
+        window.clearTimeout(timeoutId);
+        reject(error);
+      },
+    );
+  });
+}
 
 async function readSessionBounded() {
   let timeoutId: number | undefined;
@@ -550,7 +563,10 @@ function AuthGate({ children }: { children: React.ReactNode }) {
       // so a social user with stripped provider metadata is still classified
       // correctly. Falls back to the client query if the server fn fails.
       try {
-        const status = await getOnboardingStatus();
+        const status = await withDeadline(
+          getOnboardingStatus(),
+          ONBOARDING_CHECK_TIMEOUT_MS,
+        );
         if (cancelled) return;
         if (status.needsOnboarding) {
           setTypeStatus("missing");
@@ -564,11 +580,10 @@ function AuthGate({ children }: { children: React.ReactNode }) {
         /* fall through to client check */
       }
       try {
-        const { data, error } = await supabase
-          .from("profiles")
-          .select("account_type")
-          .eq("id", user.id)
-          .maybeSingle();
+        const { data, error } = await withDeadline(
+          supabase.from("profiles").select("account_type").eq("id", user.id).maybeSingle(),
+          ONBOARDING_CHECK_TIMEOUT_MS,
+        );
         if (cancelled) return;
         if (error) throw error;
         const t = (data as { account_type?: string } | null)?.account_type;
