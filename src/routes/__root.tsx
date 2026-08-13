@@ -143,6 +143,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
 const THEME_INIT_SCRIPT = `(function(){try{var h=document.documentElement;h.classList.add('dark');h.dataset.theme='dark';h.dataset.themePref='dark';}catch(e){document.documentElement.classList.add('dark');}})();`;
 
 const BOOT_RETRY_KEY = "openrun:boot-retry";
+const BOOT_TIMEOUT_MS = 8_000;
 
 /**
  * Boot watchdog. Runs as a plain inline script (NOT a React effect) because the
@@ -153,7 +154,7 @@ const BOOT_RETRY_KEY = "openrun:boot-retry";
 const BOOT_WATCHDOG_SCRIPT = `(function(){
   var K=${JSON.stringify(BOOT_RETRY_KEY)};
   var START=Date.now();
-  var TIMEOUT=30000;
+  var TIMEOUT=${BOOT_TIMEOUT_MS};
   var RE=/dynamically imported module|Importing a module script failed|Loading chunk|error loading dynamically imported module/i;
   function read(){try{return sessionStorage.getItem(K);}catch(e){return null;}}
   function write(v){try{sessionStorage.setItem(K,v);}catch(e){}}
@@ -230,6 +231,21 @@ function RootShell({ children }: { children: React.ReactNode }) {
 
 const CHUNK_RELOAD_KEY = "__openrun_chunk_reloaded_at";
 const OAUTH_PROVIDER_KEY = "openrun:oauth-provider";
+const AUTH_SESSION_CHECK_TIMEOUT_MS = 5_000;
+
+async function readSessionBounded() {
+  let timeoutId: number | undefined;
+  try {
+    return await Promise.race([
+      supabase.auth.getSession(),
+      new Promise<null>((resolve) => {
+        timeoutId = window.setTimeout(() => resolve(null), AUTH_SESSION_CHECK_TIMEOUT_MS);
+      }),
+    ]);
+  } finally {
+    if (timeoutId !== undefined) window.clearTimeout(timeoutId);
+  }
+}
 
 function readSavedOAuthProvider(): "google" | "apple" | null {
   try {
@@ -387,7 +403,7 @@ function AuthGate({ children }: { children: React.ReactNode }) {
     }
     if (user) {
       logAuthGateDecision("user-present", { pathname, loading, hasUser: true });
-      if (verifying) setVerifying(false);
+      setVerifying(false);
       return;
     }
     if (isPublic) {
@@ -409,9 +425,9 @@ function AuthGate({ children }: { children: React.ReactNode }) {
     });
     const t0 = performance.now();
     const attemptRedirect = async () => {
-      const first = await supabase.auth.getSession();
+      const first = await readSessionBounded();
       if (cancelled) return;
-      if (first.data.session?.user) {
+      if (first?.data.session?.user) {
         logAuthGateDecision("verify-hydrated-late", {
           pathname,
           loading,
@@ -443,9 +459,9 @@ function AuthGate({ children }: { children: React.ReactNode }) {
         });
         await new Promise((r) => setTimeout(r, 4000));
         if (cancelled) return;
-        const final = await supabase.auth.getSession();
+        const final = await readSessionBounded();
         if (cancelled) return;
-        if (final.data.session?.user) {
+        if (final?.data.session?.user) {
           logAuthGateDecision("verify-hydrated-late", {
             pathname,
             loading,
@@ -459,19 +475,16 @@ function AuthGate({ children }: { children: React.ReactNode }) {
           setVerifying(false);
           return;
         }
-        // Still no session and the stored token is either gone or expired:
-        // fall through to the redirect below.
+        // Still no session after both bounded checks. Even if stale storage
+        // remains, fall through to sign-in rather than holding the full-screen
+        // loader forever.
         if (readStoredSupabaseSession()) {
-          // Token is still present and valid — keep waiting rather than
-          // redirecting. `verifying` stays true so the loader keeps
-          // showing until onAuthStateChange fires (or the user reloads).
           logAuthGateDecision("verify-waiting-hydration", {
             pathname,
             loading,
             hasUser: false,
-            extra: { phase: "still-waiting-after-timeout" },
+            extra: { phase: "timed-out-after-final-check" },
           });
-          return;
         }
       }
 
@@ -482,8 +495,8 @@ function AuthGate({ children }: { children: React.ReactNode }) {
         hasUser: false,
         extra: {
           durationMs,
-          errorName: first.error?.name ?? null,
-          errorMessage: first.error?.message ?? null,
+          errorName: first?.error?.name ?? null,
+          errorMessage: first?.error?.message ?? null,
         },
       });
       const href = router.state.location.href;
@@ -505,7 +518,7 @@ function AuthGate({ children }: { children: React.ReactNode }) {
     return () => {
       cancelled = true;
     };
-  }, [loading, user, isPublic, router, pathname, verifying]);
+  }, [loading, user, isPublic, router, pathname]);
 
   // Onboarding completion guard: block rendering of protected routes until we
   // confirm the user has picked an account type. Fresh Google sign-ins would

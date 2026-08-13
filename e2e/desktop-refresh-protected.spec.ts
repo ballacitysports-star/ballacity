@@ -98,3 +98,29 @@ test("signed-out refresh on a protected route still redirects to /auth", async (
   expect(url.pathname).toBe("/auth");
   expect(url.searchParams.get("next")).toBe("/feed");
 });
+
+test("unusable persisted session exits the loader and redirects to sign-in", async ({ page }) => {
+  await page.goto("/", { waitUntil: "domcontentloaded" });
+  await page.evaluate((key) => {
+    window.localStorage.setItem(
+      key,
+      JSON.stringify({
+        access_token: "unusable-session",
+        refresh_token: "unusable-refresh",
+        expires_at: Math.floor(Date.now() / 1000) + 3600,
+        user: { id: "00000000-0000-0000-0000-000000000000" },
+      }),
+    );
+  }, STORAGE_KEY!);
+
+  await page.route(/\/auth\/v1\/(token|user)\b/, async (route) => {
+    await route.abort("failed");
+  });
+
+  await page.goto("/feed", { waitUntil: "domcontentloaded" });
+  await page.waitForURL(/\/auth(\?|$)/, { timeout: 15_000 });
+
+  const url = new URL(page.url());
+  expect(url.pathname).toBe("/auth");
+  expect(url.searchParams.get("next")).toBe("/feed");
+});
