@@ -2,7 +2,7 @@ import { createFileRoute, Link, notFound } from "@tanstack/react-router";
 import { pageHead } from "@/lib/seo";
 import { ensureOrgById, getOrgById } from "@/lib/org-store";
 import type { Org } from "@/lib/sample-data";
-import { EditOrgScreen } from "./teams.$teamId.edit";
+import { EditOrgScreen } from "@/components/EditOrgScreen";
 
 export const Route = createFileRoute("/trainers/$trainerId/edit")({
   head: () =>

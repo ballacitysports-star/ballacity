@@ -1,8 +1,7 @@
 import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
 import { pageHead } from "@/lib/seo";
-import { motion } from "framer-motion";
 import { ArrowRight, MapPin, Sparkles, Trophy, Users, Video, Zap } from "lucide-react";
-import { useEffect } from "react";
+import { useEffect, type CSSProperties } from "react";
 import { Logo } from "@/components/Logo";
 import { HERO_IMAGE, SPORTS, GAMES } from "@/lib/sample-data";
 import { GameCard } from "@/components/GameCard";
@@ -91,38 +90,30 @@ function Landing() {
         <div className="absolute inset-0 grid-noise opacity-30" />
         <div className="relative mx-auto max-w-6xl px-5 pt-12 pb-20 md:pt-20 md:pb-32 grid md:grid-cols-2 gap-10 items-center">
           <div>
-            <motion.div
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="inline-flex items-center gap-2 rounded-full border border-lime/30 bg-lime/10 px-3 py-1 text-xs font-semibold text-lime"
+            <div
+              className="enter-up inline-flex items-center gap-2 rounded-full border border-lime/30 bg-lime/10 px-3 py-1 text-xs font-semibold text-lime"
             >
               <span className="h-1.5 w-1.5 rounded-full bg-lime animate-pulse" />
               Live · 1,284 games this week
-            </motion.div>
-            <motion.h1
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.05 }}
-              className="mt-5 font-display text-5xl md:text-7xl font-bold leading-[0.95] tracking-tight"
+            </div>
+            <h1
+              style={{ "--enter-delay": "50ms" } as CSSProperties}
+              className="enter-up mt-5 font-display text-5xl md:text-7xl font-bold leading-[0.95] tracking-tight"
             >
               Pickup sports.
               <br />
               <span className="text-lime">On demand.</span>
-            </motion.h1>
-            <motion.p
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.12 }}
-              className="mt-5 max-w-md text-lg text-muted-foreground"
+            </h1>
+            <p
+              style={{ "--enter-delay": "120ms" } as CSSProperties}
+              className="enter-up mt-5 max-w-md text-lg text-muted-foreground"
             >
               Find a game in 15 seconds. Host your court. Build a crew. From hoops to pickleball —
               OpenRun connects the players around you.
-            </motion.p>
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.18 }}
-              className="mt-7 flex flex-wrap gap-3"
+            </p>
+            <div
+              style={{ "--enter-delay": "180ms" } as CSSProperties}
+              className="enter-up mt-7 flex flex-wrap gap-3"
             >
               <Link
                 to="/feed"
@@ -136,7 +127,7 @@ function Landing() {
               >
                 Host a game
               </Link>
-            </motion.div>
+            </div>
 
             <div className="mt-10 grid grid-cols-3 gap-6 max-w-md">
               {[
@@ -154,11 +145,9 @@ function Landing() {
             </div>
           </div>
 
-          <motion.div
-            initial={{ opacity: 0, scale: 0.94, rotate: 2 }}
-            animate={{ opacity: 1, scale: 1, rotate: 0 }}
-            transition={{ type: "spring", stiffness: 140, damping: 18, delay: 0.1 }}
-            className="relative mx-auto w-[300px] md:w-[340px]"
+          <div
+            style={{ "--enter-delay": "100ms" } as CSSProperties}
+            className="enter-pop relative mx-auto w-[300px] md:w-[340px]"
           >
             {/* Phone frame */}
             <div className="relative rounded-[2.5rem] border-[10px] border-surface-2 bg-background shadow-2xl glow-coral overflow-hidden">
@@ -188,10 +177,8 @@ function Landing() {
                 </button>
               </div>
             </div>
-            <motion.div
-              animate={{ y: [0, -8, 0] }}
-              transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
-              className="absolute -left-10 top-10 rounded-2xl border border-border bg-surface/90 backdrop-blur p-3 shadow-xl"
+            <div
+              className="float-soft absolute -left-10 top-10 rounded-2xl border border-border bg-surface/90 backdrop-blur p-3 shadow-xl"
             >
               <div className="flex items-center gap-2 text-xs font-semibold">
                 <span className="grid h-7 w-7 place-items-center rounded-full bg-coral-gradient text-white">
@@ -199,18 +186,17 @@ function Landing() {
                 </span>
                 Marcus joined your game
               </div>
-            </motion.div>
-            <motion.div
-              animate={{ y: [0, 8, 0] }}
-              transition={{ duration: 5, repeat: Infinity, ease: "easeInOut", delay: 0.5 }}
-              className="absolute -right-6 bottom-24 rounded-2xl border border-border bg-surface/90 backdrop-blur p-3 shadow-xl"
+            </div>
+            <div
+              style={{ "--enter-delay": "500ms" } as CSSProperties}
+              className="float-soft absolute -right-6 bottom-24 rounded-2xl border border-border bg-surface/90 backdrop-blur p-3 shadow-xl"
             >
               <div className="text-[10px] uppercase tracking-wider text-muted-foreground">
                 Reliability
               </div>
               <div className="font-display text-xl font-bold text-lime">98%</div>
-            </motion.div>
-          </motion.div>
+            </div>
+          </div>
         </div>
       </section>
 
@@ -226,20 +212,17 @@ function Landing() {
         </div>
         <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
           {SPORTS.map((s, i) => (
-            <motion.div
+            <div
               key={s.name}
-              initial={{ opacity: 0, y: 12 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ delay: i * 0.04 }}
-              className="group rounded-2xl border border-border bg-surface p-4 hover:border-lime/40 transition-all hover:-translate-y-0.5"
+              style={{ "--enter-delay": `${i * 40}ms` } as CSSProperties}
+              className="enter-up group rounded-2xl border border-border bg-surface p-4 hover:border-lime/40 transition-all hover:-translate-y-0.5"
             >
               <div className="text-3xl mb-2">{s.emoji}</div>
               <div className="font-semibold">{s.name}</div>
               <div className="text-xs text-muted-foreground">
                 {20 + ((s.name.charCodeAt(0) * 7 + s.name.length * 13) % 80)} nearby
               </div>
-            </motion.div>
+            </div>
           ))}
         </div>
       </section>
@@ -290,13 +273,10 @@ function Landing() {
           ].map((f, i) => {
             const Icon = f.icon;
             return (
-              <motion.div
+              <div
                 key={f.title}
-                initial={{ opacity: 0, y: 12 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ delay: i * 0.05 }}
-                className="rounded-3xl border border-border bg-surface p-6"
+                style={{ "--enter-delay": `${i * 50}ms` } as CSSProperties}
+                className="enter-up rounded-3xl border border-border bg-surface p-6"
               >
                 <div
                   className={`inline-grid h-11 w-11 place-items-center rounded-2xl mb-4 ${f.color === "lime" ? "bg-lime/15 text-lime" : "bg-coral/15 text-coral"}`}
@@ -305,7 +285,7 @@ function Landing() {
                 </div>
                 <h3 className="font-display text-xl font-semibold">{f.title}</h3>
                 <p className="text-muted-foreground mt-1.5 text-sm">{f.body}</p>
-              </motion.div>
+              </div>
             );
           })}
         </div>

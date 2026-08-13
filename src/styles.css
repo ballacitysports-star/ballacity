@@ -213,6 +213,61 @@ html.light {
   }
   .scrollbar-hide::-webkit-scrollbar { display: none; }
   .scrollbar-hide { scrollbar-width: none; }
+
+  /* Lightweight CSS entrance/idle animations used on first-paint surfaces
+     (landing hero, logo, cards) so they don't pull in a JS animation
+     library on the critical path. `--enter-delay` staggers lists. */
+  .enter-up {
+    animation: enter-up 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
+    animation-delay: var(--enter-delay, 0ms);
+  }
+  .enter-fade {
+    animation: enter-fade 0.4s ease-out both;
+    animation-delay: var(--enter-delay, 0ms);
+  }
+  .enter-pop {
+    animation: enter-pop 0.6s cubic-bezier(0.22, 1, 0.36, 1) both;
+    animation-delay: var(--enter-delay, 0ms);
+  }
+  .float-soft {
+    animation: float-soft 4s ease-in-out infinite;
+    animation-delay: var(--enter-delay, 0ms);
+  }
+  .grow-x {
+    animation: grow-x 0.8s ease-out both;
+    animation-delay: var(--enter-delay, 0ms);
+    transform-origin: left center;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .enter-up,
+    .enter-fade,
+    .enter-pop,
+    .float-soft,
+    .grow-x {
+      animation: none;
+    }
+  }
+}
+
+@keyframes enter-up {
+  from { opacity: 0; transform: translateY(16px); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes enter-fade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes enter-pop {
+  from { opacity: 0; transform: scale(0.94) rotate(2deg); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes float-soft {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-8px); }
+}
+@keyframes grow-x {
+  from { transform: scaleX(0); }
+  to { transform: scaleX(1); }
 }
 
 
