@@ -12,6 +12,7 @@ const listeners = new Set<() => void>();
 const SERVER_AUTH_STATE: AuthState = { session: null, user: null, loading: true };
 let authState: AuthState = { session: null, user: null, loading: true };
 let initialized = false;
+const AUTH_HYDRATION_TIMEOUT_MS = 6_000;
 
 function emit() {
   listeners.forEach((listener) => listener());
@@ -37,9 +38,19 @@ function initAuthStore() {
   //    "auth is ready" signal on mobile webviews. Network-based
   //    getUser() races with storage rehydration and produces false
   //    null-user states.
+  const hydrationTimeout = window.setTimeout(() => {
+    // A stuck auth storage lock must not hold every protected route behind a
+    // full-screen loader forever. A valid session may still arrive through
+    // onAuthStateChange or the late getSession resolution below.
+    if (authState.loading) {
+      setAuthState({ session: null, user: null, loading: false });
+    }
+  }, AUTH_HYDRATION_TIMEOUT_MS);
+
   supabase.auth
     .getSession()
     .then(({ data }) => {
+      window.clearTimeout(hydrationTimeout);
       setAuthState({
         session: data.session,
         user: data.session?.user ?? null,
@@ -65,6 +76,7 @@ function initAuthStore() {
       }
     })
     .catch(() => {
+      window.clearTimeout(hydrationTimeout);
       setAuthState({ session: null, user: null, loading: false });
     });
 }
