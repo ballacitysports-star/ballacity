@@ -1,6 +1,4 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { ImageResponse } from "@cf-wasm/og";
-import { htmlToReact } from "@cf-wasm/og/html-to-react";
 
 /**
  * Dynamic OpenGraph / Twitter card renderer.
@@ -41,6 +39,30 @@ const esc = (s: string) =>
     .replace(/"/g, "&quot;");
 
 const clamp = (s: string, n: number) => (s.length > n ? `${s.slice(0, n - 1).trimEnd()}…` : s);
+
+function fallbackSvg(opts: {
+  kind: { label: string; accent: string };
+  title: string;
+  subtitle: string;
+  width: number;
+  height: number;
+}) {
+  const { kind, title, subtitle, width, height } = opts;
+  const scale = width / 1200;
+  const s = (value: number) => Math.round(value * scale);
+  const titleSize = s(title.length > 40 ? 62 : 80);
+
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">
+    <rect width="${width}" height="${height}" fill="#0C0F0B"/>
+    <rect x="${s(72)}" y="${s(72)}" width="${s(56)}" height="${s(56)}" rx="${s(16)}" fill="${kind.accent}"/>
+    <text x="${s(148)}" y="${s(116)}" fill="#F4F7F2" font-family="Arial, sans-serif" font-size="${s(40)}" font-weight="700">OpenRun</text>
+    <rect x="${width - s(300)}" y="${s(72)}" width="${s(228)}" height="${s(58)}" rx="${s(29)}" fill="${kind.accent}"/>
+    <text x="${width - s(186)}" y="${s(111)}" text-anchor="middle" fill="#0C0F0B" font-family="Arial, sans-serif" font-size="${s(26)}" font-weight="700">${esc(kind.label)}</text>
+    <text x="${s(72)}" y="${Math.round(height * 0.55)}" fill="#FFFFFF" font-family="Arial, sans-serif" font-size="${titleSize}" font-weight="700">${esc(title)}</text>
+    ${subtitle ? `<text x="${s(72)}" y="${Math.round(height * 0.68)}" fill="#A7B3A2" font-family="Arial, sans-serif" font-size="${s(34)}">${esc(subtitle)}</text>` : ""}
+    <text x="${width - s(72)}" y="${height - s(72)}" text-anchor="end" fill="#6F7C6B" font-family="Arial, sans-serif" font-size="${s(26)}">open-run-connect.lovable.app</text>
+  </svg>`;
+}
 
 function template(opts: {
   kind: { label: string; accent: string };
@@ -146,6 +168,13 @@ export const Route = createFileRoute("/api/public/og")({
         }
 
         try {
+          // Keep the WASM renderer outside the application startup graph. Some
+          // edge runtimes cannot resolve its resvg asset; that must never make
+          // unrelated routes such as `/` fail during route-tree evaluation.
+          const [{ ImageResponse }, { htmlToReact }] = await Promise.all([
+            import("@cf-wasm/og"),
+            import("@cf-wasm/og/html-to-react"),
+          ]);
           return new ImageResponse(
             htmlToReact(template({ kind, title, subtitle, meta, width, height })),
             {
@@ -156,10 +185,14 @@ export const Route = createFileRoute("/api/public/og")({
             },
           );
         } catch (err) {
-
-          return new Response(`OG render failed: ${(err as Error).message}`, {
-            status: 500,
-            headers: { "Cache-Control": "no-store" },
+          console.error("OG renderer unavailable; serving SVG fallback", err);
+          return new Response(fallbackSvg({ kind, title, subtitle, width, height }), {
+            status: 200,
+            headers: {
+              "Cache-Control": "no-store",
+              "Content-Type": "image/svg+xml; charset=utf-8",
+              "X-OpenRun-OG-Fallback": "renderer-unavailable",
+            },
           });
         }
       },

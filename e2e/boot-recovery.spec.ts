@@ -1,5 +1,19 @@
 import { expect, test } from "@playwright/test";
 
+test("the app boots independently of the OG image renderer", async ({ page, request }) => {
+  const rootResponse = await page.goto("/", { waitUntil: "domcontentloaded" });
+  expect(rootResponse?.status()).toBe(200);
+  await expect
+    .poll(() => page.evaluate(() => window.__openrun_booted === true), { timeout: 30_000 })
+    .toBe(true);
+
+  const ogResponse = await request.get(
+    "/api/public/og?kind=game&title=Startup%20check&subtitle=Renderer%20isolated&size=og",
+  );
+  expect(ogResponse.status()).toBe(200);
+  expect(ogResponse.headers()["content-type"]).toMatch(/^image\/(png|svg\+xml)/);
+});
+
 test("failed client boot reloads once, then shows recovery actions", async ({ page }) => {
   let documentRequests = 0;
   page.on("request", (request) => {
