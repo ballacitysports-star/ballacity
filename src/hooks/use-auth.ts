@@ -101,6 +101,13 @@ export function useAuth() {
 }
 
 export async function signOut() {
+  // Unlink this device from the user's push identity so alerts stop following them.
+  try {
+    const { logoutOneSignal } = await import("@/lib/onesignal");
+    await logoutOneSignal();
+  } catch {
+    /* ignore */
+  }
   await supabase.auth.signOut();
 }
 
