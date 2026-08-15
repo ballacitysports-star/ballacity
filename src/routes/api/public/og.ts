@@ -64,45 +64,6 @@ function fallbackSvg(opts: {
   </svg>`;
 }
 
-function template(opts: {
-  kind: { label: string; accent: string };
-  title: string;
-  subtitle: string;
-  meta: string[];
-  width: number;
-  height: number;
-}) {
-  const { kind, title, subtitle, meta, width, height } = opts;
-  // Scale every dimension off the 1200x630 base so each preset stays identical
-  // in composition, just rendered at higher pixel density / aspect ratio.
-  const s = (n: number) => Math.round(n * (width / 1200));
-  const chips = meta
-    .map(
-      (m) =>
-        `<div style="display:flex;padding:${s(8)}px ${s(22)}px;border-radius:999px;background:#1A2118;border:${Math.max(2, s(2))}px solid #2A331F;color:#E8EDE6;font-size:${s(28)}px;">${esc(m)}</div>`,
-    )
-    .join("");
-
-  return `<div style="display:flex;flex-direction:column;justify-content:space-between;width:${width}px;height:${height}px;padding:${s(72)}px;background:#0C0F0B;font-family:sans-serif;">
-    <div style="display:flex;align-items:center;justify-content:space-between;">
-      <div style="display:flex;align-items:center;">
-        <div style="display:flex;width:${s(56)}px;height:${s(56)}px;border-radius:${s(16)}px;background:${kind.accent};"></div>
-        <div style="display:flex;margin-left:${s(20)}px;color:#F4F7F2;font-size:${s(40)}px;font-weight:700;">OpenRun</div>
-      </div>
-      <div style="display:flex;padding:${s(12)}px ${s(26)}px;border-radius:999px;background:${kind.accent};color:#0C0F0B;font-size:${s(26)}px;font-weight:700;">${esc(kind.label)}</div>
-    </div>
-    <div style="display:flex;flex-direction:column;">
-      <div style="display:flex;color:#FFFFFF;font-size:${s(title.length > 40 ? 62 : 80)}px;font-weight:700;line-height:1.05;">${esc(title)}</div>
-      ${subtitle ? `<div style="display:flex;margin-top:${s(24)}px;color:#A7B3A2;font-size:${s(34)}px;line-height:1.25;">${esc(subtitle)}</div>` : ""}
-    </div>
-    <div style="display:flex;align-items:center;justify-content:space-between;">
-      <div style="display:flex;gap:${s(16)}px;max-width:${s(800)}px;overflow:hidden;">${chips}</div>
-      <div style="display:flex;flex-shrink:0;margin-left:${s(32)}px;color:#6F7C6B;font-size:${s(26)}px;white-space:nowrap;">open-run-connect.lovable.app</div>
-    </div>
-  </div>`;
-}
-
-
 /** Cache for a day in the browser, a year at the edge; previews are immutable per URL. */
 const CACHE_CONTROL = "public, max-age=86400, s-maxage=31536000, stale-while-revalidate=604800, stale-if-error=604800, immutable";
 
@@ -167,34 +128,16 @@ export const Route = createFileRoute("/api/public/og")({
           return new Response(null, { status: 304, headers: cacheHeaders });
         }
 
-        try {
-          // Keep the WASM renderer outside the application startup graph. Some
-          // edge runtimes cannot resolve its resvg asset; that must never make
-          // unrelated routes such as `/` fail during route-tree evaluation.
-          const [{ ImageResponse }, { htmlToReact }] = await Promise.all([
-            import("@cf-wasm/og"),
-            import("@cf-wasm/og/html-to-react"),
-          ]);
-          return new ImageResponse(
-            htmlToReact(template({ kind, title, subtitle, meta, width, height })),
-            {
-              width,
-              height,
-              format: "png",
-              headers: { ...cacheHeaders, "Content-Type": "image/png" },
-            },
-          );
-        } catch (err) {
-          console.error("OG renderer unavailable; serving SVG fallback", err);
-          return new Response(fallbackSvg({ kind, title, subtitle, width, height }), {
-            status: 200,
-            headers: {
-              "Cache-Control": "no-store",
-              "Content-Type": "image/svg+xml; charset=utf-8",
-              "X-OpenRun-OG-Fallback": "renderer-unavailable",
-            },
-          });
-        }
+        // SVG is intentionally the canonical response. It is supported by social
+        // crawlers and avoids native/WASM renderer assets that can prevent the
+        // worker from starting before this route is ever requested.
+        return new Response(fallbackSvg({ kind, title, subtitle, width, height }), {
+          status: 200,
+          headers: {
+            ...cacheHeaders,
+            "Content-Type": "image/svg+xml; charset=utf-8",
+          },
+        });
       },
     },
   },
