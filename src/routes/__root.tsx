@@ -25,6 +25,7 @@ import { clearPendingAccountType, isAccountType, readPendingAccountType } from "
 import { getOnboardingStatus } from "@/lib/onboarding.functions";
 import { logNotFound } from "@/lib/route-doctor";
 import { ErrorFallback, GlobalErrorBoundary } from "@/components/GlobalErrorBoundary";
+import { setDeepLinkNavigator } from "@/lib/deep-links";
 
 function NotFoundComponent() {
   const router = useRouter();
@@ -422,6 +423,16 @@ function AuthGate({ children }: { children: React.ReactNode }) {
   const [verifying, setVerifying] = useState(false);
   useNotificationPush();
   useOneSignal();
+
+  // Let push/notification handlers route in-app instead of reloading the page.
+  const router = useRouter();
+  useEffect(() => {
+    setDeepLinkNavigator((path) => {
+      void router.navigate({ href: path } as any);
+      if (typeof window !== "undefined") window.focus();
+    });
+    return () => setDeepLinkNavigator(null);
+  }, [router]);
 
   useEffect(() => {
     if (loading) {
