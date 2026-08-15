@@ -425,7 +425,7 @@ function AuthGate({ children }: { children: React.ReactNode }) {
   useOneSignal();
 
   // Let push/notification handlers route in-app instead of reloading the page.
-  const router = useRouter();
+
   useEffect(() => {
     setDeepLinkNavigator((path) => {
       void router.navigate({ href: path } as any);
