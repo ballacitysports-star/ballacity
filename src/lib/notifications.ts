@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
 import { isAllowed } from "@/lib/notification-prefs";
+import { openDeepLink, toAbsoluteDeepLink } from "@/lib/deep-links";
 
 export type Notification = {
   id: string;
@@ -36,7 +37,9 @@ export async function createNotification(input: {
         userId: input.user_id,
         title: input.title,
         body: input.body ?? null,
-        url: input.link ?? null,
+        // Push providers need an absolute URL so tapping the alert opens the
+        // exact game / chat / profile the notification refers to.
+        url: toAbsoluteDeepLink(input.link ?? null, input.type),
       },
     }).catch((e) => console.warn("push send failed", e));
   } catch (e) {
@@ -236,7 +239,7 @@ function showBrowserNotification(n: Pick<Notification, "title" | "body" | "link"
     });
     native.onclick = () => {
       window.focus();
-      if (n.link) window.location.assign(n.link);
+      openDeepLink(n.link, n.type);
       native.close();
     };
   } catch {
@@ -310,7 +313,7 @@ export function useNotificationPush() {
                         label: "Open",
                         onClick: () => {
                           messageGroups.delete(convId!);
-                          if (n.link) window.location.assign(n.link);
+                          openDeepLink(n.link, n.type);
                         },
                       }
                     : undefined,
@@ -325,7 +328,7 @@ export function useNotificationPush() {
                     ? {
                         label: "Open",
                         onClick: () => {
-                          if (n.link) window.location.assign(n.link);
+                          openDeepLink(n.link, n.type);
                         },
                       }
                     : undefined,
