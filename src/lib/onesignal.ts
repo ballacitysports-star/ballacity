@@ -86,6 +86,60 @@ export async function logoutOneSignal() {
   });
 }
 
+/** Runs `fn` once the OneSignal SDK is loaded and initialized. */
+async function withOneSignal<T>(fn: (os: any) => Promise<T>): Promise<T | null> {
+  if (typeof window === "undefined") return null;
+  try {
+    await loadSdk();
+  } catch (e) {
+    console.warn("[onesignal] sdk load failed", e);
+    return null;
+  }
+  return new Promise<T | null>((resolve) => {
+    window.OneSignalDeferred = window.OneSignalDeferred || [];
+    window.OneSignalDeferred.push(async (OneSignal: any) => {
+      try {
+        resolve(await fn(OneSignal));
+      } catch (e) {
+        console.warn("[onesignal] call failed", e);
+        resolve(null);
+      }
+    });
+  });
+}
+
+/**
+ * Opts the current device into OneSignal web push. This is what actually
+ * creates the push subscription (and, on Safari/iOS, triggers the native
+ * permission sheet) so closed-app alerts can be delivered.
+ */
+export async function optInOneSignalPush(): Promise<boolean> {
+  const result = await withOneSignal(async (OneSignal: any) => {
+    if (!window.__openrunOneSignalInited) {
+      await OneSignal.init({
+        appId: ONESIGNAL_APP_ID,
+        allowLocalhostAsSecureOrigin: true,
+        serviceWorkerPath: "/OneSignalSDKWorker.js",
+        notifyButton: { enable: false },
+      });
+      window.__openrunOneSignalInited = true;
+    }
+    await OneSignal.User.PushSubscription.optIn();
+    return OneSignal.User.PushSubscription.optedIn === true;
+  });
+  return result === true;
+}
+
+/** True when this device currently has an active OneSignal push subscription. */
+export async function isOneSignalSubscribed(): Promise<boolean> {
+  if (typeof window === "undefined") return false;
+  if (!window.__openrunOneSignalInited) return false;
+  const result = await withOneSignal(
+    async (OneSignal: any) => OneSignal.User.PushSubscription.optedIn === true,
+  );
+  return result === true;
+}
+
 /** Mount once near the app root; initializes OneSignal for the signed-in user. */
 export function useOneSignal() {
   const { user } = useAuth();
