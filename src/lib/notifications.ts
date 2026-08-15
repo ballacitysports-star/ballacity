@@ -173,11 +173,33 @@ export function pushPermissionState(): "granted" | "denied" | "default" | "unsup
 
 export async function requestPushPermission(): Promise<NotificationPermission | "unsupported"> {
   if (typeof window === "undefined" || !("Notification" in window)) return "unsupported";
-  if (window.Notification.permission !== "default") return window.Notification.permission;
+  if (window.Notification.permission === "granted") {
+    // Already allowed in the browser, but the device may still lack a OneSignal
+    // subscription (needed for delivery while the app is closed).
+    void ensureOneSignalSubscription();
+    return "granted";
+  }
+  if (window.Notification.permission === "denied") return "denied";
+  // Prompt through OneSignal so permission AND the push subscription are created.
+  const subscribed = await ensureOneSignalSubscription();
+  if (subscribed) return "granted";
   try {
-    return await window.Notification.requestPermission();
+    const result = await window.Notification.requestPermission();
+    if (result === "granted") void ensureOneSignalSubscription();
+    return result;
   } catch {
     return window.Notification.permission;
+  }
+}
+
+/** Best-effort opt-in to OneSignal web push for closed-app delivery. */
+export async function ensureOneSignalSubscription(): Promise<boolean> {
+  try {
+    const { optInOneSignalPush } = await import("@/lib/onesignal");
+    return await optInOneSignalPush();
+  } catch (e) {
+    console.warn("[push] onesignal opt-in failed", e);
+    return false;
   }
 }
 
