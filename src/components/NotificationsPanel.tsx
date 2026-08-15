@@ -61,6 +61,8 @@ export function NotificationsPanel() {
   const [fetching, setFetching] = useState(true);
   const nav = useNavigate();
 
+  const [live, setLive] = useState(false);
+
   useEffect(() => {
     if (loading) return;
     if (!user) {
@@ -77,16 +79,74 @@ export function NotificationsPanel() {
       }
     };
     load();
+
+    const upsert = (row: Notification) =>
+      setItems((prev) => {
+        const idx = prev.findIndex((x) => x.id === row.id);
+        if (idx === -1)
+          return [row, ...prev].sort((a, b) => b.created_at.localeCompare(a.created_at));
+        const next = [...prev];
+        next[idx] = { ...next[idx], ...row };
+        return next;
+      });
+
     const channel = supabase
       .channel(`notif-list-${user.id}`)
       .on(
         "postgres_changes",
-        { event: "*", schema: "public", table: "notifications", filter: `user_id=eq.${user.id}` },
-        load,
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "notifications",
+          filter: `user_id=eq.${user.id}`,
+        },
+        (payload) => {
+          if (cancelled) return;
+          const row = payload.new as Notification;
+          upsert(row);
+          toast(row.title, { description: row.body ?? undefined });
+        },
       )
-      .subscribe();
+      .on(
+        "postgres_changes",
+        {
+          event: "UPDATE",
+          schema: "public",
+          table: "notifications",
+          filter: `user_id=eq.${user.id}`,
+        },
+        (payload) => {
+          if (!cancelled) upsert(payload.new as Notification);
+        },
+      )
+      .on(
+        "postgres_changes",
+        {
+          event: "DELETE",
+          schema: "public",
+          table: "notifications",
+          filter: `user_id=eq.${user.id}`,
+        },
+        (payload) => {
+          const old = payload.old as Partial<Notification>;
+          if (!cancelled && old?.id) setItems((prev) => prev.filter((x) => x.id !== old.id));
+        },
+      )
+      .subscribe((status) => {
+        if (!cancelled) setLive(status === "SUBSCRIBED");
+      });
+
+    // Catch up on anything missed while the tab was hidden or offline.
+    const resync = () => {
+      if (document.visibilityState === "visible") void load();
+    };
+    document.addEventListener("visibilitychange", resync);
+    window.addEventListener("online", resync);
+
     return () => {
       cancelled = true;
+      document.removeEventListener("visibilitychange", resync);
+      window.removeEventListener("online", resync);
       supabase.removeChannel(channel);
     };
   }, [user?.id, loading]);
@@ -158,6 +218,16 @@ export function NotificationsPanel() {
   return (
     <div>
       <div className="flex items-center justify-end gap-2 mb-3">
+        <span
+          className="mr-auto inline-flex items-center gap-1.5 text-[11px] font-semibold text-muted-foreground"
+          aria-live="polite"
+        >
+          <span
+            className={`h-2 w-2 rounded-full ${live ? "bg-lime animate-pulse" : "bg-muted-foreground/40"}`}
+          />
+          {live ? "Live" : "Reconnecting…"}
+        </span>
+
         <Link
           to="/account/notifications"
           className="inline-flex items-center gap-1.5 rounded-full border border-border bg-surface px-3 py-1.5 text-xs font-semibold text-foreground hover:border-lime/60 hover:text-lime"
