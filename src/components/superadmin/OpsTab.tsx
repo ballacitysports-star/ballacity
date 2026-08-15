@@ -22,6 +22,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { ConfirmAction } from "./ConfirmAction";
+import { sendTestPushToSelf } from "@/lib/push.functions";
 
 export function OpsTab() {
   const qc = useQueryClient();
@@ -320,5 +321,105 @@ function Queue({
         ))
       )}
     </div>
+  );
+}
+
+function PushTester() {
+  const sendTest = useServerFn(sendTestPushToSelf);
+  const [title, setTitle] = useState("");
+  const [body, setBody] = useState("");
+  const [result, setResult] = useState<any>(null);
+
+  const run = useMutation({
+    mutationFn: () =>
+      sendTest({ data: { title: title.trim() || null, body: body.trim() || null } }),
+    onSuccess: (r: any) => {
+      setResult(r);
+      if (r.reason === "not_configured") toast.error("Push provider key isn't configured");
+      else if (r.ok) toast.success(`Push delivered to ${r.recipients} device(s)`);
+      else if (!r.linked) toast.error("Your account isn't linked to push yet");
+      else toast.error(r.error ? `Send failed: ${r.error}` : "No subscribed devices");
+    },
+    onError: (e: any) => toast.error(e?.message ?? "Failed"),
+  });
+
+  const Row = ({ label, ok, value }: { label: string; ok: boolean; value: string }) => (
+    <div className="flex items-center justify-between gap-2 text-xs">
+      <span className="text-muted-foreground">{label}</span>
+      <Badge variant={ok ? "default" : "destructive"}>{value}</Badge>
+    </div>
+  );
+
+  return (
+    <Card className="lg:col-span-2">
+      <CardHeader className="pb-2">
+        <CardTitle className="text-base">Push delivery test (your account)</CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        <p className="text-xs text-muted-foreground">
+          Sends a sample push to your own devices and verifies your account is linked to the push
+          provider with an active subscription.
+        </p>
+        <div className="grid gap-2 sm:grid-cols-2">
+          <Input
+            placeholder="Title (optional)"
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+          />
+          <Input
+            placeholder="Message (optional)"
+            value={body}
+            onChange={(e) => setBody(e.target.value)}
+          />
+        </div>
+        <Button size="sm" onClick={() => run.mutate()} disabled={run.isPending}>
+          {run.isPending ? "Sending…" : "Send test push"}
+        </Button>
+
+        {result && (
+          <div className="space-y-1.5 rounded-lg border border-border p-3">
+            <Row
+              label="Account linked to push provider"
+              ok={!!result.linked}
+              value={result.linked ? "Linked" : "Not linked"}
+            />
+            <Row
+              label="Subscribed devices"
+              ok={(result.enabledSubscriptions ?? 0) > 0}
+              value={String(result.enabledSubscriptions ?? 0)}
+            />
+            <Row
+              label="Devices reached"
+              ok={(result.recipients ?? 0) > 0}
+              value={String(result.recipients ?? 0)}
+            />
+            <Row
+              label="Delivery log"
+              ok={result.delivery?.status === "sent"}
+              value={result.delivery?.status ?? "not recorded"}
+            />
+            {result.error && <p className="text-xs text-destructive">Error: {result.error}</p>}
+            {result.reason === "not_configured" && (
+              <p className="text-xs text-destructive">Push provider key is not configured.</p>
+            )}
+            {!result.linked && (
+              <p className="text-xs text-muted-foreground">
+                Open Notifications and tap “Turn on push” on this device, then retest.
+              </p>
+            )}
+            {result.subscriptions?.length > 0 && (
+              <ul className="pt-1 text-[11px] text-muted-foreground">
+                {result.subscriptions.map((s: any) => (
+                  <li key={s.id}>
+                    {s.type ?? "push"} · {s.device ?? "unknown device"} ·{" "}
+                    {s.enabled ? "enabled" : "disabled"}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        )}
+      </CardContent>
+    </Card>
   );
 }
