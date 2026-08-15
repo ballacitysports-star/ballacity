@@ -61,6 +61,8 @@ export function NotificationsPanel() {
   const [fetching, setFetching] = useState(true);
   const nav = useNavigate();
 
+  const [live, setLive] = useState(false);
+
   useEffect(() => {
     if (loading) return;
     if (!user) {
@@ -77,16 +79,74 @@ export function NotificationsPanel() {
       }
     };
     load();
+
+    const upsert = (row: Notification) =>
+      setItems((prev) => {
+        const idx = prev.findIndex((x) => x.id === row.id);
+        if (idx === -1)
+          return [row, ...prev].sort((a, b) => b.created_at.localeCompare(a.created_at));
+        const next = [...prev];
+        next[idx] = { ...next[idx], ...row };
+        return next;
+      });
+
     const channel = supabase
       .channel(`notif-list-${user.id}`)
       .on(
         "postgres_changes",
-        { event: "*", schema: "public", table: "notifications", filter: `user_id=eq.${user.id}` },
-        load,
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "notifications",
+          filter: `user_id=eq.${user.id}`,
+        },
+        (payload) => {
+          if (cancelled) return;
+          const row = payload.new as Notification;
+          upsert(row);
+          toast(row.title, { description: row.body ?? undefined });
+        },
       )
-      .subscribe();
+      .on(
+        "postgres_changes",
+        {
+          event: "UPDATE",
+          schema: "public",
+          table: "notifications",
+          filter: `user_id=eq.${user.id}`,
+        },
+        (payload) => {
+          if (!cancelled) upsert(payload.new as Notification);
+        },
+      )
+      .on(
+        "postgres_changes",
+        {
+          event: "DELETE",
+          schema: "public",
+          table: "notifications",
+          filter: `user_id=eq.${user.id}`,
+        },
+        (payload) => {
+          const old = payload.old as Partial<Notification>;
+          if (!cancelled && old?.id) setItems((prev) => prev.filter((x) => x.id !== old.id));
+        },
+      )
+      .subscribe((status) => {
+        if (!cancelled) setLive(status === "SUBSCRIBED");
+      });
+
+    // Catch up on anything missed while the tab was hidden or offline.
+    const resync = () => {
+      if (document.visibilityState === "visible") void load();
+    };
+    document.addEventListener("visibilitychange", resync);
+    window.addEventListener("online", resync);
+
     return () => {
       cancelled = true;
+      document.removeEventListener("visibilitychange", resync);
+      window.removeEventListener("online", resync);
       supabase.removeChannel(channel);
     };
   }, [user?.id, loading]);
