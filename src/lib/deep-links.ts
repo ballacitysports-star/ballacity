@@ -42,7 +42,7 @@ export function toAppPath(link: string | null | undefined): string | null {
         : "https://app.local";
     const url = new URL(raw, origin);
     if (!/^https?:$/.test(url.protocol)) return null;
-    if (/^https?:/i.test(raw) && url.origin !== origin && typeof window !== "undefined") {
+    if (/^https?:/i.test(raw) && url.origin !== origin) {
       // Absolute link pointing somewhere else — not a deep link into this app.
       return null;
     }
