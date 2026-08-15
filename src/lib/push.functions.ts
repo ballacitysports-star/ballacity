@@ -25,6 +25,34 @@ function validate(input: unknown): PushInput {
 }
 
 /**
+ * Push URLs must be absolute for the provider to open them. Callers normally
+ * pass an absolute deep link; this backstops server-side callers that only
+ * have an app-relative path.
+ */
+async function absolutizeUrl(url: string | null): Promise<string | undefined> {
+  if (!url) return undefined;
+  if (/^https?:\/\//i.test(url)) return url;
+  let origin = process.env['PUBLIC_SITE_URL'] ?? null;
+  if (!origin) {
+    try {
+      const { getRequest } = await import("@tanstack/react-start/server");
+      const req = getRequest();
+      const hdrOrigin = req?.headers?.get("origin");
+      const host = req?.headers?.get("host");
+      origin = hdrOrigin ?? (host ? `https://${host}` : null);
+    } catch {
+      origin = null;
+    }
+  }
+  if (!origin) return undefined;
+  try {
+    return new URL(url, origin).toString();
+  } catch {
+    return undefined;
+  }
+}
+
+/**
  * Sends a OneSignal push to a single user, identified by their Supabase user id
  * (registered as the OneSignal external_id alias on the client).
  *
@@ -83,7 +111,7 @@ export const sendPushToUser = createServerFn({ method: "POST" })
           include_aliases: { external_id: [data.userId] },
           headings: { en: data.title },
           contents: { en: data.body ?? "" },
-          url: data.url ?? undefined,
+          url: await absolutizeUrl(data.url ?? null),
         }),
       });
       const text = await res.text().catch(() => "");

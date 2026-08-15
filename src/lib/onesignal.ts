@@ -2,6 +2,7 @@
 // App ID is public; safe to inline.
 import { useEffect } from "react";
 import { useAuth } from "@/hooks/use-auth";
+import { openDeepLink } from "@/lib/deep-links";
 
 export const ONESIGNAL_APP_ID = "c6024ea7-b1a2-4f64-b43a-783971d802f9";
 
@@ -31,6 +32,29 @@ function loadSdk(): Promise<void> {
   });
 }
 
+/**
+ * Routes taps on push alerts to the exact game / chat / profile they refer to.
+ * When the app is already open we route client-side instead of reloading.
+ */
+function attachClickHandler(OneSignal: any) {
+  if (typeof window === "undefined") return;
+  if ((window as any).__openrunOneSignalClickBound) return;
+  try {
+    OneSignal.Notifications.addEventListener("click", (event: any) => {
+      const url: string | undefined =
+        event?.result?.url ??
+        event?.notification?.launchURL ??
+        event?.notification?.url ??
+        event?.notification?.additionalData?.url;
+      if (!url) return;
+      openDeepLink(url, event?.notification?.additionalData?.type ?? null);
+    });
+    (window as any).__openrunOneSignalClickBound = true;
+  } catch (e) {
+    console.warn("[onesignal] click handler failed", e);
+  }
+}
+
 async function initOneSignal(userId: string) {
   if (typeof window === "undefined") return;
   try {
@@ -51,6 +75,7 @@ async function initOneSignal(userId: string) {
         });
         window.__openrunOneSignalInited = true;
       }
+      attachClickHandler(OneSignal);
       // Tie the device/subscription to the Supabase user id (external_id alias)
       try {
         await OneSignal.login(userId);
@@ -124,6 +149,7 @@ export async function optInOneSignalPush(): Promise<boolean> {
       });
       window.__openrunOneSignalInited = true;
     }
+    attachClickHandler(OneSignal);
     await OneSignal.User.PushSubscription.optIn();
     return OneSignal.User.PushSubscription.optedIn === true;
   });

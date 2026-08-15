@@ -43,6 +43,7 @@ import {
 
 import { Switch } from "@/components/ui/switch";
 
+import { resolveNotificationTarget } from "@/lib/deep-links";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
@@ -155,7 +156,7 @@ export function NotificationsPanel() {
 
   const handleClick = async (n: Notification) => {
     if (!n.read_at) await markNotificationRead(n.id);
-    if (n.link) nav({ to: n.link as any });
+    nav({ href: resolveNotificationTarget(n) } as any);
   };
 
   if (!loading && !user) {
