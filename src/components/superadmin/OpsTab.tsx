@@ -187,6 +187,10 @@ export function OpsTab() {
         </CardContent>
       </Card>
 
+      <PushTester />
+
+
+
       <Card className="lg:col-span-2">
         <CardHeader className="pb-2">
           <CardTitle className="text-base">Live queues</CardTitle>
