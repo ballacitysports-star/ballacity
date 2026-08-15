@@ -218,6 +218,16 @@ export function NotificationsPanel() {
   return (
     <div>
       <div className="flex items-center justify-end gap-2 mb-3">
+        <span
+          className="mr-auto inline-flex items-center gap-1.5 text-[11px] font-semibold text-muted-foreground"
+          aria-live="polite"
+        >
+          <span
+            className={`h-2 w-2 rounded-full ${live ? "bg-lime animate-pulse" : "bg-muted-foreground/40"}`}
+          />
+          {live ? "Live" : "Reconnecting…"}
+        </span>
+
         <Link
           to="/account/notifications"
           className="inline-flex items-center gap-1.5 rounded-full border border-border bg-surface px-3 py-1.5 text-xs font-semibold text-foreground hover:border-lime/60 hover:text-lime"
