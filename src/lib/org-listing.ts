@@ -96,25 +96,79 @@ export function scoreListing(v: ListingCompleteness): {
   };
 }
 
-const PHONE_RE = /^[+]?[\d\s().-]{7,20}$/;
+const PHONE_RE = /^[+]?[\d\s().-]{7,20}(\s*(?:x|ext\.?|extension)\s*\d{1,6})?$/i;
 
 export function isValidPhone(v: string): boolean {
   return PHONE_RE.test(v.trim());
 }
 
-export function telHref(v: string): string {
-  return `tel:${v.replace(/[^\d+]/g, "")}`;
+/** Splits a phone string into its dialable digits and optional extension. */
+function splitPhone(v: string): { number: string; ext: string | null } {
+  const raw = String(v ?? "").trim();
+  const m = raw.match(/(?:x|ext\.?|extension)\s*(\d{1,6})\s*$/i);
+  const ext = m ? m[1] : null;
+  const head = m ? raw.slice(0, m.index) : raw;
+  const plus = head.trimStart().startsWith("+") ? "+" : "";
+  const digits = head.replace(/\D/g, "");
+  return { number: plus + digits, ext };
 }
 
+/** True when the value has enough digits to actually place a call. */
+export function isDialable(v: string | null | undefined): boolean {
+  if (!v) return false;
+  const { number } = splitPhone(v);
+  return number.replace(/\D/g, "").length >= 7;
+}
+
+/** `tel:` href with separators stripped, a single leading `+`, and `;ext=`. */
+export function telHref(v: string | null | undefined): string | null {
+  if (!isDialable(v)) return null;
+  const { number, ext } = splitPhone(String(v));
+  return `tel:${number}${ext ? `;ext=${ext}` : ""}`;
+}
+
+/** `mailto:` href for a plausible address, else null. */
+export function emailHref(v: string | null | undefined): string | null {
+  const raw = String(v ?? "").trim();
+  if (!raw || /\s/.test(raw)) return null;
+  if (!/^[^@]+@[^@.]+(\.[^@.]+)+$/.test(raw)) return null;
+  return `mailto:${raw}`;
+}
+
+/** Normalizes a stored website value into a safe absolute http(s) URL. */
+export function websiteHref(v: string | null | undefined): string | null {
+  const raw = String(v ?? "").trim();
+  if (!raw) return null;
+  if (raw.startsWith("//")) return null;
+  const hasScheme = /^[a-z][a-z0-9+.-]*:/i.test(raw);
+  if (hasScheme && !/^https?:/i.test(raw)) return null;
+  const candidate = hasScheme ? raw : `https://${raw}`;
+  try {
+    const url = new URL(candidate);
+    if (!/^https?:$/.test(url.protocol)) return null;
+    if (!url.hostname.includes(".") || url.hostname.endsWith(".")) return null;
+    return url.toString();
+  } catch {
+    return null;
+  }
+}
+
+/** Google Maps directions URL, or null when there is no usable destination. */
 export function directionsHref(opts: {
   address?: string | null;
   placeId?: string | null;
   lat?: number | null;
   lng?: number | null;
-}): string {
-  const params = new URLSearchParams({ api: "1" });
-  const dest = opts.address || (opts.lat != null && opts.lng != null ? `${opts.lat},${opts.lng}` : "");
-  params.set("destination", dest);
+}): string | null {
+  const address = String(opts.address ?? "").trim();
+  const hasCoords =
+    typeof opts.lat === "number" &&
+    Number.isFinite(opts.lat) &&
+    typeof opts.lng === "number" &&
+    Number.isFinite(opts.lng);
+  const dest = hasCoords ? `${opts.lat},${opts.lng}` : address;
+  if (!dest) return null;
+  const params = new URLSearchParams({ api: "1", destination: dest });
   if (opts.placeId) params.set("destination_place_id", opts.placeId);
   return `https://www.google.com/maps/dir/?${params.toString()}`;
 }
