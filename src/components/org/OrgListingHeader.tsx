@@ -111,6 +111,16 @@ export function OrgListingHeader({
   const geo = org.geo ?? null;
   const today = localNow(org.timezone).day;
 
+  const directions = directionsHref({
+    address: org.address,
+    placeId: org.place_id,
+    lat: geo?.lat ?? null,
+    lng: geo?.lng ?? null,
+  });
+  const tel = telHref(org.phone);
+  const site = websiteHref(org.website);
+  const mail = emailHref(org.email);
+
   return (
     <header className="overflow-hidden rounded-2xl border border-border/60 bg-surface">
       {photos.length > 0 ? (
