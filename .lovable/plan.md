@@ -1,25 +1,41 @@
-# Fix gym image uploads ("new row violates row-level security policy")
+# Fix image uploads app-wide ("new row violates row-level security policy")
 
 ## What's wrong
 
-Gym image uploads (logo, cover, gallery) are stored in folders named after the **signed-in user's id**, but the storage access rule for gym buckets only allows folders named after the **gym's id**. Every upload from the gym edit page is therefore rejected.
+Every image uploader in the app saves files into a folder named after the **signed-in user's id**, but the storage rules for gym, team, and trainer image buckets only allow folders named after the **gym's / team's id**. So those uploads are rejected.
 
-Confirmed:
-- `src/components/OrgForm.tsx` passes `pathPrefix={userId}` for logo, cover, and gallery uploads.
-- The storage rule "Org admins write org images" allows writes only when the first folder segment is a gym id the user administers.
+Confirmed by reading the code and the live storage rules:
+
+| Upload surface | Folder used in code | Rule requires | Result |
+| --- | --- | --- | --- |
+| Gym logo / cover / gallery (create + edit) | user id | gym id | blocked |
+| Team logo / cover (create + edit) | user id | team id | blocked (team-covers inserts pass, edits/removals don't) |
+| Trainer avatar / cover (create + edit) | user id | team id | blocked |
+| Player avatar / cover | user id | user id | works |
+| Game cover | user id | user id | works |
+
+Gym and team creation happen *before* the entity exists, so the folder can never be the entity id there — the folder-per-user convention the code already uses is the right one.
 
 ## The fix
 
-1. Gym edit page (`/orgs/:orgId/edit`): upload into the gym's own folder — pass the gym id as the upload folder instead of the user id. This satisfies the existing admin rule.
-2. Gym create page (`/orgs/create`): no gym exists yet, so keep using the user's own folder. Add a storage rule so authenticated users may write gym images into a folder named after their own user id (their own staging area only), alongside the existing gym-admin rule. Public read stays unchanged.
-3. Leave already-uploaded image URLs untouched — existing files remain readable.
+Align the storage rules with the convention the app already follows, in one migration:
+
+- Allow signed-in users to upload, replace, and remove image files inside a folder named after their own user id, for the gym and team image buckets (`org-avatars`, `org-covers`, `trainer-avatars`, `team-avatars`, `team-covers`). Each user can only touch their own folder.
+- Keep the existing gym-admin and team-owner rules untouched, so files already stored under a gym or team id keep working.
+- Tidy the partial `team-covers` rules so insert/replace/remove behave the same.
+- Public viewing of these images is unchanged; nothing becomes readable that wasn't already.
+
+No application code changes are needed — every uploader already passes the user id.
 
 ## Technical notes
 
-- `OrgForm` gains an explicit upload-folder prop (`uploadPrefix`) that the edit route sets to `orgId` and the create route sets to `userId`; `ImageUploader` and `PhotoGalleryEditor` keep their current API.
-- Migration adds INSERT/UPDATE/DELETE policies on `storage.objects` for buckets `org-avatars` and `org-covers` scoped to `(storage.foldername(name))[1] = auth.uid()::text` for role `authenticated`. Existing `is_trainer_org_admin` policy is kept as-is.
+- Migration adds INSERT / UPDATE / DELETE policies on `storage.objects` for role `authenticated`, scoped to `bucket_id = ANY (...)` AND `(storage.foldername(name))[1] = auth.uid()::text`.
+- Existing policies `Org admins write org images` and `Team owners write team images` are preserved; policies are permissive, so either path grants access.
+- Existing `team_covers_owner_insert/update/delete` policies are replaced by the unified set to avoid duplicate overlapping rules.
 
 ## Verification
 
-- Load the gym edit page, upload a logo, cover, and one gallery photo; confirm no RLS error and the images render after save.
-- Repeat on the gym create page before the gym exists.
+- Gym edit page: upload logo, cover, and a gallery photo — no RLS error, images persist and render.
+- Gym create page (before the gym exists): same three uploads succeed.
+- Team edit/create and trainer edit/create: avatar and cover upload succeed.
+- Player profile avatar/cover and game cover still upload (no regression).
