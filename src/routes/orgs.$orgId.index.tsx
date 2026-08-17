@@ -54,7 +54,7 @@ import {
   leaveOrgMembership,
 } from "@/lib/trainer-orgs.functions";
 
-export const Route = createFileRoute("/orgs/$orgId")({
+export const Route = createFileRoute("/orgs/$orgId/")({
   head: ({ loaderData, params }) => {
     const o = (loaderData as Awaited<ReturnType<typeof getTrainerOrg>> | undefined) ?? null;
     const org = o?.org;

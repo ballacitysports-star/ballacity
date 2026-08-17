@@ -46,7 +46,6 @@ import { Route as MessagesConversationIdRouteImport } from './routes/messages.$c
 import { Route as OnboardingAccountTypeRouteImport } from './routes/onboarding.account-type'
 import { Route as OnboardingWelcomeRouteImport } from './routes/onboarding.welcome'
 import { Route as OrgsIndexRouteImport } from './routes/orgs.index'
-import { Route as OrgsOrgIdRouteImport } from './routes/orgs.$orgId'
 import { Route as OrgsCreateRouteImport } from './routes/orgs.create'
 import { Route as PlayersUserIdRouteImport } from './routes/players.$userId'
 import { Route as ProfileEditRouteImport } from './routes/profile.edit'
@@ -59,6 +58,7 @@ import { Route as ApiPublicOgRouteImport } from './routes/api/public/og'
 import { Route as GamesGameIdIndexRouteImport } from './routes/games.$gameId.index'
 import { Route as GamesGameIdPayRouteImport } from './routes/games.$gameId.pay'
 import { Route as GamesGameIdPaymentSetupRouteImport } from './routes/games.$gameId.payment-setup'
+import { Route as OrgsOrgIdIndexRouteImport } from './routes/orgs.$orgId.index'
 import { Route as OrgsOrgIdEditRouteImport } from './routes/orgs.$orgId.edit'
 import { Route as OrgsOrgIdMembersRouteImport } from './routes/orgs.$orgId.members'
 import { Route as TeamsTeamIdIndexRouteImport } from './routes/teams.$teamId.index'
@@ -254,11 +254,6 @@ const OrgsIndexRoute = OrgsIndexRouteImport.update({
   path: '/orgs/',
   getParentRoute: () => rootRouteImport,
 } as any)
-const OrgsOrgIdRoute = OrgsOrgIdRouteImport.update({
-  id: '/orgs/$orgId',
-  path: '/orgs/$orgId',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const OrgsCreateRoute = OrgsCreateRouteImport.update({
   id: '/orgs/create',
   path: '/orgs/create',
@@ -320,15 +315,20 @@ const GamesGameIdPaymentSetupRoute = GamesGameIdPaymentSetupRouteImport.update({
   path: '/payment-setup',
   getParentRoute: () => GamesGameIdRoute,
 } as any)
+const OrgsOrgIdIndexRoute = OrgsOrgIdIndexRouteImport.update({
+  id: '/orgs/$orgId/',
+  path: '/orgs/$orgId/',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const OrgsOrgIdEditRoute = OrgsOrgIdEditRouteImport.update({
-  id: '/edit',
-  path: '/edit',
-  getParentRoute: () => OrgsOrgIdRoute,
+  id: '/orgs/$orgId/edit',
+  path: '/orgs/$orgId/edit',
+  getParentRoute: () => rootRouteImport,
 } as any)
 const OrgsOrgIdMembersRoute = OrgsOrgIdMembersRouteImport.update({
-  id: '/members',
-  path: '/members',
-  getParentRoute: () => OrgsOrgIdRoute,
+  id: '/orgs/$orgId/members',
+  path: '/orgs/$orgId/members',
+  getParentRoute: () => rootRouteImport,
 } as any)
 const TeamsTeamIdIndexRoute = TeamsTeamIdIndexRouteImport.update({
   id: '/teams/$teamId/',
@@ -397,7 +397,6 @@ export interface FileRoutesByFullPath {
   '/messages/$conversationId': typeof MessagesConversationIdRoute
   '/onboarding/account-type': typeof OnboardingAccountTypeRoute
   '/onboarding/welcome': typeof OnboardingWelcomeRoute
-  '/orgs/$orgId': typeof OrgsOrgIdRouteWithChildren
   '/orgs/create': typeof OrgsCreateRoute
   '/players/$userId': typeof PlayersUserIdRoute
   '/profile/edit': typeof ProfileEditRoute
@@ -416,6 +415,7 @@ export interface FileRoutesByFullPath {
   '/teams/$teamId/edit': typeof TeamsTeamIdEditRoute
   '/trainers/$trainerId/edit': typeof TrainersTrainerIdEditRoute
   '/games/$gameId/': typeof GamesGameIdIndexRoute
+  '/orgs/$orgId/': typeof OrgsOrgIdIndexRoute
   '/teams/$teamId/': typeof TeamsTeamIdIndexRoute
   '/trainers/$trainerId/': typeof TrainersTrainerIdIndexRoute
   '/api/public/payments/webhook': typeof ApiPublicPaymentsWebhookRoute
@@ -455,7 +455,6 @@ export interface FileRoutesByTo {
   '/messages/$conversationId': typeof MessagesConversationIdRoute
   '/onboarding/account-type': typeof OnboardingAccountTypeRoute
   '/onboarding/welcome': typeof OnboardingWelcomeRoute
-  '/orgs/$orgId': typeof OrgsOrgIdRouteWithChildren
   '/orgs/create': typeof OrgsCreateRoute
   '/players/$userId': typeof PlayersUserIdRoute
   '/profile/edit': typeof ProfileEditRoute
@@ -474,6 +473,7 @@ export interface FileRoutesByTo {
   '/teams/$teamId/edit': typeof TeamsTeamIdEditRoute
   '/trainers/$trainerId/edit': typeof TrainersTrainerIdEditRoute
   '/games/$gameId': typeof GamesGameIdIndexRoute
+  '/orgs/$orgId': typeof OrgsOrgIdIndexRoute
   '/teams/$teamId': typeof TeamsTeamIdIndexRoute
   '/trainers/$trainerId': typeof TrainersTrainerIdIndexRoute
   '/api/public/payments/webhook': typeof ApiPublicPaymentsWebhookRoute
@@ -516,7 +516,6 @@ export interface FileRoutesById {
   '/messages/$conversationId': typeof MessagesConversationIdRoute
   '/onboarding/account-type': typeof OnboardingAccountTypeRoute
   '/onboarding/welcome': typeof OnboardingWelcomeRoute
-  '/orgs/$orgId': typeof OrgsOrgIdRouteWithChildren
   '/orgs/create': typeof OrgsCreateRoute
   '/players/$userId': typeof PlayersUserIdRoute
   '/profile/edit': typeof ProfileEditRoute
@@ -535,6 +534,7 @@ export interface FileRoutesById {
   '/teams/$teamId/edit': typeof TeamsTeamIdEditRoute
   '/trainers/$trainerId/edit': typeof TrainersTrainerIdEditRoute
   '/games/$gameId/': typeof GamesGameIdIndexRoute
+  '/orgs/$orgId/': typeof OrgsOrgIdIndexRoute
   '/teams/$teamId/': typeof TeamsTeamIdIndexRoute
   '/trainers/$trainerId/': typeof TrainersTrainerIdIndexRoute
   '/api/public/payments/webhook': typeof ApiPublicPaymentsWebhookRoute
@@ -577,7 +577,6 @@ export interface FileRouteTypes {
     | '/messages/$conversationId'
     | '/onboarding/account-type'
     | '/onboarding/welcome'
-    | '/orgs/$orgId'
     | '/orgs/create'
     | '/players/$userId'
     | '/profile/edit'
@@ -596,6 +595,7 @@ export interface FileRouteTypes {
     | '/teams/$teamId/edit'
     | '/trainers/$trainerId/edit'
     | '/games/$gameId/'
+    | '/orgs/$orgId/'
     | '/teams/$teamId/'
     | '/trainers/$trainerId/'
     | '/api/public/payments/webhook'
@@ -635,7 +635,6 @@ export interface FileRouteTypes {
     | '/messages/$conversationId'
     | '/onboarding/account-type'
     | '/onboarding/welcome'
-    | '/orgs/$orgId'
     | '/orgs/create'
     | '/players/$userId'
     | '/profile/edit'
@@ -654,6 +653,7 @@ export interface FileRouteTypes {
     | '/teams/$teamId/edit'
     | '/trainers/$trainerId/edit'
     | '/games/$gameId'
+    | '/orgs/$orgId'
     | '/teams/$teamId'
     | '/trainers/$trainerId'
     | '/api/public/payments/webhook'
@@ -695,7 +695,6 @@ export interface FileRouteTypes {
     | '/messages/$conversationId'
     | '/onboarding/account-type'
     | '/onboarding/welcome'
-    | '/orgs/$orgId'
     | '/orgs/create'
     | '/players/$userId'
     | '/profile/edit'
@@ -714,6 +713,7 @@ export interface FileRouteTypes {
     | '/teams/$teamId/edit'
     | '/trainers/$trainerId/edit'
     | '/games/$gameId/'
+    | '/orgs/$orgId/'
     | '/teams/$teamId/'
     | '/trainers/$trainerId/'
     | '/api/public/payments/webhook'
@@ -746,7 +746,6 @@ export interface RootRouteChildren {
   MessagesConversationIdRoute: typeof MessagesConversationIdRoute
   OnboardingAccountTypeRoute: typeof OnboardingAccountTypeRoute
   OnboardingWelcomeRoute: typeof OnboardingWelcomeRoute
-  OrgsOrgIdRoute: typeof OrgsOrgIdRouteWithChildren
   OrgsCreateRoute: typeof OrgsCreateRoute
   PlayersUserIdRoute: typeof PlayersUserIdRoute
   ProfileEditRoute: typeof ProfileEditRoute
@@ -758,8 +757,11 @@ export interface RootRouteChildren {
   DotlovableOauthConsentRoute: typeof DotlovableOauthConsentRoute
   Char91DotmcpChar93InvokeToolToolRoute: typeof Char91DotmcpChar93InvokeToolToolRoute
   ApiPublicOgRoute: typeof ApiPublicOgRoute
+  OrgsOrgIdEditRoute: typeof OrgsOrgIdEditRoute
+  OrgsOrgIdMembersRoute: typeof OrgsOrgIdMembersRoute
   TeamsTeamIdEditRoute: typeof TeamsTeamIdEditRoute
   TrainersTrainerIdEditRoute: typeof TrainersTrainerIdEditRoute
+  OrgsOrgIdIndexRoute: typeof OrgsOrgIdIndexRoute
   TeamsTeamIdIndexRoute: typeof TeamsTeamIdIndexRoute
   TrainersTrainerIdIndexRoute: typeof TrainersTrainerIdIndexRoute
   ApiPublicPaymentsWebhookRoute: typeof ApiPublicPaymentsWebhookRoute
@@ -1027,13 +1029,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof OrgsIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/orgs/$orgId': {
-      id: '/orgs/$orgId'
-      path: '/orgs/$orgId'
-      fullPath: '/orgs/$orgId'
-      preLoaderRoute: typeof OrgsOrgIdRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/orgs/create': {
       id: '/orgs/create'
       path: '/orgs/create'
@@ -1118,19 +1113,26 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof GamesGameIdPaymentSetupRouteImport
       parentRoute: typeof GamesGameIdRoute
     }
+    '/orgs/$orgId/': {
+      id: '/orgs/$orgId/'
+      path: '/orgs/$orgId'
+      fullPath: '/orgs/$orgId/'
+      preLoaderRoute: typeof OrgsOrgIdIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/orgs/$orgId/edit': {
       id: '/orgs/$orgId/edit'
-      path: '/edit'
+      path: '/orgs/$orgId/edit'
       fullPath: '/orgs/$orgId/edit'
       preLoaderRoute: typeof OrgsOrgIdEditRouteImport
-      parentRoute: typeof OrgsOrgIdRoute
+      parentRoute: typeof rootRouteImport
     }
     '/orgs/$orgId/members': {
       id: '/orgs/$orgId/members'
-      path: '/members'
+      path: '/orgs/$orgId/members'
       fullPath: '/orgs/$orgId/members'
       preLoaderRoute: typeof OrgsOrgIdMembersRouteImport
-      parentRoute: typeof OrgsOrgIdRoute
+      parentRoute: typeof rootRouteImport
     }
     '/teams/$teamId/': {
       id: '/teams/$teamId/'
@@ -1229,20 +1231,6 @@ const GamesGameIdRouteWithChildren = GamesGameIdRoute._addFileChildren(
   GamesGameIdRouteChildren,
 )
 
-interface OrgsOrgIdRouteChildren {
-  OrgsOrgIdEditRoute: typeof OrgsOrgIdEditRoute
-  OrgsOrgIdMembersRoute: typeof OrgsOrgIdMembersRoute
-}
-
-const OrgsOrgIdRouteChildren: OrgsOrgIdRouteChildren = {
-  OrgsOrgIdEditRoute: OrgsOrgIdEditRoute,
-  OrgsOrgIdMembersRoute: OrgsOrgIdMembersRoute,
-}
-
-const OrgsOrgIdRouteWithChildren = OrgsOrgIdRoute._addFileChildren(
-  OrgsOrgIdRouteChildren,
-)
-
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   TabsRoute: TabsRouteWithChildren,
@@ -1270,7 +1258,6 @@ const rootRouteChildren: RootRouteChildren = {
   MessagesConversationIdRoute: MessagesConversationIdRoute,
   OnboardingAccountTypeRoute: OnboardingAccountTypeRoute,
   OnboardingWelcomeRoute: OnboardingWelcomeRoute,
-  OrgsOrgIdRoute: OrgsOrgIdRouteWithChildren,
   OrgsCreateRoute: OrgsCreateRoute,
   PlayersUserIdRoute: PlayersUserIdRoute,
   ProfileEditRoute: ProfileEditRoute,
@@ -1282,8 +1269,11 @@ const rootRouteChildren: RootRouteChildren = {
   DotlovableOauthConsentRoute: DotlovableOauthConsentRoute,
   Char91DotmcpChar93InvokeToolToolRoute: Char91DotmcpChar93InvokeToolToolRoute,
   ApiPublicOgRoute: ApiPublicOgRoute,
+  OrgsOrgIdEditRoute: OrgsOrgIdEditRoute,
+  OrgsOrgIdMembersRoute: OrgsOrgIdMembersRoute,
   TeamsTeamIdEditRoute: TeamsTeamIdEditRoute,
   TrainersTrainerIdEditRoute: TrainersTrainerIdEditRoute,
+  OrgsOrgIdIndexRoute: OrgsOrgIdIndexRoute,
   TeamsTeamIdIndexRoute: TeamsTeamIdIndexRoute,
   TrainersTrainerIdIndexRoute: TrainersTrainerIdIndexRoute,
   ApiPublicPaymentsWebhookRoute: ApiPublicPaymentsWebhookRoute,
