@@ -287,20 +287,25 @@ export function OrgListingHeader({
               )}
             </div>
           )}
-          {org.phone && (
-            <a href={telHref(org.phone)} className="flex items-center gap-2 px-3 py-2.5 text-sm hover:bg-secondary/40">
+          {tel && (
+            <a href={tel} className="flex items-center gap-2 px-3 py-2.5 text-sm hover:bg-secondary/40">
               <Phone className="h-4 w-4 shrink-0 text-lime" /> {org.phone}
             </a>
           )}
-          {org.website && (
+          {site && (
             <a
-              href={org.website}
+              href={site}
               target="_blank"
               rel="noreferrer"
               className="flex items-center gap-2 px-3 py-2.5 text-sm hover:bg-secondary/40"
             >
               <Globe className="h-4 w-4 shrink-0 text-lime" />
               <span className="min-w-0 truncate text-lime">{org.website}</span>
+            </a>
+          )}
+          {mail && (
+            <a href={mail} className="flex items-center gap-2 px-3 py-2.5 text-sm hover:bg-secondary/40">
+              <Mail className="h-4 w-4 shrink-0 text-lime" /> {org.email}
             </a>
           )}
         </div>
