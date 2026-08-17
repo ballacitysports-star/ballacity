@@ -1,6 +1,50 @@
 import { describe, expect, it } from "vitest";
 import { formatDayHours, parseHours, resolveOpenState } from "@/lib/org-hours";
-import { scoreListing } from "@/lib/org-listing";
+import {
+  directionsHref,
+  emailHref,
+  isDialable,
+  scoreListing,
+  telHref,
+  websiteHref,
+} from "@/lib/org-listing";
+
+describe("listing action links", () => {
+  it("normalizes scheme-less websites", () => {
+    expect(websiteHref("google.com")).toBe("https://google.com/");
+    expect(websiteHref("http://google.com")).toBe("http://google.com/");
+  });
+
+  it("rejects unsafe or unusable websites", () => {
+    expect(websiteHref("javascript:alert(1)")).toBe(null);
+    expect(websiteHref("//evil.com")).toBe(null);
+    expect(websiteHref("   ")).toBe(null);
+    expect(websiteHref("notadomain")).toBe(null);
+  });
+
+  it("builds tel links with extensions", () => {
+    expect(telHref("+1 (678) 341-0221 x12")).toBe("tel:+16783410221;ext=12");
+    expect(telHref("678-341-0221")).toBe("tel:6783410221");
+    expect(telHref("123")).toBe(null);
+    expect(isDialable("6783410221")).toBe(true);
+    expect(isDialable("")).toBe(false);
+  });
+
+  it("validates emails", () => {
+    expect(emailHref("hi@peak.com")).toBe("mailto:hi@peak.com");
+    expect(emailHref(" ")).toBe(null);
+    expect(emailHref("nope")).toBe(null);
+    expect(emailHref("a b@peak.com")).toBe(null);
+  });
+
+  it("builds directions from address, coords, or place id", () => {
+    expect(directionsHref({ address: "123 city" })).toContain("destination=123+city");
+    expect(directionsHref({ lat: 30.1, lng: -97.5 })).toContain("destination=30.1%2C-97.5");
+    expect(directionsHref({ address: "x y", placeId: "abc" })).toContain("destination_place_id=abc");
+    expect(directionsHref({ address: "  ", lat: null, lng: null })).toBe(null);
+    expect(directionsHref({})).toBe(null);
+  });
+});
 
 const tz = "UTC";
 const at = (iso: string) => new Date(iso);
