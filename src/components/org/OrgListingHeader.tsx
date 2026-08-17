@@ -224,35 +224,27 @@ export function OrgListingHeader({
         </div>
 
         <div className="flex flex-wrap gap-2">
-          {(org.address || geo) && (
-            <ActionButton
-              icon={Navigation}
-              label="Directions"
-              href={directionsHref({
-                address: org.address,
-                placeId: org.place_id,
-                lat: geo?.lat ?? null,
-                lng: geo?.lng ?? null,
-              })}
-            />
-          )}
-          {org.phone && <ActionButton icon={Phone} label="Call" href={telHref(org.phone)} />}
-          {org.website && <ActionButton icon={Globe} label="Website" href={org.website} />}
-          {org.email && <ActionButton icon={Mail} label="Email" href={`mailto:${org.email}`} />}
+          {directions && <ActionButton icon={Navigation} label="Directions" href={directions} />}
+          {tel && <ActionButton icon={Phone} label="Call" href={tel} />}
+          {site && <ActionButton icon={Globe} label="Website" href={site} />}
+          {mail && <ActionButton icon={Mail} label="Email" href={mail} />}
           <ActionButton
             icon={Share2}
             label="Share"
             onClick={async () => {
               const url = typeof window !== "undefined" ? window.location.href : "";
+              if (!url) return;
               try {
-                if (navigator.share) await navigator.share({ title: org.name, url });
-                else {
-                  await navigator.clipboard.writeText(url);
-                  toast.success("Link copied");
+                if (navigator.share) {
+                  await navigator.share({ title: org.name, url });
+                  return;
                 }
-              } catch {
-                /* dismissed */
+              } catch (err) {
+                // User dismissed the native sheet — nothing to report.
+                if (err instanceof DOMException && err.name === "AbortError") return;
               }
+              if (await copyText(url)) toast.success("Link copied");
+              else toast.error("Couldn't share this link");
             }}
           />
         </div>
