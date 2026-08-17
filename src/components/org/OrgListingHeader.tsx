@@ -26,7 +26,36 @@ import {
   parseHours,
   resolveOpenState,
 } from "@/lib/org-hours";
-import { directionsHref, telHref } from "@/lib/org-listing";
+import { directionsHref, emailHref, telHref, websiteHref } from "@/lib/org-listing";
+
+/**
+ * Copies text with the clipboard API, falling back to a hidden textarea for
+ * insecure contexts / browsers that block clipboard writes.
+ */
+async function copyText(text: string): Promise<boolean> {
+  try {
+    if (navigator.clipboard?.writeText) {
+      await navigator.clipboard.writeText(text);
+      return true;
+    }
+  } catch {
+    /* fall through to the legacy path */
+  }
+  try {
+    const ta = document.createElement("textarea");
+    ta.value = text;
+    ta.setAttribute("readonly", "");
+    ta.style.position = "fixed";
+    ta.style.opacity = "0";
+    document.body.appendChild(ta);
+    ta.select();
+    const ok = document.execCommand("copy");
+    document.body.removeChild(ta);
+    return ok;
+  } catch {
+    return false;
+  }
+}
 
 export type OrgListingRow = {
   id: string;
@@ -110,6 +139,16 @@ export function OrgListingHeader({
   const photos = [org.cover_url, ...(org.photos ?? [])].filter(Boolean) as string[];
   const geo = org.geo ?? null;
   const today = localNow(org.timezone).day;
+
+  const directions = directionsHref({
+    address: org.address,
+    placeId: org.place_id,
+    lat: geo?.lat ?? null,
+    lng: geo?.lng ?? null,
+  });
+  const tel = telHref(org.phone);
+  const site = websiteHref(org.website);
+  const mail = emailHref(org.email);
 
   return (
     <header className="overflow-hidden rounded-2xl border border-border/60 bg-surface">
@@ -224,35 +263,27 @@ export function OrgListingHeader({
         </div>
 
         <div className="flex flex-wrap gap-2">
-          {(org.address || geo) && (
-            <ActionButton
-              icon={Navigation}
-              label="Directions"
-              href={directionsHref({
-                address: org.address,
-                placeId: org.place_id,
-                lat: geo?.lat ?? null,
-                lng: geo?.lng ?? null,
-              })}
-            />
-          )}
-          {org.phone && <ActionButton icon={Phone} label="Call" href={telHref(org.phone)} />}
-          {org.website && <ActionButton icon={Globe} label="Website" href={org.website} />}
-          {org.email && <ActionButton icon={Mail} label="Email" href={`mailto:${org.email}`} />}
+          {directions && <ActionButton icon={Navigation} label="Directions" href={directions} />}
+          {tel && <ActionButton icon={Phone} label="Call" href={tel} />}
+          {site && <ActionButton icon={Globe} label="Website" href={site} />}
+          {mail && <ActionButton icon={Mail} label="Email" href={mail} />}
           <ActionButton
             icon={Share2}
             label="Share"
             onClick={async () => {
               const url = typeof window !== "undefined" ? window.location.href : "";
+              if (!url) return;
               try {
-                if (navigator.share) await navigator.share({ title: org.name, url });
-                else {
-                  await navigator.clipboard.writeText(url);
-                  toast.success("Link copied");
+                if (navigator.share) {
+                  await navigator.share({ title: org.name, url });
+                  return;
                 }
-              } catch {
-                /* dismissed */
+              } catch (err) {
+                // User dismissed the native sheet — nothing to report.
+                if (err instanceof DOMException && err.name === "AbortError") return;
               }
+              if (await copyText(url)) toast.success("Link copied");
+              else toast.error("Couldn't share this link");
             }}
           />
         </div>
@@ -295,20 +326,25 @@ export function OrgListingHeader({
               )}
             </div>
           )}
-          {org.phone && (
-            <a href={telHref(org.phone)} className="flex items-center gap-2 px-3 py-2.5 text-sm hover:bg-secondary/40">
+          {tel && (
+            <a href={tel} className="flex items-center gap-2 px-3 py-2.5 text-sm hover:bg-secondary/40">
               <Phone className="h-4 w-4 shrink-0 text-lime" /> {org.phone}
             </a>
           )}
-          {org.website && (
+          {site && (
             <a
-              href={org.website}
+              href={site}
               target="_blank"
               rel="noreferrer"
               className="flex items-center gap-2 px-3 py-2.5 text-sm hover:bg-secondary/40"
             >
               <Globe className="h-4 w-4 shrink-0 text-lime" />
               <span className="min-w-0 truncate text-lime">{org.website}</span>
+            </a>
+          )}
+          {mail && (
+            <a href={mail} className="flex items-center gap-2 px-3 py-2.5 text-sm hover:bg-secondary/40">
+              <Mail className="h-4 w-4 shrink-0 text-lime" /> {org.email}
             </a>
           )}
         </div>
