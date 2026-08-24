@@ -245,6 +245,20 @@ function ReelsPage() {
         </p>
       </header>
 
+      {gameId && (
+        <section className="mx-5 mb-5 rounded-2xl border border-lime/30 bg-lime/5 p-4">
+          <p className="text-[10px] font-bold uppercase tracking-wider text-lime">
+            Recap for finished game
+          </p>
+          <p className="mt-1 text-sm font-semibold">{gameTitle || "Your game"}</p>
+          <p className="mt-1 text-xs text-muted-foreground">
+            {gameReels.length > 0
+              ? `${gameReels.length} recap${gameReels.length === 1 ? "" : "s"} linked to this game.`
+              : "Upload footage below and we'll link the recap to this game."}
+          </p>
+        </section>
+      )}
+
       {isPastDue && (
         <div className="mx-5 mb-3 flex items-center gap-2 rounded-xl border border-amber-400/40 bg-amber-50/10 px-3 py-2 text-sm text-amber-300">
           <AlertTriangle className="h-4 w-4" />
