@@ -1,0 +1,2 @@
+ALTER TABLE public.highlight_reels ADD COLUMN IF NOT EXISTS game_id text, ADD COLUMN IF NOT EXISTS game_title text;
+CREATE INDEX IF NOT EXISTS highlight_reels_user_game_idx ON public.highlight_reels (user_id, game_id);

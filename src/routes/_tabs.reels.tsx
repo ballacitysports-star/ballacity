@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { pageHead } from "@/lib/seo";
 import { useEffect, useRef, useState } from "react";
 import { Sparkles, Upload, Video, Lock, Loader2, AlertTriangle, ExternalLink, Check } from "lucide-react";
@@ -13,6 +13,11 @@ import { createPortalSession } from "@/utils/payments.functions";
 import { FREE_TIER } from "@/lib/catalog";
 
 export const Route = createFileRoute("/_tabs/reels")({
+  validateSearch: (search: Record<string, unknown>) => ({
+    game: typeof search.game === "string" ? search.game : "",
+    title: typeof search.title === "string" ? search.title : "",
+    upload: search.upload === "1" || search.upload === true ? "1" : "",
+  }),
   head: () =>
     pageHead({
       path: "/reels",
@@ -35,6 +40,8 @@ type Reel = {
   ai_hashtags: string[] | null;
   thumbnail_path: string | null;
   error_message: string | null;
+  game_id: string | null;
+  game_title: string | null;
 };
 
 function ReelCard({ reel }: { reel: Reel }) {
@@ -107,11 +114,16 @@ function ReelCard({ reel }: { reel: Reel }) {
 
 function ReelsPage() {
   const { user } = useAuth();
+  const { game: gameId, title: gameTitle, upload: autoUpload } = Route.useSearch();
   const { isActive, isPastDue, freeUsed, freeRemaining, loading: subLoading } = useSubscription();
   const { openCheckout, isOpen, checkoutElement, closeCheckout } = useStripeCheckout();
   const fileRef = useRef<HTMLInputElement>(null);
   const [reels, setReels] = useState<Reel[]>([]);
   const [busy, setBusy] = useState(false);
+  const autoOpened = useRef(false);
+  const gameReels = gameId ? reels.filter((r) => r.game_id === gameId) : [];
+  const visibleReels = gameId ? gameReels : reels;
+
 
   const canGenerate = isActive || freeRemaining > 0;
   const lockedReason = !user
@@ -137,6 +149,14 @@ function ReelsPage() {
       .then(({ data }) => setReels((data as Reel[]) ?? []));
   }, [user, busy]);
 
+  // Deep link from a finished game: open the picker straight away.
+  useEffect(() => {
+    if (autoUpload !== "1" || autoOpened.current || !user || !canGenerate) return;
+    autoOpened.current = true;
+    fileRef.current?.click();
+  }, [autoUpload, user, canGenerate]);
+
+
   async function handleUpload(file: File) {
     if (!user) return;
     if (!canGenerate) {
@@ -155,11 +175,15 @@ function ReelsPage() {
       const usedFree = !isActive;
       const { error: insErr } = await supabase.from("highlight_reels").insert({
         user_id: user.id,
-        title: file.name.replace(/\.[^.]+$/, ""),
+        title: gameTitle
+          ? `Recap · ${gameTitle}`
+          : file.name.replace(/\.[^.]+$/, ""),
         video_path: path,
         status: "processing",
         used_free: usedFree,
         environment: env,
+        game_id: gameId || null,
+        game_title: gameTitle || null,
       });
       if (insErr) throw insErr;
 
@@ -220,6 +244,20 @@ function ReelsPage() {
           Upload a clip and let AI generate your highlight.
         </p>
       </header>
+
+      {gameId && (
+        <section className="mx-5 mb-5 rounded-2xl border border-lime/30 bg-lime/5 p-4">
+          <p className="text-[10px] font-bold uppercase tracking-wider text-lime">
+            Recap for finished game
+          </p>
+          <p className="mt-1 text-sm font-semibold">{gameTitle || "Your game"}</p>
+          <p className="mt-1 text-xs text-muted-foreground">
+            {gameReels.length > 0
+              ? `${gameReels.length} recap${gameReels.length === 1 ? "" : "s"} linked to this game.`
+              : "Upload footage below and we'll link the recap to this game."}
+          </p>
+        </section>
+      )}
 
       {isPastDue && (
         <div className="mx-5 mb-3 flex items-center gap-2 rounded-xl border border-amber-400/40 bg-amber-50/10 px-3 py-2 text-sm text-amber-300">
@@ -316,18 +354,29 @@ function ReelsPage() {
 
       <section className="mx-5 pb-24">
         <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-          Your reels
+          {gameId ? "Recaps for this game" : "Your reels"}
         </h2>
-        {reels.length === 0 ? (
+        {visibleReels.length === 0 ? (
           <p className="text-sm text-muted-foreground">
-            No reels yet — upload your first clip above.
+            {gameId
+              ? "No recap for this game yet — upload footage above."
+              : "No reels yet — upload your first clip above."}
           </p>
         ) : (
           <ul className="space-y-2">
-            {reels.map((r) => (
+            {visibleReels.map((r) => (
               <ReelCard key={r.id} reel={r} />
             ))}
           </ul>
+        )}
+        {gameId && reels.length > gameReels.length && (
+          <Link
+            to="/reels"
+            search={{ game: "", title: "", upload: "" }}
+            className="mt-3 inline-block text-xs font-semibold text-lime underline"
+          >
+            View all your reels
+          </Link>
         )}
       </section>
     </div>

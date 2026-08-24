@@ -4,7 +4,17 @@ import { zodValidator, fallback } from "@tanstack/zod-adapter";
 import { z } from "zod";
 import { formatSportLevel } from "@/lib/sport-levels";
 
-import { Settings, Shield, Clock, Star, Crown, Users } from "lucide-react";
+import {
+  Settings,
+  Shield,
+  Clock,
+  Star,
+  Crown,
+  Users,
+  PlayCircle,
+  Sparkles,
+  BarChart3,
+} from "lucide-react";
 import { useFollow } from "@/lib/follows";
 import { FollowSheet } from "@/components/FollowSheet";
 import { ME, GAMES, type Game } from "@/lib/sample-data";
@@ -227,6 +237,32 @@ function PlayerProfile() {
   const recentlyReviewed = filteredRequests.filter((r) => r.status !== "pending").slice(0, 3);
   const pendingWithGame = pendingRequests.filter((r) => gameLookup.has(r.game_id));
   const reviewedWithGame = recentlyReviewed.filter((r) => gameLookup.has(r.game_id));
+
+  // Recap (highlight reel) counts per finished game, for the Archive CTA.
+  const [recapCounts, setRecapCounts] = useState<Record<string, number>>({});
+  useEffect(() => {
+    if (!profileUser) {
+      setRecapCounts({});
+      return;
+    }
+    let cancelled = false;
+    supabase
+      .from("highlight_reels")
+      .select("game_id")
+      .eq("user_id", profileUser.id)
+      .not("game_id", "is", null)
+      .then(({ data }) => {
+        if (cancelled) return;
+        const counts: Record<string, number> = {};
+        (data ?? []).forEach((r: { game_id: string | null }) => {
+          if (r.game_id) counts[r.game_id] = (counts[r.game_id] ?? 0) + 1;
+        });
+        setRecapCounts(counts);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [profileUser?.id]);
 
   useEffect(() => {
     if (user) setConfirmedUser(user);
@@ -704,7 +740,9 @@ function PlayerProfile() {
                     items={upcomingGroups.archiveHosting}
                     pageSize={6}
                     keyFor={(g) => g.id}
-                    renderItem={(g, i) => <GameCard game={g} index={i} />}
+                    renderItem={(g, i) => (
+                      <ArchiveGameItem game={g} index={i} recaps={recapCounts[g.id] ?? 0} />
+                    )}
                     renderSkeleton={() => <GameCardSkeleton />}
                     resetKey="archive-hosting"
                   />
@@ -734,7 +772,9 @@ function PlayerProfile() {
                     items={upcomingGroups.archivePlaying}
                     pageSize={6}
                     keyFor={(g) => g.id}
-                    renderItem={(g, i) => <GameCard game={g} index={i} />}
+                    renderItem={(g, i) => (
+                      <ArchiveGameItem game={g} index={i} recaps={recapCounts[g.id] ?? 0} />
+                    )}
                     renderSkeleton={() => <GameCardSkeleton />}
                     resetKey="archive-playing"
                   />
@@ -846,4 +886,49 @@ function ageFrom(iso: string): number | null {
   const m = now.getMonth() - d.getMonth();
   if (m < 0 || (m === 0 && now.getDate() < d.getDate())) age--;
   return age >= 0 && age < 150 ? age : null;
+}
+
+/** A finished game in the Archive, with recap / results calls-to-action. */
+function ArchiveGameItem({
+  game,
+  index,
+  recaps,
+}: {
+  game: Game;
+  index: number;
+  recaps: number;
+}) {
+  return (
+    <div>
+      <GameCard game={game} index={index} />
+      <div className="mt-2 mb-1 flex flex-wrap items-center gap-2">
+        {recaps > 0 && (
+          <Link
+            to="/reels"
+            search={{ game: game.id, title: game.title, upload: "" }}
+            className="inline-flex items-center gap-1.5 rounded-full border border-lime/40 bg-lime/10 px-3 py-1.5 text-[11px] font-bold text-lime"
+          >
+            <PlayCircle className="h-3.5 w-3.5" />
+            Watch highlights{recaps > 1 ? ` (${recaps})` : ""}
+          </Link>
+        )}
+        <Link
+          to="/reels"
+          search={{ game: game.id, title: game.title, upload: "1" }}
+          className="inline-flex items-center gap-1.5 rounded-full border border-border bg-surface px-3 py-1.5 text-[11px] font-bold text-foreground transition-colors hover:border-lime/40"
+        >
+          <Sparkles className="h-3.5 w-3.5 text-lime" />
+          {recaps > 0 ? "Generate another recap" : "Generate recap"}
+        </Link>
+        <Link
+          to="/games/$gameId"
+          params={{ gameId: game.id }}
+          className="inline-flex items-center gap-1.5 rounded-full border border-border bg-surface px-3 py-1.5 text-[11px] font-bold text-muted-foreground transition-colors hover:text-foreground"
+        >
+          <BarChart3 className="h-3.5 w-3.5" />
+          Results
+        </Link>
+      </div>
+    </div>
+  );
 }
