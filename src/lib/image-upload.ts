@@ -1,5 +1,13 @@
 import { supabase } from "@/integrations/supabase/client";
 import { warmImageVariants } from "@/lib/image-variants";
+import { finalizeImageUpload } from "@/lib/image-uploads.functions";
+import { refreshBlockedImages } from "@/lib/blocked-images";
+import {
+  MAX_IMAGE_BYTES,
+  isAllowedImageMime,
+  readImageDimensions,
+  validateImageMeta,
+} from "@/lib/image-validation";
 
 export type PublicImageBucket =
   | "avatars"
