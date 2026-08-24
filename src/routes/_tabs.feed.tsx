@@ -36,6 +36,7 @@ import { listRecentTeamPosts } from "@/lib/team-posts.functions";
 import { PostCard } from "@/components/PostCard";
 import { PostDetailsDialog, type PostDetailsTeam } from "@/components/PostDetailsDialog";
 import type { OrgPost, PostKind } from "@/lib/sample-data";
+import { hideFinishedGames } from "@/lib/game-time";
 
 // URL-persisted feed state. Refreshing or sharing the URL preserves search
 // text, sport chip, sort, distance cap, position, view/density toggles, and
@@ -233,7 +234,7 @@ function Feed() {
   };
 
   const filtered = useMemo(() => {
-    const all = [...hosted, ...GAMES];
+    const all = hideFinishedGames([...hosted, ...GAMES]);
     return all
       .filter((g) =>
         prefs.preferredSports.length ? prefs.preferredSports.includes(g.sport) : true,
@@ -288,7 +289,7 @@ function Feed() {
     const needle = q.toLowerCase();
     const seen = new Set<string>();
     const out: { label: string; sub: string }[] = [];
-    for (const g of [...hosted, ...GAMES]) {
+    for (const g of hideFinishedGames([...hosted, ...GAMES])) {
       for (const cand of [
         { label: g.title, sub: g.location },
         { label: g.location, sub: g.sport },

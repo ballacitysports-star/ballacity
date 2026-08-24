@@ -12,6 +12,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { useLiveParticipantCount } from "@/lib/game-participants-store";
 import { computeSpotsLeft } from "@/lib/spots-left";
 import { SpotsPill } from "@/components/SpotsPill";
+import { hideFinishedGames } from "@/lib/game-time";
 
 const emojiBySport: Record<string, string> = Object.fromEntries(
   SPORTS.map((s) => [s.name, s.emoji]),
@@ -50,7 +51,7 @@ export function PlayMapView<T extends MapItemLike>(props?: {
   const navigate = useNavigate();
 
   // Default (games) behavior when caller supplies nothing.
-  const defaultGames = useMemo(() => [...hosted, ...GAMES], [hosted]);
+  const defaultGames = useMemo(() => hideFinishedGames([...hosted, ...GAMES]), [hosted]);
   const items = (props?.items ?? (defaultGames as unknown as T[])) as T[];
   const noun = props?.noun ?? "game";
   const emptyLabel =

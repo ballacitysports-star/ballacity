@@ -11,6 +11,7 @@ import { readStoredSupabaseSession } from "@/lib/authgate-log";
 import { readLastVisited } from "@/lib/last-visited";
 import { isAccountType } from "@/lib/account-type";
 import { supabase } from "@/integrations/supabase/client";
+import { hideFinishedGames } from "@/lib/game-time";
 
 export const Route = createFileRoute("/")({
   head: () =>
@@ -57,7 +58,7 @@ function Landing() {
   // see a skeleton instead of the marketing hero while we redirect.
   if (user || (loading && hasStoredSession)) return <AuthRedirectSkeleton />;
 
-  const trending = GAMES.filter((g) => g.trending).slice(0, 4);
+  const trending = hideFinishedGames(GAMES.filter((g) => g.trending)).slice(0, 4);
 
   return (
     <div className="min-h-dvh">
