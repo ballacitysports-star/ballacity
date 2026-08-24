@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { ImageEditorDialog } from "@/components/ImageEditorDialog";
 import { uploadDataUrlToBucket, type ImageBucket } from "@/lib/image-upload";
 import { imageFor, type Sport } from "@/lib/sample-data";
+import { ResponsiveImage } from "@/components/ResponsiveImage";
 
 type Kind = "avatar" | "cover";
 
