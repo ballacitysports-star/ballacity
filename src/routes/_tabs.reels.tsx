@@ -114,11 +114,16 @@ function ReelCard({ reel }: { reel: Reel }) {
 
 function ReelsPage() {
   const { user } = useAuth();
+  const { game: gameId, title: gameTitle, upload: autoUpload } = Route.useSearch();
   const { isActive, isPastDue, freeUsed, freeRemaining, loading: subLoading } = useSubscription();
   const { openCheckout, isOpen, checkoutElement, closeCheckout } = useStripeCheckout();
   const fileRef = useRef<HTMLInputElement>(null);
   const [reels, setReels] = useState<Reel[]>([]);
   const [busy, setBusy] = useState(false);
+  const autoOpened = useRef(false);
+  const gameReels = gameId ? reels.filter((r) => r.game_id === gameId) : [];
+  const visibleReels = gameId ? gameReels : reels;
+
 
   const canGenerate = isActive || freeRemaining > 0;
   const lockedReason = !user
