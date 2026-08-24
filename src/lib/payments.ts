@@ -95,13 +95,13 @@ export const PAYMENT_TYPES: {
     id: "venmo",
     name: "Venmo",
     emoji: "💸",
-    fields: { username: "Venmo username", url: "Payment URL (https://venmo.com/u/…)" },
+    fields: { username: "Venmo username", url: "Payment link (venmo.com/u/…)" },
   },
   {
     id: "cashapp",
     name: "Cash App",
     emoji: "💵",
-    fields: { username: "Cashtag ($yourname)", url: "Payment URL (https://cash.app/$…)" },
+    fields: { username: "Cashtag ($yourname)", url: "Payment link (cash.app/$…)" },
   },
   { id: "zelle", name: "Zelle", emoji: "⚡", fields: { contact: "Email or phone" } },
   {

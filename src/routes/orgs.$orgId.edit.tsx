@@ -17,6 +17,7 @@ import {
 } from "@/lib/trainer-orgs.functions";
 import { OrgForm, type OrgFormValue } from "@/components/OrgForm";
 import { parseHours } from "@/lib/org-hours";
+import { websiteHref } from "@/lib/org-listing";
 import { useAutosave } from "@/hooks/use-autosave";
 import { SaveStatus } from "@/components/SaveStatus";
 
@@ -151,7 +152,7 @@ function EditOrg() {
         handle: v.handle.trim().toLowerCase(),
         bio: v.bio.trim() || null,
         city: v.city.trim() || null,
-        website: v.website.trim() || null,
+        website: websiteHref(v.website) ?? (v.website.trim() || null),
         address: v.address.trim() || null,
         placeId: v.placeId || null,
         geo: v.geo,

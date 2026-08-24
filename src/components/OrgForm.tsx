@@ -10,7 +10,13 @@ import { PhotoGalleryEditor } from "@/components/org/PhotoGalleryEditor";
 import { ProfileStrengthMeter } from "@/components/org/ProfileStrengthMeter";
 import { ListingPreviewCard } from "@/components/org/ListingPreviewCard";
 import { detectTimezone, emptyHours, type OrgHours } from "@/lib/org-hours";
-import { ORG_AMENITIES, ORG_CATEGORIES, isValidPhone, scoreListing } from "@/lib/org-listing";
+import {
+  ORG_AMENITIES,
+  ORG_CATEGORIES,
+  isValidPhone,
+  scoreListing,
+  websiteHref,
+} from "@/lib/org-listing";
 import {
   autocompletePlaces,
   getPlaceDetails,
@@ -74,7 +80,7 @@ export function validateOrgForm(v: OrgFormValue): string | null {
   if (v.name.trim().length < 2) return "Name is too short.";
   if (!HANDLE_RE.test(v.handle.trim().toLowerCase()))
     return "Handle must be 3–40 chars: a–z, 0–9, - or _.";
-  if (v.website && !/^https?:\/\//i.test(v.website)) return "Website must start with http(s)://";
+  if (v.website.trim() && !websiteHref(v.website)) return "Enter a valid website (e.g. example.com).";
   if (v.phone && !isValidPhone(v.phone)) return "Phone number looks invalid.";
   if (v.email && !EMAIL_RE.test(v.email.trim())) return "Email looks invalid.";
   return null;
@@ -394,7 +400,7 @@ export function OrgForm({
             <input
               value={value.website}
               onChange={(e) => patch({ website: e.target.value })}
-              placeholder="https://example.com"
+              placeholder="example.com"
               className={inputCls}
             />
           </label>
