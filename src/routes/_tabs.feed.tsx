@@ -274,6 +274,8 @@ function Feed() {
           : true,
       )
       .sort((a, b) => {
+        // Archive lists the most recently finished games first.
+        if (tab === "archive") return +new Date(b.date) - +new Date(a.date);
         if (prefs.sortBy === "nearest") {
           // Nearest first; prefer local city, then distanceMi, then date.
           const la = isLocal(a) ? 0 : 1;
