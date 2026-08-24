@@ -8,11 +8,27 @@ import {
   telHref,
   websiteHref,
 } from "@/lib/org-listing";
+import {
+  normalizeProfileUrl,
+  validateProfileUrl,
+} from "@/components/profile/ProfileLinksFields";
 
 describe("listing action links", () => {
   it("normalizes scheme-less websites", () => {
     expect(websiteHref("google.com")).toBe("https://google.com/");
     expect(websiteHref("http://google.com")).toBe("http://google.com/");
+    expect(websiteHref("  example.com  ")).toBe("https://example.com/");
+    expect(websiteHref("sub.example.com/gym")).toBe("https://sub.example.com/gym");
+    expect(websiteHref("www.example.co.uk/a?b=1")).toBe("https://www.example.co.uk/a?b=1");
+  });
+
+  it("accepts bare domains in profile links and rejects bad ones", () => {
+    expect(normalizeProfileUrl("yoursite.com")).toBe("https://yoursite.com");
+    expect(normalizeProfileUrl("instagram.com/handle")).toBe("https://instagram.com/handle");
+    expect(validateProfileUrl("yoursite.com")).toBe(null);
+    expect(validateProfileUrl("sub.example.co.uk/x")).toBe(null);
+    expect(validateProfileUrl("javascript:alert(1)")).not.toBe(null);
+    expect(validateProfileUrl("notadomain")).not.toBe(null);
   });
 
   it("rejects unsafe or unusable websites", () => {
