@@ -93,7 +93,9 @@ function PlayerProfile() {
   const [aboutOpen, setAboutOpen] = useState(false);
 
   const [followList, setFollowList] = useState<null | "followers" | "following">(null);
-  const [activeTab, setActiveTab] = useState<"games" | "hosting" | "requests" | "reviews">("games");
+  const [activeTab, setActiveTab] = useState<
+    "games" | "hosting" | "requests" | "reviews" | "archive"
+  >("games");
   const profileUser = user ?? confirmedUser;
   const me = useMyProfile(profileUser);
   const follow = useFollow(profileUser?.id ?? "");
@@ -103,21 +105,22 @@ function PlayerProfile() {
     const ids = new Set(joinedGameIds);
     const pool = [...hosted, ...GAMES];
     const seen = new Set<string>();
+    const isHosting = (g: Game) =>
+      Boolean(profileUser && (g as { hostUserId?: string }).hostUserId === profileUser.id);
     const relevant = pool
-      .filter(
-        (game) =>
-          ids.has(game.id) ||
-          (profileUser && (game as { hostUserId?: string }).hostUserId === profileUser.id),
-      )
+      .filter((game) => ids.has(game.id) || isHosting(game))
       .filter((g) => (seen.has(g.id) ? false : (seen.add(g.id), true)))
       .sort((a, b) => +new Date(a.date) - +new Date(b.date));
-    const hosting = relevant.filter(
-      (g) => profileUser && (g as { hostUserId?: string }).hostUserId === profileUser.id,
-    );
-    const playing = relevant.filter(
-      (g) => !(profileUser && (g as { hostUserId?: string }).hostUserId === profileUser.id),
-    );
-    return { hosting, playing, total: relevant.length };
+    const live = hideFinishedGames(relevant);
+    const finished = onlyFinishedGames(relevant).sort((a, b) => gameEndsAt(b) - gameEndsAt(a));
+    return {
+      hosting: live.filter(isHosting),
+      playing: live.filter((g) => !isHosting(g)),
+      total: live.length,
+      archiveHosting: finished.filter(isHosting),
+      archivePlaying: finished.filter((g) => !isHosting(g)),
+      archiveTotal: finished.length,
+    };
   }, [joinedGameIds, hosted, profileUser]);
 
   // Pending / recently-reviewed join requests for player and host views
