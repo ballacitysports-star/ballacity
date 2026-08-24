@@ -35,7 +35,7 @@ export const superadminListImages = createServerFn({ method: "POST" })
 
     const { data: rows, error } = await admin.rpc("admin_list_storage_objects", {
       _buckets: buckets,
-      _search: data.search ?? null,
+      _search: data.search ?? undefined,
       _status: data.status ?? "pending",
       _limit: data.limit ?? 60,
       _offset: data.offset ?? 0,
