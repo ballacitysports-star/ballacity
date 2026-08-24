@@ -9,6 +9,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useEffect } from "react";
 import { createStandaloneOrg } from "@/lib/trainer-orgs.functions";
 import { OrgForm, emptyOrgForm, type OrgFormValue } from "@/components/OrgForm";
+import { websiteHref } from "@/lib/org-listing";
 import { AccountTypeGate } from "@/components/AccountTypeGate";
 import { loadDraft, useDraftPersistence } from "@/components/create/useDraftPersistence";
 import { SaveStatus } from "@/components/SaveStatus";
@@ -61,7 +62,7 @@ function CreateOrg() {
           handle: value.handle.trim().toLowerCase(),
           bio: value.bio.trim() || undefined,
           city: value.city.trim() || undefined,
-          website: value.website.trim() || undefined,
+          website: websiteHref(value.website) ?? value.website.trim() || undefined,
           address: value.address.trim() || undefined,
           placeId: value.placeId || undefined,
           geo: value.geo,

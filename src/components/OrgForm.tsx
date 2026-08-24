@@ -400,7 +400,7 @@ export function OrgForm({
             <input
               value={value.website}
               onChange={(e) => patch({ website: e.target.value })}
-              placeholder="https://example.com"
+              placeholder="example.com"
               className={inputCls}
             />
           </label>
