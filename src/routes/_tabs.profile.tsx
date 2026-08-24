@@ -671,6 +671,80 @@ function PlayerProfile() {
           )}
         </section>
 
+        {/* Archive — completed games */}
+        <section className={`mt-6 ${activeTab === "archive" ? "" : "hidden"}`}>
+          {upcomingGroups.archiveTotal === 0 ? (
+            <div className="rounded-2xl border border-dashed border-border bg-surface/40 p-5 text-center">
+              <div className="font-display text-base font-bold">No completed games yet</div>
+              <p className="text-xs text-muted-foreground mt-1">
+                Games you host or join will appear here once they finish.
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-8">
+              {upcomingGroups.archiveHosting.length > 0 && (
+                <div>
+                  <div className="mb-3 flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-2">
+                      <span className="grid h-8 w-8 place-items-center rounded-2xl border border-border bg-surface text-muted-foreground">
+                        <Crown className="h-4 w-4" />
+                      </span>
+                      <div>
+                        <h2 className="font-display text-sm font-bold uppercase tracking-wider text-foreground">
+                          Hosted
+                        </h2>
+                        <p className="text-[10px] text-muted-foreground">Completed games you ran</p>
+                      </div>
+                    </div>
+                    <span className="rounded-full bg-surface px-2.5 py-1 text-[10px] font-bold text-muted-foreground">
+                      {upcomingGroups.archiveHosting.length}
+                    </span>
+                  </div>
+                  <InfiniteList
+                    items={upcomingGroups.archiveHosting}
+                    pageSize={6}
+                    keyFor={(g) => g.id}
+                    renderItem={(g, i) => <GameCard game={g} index={i} />}
+                    renderSkeleton={() => <GameCardSkeleton />}
+                    resetKey="archive-hosting"
+                  />
+                </div>
+              )}
+              {upcomingGroups.archivePlaying.length > 0 && (
+                <div>
+                  <div className="mb-3 flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-2">
+                      <span className="grid h-8 w-8 place-items-center rounded-2xl border border-border bg-surface text-muted-foreground">
+                        <Users className="h-4 w-4" />
+                      </span>
+                      <div>
+                        <h2 className="font-display text-sm font-bold uppercase tracking-wider text-foreground">
+                          Joined
+                        </h2>
+                        <p className="text-[10px] text-muted-foreground">
+                          Completed games you played
+                        </p>
+                      </div>
+                    </div>
+                    <span className="rounded-full bg-surface px-2.5 py-1 text-[10px] font-bold text-muted-foreground">
+                      {upcomingGroups.archivePlaying.length}
+                    </span>
+                  </div>
+                  <InfiniteList
+                    items={upcomingGroups.archivePlaying}
+                    pageSize={6}
+                    keyFor={(g) => g.id}
+                    renderItem={(g, i) => <GameCard game={g} index={i} />}
+                    renderSkeleton={() => <GameCardSkeleton />}
+                    resetKey="archive-playing"
+                  />
+                </div>
+              )}
+            </div>
+          )}
+        </section>
+
+
         <div className={activeTab === "games" ? "" : "hidden"}>
           <MyWaitlistCard />
         </div>
