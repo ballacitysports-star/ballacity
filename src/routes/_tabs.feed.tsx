@@ -36,7 +36,7 @@ import { listRecentTeamPosts } from "@/lib/team-posts.functions";
 import { PostCard } from "@/components/PostCard";
 import { PostDetailsDialog, type PostDetailsTeam } from "@/components/PostDetailsDialog";
 import type { OrgPost, PostKind } from "@/lib/sample-data";
-import { hideFinishedGames } from "@/lib/game-time";
+import { hideFinishedGames, onlyFinishedGames } from "@/lib/game-time";
 
 // URL-persisted feed state. Refreshing or sharing the URL preserves search
 // text, sport chip, sort, distance cap, position, view/density toggles, and
@@ -55,6 +55,7 @@ const feedSearchSchema = z.object({
   joined: fallback(z.boolean().optional(), undefined).default(undefined),
   free: fallback(z.boolean().optional(), undefined).default(undefined),
   paid: fallback(z.boolean().optional(), undefined).default(undefined),
+  tab: fallback(z.string(), "upcoming").default("upcoming"),
 });
 
 export const Route = createFileRoute("/_tabs/feed")({
@@ -73,6 +74,9 @@ function Feed() {
   const search = Route.useSearch();
   const navigate = useNavigate({ from: "/feed" });
   const [q, setQ] = useState(search.q ?? "");
+  const [tab, setTab] = useState<"upcoming" | "archive">(
+    search.tab === "archive" ? "archive" : "upcoming",
+  );
 
   const [viewMode, setViewMode] = useState<"list" | "map">(() => {
     if (search.view === "list" || search.view === "map") return search.view;
@@ -167,6 +171,7 @@ function Feed() {
     if (positionFilter) next.pos = positionFilter;
     if (viewMode !== "list") next.view = viewMode;
     if (density !== "grid") next.density = density;
+    if (tab !== "upcoming") next.tab = tab;
     for (const [k, defKey, urlKey] of [
       ["showUrgent", "showUrgent", "urgent"],
       ["showForYou", "showForYou", "foryou"],
@@ -182,7 +187,7 @@ function Feed() {
     }
     navigate({ search: next as any, replace: true });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [q, prefs, positionFilter, viewMode, density]);
+  }, [q, prefs, positionFilter, viewMode, density, tab]);
 
   const userCityToken = useMemo(
     () => (profile?.city ?? "").toLowerCase().split(",")[0].trim(),
@@ -234,7 +239,8 @@ function Feed() {
   };
 
   const filtered = useMemo(() => {
-    const all = hideFinishedGames([...hosted, ...GAMES]);
+    const pool = [...hosted, ...GAMES];
+    const all = tab === "archive" ? onlyFinishedGames(pool) : hideFinishedGames(pool);
     return all
       .filter((g) =>
         prefs.preferredSports.length ? prefs.preferredSports.includes(g.sport) : true,
@@ -268,6 +274,8 @@ function Feed() {
           : true,
       )
       .sort((a, b) => {
+        // Archive lists the most recently finished games first.
+        if (tab === "archive") return +new Date(b.date) - +new Date(a.date);
         if (prefs.sortBy === "nearest") {
           // Nearest first; prefer local city, then distanceMi, then date.
           const la = isLocal(a) ? 0 : 1;
@@ -282,7 +290,7 @@ function Feed() {
         return a.distanceMi - b.distanceMi;
       });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [q, hosted, prefs, joinedSet, hostedIds, userCityToken, positionFilter]);
+  }, [q, hosted, prefs, joinedSet, hostedIds, userCityToken, positionFilter, tab]);
 
   const suggestions = useMemo(() => {
     if (!q) return [] as { label: string; sub: string }[];
@@ -309,7 +317,11 @@ function Feed() {
 
   const isFull = (g: (typeof GAMES)[number]) => g.joined >= g.maxPlayers;
 
-  const urgent = filtered.filter((g) => g.urgent && !isFull(g));
+  const urgent = tab === "archive" ? [] : filtered.filter((g) => g.urgent && !isFull(g));
+  const finishedCount = useMemo(
+    () => onlyFinishedGames([...hosted, ...GAMES]).length,
+    [hosted],
+  );
   const activeFilterCount =
     (prefs.preferredSports.length > 0 ? 1 : 0) +
     (prefs.maxDistanceMi != null ? 1 : 0) +
@@ -326,7 +338,7 @@ function Feed() {
   );
 
   const sentinelRef = useRef<HTMLDivElement | null>(null);
-  const filterKey = `${q}|${JSON.stringify(prefs)}|${hosted.length}`;
+  const filterKey = `${tab}|${q}|${JSON.stringify(prefs)}|${hosted.length}`;
   // Locks: prevent overlapping refresh and pagination so the same cards
   // never get appended twice when the user pulls while a fetch is mid-flight
   // (or the IO sentinel fires multiple times during a single scroll).
@@ -473,7 +485,9 @@ function Feed() {
       </div>
 
       <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="mb-4">
-        <h1 className="font-display text-3xl font-bold leading-tight">Tonight's run.</h1>
+        <h1 className="font-display text-3xl font-bold leading-tight">
+          {tab === "archive" ? "Finished games." : "Tonight's run."}
+        </h1>
         <p className="text-muted-foreground text-sm inline-flex items-center gap-1">
           {userCityToken ? (
             <>
@@ -491,6 +505,37 @@ function Feed() {
           )}
         </p>
       </motion.div>
+
+      <div
+        role="tablist"
+        aria-label="Game timeframe"
+        className="mb-4 inline-flex rounded-full border border-border bg-surface p-1"
+      >
+        {(
+          [
+            { id: "upcoming", label: "Upcoming" },
+            { id: "archive", label: `Archive${finishedCount ? ` (${finishedCount})` : ""}` },
+          ] as const
+        ).map((t) => {
+          const active = tab === t.id;
+          return (
+            <button
+              key={t.id}
+              type="button"
+              role="tab"
+              aria-selected={active}
+              onClick={() => setTab(t.id)}
+              className={`rounded-full px-4 py-1.5 text-sm font-semibold transition-colors ${
+                active
+                  ? "bg-lime text-primary-foreground"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              {t.label}
+            </button>
+          );
+        })}
+      </div>
 
       <ViewDensityToggle
         view={viewMode}
@@ -685,10 +730,10 @@ function Feed() {
                 </div>
               )}
 
-              {prefs.sections.showForYou && (
+              {(tab === "archive" || prefs.sections.showForYou) && (
                 <>
                   <h2 className="font-display text-sm font-bold uppercase tracking-wider text-muted-foreground mb-2">
-                    For you
+                    {tab === "archive" ? "Recently finished" : "For you"}
                   </h2>
                   <div className={listContainerClass}>
                     {refreshing && filtered.length === 0
@@ -699,7 +744,11 @@ function Feed() {
                       <div
                         className={`${emptyColSpan} rounded-2xl border border-border bg-surface p-8 text-center text-muted-foreground space-y-3`}
                       >
-                        <div>No games match your filters.</div>
+                        <div>
+                          {tab === "archive"
+                            ? "No finished games match your filters yet."
+                            : "No games match your filters."}
+                        </div>
                         <button
                           onClick={() => setFeedPrefs(DEFAULT_PREFS)}
                           className="inline-flex rounded-full bg-lime px-4 py-2 text-sm font-bold text-primary-foreground"

@@ -34,3 +34,11 @@ export function hideFinishedGames<T extends Pick<Game, "date" | "duration">>(
 ): T[] {
   return games.filter((g) => !isGameFinished(g, now));
 }
+
+/** Keep only finished games, for archive/history views. */
+export function onlyFinishedGames<T extends Pick<Game, "date" | "duration">>(
+  games: T[],
+  now: number = Date.now(),
+): T[] {
+  return games.filter((g) => isGameFinished(g, now));
+}
