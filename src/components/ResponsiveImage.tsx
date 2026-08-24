@@ -6,6 +6,7 @@ import {
   imageVariant,
   type ResizeMode,
 } from "@/lib/image-variants";
+import { useBlockedImage } from "@/lib/blocked-images";
 
 type Props = Omit<ImgHTMLAttributes<HTMLImageElement>, "srcSet"> & {
   src: string | null | undefined;
@@ -38,7 +39,8 @@ export function ResponsiveImage({
   alt = "",
   ...rest
 }: Props) {
-  if (!src) return null;
+  const blocked = useBlockedImage(src);
+  if (!src || blocked) return null;
   const fallbackWidth = baseWidth ?? widths[Math.max(0, widths.length - 2)] ?? 960;
   const base = imageVariant(src, {
     width: fallbackWidth,

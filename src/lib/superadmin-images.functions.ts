@@ -18,7 +18,7 @@ export const superadminListImages = createServerFn({ method: "POST" })
         .object({
           buckets: z.array(z.string().max(60)).optional(),
           search: z.string().max(200).optional(),
-          status: z.enum(["all", "pending", "kept", "removed"]).optional(),
+          status: z.enum(["all", "pending", "kept", "quarantined", "removed"]).optional(),
           limit: z.number().int().min(1).max(200).optional(),
           offset: z.number().int().min(0).optional(),
         })
@@ -87,7 +87,7 @@ export const superadminReviewImage = createServerFn({ method: "POST" })
         .object({
           bucket: z.string().max(60),
           path: z.string().min(1).max(500),
-          action: z.enum(["keep", "remove", "reopen"]),
+          action: z.enum(["keep", "quarantine", "remove", "reopen"]),
           reason: z.string().max(500).optional(),
           suspendOwner: z.boolean().optional(),
         })
@@ -133,7 +133,14 @@ export const superadminReviewImage = createServerFn({ method: "POST" })
       }
     }
 
-    const status = action === "remove" ? "removed" : action === "keep" ? "kept" : "pending";
+    const status =
+      action === "remove"
+        ? "removed"
+        : action === "keep"
+          ? "kept"
+          : action === "quarantine"
+            ? "quarantined"
+            : "pending";
     const { error: upErr } = await admin.from("image_moderation").upsert(
       {
         bucket,
@@ -143,6 +150,7 @@ export const superadminReviewImage = createServerFn({ method: "POST" })
         reason,
         reviewed_by: action === "reopen" ? null : context.userId,
         reviewed_at: action === "reopen" ? null : new Date().toISOString(),
+        quarantined_at: action === "quarantine" ? new Date().toISOString() : null,
       },
       { onConflict: "bucket,path" },
     );
@@ -165,7 +173,7 @@ export const superadminImageStats = createServerFn({ method: "GET" })
     await assertSuperadmin(context);
     const admin = await getAdmin();
     const { data } = await admin.from("image_moderation").select("status");
-    const counts: Record<string, number> = { pending: 0, kept: 0, removed: 0 };
+    const counts: Record<string, number> = { pending: 0, kept: 0, quarantined: 0, removed: 0 };
     (data ?? []).forEach((r: any) => {
       counts[r.status] = (counts[r.status] ?? 0) + 1;
     });

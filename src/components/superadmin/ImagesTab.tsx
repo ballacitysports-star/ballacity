@@ -29,6 +29,7 @@ import {
 
 const STATUSES = [
   { key: "pending", label: "Needs review" },
+  { key: "quarantined", label: "Quarantined" },
   { key: "kept", label: "Approved" },
   { key: "removed", label: "Removed" },
   { key: "all", label: "All" },
@@ -86,13 +87,15 @@ export function ImagesTab() {
     mutationFn: (input: {
       bucket: string;
       path: string;
-      action: "keep" | "remove" | "reopen";
+      action: "keep" | "quarantine" | "remove" | "reopen";
       reason?: string;
       suspendOwner?: boolean;
     }) => review({ data: input }),
     onSuccess: (res: any, input) => {
       toast.success(
-        input.action === "remove"
+        input.action === "quarantine"
+          ? "Image quarantined — hidden across the app until approved"
+          : input.action === "remove"
           ? `Image removed${res?.removedRefs ? ` · ${res.removedRefs} reference(s) cleared` : ""}`
           : input.action === "keep"
             ? "Image approved"
@@ -130,7 +133,7 @@ export function ImagesTab() {
             }}
           >
             {s.label}
-            {counts && s.key !== "all" && s.key !== "pending" ? (
+            {counts && s.key !== "all" ? (
               <span className="ml-1 opacity-70">{counts[s.key] ?? 0}</span>
             ) : null}
           </Button>
@@ -195,7 +198,7 @@ export function ImagesTab() {
                 </Badge>
                 <Badge
                   variant={
-                    img.status === "removed"
+                    img.status === "removed" || img.status === "quarantined"
                       ? "destructive"
                       : img.status === "kept"
                         ? "outline"
@@ -230,6 +233,19 @@ export function ImagesTab() {
                     >
                       Approve
                     </Button>
+                    {img.status !== "quarantined" ? (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-7 px-2 text-[11px]"
+                        disabled={act.isPending}
+                        onClick={() =>
+                          act.mutate({ bucket: img.bucket, path: img.path, action: "quarantine" })
+                        }
+                      >
+                        Quarantine
+                      </Button>
+                    ) : null}
                     <Button
                       size="sm"
                       variant="destructive"

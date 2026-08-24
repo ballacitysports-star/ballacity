@@ -642,39 +642,57 @@ export type Database = {
       image_moderation: {
         Row: {
           bucket: string
+          bytes: number | null
           created_at: string
+          height: number | null
           id: string
+          mime: string | null
           owner_id: string | null
           path: string
+          quarantined_at: string | null
           reason: string | null
           reviewed_at: string | null
           reviewed_by: string | null
+          scan: Json | null
           status: string
           updated_at: string
+          width: number | null
         }
         Insert: {
           bucket: string
+          bytes?: number | null
           created_at?: string
+          height?: number | null
           id?: string
+          mime?: string | null
           owner_id?: string | null
           path: string
+          quarantined_at?: string | null
           reason?: string | null
           reviewed_at?: string | null
           reviewed_by?: string | null
+          scan?: Json | null
           status?: string
           updated_at?: string
+          width?: number | null
         }
         Update: {
           bucket?: string
+          bytes?: number | null
           created_at?: string
+          height?: number | null
           id?: string
+          mime?: string | null
           owner_id?: string | null
           path?: string
+          quarantined_at?: string | null
           reason?: string | null
           reviewed_at?: string | null
           reviewed_by?: string | null
+          scan?: Json | null
           status?: string
           updated_at?: string
+          width?: number | null
         }
         Relationships: []
       }
@@ -2147,6 +2165,13 @@ export type Database = {
       }
       approve_org_member_request: { Args: { _req: string }; Returns: string }
       approve_trainer_org_join: { Args: { _req: string }; Returns: string }
+      blocked_image_paths: {
+        Args: never
+        Returns: {
+          bucket: string
+          path: string
+        }[]
+      }
       can_notify: {
         Args: { _caller: string; _target: string }
         Returns: boolean

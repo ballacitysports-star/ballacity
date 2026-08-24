@@ -14,7 +14,7 @@ export type ImageBucketKey = keyof typeof IMAGE_BUCKETS;
 
 export const IMAGE_BUCKET_KEYS = Object.keys(IMAGE_BUCKETS) as ImageBucketKey[];
 
-export const MODERATION_STATUSES = ["pending", "kept", "removed", "all"] as const;
+export const MODERATION_STATUSES = ["pending", "kept", "quarantined", "removed", "all"] as const;
 export type ModerationStatus = (typeof MODERATION_STATUSES)[number];
 
 export function isPublicImageBucket(bucket: string): boolean {
