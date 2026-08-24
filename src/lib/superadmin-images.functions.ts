@@ -33,7 +33,7 @@ export const superadminListImages = createServerFn({ method: "POST" })
     const requested = (data.buckets ?? []).filter((b) => allowed.has(b));
     const buckets = requested.length ? requested : IMAGE_BUCKET_KEYS;
 
-    const { data: rows, error } = await admin.rpc("admin_list_storage_objects", {
+    const { data: rows, error } = await context.supabase.rpc("admin_list_storage_objects", {
       _buckets: buckets,
       _search: data.search ?? undefined,
       _status: data.status ?? "pending",
@@ -108,7 +108,7 @@ export const superadminReviewImage = createServerFn({ method: "POST" })
     let removedRefs = 0;
 
     if (action === "remove") {
-      const { data: objRows } = await admin.rpc("admin_list_storage_objects", {
+      const { data: objRows } = await context.supabase.rpc("admin_list_storage_objects", {
         _buckets: [bucket],
         _search: path,
         _status: "all",
