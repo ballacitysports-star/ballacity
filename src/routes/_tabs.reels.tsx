@@ -13,6 +13,11 @@ import { createPortalSession } from "@/utils/payments.functions";
 import { FREE_TIER } from "@/lib/catalog";
 
 export const Route = createFileRoute("/_tabs/reels")({
+  validateSearch: (search: Record<string, unknown>) => ({
+    game: typeof search.game === "string" ? search.game : "",
+    title: typeof search.title === "string" ? search.title : "",
+    upload: search.upload === "1" || search.upload === true ? "1" : "",
+  }),
   head: () =>
     pageHead({
       path: "/reels",
@@ -35,6 +40,8 @@ type Reel = {
   ai_hashtags: string[] | null;
   thumbnail_path: string | null;
   error_message: string | null;
+  game_id: string | null;
+  game_title: string | null;
 };
 
 function ReelCard({ reel }: { reel: Reel }) {
