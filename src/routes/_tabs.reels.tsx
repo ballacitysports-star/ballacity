@@ -354,18 +354,29 @@ function ReelsPage() {
 
       <section className="mx-5 pb-24">
         <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-          Your reels
+          {gameId ? "Recaps for this game" : "Your reels"}
         </h2>
-        {reels.length === 0 ? (
+        {visibleReels.length === 0 ? (
           <p className="text-sm text-muted-foreground">
-            No reels yet — upload your first clip above.
+            {gameId
+              ? "No recap for this game yet — upload footage above."
+              : "No reels yet — upload your first clip above."}
           </p>
         ) : (
           <ul className="space-y-2">
-            {reels.map((r) => (
+            {visibleReels.map((r) => (
               <ReelCard key={r.id} reel={r} />
             ))}
           </ul>
+        )}
+        {gameId && reels.length > gameReels.length && (
+          <Link
+            to="/reels"
+            search={{ game: "", title: "", upload: "" }}
+            className="mt-3 inline-block text-xs font-semibold text-lime underline"
+          >
+            View all your reels
+          </Link>
         )}
       </section>
     </div>
