@@ -40,8 +40,8 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { listTeamPosts, deleteTeamPost } from "@/lib/team-posts.functions";
 import { Trash2 } from "lucide-react";
-import {
 import { hideFinishedGames } from "@/lib/game-time";
+import {
   Dialog,
   DialogContent,
   DialogDescription,
