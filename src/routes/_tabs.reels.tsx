@@ -149,6 +149,14 @@ function ReelsPage() {
       .then(({ data }) => setReels((data as Reel[]) ?? []));
   }, [user, busy]);
 
+  // Deep link from a finished game: open the picker straight away.
+  useEffect(() => {
+    if (autoUpload !== "1" || autoOpened.current || !user || !canGenerate) return;
+    autoOpened.current = true;
+    fileRef.current?.click();
+  }, [autoUpload, user, canGenerate]);
+
+
   async function handleUpload(file: File) {
     if (!user) return;
     if (!canGenerate) {
