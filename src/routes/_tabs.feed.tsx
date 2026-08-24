@@ -730,10 +730,10 @@ function Feed() {
                 </div>
               )}
 
-              {prefs.sections.showForYou && (
+              {(tab === "archive" || prefs.sections.showForYou) && (
                 <>
                   <h2 className="font-display text-sm font-bold uppercase tracking-wider text-muted-foreground mb-2">
-                    For you
+                    {tab === "archive" ? "Recently finished" : "For you"}
                   </h2>
                   <div className={listContainerClass}>
                     {refreshing && filtered.length === 0
