@@ -338,7 +338,7 @@ function Feed() {
   );
 
   const sentinelRef = useRef<HTMLDivElement | null>(null);
-  const filterKey = `${q}|${JSON.stringify(prefs)}|${hosted.length}`;
+  const filterKey = `${tab}|${q}|${JSON.stringify(prefs)}|${hosted.length}`;
   // Locks: prevent overlapping refresh and pagination so the same cards
   // never get appended twice when the user pulls while a fetch is mid-flight
   // (or the IO sentinel fires multiple times during a single scroll).
