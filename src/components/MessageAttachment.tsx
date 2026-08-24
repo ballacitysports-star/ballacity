@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { FileText, Download, ImageIcon } from "lucide-react";
 import { getAttachmentUrl } from "@/lib/messages";
+import { ResponsiveImage } from "@/components/ResponsiveImage";
 
 type Props = {
   path: string;
