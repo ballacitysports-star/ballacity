@@ -72,6 +72,16 @@ export async function uploadDataUrlToBucket(
   });
   if (error) throw new Error(error.message);
 
+  // Server-side re-validation + automated safety scan. Anything unsafe is
+  // quarantined (hidden app-wide) and never handed back as a usable URL.
+  const check = await finalizeImageUpload({ data: { bucket, path } });
+  if (check?.quarantined) {
+    void refreshBlockedImages();
+    throw new Error(
+      "This image was flagged by our automated safety check and is pending review.",
+    );
+  }
+
   if ((PRIVATE_BUCKETS as Record<string, true>)[bucket]) {
     const { data, error: sErr } = await supabase.storage
       .from(bucket)
