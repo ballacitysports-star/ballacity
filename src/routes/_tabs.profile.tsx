@@ -4,7 +4,17 @@ import { zodValidator, fallback } from "@tanstack/zod-adapter";
 import { z } from "zod";
 import { formatSportLevel } from "@/lib/sport-levels";
 
-import { Settings, Shield, Clock, Star, Crown, Users } from "lucide-react";
+import {
+  Settings,
+  Shield,
+  Clock,
+  Star,
+  Crown,
+  Users,
+  PlayCircle,
+  Sparkles,
+  BarChart3,
+} from "lucide-react";
 import { useFollow } from "@/lib/follows";
 import { FollowSheet } from "@/components/FollowSheet";
 import { ME, GAMES, type Game } from "@/lib/sample-data";
