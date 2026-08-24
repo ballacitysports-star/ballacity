@@ -33,10 +33,19 @@ function decodeDataUrl(dataUrl: string): { blob: Blob; mime: string; ext: string
   const match = dataUrl.match(/^data:(image\/[a-zA-Z0-9+.-]+);base64,(.+)$/);
   if (!match) throw new Error("Not a valid image data URL");
   const mime = match[1];
+  if (!isAllowedImageMime(mime)) throw new Error("Only JPG, PNG or WEBP images are allowed");
   const ext = mime === "image/png" ? "png" : mime === "image/webp" ? "webp" : "jpg";
   const bytes = Uint8Array.from(atob(match[2]), (c) => c.charCodeAt(0));
+  if (bytes.byteLength > MAX_IMAGE_BYTES) throw new Error("Image is too large (max 8 MB)");
+
+  const failure = validateImageMeta({
+    mime,
+    bytes: bytes.byteLength,
+    dimensions: readImageDimensions(bytes),
+  });
+  if (failure) throw new Error(failure);
+
   const blob = new Blob([bytes], { type: mime });
-  if (blob.size > 8 * 1024 * 1024) throw new Error("Image is too large (max 8 MB)");
   return { blob, mime, ext };
 }
 
