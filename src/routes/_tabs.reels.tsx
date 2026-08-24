@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { pageHead } from "@/lib/seo";
 import { useEffect, useRef, useState } from "react";
-import { Sparkles, Upload, Video, Lock, Loader2, AlertTriangle, ExternalLink } from "lucide-react";
+import { Sparkles, Upload, Video, Lock, Loader2, AlertTriangle, ExternalLink, Check } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
@@ -10,6 +10,7 @@ import { useStripeCheckout } from "@/hooks/useStripeCheckout";
 import { PaymentTestModeBanner } from "@/components/PaymentTestModeBanner";
 import { getStripeEnvironment } from "@/lib/stripe";
 import { createPortalSession } from "@/utils/payments.functions";
+import { FREE_TIER } from "@/lib/catalog";
 
 export const Route = createFileRoute("/_tabs/reels")({
   head: () =>
@@ -263,6 +264,19 @@ function ReelsPage() {
           </div>
         )}
       </section>
+
+      {!isActive && (
+        <section className="mx-5 mb-5 rounded-2xl border border-border bg-surface p-5">
+          <h2 className="mb-3 text-sm font-semibold">Free account includes</h2>
+          <ul className="space-y-2">
+            {FREE_TIER.features.map((f) => (
+              <li key={f} className="flex items-start gap-2 text-sm text-muted-foreground">
+                <Check className="mt-0.5 h-4 w-4 shrink-0 text-lime" aria-hidden /> {f}
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
 
       <section className="mx-5 mb-6">
         <input

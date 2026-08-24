@@ -6,7 +6,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { useAllSubscriptions } from "@/hooks/useAllSubscriptions";
 import { useStripeCheckout } from "@/hooks/useStripeCheckout";
 import { PaymentTestModeBanner } from "@/components/PaymentTestModeBanner";
-import { PLAN_TIERS } from "@/lib/catalog";
+import { FREE_TIER, PLAN_TIERS } from "@/lib/catalog";
 import { getStripeEnvironment } from "@/lib/stripe";
 import { createPortalSession } from "@/utils/payments.functions";
 import { useState } from "react";
@@ -29,6 +29,7 @@ function PlansPage() {
   const [portalBusy, setPortalBusy] = useState(false);
 
   function handleSubscribe(priceId: string) {
+    if (priceId === "free") return;
     if (!user) {
       toast.error("Sign in to subscribe");
       return;
@@ -104,8 +105,9 @@ function PlansPage() {
         )}
 
         <div className="mt-6 grid gap-4">
-          {PLAN_TIERS.map((plan) => {
+          {[FREE_TIER, ...PLAN_TIERS].map((plan) => {
             const active = hasActive(plan.priceId);
+            const isFree = plan.priceId === "free";
             return (
               <div
                 key={plan.priceId}
@@ -129,10 +131,10 @@ function PlansPage() {
                 </ul>
                 <button
                   onClick={() => handleSubscribe(plan.priceId)}
-                  disabled={loading || active}
+                  disabled={loading || active || isFree}
                   className="mt-4 inline-flex w-full items-center justify-center rounded-xl bg-lime px-4 py-2.5 text-sm font-bold text-black disabled:bg-muted disabled:text-muted-foreground"
                 >
-                  {active ? "Current plan" : plan.cta}
+                  {active ? "Current plan" : isFree ? "Included" : plan.cta}
                 </button>
               </div>
             );
