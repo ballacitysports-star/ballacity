@@ -35,6 +35,7 @@ import {
   type JoinRequest,
 } from "@/lib/payments";
 import { leaveGame } from "@/lib/games-store";
+import { hideFinishedGames, onlyFinishedGames, gameEndsAt } from "@/lib/game-time";
 import { supabase } from "@/integrations/supabase/client";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -93,7 +94,9 @@ function PlayerProfile() {
   const [aboutOpen, setAboutOpen] = useState(false);
 
   const [followList, setFollowList] = useState<null | "followers" | "following">(null);
-  const [activeTab, setActiveTab] = useState<"games" | "hosting" | "requests" | "reviews">("games");
+  const [activeTab, setActiveTab] = useState<
+    "games" | "hosting" | "requests" | "reviews" | "archive"
+  >("games");
   const profileUser = user ?? confirmedUser;
   const me = useMyProfile(profileUser);
   const follow = useFollow(profileUser?.id ?? "");
@@ -103,21 +106,22 @@ function PlayerProfile() {
     const ids = new Set(joinedGameIds);
     const pool = [...hosted, ...GAMES];
     const seen = new Set<string>();
+    const isHosting = (g: Game) =>
+      Boolean(profileUser && (g as { hostUserId?: string }).hostUserId === profileUser.id);
     const relevant = pool
-      .filter(
-        (game) =>
-          ids.has(game.id) ||
-          (profileUser && (game as { hostUserId?: string }).hostUserId === profileUser.id),
-      )
+      .filter((game) => ids.has(game.id) || isHosting(game))
       .filter((g) => (seen.has(g.id) ? false : (seen.add(g.id), true)))
       .sort((a, b) => +new Date(a.date) - +new Date(b.date));
-    const hosting = relevant.filter(
-      (g) => profileUser && (g as { hostUserId?: string }).hostUserId === profileUser.id,
-    );
-    const playing = relevant.filter(
-      (g) => !(profileUser && (g as { hostUserId?: string }).hostUserId === profileUser.id),
-    );
-    return { hosting, playing, total: relevant.length };
+    const live = hideFinishedGames(relevant);
+    const finished = onlyFinishedGames(relevant).sort((a, b) => gameEndsAt(b) - gameEndsAt(a));
+    return {
+      hosting: live.filter(isHosting),
+      playing: live.filter((g) => !isHosting(g)),
+      total: live.length,
+      archiveHosting: finished.filter(isHosting),
+      archivePlaying: finished.filter((g) => !isHosting(g)),
+      archiveTotal: finished.length,
+    };
   }, [joinedGameIds, hosted, profileUser]);
 
   // Pending / recently-reviewed join requests for player and host views
@@ -422,6 +426,11 @@ function PlayerProfile() {
             { k: "hosting" as const, label: "Hosting" },
             { k: "requests" as const, label: "Requests", count: pendingWithGame.length },
             { k: "reviews" as const, label: "Reviews" },
+            {
+              k: "archive" as const,
+              label: "Archive",
+              count: upcomingGroups.archiveTotal,
+            },
           ]}
         />
 
@@ -661,6 +670,80 @@ function PlayerProfile() {
             </Link>
           )}
         </section>
+
+        {/* Archive — completed games */}
+        <section className={`mt-6 ${activeTab === "archive" ? "" : "hidden"}`}>
+          {upcomingGroups.archiveTotal === 0 ? (
+            <div className="rounded-2xl border border-dashed border-border bg-surface/40 p-5 text-center">
+              <div className="font-display text-base font-bold">No completed games yet</div>
+              <p className="text-xs text-muted-foreground mt-1">
+                Games you host or join will appear here once they finish.
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-8">
+              {upcomingGroups.archiveHosting.length > 0 && (
+                <div>
+                  <div className="mb-3 flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-2">
+                      <span className="grid h-8 w-8 place-items-center rounded-2xl border border-border bg-surface text-muted-foreground">
+                        <Crown className="h-4 w-4" />
+                      </span>
+                      <div>
+                        <h2 className="font-display text-sm font-bold uppercase tracking-wider text-foreground">
+                          Hosted
+                        </h2>
+                        <p className="text-[10px] text-muted-foreground">Completed games you ran</p>
+                      </div>
+                    </div>
+                    <span className="rounded-full bg-surface px-2.5 py-1 text-[10px] font-bold text-muted-foreground">
+                      {upcomingGroups.archiveHosting.length}
+                    </span>
+                  </div>
+                  <InfiniteList
+                    items={upcomingGroups.archiveHosting}
+                    pageSize={6}
+                    keyFor={(g) => g.id}
+                    renderItem={(g, i) => <GameCard game={g} index={i} />}
+                    renderSkeleton={() => <GameCardSkeleton />}
+                    resetKey="archive-hosting"
+                  />
+                </div>
+              )}
+              {upcomingGroups.archivePlaying.length > 0 && (
+                <div>
+                  <div className="mb-3 flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-2">
+                      <span className="grid h-8 w-8 place-items-center rounded-2xl border border-border bg-surface text-muted-foreground">
+                        <Users className="h-4 w-4" />
+                      </span>
+                      <div>
+                        <h2 className="font-display text-sm font-bold uppercase tracking-wider text-foreground">
+                          Joined
+                        </h2>
+                        <p className="text-[10px] text-muted-foreground">
+                          Completed games you played
+                        </p>
+                      </div>
+                    </div>
+                    <span className="rounded-full bg-surface px-2.5 py-1 text-[10px] font-bold text-muted-foreground">
+                      {upcomingGroups.archivePlaying.length}
+                    </span>
+                  </div>
+                  <InfiniteList
+                    items={upcomingGroups.archivePlaying}
+                    pageSize={6}
+                    keyFor={(g) => g.id}
+                    renderItem={(g, i) => <GameCard game={g} index={i} />}
+                    renderSkeleton={() => <GameCardSkeleton />}
+                    resetKey="archive-playing"
+                  />
+                </div>
+              )}
+            </div>
+          )}
+        </section>
+
 
         <div className={activeTab === "games" ? "" : "hidden"}>
           <MyWaitlistCard />
