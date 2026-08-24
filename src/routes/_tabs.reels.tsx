@@ -167,11 +167,15 @@ function ReelsPage() {
       const usedFree = !isActive;
       const { error: insErr } = await supabase.from("highlight_reels").insert({
         user_id: user.id,
-        title: file.name.replace(/\.[^.]+$/, ""),
+        title: gameTitle
+          ? `Recap · ${gameTitle}`
+          : file.name.replace(/\.[^.]+$/, ""),
         video_path: path,
         status: "processing",
         used_free: usedFree,
         environment: env,
+        game_id: gameId || null,
+        game_title: gameTitle || null,
       });
       if (insErr) throw insErr;
 
