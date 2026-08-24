@@ -55,6 +55,7 @@ const feedSearchSchema = z.object({
   joined: fallback(z.boolean().optional(), undefined).default(undefined),
   free: fallback(z.boolean().optional(), undefined).default(undefined),
   paid: fallback(z.boolean().optional(), undefined).default(undefined),
+  tab: fallback(z.string(), "upcoming").default("upcoming"),
 });
 
 export const Route = createFileRoute("/_tabs/feed")({
