@@ -730,7 +730,9 @@ function PlayerProfile() {
                     items={upcomingGroups.archiveHosting}
                     pageSize={6}
                     keyFor={(g) => g.id}
-                    renderItem={(g, i) => <GameCard game={g} index={i} />}
+                    renderItem={(g, i) => (
+                      <ArchiveGameItem game={g} index={i} recaps={recapCounts[g.id] ?? 0} />
+                    )}
                     renderSkeleton={() => <GameCardSkeleton />}
                     resetKey="archive-hosting"
                   />
