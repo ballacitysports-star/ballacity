@@ -6,6 +6,7 @@ import {
   imageVariant,
   type ResizeMode,
 } from "@/lib/image-variants";
+import { useBlockedImage } from "@/lib/blocked-images";
 
 type Props = Omit<ImgHTMLAttributes<HTMLImageElement>, "srcSet"> & {
   src: string | null | undefined;
