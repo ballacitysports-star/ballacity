@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { pageHead } from "@/lib/seo";
 import { useEffect, useRef, useState } from "react";
 import { Sparkles, Upload, Video, Lock, Loader2, AlertTriangle, ExternalLink, Check } from "lucide-react";
