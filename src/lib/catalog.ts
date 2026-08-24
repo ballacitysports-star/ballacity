@@ -8,6 +8,21 @@ export type PlanTier = {
   highlight?: boolean;
 };
 
+export const FREE_TIER: PlanTier = {
+  priceId: "free",
+  name: "Free",
+  tagline: "Everything you need to start playing",
+  priceLabel: "Free",
+  features: [
+    "Create your player profile & availability",
+    "Browse and request to join games",
+    "Discover players, teams, trainers & gyms",
+    "3 free AI highlight reels",
+    "Messaging & push notifications",
+  ],
+  cta: "Included",
+};
+
 export const PLAN_TIERS: PlanTier[] = [
   {
     priceId: "ai_highlight_reel_monthly",
