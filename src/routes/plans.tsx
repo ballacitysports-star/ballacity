@@ -29,6 +29,7 @@ function PlansPage() {
   const [portalBusy, setPortalBusy] = useState(false);
 
   function handleSubscribe(priceId: string) {
+    if (priceId === "free") return;
     if (!user) {
       toast.error("Sign in to subscribe");
       return;
