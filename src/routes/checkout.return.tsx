@@ -40,7 +40,7 @@ function CheckoutReturn() {
           >
             Plans
           </Link>
-          <Link to="/reels" className="rounded-xl bg-lime px-4 py-2 text-sm font-bold text-black">
+          <Link to="/reels" search={{ game: "", title: "", upload: "" }} className="rounded-xl bg-lime px-4 py-2 text-sm font-bold text-black">
             Back to Reels
           </Link>
         </div>

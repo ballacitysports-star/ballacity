@@ -553,6 +553,7 @@ function EditProfile() {
       <Section title="AI Highlight Reels">
         <Link
           to="/reels"
+          search={{ game: "", title: "", upload: "" }}
           className="flex items-center gap-3 rounded-2xl border border-border bg-surface p-3 hover:border-lime/40 transition-colors"
         >
           <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-lime/15 text-lime">
