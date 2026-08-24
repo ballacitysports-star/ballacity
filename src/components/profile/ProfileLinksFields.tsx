@@ -38,7 +38,7 @@ export function validateProfileUrl(raw: string): string | null {
     return "Enter a valid URL";
   }
   if (u.protocol !== "http:" && u.protocol !== "https:")
-    return "Must start with http:// or https://";
+    return "Enter a valid website (e.g. example.com)";
   const host = u.hostname;
   if (!host || host.length > 253) return "Enter a valid domain";
   if (!/^[a-z0-9.-]+$/i.test(host)) return "Domain has invalid characters";

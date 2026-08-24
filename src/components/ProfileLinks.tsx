@@ -16,15 +16,15 @@ export const LINK_TYPES: { type: ProfileLinkType; label: string; placeholder: st
   {
     type: "perfect_game",
     label: "Perfect Game",
-    placeholder: "https://perfectgame.org/players/...",
+    placeholder: "perfectgame.org/players/...",
   },
-  { type: "pbr", label: "Prep Baseball Report", placeholder: "https://prepbaseballreport.com/..." },
-  { type: "hudl", label: "Hudl", placeholder: "https://hudl.com/profile/..." },
-  { type: "instagram", label: "Instagram", placeholder: "https://instagram.com/yourhandle" },
-  { type: "twitter", label: "X / Twitter", placeholder: "https://x.com/yourhandle" },
-  { type: "tiktok", label: "TikTok", placeholder: "https://tiktok.com/@yourhandle" },
-  { type: "youtube", label: "YouTube", placeholder: "https://youtube.com/@yourchannel" },
-  { type: "website", label: "Website", placeholder: "https://yoursite.com" },
+  { type: "pbr", label: "Prep Baseball Report", placeholder: "prepbaseballreport.com/..." },
+  { type: "hudl", label: "Hudl", placeholder: "hudl.com/profile/..." },
+  { type: "instagram", label: "Instagram", placeholder: "instagram.com/yourhandle" },
+  { type: "twitter", label: "X / Twitter", placeholder: "x.com/yourhandle" },
+  { type: "tiktok", label: "TikTok", placeholder: "tiktok.com/@yourhandle" },
+  { type: "youtube", label: "YouTube", placeholder: "youtube.com/@yourchannel" },
+  { type: "website", label: "Website", placeholder: "yoursite.com" },
 ];
 
 export function linkLabel(type: ProfileLinkType): string {
