@@ -642,39 +642,57 @@ export type Database = {
       image_moderation: {
         Row: {
           bucket: string
+          bytes: number | null
           created_at: string
+          height: number | null
           id: string
+          mime: string | null
           owner_id: string | null
           path: string
+          quarantined_at: string | null
           reason: string | null
           reviewed_at: string | null
           reviewed_by: string | null
+          scan: Json | null
           status: string
           updated_at: string
+          width: number | null
         }
         Insert: {
           bucket: string
+          bytes?: number | null
           created_at?: string
+          height?: number | null
           id?: string
+          mime?: string | null
           owner_id?: string | null
           path: string
+          quarantined_at?: string | null
           reason?: string | null
           reviewed_at?: string | null
           reviewed_by?: string | null
+          scan?: Json | null
           status?: string
           updated_at?: string
+          width?: number | null
         }
         Update: {
           bucket?: string
+          bytes?: number | null
           created_at?: string
+          height?: number | null
           id?: string
+          mime?: string | null
           owner_id?: string | null
           path?: string
+          quarantined_at?: string | null
           reason?: string | null
           reviewed_at?: string | null
           reviewed_by?: string | null
+          scan?: Json | null
           status?: string
           updated_at?: string
+          width?: number | null
         }
         Relationships: []
       }
@@ -2119,7 +2137,21 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      blocked_images: {
+        Row: {
+          bucket: string | null
+          path: string | null
+        }
+        Insert: {
+          bucket?: string | null
+          path?: string | null
+        }
+        Update: {
+          bucket?: string | null
+          path?: string | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
       accept_conversation: { Args: { _conv: string }; Returns: undefined }
