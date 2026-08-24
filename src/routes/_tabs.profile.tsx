@@ -35,6 +35,7 @@ import {
   type JoinRequest,
 } from "@/lib/payments";
 import { leaveGame } from "@/lib/games-store";
+import { hideFinishedGames, onlyFinishedGames, gameEndsAt } from "@/lib/game-time";
 import { supabase } from "@/integrations/supabase/client";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
