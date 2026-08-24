@@ -6,7 +6,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { useAllSubscriptions } from "@/hooks/useAllSubscriptions";
 import { useStripeCheckout } from "@/hooks/useStripeCheckout";
 import { PaymentTestModeBanner } from "@/components/PaymentTestModeBanner";
-import { PLAN_TIERS } from "@/lib/catalog";
+import { FREE_TIER, PLAN_TIERS } from "@/lib/catalog";
 import { getStripeEnvironment } from "@/lib/stripe";
 import { createPortalSession } from "@/utils/payments.functions";
 import { useState } from "react";
