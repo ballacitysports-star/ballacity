@@ -41,7 +41,6 @@ export const superadminListImages = createServerFn({ method: "POST" })
       _offset: data.offset ?? 0,
     });
     if (error) throw new Error(error.message);
-    console.log("[img-mod] rpc", { buckets, status: data.status, rows: (rows ?? []).length, error });
 
     const list = (rows ?? []) as any[];
     const total = list.length > 0 ? Number(list[0].total ?? list.length) : 0;
