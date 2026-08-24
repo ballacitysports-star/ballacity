@@ -485,7 +485,9 @@ function Feed() {
       </div>
 
       <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="mb-4">
-        <h1 className="font-display text-3xl font-bold leading-tight">Tonight's run.</h1>
+        <h1 className="font-display text-3xl font-bold leading-tight">
+          {tab === "archive" ? "Finished games." : "Tonight's run."}
+        </h1>
         <p className="text-muted-foreground text-sm inline-flex items-center gap-1">
           {userCityToken ? (
             <>
