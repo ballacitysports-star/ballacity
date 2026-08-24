@@ -426,6 +426,11 @@ function PlayerProfile() {
             { k: "hosting" as const, label: "Hosting" },
             { k: "requests" as const, label: "Requests", count: pendingWithGame.length },
             { k: "reviews" as const, label: "Reviews" },
+            {
+              k: "archive" as const,
+              label: "Archive",
+              count: upcomingGroups.archiveTotal,
+            },
           ]}
         />
 
