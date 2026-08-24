@@ -887,3 +887,48 @@ function ageFrom(iso: string): number | null {
   if (m < 0 || (m === 0 && now.getDate() < d.getDate())) age--;
   return age >= 0 && age < 150 ? age : null;
 }
+
+/** A finished game in the Archive, with recap / results calls-to-action. */
+function ArchiveGameItem({
+  game,
+  index,
+  recaps,
+}: {
+  game: Game;
+  index: number;
+  recaps: number;
+}) {
+  return (
+    <div>
+      <GameCard game={game} index={index} />
+      <div className="mt-2 mb-1 flex flex-wrap items-center gap-2">
+        {recaps > 0 && (
+          <Link
+            to="/reels"
+            search={{ game: game.id, title: game.title, upload: "" }}
+            className="inline-flex items-center gap-1.5 rounded-full border border-lime/40 bg-lime/10 px-3 py-1.5 text-[11px] font-bold text-lime"
+          >
+            <PlayCircle className="h-3.5 w-3.5" />
+            Watch highlights{recaps > 1 ? ` (${recaps})` : ""}
+          </Link>
+        )}
+        <Link
+          to="/reels"
+          search={{ game: game.id, title: game.title, upload: "1" }}
+          className="inline-flex items-center gap-1.5 rounded-full border border-border bg-surface px-3 py-1.5 text-[11px] font-bold text-foreground transition-colors hover:border-lime/40"
+        >
+          <Sparkles className="h-3.5 w-3.5 text-lime" />
+          {recaps > 0 ? "Generate another recap" : "Generate recap"}
+        </Link>
+        <Link
+          to="/games/$gameId"
+          params={{ gameId: game.id }}
+          className="inline-flex items-center gap-1.5 rounded-full border border-border bg-surface px-3 py-1.5 text-[11px] font-bold text-muted-foreground transition-colors hover:text-foreground"
+        >
+          <BarChart3 className="h-3.5 w-3.5" />
+          Results
+        </Link>
+      </div>
+    </div>
+  );
+}
