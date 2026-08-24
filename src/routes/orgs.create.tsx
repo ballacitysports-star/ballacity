@@ -62,7 +62,7 @@ function CreateOrg() {
           handle: value.handle.trim().toLowerCase(),
           bio: value.bio.trim() || undefined,
           city: value.city.trim() || undefined,
-          website: websiteHref(value.website) ?? value.website.trim() || undefined,
+          website: websiteHref(value.website) ?? (value.website.trim() || undefined),
           address: value.address.trim() || undefined,
           placeId: value.placeId || undefined,
           geo: value.geo,
