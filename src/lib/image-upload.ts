@@ -1,4 +1,5 @@
 import { supabase } from "@/integrations/supabase/client";
+import { warmImageVariants } from "@/lib/image-variants";
 
 export type PublicImageBucket =
   | "avatars"
