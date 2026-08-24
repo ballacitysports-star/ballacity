@@ -171,6 +171,7 @@ function Feed() {
     if (positionFilter) next.pos = positionFilter;
     if (viewMode !== "list") next.view = viewMode;
     if (density !== "grid") next.density = density;
+    if (tab !== "upcoming") next.tab = tab;
     for (const [k, defKey, urlKey] of [
       ["showUrgent", "showUrgent", "urgent"],
       ["showForYou", "showForYou", "foryou"],
