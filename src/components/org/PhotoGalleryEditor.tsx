@@ -71,7 +71,15 @@ export function PhotoGalleryEditor({
       <div className="grid grid-cols-3 gap-2">
         {value.map((url, i) => (
           <div key={url + i} className="group relative overflow-hidden rounded-xl border border-border">
-            <img src={url} alt={`Gym photo ${i + 1}`} className="h-24 w-full object-cover" />
+            <ResponsiveImage
+              src={url}
+              alt={`Gym photo ${i + 1}`}
+              aspect={4 / 3}
+              widths={[160, 320, 480]}
+              sizes="(min-width: 640px) 200px, 33vw"
+              baseWidth={320}
+              className="h-24 w-full object-cover"
+            />
             {i === 0 && (
               <span className="absolute left-1 top-1 rounded-full bg-background/85 px-1.5 py-0.5 text-[10px] font-bold">
                 Hero
