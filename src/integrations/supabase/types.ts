@@ -639,6 +639,45 @@ export type Database = {
           },
         ]
       }
+      image_moderation: {
+        Row: {
+          bucket: string
+          created_at: string
+          id: string
+          owner_id: string | null
+          path: string
+          reason: string | null
+          reviewed_at: string | null
+          reviewed_by: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          bucket: string
+          created_at?: string
+          id?: string
+          owner_id?: string | null
+          path: string
+          reason?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          bucket?: string
+          created_at?: string
+          id?: string
+          owner_id?: string | null
+          path?: string
+          reason?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       join_requests: {
         Row: {
           attempt_count: number
@@ -2085,6 +2124,27 @@ export type Database = {
     Functions: {
       accept_conversation: { Args: { _conv: string }; Returns: undefined }
       accept_trainer_org_invite: { Args: { _invite: string }; Returns: string }
+      admin_list_storage_objects: {
+        Args: {
+          _buckets: string[]
+          _limit?: number
+          _offset?: number
+          _search?: string
+          _status?: string
+        }
+        Returns: {
+          bucket_id: string
+          created_at: string
+          mimetype: string
+          name: string
+          owner: string
+          reason: string
+          reviewed_at: string
+          size: number
+          status: string
+          total: number
+        }[]
+      }
       approve_org_member_request: { Args: { _req: string }; Returns: string }
       approve_trainer_org_join: { Args: { _req: string }; Returns: string }
       can_notify: {
