@@ -89,6 +89,7 @@ import {
   scaleForSport,
 } from "@/lib/sport-levels";
 import { SportSkillLevels } from "@/components/filters/SportSkillLevels";
+import { hideFinishedGames } from "@/lib/game-time";
 import {
   countSkillSelections,
   matchesSportSkillFilter,
@@ -184,10 +185,10 @@ function PlayersPage() {
   const myUpcomingHosted = useMemo(() => {
     if (!user) return [];
     const now = Date.now();
-    return hostedGames
-      .filter(
-        (g) => g.hostUserId === user.id && new Date(g.date).getTime() > now - 3 * 60 * 60 * 1000,
-      )
+    return hideFinishedGames(
+      hostedGames.filter((g) => g.hostUserId === user.id),
+      now,
+    )
       .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
   }, [hostedGames, user?.id]);
   const search = Route.useSearch();

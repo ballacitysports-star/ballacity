@@ -43,6 +43,7 @@ import { TrainerOrgSection } from "@/components/TrainerOrgSection";
 import { TrainerProfileChecklist } from "@/components/TrainerProfileChecklist";
 import { Building2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { hideFinishedGames } from "@/lib/game-time";
 
 export const Route = createFileRoute("/trainers/$trainerId/")({
   validateSearch: zodValidator(
@@ -189,7 +190,7 @@ function TrainerPage() {
   const orgRep = useMemo(() => computeReputation(orgReviews, "trainer"), [orgReviews]);
 
   const hostedGames = useMemo(
-    () => GAMES.filter((g) => org.upcoming.includes(g.id)),
+    () => hideFinishedGames(GAMES.filter((g) => org.upcoming.includes(g.id))),
     [org.upcoming],
   );
 

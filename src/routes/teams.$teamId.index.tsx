@@ -40,6 +40,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { listTeamPosts, deleteTeamPost } from "@/lib/team-posts.functions";
 import { Trash2 } from "lucide-react";
+import { hideFinishedGames } from "@/lib/game-time";
 import {
   Dialog,
   DialogContent,
@@ -185,7 +186,7 @@ function TeamPage() {
     [postsQuery.data],
   );
   const posts = allPosts.filter((p) => (filter === "all" ? true : p.kind === filter));
-  const upcomingGames = GAMES.filter((g) => org.upcoming.includes(g.id));
+  const upcomingGames = hideFinishedGames(GAMES.filter((g) => org.upcoming.includes(g.id)));
 
   return (
     <div className="mx-auto w-full max-w-md sm:max-w-2xl lg:max-w-4xl pb-32">

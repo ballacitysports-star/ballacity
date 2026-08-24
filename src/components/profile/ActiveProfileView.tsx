@@ -18,6 +18,7 @@ import {
 import { ProfileAboutSheet, AboutBlock, AboutStats } from "@/components/profile/ProfileAboutSheet";
 import { ACCOUNT_TYPE_META } from "@/lib/account-type";
 import type { AccountProfile } from "@/lib/account-profiles";
+import { hideFinishedGames } from "@/lib/game-time";
 
 type ViewModel = {
   name: string;
@@ -57,7 +58,7 @@ export function ActiveProfileView({ profile }: { profile: AccountProfile }) {
 
   const hosted = useHostedGames();
   const games: Game[] = useMemo(() => {
-    const pool = [...hosted, ...GAMES];
+    const pool = hideFinishedGames([...hosted, ...GAMES]);
     const seen = new Set<string>();
     return pool
       .filter((g) => (isGym ? g.orgId === refId : g.teamId === refId))
