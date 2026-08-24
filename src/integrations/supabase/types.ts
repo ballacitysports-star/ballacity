@@ -2137,21 +2137,7 @@ export type Database = {
       }
     }
     Views: {
-      blocked_images: {
-        Row: {
-          bucket: string | null
-          path: string | null
-        }
-        Insert: {
-          bucket?: string | null
-          path?: string | null
-        }
-        Update: {
-          bucket?: string | null
-          path?: string | null
-        }
-        Relationships: []
-      }
+      [_ in never]: never
     }
     Functions: {
       accept_conversation: { Args: { _conv: string }; Returns: undefined }
@@ -2179,6 +2165,13 @@ export type Database = {
       }
       approve_org_member_request: { Args: { _req: string }; Returns: string }
       approve_trainer_org_join: { Args: { _req: string }; Returns: string }
+      blocked_image_paths: {
+        Args: never
+        Returns: {
+          bucket: string
+          path: string
+        }[]
+      }
       can_notify: {
         Args: { _caller: string; _target: string }
         Returns: boolean
