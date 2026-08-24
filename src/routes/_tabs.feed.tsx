@@ -74,6 +74,9 @@ function Feed() {
   const search = Route.useSearch();
   const navigate = useNavigate({ from: "/feed" });
   const [q, setQ] = useState(search.q ?? "");
+  const [tab, setTab] = useState<"upcoming" | "archive">(
+    search.tab === "archive" ? "archive" : "upcoming",
+  );
 
   const [viewMode, setViewMode] = useState<"list" | "map">(() => {
     if (search.view === "list" || search.view === "map") return search.view;
