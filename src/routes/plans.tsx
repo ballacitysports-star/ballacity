@@ -105,8 +105,9 @@ function PlansPage() {
         )}
 
         <div className="mt-6 grid gap-4">
-          {PLAN_TIERS.map((plan) => {
+          {[FREE_TIER, ...PLAN_TIERS].map((plan) => {
             const active = hasActive(plan.priceId);
+            const isFree = plan.priceId === "free";
             return (
               <div
                 key={plan.priceId}
@@ -130,10 +131,10 @@ function PlansPage() {
                 </ul>
                 <button
                   onClick={() => handleSubscribe(plan.priceId)}
-                  disabled={loading || active}
+                  disabled={loading || active || isFree}
                   className="mt-4 inline-flex w-full items-center justify-center rounded-xl bg-lime px-4 py-2.5 text-sm font-bold text-black disabled:bg-muted disabled:text-muted-foreground"
                 >
-                  {active ? "Current plan" : plan.cta}
+                  {active ? "Current plan" : isFree ? "Included" : plan.cta}
                 </button>
               </div>
             );
