@@ -265,6 +265,19 @@ function ReelsPage() {
         )}
       </section>
 
+      {!isActive && (
+        <section className="mx-5 mb-5 rounded-2xl border border-border bg-surface p-5">
+          <h2 className="mb-3 text-sm font-semibold">Free account includes</h2>
+          <ul className="space-y-2">
+            {FREE_TIER.features.map((f) => (
+              <li key={f} className="flex items-start gap-2 text-sm text-muted-foreground">
+                <Check className="mt-0.5 h-4 w-4 shrink-0 text-lime" aria-hidden /> {f}
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
       <section className="mx-5 mb-6">
         <input
           ref={fileRef}
