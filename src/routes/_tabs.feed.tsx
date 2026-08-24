@@ -187,7 +187,7 @@ function Feed() {
     }
     navigate({ search: next as any, replace: true });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [q, prefs, positionFilter, viewMode, density]);
+  }, [q, prefs, positionFilter, viewMode, density, tab]);
 
   const userCityToken = useMemo(
     () => (profile?.city ?? "").toLowerCase().split(",")[0].trim(),
