@@ -2,6 +2,7 @@ import { useRef, useState } from "react";
 import { toast } from "sonner";
 import { ImagePlus, Loader2, X, ArrowLeft, ArrowRight } from "lucide-react";
 import { uploadDataUrlToBucket } from "@/lib/image-upload";
+import { ResponsiveImage } from "@/components/ResponsiveImage";
 
 const MAX_PHOTOS = 12;
 
