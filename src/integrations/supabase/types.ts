@@ -419,6 +419,8 @@ export type Database = {
           environment: string
           error_message: string | null
           failed_at: string | null
+          game_id: string | null
+          game_title: string | null
           id: string
           last_step_at: string | null
           processing_started_at: string | null
@@ -441,6 +443,8 @@ export type Database = {
           environment?: string
           error_message?: string | null
           failed_at?: string | null
+          game_id?: string | null
+          game_title?: string | null
           id?: string
           last_step_at?: string | null
           processing_started_at?: string | null
@@ -463,6 +467,8 @@ export type Database = {
           environment?: string
           error_message?: string | null
           failed_at?: string | null
+          game_id?: string | null
+          game_title?: string | null
           id?: string
           last_step_at?: string | null
           processing_started_at?: string | null
