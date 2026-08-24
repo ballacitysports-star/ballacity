@@ -290,7 +290,7 @@ function Feed() {
         return a.distanceMi - b.distanceMi;
       });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [q, hosted, prefs, joinedSet, hostedIds, userCityToken, positionFilter]);
+  }, [q, hosted, prefs, joinedSet, hostedIds, userCityToken, positionFilter, tab]);
 
   const suggestions = useMemo(() => {
     if (!q) return [] as { label: string; sub: string }[];
