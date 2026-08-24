@@ -1,4 +1,5 @@
 import { supabase } from "@/integrations/supabase/client";
+import { warmImageVariants } from "@/lib/image-variants";
 
 export type PublicImageBucket =
   | "avatars"
@@ -61,9 +62,13 @@ export async function uploadDataUrlToBucket(
     if (sErr || !data?.signedUrl) {
       throw new Error(sErr?.message ?? "Could not build a signed URL");
     }
+    // Pre-render thumbnails / responsive sizes on the server so the first view
+    // is already cached.
+    warmImageVariants(data.signedUrl);
     return data.signedUrl;
   }
 
   const { data } = supabase.storage.from(bucket).getPublicUrl(path);
+  warmImageVariants(data.publicUrl);
   return data.publicUrl;
 }

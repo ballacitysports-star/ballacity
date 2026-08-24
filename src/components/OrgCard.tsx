@@ -2,6 +2,7 @@ import { Link } from "@tanstack/react-router";
 import { motion } from "framer-motion";
 import { ShieldCheck, Star, Users } from "lucide-react";
 import type { Org } from "@/lib/sample-data";
+import { ResponsiveAvatar, ResponsiveImage } from "@/components/ResponsiveImage";
 
 export function OrgCard({
   org,
@@ -25,10 +26,13 @@ export function OrgCard({
         className="group block overflow-hidden rounded-3xl border border-border bg-surface transition-all hover:border-lime/40 hover:-translate-y-0.5"
       >
         <div className="relative h-28 overflow-hidden">
-          <img
+          <ResponsiveImage
             src={org.cover}
             alt=""
-            loading="lazy"
+            aspect={16 / 9}
+            widths={[320, 480, 640, 960]}
+            sizes="(min-width: 1024px) 320px, (min-width: 640px) 50vw, 100vw"
+            baseWidth={640}
             className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-105"
           />
           <div className="absolute inset-0 bg-gradient-to-t from-surface via-surface/40 to-transparent" />
@@ -44,7 +48,7 @@ export function OrgCard({
             if (isUrl) {
               return (
                 <div className="h-16 w-16 overflow-hidden rounded-2xl border-4 border-surface bg-surface">
-                  <img src={a} alt="" className="h-full w-full object-cover" />
+                  <ResponsiveAvatar src={a} size={64} alt="" className="h-full w-full object-cover" />
                 </div>
               );
             }

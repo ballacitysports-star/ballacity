@@ -27,6 +27,7 @@ import {
   resolveOpenState,
 } from "@/lib/org-hours";
 import { directionsHref, emailHref, telHref, websiteHref } from "@/lib/org-listing";
+import { ResponsiveAvatar, ResponsiveImage } from "@/components/ResponsiveImage";
 
 /**
  * Copies text with the clipboard API, falling back to a hidden textarea for
@@ -161,7 +162,14 @@ export function OrgListingHeader({
               onClick={() => setLightbox(i)}
               className={`${i === 0 ? "w-2/3" : "w-1/3"} h-40 shrink-0 sm:h-56`}
             >
-              <img src={src} alt={`${org.name} photo ${i + 1}`} className="h-full w-full object-cover" />
+              <ResponsiveImage
+                src={src}
+                alt={`${org.name} photo ${i + 1}`}
+                widths={[320, 480, 640, 960]}
+                sizes="(min-width: 640px) 60vw, 66vw"
+                baseWidth={640}
+                className="h-full w-full object-cover"
+              />
             </button>
           ))}
         </div>
@@ -173,9 +181,12 @@ export function OrgListingHeader({
           onClick={() => setLightbox(null)}
           role="presentation"
         >
-          <img
+          <ResponsiveImage
             src={photos[lightbox]}
             alt={`${org.name} photo ${lightbox + 1}`}
+            sizes="100vw"
+            baseWidth={1280}
+            loading="eager"
             className="max-h-[85vh] max-w-full rounded-2xl object-contain"
           />
         </div>
@@ -185,7 +196,7 @@ export function OrgListingHeader({
         <div className="flex items-start gap-3">
           <div className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-lime/15 text-2xl">
             {org.avatar_url ? (
-              <img src={org.avatar_url} alt="" className="h-full w-full object-cover" />
+              <ResponsiveAvatar src={org.avatar_url} size={56} alt="" className="h-full w-full object-cover" />
             ) : org.avatar ? (
               <span>{org.avatar}</span>
             ) : (

@@ -16,6 +16,7 @@ import { useMyFlowStatus, isUuid } from "@/lib/game-flow-status";
 import { PlayerFlowPill } from "@/components/PlayerFlowPill";
 import { Distance } from "@/components/Distance";
 import { JoinBlockedReason } from "@/components/JoinBlockedReason";
+import { ResponsiveImage } from "@/components/ResponsiveImage";
 
 const sportEmoji: Record<string, string> = {
   Basketball: "🏀",
@@ -81,10 +82,13 @@ export function GameCard({ game, index = 0 }: { game: Game; index?: number }) {
         className="group block overflow-hidden rounded-3xl border border-border bg-surface transition-all hover:border-lime/40 hover:-translate-y-0.5"
       >
         <div className="relative h-28 overflow-hidden">
-          <img
+          <ResponsiveImage
             src={game.image}
             alt={game.title}
-            loading="lazy"
+            aspect={16 / 9}
+            widths={[320, 480, 640, 960]}
+            sizes="(min-width: 1024px) 320px, (min-width: 640px) 50vw, 100vw"
+            baseWidth={640}
             className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-105"
           />
           <div className="absolute inset-0 bg-gradient-to-t from-surface via-surface/30 to-transparent" />

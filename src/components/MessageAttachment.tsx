@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { FileText, Download, ImageIcon } from "lucide-react";
 import { getAttachmentUrl } from "@/lib/messages";
+import { ResponsiveImage } from "@/components/ResponsiveImage";
 
 type Props = {
   path: string;
@@ -33,7 +34,14 @@ export function MessageAttachment({ path, type, name, size, mine }: Props) {
   if (isImage) {
     return url ? (
       <a href={url} target="_blank" rel="noreferrer" className="block">
-        <img src={url} alt={label} className="max-h-64 max-w-full rounded-xl object-cover" />
+        <ResponsiveImage
+          src={url}
+          alt={label}
+          widths={[320, 480, 640]}
+          sizes="(min-width: 640px) 320px, 70vw"
+          baseWidth={480}
+          className="max-h-64 max-w-full rounded-xl object-cover"
+        />
       </a>
     ) : (
       <div className="grid h-32 w-48 place-items-center rounded-xl bg-black/10">

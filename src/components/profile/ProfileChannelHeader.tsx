@@ -1,4 +1,5 @@
 import * as React from "react";
+import { ResponsiveAvatar, ResponsiveImage } from "@/components/ResponsiveImage";
 
 /**
  * YouTube channel-page header: short rounded banner, large avatar, name, a
@@ -38,7 +39,14 @@ export function ProfileChannelHeader({
       {/* Banner — full-bleed, 176px tall, heavy fade into the page background */}
       <div className="relative h-44 w-full overflow-hidden bg-surface">
         {bannerUrl && (
-          <img src={bannerUrl} alt="" className="h-full w-full object-cover" loading="lazy" />
+          <ResponsiveImage
+            src={bannerUrl}
+            alt=""
+            aspect={16 / 5}
+            sizes="100vw"
+            baseWidth={1280}
+            className="h-full w-full object-cover"
+          />
         )}
         <div
           aria-hidden
@@ -54,7 +62,7 @@ export function ProfileChannelHeader({
         <div className="flex items-start gap-4">
           <div className="grid h-20 w-20 shrink-0 place-items-center overflow-hidden rounded-full bg-surface-2 text-2xl font-bold">
             {avatarUrl ? (
-              <img src={avatarUrl} alt={name} className="h-full w-full object-cover" />
+              <ResponsiveAvatar src={avatarUrl} size={80} alt={name} className="h-full w-full object-cover" />
             ) : (
               avatarFallback
             )}
