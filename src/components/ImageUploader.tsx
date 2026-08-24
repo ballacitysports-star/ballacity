@@ -107,9 +107,13 @@ export function ImageUploader({
           }
         >
           {preview ? (
-            <img
+            <ResponsiveImage
               src={preview}
               alt={label ?? (isCover ? "Cover preview" : "Avatar preview")}
+              aspect={isCover ? 16 / 9 : 1}
+              widths={isCover ? [320, 480, 640, 960] : [112, 224, 448]}
+              sizes={isCover ? "(min-width: 640px) 420px, 90vw" : "112px"}
+              baseWidth={isCover ? 640 : 224}
               className="h-full w-full object-cover"
             />
           ) : (
