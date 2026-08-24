@@ -239,7 +239,8 @@ function Feed() {
   };
 
   const filtered = useMemo(() => {
-    const all = hideFinishedGames([...hosted, ...GAMES]);
+    const pool = [...hosted, ...GAMES];
+    const all = tab === "archive" ? onlyFinishedGames(pool) : hideFinishedGames(pool);
     return all
       .filter((g) =>
         prefs.preferredSports.length ? prefs.preferredSports.includes(g.sport) : true,
