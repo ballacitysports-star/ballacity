@@ -95,6 +95,7 @@ function SuperadminPage() {
           <TabsTrigger value="overview">Overview</TabsTrigger>
           <TabsTrigger value="users">Users &amp; profiles</TabsTrigger>
           <TabsTrigger value="moderation">Content</TabsTrigger>
+          <TabsTrigger value="images">Images</TabsTrigger>
           <TabsTrigger value="payments">Payments</TabsTrigger>
           <TabsTrigger value="ops">Ops &amp; config</TabsTrigger>
           <TabsTrigger value="audit">Audit log</TabsTrigger>
@@ -108,6 +109,10 @@ function SuperadminPage() {
         <TabsContent value="moderation" className="pt-3">
           <ModerationTab />
         </TabsContent>
+        <TabsContent value="images" className="pt-3">
+          <ImagesTab />
+        </TabsContent>
+
         <TabsContent value="payments" className="pt-3">
           <PaymentsTab />
         </TabsContent>
