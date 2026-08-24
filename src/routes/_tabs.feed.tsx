@@ -506,6 +506,37 @@ function Feed() {
         </p>
       </motion.div>
 
+      <div
+        role="tablist"
+        aria-label="Game timeframe"
+        className="mb-4 inline-flex rounded-full border border-border bg-surface p-1"
+      >
+        {(
+          [
+            { id: "upcoming", label: "Upcoming" },
+            { id: "archive", label: `Archive${finishedCount ? ` (${finishedCount})` : ""}` },
+          ] as const
+        ).map((t) => {
+          const active = tab === t.id;
+          return (
+            <button
+              key={t.id}
+              type="button"
+              role="tab"
+              aria-selected={active}
+              onClick={() => setTab(t.id)}
+              className={`rounded-full px-4 py-1.5 text-sm font-semibold transition-colors ${
+                active
+                  ? "bg-lime text-primary-foreground"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              {t.label}
+            </button>
+          );
+        })}
+      </div>
+
       <ViewDensityToggle
         view={viewMode}
         onViewChange={(v) => switchView(v)}
