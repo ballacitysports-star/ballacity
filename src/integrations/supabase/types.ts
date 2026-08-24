@@ -639,6 +639,45 @@ export type Database = {
           },
         ]
       }
+      image_moderation: {
+        Row: {
+          bucket: string
+          created_at: string
+          id: string
+          owner_id: string | null
+          path: string
+          reason: string | null
+          reviewed_at: string | null
+          reviewed_by: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          bucket: string
+          created_at?: string
+          id?: string
+          owner_id?: string | null
+          path: string
+          reason?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          bucket?: string
+          created_at?: string
+          id?: string
+          owner_id?: string | null
+          path?: string
+          reason?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       join_requests: {
         Row: {
           attempt_count: number
