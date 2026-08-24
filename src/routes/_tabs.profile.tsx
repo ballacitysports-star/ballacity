@@ -228,6 +228,32 @@ function PlayerProfile() {
   const pendingWithGame = pendingRequests.filter((r) => gameLookup.has(r.game_id));
   const reviewedWithGame = recentlyReviewed.filter((r) => gameLookup.has(r.game_id));
 
+  // Recap (highlight reel) counts per finished game, for the Archive CTA.
+  const [recapCounts, setRecapCounts] = useState<Record<string, number>>({});
+  useEffect(() => {
+    if (!profileUser) {
+      setRecapCounts({});
+      return;
+    }
+    let cancelled = false;
+    supabase
+      .from("highlight_reels")
+      .select("game_id")
+      .eq("user_id", profileUser.id)
+      .not("game_id", "is", null)
+      .then(({ data }) => {
+        if (cancelled) return;
+        const counts: Record<string, number> = {};
+        (data ?? []).forEach((r: { game_id: string | null }) => {
+          if (r.game_id) counts[r.game_id] = (counts[r.game_id] ?? 0) + 1;
+        });
+        setRecapCounts(counts);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [profileUser?.id]);
+
   useEffect(() => {
     if (user) setConfirmedUser(user);
   }, [user]);
