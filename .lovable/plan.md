@@ -1,27 +1,36 @@
-# Relax gym website field to accept bare domains
+# Accept bare domains (xxx.com) in every URL field
+
+Users should be able to type `xxx.com` anywhere a website/link is entered, and the app stores and links out to a proper `https://xxx.com`.
 
 ## Current state
 
-The gym/org editor (`src/components/OrgForm.tsx`) requires users to type a full URL with a scheme:
-
-- `validateOrgForm` rejects anything that doesn't match `/^https?:\/\//i` with the message "Website must start with http(s)://".
-- The Website input placeholder is `https://example.com`.
-
-The link-rendering helper `websiteHref` in `src/lib/org-listing.ts` already normalizes bare domains to `https://` and rejects invalid URLs, so the strict validation is unnecessary and conflicts with the user's expectation of typing `xxx.com`.
+- `src/components/OrgForm.tsx` — `validateOrgForm` rejects anything not matching `/^https?:\/\//i` with "Website must start with http(s)://"; the input placeholder is `https://example.com`.
+- `src/components/profile/ProfileLinksFields.tsx` — `normalizeProfileUrl` already prepends `https://`, but `validateProfileUrl` can still surface "Must start with http:// or https://".
+- `src/components/ProfileLinks.tsx` — link placeholders show `https://yoursite.com`.
+- `src/lib/org-listing.ts` — `websiteHref` already normalizes bare domains and rejects unsafe/invalid values. This becomes the single source of truth for website normalization.
+- `src/lib/payments.ts` — payment link fields show full-URL hints (`https://venmo.com/u/…`).
 
 ## Changes
 
-1. **Relax validation in `src/components/OrgForm.tsx`**
-   - Import `websiteHref` from `@/lib/org-listing.ts`.
-   - Replace the scheme-mandatory check with a check that uses `websiteHref`: if the user enters a value, it must normalize to a non-null absolute URL; otherwise return a generic "Enter a valid website" error.
+1. **Gym/org editor** (`src/components/OrgForm.tsx`)
+   - Validate the website with `websiteHref` instead of the scheme regex; error text becomes "Enter a valid website (e.g. example.com)".
+   - Placeholder becomes `example.com`.
 
-2. **Update the Website input placeholder**
-   - Change `https://example.com` to `example.com`.
+2. **Normalize on save** — `src/routes/orgs.create.tsx` and `src/routes/orgs.$orgId.edit.tsx` run `website` through `websiteHref(...)` so the database always stores an absolute `https://` URL even though the user typed a bare domain. Same for the trainer and team editors if they carry a website field.
 
-3. **Normalize on save**
-   - In `src/routes/orgs.create.tsx` and `src/routes/orgs.$orgId.edit.tsx`, pass `website` through `websiteHref(...)` before saving so the database stores an absolute, safe URL while the user can type a bare domain.
+3. **Profile links** (`src/components/profile/ProfileLinksFields.tsx`)
+   - Drop the "Must start with http:// or https://" message; scheme-less input is normalized, and only a genuinely bad scheme (e.g. `javascript:`) errors, with wording "Enter a valid website (e.g. example.com)".
+   - Keep the existing domain/TLD checks so typos are still caught.
 
-4. **Add a unit test in `src/lib/org-listing.test.ts`**
-   - Confirm `websiteHref("example.com")` returns `"https://example.com/"` and `websiteHref("not a url")` returns `null` (the latter already exists in spirit; verify coverage).
+4. **Placeholders across link inputs** (`src/components/ProfileLinks.tsx`, and payment link hints in `src/lib/payments.ts`)
+   - Show bare-domain examples (`yoursite.com`, `venmo.com/u/…`) so the UI stops implying a scheme is required.
 
-No database or schema changes; only frontend validation, normalization, and placeholder updates.
+5. **Trainer / team / any other website or link inputs**
+   - Sweep for remaining URL inputs and apply the same relaxed validation, normalization on save, and bare-domain placeholder.
+
+6. **Tests** (`src/lib/org-listing.test.ts` plus a small test for `normalizeProfileUrl`/`validateProfileUrl`)
+   - Bare domain accepted and normalized to `https://…`.
+   - `javascript:` and nonsense values still rejected.
+   - Paths and subdomains (`sub.example.com/gym`) preserved.
+
+No database or schema changes; validation, normalization, placeholders, and tests only.
