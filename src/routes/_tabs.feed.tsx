@@ -225,6 +225,31 @@ function Feed() {
     staleTime: 30_000,
   });
   const teamPosts = useMemo(() => (teamPostsQuery.data?.pages ?? []).flat(), [teamPostsQuery.data]);
+
+  // Distance-based home-court filtering: each team post carries the geocoded
+  // coordinates of its venue (home court). When the viewer has shared their
+  // location and set a distance cap, keep only posts whose court falls inside
+  // the radius, nearest first, and annotate each with its real distance.
+  const nearbyTeamPosts = useMemo(() => {
+    const capMi = prefs.maxDistanceMi;
+    const withDist = teamPosts.map((p) => {
+      const km =
+        coords && typeof p.lat === "number" && typeof p.lng === "number"
+          ? haversineKm(coords, { lat: p.lat, lng: p.lng })
+          : null;
+      return { ...p, distanceMi: km == null ? null : km * MI_PER_KM };
+    });
+    const inRange =
+      coords && capMi != null
+        ? withDist.filter((p) => p.distanceMi != null && p.distanceMi <= capMi)
+        : withDist;
+    if (!coords || prefs.sortBy !== "nearest") return inRange;
+    return [...inRange].sort(
+      (a, b) => (a.distanceMi ?? Infinity) - (b.distanceMi ?? Infinity),
+    );
+  }, [teamPosts, coords, prefs.maxDistanceMi, prefs.sortBy]);
+  const hiddenByDistance = teamPosts.length - nearbyTeamPosts.length;
+
   const setChipSport = (s: string | null) => {
     if (s === null) {
       setFeedPrefs({ ...prefs, preferredSports: [] });
