@@ -104,8 +104,8 @@ function OnboardingAccountTypePage() {
       <div className="mx-auto max-w-lg space-y-6">
         <AccountTypePicker value={choice} onChange={setChoice} />
         <div className="rounded-lg border border-border bg-surface p-3 text-xs text-muted-foreground">
-          This is just your starting point. You can add team, trainer, and gym profiles later and
-          switch between them anytime.
+          This is just your starting point. You can add other profiles later and switch between
+          them anytime.
         </div>
 
         <div className="flex flex-col gap-2">
