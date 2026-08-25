@@ -238,29 +238,56 @@ function PlayerProfile() {
   const pendingWithGame = pendingRequests.filter((r) => gameLookup.has(r.game_id));
   const reviewedWithGame = recentlyReviewed.filter((r) => gameLookup.has(r.game_id));
 
-  // Recap (highlight reel) counts per finished game, for the Archive CTA.
-  const [recapCounts, setRecapCounts] = useState<Record<string, number>>({});
+  // Recaps (highlight reels) per finished game, for the Archive status + inline player.
+  const [recapsByGame, setRecapsByGame] = useState<Record<string, RecapSummary[]>>({});
   useEffect(() => {
     if (!profileUser) {
-      setRecapCounts({});
+      setRecapsByGame({});
       return;
     }
     let cancelled = false;
-    supabase
-      .from("highlight_reels")
-      .select("game_id")
-      .eq("user_id", profileUser.id)
-      .not("game_id", "is", null)
-      .then(({ data }) => {
-        if (cancelled) return;
-        const counts: Record<string, number> = {};
-        (data ?? []).forEach((r: { game_id: string | null }) => {
-          if (r.game_id) counts[r.game_id] = (counts[r.game_id] ?? 0) + 1;
+    const load = () =>
+      supabase
+        .from("highlight_reels")
+        .select(RECAP_COLUMNS)
+        .eq("user_id", profileUser.id)
+        .not("game_id", "is", null)
+        .order("created_at", { ascending: false })
+        .then(({ data }) => {
+          if (cancelled) return;
+          const map: Record<string, RecapSummary[]> = {};
+          ((data ?? []) as RecapSummary[]).forEach((r) => {
+            if (!r.game_id) return;
+            (map[r.game_id] ??= []).push(r);
+          });
+          setRecapsByGame(map);
         });
-        setRecapCounts(counts);
-      });
+    load();
+
+    // Live progress: pipeline updates land as UPDATEs on the user's own rows.
+    const channel = supabase
+      .channel(`recaps-${profileUser.id}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "highlight_reels",
+          filter: `user_id=eq.${profileUser.id}`,
+        },
+        (payload) => {
+          const row = payload.new as RecapSummary | null;
+          if (row?.status === "completed" && (payload.old as any)?.status !== "completed") {
+            toast.success(`Recap ready${row.game_title ? ` · ${row.game_title}` : ""}`);
+          }
+          load();
+        },
+      )
+      .subscribe();
+
     return () => {
       cancelled = true;
+      supabase.removeChannel(channel);
     };
   }, [profileUser?.id]);
 
