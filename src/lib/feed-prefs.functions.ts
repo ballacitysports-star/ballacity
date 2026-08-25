@@ -1,6 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-import { readFeedPreferencesForRequest } from "@/lib/feed-prefs.server";
 import type { Json } from "@/integrations/supabase/types";
 
 /**
@@ -13,7 +12,10 @@ import type { Json } from "@/integrations/supabase/types";
  * serializable string rather than an open-ended record.
  */
 export const getFeedPreferences = createServerFn({ method: "GET" }).handler(
-  async () => readFeedPreferencesForRequest(),
+  async () => {
+    const { readFeedPreferencesForRequest } = await import("@/lib/feed-prefs.server");
+    return readFeedPreferencesForRequest();
+  },
 );
 
 export const saveFeedPreferences = createServerFn({ method: "POST" })
