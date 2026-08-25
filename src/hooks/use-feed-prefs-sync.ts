@@ -26,14 +26,19 @@ export function useFeedPrefsSync() {
   const lastSynced = useRef<string>("");
   const json = JSON.stringify(prefs);
 
-  const getLiveAccessToken = useCallback(async (expectedUserId: string) => {
-    if (session?.access_token && session.user?.id === expectedUserId) return session.access_token;
-    const { data } = await supabase.auth.getSession();
-    if (data.session?.access_token && data.session.user?.id === expectedUserId) {
-      return data.session.access_token;
-    }
-    return null;
-  }, [session?.access_token, session?.user?.id]);
+  const getLiveAccessToken = useCallback(
+    async (expectedUserId: string) => {
+      if (session?.access_token && session.user?.id === expectedUserId) {
+        return session.access_token;
+      }
+      const { data } = await supabase.auth.getSession();
+      if (data.session?.access_token && data.session.user?.id === expectedUserId) {
+        return data.session.access_token;
+      }
+      return null;
+    },
+    [session?.access_token, session?.user?.id],
+  );
 
   useEffect(() => {
     if (loading) return;
@@ -63,7 +68,10 @@ export function useFeedPrefsSync() {
           void getLiveAccessToken(user.id)
             .then((token) => {
               if (!token) return null;
-              return save({ data: { prefsJson: json }, headers: { Authorization: `Bearer ${token}` } });
+              return save({
+                data: { prefsJson: json },
+                headers: { Authorization: `Bearer ${token}` },
+              });
             })
             .catch(() => {});
           return;
@@ -90,7 +98,10 @@ export function useFeedPrefsSync() {
       void getLiveAccessToken(user.id)
         .then((token) => {
           if (!token) return null;
-          return save({ data: { prefsJson: json }, headers: { Authorization: `Bearer ${token}` } });
+          return save({
+            data: { prefsJson: json },
+            headers: { Authorization: `Bearer ${token}` },
+          });
         })
         .catch(() => {});
     }, 800);
