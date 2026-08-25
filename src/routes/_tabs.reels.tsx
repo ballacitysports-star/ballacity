@@ -177,13 +177,39 @@ function ReelsPage() {
     } catch {
       return;
     }
-    supabase
-      .from("highlight_reels")
-      .select("*")
-      .eq("user_id", user.id)
-      .eq("environment", env)
-      .order("created_at", { ascending: false })
-      .then(({ data }) => setReels((data as Reel[]) ?? []));
+    const load = () =>
+      supabase
+        .from("highlight_reels")
+        .select("*")
+        .eq("user_id", user.id)
+        .eq("environment", env)
+        .order("created_at", { ascending: false })
+        .then(({ data }) => setReels((data as Reel[]) ?? []));
+    load();
+
+    // Live pipeline progress for this user's reels.
+    const channel = supabase
+      .channel(`my-reels-${user.id}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "highlight_reels",
+          filter: `user_id=eq.${user.id}`,
+        },
+        (payload) => {
+          const row = payload.new as Reel | null;
+          if (row?.status === "completed" && (payload.old as any)?.status !== "completed") {
+            toast.success("Your highlight reel is ready");
+          }
+          load();
+        },
+      )
+      .subscribe();
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, [user, busy]);
 
   // Deep link from a finished game: open the picker straight away.
