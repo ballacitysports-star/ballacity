@@ -247,6 +247,19 @@ const OAUTH_PROVIDER_KEY = "openrun:oauth-provider";
 const AUTH_SESSION_CHECK_TIMEOUT_MS = 5_000;
 const ONBOARDING_CHECK_TIMEOUT_MS = 5_000;
 
+/**
+ * The onboarding guard runs behind `requireSupabaseAuth`, so calling it without
+ * a live access token throws "Unauthorized: No authorization header provided"
+ * on the server. Verify the token client-side first and fail fast locally so
+ * callers just use their existing fallback path.
+ */
+async function fetchOnboardingStatus() {
+  const { data } = await supabase.auth.getSession();
+  if (!data.session?.access_token) throw new Error("No Supabase session");
+  return getOnboardingStatus();
+}
+
+
 function withDeadline<T>(operation: PromiseLike<T>, timeoutMs: number): Promise<T> {
   return new Promise<T>((resolve, reject) => {
     const timeoutId = window.setTimeout(
@@ -594,7 +607,7 @@ function AuthGate({ children }: { children: React.ReactNode }) {
       // correctly. Falls back to the client query if the server fn fails.
       try {
         const status = await withDeadline(
-          getOnboardingStatus(),
+          fetchOnboardingStatus(),
           ONBOARDING_CHECK_TIMEOUT_MS,
         );
         if (cancelled) return;
@@ -739,7 +752,7 @@ function RootComponent() {
         // Backend guard: authoritative check via getOnboardingStatus. Even if
         // provider metadata was stripped from the session, the server inspects
         // linked identities and can still classify the user as social.
-        void getOnboardingStatus()
+        void fetchOnboardingStatus()
           .then((status) => {
             const isOAuth = clientIsOAuth || status.isSocial;
             if (!status.needsOnboarding) {
