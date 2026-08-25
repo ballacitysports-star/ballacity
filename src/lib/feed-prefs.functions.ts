@@ -2,7 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { getRequest } from "@tanstack/react-start/server";
 import { createClient } from "@supabase/supabase-js";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-import type { Database } from "@/integrations/supabase/types";
+import type { Database, Json } from "@/integrations/supabase/types";
 
 /**
  * Account-synced feed preferences. The client keeps localStorage as the
@@ -61,7 +61,7 @@ export const saveFeedPreferences = createServerFn({ method: "POST" })
     const { error } = await context.supabase.from("feed_preferences").upsert(
       {
         user_id: context.userId,
-        prefs: parsed,
+        prefs: parsed as Json,
         saved_views: savedViews,
         updated_at: new Date().toISOString(),
       },
