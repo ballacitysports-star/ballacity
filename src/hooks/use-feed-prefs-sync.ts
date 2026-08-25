@@ -1,6 +1,7 @@
 import { useEffect, useRef } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { useAuth } from "@/hooks/use-auth";
+import { supabase } from "@/integrations/supabase/client";
 import { getFeedPreferences, saveFeedPreferences } from "@/lib/feed-prefs.functions";
 import {
   normalizeFeedPrefs,
@@ -16,7 +17,7 @@ import {
  * later local change back with a short debounce.
  */
 export function useFeedPrefsSync() {
-  const { user } = useAuth();
+  const { user, session, loading } = useAuth();
   const prefs = useFeedPrefs();
   const load = useServerFn(getFeedPreferences);
   const save = useServerFn(saveFeedPreferences);
@@ -25,7 +26,17 @@ export function useFeedPrefsSync() {
   const lastSynced = useRef<string>("");
   const json = JSON.stringify(prefs);
 
+  async function getLiveAccessToken(expectedUserId: string) {
+    if (session?.access_token && session.user?.id === expectedUserId) return session.access_token;
+    const { data } = await supabase.auth.getSession();
+    if (data.session?.access_token && data.session.user?.id === expectedUserId) {
+      return data.session.access_token;
+    }
+    return null;
+  }
+
   useEffect(() => {
+    if (loading) return;
     if (!user?.id) {
       loadedFor.current = null;
       lastSynced.current = "";
@@ -35,13 +46,26 @@ export function useFeedPrefsSync() {
     loadedFor.current = user.id;
     let cancelled = false;
 
-    void load()
+    void getLiveAccessToken(user.id)
+      .then((token) => {
+        if (cancelled || !token) return null;
+        return load({ headers: { Authorization: `Bearer ${token}` } });
+      })
       .then((row) => {
         if (cancelled) return;
         if (!row) {
+          loadedFor.current = null;
+          return;
+        }
+        if (!row) {
           // First device for this account: adopt whatever is stored locally.
           lastSynced.current = json;
-          void save({ data: { prefsJson: json } }).catch(() => {});
+          void getLiveAccessToken(user.id)
+            .then((token) => {
+              if (!token) return null;
+              return save({ data: { prefsJson: json }, headers: { Authorization: `Bearer ${token}` } });
+            })
+            .catch(() => {});
           return;
         }
         const remote = normalizeFeedPrefs(JSON.parse(row.prefsJson)) as FeedPrefs;
@@ -56,15 +80,20 @@ export function useFeedPrefsSync() {
     return () => {
       cancelled = true;
     };
-  }, [user?.id]);
+  }, [loading, session?.access_token, user?.id]);
 
   useEffect(() => {
-    if (!user?.id || loadedFor.current !== user.id) return;
+    if (loading || !user?.id || loadedFor.current !== user.id) return;
     if (!lastSynced.current || json === lastSynced.current) return;
     const t = setTimeout(() => {
       lastSynced.current = json;
-      void save({ data: { prefsJson: json } }).catch(() => {});
+      void getLiveAccessToken(user.id)
+        .then((token) => {
+          if (!token) return null;
+          return save({ data: { prefsJson: json }, headers: { Authorization: `Bearer ${token}` } });
+        })
+        .catch(() => {});
     }, 800);
     return () => clearTimeout(t);
-  }, [json, user?.id]);
+  }, [json, loading, session?.access_token, user?.id]);
 }
