@@ -13,6 +13,8 @@ const TYPE_FALLBACKS: Record<string, string> = {
   game: "/feed",
   game_invite: "/feed",
   join_request: "/notifications",
+  reel_ready: "/reels",
+  reel_failed: "/reels",
   payment: "/payments",
   review: "/reviews",
   team: "/teams",

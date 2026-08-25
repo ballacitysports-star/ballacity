@@ -4,17 +4,9 @@ import { zodValidator, fallback } from "@tanstack/zod-adapter";
 import { z } from "zod";
 import { formatSportLevel } from "@/lib/sport-levels";
 
-import {
-  Settings,
-  Shield,
-  Clock,
-  Star,
-  Crown,
-  Users,
-  PlayCircle,
-  Sparkles,
-  BarChart3,
-} from "lucide-react";
+import { Settings, Shield, Clock, Star, Crown, Users } from "lucide-react";
+import { GameRecapPanel } from "@/components/GameRecapPanel";
+import { RECAP_COLUMNS, type RecapSummary } from "@/lib/recaps";
 import { useFollow } from "@/lib/follows";
 import { FollowSheet } from "@/components/FollowSheet";
 import { ME, GAMES, type Game } from "@/lib/sample-data";
@@ -238,29 +230,56 @@ function PlayerProfile() {
   const pendingWithGame = pendingRequests.filter((r) => gameLookup.has(r.game_id));
   const reviewedWithGame = recentlyReviewed.filter((r) => gameLookup.has(r.game_id));
 
-  // Recap (highlight reel) counts per finished game, for the Archive CTA.
-  const [recapCounts, setRecapCounts] = useState<Record<string, number>>({});
+  // Recaps (highlight reels) per finished game, for the Archive status + inline player.
+  const [recapsByGame, setRecapsByGame] = useState<Record<string, RecapSummary[]>>({});
   useEffect(() => {
     if (!profileUser) {
-      setRecapCounts({});
+      setRecapsByGame({});
       return;
     }
     let cancelled = false;
-    supabase
-      .from("highlight_reels")
-      .select("game_id")
-      .eq("user_id", profileUser.id)
-      .not("game_id", "is", null)
-      .then(({ data }) => {
-        if (cancelled) return;
-        const counts: Record<string, number> = {};
-        (data ?? []).forEach((r: { game_id: string | null }) => {
-          if (r.game_id) counts[r.game_id] = (counts[r.game_id] ?? 0) + 1;
+    const load = () =>
+      supabase
+        .from("highlight_reels")
+        .select(RECAP_COLUMNS)
+        .eq("user_id", profileUser.id)
+        .not("game_id", "is", null)
+        .order("created_at", { ascending: false })
+        .then(({ data }) => {
+          if (cancelled) return;
+          const map: Record<string, RecapSummary[]> = {};
+          ((data ?? []) as RecapSummary[]).forEach((r) => {
+            if (!r.game_id) return;
+            (map[r.game_id] ??= []).push(r);
+          });
+          setRecapsByGame(map);
         });
-        setRecapCounts(counts);
-      });
+    load();
+
+    // Live progress: pipeline updates land as UPDATEs on the user's own rows.
+    const channel = supabase
+      .channel(`recaps-${profileUser.id}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "highlight_reels",
+          filter: `user_id=eq.${profileUser.id}`,
+        },
+        (payload) => {
+          const row = payload.new as RecapSummary | null;
+          if (row?.status === "completed" && (payload.old as any)?.status !== "completed") {
+            toast.success(`Recap ready${row.game_title ? ` · ${row.game_title}` : ""}`);
+          }
+          load();
+        },
+      )
+      .subscribe();
+
     return () => {
       cancelled = true;
+      supabase.removeChannel(channel);
     };
   }, [profileUser?.id]);
 
@@ -741,7 +760,7 @@ function PlayerProfile() {
                     pageSize={6}
                     keyFor={(g) => g.id}
                     renderItem={(g, i) => (
-                      <ArchiveGameItem game={g} index={i} recaps={recapCounts[g.id] ?? 0} />
+                      <ArchiveGameItem game={g} index={i} recaps={recapsByGame[g.id] ?? []} />
                     )}
                     renderSkeleton={() => <GameCardSkeleton />}
                     resetKey="archive-hosting"
@@ -773,7 +792,7 @@ function PlayerProfile() {
                     pageSize={6}
                     keyFor={(g) => g.id}
                     renderItem={(g, i) => (
-                      <ArchiveGameItem game={g} index={i} recaps={recapCounts[g.id] ?? 0} />
+                      <ArchiveGameItem game={g} index={i} recaps={recapsByGame[g.id] ?? []} />
                     )}
                     renderSkeleton={() => <GameCardSkeleton />}
                     resetKey="archive-playing"
@@ -888,7 +907,7 @@ function ageFrom(iso: string): number | null {
   return age >= 0 && age < 150 ? age : null;
 }
 
-/** A finished game in the Archive, with recap / results calls-to-action. */
+/** A finished game in the Archive, with recap status, inline player, and share. */
 function ArchiveGameItem({
   game,
   index,
@@ -896,39 +915,12 @@ function ArchiveGameItem({
 }: {
   game: Game;
   index: number;
-  recaps: number;
+  recaps: RecapSummary[];
 }) {
   return (
     <div>
       <GameCard game={game} index={index} />
-      <div className="mt-2 mb-1 flex flex-wrap items-center gap-2">
-        {recaps > 0 && (
-          <Link
-            to="/reels"
-            search={{ game: game.id, title: game.title, upload: "" }}
-            className="inline-flex items-center gap-1.5 rounded-full border border-lime/40 bg-lime/10 px-3 py-1.5 text-[11px] font-bold text-lime"
-          >
-            <PlayCircle className="h-3.5 w-3.5" />
-            Watch highlights{recaps > 1 ? ` (${recaps})` : ""}
-          </Link>
-        )}
-        <Link
-          to="/reels"
-          search={{ game: game.id, title: game.title, upload: "1" }}
-          className="inline-flex items-center gap-1.5 rounded-full border border-border bg-surface px-3 py-1.5 text-[11px] font-bold text-foreground transition-colors hover:border-lime/40"
-        >
-          <Sparkles className="h-3.5 w-3.5 text-lime" />
-          {recaps > 0 ? "Generate another recap" : "Generate recap"}
-        </Link>
-        <Link
-          to="/games/$gameId"
-          params={{ gameId: game.id }}
-          className="inline-flex items-center gap-1.5 rounded-full border border-border bg-surface px-3 py-1.5 text-[11px] font-bold text-muted-foreground transition-colors hover:text-foreground"
-        >
-          <BarChart3 className="h-3.5 w-3.5" />
-          Results
-        </Link>
-      </div>
+      <GameRecapPanel game={{ id: game.id, title: game.title }} recaps={recaps} />
     </div>
   );
 }

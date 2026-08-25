@@ -17,6 +17,7 @@ type Reel = {
   attempts: number;
   processing_step: string;
   step_progress: Record<string, any> | null;
+  game_id: string | null;
 };
 
 async function callLovableAI(prompt: string, system: string, apiKey: string) {
@@ -137,6 +138,15 @@ async function processReel(reel: Reel, supabaseAdmin: any, apiKey: string) {
       })
       .eq("id", reel.id);
 
+    // Notify the owner that their highlight video is ready (in-app + push fanout).
+    await supabaseAdmin.from("notifications").insert({
+      user_id: reel.user_id,
+      type: "reel_ready",
+      title: "Your highlight reel is ready",
+      body: progress.ai_title ? String(progress.ai_title) : reel.title,
+      link: reel.game_id ? `/reels?game=${reel.game_id}` : "/reels",
+    });
+
     return { id: reel.id, status: "completed", resumedFrom: resumed ? startStep : null };
   } catch (e: any) {
     const msg = e?.message ?? String(e);
@@ -152,6 +162,16 @@ async function processReel(reel: Reel, supabaseAdmin: any, apiKey: string) {
         processing_started_at: null,
       })
       .eq("id", reel.id);
+    if (finalFail) {
+      await supabaseAdmin.from("notifications").insert({
+        user_id: reel.user_id,
+        type: "reel_failed",
+        title: "Recap generation failed",
+        body: `We couldn't finish "${reel.title}". Try generating it again.`,
+        link: reel.game_id ? `/reels?game=${reel.game_id}` : "/reels",
+      });
+    }
+
     return { id: reel.id, status: finalFail ? "failed" : "retry-pending", error: msg };
   }
 }
@@ -196,7 +216,7 @@ export const Route = createFileRoute("/api/public/reels/process")({
         const stuckBefore = new Date(Date.now() - STUCK_AFTER_MS).toISOString();
         const { data: reels, error } = await supabaseAdmin
           .from("highlight_reels")
-          .select("id,user_id,title,video_path,attempts,processing_step,step_progress")
+          .select("id,user_id,title,video_path,attempts,processing_step,step_progress,game_id")
           .eq("status", "processing")
           .lt("attempts", MAX_ATTEMPTS)
           .or(`processing_started_at.is.null,processing_started_at.lt.${stuckBefore}`)
