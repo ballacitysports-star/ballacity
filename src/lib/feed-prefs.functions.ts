@@ -11,12 +11,10 @@ import type { Json } from "@/integrations/supabase/types";
  * The blob crosses the RPC boundary as JSON text so the payload stays a plain
  * serializable string rather than an open-ended record.
  */
-export const getFeedPreferences = createServerFn({ method: "GET" }).handler(
-  async () => {
-    const { readFeedPreferencesForRequest } = await import("@/lib/feed-prefs.server");
-    return readFeedPreferencesForRequest();
-  },
-);
+export const getFeedPreferences = createServerFn({ method: "GET" }).handler(async () => {
+  const { readFeedPreferencesForRequest } = await import("@/lib/feed-prefs.server");
+  return readFeedPreferencesForRequest();
+});
 
 export const saveFeedPreferences = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
