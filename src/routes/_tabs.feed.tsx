@@ -754,7 +754,12 @@ function Feed() {
                             {formatDistance(p.distanceMi, distanceUnit, p.distanceMi < 10 ? 1 : 0)}
                           </span>
                         )}
-
+                        {coords && p.geoStatus !== "valid" && (
+                          <span className="ml-auto shrink-0 inline-flex items-center gap-1 text-xs text-coral/80">
+                            <MapPinOff className="h-3 w-3" />
+                            Location unavailable
+                          </span>
+                        )}
                       </Link>
                       <PostCard
                         post={orgPost}
