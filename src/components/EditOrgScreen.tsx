@@ -1341,12 +1341,14 @@ export function EditOrgScreen({ org }: { org: Org }) {
               </Section>
 
               <Section title="Home court / venue">
-                <input
+                <LocationAutocomplete
                   value={homeCourt}
-                  onChange={(e) => setHomeCourt(e.target.value)}
+                  onChange={setHomeCourt}
+                  mode="place"
+                  showCurrentButton={false}
                   placeholder="Tompkins Square Courts"
-                  className="w-full rounded-2xl border border-border bg-surface px-4 py-3 text-sm outline-none focus:border-lime"
                 />
+
               </Section>
 
               <Section title="Record (optional)">
