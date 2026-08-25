@@ -711,6 +711,12 @@ function Feed() {
                   {formatDistance(prefs.maxDistanceMi, distanceUnit)}
                 </p>
               )}
+              {unlocatableCount > 0 && (
+                <p className="mb-2 text-xs text-coral/80">
+                  {unlocatableCount} team post{unlocatableCount === 1 ? "" : "s"} with no mappable home
+                  court — still shown below
+                </p>
+              )}
               <div className="flex flex-col gap-3">
                 {nearbyTeamPosts.length === 0 && (
                   <p className="text-sm text-muted-foreground">
