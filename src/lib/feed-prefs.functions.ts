@@ -1,6 +1,4 @@
 import { createServerFn } from "@tanstack/react-start";
-import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-import type { Json } from "@/integrations/supabase/types";
 
 /**
  * Account-synced feed preferences. The client keeps localStorage as the
@@ -17,7 +15,6 @@ export const getFeedPreferences = createServerFn({ method: "GET" }).handler(asyn
 });
 
 export const saveFeedPreferences = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
   .inputValidator((input: { prefsJson: string }) => {
     if (typeof input?.prefsJson !== "string" || input.prefsJson.length > 100_000) {
       throw new Error("Invalid feed preferences payload");
@@ -25,18 +22,6 @@ export const saveFeedPreferences = createServerFn({ method: "POST" })
     return input;
   })
   .handler(async ({ data, context }): Promise<{ ok: boolean }> => {
-    const parsed = JSON.parse(data.prefsJson) as Record<string, unknown>;
-    const savedViews = Array.isArray(parsed.savedViews) ? parsed.savedViews : [];
-    delete parsed.savedViews;
-    const { error } = await context.supabase.from("feed_preferences").upsert(
-      {
-        user_id: context.userId,
-        prefs: parsed as Json,
-        saved_views: savedViews,
-        updated_at: new Date().toISOString(),
-      },
-      { onConflict: "user_id" },
-    );
-    if (error) throw new Error(error.message);
-    return { ok: true };
+    const { writeFeedPreferencesForRequest } = await import("@/lib/feed-prefs.server");
+    return writeFeedPreferencesForRequest(data.prefsJson);
   });
