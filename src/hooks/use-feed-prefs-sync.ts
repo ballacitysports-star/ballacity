@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { useAuth } from "@/hooks/use-auth";
 import { supabase } from "@/integrations/supabase/client";
@@ -26,14 +26,14 @@ export function useFeedPrefsSync() {
   const lastSynced = useRef<string>("");
   const json = JSON.stringify(prefs);
 
-  async function getLiveAccessToken(expectedUserId: string) {
+  const getLiveAccessToken = useCallback(async (expectedUserId: string) => {
     if (session?.access_token && session.user?.id === expectedUserId) return session.access_token;
     const { data } = await supabase.auth.getSession();
     if (data.session?.access_token && data.session.user?.id === expectedUserId) {
       return data.session.access_token;
     }
     return null;
-  }
+  }, [session?.access_token, session?.user?.id]);
 
   useEffect(() => {
     if (loading) return;
@@ -80,7 +80,7 @@ export function useFeedPrefsSync() {
     return () => {
       cancelled = true;
     };
-  }, [loading, session?.access_token, user?.id]);
+  }, [getLiveAccessToken, json, load, loading, save, user?.id]);
 
   useEffect(() => {
     if (loading || !user?.id || loadedFor.current !== user.id) return;
@@ -95,5 +95,5 @@ export function useFeedPrefsSync() {
         .catch(() => {});
     }, 800);
     return () => clearTimeout(t);
-  }, [json, loading, session?.access_token, user?.id]);
+  }, [getLiveAccessToken, json, loading, save, user?.id]);
 }
