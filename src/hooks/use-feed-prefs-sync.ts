@@ -48,12 +48,12 @@ export function useFeedPrefsSync() {
 
     void getLiveAccessToken(user.id)
       .then((token) => {
-        if (cancelled || !token) return null;
+        if (cancelled || !token) return undefined;
         return load({ headers: { Authorization: `Bearer ${token}` } });
       })
       .then((row) => {
         if (cancelled) return;
-        if (!row) {
+        if (row === undefined) {
           loadedFor.current = null;
           return;
         }
