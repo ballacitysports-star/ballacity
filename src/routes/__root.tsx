@@ -607,7 +607,7 @@ function AuthGate({ children }: { children: React.ReactNode }) {
       // correctly. Falls back to the client query if the server fn fails.
       try {
         const status = await withDeadline(
-          getOnboardingStatus(),
+          fetchOnboardingStatus(),
           ONBOARDING_CHECK_TIMEOUT_MS,
         );
         if (cancelled) return;
@@ -752,7 +752,7 @@ function RootComponent() {
         // Backend guard: authoritative check via getOnboardingStatus. Even if
         // provider metadata was stripped from the session, the server inspects
         // linked identities and can still classify the user as social.
-        void getOnboardingStatus()
+        void fetchOnboardingStatus()
           .then((status) => {
             const isOAuth = clientIsOAuth || status.isSocial;
             if (!status.needsOnboarding) {
