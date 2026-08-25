@@ -28,7 +28,9 @@ async function getUserScopedClient() {
   const client = getServerClientForBearer();
   if (!client) return null;
 
-  const { data: claimsData, error: claimsError } = await client.supabase.auth.getClaims(client.token);
+  const { data: claimsData, error: claimsError } = await client.supabase.auth.getClaims(
+    client.token,
+  );
   const userId = claimsData?.claims?.sub;
   if (claimsError || !userId) return null;
 
