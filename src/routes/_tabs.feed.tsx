@@ -2,7 +2,7 @@ import { createFileRoute, Link, useNavigate, useRouter } from "@tanstack/react-r
 import { pageHead } from "@/lib/seo";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Loader2, RefreshCw } from "lucide-react";
-import { Bell, MessageCircle, MapPin } from "lucide-react";
+import { Bell, MessageCircle, MapPin, MapPinOff } from "lucide-react";
 import { ViewDensityToggle } from "@/components/ViewDensityToggle";
 import { PlayMapView } from "@/components/PlayMapView";
 import { useUnreadNotificationCount } from "@/lib/notifications";
@@ -237,25 +237,57 @@ function Feed() {
   // coordinates of its venue (home court). When the viewer has shared their
   // location and set a distance cap, keep only posts whose court falls inside
   // the radius, nearest first, and annotate each with its real distance.
+  // Posts with missing or invalid coordinates are never hidden; they're kept
+  // at the end of the list with a clear "location unavailable" status.
+  const validCoord = (lat: unknown, lng: unknown) =>
+    typeof lat === "number" &&
+    typeof lng === "number" &&
+    !Number.isNaN(lat) &&
+    !Number.isNaN(lng) &&
+    lat >= -90 &&
+    lat <= 90 &&
+    lng >= -180 &&
+    lng <= 180;
+
   const nearbyTeamPosts = useMemo(() => {
     const capMi = prefs.maxDistanceMi;
     const withDist = teamPosts.map((p) => {
-      const km =
-        coords && typeof p.lat === "number" && typeof p.lng === "number"
-          ? haversineKm(coords, { lat: p.lat, lng: p.lng })
-          : null;
-      return { ...p, distanceMi: km == null ? null : km * MI_PER_KM };
+      if (!validCoord(p.lat, p.lng)) {
+        const status = p.lat == null || p.lng == null ? "missing" : "invalid";
+        return { ...p, distanceMi: null as number | null, geoStatus: status as "missing" | "invalid" };
+      }
+      const km = coords ? haversineKm(coords, { lat: p.lat as number, lng: p.lng as number }) : null;
+      return { ...p, distanceMi: km == null ? null : km * MI_PER_KM, geoStatus: "valid" as const };
     });
     const inRange =
       coords && capMi != null
-        ? withDist.filter((p) => p.distanceMi != null && p.distanceMi <= capMi)
+        ? withDist.filter(
+            (p) => p.geoStatus !== "valid" || (p.distanceMi != null && p.distanceMi <= capMi),
+          )
         : withDist;
     if (!coords || prefs.sortBy !== "nearest") return inRange;
-    return [...inRange].sort(
-      (a, b) => (a.distanceMi ?? Infinity) - (b.distanceMi ?? Infinity),
-    );
+    return [...inRange].sort((a, b) => {
+      // Locatable posts first, then unlocatable; both groups sorted nearest-first.
+      if (a.geoStatus !== "valid" && b.geoStatus === "valid") return 1;
+      if (a.geoStatus === "valid" && b.geoStatus !== "valid") return -1;
+      return (a.distanceMi ?? Infinity) - (b.distanceMi ?? Infinity);
+    });
   }, [teamPosts, coords, prefs.maxDistanceMi, prefs.sortBy]);
-  const hiddenByDistance = teamPosts.length - nearbyTeamPosts.length;
+
+  const hiddenByDistance = useMemo(() => {
+    const capMi = prefs.maxDistanceMi;
+    if (!coords || capMi == null) return 0;
+    return teamPosts.filter((p) => {
+      if (!validCoord(p.lat, p.lng)) return false;
+      const mi = haversineKm(coords, { lat: p.lat as number, lng: p.lng as number }) * MI_PER_KM;
+      return mi > capMi;
+    }).length;
+  }, [teamPosts, coords, prefs.maxDistanceMi]);
+
+  const unlocatableCount = useMemo(() => {
+    if (!coords || prefs.maxDistanceMi == null) return 0;
+    return teamPosts.filter((p) => !validCoord(p.lat, p.lng)).length;
+  }, [teamPosts, coords, prefs.maxDistanceMi]);
 
   const setChipSport = (s: string | null) => {
     if (s === null) {
@@ -679,6 +711,12 @@ function Feed() {
                   {formatDistance(prefs.maxDistanceMi, distanceUnit)}
                 </p>
               )}
+              {unlocatableCount > 0 && (
+                <p className="mb-2 text-xs text-coral/80">
+                  {unlocatableCount} team post{unlocatableCount === 1 ? "" : "s"} with no mappable home
+                  court — still shown below
+                </p>
+              )}
               <div className="flex flex-col gap-3">
                 {nearbyTeamPosts.length === 0 && (
                   <p className="text-sm text-muted-foreground">
@@ -716,7 +754,12 @@ function Feed() {
                             {formatDistance(p.distanceMi, distanceUnit, p.distanceMi < 10 ? 1 : 0)}
                           </span>
                         )}
-
+                        {coords && p.geoStatus !== "valid" && (
+                          <span className="ml-auto shrink-0 inline-flex items-center gap-1 text-xs text-coral/80">
+                            <MapPinOff className="h-3 w-3" />
+                            Location unavailable
+                          </span>
+                        )}
                       </Link>
                       <PostCard
                         post={orgPost}
