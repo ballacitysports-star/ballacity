@@ -247,6 +247,19 @@ const OAUTH_PROVIDER_KEY = "openrun:oauth-provider";
 const AUTH_SESSION_CHECK_TIMEOUT_MS = 5_000;
 const ONBOARDING_CHECK_TIMEOUT_MS = 5_000;
 
+/**
+ * The onboarding guard runs behind `requireSupabaseAuth`, so calling it without
+ * a live access token throws "Unauthorized: No authorization header provided"
+ * on the server. Verify the token client-side first and fail fast locally so
+ * callers just use their existing fallback path.
+ */
+async function fetchOnboardingStatus() {
+  const { data } = await supabase.auth.getSession();
+  if (!data.session?.access_token) throw new Error("No Supabase session");
+  return getOnboardingStatus();
+}
+
+
 function withDeadline<T>(operation: PromiseLike<T>, timeoutMs: number): Promise<T> {
   return new Promise<T>((resolve, reject) => {
     const timeoutId = window.setTimeout(
