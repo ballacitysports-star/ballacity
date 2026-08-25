@@ -25,7 +25,11 @@ import {
   DEFAULT_PREFS,
   DEFAULT_FILTERS,
   useMyProfile,
+  useDistanceUnit,
 } from "@/lib/user-prefs-store";
+import { haversineKm, MI_PER_KM, useUserLocation } from "@/lib/geo";
+import { formatDistance } from "@/lib/distance";
+
 import { clearScrollRestore, useScrollRestore } from "@/hooks/use-scroll-restore";
 import { motion } from "framer-motion";
 import { zodValidator, fallback } from "@tanstack/zod-adapter";
