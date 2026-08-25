@@ -1,8 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
-import { getRequest } from "@tanstack/react-start/server";
-import { createClient } from "@supabase/supabase-js";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-import type { Database, Json } from "@/integrations/supabase/types";
+import { readFeedPreferencesForRequest } from "@/lib/feed-prefs.server";
+import type { Json } from "@/integrations/supabase/types";
 
 /**
  * Account-synced feed preferences. The client keeps localStorage as the
@@ -14,36 +13,7 @@ import type { Database, Json } from "@/integrations/supabase/types";
  * serializable string rather than an open-ended record.
  */
 export const getFeedPreferences = createServerFn({ method: "GET" }).handler(
-  async (): Promise<{ prefsJson: string; updatedAt: string } | null> => {
-    const authHeader = getRequest()?.headers?.get("authorization");
-    if (!authHeader?.startsWith("Bearer ")) return null;
-
-    const token = authHeader.replace("Bearer ", "");
-    if (!token) return null;
-
-    const supabaseUrl = process.env["SUPABASE_URL"];
-    const publishableKey = process.env["SUPABASE_PUBLISHABLE_KEY"];
-    if (!supabaseUrl || !publishableKey) return null;
-
-    const supabase = createClient<Database>(supabaseUrl, publishableKey, {
-      global: { headers: { Authorization: `Bearer ${token}` } },
-      auth: { storage: undefined, persistSession: false, autoRefreshToken: false },
-    });
-
-    const { data: claimsData, error: claimsError } = await supabase.auth.getClaims(token);
-    const userId = claimsData?.claims?.sub;
-    if (claimsError || !userId) return null;
-
-    const { data, error } = await supabase
-      .from("feed_preferences")
-      .select("prefs, saved_views, updated_at")
-      .eq("user_id", userId)
-      .maybeSingle();
-    if (error) throw new Error(error.message);
-    if (!data) return null;
-    const prefs = { ...((data.prefs ?? {}) as object), savedViews: data.saved_views ?? [] };
-    return { prefsJson: JSON.stringify(prefs), updatedAt: String(data.updated_at) };
-  },
+  async () => readFeedPreferencesForRequest(),
 );
 
 export const saveFeedPreferences = createServerFn({ method: "POST" })
