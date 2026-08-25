@@ -237,25 +237,57 @@ function Feed() {
   // coordinates of its venue (home court). When the viewer has shared their
   // location and set a distance cap, keep only posts whose court falls inside
   // the radius, nearest first, and annotate each with its real distance.
+  // Posts with missing or invalid coordinates are never hidden; they're kept
+  // at the end of the list with a clear "location unavailable" status.
+  const validCoord = (lat: unknown, lng: unknown) =>
+    typeof lat === "number" &&
+    typeof lng === "number" &&
+    !Number.isNaN(lat) &&
+    !Number.isNaN(lng) &&
+    lat >= -90 &&
+    lat <= 90 &&
+    lng >= -180 &&
+    lng <= 180;
+
   const nearbyTeamPosts = useMemo(() => {
     const capMi = prefs.maxDistanceMi;
     const withDist = teamPosts.map((p) => {
-      const km =
-        coords && typeof p.lat === "number" && typeof p.lng === "number"
-          ? haversineKm(coords, { lat: p.lat, lng: p.lng })
-          : null;
-      return { ...p, distanceMi: km == null ? null : km * MI_PER_KM };
+      if (!validCoord(p.lat, p.lng)) {
+        const status = p.lat == null || p.lng == null ? "missing" : "invalid";
+        return { ...p, distanceMi: null as number | null, geoStatus: status as "missing" | "invalid" };
+      }
+      const km = coords ? haversineKm(coords, { lat: p.lat as number, lng: p.lng as number }) : null;
+      return { ...p, distanceMi: km == null ? null : km * MI_PER_KM, geoStatus: "valid" as const };
     });
     const inRange =
       coords && capMi != null
-        ? withDist.filter((p) => p.distanceMi != null && p.distanceMi <= capMi)
+        ? withDist.filter(
+            (p) => p.geoStatus !== "valid" || (p.distanceMi != null && p.distanceMi <= capMi),
+          )
         : withDist;
     if (!coords || prefs.sortBy !== "nearest") return inRange;
-    return [...inRange].sort(
-      (a, b) => (a.distanceMi ?? Infinity) - (b.distanceMi ?? Infinity),
-    );
+    return [...inRange].sort((a, b) => {
+      // Locatable posts first, then unlocatable; both groups sorted nearest-first.
+      if (a.geoStatus !== "valid" && b.geoStatus === "valid") return 1;
+      if (a.geoStatus === "valid" && b.geoStatus !== "valid") return -1;
+      return (a.distanceMi ?? Infinity) - (b.distanceMi ?? Infinity);
+    });
   }, [teamPosts, coords, prefs.maxDistanceMi, prefs.sortBy]);
-  const hiddenByDistance = teamPosts.length - nearbyTeamPosts.length;
+
+  const hiddenByDistance = useMemo(() => {
+    const capMi = prefs.maxDistanceMi;
+    if (!coords || capMi == null) return 0;
+    return teamPosts.filter((p) => {
+      if (!validCoord(p.lat, p.lng)) return false;
+      const mi = haversineKm(coords, { lat: p.lat as number, lng: p.lng as number }) * MI_PER_KM;
+      return mi > capMi;
+    }).length;
+  }, [teamPosts, coords, prefs.maxDistanceMi]);
+
+  const unlocatableCount = useMemo(() => {
+    if (!coords || prefs.maxDistanceMi == null) return 0;
+    return teamPosts.filter((p) => !validCoord(p.lat, p.lng)).length;
+  }, [teamPosts, coords, prefs.maxDistanceMi]);
 
   const setChipSport = (s: string | null) => {
     if (s === null) {
