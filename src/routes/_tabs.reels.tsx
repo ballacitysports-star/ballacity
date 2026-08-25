@@ -11,6 +11,8 @@ import { PaymentTestModeBanner } from "@/components/PaymentTestModeBanner";
 import { getStripeEnvironment } from "@/lib/stripe";
 import { createPortalSession } from "@/utils/payments.functions";
 import { FREE_TIER } from "@/lib/catalog";
+import { recapProgress, recapStepLabel, shareRecap, type RecapSummary } from "@/lib/recaps";
+import { Share2 } from "lucide-react";
 
 export const Route = createFileRoute("/_tabs/reels")({
   validateSearch: (search: Record<string, unknown>) => ({
@@ -42,6 +44,8 @@ type Reel = {
   error_message: string | null;
   game_id: string | null;
   game_title: string | null;
+  processing_step: string | null;
+  completed_at: string | null;
 };
 
 function ReelCard({ reel }: { reel: Reel }) {
@@ -76,6 +80,7 @@ function ReelCard({ reel }: { reel: Reel }) {
 
   const isDone = reel.status === "completed";
   const displayTitle = reel.ai_title || reel.title;
+  const isProcessing = reel.status === "processing";
 
   return (
     <li className="rounded-xl border border-border bg-surface p-3">
@@ -101,7 +106,39 @@ function ReelCard({ reel }: { reel: Reel }) {
           {reel.ai_caption && (
             <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">{reel.ai_caption}</p>
           )}
+          {isProcessing && (
+            <div className="mt-1.5">
+              <div className="h-1 overflow-hidden rounded-full bg-lime/15">
+                <div
+                  className="h-full rounded-full bg-lime transition-all"
+                  style={{ width: `${recapProgress(reel as unknown as RecapSummary)}%` }}
+                />
+              </div>
+              <p className="mt-1 text-[10px] font-semibold text-lime">
+                {recapStepLabel(reel as unknown as RecapSummary)} — we'll notify you when it's ready
+              </p>
+            </div>
+          )}
+          {reel.status === "failed" && reel.error_message && (
+            <p className="mt-1 text-[10px] text-amber-300">{reel.error_message}</p>
+          )}
         </div>
+        {isDone && reel.game_id && (
+          <button
+            onClick={async () => {
+              const r = await shareRecap(reel as unknown as RecapSummary, {
+                id: reel.game_id!,
+                title: reel.game_title || displayTitle,
+              });
+              if (r === "copied") toast.success("Highlight link copied");
+              if (r === "failed") toast.error("Could not share this highlight");
+            }}
+            className="shrink-0 rounded-full border border-border p-2 text-muted-foreground"
+            aria-label="Share highlight"
+          >
+            <Share2 className="h-3.5 w-3.5" />
+          </button>
+        )}
       </div>
       {open && videoUrl && (
         <div className="mt-3">
