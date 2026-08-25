@@ -25,7 +25,11 @@ import {
   DEFAULT_PREFS,
   DEFAULT_FILTERS,
   useMyProfile,
+  useDistanceUnit,
 } from "@/lib/user-prefs-store";
+import { haversineKm, MI_PER_KM, useUserLocation } from "@/lib/geo";
+import { formatDistance } from "@/lib/distance";
+
 import { clearScrollRestore, useScrollRestore } from "@/hooks/use-scroll-restore";
 import { motion } from "framer-motion";
 import { zodValidator, fallback } from "@tanstack/zod-adapter";
@@ -125,6 +129,9 @@ function Feed() {
   const prefs = useFeedPrefs();
   useFeedPrefsSync();
   const profile = useMyProfile();
+  const distanceUnit = useDistanceUnit();
+  const { coords, status: geoStatus, request: requestLocation } = useUserLocation();
+
   const joinedSet = useMemo(() => new Set(joinedIds), [joinedIds]);
   const hostedIds = useMemo(() => new Set(hosted.map((g) => g.id)), [hosted]);
 
@@ -225,6 +232,31 @@ function Feed() {
     staleTime: 30_000,
   });
   const teamPosts = useMemo(() => (teamPostsQuery.data?.pages ?? []).flat(), [teamPostsQuery.data]);
+
+  // Distance-based home-court filtering: each team post carries the geocoded
+  // coordinates of its venue (home court). When the viewer has shared their
+  // location and set a distance cap, keep only posts whose court falls inside
+  // the radius, nearest first, and annotate each with its real distance.
+  const nearbyTeamPosts = useMemo(() => {
+    const capMi = prefs.maxDistanceMi;
+    const withDist = teamPosts.map((p) => {
+      const km =
+        coords && typeof p.lat === "number" && typeof p.lng === "number"
+          ? haversineKm(coords, { lat: p.lat, lng: p.lng })
+          : null;
+      return { ...p, distanceMi: km == null ? null : km * MI_PER_KM };
+    });
+    const inRange =
+      coords && capMi != null
+        ? withDist.filter((p) => p.distanceMi != null && p.distanceMi <= capMi)
+        : withDist;
+    if (!coords || prefs.sortBy !== "nearest") return inRange;
+    return [...inRange].sort(
+      (a, b) => (a.distanceMi ?? Infinity) - (b.distanceMi ?? Infinity),
+    );
+  }, [teamPosts, coords, prefs.maxDistanceMi, prefs.sortBy]);
+  const hiddenByDistance = teamPosts.length - nearbyTeamPosts.length;
+
   const setChipSport = (s: string | null) => {
     if (s === null) {
       setFeedPrefs({ ...prefs, preferredSports: [] });
@@ -629,8 +661,31 @@ function Feed() {
                   See all
                 </Link>
               </div>
+              {prefs.maxDistanceMi != null && !coords && geoStatus !== "unsupported" && (
+                <button
+                  type="button"
+                  onClick={requestLocation}
+                  className="mb-2 inline-flex items-center gap-1.5 rounded-full border border-border bg-surface px-3 py-1.5 text-xs font-semibold"
+                >
+                  <MapPin className="h-3.5 w-3.5 text-coral" />
+                  {geoStatus === "denied"
+                    ? "Location blocked — enable to filter by home court"
+                    : "Use my location to filter by home court distance"}
+                </button>
+              )}
+              {hiddenByDistance > 0 && (
+                <p className="mb-2 text-xs text-muted-foreground">
+                  {hiddenByDistance} hidden beyond{" "}
+                  {formatDistance(prefs.maxDistanceMi, distanceUnit)}
+                </p>
+              )}
               <div className="flex flex-col gap-3">
-                {teamPosts.map((p, i) => {
+                {nearbyTeamPosts.length === 0 && (
+                  <p className="text-sm text-muted-foreground">
+                    No team posts within {formatDistance(prefs.maxDistanceMi, distanceUnit)} of you.
+                  </p>
+                )}
+                {nearbyTeamPosts.map((p, i) => {
                   const orgPost: OrgPost = {
                     id: p.id,
                     kind: p.kind as PostKind,
@@ -656,6 +711,12 @@ function Feed() {
                         {p.teamSports?.[0] && (
                           <span className="text-muted-foreground">· {p.teamSports[0]}</span>
                         )}
+                        {p.distanceMi != null && (
+                          <span className="ml-auto shrink-0 text-muted-foreground">
+                            {formatDistance(p.distanceMi, distanceUnit, p.distanceMi < 10 ? 1 : 0)}
+                          </span>
+                        )}
+
                       </Link>
                       <PostCard
                         post={orgPost}
