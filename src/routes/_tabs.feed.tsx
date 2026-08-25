@@ -661,8 +661,31 @@ function Feed() {
                   See all
                 </Link>
               </div>
+              {prefs.maxDistanceMi != null && !coords && geoStatus !== "unsupported" && (
+                <button
+                  type="button"
+                  onClick={requestLocation}
+                  className="mb-2 inline-flex items-center gap-1.5 rounded-full border border-border bg-surface px-3 py-1.5 text-xs font-semibold"
+                >
+                  <MapPin className="h-3.5 w-3.5 text-coral" />
+                  {geoStatus === "denied"
+                    ? "Location blocked — enable to filter by home court"
+                    : "Use my location to filter by home court distance"}
+                </button>
+              )}
+              {hiddenByDistance > 0 && (
+                <p className="mb-2 text-xs text-muted-foreground">
+                  {hiddenByDistance} hidden beyond{" "}
+                  {formatDistance(prefs.maxDistanceMi, distanceUnit)}
+                </p>
+              )}
               <div className="flex flex-col gap-3">
-                {teamPosts.map((p, i) => {
+                {nearbyTeamPosts.length === 0 && (
+                  <p className="text-sm text-muted-foreground">
+                    No team posts within {formatDistance(prefs.maxDistanceMi, distanceUnit)} of you.
+                  </p>
+                )}
+                {nearbyTeamPosts.map((p, i) => {
                   const orgPost: OrgPost = {
                     id: p.id,
                     kind: p.kind as PostKind,
@@ -688,6 +711,12 @@ function Feed() {
                         {p.teamSports?.[0] && (
                           <span className="text-muted-foreground">· {p.teamSports[0]}</span>
                         )}
+                        {p.distanceMi != null && (
+                          <span className="ml-auto shrink-0 text-muted-foreground">
+                            {formatDistance(p.distanceMi, distanceUnit, p.distanceMi < 10 ? 1 : 0)}
+                          </span>
+                        )}
+
                       </Link>
                       <PostCard
                         post={orgPost}
