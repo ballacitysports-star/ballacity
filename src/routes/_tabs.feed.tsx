@@ -125,6 +125,9 @@ function Feed() {
   const prefs = useFeedPrefs();
   useFeedPrefsSync();
   const profile = useMyProfile();
+  const distanceUnit = useDistanceUnit();
+  const { coords, status: geoStatus, request: requestLocation } = useUserLocation();
+
   const joinedSet = useMemo(() => new Set(joinedIds), [joinedIds]);
   const hostedIds = useMemo(() => new Set(hosted.map((g) => g.id)), [hosted]);
 
