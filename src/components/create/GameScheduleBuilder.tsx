@@ -169,17 +169,40 @@ export function GameScheduleBuilder({
               <span className="min-w-[92px] flex-1 text-xs font-bold">
                 {formatShortDate(e.date)}
               </span>
-              <input
-                type="time"
-                aria-label={`Start time on ${formatShortDate(e.date)}`}
-                value={e.time}
-                step={900}
-                onChange={(ev) => onChange(setScheduleTime(value, e.date, ev.target.value))}
-                className="rounded-xl border border-border bg-surface px-2 py-1.5 text-xs [color-scheme:dark]"
-              />
+              {!e.allDay && (
+                <>
+                  <input
+                    type="time"
+                    aria-label={`Start time on ${formatShortDate(e.date)}`}
+                    value={e.time}
+                    step={900}
+                    onChange={(ev) => onChange(setScheduleTime(value, e.date, ev.target.value))}
+                    className="rounded-xl border border-border bg-surface px-2 py-1.5 text-xs [color-scheme:dark]"
+                  />
+                  <span className="text-xs text-muted-foreground">to</span>
+                  <input
+                    type="time"
+                    aria-label={`End time on ${formatShortDate(e.date)}`}
+                    value={e.endTime ?? defaultEndTime(e.time)}
+                    step={900}
+                    onChange={(ev) => onChange(setScheduleEndTime(value, e.date, ev.target.value))}
+                    className="rounded-xl border border-border bg-surface px-2 py-1.5 text-xs [color-scheme:dark]"
+                  />
+                </>
+              )}
+              <label className="flex items-center gap-1 text-[10px] font-semibold text-muted-foreground">
+                <input
+                  type="checkbox"
+                  aria-label={`All day on ${formatShortDate(e.date)}`}
+                  checked={!!e.allDay}
+                  onChange={(ev) => onChange(setScheduleAllDay(value, e.date, ev.target.checked))}
+                  className="h-3.5 w-3.5 accent-lime"
+                />
+                All day
+              </label>
               <button
                 type="button"
-                onClick={() => onChange(applyTimeToAll(value, e.time))}
+                onClick={() => onChange(applyTimeToAll(value, e))}
                 className="rounded-full border border-border px-2 py-1 text-[10px] font-semibold text-muted-foreground hover:border-lime/60"
               >
                 Apply to all days
@@ -187,7 +210,7 @@ export function GameScheduleBuilder({
               <button
                 type="button"
                 aria-label={`Remove ${formatShortDate(e.date)}`}
-                onClick={() => onChange(toggleScheduleDate(value, e.date, lastTime))}
+                onClick={() => onChange(toggleScheduleDate(value, e.date, fallback))}
                 className="rounded-full p-1.5 text-muted-foreground hover:text-coral"
               >
                 <Trash2 className="h-3.5 w-3.5" />
