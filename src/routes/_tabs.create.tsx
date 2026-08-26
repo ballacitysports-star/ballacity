@@ -587,7 +587,7 @@ function Create() {
                 </button>
               </div>
               <p className="mt-1 text-[11px] text-muted-foreground">
-                Pick any days you want — each one gets its own start time.
+                Pick any days you want — each one gets its own start and end time.
               </p>
             </div>
             {multiDay && <GameScheduleBuilder value={schedule} onChange={setSchedule} />}

@@ -256,6 +256,7 @@ export type HostedGameInput = {
   sport: Sport;
   title: string;
   date: string; // ISO
+  duration?: string; // e.g. "90 min"
   location: string;
   skill: Game["skill"];
   maxPlayers: number;
@@ -293,7 +294,7 @@ export async function addHostedGame(input: HostedGameInput): Promise<Game> {
     host,
     hostUserId: input.hostUserId,
     date: input.date,
-    duration: "90 min",
+    duration: input.duration?.trim() || "90 min",
     location: input.location || "TBD",
     neighborhood: "",
     distanceMi: 0,
