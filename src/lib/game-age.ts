@@ -83,3 +83,25 @@ export function requesterAgeLabel(
 export function clampAge(value: number): number {
   return Math.min(AGE_MAX, Math.max(AGE_MIN, Math.round(value)));
 }
+
+/** One-tap host presets shown before the custom range editor. */
+export const AGE_PRESETS: ReadonlyArray<{
+  id: string;
+  label: string;
+  minAge: number | null;
+  maxAge: number | null;
+}> = [
+  { id: "any", label: "Any age", minAge: null, maxAge: null },
+  { id: "13", label: "13+", minAge: 13, maxAge: null },
+  { id: "16", label: "16+", minAge: 16, maxAge: null },
+  { id: "18", label: "18+", minAge: 18, maxAge: null },
+  { id: "21", label: "21+", minAge: 21, maxAge: null },
+];
+
+/** Which preset (if any) matches the current values; "custom" otherwise. */
+export function matchAgePreset(req: AgeRequirement | null | undefined): string {
+  const min = req?.minAge ?? null;
+  const max = req?.maxAge ?? null;
+  const hit = AGE_PRESETS.find((p) => p.minAge === min && p.maxAge === max);
+  return hit ? hit.id : "custom";
+}
