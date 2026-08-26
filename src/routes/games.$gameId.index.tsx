@@ -88,6 +88,7 @@ import { PaymentRequiredBanner } from "@/components/PaymentRequiredBanner";
 import { HostPaymentsPanel, PlayerPaymentsPanel } from "@/components/GamePaymentsPanel";
 import { PostEngagement } from "@/components/PostEngagement";
 import { Distance } from "@/components/Distance";
+import { SeriesSessionsStrip } from "@/components/SeriesSessionsStrip";
 
 import {
   useHostedGames,
@@ -1101,6 +1102,13 @@ function GameDetail() {
           <h1 className="font-display text-3xl font-bold drop-shadow-lg">{game.title}</h1>
         </div>
       </div>
+
+      {/* Multi-day series: switch between sessions */}
+      {game.seriesId && (
+        <div className="page-shell mt-4">
+          <SeriesSessionsStrip game={game} />
+        </div>
+      )}
 
       {/* Tabs: Overview / Payments */}
       {isPaid && (

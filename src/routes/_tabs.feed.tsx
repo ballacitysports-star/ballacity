@@ -44,6 +44,7 @@ import { PostCard } from "@/components/PostCard";
 import { PostDetailsDialog, type PostDetailsTeam } from "@/components/PostDetailsDialog";
 import type { OrgPost, PostKind } from "@/lib/sample-data";
 import { hideFinishedGames, onlyFinishedGames } from "@/lib/game-time";
+import { collapseSeriesGames } from "@/lib/game-series";
 
 // URL-persisted feed state. Refreshing or sharing the URL preserves search
 // text, sport chip, sort, distance cap, position, view/density toggles, and
@@ -327,7 +328,8 @@ function Feed() {
   };
 
   const filtered = useMemo(() => {
-    const pool = [...hosted, ...GAMES];
+    // Collapse multi-day series first so one event never shows duplicate cards.
+    const pool = collapseSeriesGames([...hosted, ...GAMES], tab);
     const all = tab === "archive" ? onlyFinishedGames(pool) : hideFinishedGames(pool);
     return all
       .filter((g) =>
