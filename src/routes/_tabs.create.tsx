@@ -381,11 +381,12 @@ function Create() {
 
             const cleanPositions = positionsCleanup(positionsNeeded);
             let firstGameId: string | null = null;
-            for (const date of dates) {
+            for (const plan of plans) {
               const game = await addHostedGame({
                 sport,
                 title,
-                date,
+                date: plan.startIso,
+                duration: durationToText(plan.durationMin),
                 location,
                 skill,
                 maxPlayers: size,
@@ -421,8 +422,8 @@ function Create() {
 
             // Note: do NOT auto-join the host. Hosting ≠ playing; the host
             // sees their published games in the profile's hosted section.
-            if (dates.length > 1) {
-              toast.success(`Created ${dates.length} games`);
+            if (plans.length > 1) {
+              toast.success(`Created ${plans.length} games`);
               nav({ to: "/feed" });
             } else {
               toast.success("Game published");
