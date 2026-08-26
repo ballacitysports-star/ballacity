@@ -565,32 +565,37 @@ function Create() {
             />
           </Section>
 
-          {/* Date */}
           {/* When */}
           <Section title="When" icon={<Calendar className="h-4 w-4" />}>
-            {!multiDay && <DateTimeRangeFields value={when} onChange={setWhen} />}
-            <div className="rounded-2xl border border-border bg-surface px-4 py-3">
-              <div className="flex items-center justify-between">
-                <span className="text-sm font-medium">Multiple days, different hours</span>
+            <div
+              role="group"
+              aria-label="Schedule mode"
+              className="flex gap-1 rounded-full border border-border bg-surface p-1"
+            >
+              {[
+                { label: "One day", multi: false },
+                { label: "Multiple days", multi: true },
+              ].map((m) => (
                 <button
+                  key={m.label}
                   type="button"
-                  onClick={() => setMultiDay((v) => !v)}
-                  className={`relative h-6 w-10 rounded-full transition-colors ${multiDay ? "bg-lime" : "bg-secondary"}`}
-                  aria-label="Toggle multi-day schedule"
+                  aria-pressed={multiDay === m.multi}
+                  onClick={() => setMultiDay(m.multi)}
+                  className={`flex-1 rounded-full px-3 py-2 text-[13px] font-semibold transition-colors ${
+                    multiDay === m.multi
+                      ? "bg-lime text-primary-foreground"
+                      : "text-muted-foreground hover:text-foreground"
+                  }`}
                 >
-                  <motion.span
-                    layout
-                    transition={{ type: "spring", stiffness: 500, damping: 30 }}
-                    className="absolute top-0.5 h-5 w-5 rounded-full bg-background shadow"
-                    style={{ left: multiDay ? "calc(100% - 1.375rem)" : "0.125rem" }}
-                  />
+                  {m.label}
                 </button>
-              </div>
-              <p className="mt-1 text-[11px] text-muted-foreground">
-                Pick any days you want — each one gets its own start and end time.
-              </p>
+              ))}
             </div>
-            {multiDay && <GameScheduleBuilder value={schedule} onChange={setSchedule} />}
+            {multiDay ? (
+              <GameScheduleBuilder value={schedule} onChange={setSchedule} />
+            ) : (
+              <DateTimeRangeFields value={when} onChange={setWhen} />
+            )}
           </Section>
 
           {/* Venue address */}
