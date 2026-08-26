@@ -26,6 +26,15 @@ import {
   History,
 } from "lucide-react";
 import { GAMES, SPORTS, imageFor } from "@/lib/sample-data";
+import {
+  ageGateMessage,
+  ageGateState,
+  ageRequirementLabel,
+  hasAgeRequirement,
+} from "@/lib/game-age";
+import { useMyAge, fetchProfileAges } from "@/lib/use-my-age";
+import { requesterAgeLabel } from "@/lib/game-age";
+import { AgeRequirementFields } from "@/components/games/AgeRequirementFields";
 import { formatWhen } from "@/lib/format";
 import { ReviewsSection } from "@/components/ReviewsSection";
 import { SpotsPill } from "@/components/SpotsPill";
@@ -649,11 +658,19 @@ function GameDetail() {
     );
   }
 
+  const { age: myAge } = useMyAge();
   const fee = Number(settings?.entry_fee ?? game.price);
   const isPaid = fee > 0;
   // Host approval is the default. A game whose host hasn't saved settings yet
   // is treated as request-to-join; hosts can opt out in game settings.
-  const requiresApproval = settings ? !!settings.requires_approval : true;
+  const hostRequiresApproval = settings ? !!settings.requires_approval : true;
+  // An age requirement forces the request-to-join flow for anyone outside the
+  // range (or who hasn't shared a birthday), even on instant-join games.
+  const ageReq = { minAge: game.minAge ?? null, maxAge: game.maxAge ?? null };
+  const ageGate = ageGateState({ req: ageReq, viewerAge: myAge });
+  const ageNeedsApproval = ageGate === "needs_approval" || ageGate === "unknown_age";
+  const requiresApproval = hostRequiresApproval || (!isHost && ageNeedsApproval);
+  const ageNotice = !isHost && ageNeedsApproval ? ageGateMessage(ageGate, ageReq) : null;
   const latestSub = mySubs[0];
   const isApproved = myReq?.status === "approved";
   const isRequestPending = myReq?.status === "pending";
@@ -1070,6 +1087,11 @@ function GameDetail() {
             <span className="rounded-full bg-background/70 backdrop-blur px-3 py-1 text-xs font-semibold">
               {formatSkillValue(game.sport, game.skill)}
             </span>
+            {hasAgeRequirement(ageReq) && (
+              <span className="rounded-full bg-background/70 backdrop-blur px-3 py-1 text-xs font-semibold">
+                🎂 {ageRequirementLabel(ageReq)}
+              </span>
+            )}
             {game.urgent && spotsLeft > 0 && (
               <span className="rounded-full bg-coral-gradient px-3 py-1 text-xs font-bold text-white">
                 ⚡ {spotsLeft} spots left
@@ -2165,6 +2187,7 @@ function GameDetail() {
                   <HostRequestRow
                     key={r.id}
                     req={r}
+                    ageReq={ageReq}
                     gameTitle={game.title}
                     onOptimistic={applyOptimisticReview}
                   />
@@ -2305,6 +2328,11 @@ function GameDetail() {
         <div className="mx-auto w-[min(100%,28rem)]">
           {!isHost && !joined && !isPending && !isConfirmed && !isApproved && (
             <JoinBlockedReason gate={viewerGate} className="mb-2" waitlistHint />
+          )}
+          {ageNotice && !isConfirmed && !isApproved && (
+            <p className="mb-2 text-[11px] font-medium text-muted-foreground" role="status">
+              🎂 {ageNotice}
+            </p>
           )}
           <div className="flex items-center gap-2">
             <button
@@ -2629,6 +2657,8 @@ function EditGameModal({
   const [requiresApproval, setRequiresApproval] = useState<boolean>(
     settings ? !!settings.requires_approval : true,
   );
+  const [minAge, setMinAge] = useState<number | null>(game.minAge ?? null);
+  const [maxAge, setMaxAge] = useState<number | null>(game.maxAge ?? null);
   const [acceptedMethodIds, setAcceptedMethodIds] = useState<Set<string>>(
     () => new Set(settings?.accepted_method_ids ?? []),
   );
@@ -2720,6 +2750,8 @@ function EditGameModal({
         title: title.trim() || game.title,
         sport,
         skill,
+        minAge,
+        maxAge,
         location: location.trim() || game.location,
         neighborhood: neighborhood.trim(),
         date: Number.isFinite(new Date(dateLocal).getTime()) ? iso : game.date,
@@ -3092,6 +3124,15 @@ function EditGameModal({
                 Players send a pickup request and you approve or decline each one.
               </p>
             )}
+            <AgeRequirementFields
+              minAge={minAge}
+              maxAge={maxAge}
+              onChange={(n) => {
+                setMinAge(n.minAge);
+                setMaxAge(n.maxAge);
+              }}
+              idPrefix="edit-age"
+            />
           </Field>
 
           {price > 0 && (
@@ -3861,14 +3902,17 @@ function RosterPlayerRow({
 function HostRequestRow({
   req,
   gameTitle,
+  ageReq,
   onOptimistic,
 }: {
   req: JoinRequest;
   gameTitle: string;
+  ageReq?: { minAge: number | null; maxAge: number | null };
   onOptimistic: (reqId: string, status: "approved" | "rejected") => () => void;
 }) {
   const [busy, setBusy] = useState(false);
   const [name, setName] = useState<string>("Player");
+  const [age, setAge] = useState<number | null>(null);
   useEffect(() => {
     (async () => {
       const { data } = await supabase
@@ -3877,8 +3921,11 @@ function HostRequestRow({
         .eq("id", req.player_id)
         .maybeSingle();
       if (data) setName((data as any).display_name ?? "Player");
+      const ages = await fetchProfileAges([req.player_id]);
+      setAge(ages[req.player_id] ?? null);
     })();
   }, [req.player_id]);
+  const ageLabel = requesterAgeLabel(age, ageReq);
 
   const act = async (status: "approved" | "rejected", reason?: string | null) => {
     setBusy(true);
@@ -3937,6 +3984,9 @@ function HostRequestRow({
           >
             {name}
           </Link>
+          {ageLabel && (
+            <div className="text-[11px] font-semibold text-muted-foreground">🎂 {ageLabel}</div>
+          )}
           {req.message && (
             <div className="text-xs text-muted-foreground truncate">"{req.message}"</div>
           )}

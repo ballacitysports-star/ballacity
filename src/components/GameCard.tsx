@@ -1,3 +1,4 @@
+import { ageRequirementLabel } from "@/lib/game-age";
 import type { CSSProperties } from "react";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { MapPin, Users, Clock, Zap, Lock, Flame, MessageCircle } from "lucide-react";
@@ -213,6 +214,11 @@ export function GameCard({ game, index = 0 }: { game: Game; index?: number }) {
                 <span className="truncate">{game.host.name}</span>
               )}
               <span className="shrink-0 text-foreground">· {game.skill}</span>
+              {ageRequirementLabel({ minAge: game.minAge, maxAge: game.maxAge }) && (
+                <span className="shrink-0 text-muted-foreground">
+                  · 🎂 {ageRequirementLabel({ minAge: game.minAge, maxAge: game.maxAge })}
+                </span>
+              )}
             </div>
             <div className="flex shrink-0 items-center gap-1.5">
               {hostUserId && (

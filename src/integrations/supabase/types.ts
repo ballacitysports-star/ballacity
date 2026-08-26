@@ -545,7 +545,9 @@ export type Database = {
           lat: number
           lng: number
           location: string
+          max_age: number | null
           max_players: number
+          min_age: number | null
           neighborhood: string
           org_id: string | null
           positions_needed: Json
@@ -579,7 +581,9 @@ export type Database = {
           lat?: number
           lng?: number
           location?: string
+          max_age?: number | null
           max_players?: number
+          min_age?: number | null
           neighborhood?: string
           org_id?: string | null
           positions_needed?: Json
@@ -613,7 +617,9 @@ export type Database = {
           lat?: number
           lng?: number
           location?: string
+          max_age?: number | null
           max_players?: number
+          min_age?: number | null
           neighborhood?: string
           org_id?: string | null
           positions_needed?: Json

@@ -1,3 +1,4 @@
+import { ageRequirementLabel } from "@/lib/game-age";
 import { useState } from "react";
 import { Link } from "@tanstack/react-router";
 import { motion } from "framer-motion";
@@ -187,6 +188,11 @@ function RequestGameCardInner({
                 <UserAvatar initials={game.host.avatar} name={game.host.name} size="xs" />
                 <span className="truncate">{game.host.name}</span>
                 <span className="shrink-0 text-foreground">· {game.skill}</span>
+              {ageRequirementLabel({ minAge: game.minAge, maxAge: game.maxAge }) && (
+                <span className="shrink-0 text-muted-foreground">
+                  · 🎂 {ageRequirementLabel({ minAge: game.minAge, maxAge: game.maxAge })}
+                </span>
+              )}
               </div>
               <div className="flex shrink-0 items-center gap-1 text-[11px] font-semibold">
                 <span className="text-foreground">
