@@ -145,7 +145,7 @@ export function GameScheduleBuilder({
             onClick={() => onChange(applyTimeToAll(value, rows[0]!))}
             className="rounded-full border border-border bg-background px-2.5 py-1 text-[11px] font-semibold hover:border-lime/60"
           >
-            Same hours everywhere
+            Same hours for every day
           </button>
         )}
         {rows.length > 0 && (
