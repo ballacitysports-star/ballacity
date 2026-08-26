@@ -132,7 +132,7 @@ function Create() {
   };
 
   const [title, setTitle] = useState("");
-  const [when, setWhen] = useState("");
+  const [when, setWhen] = useState<WhenRange>(() => defaultWhenRange());
   const [location, setLocation] = useState(profile?.city ?? "");
   const previousProfileCityRef = useRef(profile?.city ?? "");
   const locationEditedRef = useRef(false);
