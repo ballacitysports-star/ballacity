@@ -1,8 +1,7 @@
 import { useCallback, useEffect, useRef } from "react";
-import { useServerFn } from "@tanstack/react-start";
 import { useAuth } from "@/hooks/use-auth";
 import { supabase } from "@/integrations/supabase/client";
-import { getFeedPreferences, saveFeedPreferences } from "@/lib/feed-prefs.functions";
+import type { Json } from "@/integrations/supabase/types";
 import {
   normalizeFeedPrefs,
   setFeedPrefs,
@@ -19,8 +18,6 @@ import {
 export function useFeedPrefsSync() {
   const { user, session, loading } = useAuth();
   const prefs = useFeedPrefs();
-  const load = useServerFn(getFeedPreferences);
-  const save = useServerFn(saveFeedPreferences);
 
   const loadedFor = useRef<string | null>(null);
   const lastSynced = useRef<string>("");
@@ -40,6 +37,44 @@ export function useFeedPrefsSync() {
     [session?.access_token, session?.user?.id],
   );
 
+  const readRemotePrefs = useCallback(async (userId: string) => {
+    const { data, error } = await supabase
+      .from("feed_preferences")
+      .select("prefs, saved_views, updated_at")
+      .eq("user_id", userId)
+      .maybeSingle();
+
+    if (error) throw error;
+    if (!data) return null;
+
+    return {
+      prefsJson: JSON.stringify({
+        ...((data.prefs ?? {}) as Record<string, unknown>),
+        savedViews: data.saved_views ?? [],
+      }),
+      updatedAt: String(data.updated_at),
+    };
+  }, []);
+
+  const writeRemotePrefs = useCallback(async (userId: string, prefsJson: string) => {
+    const parsed = JSON.parse(prefsJson) as Record<string, unknown>;
+    const savedViews = Array.isArray(parsed.savedViews) ? parsed.savedViews : [];
+    delete parsed.savedViews;
+
+    const { error } = await supabase.from("feed_preferences").upsert(
+      {
+        user_id: userId,
+        prefs: parsed as Json,
+        saved_views: savedViews as Json,
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: "user_id" },
+    );
+
+    if (error) throw error;
+    return { ok: true };
+  }, []);
+
   useEffect(() => {
     if (loading) return;
     if (!user?.id) {
@@ -54,7 +89,7 @@ export function useFeedPrefsSync() {
     void getLiveAccessToken(user.id)
       .then((token) => {
         if (cancelled || !token) return undefined;
-        return load({ headers: { Authorization: `Bearer ${token}` } });
+        return readRemotePrefs(user.id);
       })
       .then((row) => {
         if (cancelled) return;
@@ -68,10 +103,7 @@ export function useFeedPrefsSync() {
           void getLiveAccessToken(user.id)
             .then((token) => {
               if (!token) return null;
-              return save({
-                data: { prefsJson: json },
-                headers: { Authorization: `Bearer ${token}` },
-              });
+              return writeRemotePrefs(user.id, json);
             })
             .catch(() => {});
           return;
@@ -88,7 +120,7 @@ export function useFeedPrefsSync() {
     return () => {
       cancelled = true;
     };
-  }, [getLiveAccessToken, json, load, loading, save, user?.id]);
+  }, [getLiveAccessToken, json, loading, readRemotePrefs, user?.id, writeRemotePrefs]);
 
   useEffect(() => {
     if (loading || !user?.id || loadedFor.current !== user.id) return;
@@ -98,13 +130,10 @@ export function useFeedPrefsSync() {
       void getLiveAccessToken(user.id)
         .then((token) => {
           if (!token) return null;
-          return save({
-            data: { prefsJson: json },
-            headers: { Authorization: `Bearer ${token}` },
-          });
+          return writeRemotePrefs(user.id, json);
         })
         .catch(() => {});
     }, 800);
     return () => clearTimeout(t);
-  }, [getLiveAccessToken, json, loading, save, user?.id]);
+  }, [getLiveAccessToken, json, loading, user?.id, writeRemotePrefs]);
 }
