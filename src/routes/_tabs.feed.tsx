@@ -29,6 +29,7 @@ import {
   getFeedPrefsSnapshot,
 } from "@/lib/user-prefs-store";
 import { useSeedSportsOnce } from "@/lib/default-sports";
+import { useAuth } from "@/hooks/use-auth";
 import { haversineKm, MI_PER_KM, useUserLocation } from "@/lib/geo";
 import { formatDistance } from "@/lib/distance";
 
@@ -129,6 +130,7 @@ function Feed() {
   const hosted = useHostedGames();
   const joinedIds = useJoinedGameIds();
   const prefs = useFeedPrefs();
+  const { user: authUser } = useAuth();
   useFeedPrefsSync();
   const profile = useMyProfile();
   const distanceUnit = useDistanceUnit();
@@ -204,9 +206,18 @@ function Feed() {
       if (cur !== def) next[urlKey] = cur;
       void defKey;
     }
-    navigate({ search: next as any, replace: true });
+    // Only write the URL while this route is still the active match and the
+    // viewer is signed in — otherwise this fights the auth gate's redirect to
+    // /auth and can strand the app on the loading screen.
+    if (!authUser) return;
+    if (!router.state.location.pathname.startsWith("/feed")) return;
+    try {
+      navigate({ search: next as any, replace: true });
+    } catch (e) {
+      console.warn("feed url sync skipped", e);
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [q, prefs, positionFilter, viewMode, density, tab]);
+  }, [q, prefs, positionFilter, viewMode, density, tab, authUser]);
 
   const userCityToken = useMemo(
     () => (profile?.city ?? "").toLowerCase().split(",")[0].trim(),
