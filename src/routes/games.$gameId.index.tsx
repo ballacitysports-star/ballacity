@@ -2327,6 +2327,11 @@ function GameDetail() {
           {!isHost && !joined && !isPending && !isConfirmed && !isApproved && (
             <JoinBlockedReason gate={viewerGate} className="mb-2" waitlistHint />
           )}
+          {ageNotice && !isConfirmed && !isApproved && (
+            <p className="mb-2 text-[11px] font-medium text-muted-foreground" role="status">
+              🎂 {ageNotice}
+            </p>
+          )}
           <div className="flex items-center gap-2">
             <button
               disabled={messaging}
