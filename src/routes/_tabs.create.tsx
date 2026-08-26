@@ -34,6 +34,7 @@ import { useMyProfiles } from "@/lib/account-profiles";
 import { toast } from "sonner";
 import { LocationAutocomplete } from "@/components/LocationAutocomplete";
 import { useMyProfile } from "@/lib/user-prefs-store";
+import { useDefaultSports } from "@/lib/default-sports";
 import { useAuth } from "@/hooks/use-auth";
 import { useAvailabilityGate } from "@/lib/availability-gate";
 import { AvailabilityPromptBanner } from "@/components/availability/AvailabilityPromptDialog";
