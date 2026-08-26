@@ -248,16 +248,27 @@ const AUTH_SESSION_CHECK_TIMEOUT_MS = 5_000;
 const ONBOARDING_CHECK_TIMEOUT_MS = 5_000;
 
 /**
- * The onboarding guard runs behind `requireSupabaseAuth`, so calling it without
- * a live access token throws "Unauthorized: No authorization header provided"
- * on the server. Verify the token client-side first and fail fast locally so
- * callers just use their existing fallback path.
+ * The onboarding guard runs behind `requireSupabaseAuth`, so calling it with a
+ * missing OR stale access token throws "Unauthorized" on the server (which the
+ * error overlay reports as a runtime error). Verify locally first, and refresh
+ * an expired/near-expiry token before the RPC so callers only ever hit their
+ * fallback path for genuine failures.
  */
 async function fetchOnboardingStatus() {
   const { data } = await supabase.auth.getSession();
-  if (!data.session?.access_token) throw new Error("No Supabase session");
+  let session = data.session;
+  if (!session?.access_token) throw new Error("No Supabase session");
+
+  const expiresAt = session.expires_at ? session.expires_at * 1000 : 0;
+  if (expiresAt && expiresAt - Date.now() < 60_000) {
+    const { data: refreshed } = await supabase.auth.refreshSession();
+    session = refreshed.session ?? null;
+    if (!session?.access_token) throw new Error("Supabase session expired");
+  }
+
   return getOnboardingStatus();
 }
+
 
 
 function withDeadline<T>(operation: PromiseLike<T>, timeoutMs: number): Promise<T> {
