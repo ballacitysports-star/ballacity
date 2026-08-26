@@ -557,6 +557,7 @@ function PlayersPage() {
               </button>
             }
             onReset={() => {
+              markSportChoice("players");
               setSports([]);
               setMaxDistance(0);
               setAgeMin("");
@@ -567,7 +568,10 @@ function PlayersPage() {
               <PlayersFilterBody
                 sports={sports}
                 onToggleSport={toggleSportFilter}
-                onClearSports={() => setSports([])}
+                onClearSports={() => {
+                  markSportChoice("players");
+                  setSports([]);
+                }}
                 skills={skills}
                 setSkills={setSkills}
                 maxDistance={maxDistance}
@@ -1285,7 +1289,8 @@ function PostAvailabilityDialog({
                 <Chip
                   key={s.name}
                   active={sports.includes(s.name)}
-                  onClick={() =>
+                  onClick={() => {
+                    sportsTouchedRef.current = true;
                     setSports((arr) => {
                       const next = toggle(arr, s.name);
                       // Prefill from the profile tier the first time a sport is added.
@@ -1294,8 +1299,8 @@ function PostAvailabilityDialog({
                         if (mine) setLevels((l) => ({ ...l, [s.name]: mine }));
                       }
                       return next;
-                    })
-                  }
+                    });
+                  }}
                 >
                   <span className="mr-1">{s.emoji}</span>
                   {s.name}
