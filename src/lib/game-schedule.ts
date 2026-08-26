@@ -41,6 +41,36 @@ export function todayKey(now: Date = new Date()): string {
   return toDateKey(now);
 }
 
+/** Shift a date key by whole days. */
+export function addDaysToKey(key: string, days: number): string {
+  const d = fromDateKey(isValidDateKey(key) ? key : todayKey());
+  d.setDate(d.getDate() + days);
+  return toDateKey(d);
+}
+
+/** The next occurrence of a weekday (0=Sun) strictly after today. */
+export function nextWeekdayKey(weekday: number, now: Date = new Date()): string {
+  const base = todayKey(now);
+  for (let i = 1; i <= 7; i++) {
+    const key = addDaysToKey(base, i);
+    if (fromDateKey(key).getDay() === weekday) return key;
+  }
+  return base;
+}
+
+/** Short weekday label for a date key, e.g. "Sat". */
+export function weekdayLabel(key: string): string {
+  return fromDateKey(key).toLocaleDateString(undefined, { weekday: "short" });
+}
+
+/** Friendly day label: Today / Tomorrow / "Sat, Sep 5". */
+export function friendlyDayLabel(key: string, now: Date = new Date()): string {
+  const t = todayKey(now);
+  if (key === t) return "Today";
+  if (key === addDaysToKey(t, 1)) return "Tomorrow";
+  return formatShortDate(key);
+}
+
 export function minutesOfTime(time: string): number {
   const [h, m] = time.split(":").map(Number);
   return (h ?? 0) * 60 + (m ?? 0);
