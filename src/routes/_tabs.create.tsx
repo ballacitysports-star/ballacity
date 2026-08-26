@@ -568,14 +568,7 @@ function Create() {
           {/* Date */}
           {/* When */}
           <Section title="When" icon={<Calendar className="h-4 w-4" />}>
-            {!multiDay && (
-              <input
-                type="datetime-local"
-                value={when}
-                onChange={(e) => setWhen(e.target.value)}
-                className="w-full rounded-2xl border border-border bg-surface px-4 py-3 text-sm outline-none focus:border-lime [color-scheme:dark]"
-              />
-            )}
+            {!multiDay && <DateTimeRangeFields value={when} onChange={setWhen} />}
             <div className="rounded-2xl border border-border bg-surface px-4 py-3">
               <div className="flex items-center justify-between">
                 <span className="text-sm font-medium">Multiple days, different hours</span>
