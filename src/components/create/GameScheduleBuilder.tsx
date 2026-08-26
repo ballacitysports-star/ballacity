@@ -202,13 +202,6 @@ export function GameScheduleBuilder({
               </label>
               <button
                 type="button"
-                onClick={() => onChange(applyTimeToAll(value, e))}
-                className="rounded-full border border-border px-2 py-1 text-[10px] font-semibold text-muted-foreground hover:border-lime/60"
-              >
-                Apply to all days
-              </button>
-              <button
-                type="button"
                 aria-label={`Remove ${formatShortDate(e.date)}`}
                 onClick={() => onChange(toggleScheduleDate(value, e.date, fallback))}
                 className="rounded-full p-1.5 text-muted-foreground hover:text-coral"
