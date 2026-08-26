@@ -313,6 +313,7 @@ function Feed() {
   }, [teamPosts, coords, prefs.maxDistanceMi]);
 
   const setChipSport = (s: string | null) => {
+    markSportChoice("feed");
     if (s === null) {
       setFeedPrefs({ ...prefs, preferredSports: [] });
     } else {

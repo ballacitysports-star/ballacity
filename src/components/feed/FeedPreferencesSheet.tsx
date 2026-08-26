@@ -15,6 +15,7 @@ import {
   type FeedMoneyFilter,
 } from "@/lib/user-prefs-store";
 import {
+import { markSportChoice } from "@/lib/default-sports";
   applyView,
   filterSnapshot,
   makeViewId,
@@ -187,12 +188,14 @@ export function FeedPreferencesBody() {
   /** Any filter edit drops the "unchanged saved view" link unless it matches again. */
   const patch = (p: Partial<typeof prefs>) => setFeedPrefs({ ...prefs, ...p });
 
-  const toggleSport = (s: Sport) =>
-    patch({
+  const toggleSport = (s: Sport) => {
+    markSportChoice("feed");
+    return patch({
       preferredSports: prefs.preferredSports.includes(s)
         ? prefs.preferredSports.filter((x) => x !== s)
         : [...prefs.preferredSports, s],
     });
+  };
 
   const toggleSection = (k: keyof typeof sections) => {
     const next = { ...sections, [k]: !sections[k] };
