@@ -15,51 +15,64 @@ export function useDefaultSports(): { sports: string[]; loaded: boolean } {
   };
 }
 
-const SEED_PREFIX = "openrun:sport-seeded.";
+const OVERRIDE_PREFIX = "openrun:sport-choice.";
 
-function alreadySeeded(key: string): boolean {
-  if (typeof window === "undefined") return true;
-  try {
-    return window.localStorage.getItem(SEED_PREFIX + key) === "1";
-  } catch {
-    return true;
-  }
-}
-
-function markSeeded(key: string) {
+/**
+ * Remember that the viewer picked the sport filter themselves on a screen.
+ * From then on their choice — including "All sports" — always wins.
+ */
+export function markSportChoice(key: string) {
   if (typeof window === "undefined") return;
   try {
-    window.localStorage.setItem(SEED_PREFIX + key, "1");
+    window.localStorage.setItem(OVERRIDE_PREFIX + key, "1");
   } catch {
     /* ignore */
   }
 }
 
+export function hasSportChoice(key: string): boolean {
+  if (typeof window === "undefined") return true;
+  try {
+    return window.localStorage.getItem(OVERRIDE_PREFIX + key) === "1";
+  } catch {
+    return true;
+  }
+}
+
+const sameSports = (a: string[], b: string[]) =>
+  a.length === b.length && a.every((v, i) => v === b[i]);
+
 /**
- * One-time seeding of a screen's sport filter from the viewer's profile.
+ * Keep a screen's sport filter defaulted to the viewer's profile sports until
+ * they choose for themselves (tracked via `markSportChoice`).
  *
- * Fires at most once per browser per `key`, and only while the screen has no
- * selection of its own — so an explicit "All sports" always sticks afterwards.
+ * Unlike a one-shot seed, this re-applies when the profile loads late or the
+ * viewer edits their favorite sports.
  */
-export function useSeedSportsOnce(
+export function useProfileSportDefault(
   key: string,
   {
     ready,
-    hasSelection,
+    current,
     apply,
-  }: { ready: boolean; hasSelection: boolean; apply: (sports: string[]) => void },
+  }: { ready: boolean; current: string[]; apply: (sports: string[]) => void },
 ) {
   const { sports, loaded } = useDefaultSports();
-  const doneRef = useRef(false);
+  const lastAppliedRef = useRef<string | null>(null);
 
   useEffect(() => {
-    if (doneRef.current) return;
     if (!ready || !loaded) return;
-    doneRef.current = true;
-    if (alreadySeeded(key)) return;
-    markSeeded(key);
-    if (hasSelection || sports.length === 0) return;
+    if (sports.length === 0) return;
+    if (hasSportChoice(key)) return;
+    const signature = sports.join("|");
+    if (lastAppliedRef.current === signature) return;
+    if (sameSports(current, sports)) {
+      lastAppliedRef.current = signature;
+      return;
+    }
+    lastAppliedRef.current = signature;
     apply(sports);
+    // `current`/`apply` intentionally read at effect time only.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ready, loaded, key]);
+  }, [ready, loaded, key, sports.join("|")]);
 }
