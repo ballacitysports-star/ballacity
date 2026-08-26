@@ -2655,6 +2655,8 @@ function EditGameModal({
   const [requiresApproval, setRequiresApproval] = useState<boolean>(
     settings ? !!settings.requires_approval : true,
   );
+  const [minAge, setMinAge] = useState<number | null>(game.minAge ?? null);
+  const [maxAge, setMaxAge] = useState<number | null>(game.maxAge ?? null);
   const [acceptedMethodIds, setAcceptedMethodIds] = useState<Set<string>>(
     () => new Set(settings?.accepted_method_ids ?? []),
   );
@@ -2746,6 +2748,8 @@ function EditGameModal({
         title: title.trim() || game.title,
         sport,
         skill,
+        minAge,
+        maxAge,
         location: location.trim() || game.location,
         neighborhood: neighborhood.trim(),
         date: Number.isFinite(new Date(dateLocal).getTime()) ? iso : game.date,
@@ -3118,6 +3122,15 @@ function EditGameModal({
                 Players send a pickup request and you approve or decline each one.
               </p>
             )}
+            <AgeRequirementFields
+              minAge={minAge}
+              maxAge={maxAge}
+              onChange={(n) => {
+                setMinAge(n.minAge);
+                setMaxAge(n.maxAge);
+              }}
+              idPrefix="edit-age"
+            />
           </Field>
 
           {price > 0 && (
