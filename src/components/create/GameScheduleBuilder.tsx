@@ -47,14 +47,19 @@ export function GameScheduleBuilder({
   const [cursor, setCursor] = useState<Date>(startOfMonth(today));
   const cells = useMemo(() => monthGrid(cursor), [cursor]);
   const rows = normalizeSchedule(value);
-  const lastTime = rows[rows.length - 1]?.time ?? DEFAULT_GAME_TIME;
+  const last = rows[rows.length - 1];
+  const fallback = {
+    time: last?.time ?? DEFAULT_GAME_TIME,
+    endTime: last?.endTime ?? defaultEndTime(last?.time ?? DEFAULT_GAME_TIME),
+    allDay: last?.allDay ?? false,
+  };
   const canGoBack = startOfMonth(cursor) > startOfMonth(today);
 
   const addMany = (dates: string[]) => {
     let next = value;
     for (const d of dates) {
       if (next.some((e) => e.date === d)) continue;
-      next = toggleScheduleDate(next, d, lastTime);
+      next = toggleScheduleDate(next, d, fallback);
     }
     onChange(normalizeSchedule(next));
   };
