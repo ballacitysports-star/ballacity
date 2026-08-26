@@ -574,12 +574,29 @@ function AuthGate({ children }: { children: React.ReactNode }) {
         hasUser: false,
         extra: { to: "/auth", next: safeNext ?? null, durationMs },
       });
-      router.navigate({
-        to: "/auth",
-        search: safeNext ? { next: safeNext } : {},
-        replace: true,
-      });
-      setVerifying(false);
+      // The redirect must survive a router rejection (e.g. a competing
+      // navigate from the page we're leaving). Never leave `verifying` true —
+      // that holds the full-screen loader forever.
+      try {
+        router.navigate({
+          to: "/auth",
+          search: safeNext ? { next: safeNext } : {},
+          replace: true,
+        });
+      } catch (e) {
+        console.error(e);
+      } finally {
+        setVerifying(false);
+      }
+      // Hard fallback: if we're somehow still on the protected URL a moment
+      // later, leave via the browser so the user is never stranded.
+      window.setTimeout(() => {
+        if (cancelled) return;
+        if (typeof window === "undefined") return;
+        if (window.location.pathname === "/auth") return;
+        const q = safeNext ? `?next=${encodeURIComponent(safeNext)}` : "";
+        window.location.replace(`/auth${q}`);
+      }, 700);
     };
     void attemptRedirect();
     return () => {
