@@ -17,7 +17,7 @@ import {
   serializeSportList,
   toggleSport,
 } from "@/lib/sport-filter";
-import { useSeedSportsOnce, useDefaultSports } from "@/lib/default-sports";
+import { useSeedSportsOnce } from "@/lib/default-sports";
 import { ViewDensityToggle, type ViewMode, type Density } from "@/components/ViewDensityToggle";
 import { TeamsMapView } from "@/components/TeamsMapView";
 import { TrainerActions } from "@/components/TrainerActions";
