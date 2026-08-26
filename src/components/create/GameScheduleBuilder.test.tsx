@@ -32,7 +32,7 @@ describe("GameScheduleBuilder", () => {
     );
     fireEvent.click(cells[cells.length - 1]!);
     expect(container.querySelectorAll('input[type="time"]').length).toBe(2);
-    fireEvent.click(getAllByRole("checkbox")[0]!);
+    fireEvent.click(container.querySelector<HTMLInputElement>('input[type="checkbox"]')!);
     expect(container.querySelectorAll('input[type="time"]').length).toBe(0);
   });
 });
