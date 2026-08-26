@@ -46,10 +46,17 @@ import {
   type PositionsNeeded,
 } from "@/components/PositionsPicker";
 import { GameScheduleBuilder } from "@/components/create/GameScheduleBuilder";
+import { DateTimeRangeFields } from "@/components/create/DateTimeRangeFields";
 import {
-  scheduleToIsoDates,
+  defaultWhenRange,
+  durationToText,
+  scheduleToPlans,
   validateSchedule,
+  validateWhenRange,
+  whenRangeToPlan,
+  type GamePlan,
   type ScheduleEntry,
+  type WhenRange,
 } from "@/lib/game-schedule";
 import { AgeRequirementFields } from "@/components/games/AgeRequirementFields";
 
