@@ -26,12 +26,13 @@ describe("GameScheduleBuilder", () => {
   });
 
   it("all day hides that day's clock inputs", () => {
-    render(<Harness />);
-    const cells = screen.getAllByRole("button").filter((b) => /^\d+$/.test(b.textContent ?? "") && !(b as HTMLButtonElement).disabled);
+    const { container, getAllByRole } = render(<Harness />);
+    const cells = getAllByRole("button").filter(
+      (b) => /^\d+$/.test(b.textContent ?? "") && !(b as HTMLButtonElement).disabled,
+    );
     fireEvent.click(cells[cells.length - 1]!);
-    const allDay = screen.getAllByRole("checkbox")[0]!;
-    fireEvent.click(allDay);
-    expect(document.querySelectorAll('input[type="time"]').length).toBe(0);
-    expect(screen.getByText(/all day/i)).toBeTruthy();
+    expect(container.querySelectorAll('input[type="time"]').length).toBe(2);
+    fireEvent.click(getAllByRole("checkbox")[0]!);
+    expect(container.querySelectorAll('input[type="time"]').length).toBe(0);
   });
 });
