@@ -32,7 +32,8 @@ import {
   ageRequirementLabel,
   hasAgeRequirement,
 } from "@/lib/game-age";
-import { useMyAge } from "@/lib/use-my-age";
+import { useMyAge, fetchProfileAges } from "@/lib/use-my-age";
+import { requesterAgeLabel } from "@/lib/game-age";
 import { AgeRequirementFields } from "@/components/games/AgeRequirementFields";
 import { formatWhen } from "@/lib/format";
 import { ReviewsSection } from "@/components/ReviewsSection";
@@ -2186,6 +2187,7 @@ function GameDetail() {
                   <HostRequestRow
                     key={r.id}
                     req={r}
+                    ageReq={ageReq}
                     gameTitle={game.title}
                     onOptimistic={applyOptimisticReview}
                   />
@@ -3900,14 +3902,17 @@ function RosterPlayerRow({
 function HostRequestRow({
   req,
   gameTitle,
+  ageReq,
   onOptimistic,
 }: {
   req: JoinRequest;
   gameTitle: string;
+  ageReq?: { minAge: number | null; maxAge: number | null };
   onOptimistic: (reqId: string, status: "approved" | "rejected") => () => void;
 }) {
   const [busy, setBusy] = useState(false);
   const [name, setName] = useState<string>("Player");
+  const [age, setAge] = useState<number | null>(null);
   useEffect(() => {
     (async () => {
       const { data } = await supabase
@@ -3916,8 +3921,11 @@ function HostRequestRow({
         .eq("id", req.player_id)
         .maybeSingle();
       if (data) setName((data as any).display_name ?? "Player");
+      const ages = await fetchProfileAges([req.player_id]);
+      setAge(ages[req.player_id] ?? null);
     })();
   }, [req.player_id]);
+  const ageLabel = requesterAgeLabel(age, ageReq);
 
   const act = async (status: "approved" | "rejected", reason?: string | null) => {
     setBusy(true);
@@ -3976,6 +3984,9 @@ function HostRequestRow({
           >
             {name}
           </Link>
+          {ageLabel && (
+            <div className="text-[11px] font-semibold text-muted-foreground">🎂 {ageLabel}</div>
+          )}
           {req.message && (
             <div className="text-xs text-muted-foreground truncate">"{req.message}"</div>
           )}
