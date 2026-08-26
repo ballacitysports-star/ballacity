@@ -101,6 +101,7 @@ import {
   toggleSport,
   type SportSkillMap,
 } from "@/lib/sport-filter";
+import { useSeedSportsOnce, useDefaultSports } from "@/lib/default-sports";
 
 // URL-persisted Players state. Refreshing or sharing the URL restores the
 // exact view: search text, sport chip, skill, distance cap, age range,
