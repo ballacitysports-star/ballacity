@@ -79,6 +79,9 @@ export type Game = {
   joinsClosed?: boolean;
   /** Minutes before start when signups close automatically. 0 = off. */
   signupCutoffMin?: number;
+  /** Optional age requirement. Players outside it must be approved by the host. */
+  minAge?: number | null;
+  maxAge?: number | null;
   positionsNeeded?: Record<string, number>;
   teamId?: string;
   orgId?: string;
