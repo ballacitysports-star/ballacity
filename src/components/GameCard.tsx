@@ -1,7 +1,7 @@
 import { ageRequirementLabel } from "@/lib/game-age";
 import type { CSSProperties } from "react";
 import { Link, useNavigate } from "@tanstack/react-router";
-import { MapPin, Users, Clock, Zap, Lock, Flame, MessageCircle } from "lucide-react";
+import { MapPin, Users, Clock, Zap, Lock, Flame, MessageCircle, CalendarDays } from "lucide-react";
 import { UserAvatar } from "@/components/UserAvatar";
 import { SpotsPill } from "@/components/SpotsPill";
 import type { Game } from "@/lib/sample-data";
@@ -98,6 +98,11 @@ export function GameCard({ game, index = 0 }: { game: Game; index?: number }) {
               <span>{sportEmoji[game.sport]}</span>
               {game.sport}
             </span>
+            {(game.seriesCount ?? 0) > 1 && (
+              <span className="inline-flex items-center gap-1 rounded-full bg-background/70 backdrop-blur px-2 py-0.5 text-[11px] font-semibold text-lime">
+                <CalendarDays className="h-3 w-3" /> Multi-day · {game.seriesCount} sessions
+              </span>
+            )}
             {game.urgent && spotsLeft > 0 && !gate.locked && (
               <span className="inline-flex items-center gap-1 rounded-full bg-coral-gradient px-2 py-0.5 text-[11px] font-bold text-white">
                 <Zap className="h-3 w-3" /> Needs players

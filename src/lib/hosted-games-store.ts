@@ -92,6 +92,7 @@ type DbRow = {
   positions_needed?: Record<string, number> | null;
   team_id?: string | null;
   org_id?: string | null;
+  series_id?: string | null;
 
 };
 
@@ -135,6 +136,7 @@ function rowToGame(r: DbRow): Game {
     positionsNeeded: (r.positions_needed ?? {}) as Record<string, number>,
     teamId: r.team_id ?? undefined,
     orgId: r.org_id ?? undefined,
+    seriesId: r.series_id ?? null,
 
   } as Game;
 }
@@ -172,6 +174,7 @@ function gameToInsertRow(g: Game): TablesInsert<"hosted_games"> {
     positions_needed: (g.positionsNeeded ?? {}) as TablesInsert<"hosted_games">["positions_needed"],
     ...(g.teamId ? { team_id: g.teamId } : {}),
     ...(g.orgId ? { org_id: g.orgId } : {}),
+    ...(g.seriesId ? { series_id: g.seriesId } : {}),
   } as TablesInsert<"hosted_games">;
 
 }
@@ -273,6 +276,8 @@ export type HostedGameInput = {
   signupCutoffMin?: number;
   minAge?: number | null;
   maxAge?: number | null;
+  /** Shared id linking sessions of one multi-day event so the feed shows one card. */
+  seriesId?: string | null;
 
 };
 
@@ -315,6 +320,7 @@ export async function addHostedGame(input: HostedGameInput): Promise<Game> {
     signupCutoffMin: input.signupCutoffMin ?? 0,
     minAge: input.minAge ?? null,
     maxAge: input.maxAge ?? null,
+    seriesId: input.seriesId ?? null,
   };
 
 

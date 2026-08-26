@@ -1,6 +1,6 @@
 import { Link } from "@tanstack/react-router";
 import { motion } from "framer-motion";
-import { MapPin, Users, Clock, Lock } from "lucide-react";
+import { MapPin, Users, Clock, Lock, CalendarDays } from "lucide-react";
 import type { Game } from "@/lib/sample-data";
 import { formatWhen } from "@/lib/format";
 import { useIsJoined } from "@/lib/games-store";
@@ -83,6 +83,11 @@ export function GameListRow({ game, index = 0 }: { game: Game; index?: number })
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-1.5">
             <h3 className="truncate font-display text-sm font-bold">{game.title}</h3>
+            {(game.seriesCount ?? 0) > 1 && (
+              <span className="inline-flex shrink-0 items-center gap-0.5 rounded-full bg-lime/15 px-1.5 py-0.5 text-[9px] font-bold text-lime">
+                <CalendarDays className="h-2.5 w-2.5" /> {game.seriesCount} days
+              </span>
+            )}
             {game.isPrivate && <Lock className="h-3 w-3 shrink-0 text-muted-foreground" />}
           </div>
           <div className="mt-0.5 flex items-center gap-2 text-[11px] text-muted-foreground">

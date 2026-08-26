@@ -381,6 +381,9 @@ function Create() {
 
             const cleanPositions = positionsCleanup(positionsNeeded);
             let firstGameId: string | null = null;
+            // One shared series id links all sessions of a multi-day event so
+            // the feed renders a single card instead of one card per day.
+            const seriesId = plans.length > 1 ? crypto.randomUUID() : undefined;
             for (const plan of plans) {
               const game = await addHostedGame({
                 sport,
@@ -403,6 +406,7 @@ function Create() {
                 maxAge,
                 teamId: selectedAffiliation?.id,
                 orgId: undefined,
+                seriesId,
               });
 
               if (!firstGameId) firstGameId = game.id;
