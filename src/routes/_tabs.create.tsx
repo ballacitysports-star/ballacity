@@ -46,10 +46,17 @@ import {
   type PositionsNeeded,
 } from "@/components/PositionsPicker";
 import { GameScheduleBuilder } from "@/components/create/GameScheduleBuilder";
+import { DateTimeRangeFields } from "@/components/create/DateTimeRangeFields";
 import {
-  scheduleToIsoDates,
+  defaultWhenRange,
+  durationToText,
+  scheduleToPlans,
   validateSchedule,
+  validateWhenRange,
+  whenRangeToPlan,
+  type GamePlan,
   type ScheduleEntry,
+  type WhenRange,
 } from "@/lib/game-schedule";
 import { AgeRequirementFields } from "@/components/games/AgeRequirementFields";
 
@@ -125,7 +132,7 @@ function Create() {
   };
 
   const [title, setTitle] = useState("");
-  const [when, setWhen] = useState("");
+  const [when, setWhen] = useState<WhenRange>(() => defaultWhenRange());
   const [location, setLocation] = useState(profile?.city ?? "");
   const previousProfileCityRef = useRef(profile?.city ?? "");
   const locationEditedRef = useRef(false);
@@ -326,8 +333,8 @@ function Create() {
           setPublishing(true);
 
           try {
-            // Compute one or many ISO datetimes.
-            let dates: string[];
+            // Compute one or many start times, each with its own length.
+            let plans: GamePlan[];
             if (multiDay) {
               const check = validateSchedule(schedule);
               if (!check.ok) {
@@ -335,11 +342,15 @@ function Create() {
                 setPublishing(false);
                 return;
               }
-              dates = scheduleToIsoDates(schedule);
+              plans = scheduleToPlans(schedule);
             } else {
-              dates = [
-                when ? new Date(when).toISOString() : new Date(Date.now() + 3600_000).toISOString(),
-              ];
+              const check = validateWhenRange(when);
+              if (!check.ok) {
+                toast.error(check.error ?? "Fix the date and time to continue.");
+                setPublishing(false);
+                return;
+              }
+              plans = [whenRangeToPlan(when)];
             }
 
             // Build the host snapshot from the freshest profile available so
@@ -370,11 +381,12 @@ function Create() {
 
             const cleanPositions = positionsCleanup(positionsNeeded);
             let firstGameId: string | null = null;
-            for (const date of dates) {
+            for (const plan of plans) {
               const game = await addHostedGame({
                 sport,
                 title,
-                date,
+                date: plan.startIso,
+                duration: durationToText(plan.durationMin),
                 location,
                 skill,
                 maxPlayers: size,
@@ -410,8 +422,8 @@ function Create() {
 
             // Note: do NOT auto-join the host. Hosting ≠ playing; the host
             // sees their published games in the profile's hosted section.
-            if (dates.length > 1) {
-              toast.success(`Created ${dates.length} games`);
+            if (plans.length > 1) {
+              toast.success(`Created ${plans.length} games`);
               nav({ to: "/feed" });
             } else {
               toast.success("Game published");
@@ -556,14 +568,7 @@ function Create() {
           {/* Date */}
           {/* When */}
           <Section title="When" icon={<Calendar className="h-4 w-4" />}>
-            {!multiDay && (
-              <input
-                type="datetime-local"
-                value={when}
-                onChange={(e) => setWhen(e.target.value)}
-                className="w-full rounded-2xl border border-border bg-surface px-4 py-3 text-sm outline-none focus:border-lime [color-scheme:dark]"
-              />
-            )}
+            {!multiDay && <DateTimeRangeFields value={when} onChange={setWhen} />}
             <div className="rounded-2xl border border-border bg-surface px-4 py-3">
               <div className="flex items-center justify-between">
                 <span className="text-sm font-medium">Multiple days, different hours</span>
@@ -582,7 +587,7 @@ function Create() {
                 </button>
               </div>
               <p className="mt-1 text-[11px] text-muted-foreground">
-                Pick any days you want — each one gets its own start time.
+                Pick any days you want — each one gets its own start and end time.
               </p>
             </div>
             {multiDay && <GameScheduleBuilder value={schedule} onChange={setSchedule} />}
