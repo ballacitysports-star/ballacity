@@ -44,6 +44,12 @@ import {
   positionsCleanup,
   type PositionsNeeded,
 } from "@/components/PositionsPicker";
+import { GameScheduleBuilder } from "@/components/create/GameScheduleBuilder";
+import {
+  scheduleToIsoDates,
+  validateSchedule,
+  type ScheduleEntry,
+} from "@/lib/game-schedule";
 import { AgeRequirementFields } from "@/components/games/AgeRequirementFields";
 
 export const Route = createFileRoute("/_tabs/create")({
@@ -133,24 +139,8 @@ function Create() {
   const hostAvailGate = useAvailabilityGate();
   const [coverUrl, setCoverUrl] = useState<string | null>(null);
   const [positionsNeeded, setPositionsNeeded] = useState<PositionsNeeded>({});
-  const [repeatRange, setRepeatRange] = useState(false);
-  const [rangeStart, setRangeStart] = useState("");
-  const [rangeEnd, setRangeEnd] = useState("");
-
-  const rangeDates: string[] = (() => {
-    if (!repeatRange || !rangeStart || !rangeEnd) return [];
-    const start = new Date(rangeStart + "T00:00:00");
-    const end = new Date(rangeEnd + "T00:00:00");
-    if (isNaN(start.getTime()) || isNaN(end.getTime()) || end < start) return [];
-    const out: string[] = [];
-    for (let d = new Date(start); d <= end && out.length < 60; d.setDate(d.getDate() + 1)) {
-      const y = d.getFullYear();
-      const m = String(d.getMonth() + 1).padStart(2, "0");
-      const day = String(d.getDate()).padStart(2, "0");
-      out.push(`${y}-${m}-${day}`);
-    }
-    return out;
-  })();
+  const [multiDay, setMultiDay] = useState(false);
+  const [schedule, setSchedule] = useState<ScheduleEntry[]>([]);
 
   useEffect(() => {
     const nextCity = profile?.city?.trim() ?? "";
@@ -323,15 +313,14 @@ function Create() {
           try {
             // Compute one or many ISO datetimes.
             let dates: string[];
-            if (repeatRange) {
-              if (rangeDates.length === 0) {
-                toast.error("Pick a valid start and end date.");
+            if (multiDay) {
+              const check = validateSchedule(schedule);
+              if (!check.ok) {
+                toast.error(check.error ?? "Fix the schedule to continue.");
                 setPublishing(false);
                 return;
               }
-              const time = when.includes("T") ? when.split("T")[1] : when;
-              const t = time && /^\d{2}:\d{2}/.test(time) ? time : "18:00";
-              dates = rangeDates.map((d) => new Date(`${d}T${t}`).toISOString());
+              dates = scheduleToIsoDates(schedule);
             } else {
               dates = [
                 when ? new Date(when).toISOString() : new Date(Date.now() + 3600_000).toISOString(),
@@ -550,15 +539,9 @@ function Create() {
           </Section>
 
           {/* Date */}
-          <Section title={repeatRange ? "Time" : "When"} icon={<Calendar className="h-4 w-4" />}>
-            {repeatRange ? (
-              <input
-                type="time"
-                value={when.includes("T") ? when.split("T")[1] : when}
-                onChange={(e) => setWhen(e.target.value)}
-                className="w-full rounded-2xl border border-border bg-surface px-4 py-3 text-sm outline-none focus:border-lime [color-scheme:dark]"
-              />
-            ) : (
+          {/* When */}
+          <Section title="When" icon={<Calendar className="h-4 w-4" />}>
+            {!multiDay && (
               <input
                 type="datetime-local"
                 value={when}
@@ -568,52 +551,26 @@ function Create() {
             )}
             <div className="rounded-2xl border border-border bg-surface px-4 py-3">
               <div className="flex items-center justify-between">
-                <span className="text-sm font-medium">Repeat on multiple days</span>
+                <span className="text-sm font-medium">Multiple days, different hours</span>
                 <button
                   type="button"
-                  onClick={() => setRepeatRange((v) => !v)}
-                  className={`relative h-6 w-10 rounded-full transition-colors ${repeatRange ? "bg-lime" : "bg-secondary"}`}
-                  aria-label="Toggle date range"
+                  onClick={() => setMultiDay((v) => !v)}
+                  className={`relative h-6 w-10 rounded-full transition-colors ${multiDay ? "bg-lime" : "bg-secondary"}`}
+                  aria-label="Toggle multi-day schedule"
                 >
                   <motion.span
                     layout
                     transition={{ type: "spring", stiffness: 500, damping: 30 }}
                     className="absolute top-0.5 h-5 w-5 rounded-full bg-background shadow"
-                    style={{ left: repeatRange ? "calc(100% - 1.375rem)" : "0.125rem" }}
+                    style={{ left: multiDay ? "calc(100% - 1.375rem)" : "0.125rem" }}
                   />
                 </button>
               </div>
-              {repeatRange && (
-                <div className="mt-3 space-y-2">
-                  <div className="grid grid-cols-2 gap-2">
-                    <label className="text-xs text-muted-foreground">
-                      Start date
-                      <input
-                        type="date"
-                        value={rangeStart}
-                        onChange={(e) => setRangeStart(e.target.value)}
-                        className="mt-1 w-full rounded-xl border border-border bg-background px-3 py-2 text-sm outline-none focus:border-lime [color-scheme:dark]"
-                      />
-                    </label>
-                    <label className="text-xs text-muted-foreground">
-                      End date
-                      <input
-                        type="date"
-                        value={rangeEnd}
-                        min={rangeStart || undefined}
-                        onChange={(e) => setRangeEnd(e.target.value)}
-                        className="mt-1 w-full rounded-xl border border-border bg-background px-3 py-2 text-sm outline-none focus:border-lime [color-scheme:dark]"
-                      />
-                    </label>
-                  </div>
-                  <p className="text-[11px] text-muted-foreground">
-                    {rangeDates.length > 0
-                      ? `Will create ${rangeDates.length} game${rangeDates.length === 1 ? "" : "s"}, one per day at the time above.`
-                      : "Pick start and end dates (max 60 days)."}
-                  </p>
-                </div>
-              )}
+              <p className="mt-1 text-[11px] text-muted-foreground">
+                Pick any days you want — each one gets its own start time.
+              </p>
             </div>
+            {multiDay && <GameScheduleBuilder value={schedule} onChange={setSchedule} />}
           </Section>
 
           {/* Venue address */}

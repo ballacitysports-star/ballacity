@@ -416,6 +416,10 @@ export function OrgForm({
               className={inputCls}
             />
           </label>
+          <p className="text-[11px] text-muted-foreground">
+            Each day can have its own hours — set a different open and close time per day, or mark
+            a day closed or open 24 hours.
+          </p>
           <HoursEditor value={value.hours} onChange={(h) => patch({ hours: h })} />
         </Section>
 
