@@ -1,6 +1,6 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { pageHead } from "@/lib/seo";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { zodValidator, fallback } from "@tanstack/zod-adapter";
 import { z } from "zod";
 import {
@@ -101,6 +101,7 @@ import {
   toggleSport,
   type SportSkillMap,
 } from "@/lib/sport-filter";
+import { useSeedSportsOnce, useDefaultSports } from "@/lib/default-sports";
 
 // URL-persisted Players state. Refreshing or sharing the URL restores the
 // exact view: search text, sport chip, skill, distance cap, age range,
@@ -254,6 +255,12 @@ function PlayersPage() {
     );
   };
   const toggleSportFilter = (name: string | null) => setSports(toggleSport(sports, name));
+  // First visit only: start filtered to the viewer's profile sports.
+  useSeedSportsOnce("players", {
+    ready: hydrated,
+    hasSelection: sports.length > 0,
+    apply: (next) => updateSearch({ sport: serializeSportList(next) }),
+  });
 
   const setSkills = (next: SportSkillMap) => {
     const safe = sanitizeSportSkillMap(next, sports);
@@ -1198,7 +1205,15 @@ function PostAvailabilityDialog({
   const myProfile = useMyProfile();
   const gate = useAvailabilityGate();
   const isEdit = !!initial;
+  const { sports: mySports } = useDefaultSports();
+  // New posts start from the viewer's profile sports; edits keep their own.
   const [sports, setSports] = useState<string[]>(initial?.sports ?? []);
+  const seededSportsRef = useRef(false);
+  useEffect(() => {
+    if (initial || seededSportsRef.current || !mySports.length) return;
+    seededSportsRef.current = true;
+    setSports(mySports);
+  }, [initial, mySports]);
   // Per-sport tiers, mirroring the profile editor. Keyed by sport name.
   const [levels, setLevels] = useState<Record<string, string>>(() =>
     initial && initial.sports.length && initial.skill_level

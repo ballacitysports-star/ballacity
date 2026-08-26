@@ -14,6 +14,7 @@ import {
   serializeSportList,
   toggleSport,
 } from "@/lib/sport-filter";
+import { useSeedSportsOnce } from "@/lib/default-sports";
 import { ViewDensityToggle, type ViewMode, type Density } from "@/components/ViewDensityToggle";
 import { TeamsMapView } from "@/components/TeamsMapView";
 import { FilterBar } from "@/components/FilterBar";
@@ -66,7 +67,7 @@ function TeamsPage() {
   const navigate = useNavigate({ from: "/teams" });
   const updateSearch = (patch: Partial<TeamsSearch>) =>
     navigate({ search: (prev: TeamsSearch) => ({ ...prev, ...patch }), replace: true });
-  usePersistedSearch("openrun:teams-search", search, "/teams", {
+  const { hydrated } = usePersistedSearch("openrun:teams-search", search, "/teams", {
     q: "",
     kind: "team",
     sport: "",
@@ -112,6 +113,12 @@ function TeamsPage() {
   const setQ = (v: string) => updateSearch({ q: v });
   const toggleSportFilter = (v: string | null) =>
     updateSearch({ sport: serializeSportList(toggleSport(sports, v)) });
+  // First visit only: start filtered to the viewer's profile sports.
+  useSeedSportsOnce("teams", {
+    ready: hydrated,
+    hasSelection: sports.length > 0,
+    apply: (next) => updateSearch({ sport: serializeSportList(next) }),
+  });
   const setSortBy = (v: SortBy) => updateSearch({ sort: v });
   const setAvail = (v: "any" | "recruiting" | "weekly" | "casual") => updateSearch({ avail: v });
   const switchView = (v: ViewMode) => updateSearch({ view: v });

@@ -34,6 +34,7 @@ import { useMyProfiles } from "@/lib/account-profiles";
 import { toast } from "sonner";
 import { LocationAutocomplete } from "@/components/LocationAutocomplete";
 import { useMyProfile } from "@/lib/user-prefs-store";
+import { useDefaultSports } from "@/lib/default-sports";
 import { useAuth } from "@/hooks/use-auth";
 import { useAvailabilityGate } from "@/lib/availability-gate";
 import { AvailabilityPromptBanner } from "@/components/availability/AvailabilityPromptDialog";
@@ -108,6 +109,22 @@ function Create() {
   const affiliationShortLabel = affiliationLabel;
 
   const [sport, setSport] = useState<Sport>("Basketball");
+  // Default to the viewer's first favorite sport once the profile has loaded,
+  // unless they already picked one themselves.
+  const { sports: profileSports, loaded: profileSportsLoaded } = useDefaultSports();
+  const sportTouchedRef = useRef(false);
+  const sportSeededRef = useRef(false);
+  useEffect(() => {
+    if (sportSeededRef.current || sportTouchedRef.current) return;
+    if (!profileSportsLoaded) return;
+    sportSeededRef.current = true;
+    const first = profileSports[0];
+    if (first) setSport(first as Sport);
+  }, [profileSportsLoaded, profileSports]);
+  const pickSport = (next: Sport) => {
+    sportTouchedRef.current = true;
+    setSport(next);
+  };
 
   const [title, setTitle] = useState("");
   const [when, setWhen] = useState("");
@@ -495,7 +512,7 @@ function Create() {
                     type="button"
                     key={s.name}
                     onClick={() => {
-                      setSport(s.name);
+                      pickSport(s.name);
                       setPositionsNeeded({});
                     }}
                     className={`flex flex-col items-center gap-1 rounded-2xl border px-2 py-3 text-xs font-semibold transition-all ${

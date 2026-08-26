@@ -26,7 +26,9 @@ import {
   DEFAULT_FILTERS,
   useMyProfile,
   useDistanceUnit,
+  getFeedPrefsSnapshot,
 } from "@/lib/user-prefs-store";
+import { useSeedSportsOnce } from "@/lib/default-sports";
 import { haversineKm, MI_PER_KM, useUserLocation } from "@/lib/geo";
 import { formatDistance } from "@/lib/distance";
 
@@ -166,6 +168,14 @@ function Feed() {
     if (Object.keys(patch).length > 0) setFeedPrefs({ ...prefs, ...patch });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // First visit only: start the feed filtered to the viewer's profile sports.
+  useSeedSportsOnce("feed", {
+    ready: true,
+    hasSelection: !!search.sport || prefs.preferredSports.length > 0,
+    apply: (next) =>
+      setFeedPrefs({ ...getFeedPrefsSnapshot(), preferredSports: next as Sport[] }),
+  });
 
   // Reflect current state back into the URL so refresh/share preserves it.
   useEffect(() => {
