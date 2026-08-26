@@ -145,7 +145,7 @@ export function GameScheduleBuilder({
             onClick={() => onChange(applyTimeToAll(value, rows[0]!))}
             className="rounded-full border border-border bg-background px-2.5 py-1 text-[11px] font-semibold hover:border-lime/60"
           >
-            Same hours everywhere
+            Same hours for every day
           </button>
         )}
         {rows.length > 0 && (
@@ -200,13 +200,6 @@ export function GameScheduleBuilder({
                 />
                 All day
               </label>
-              <button
-                type="button"
-                onClick={() => onChange(applyTimeToAll(value, e))}
-                className="rounded-full border border-border px-2 py-1 text-[10px] font-semibold text-muted-foreground hover:border-lime/60"
-              >
-                Apply to all days
-              </button>
               <button
                 type="button"
                 aria-label={`Remove ${formatShortDate(e.date)}`}

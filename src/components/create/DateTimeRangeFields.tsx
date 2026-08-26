@@ -1,9 +1,14 @@
+import { useState } from "react";
 import {
+  addDaysToKey,
+  formatTime,
   formatWhenRange,
+  friendlyDayLabel,
+  nextWeekdayKey,
   setRangeDuration,
   todayKey,
   validateWhenRange,
-  whenRangeDurationMin,
+  weekdayLabel,
   type WhenRange,
 } from "@/lib/game-schedule";
 
@@ -15,11 +20,39 @@ const LENGTH_PRESETS = [
 ];
 
 const inputCls =
-  "w-full rounded-2xl border border-border bg-surface px-3 py-2.5 text-sm outline-none focus:border-lime [color-scheme:dark]";
+  "rounded-2xl border border-border bg-surface px-3 py-2.5 text-sm outline-none focus:border-lime [color-scheme:dark]";
+
+function Chip({
+  active,
+  onClick,
+  children,
+  ariaLabel,
+}: {
+  active?: boolean;
+  onClick: () => void;
+  children: React.ReactNode;
+  ariaLabel?: string;
+}) {
+  return (
+    <button
+      type="button"
+      aria-label={ariaLabel}
+      aria-pressed={!!active}
+      onClick={onClick}
+      className={`rounded-full border px-3 py-1.5 text-[12px] font-semibold transition-colors ${
+        active
+          ? "border-lime bg-lime text-primary-foreground"
+          : "border-border bg-background text-muted-foreground hover:border-lime/60"
+      }`}
+    >
+      {children}
+    </button>
+  );
+}
 
 /**
- * One start → end window. The end may land on a later day, and "All day"
- * drops the clock while keeping the date span.
+ * One start → end window, presented as: pick a day, pick a start, pick a length.
+ * End time, end date and all-day details stay tucked away until needed.
  */
 export function DateTimeRangeFields({
   value,
@@ -30,71 +63,147 @@ export function DateTimeRangeFields({
 }) {
   const min = todayKey();
   const check = validateWhenRange(value);
-  const lengthMin = whenRangeDurationMin(value);
+  const lengthMin = (() => {
+    const d = new Date(`${value.endDate}T${value.endTime}:00`).getTime();
+    const s = new Date(`${value.startDate}T${value.startTime}:00`).getTime();
+    return Number.isFinite(d - s) && d > s ? Math.round((d - s) / 60000) : 0;
+  })();
+
+  const spansDays = value.endDate !== value.startDate;
+  const isPreset = LENGTH_PRESETS.some((p) => p.min === lengthMin);
+  const [showEndDate, setShowEndDate] = useState(spansDays);
+  const [showEndTime, setShowEndTime] = useState(!isPreset && !value.allDay);
+  const [showDatePicker, setShowDatePicker] = useState(false);
+
+  const dayChips = [
+    { key: min, label: "Today" },
+    { key: addDaysToKey(min, 1), label: "Tomorrow" },
+    { key: nextWeekdayKey(6), label: weekdayLabel(nextWeekdayKey(6)) },
+  ].filter((c, i, arr) => arr.findIndex((x) => x.key === c.key) === i);
 
   const setStartDate = (startDate: string) => {
-    const shiftEnd = value.endDate < startDate;
-    onChange({ ...value, startDate, endDate: shiftEnd ? startDate : value.endDate });
+    const dayShift = spansDays ? 1 : 0;
+    onChange({ ...value, startDate, endDate: addDaysToKey(startDate, dayShift) });
   };
 
   const setStartTime = (startTime: string) => {
-    // Keep the current length when the start moves.
-    onChange(setRangeDuration({ ...value, startTime }, lengthMin));
+    onChange(setRangeDuration({ ...value, startTime }, lengthMin || 90));
   };
 
   return (
     <div className="space-y-3 rounded-2xl border border-border bg-surface p-3">
-      <div className="flex items-center justify-between">
-        <span className="text-sm font-medium">All day</span>
-        <button
-          type="button"
-          role="switch"
-          aria-checked={value.allDay}
-          aria-label="Toggle all-day event"
-          onClick={() => onChange({ ...value, allDay: !value.allDay })}
-          className={`relative h-6 w-10 rounded-full transition-colors ${
-            value.allDay ? "bg-lime" : "bg-secondary"
-          }`}
-        >
-          <span
-            className="absolute top-0.5 h-5 w-5 rounded-full bg-background shadow transition-all"
-            style={{ left: value.allDay ? "calc(100% - 1.375rem)" : "0.125rem" }}
+      {/* Day */}
+      <div>
+        <span className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
+          Day
+        </span>
+        <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+          {dayChips.map((c) => (
+            <Chip
+              key={c.key}
+              active={value.startDate === c.key && !showDatePicker}
+              onClick={() => {
+                setShowDatePicker(false);
+                setStartDate(c.key);
+              }}
+            >
+              {c.label}
+            </Chip>
+          ))}
+          <Chip
+            active={showDatePicker}
+            onClick={() => setShowDatePicker((v) => !v)}
+            ariaLabel="Pick another date"
+          >
+            Pick date
+          </Chip>
+        </div>
+        {(showDatePicker || !dayChips.some((c) => c.key === value.startDate)) && (
+          <input
+            type="date"
+            aria-label="Start date"
+            min={min}
+            value={value.startDate}
+            onChange={(e) => setStartDate(e.target.value)}
+            className={`mt-2 w-full ${inputCls}`}
           />
-        </button>
+        )}
       </div>
 
-      <div className="grid gap-2 sm:grid-cols-2">
+      {/* Time */}
+      {!value.allDay && (
         <div>
-          <label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
-            Starts
-          </label>
-          <div className="mt-1.5 flex gap-2">
+          <span className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
+            Starts at
+          </span>
+          <div className="mt-1.5 flex flex-wrap items-center gap-2">
             <input
-              type="date"
-              aria-label="Start date"
-              min={min}
-              value={value.startDate}
-              onChange={(e) => setStartDate(e.target.value)}
-              className={inputCls}
+              type="time"
+              aria-label="Start time"
+              step={900}
+              value={value.startTime}
+              onChange={(e) => setStartTime(e.target.value)}
+              className={`w-[7.5rem] ${inputCls}`}
             />
-            {!value.allDay && (
-              <input
-                type="time"
-                aria-label="Start time"
-                step={900}
-                value={value.startTime}
-                onChange={(e) => setStartTime(e.target.value)}
-                className={inputCls}
-              />
+            {showEndTime ? (
+              <>
+                <span className="text-xs text-muted-foreground">to</span>
+                <input
+                  type="time"
+                  aria-label="End time"
+                  step={900}
+                  value={value.endTime}
+                  onChange={(e) => onChange({ ...value, endTime: e.target.value })}
+                  className={`w-[7.5rem] ${inputCls}`}
+                />
+              </>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setShowEndTime(true)}
+                className="text-xs font-semibold text-muted-foreground underline decoration-dotted"
+              >
+                ends {formatTime(value.endTime)}
+              </button>
             )}
           </div>
-        </div>
 
-        <div>
-          <label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
-            Ends
-          </label>
-          <div className="mt-1.5 flex gap-2">
+          <div className="mt-2 flex flex-wrap items-center gap-1.5">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+              Length
+            </span>
+            {LENGTH_PRESETS.map((p) => (
+              <Chip
+                key={p.min}
+                active={lengthMin === p.min && !showEndTime}
+                onClick={() => {
+                  setShowEndTime(false);
+                  setShowEndDate(false);
+                  onChange(setRangeDuration(value, p.min));
+                }}
+              >
+                {p.label}
+              </Chip>
+            ))}
+            <Chip active={showEndTime} onClick={() => setShowEndTime(true)}>
+              Custom
+            </Chip>
+          </div>
+        </div>
+      )}
+
+      {/* Extras */}
+      <div className="flex flex-wrap items-center gap-1.5">
+        <Chip
+          active={value.allDay}
+          ariaLabel="Toggle all-day event"
+          onClick={() => onChange({ ...value, allDay: !value.allDay })}
+        >
+          All day
+        </Chip>
+        {showEndDate || spansDays ? (
+          <div className="flex items-center gap-2">
+            <span className="text-[11px] font-semibold text-muted-foreground">Ends on</span>
             <input
               type="date"
               aria-label="End date"
@@ -103,45 +212,38 @@ export function DateTimeRangeFields({
               onChange={(e) => onChange({ ...value, endDate: e.target.value })}
               className={inputCls}
             />
-            {!value.allDay && (
-              <input
-                type="time"
-                aria-label="End time"
-                step={900}
-                value={value.endTime}
-                onChange={(e) => onChange({ ...value, endTime: e.target.value })}
-                className={inputCls}
-              />
+            {spansDays && (
+              <button
+                type="button"
+                onClick={() => {
+                  setShowEndDate(false);
+                  onChange({ ...value, endDate: value.startDate });
+                }}
+                className="text-[11px] font-semibold text-muted-foreground underline"
+              >
+                Same day
+              </button>
             )}
           </div>
-        </div>
+        ) : (
+          <button
+            type="button"
+            onClick={() => {
+              setShowEndDate(true);
+              setShowEndTime(true);
+              onChange({ ...value, endDate: addDaysToKey(value.startDate, 1) });
+            }}
+            className="text-[11px] font-semibold text-muted-foreground underline decoration-dotted"
+          >
+            Ends on another day
+          </button>
+        )}
       </div>
 
-      {!value.allDay && (
-        <div className="flex flex-wrap items-center gap-1.5">
-          <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-            Length
-          </span>
-          {LENGTH_PRESETS.map((p) => (
-            <button
-              key={p.min}
-              type="button"
-              aria-pressed={lengthMin === p.min}
-              onClick={() => onChange(setRangeDuration(value, p.min))}
-              className={`rounded-full border px-2.5 py-1 text-[11px] font-semibold ${
-                lengthMin === p.min
-                  ? "border-lime bg-lime text-primary-foreground"
-                  : "border-border bg-background text-muted-foreground hover:border-lime/60"
-              }`}
-            >
-              {p.label}
-            </button>
-          ))}
-        </div>
-      )}
-
-      <p className={`text-[11px] ${check.ok ? "text-muted-foreground" : "font-semibold text-coral"}`}>
-        {check.ok ? formatWhenRange(value) : check.error}
+      <p
+        className={`text-[11px] ${check.ok ? "text-muted-foreground" : "font-semibold text-coral"}`}
+      >
+        {check.ok ? `${friendlyDayLabel(value.startDate)} · ${formatWhenRange(value)}` : check.error}
       </p>
     </div>
   );
