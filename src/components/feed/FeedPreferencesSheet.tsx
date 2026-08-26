@@ -14,8 +14,8 @@ import {
   type FeedMineFilter,
   type FeedMoneyFilter,
 } from "@/lib/user-prefs-store";
-import {
 import { markSportChoice } from "@/lib/default-sports";
+import {
   applyView,
   filterSnapshot,
   makeViewId,
