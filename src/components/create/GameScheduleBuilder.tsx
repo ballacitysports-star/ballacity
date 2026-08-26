@@ -106,7 +106,7 @@ export function GameScheduleBuilder({
               disabled={past}
               aria-pressed={selected}
               aria-label={formatShortDate(key)}
-              onClick={() => onChange(toggleScheduleDate(value, key, lastTime))}
+              onClick={() => onChange(toggleScheduleDate(value, key, fallback))}
               className={`h-8 rounded-lg text-xs font-semibold transition-colors ${
                 selected
                   ? "bg-lime text-primary-foreground"
@@ -142,10 +142,10 @@ export function GameScheduleBuilder({
         {rows.length > 1 && (
           <button
             type="button"
-            onClick={() => onChange(applyTimeToAll(value, rows[0]!.time))}
+            onClick={() => onChange(applyTimeToAll(value, rows[0]!))}
             className="rounded-full border border-border bg-background px-2.5 py-1 text-[11px] font-semibold hover:border-lime/60"
           >
-            Same time everywhere
+            Same hours everywhere
           </button>
         )}
         {rows.length > 0 && (
