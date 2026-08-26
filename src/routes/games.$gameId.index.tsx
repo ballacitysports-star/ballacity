@@ -26,6 +26,14 @@ import {
   History,
 } from "lucide-react";
 import { GAMES, SPORTS, imageFor } from "@/lib/sample-data";
+import {
+  ageGateMessage,
+  ageGateState,
+  ageRequirementLabel,
+  hasAgeRequirement,
+} from "@/lib/game-age";
+import { useMyAge } from "@/lib/use-my-age";
+import { AgeRequirementFields } from "@/components/games/AgeRequirementFields";
 import { formatWhen } from "@/lib/format";
 import { ReviewsSection } from "@/components/ReviewsSection";
 import { SpotsPill } from "@/components/SpotsPill";
@@ -649,11 +657,19 @@ function GameDetail() {
     );
   }
 
+  const { age: myAge } = useMyAge();
   const fee = Number(settings?.entry_fee ?? game.price);
   const isPaid = fee > 0;
   // Host approval is the default. A game whose host hasn't saved settings yet
   // is treated as request-to-join; hosts can opt out in game settings.
-  const requiresApproval = settings ? !!settings.requires_approval : true;
+  const hostRequiresApproval = settings ? !!settings.requires_approval : true;
+  // An age requirement forces the request-to-join flow for anyone outside the
+  // range (or who hasn't shared a birthday), even on instant-join games.
+  const ageReq = { minAge: game.minAge ?? null, maxAge: game.maxAge ?? null };
+  const ageGate = ageGateState({ req: ageReq, viewerAge: myAge });
+  const ageNeedsApproval = ageGate === "needs_approval" || ageGate === "unknown_age";
+  const requiresApproval = hostRequiresApproval || (!isHost && ageNeedsApproval);
+  const ageNotice = !isHost && ageNeedsApproval ? ageGateMessage(ageGate, ageReq) : null;
   const latestSub = mySubs[0];
   const isApproved = myReq?.status === "approved";
   const isRequestPending = myReq?.status === "pending";
@@ -1070,6 +1086,11 @@ function GameDetail() {
             <span className="rounded-full bg-background/70 backdrop-blur px-3 py-1 text-xs font-semibold">
               {formatSkillValue(game.sport, game.skill)}
             </span>
+            {hasAgeRequirement(ageReq) && (
+              <span className="rounded-full bg-background/70 backdrop-blur px-3 py-1 text-xs font-semibold">
+                🎂 {ageRequirementLabel(ageReq)}
+              </span>
+            )}
             {game.urgent && spotsLeft > 0 && (
               <span className="rounded-full bg-coral-gradient px-3 py-1 text-xs font-bold text-white">
                 ⚡ {spotsLeft} spots left
