@@ -333,8 +333,8 @@ function Create() {
           setPublishing(true);
 
           try {
-            // Compute one or many ISO datetimes.
-            let dates: string[];
+            // Compute one or many start times, each with its own length.
+            let plans: GamePlan[];
             if (multiDay) {
               const check = validateSchedule(schedule);
               if (!check.ok) {
@@ -342,11 +342,15 @@ function Create() {
                 setPublishing(false);
                 return;
               }
-              dates = scheduleToIsoDates(schedule);
+              plans = scheduleToPlans(schedule);
             } else {
-              dates = [
-                when ? new Date(when).toISOString() : new Date(Date.now() + 3600_000).toISOString(),
-              ];
+              const check = validateWhenRange(when);
+              if (!check.ok) {
+                toast.error(check.error ?? "Fix the date and time to continue.");
+                setPublishing(false);
+                return;
+              }
+              plans = [whenRangeToPlan(when)];
             }
 
             // Build the host snapshot from the freshest profile available so
