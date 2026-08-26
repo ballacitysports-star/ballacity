@@ -101,7 +101,7 @@ import {
   toggleSport,
   type SportSkillMap,
 } from "@/lib/sport-filter";
-import { useSeedSportsOnce, useDefaultSports } from "@/lib/default-sports";
+import { markSportChoice, useProfileSportDefault, useDefaultSports } from "@/lib/default-sports";
 
 // URL-persisted Players state. Refreshing or sharing the URL restores the
 // exact view: search text, sport chip, skill, distance cap, age range,
@@ -254,11 +254,14 @@ function PlayersPage() {
       { push: true },
     );
   };
-  const toggleSportFilter = (name: string | null) => setSports(toggleSport(sports, name));
-  // First visit only: start filtered to the viewer's profile sports.
-  useSeedSportsOnce("players", {
+  const toggleSportFilter = (name: string | null) => {
+    markSportChoice("players");
+    setSports(toggleSport(sports, name));
+  };
+  // Default to the viewer's profile sports until they pick for themselves.
+  useProfileSportDefault("players", {
     ready: hydrated,
-    hasSelection: sports.length > 0,
+    current: sports,
     apply: (next) => updateSearch({ sport: serializeSportList(next) }),
   });
 
@@ -554,6 +557,7 @@ function PlayersPage() {
               </button>
             }
             onReset={() => {
+              markSportChoice("players");
               setSports([]);
               setMaxDistance(0);
               setAgeMin("");
@@ -564,7 +568,10 @@ function PlayersPage() {
               <PlayersFilterBody
                 sports={sports}
                 onToggleSport={toggleSportFilter}
-                onClearSports={() => setSports([])}
+                onClearSports={() => {
+                  markSportChoice("players");
+                  setSports([]);
+                }}
                 skills={skills}
                 setSkills={setSkills}
                 maxDistance={maxDistance}
@@ -1208,11 +1215,10 @@ function PostAvailabilityDialog({
   const { sports: mySports } = useDefaultSports();
   // New posts start from the viewer's profile sports; edits keep their own.
   const [sports, setSports] = useState<string[]>(initial?.sports ?? []);
-  const seededSportsRef = useRef(false);
+  const sportsTouchedRef = useRef(false);
   useEffect(() => {
-    if (initial || seededSportsRef.current || !mySports.length) return;
-    seededSportsRef.current = true;
-    setSports(mySports);
+    if (initial || sportsTouchedRef.current || !mySports.length) return;
+    setSports((cur) => (cur.length ? cur : mySports));
   }, [initial, mySports]);
   // Per-sport tiers, mirroring the profile editor. Keyed by sport name.
   const [levels, setLevels] = useState<Record<string, string>>(() =>
@@ -1283,7 +1289,8 @@ function PostAvailabilityDialog({
                 <Chip
                   key={s.name}
                   active={sports.includes(s.name)}
-                  onClick={() =>
+                  onClick={() => {
+                    sportsTouchedRef.current = true;
                     setSports((arr) => {
                       const next = toggle(arr, s.name);
                       // Prefill from the profile tier the first time a sport is added.
@@ -1292,8 +1299,8 @@ function PostAvailabilityDialog({
                         if (mine) setLevels((l) => ({ ...l, [s.name]: mine }));
                       }
                       return next;
-                    })
-                  }
+                    });
+                  }}
                 >
                   <span className="mr-1">{s.emoji}</span>
                   {s.name}

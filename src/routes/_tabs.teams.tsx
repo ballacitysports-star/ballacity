@@ -14,7 +14,7 @@ import {
   serializeSportList,
   toggleSport,
 } from "@/lib/sport-filter";
-import { useSeedSportsOnce } from "@/lib/default-sports";
+import { markSportChoice, useProfileSportDefault } from "@/lib/default-sports";
 import { ViewDensityToggle, type ViewMode, type Density } from "@/components/ViewDensityToggle";
 import { TeamsMapView } from "@/components/TeamsMapView";
 import { FilterBar } from "@/components/FilterBar";
@@ -111,12 +111,14 @@ function TeamsPage() {
   const density: Density = search.density === "grid" ? "grid" : "list";
 
   const setQ = (v: string) => updateSearch({ q: v });
-  const toggleSportFilter = (v: string | null) =>
+  const toggleSportFilter = (v: string | null) => {
+    markSportChoice("teams");
     updateSearch({ sport: serializeSportList(toggleSport(sports, v)) });
-  // First visit only: start filtered to the viewer's profile sports.
-  useSeedSportsOnce("teams", {
+  };
+  // Default to the viewer's profile sports until they pick for themselves.
+  useProfileSportDefault("teams", {
     ready: hydrated,
-    hasSelection: sports.length > 0,
+    current: sports,
     apply: (next) => updateSearch({ sport: serializeSportList(next) }),
   });
   const setSortBy = (v: SortBy) => updateSearch({ sort: v });
