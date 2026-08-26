@@ -44,6 +44,7 @@ import {
   positionsCleanup,
   type PositionsNeeded,
 } from "@/components/PositionsPicker";
+import { AgeRequirementFields } from "@/components/games/AgeRequirementFields";
 
 export const Route = createFileRoute("/_tabs/create")({
   head: () =>
@@ -124,6 +125,8 @@ function Create() {
   const [priv, setPriv] = useState(false);
   const [description, setDescription] = useState("");
   const [requiresApproval, setRequiresApproval] = useState(true);
+  const [minAge, setMinAge] = useState<number | null>(null);
+  const [maxAge, setMaxAge] = useState<number | null>(null);
   const [signupCutoffMin, setSignupCutoffMin] = useState(0);
   const [publishing, setPublishing] = useState(false);
   // Nudge hosts to keep their own player availability up to date.
@@ -380,6 +383,8 @@ function Create() {
                 image: coverUrl ?? undefined,
                 positionsNeeded: cleanPositions,
                 signupCutoffMin,
+                minAge,
+                maxAge,
                 teamId: selectedAffiliation?.id,
                 orgId: undefined,
               });
@@ -754,6 +759,15 @@ function Create() {
                 page.
               </p>
             )}
+            <AgeRequirementFields
+              minAge={minAge}
+              maxAge={maxAge}
+              onChange={(n) => {
+                setMinAge(n.minAge);
+                setMaxAge(n.maxAge);
+              }}
+              idPrefix="create-age"
+            />
             <div className="rounded-2xl border border-border bg-surface px-4 py-3">
               <label
                 htmlFor="create-signup-cutoff"
