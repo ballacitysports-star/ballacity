@@ -113,14 +113,12 @@ function Create() {
   // unless they already picked one themselves.
   const { sports: profileSports, loaded: profileSportsLoaded } = useDefaultSports();
   const sportTouchedRef = useRef(false);
-  const sportSeededRef = useRef(false);
   useEffect(() => {
-    if (sportSeededRef.current || sportTouchedRef.current) return;
-    if (!profileSportsLoaded) return;
-    sportSeededRef.current = true;
+    if (sportTouchedRef.current || !profileSportsLoaded) return;
     const first = profileSports[0];
     if (first) setSport(first as Sport);
-  }, [profileSportsLoaded, profileSports]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [profileSportsLoaded, profileSports.join("|")]);
   const pickSport = (next: Sport) => {
     sportTouchedRef.current = true;
     setSport(next);
