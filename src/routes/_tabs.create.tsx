@@ -511,7 +511,7 @@ function Create() {
                     type="button"
                     key={s.name}
                     onClick={() => {
-                      setSport(s.name);
+                      pickSport(s.name);
                       setPositionsNeeded({});
                     }}
                     className={`flex flex-col items-center gap-1 rounded-2xl border px-2 py-3 text-xs font-semibold transition-all ${
