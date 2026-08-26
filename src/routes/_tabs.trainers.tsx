@@ -106,7 +106,7 @@ function TrainersPage() {
   const navigate = useNavigate({ from: "/trainers" });
   const updateSearch = (patch: Partial<TrainersSearch>) =>
     navigate({ search: (prev: TrainersSearch) => ({ ...prev, ...patch }), replace: true });
-  usePersistedSearch("openrun:trainers-search", search, "/trainers", {
+  const { hydrated } = usePersistedSearch("openrun:trainers-search", search, "/trainers", {
     q: "",
     mode: "trainers",
     sport: "",
@@ -149,6 +149,12 @@ function TrainersPage() {
   const setQ = (v: string) => updateSearch({ q: v });
   const toggleSportFilter = (v: string | null) =>
     updateSearch({ sport: serializeSportList(toggleSport(sports, v)), specialty: "" });
+  // First visit only: start filtered to the viewer's profile sports.
+  useSeedSportsOnce("trainers", {
+    ready: hydrated,
+    hasSelection: sports.length > 0,
+    apply: (next) => updateSearch({ sport: serializeSportList(next) }),
+  });
   const setSpecialty = (v: string) => updateSearch({ specialty: specialty === v ? "" : v });
   const setVenue = (v: string) => updateSearch({ venue: venue === v ? "" : v });
   const setOrgId = (v: string) => updateSearch({ orgId: orgId === v ? "" : v });
