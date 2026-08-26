@@ -26,7 +26,9 @@ import {
   DEFAULT_FILTERS,
   useMyProfile,
   useDistanceUnit,
+  getFeedPrefsSnapshot,
 } from "@/lib/user-prefs-store";
+import { useSeedSportsOnce } from "@/lib/default-sports";
 import { haversineKm, MI_PER_KM, useUserLocation } from "@/lib/geo";
 import { formatDistance } from "@/lib/distance";
 
