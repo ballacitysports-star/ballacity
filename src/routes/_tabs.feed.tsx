@@ -170,8 +170,10 @@ function Feed() {
   }, []);
 
   // First visit only: start the feed filtered to the viewer's profile sports.
+  // Signed-out viewers are mid-redirect to /auth — writing prefs there would
+  // trigger the URL sync below and fight that redirect.
   useSeedSportsOnce("feed", {
-    ready: true,
+    ready: !!authUser,
     hasSelection: !!search.sport || prefs.preferredSports.length > 0,
     apply: (next) =>
       setFeedPrefs({ ...getFeedPrefsSnapshot(), preferredSports: next as Sport[] }),
