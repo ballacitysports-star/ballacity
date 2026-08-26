@@ -17,7 +17,7 @@ import {
   serializeSportList,
   toggleSport,
 } from "@/lib/sport-filter";
-import { useSeedSportsOnce } from "@/lib/default-sports";
+import { markSportChoice, useProfileSportDefault } from "@/lib/default-sports";
 import { ViewDensityToggle, type ViewMode, type Density } from "@/components/ViewDensityToggle";
 import { TeamsMapView } from "@/components/TeamsMapView";
 import { TrainerActions } from "@/components/TrainerActions";
@@ -147,12 +147,14 @@ function TrainersPage() {
   const radiusKm = radius > 0 ? (distanceUnit === "km" ? radius : radius * KM_PER_MI) : 0;
 
   const setQ = (v: string) => updateSearch({ q: v });
-  const toggleSportFilter = (v: string | null) =>
+  const toggleSportFilter = (v: string | null) => {
+    markSportChoice("trainers");
     updateSearch({ sport: serializeSportList(toggleSport(sports, v)), specialty: "" });
-  // First visit only: start filtered to the viewer's profile sports.
-  useSeedSportsOnce("trainers", {
+  };
+  // Default to the viewer's profile sports until they pick for themselves.
+  useProfileSportDefault("trainers", {
     ready: hydrated,
-    hasSelection: sports.length > 0,
+    current: sports,
     apply: (next) => updateSearch({ sport: serializeSportList(next) }),
   });
   const setSpecialty = (v: string) => updateSearch({ specialty: specialty === v ? "" : v });

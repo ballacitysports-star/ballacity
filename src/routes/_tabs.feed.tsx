@@ -28,7 +28,7 @@ import {
   useDistanceUnit,
   getFeedPrefsSnapshot,
 } from "@/lib/user-prefs-store";
-import { useSeedSportsOnce } from "@/lib/default-sports";
+import { markSportChoice, useProfileSportDefault } from "@/lib/default-sports";
 import { useAuth } from "@/hooks/use-auth";
 import { haversineKm, MI_PER_KM, useUserLocation } from "@/lib/geo";
 import { formatDistance } from "@/lib/distance";
@@ -174,9 +174,9 @@ function Feed() {
   // First visit only: start the feed filtered to the viewer's profile sports.
   // Signed-out viewers are mid-redirect to /auth — writing prefs there would
   // trigger the URL sync below and fight that redirect.
-  useSeedSportsOnce("feed", {
+  useProfileSportDefault("feed", {
     ready: !!authUser,
-    hasSelection: !!search.sport || prefs.preferredSports.length > 0,
+    current: prefs.preferredSports as string[],
     apply: (next) =>
       setFeedPrefs({ ...getFeedPrefsSnapshot(), preferredSports: next as Sport[] }),
   });
