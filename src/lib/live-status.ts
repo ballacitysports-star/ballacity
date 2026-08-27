@@ -190,14 +190,32 @@ export function useJoinGate(game: Game, opts: JoinGateOptions = {}): JoinGate {
   const [gate, setGate] = useState<JoinGate>(() =>
     resolveJoinGate(game, Date.now(), { spotsLeft }),
   );
+  // Same rule as useLiveStatus: depend on the gate-relevant primitives, and
+  // keep the previous gate object when nothing actually changed, so a caller
+  // that recreates `game` each render can't spin an update loop.
+  const gameRef = useRef(game);
+  gameRef.current = game;
+  const key = [
+    game.id,
+    game.date,
+    game.duration,
+    game.status ?? "",
+    game.joinsClosed ? 1 : 0,
+    (game as { signupCutoffMin?: number }).signupCutoffMin ?? 0,
+    spotsLeft ?? "",
+  ].join("|");
   useEffect(() => {
     ensureTicker();
-    const cb = () => setGate(resolveJoinGate(game, Date.now(), { spotsLeft }));
+    const cb = () => {
+      const next = resolveJoinGate(gameRef.current, Date.now(), { spotsLeft });
+      setGate((prev) => (sameGate(prev, next) ? prev : next));
+    };
     cb();
     tickListeners.add(cb);
     return () => {
       tickListeners.delete(cb);
     };
-  }, [game, spotsLeft]);
+  }, [key, spotsLeft]);
   return gate;
+
 }
