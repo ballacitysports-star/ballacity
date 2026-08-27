@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { Game } from "@/lib/sample-data";
 
 /** Parse "90 min" / "2 h" / "1.5 hr" into minutes. Defaults to 90. */
