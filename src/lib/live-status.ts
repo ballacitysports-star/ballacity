@@ -38,17 +38,27 @@ function ensureTicker() {
 
 export function useLiveStatus(game: Game): LiveStatus {
   const [status, setStatus] = useState<LiveStatus>(() => computeLiveStatus(game));
+  // Callers usually rebuild the `game` object every render, so the effect
+  // must key off stable primitives — never the object identity — otherwise
+  // setState → re-render → new object → effect re-run loops forever.
+  const gameRef = useRef(game);
+  gameRef.current = game;
+  const key = `${game.id}|${game.date}|${game.duration}|${game.status ?? ""}`;
   useEffect(() => {
     ensureTicker();
-    const cb = () => setStatus(computeLiveStatus(game));
+    const cb = () => {
+      const next = computeLiveStatus(gameRef.current);
+      setStatus((prev) => (prev === next ? prev : next));
+    };
     cb();
     tickListeners.add(cb);
     return () => {
       tickListeners.delete(cb);
     };
-  }, [game]);
+  }, [key]);
   return status;
 }
+
 
 // ---------- Signup gate (blackout window + in-progress lockout) ----------
 
