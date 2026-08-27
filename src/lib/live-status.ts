@@ -184,6 +184,19 @@ export function resolveJoinGate(
   };
 }
 
+/** Value equality for a resolved gate, so identical results don't re-render. */
+function sameGate(a: JoinGate, b: JoinGate): boolean {
+  return (
+    a.liveStatus === b.liveStatus &&
+    a.joinState === b.joinState &&
+    a.label === b.label &&
+    a.reason === b.reason &&
+    a.locked === b.locked &&
+    a.waitlistOpen === b.waitlistOpen
+  );
+}
+
+
 /** Live-updating variant of `resolveJoinGate` (shares the 30s ticker). */
 export function useJoinGate(game: Game, opts: JoinGateOptions = {}): JoinGate {
   const spotsLeft = opts.spotsLeft;
