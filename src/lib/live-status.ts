@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { Game } from "@/lib/sample-data";
 
 /** Parse "90 min" / "2 h" / "1.5 hr" into minutes. Defaults to 90. */
@@ -38,17 +38,27 @@ function ensureTicker() {
 
 export function useLiveStatus(game: Game): LiveStatus {
   const [status, setStatus] = useState<LiveStatus>(() => computeLiveStatus(game));
+  // Callers usually rebuild the `game` object every render, so the effect
+  // must key off stable primitives — never the object identity — otherwise
+  // setState → re-render → new object → effect re-run loops forever.
+  const gameRef = useRef(game);
+  gameRef.current = game;
+  const key = `${game.id}|${game.date}|${game.duration}|${game.status ?? ""}`;
   useEffect(() => {
     ensureTicker();
-    const cb = () => setStatus(computeLiveStatus(game));
+    const cb = () => {
+      const next = computeLiveStatus(gameRef.current);
+      setStatus((prev) => (prev === next ? prev : next));
+    };
     cb();
     tickListeners.add(cb);
     return () => {
       tickListeners.delete(cb);
     };
-  }, [game]);
+  }, [key]);
   return status;
 }
+
 
 // ---------- Signup gate (blackout window + in-progress lockout) ----------
 
@@ -174,20 +184,51 @@ export function resolveJoinGate(
   };
 }
 
+/** Value equality for a resolved gate, so identical results don't re-render. */
+function sameGate(a: JoinGate, b: JoinGate): boolean {
+  return (
+    a.liveStatus === b.liveStatus &&
+    a.joinState === b.joinState &&
+    a.label === b.label &&
+    a.reason === b.reason &&
+    a.locked === b.locked &&
+    a.waitlistOpen === b.waitlistOpen
+  );
+}
+
+
 /** Live-updating variant of `resolveJoinGate` (shares the 30s ticker). */
 export function useJoinGate(game: Game, opts: JoinGateOptions = {}): JoinGate {
   const spotsLeft = opts.spotsLeft;
   const [gate, setGate] = useState<JoinGate>(() =>
     resolveJoinGate(game, Date.now(), { spotsLeft }),
   );
+  // Same rule as useLiveStatus: depend on the gate-relevant primitives, and
+  // keep the previous gate object when nothing actually changed, so a caller
+  // that recreates `game` each render can't spin an update loop.
+  const gameRef = useRef(game);
+  gameRef.current = game;
+  const key = [
+    game.id,
+    game.date,
+    game.duration,
+    game.status ?? "",
+    game.joinsClosed ? 1 : 0,
+    (game as { signupCutoffMin?: number }).signupCutoffMin ?? 0,
+    spotsLeft ?? "",
+  ].join("|");
   useEffect(() => {
     ensureTicker();
-    const cb = () => setGate(resolveJoinGate(game, Date.now(), { spotsLeft }));
+    const cb = () => {
+      const next = resolveJoinGate(gameRef.current, Date.now(), { spotsLeft });
+      setGate((prev) => (sameGate(prev, next) ? prev : next));
+    };
     cb();
     tickListeners.add(cb);
     return () => {
       tickListeners.delete(cb);
     };
-  }, [game, spotsLeft]);
+  }, [key, spotsLeft]);
   return gate;
+
 }
