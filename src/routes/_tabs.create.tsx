@@ -46,7 +46,8 @@ import {
   type PositionsNeeded,
 } from "@/components/PositionsPicker";
 import { GameScheduleBuilder } from "@/components/create/GameScheduleBuilder";
-import { DateTimeRangeFields } from "@/components/create/DateTimeRangeFields";
+import { DateTimeRangePicker } from "@/components/datetime/DateTimeRangePicker";
+import { resolveTimeZone, timeZoneAbbr, todayKeyInZone } from "@/lib/datetime";
 import {
   defaultWhenRange,
   durationToText,
@@ -133,6 +134,8 @@ function Create() {
 
   const [title, setTitle] = useState("");
   const [when, setWhen] = useState<WhenRange>(() => defaultWhenRange());
+  // Wall-clock entries are interpreted in the host's own zone.
+  const eventTimeZone = resolveTimeZone(null);
   const [location, setLocation] = useState(profile?.city ?? "");
   const previousProfileCityRef = useRef(profile?.city ?? "");
   const locationEditedRef = useRef(false);
@@ -336,21 +339,21 @@ function Create() {
             // Compute one or many start times, each with its own length.
             let plans: GamePlan[];
             if (multiDay) {
-              const check = validateSchedule(schedule);
+              const check = validateSchedule(schedule, new Date(), eventTimeZone);
               if (!check.ok) {
                 toast.error(check.error ?? "Fix the schedule to continue.");
                 setPublishing(false);
                 return;
               }
-              plans = scheduleToPlans(schedule);
+              plans = scheduleToPlans(schedule, eventTimeZone);
             } else {
-              const check = validateWhenRange(when);
+              const check = validateWhenRange(when, new Date(), eventTimeZone);
               if (!check.ok) {
                 toast.error(check.error ?? "Fix the date and time to continue.");
                 setPublishing(false);
                 return;
               }
-              plans = [whenRangeToPlan(when)];
+              plans = [whenRangeToPlan(when, eventTimeZone)];
             }
 
             // Build the host snapshot from the freshest profile available so
@@ -407,6 +410,9 @@ function Create() {
                 teamId: selectedAffiliation?.id,
                 orgId: undefined,
                 seriesId,
+                endsAt: plan.endIso,
+                allDay: plan.allDay,
+                timezone: plan.timezone,
               });
 
               if (!firstGameId) firstGameId = game.id;
@@ -598,7 +604,12 @@ function Create() {
             {multiDay ? (
               <GameScheduleBuilder value={schedule} onChange={setSchedule} />
             ) : (
-              <DateTimeRangeFields value={when} onChange={setWhen} />
+              <DateTimeRangePicker
+                value={when}
+                onChange={setWhen}
+                todayKey={todayKeyInZone(eventTimeZone)}
+                timeZoneLabel={`${timeZoneAbbr(new Date(), eventTimeZone)} · ${eventTimeZone.split("/").pop()?.replace(/_/g, " ")}`}
+              />
             )}
           </Section>
 

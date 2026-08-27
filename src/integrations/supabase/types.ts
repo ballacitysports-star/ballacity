@@ -527,11 +527,14 @@ export type Database = {
       }
       hosted_games: {
         Row: {
+          all_day: boolean
+          arrive_early_min: number
           created_at: string
           date: string
           description: string
           distance_mi: number
           duration: string
+          ends_at: string | null
           equipment: string[]
           hidden_at: string | null
           host_id: string
@@ -552,23 +555,29 @@ export type Database = {
           org_id: string | null
           positions_needed: Json
           price: number
+          reminder_offsets: number[]
+          rrule: Json | null
           series_id: string | null
           signup_cutoff_min: number
           skill: string
           sport: string
           status: string | null
           team_id: string | null
+          timezone: string | null
           title: string
           trending: boolean
           updated_at: string
           urgent: boolean
         }
         Insert: {
+          all_day?: boolean
+          arrive_early_min?: number
           created_at?: string
           date: string
           description?: string
           distance_mi?: number
           duration?: string
+          ends_at?: string | null
           equipment?: string[]
           hidden_at?: string | null
           host_id: string
@@ -589,23 +598,29 @@ export type Database = {
           org_id?: string | null
           positions_needed?: Json
           price?: number
+          reminder_offsets?: number[]
+          rrule?: Json | null
           series_id?: string | null
           signup_cutoff_min?: number
           skill?: string
           sport: string
           status?: string | null
           team_id?: string | null
+          timezone?: string | null
           title: string
           trending?: boolean
           updated_at?: string
           urgent?: boolean
         }
         Update: {
+          all_day?: boolean
+          arrive_early_min?: number
           created_at?: string
           date?: string
           description?: string
           distance_mi?: number
           duration?: string
+          ends_at?: string | null
           equipment?: string[]
           hidden_at?: string | null
           host_id?: string
@@ -626,12 +641,15 @@ export type Database = {
           org_id?: string | null
           positions_needed?: Json
           price?: number
+          reminder_offsets?: number[]
+          rrule?: Json | null
           series_id?: string | null
           signup_cutoff_min?: number
           skill?: string
           sport?: string
           status?: string | null
           team_id?: string | null
+          timezone?: string | null
           title?: string
           trending?: boolean
           updated_at?: string
