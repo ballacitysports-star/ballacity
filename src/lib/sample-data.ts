@@ -89,6 +89,12 @@ export type Game = {
   seriesId?: string | null;
   /** Total sessions in the series (set when the feed collapses a series to one card). */
   seriesCount?: number;
+  /** Exact end instant. Preferred over `duration` for length and status. */
+  endsAt?: string | null;
+  /** True when the game runs the whole day rather than a clock window. */
+  allDay?: boolean;
+  /** IANA zone the host scheduled in, e.g. "America/Chicago". */
+  timezone?: string | null;
 
 };
 

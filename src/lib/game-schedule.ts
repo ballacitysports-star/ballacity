@@ -1,8 +1,37 @@
 /**
- * Game scheduling: a host either picks one start → end window (optionally
- * spanning days, optionally all day), or picks any set of calendar days and
- * gives each one its own start and end time. Each day becomes one hosted game.
+ * Game scheduling on top of the shared date & time engine (`@/lib/datetime`).
+ *
+ * A host either picks one start → end window (optionally spanning days,
+ * optionally all day, optionally repeating), or picks any set of calendar days
+ * and gives each one its own start and end time. Each day becomes one hosted
+ * game session; sessions of one event share a series id.
+ *
+ * Wall-clock values (date keys + "HH:mm") are always interpreted in the
+ * event's timezone, so a game set for 6pm in Chicago is stored as the correct
+ * instant no matter where the host is sitting.
  */
+
+import {
+  ALL_DAY_MIN,
+  DEFAULT_DURATION_MIN,
+  addDaysToKey as addDaysToKeyDt,
+  addMinutesToTime as addMinutesToTimeDt,
+  dateKeyInZone,
+  formatDuration,
+  formatTimeKey,
+  friendlyDayLabelKey,
+  isDateKey,
+  isTimeKey,
+  minutesOfTime as minutesOfTimeDt,
+  resolveTimeZone,
+  timeFromMinutes as timeFromMinutesDt,
+  timeKeyInZone,
+  todayKeyInZone,
+  weekdayOfKey,
+  WEEKDAY_LABELS,
+  zonedTimeToInstant,
+} from "@/lib/datetime";
+import { expandRecurrence, type RecurrenceRule } from "@/lib/recurrence";
 
 export type ScheduleEntry = {
   date: string;
@@ -13,19 +42,16 @@ export type ScheduleEntry = {
 
 export const MAX_SCHEDULE_DAYS = 60;
 export const DEFAULT_GAME_TIME = "18:00";
-export const DEFAULT_DURATION_MIN = 90;
-export const ALL_DAY_MIN = 24 * 60;
+export { ALL_DAY_MIN, DEFAULT_DURATION_MIN };
 
-const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
-const TIME_RE = /^([01]\d|2[0-3]):[0-5]\d$/;
+// ---------- re-exported primitives (single source of truth) ----------
 
-export function isValidDateKey(v: string): boolean {
-  return DATE_RE.test(v) && !Number.isNaN(fromDateKey(v).getTime());
-}
-
-export function isValidTime(v: string): boolean {
-  return TIME_RE.test(v);
-}
+export const isValidDateKey = isDateKey;
+export const isValidTime = isTimeKey;
+export const addDaysToKey = addDaysToKeyDt;
+export const minutesOfTime = minutesOfTimeDt;
+export const timeFromMinutes = timeFromMinutesDt;
+export const addMinutesToTime = addMinutesToTimeDt;
 
 export function toDateKey(d: Date): string {
   const p = (n: number) => String(n).padStart(2, "0");
@@ -37,15 +63,10 @@ export function fromDateKey(key: string): Date {
   return new Date(y ?? 1970, (m ?? 1) - 1, d ?? 1);
 }
 
-export function todayKey(now: Date = new Date()): string {
-  return toDateKey(now);
-}
-
-/** Shift a date key by whole days. */
-export function addDaysToKey(key: string, days: number): string {
-  const d = fromDateKey(isValidDateKey(key) ? key : todayKey());
-  d.setDate(d.getDate() + days);
-  return toDateKey(d);
+/** Today, in the event's timezone. */
+export function todayKey(nowOrTz: Date | string = new Date(), tz?: string | null): string {
+  if (typeof nowOrTz === "string") return todayKeyInZone(nowOrTz);
+  return todayKeyInZone(tz, nowOrTz);
 }
 
 /** The next occurrence of a weekday (0=Sun) strictly after today. */
@@ -53,43 +74,38 @@ export function nextWeekdayKey(weekday: number, now: Date = new Date()): string 
   const base = todayKey(now);
   for (let i = 1; i <= 7; i++) {
     const key = addDaysToKey(base, i);
-    if (fromDateKey(key).getDay() === weekday) return key;
+    if (weekdayOfKey(key) === weekday) return key;
   }
   return base;
 }
 
 /** Short weekday label for a date key, e.g. "Sat". */
 export function weekdayLabel(key: string): string {
-  return fromDateKey(key).toLocaleDateString(undefined, { weekday: "short" });
+  return WEEKDAY_LABELS[weekdayOfKey(key)];
 }
 
 /** Friendly day label: Today / Tomorrow / "Sat, Sep 5". */
 export function friendlyDayLabel(key: string, now: Date = new Date()): string {
-  const t = todayKey(now);
-  if (key === t) return "Today";
-  if (key === addDaysToKey(t, 1)) return "Tomorrow";
-  return formatShortDate(key);
+  return friendlyDayLabelKey(key, todayKey(now));
 }
 
-export function minutesOfTime(time: string): number {
-  const [h, m] = time.split(":").map(Number);
-  return (h ?? 0) * 60 + (m ?? 0);
-}
-
-export function timeFromMinutes(total: number): string {
-  const wrapped = ((total % ALL_DAY_MIN) + ALL_DAY_MIN) % ALL_DAY_MIN;
-  const p = (n: number) => String(n).padStart(2, "0");
-  return `${p(Math.floor(wrapped / 60))}:${p(wrapped % 60)}`;
-}
-
-export function addMinutesToTime(time: string, minutes: number): string {
-  return timeFromMinutes(minutesOfTime(isValidTime(time) ? time : DEFAULT_GAME_TIME) + minutes);
-}
-
-/** Default end time for a start time (start + 90 min). */
 export function defaultEndTime(start: string): string {
   return addMinutesToTime(start, DEFAULT_DURATION_MIN);
 }
+
+export function formatDurationLabel(minutes: number): string {
+  return formatDuration(minutes);
+}
+
+export function formatShortDate(date: string): string {
+  return isDateKey(date) ? friendlyDayLabelKey(date, "") : date;
+}
+
+export function formatTime(time: string): string {
+  return formatTimeKey(time);
+}
+
+// ---------- multi-day schedule (one entry per day) ----------
 
 /** Length in minutes; end times at/before the start roll past midnight. */
 export function entryDurationMin(entry: ScheduleEntry): number {
@@ -200,39 +216,16 @@ export function formatTimeRange(entry: ScheduleEntry): string {
   )}`;
 }
 
-export function formatDurationLabel(minutes: number): string {
-  if (minutes >= ALL_DAY_MIN) return "All day";
-  const h = Math.floor(minutes / 60);
-  const m = minutes % 60;
-  if (h === 0) return `${m}m`;
-  return m === 0 ? `${h}h` : `${h}h ${m}m`;
-}
-
-export function formatShortDate(date: string): string {
-  if (!isValidDateKey(date)) return date;
-  return fromDateKey(date).toLocaleDateString(undefined, {
-    weekday: "short",
-    month: "short",
-    day: "numeric",
-  });
-}
-
-export function formatTime(time: string): string {
-  if (!isValidTime(time)) return time;
-  const [h, m] = time.split(":").map(Number);
-  const d = new Date(2000, 0, 1, h ?? 0, m ?? 0);
-  return d.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
-}
-
 export type ScheduleValidation = { ok: boolean; error?: string };
 
 export function validateSchedule(
   entries: ScheduleEntry[],
   now: Date = new Date(),
+  tz?: string | null,
 ): ScheduleValidation {
   const list = normalizeSchedule(entries);
   if (list.length === 0) return { ok: false, error: "Pick at least one day to host." };
-  const min = todayKey(now);
+  const min = todayKey(now, tz);
   if (list.some((e) => e.date < min)) return { ok: false, error: "Remove days in the past." };
   if (entries.some((e) => !e.allDay && !isValidTime(e.time)))
     return { ok: false, error: "Every day needs a start time." };
@@ -243,19 +236,36 @@ export function validateSchedule(
   return { ok: true };
 }
 
-export type GamePlan = { startIso: string; durationMin: number };
+/** One publishable session. */
+export type GamePlan = {
+  startIso: string;
+  endIso: string;
+  durationMin: number;
+  allDay: boolean;
+  timezone: string;
+};
+
+function entryToPlan(entry: ScheduleEntry, tz: string): GamePlan {
+  const durationMin = entryDurationMin(entry);
+  const start = zonedTimeToInstant(entry.date, entry.allDay ? "00:00" : entry.time, tz);
+  return {
+    startIso: start.toISOString(),
+    endIso: new Date(start.getTime() + durationMin * 60_000).toISOString(),
+    durationMin,
+    allDay: !!entry.allDay,
+    timezone: tz,
+  };
+}
 
 /** One start time + length per scheduled day, ready to publish. */
-export function scheduleToPlans(entries: ScheduleEntry[]): GamePlan[] {
-  return normalizeSchedule(entries).map((e) => ({
-    startIso: new Date(`${e.date}T${e.allDay ? "00:00" : e.time}:00`).toISOString(),
-    durationMin: entryDurationMin(e),
-  }));
+export function scheduleToPlans(entries: ScheduleEntry[], tz?: string | null): GamePlan[] {
+  const zone = resolveTimeZone(tz);
+  return normalizeSchedule(entries).map((e) => entryToPlan(e, zone));
 }
 
 /** ISO datetimes for publishing, one per scheduled day. */
-export function scheduleToIsoDates(entries: ScheduleEntry[]): string[] {
-  return scheduleToPlans(entries).map((p) => p.startIso);
+export function scheduleToIsoDates(entries: ScheduleEntry[], tz?: string | null): string[] {
+  return scheduleToPlans(entries, tz).map((p) => p.startIso);
 }
 
 /** Stored as free text on the game row, e.g. "90 min". */
@@ -263,7 +273,7 @@ export function durationToText(minutes: number): string {
   return `${Math.max(1, Math.round(minutes))} min`;
 }
 
-// ---------- Single start → end window ----------
+// ---------- single start → end window ----------
 
 export type WhenRange = {
   startDate: string;
@@ -273,63 +283,102 @@ export type WhenRange = {
   allDay: boolean;
 };
 
-export function defaultWhenRange(now: Date = new Date()): WhenRange {
+export function defaultWhenRange(now: Date = new Date(), tz?: string | null): WhenRange {
+  const zone = resolveTimeZone(tz);
   const start = new Date(now.getTime() + 60 * 60 * 1000);
   start.setMinutes(start.getMinutes() >= 30 ? 30 : 0, 0, 0);
-  const startDate = toDateKey(start);
-  const startTime = `${String(start.getHours()).padStart(2, "0")}:${String(
-    start.getMinutes(),
-  ).padStart(2, "0")}`;
   const end = new Date(start.getTime() + DEFAULT_DURATION_MIN * 60 * 1000);
   return {
-    startDate,
-    startTime,
-    endDate: toDateKey(end),
-    endTime: `${String(end.getHours()).padStart(2, "0")}:${String(end.getMinutes()).padStart(2, "0")}`,
+    startDate: dateKeyInZone(start, zone),
+    startTime: timeKeyInZone(start, zone),
+    endDate: dateKeyInZone(end, zone),
+    endTime: timeKeyInZone(end, zone),
     allDay: false,
   };
 }
 
-function rangeStart(r: WhenRange): Date {
-  return new Date(`${r.startDate}T${r.allDay ? "00:00" : r.startTime}:00`);
+/** Length of the window in minutes, from the wall-clock fields. */
+export function rangeLengthMin(r: WhenRange): number {
+  if (r.allDay) {
+    const days = Math.max(0, dayGap(r.startDate, r.endDate)) + 1;
+    return days * ALL_DAY_MIN;
+  }
+  const dayMinutes = dayGap(r.startDate, r.endDate) * ALL_DAY_MIN;
+  const diff = dayMinutes + minutesOfTime(r.endTime) - minutesOfTime(r.startTime);
+  return diff > 0 ? diff : DEFAULT_DURATION_MIN;
 }
 
-function rangeEnd(r: WhenRange): Date {
-  return r.allDay
-    ? new Date(fromDateKey(r.endDate).getTime() + ALL_DAY_MIN * 60 * 1000)
-    : new Date(`${r.endDate}T${r.endTime}:00`);
-}
+/** Kept for compatibility with earlier call sites. */
+export const whenRangeDurationMin = rangeLengthMin;
 
-/** Length of the window in minutes (all-day spans whole days). */
-export function whenRangeDurationMin(r: WhenRange): number {
-  const ms = rangeEnd(r).getTime() - rangeStart(r).getTime();
-  if (!Number.isFinite(ms) || ms <= 0) return DEFAULT_DURATION_MIN;
-  return Math.round(ms / 60000);
+function dayGap(a: string, b: string): number {
+  if (!isValidDateKey(a) || !isValidDateKey(b)) return 0;
+  return Math.round((Date.parse(`${b}T00:00:00Z`) - Date.parse(`${a}T00:00:00Z`)) / 86_400_000);
 }
 
 /** Move the end so the window keeps a given length from the current start. */
 export function setRangeDuration(r: WhenRange, minutes: number): WhenRange {
-  const end = new Date(rangeStart(r).getTime() + minutes * 60 * 1000);
+  const total = minutesOfTime(r.startTime) + minutes;
   return {
     ...r,
-    endDate: toDateKey(end),
-    endTime: `${String(end.getHours()).padStart(2, "0")}:${String(end.getMinutes()).padStart(2, "0")}`,
+    endDate: addDaysToKey(r.startDate, Math.floor(total / ALL_DAY_MIN)),
+    endTime: timeFromMinutes(total),
   };
 }
 
-export function validateWhenRange(r: WhenRange, now: Date = new Date()): ScheduleValidation {
+export function validateWhenRange(
+  r: WhenRange,
+  now: Date = new Date(),
+  tz?: string | null,
+): ScheduleValidation {
   if (!isValidDateKey(r.startDate)) return { ok: false, error: "Pick a start date." };
   if (!isValidDateKey(r.endDate)) return { ok: false, error: "Pick an end date." };
   if (!r.allDay && (!isValidTime(r.startTime) || !isValidTime(r.endTime)))
     return { ok: false, error: "Pick a start and end time." };
-  if (r.startDate < todayKey(now)) return { ok: false, error: "Start date is in the past." };
-  if (rangeEnd(r).getTime() <= rangeStart(r).getTime())
+  if (r.startDate < todayKey(now, tz)) return { ok: false, error: "Start date is in the past." };
+  if (r.endDate < r.startDate) return { ok: false, error: "The end must come after the start." };
+  if (!r.allDay && rangeLengthMin(r) <= 0)
     return { ok: false, error: "The end must come after the start." };
+  if (!r.allDay && r.startDate === r.endDate && r.startTime === r.endTime)
+    return { ok: false, error: "End time can't match the start time." };
   return { ok: true };
 }
 
-export function whenRangeToPlan(r: WhenRange): GamePlan {
-  return { startIso: rangeStart(r).toISOString(), durationMin: whenRangeDurationMin(r) };
+export function whenRangeToPlan(r: WhenRange, tz?: string | null): GamePlan {
+  const zone = resolveTimeZone(tz);
+  const durationMin = rangeLengthMin(r);
+  const start = zonedTimeToInstant(r.startDate, r.allDay ? "00:00" : r.startTime, zone);
+  return {
+    startIso: start.toISOString(),
+    endIso: new Date(start.getTime() + durationMin * 60_000).toISOString(),
+    durationMin,
+    allDay: r.allDay,
+    timezone: zone,
+  };
+}
+
+/**
+ * Expand a repeating window into one plan per occurrence. Every occurrence
+ * keeps the same length and time of day as the first.
+ */
+export function whenRangeToPlans(
+  r: WhenRange,
+  rule: RecurrenceRule,
+  tz?: string | null,
+): GamePlan[] {
+  const zone = resolveTimeZone(tz);
+  if (rule.freq === "none") return [whenRangeToPlan(r, zone)];
+  const durationMin = rangeLengthMin(r);
+  return expandRecurrence(r.startDate, rule).map((key) => {
+    const start = zonedTimeToInstant(key, r.allDay ? "00:00" : r.startTime, zone);
+    return {
+      startIso: start.toISOString(),
+      endIso: new Date(start.getTime() + durationMin * 60_000).toISOString(),
+      durationMin,
+      allDay: r.allDay,
+      timezone: zone,
+    };
+  });
 }
 
 export function formatWhenRange(r: WhenRange): string {
@@ -339,13 +388,34 @@ export function formatWhenRange(r: WhenRange): string {
       ? `All day, ${formatShortDate(r.startDate)}`
       : `All day, ${formatShortDate(r.startDate)} – ${formatShortDate(r.endDate)}`;
   }
-  const length = formatDurationLabel(whenRangeDurationMin(r));
+  const length = formatDurationLabel(rangeLengthMin(r));
   return r.startDate === r.endDate
     ? `${formatShortDate(r.startDate)}, ${formatTime(r.startTime)} – ${formatTime(r.endTime)} · ${length}`
     : `${formatShortDate(r.startDate)} ${formatTime(r.startTime)} – ${formatShortDate(
         r.endDate,
       )} ${formatTime(r.endTime)} · ${length}`;
 }
+
+/** Turn a range into per-day entries, so hosts can switch modes losslessly. */
+export function whenRangeToSchedule(r: WhenRange): ScheduleEntry[] {
+  const days = Math.max(0, dayGap(r.startDate, r.endDate));
+  const endTime = r.allDay ? undefined : r.endTime;
+  if (days === 0) {
+    return normalizeSchedule([
+      { date: r.startDate, time: r.startTime, endTime, allDay: r.allDay },
+    ]);
+  }
+  return normalizeSchedule(
+    Array.from({ length: days + 1 }, (_, i) => ({
+      date: addDaysToKey(r.startDate, i),
+      time: r.startTime,
+      endTime: endTime ?? defaultEndTime(r.startTime),
+      allDay: r.allDay,
+    })),
+  );
+}
+
+// ---------- month grid helpers (kept for existing call sites) ----------
 
 /** Days of a month grid (weeks start Sunday), padded with nulls. */
 export function monthGrid(cursor: Date): (string | null)[] {
@@ -368,7 +438,7 @@ export function monthDatesMatching(
   const min = todayKey(now);
   return monthGrid(cursor)
     .filter((k): k is string => !!k && k >= min)
-    .filter((k) => match(fromDateKey(k).getDay()));
+    .filter((k) => match(weekdayOfKey(k)));
 }
 
 export const isWeekend = (w: number) => w === 0 || w === 6;

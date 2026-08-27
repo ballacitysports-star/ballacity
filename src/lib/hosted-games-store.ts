@@ -67,6 +67,9 @@ type DbRow = {
   title: string;
   date: string;
   duration: string;
+  ends_at?: string | null;
+  all_day?: boolean | null;
+  timezone?: string | null;
   location: string;
   neighborhood: string;
   distance_mi: number | string;
@@ -137,6 +140,9 @@ function rowToGame(r: DbRow): Game {
     teamId: r.team_id ?? undefined,
     orgId: r.org_id ?? undefined,
     seriesId: r.series_id ?? null,
+    endsAt: r.ends_at ?? null,
+    allDay: !!r.all_day,
+    timezone: r.timezone ?? null,
 
   } as Game;
 }
@@ -175,6 +181,9 @@ function gameToInsertRow(g: Game): TablesInsert<"hosted_games"> {
     ...(g.teamId ? { team_id: g.teamId } : {}),
     ...(g.orgId ? { org_id: g.orgId } : {}),
     ...(g.seriesId ? { series_id: g.seriesId } : {}),
+    ...(g.endsAt ? { ends_at: g.endsAt } : {}),
+    all_day: !!g.allDay,
+    ...(g.timezone ? { timezone: g.timezone } : {}),
   } as TablesInsert<"hosted_games">;
 
 }
@@ -278,6 +287,11 @@ export type HostedGameInput = {
   maxAge?: number | null;
   /** Shared id linking sessions of one multi-day event so the feed shows one card. */
   seriesId?: string | null;
+  /** Exact end instant; the source of truth for length and "finished" checks. */
+  endsAt?: string | null;
+  allDay?: boolean;
+  /** IANA zone the host set the wall-clock times in. */
+  timezone?: string | null;
 
 };
 
@@ -321,6 +335,9 @@ export async function addHostedGame(input: HostedGameInput): Promise<Game> {
     minAge: input.minAge ?? null,
     maxAge: input.maxAge ?? null,
     seriesId: input.seriesId ?? null,
+    endsAt: input.endsAt ?? null,
+    allDay: !!input.allDay,
+    timezone: input.timezone ?? null,
   };
 
 
