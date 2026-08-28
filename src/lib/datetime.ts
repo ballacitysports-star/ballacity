@@ -610,7 +610,7 @@ export function googleCalendarUrl(event: CalendarEvent): string {
     action: "TEMPLATE",
     text: event.title,
     dates,
-    ctz: resolveTimeZone(event.timezone),
+    ctz: resolveTimeZone(event.viewerTimeZone ?? deviceTimeZone()),
   });
   if (event.location) params.set("location", event.location);
   const details = calendarBody(event);
