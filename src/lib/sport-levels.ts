@@ -21,6 +21,13 @@ export type SportScale = {
    * must equal `tiers`, so filters and storage keep using flat tier strings.
    */
   groups?: { label: string; tiers: string[] }[];
+  /**
+   * Optional submenu tiers hidden behind a parent tier chip (e.g. Rec League
+   * → Tee Ball, Coach Pitch, Minors…). Values must be part of `tiers`;
+   * renderers show them only when the parent chip is expanded, while storage
+   * and filters keep using the flat tier strings.
+   */
+  submenus?: Record<string, string[]>;
   /** Allows selecting more than one tier (e.g. one per Football format). */
   multi?: boolean;
 };
@@ -42,15 +49,29 @@ const YOUTH_DIVISIONS = [
   "Junior & Senior League (Ages 12–16)",
 ];
 
+/**
+ * Youth divisions live behind the "Rec League" chip as a submenu (see
+ * `SportScale.submenus`) instead of cluttering the main tier row.
+ */
+const BALL_SUBMENUS: Record<string, string[]> = { "Rec League": [...YOUTH_DIVISIONS] };
+
 const BALL_GROUPS = [
-  { label: "Recreational", tiers: ["Casual / Pickup", "Rec League", ...YOUTH_DIVISIONS] },
+  { label: "Recreational", tiers: ["Casual / Pickup", "Rec League"] },
   {
     label: "Competitive",
     tiers: ["High School", "Travel / Showcase", "College / Adult Competitive"],
   },
 ];
 
-const BALL_TIERS = BALL_GROUPS.flatMap((g) => g.tiers);
+/** Flat ordered list — submenu tiers stay here so validation keeps working. */
+const BALL_TIERS = [
+  "Casual / Pickup",
+  "Rec League",
+  ...YOUTH_DIVISIONS,
+  "High School",
+  "Travel / Showcase",
+  "College / Adult Competitive",
+];
 
 /** Shared sub-level ladder used by every football format. */
 const FOOTBALL_SUB_TIERS = ["Casual", "Rec", "Competitive", "Travel / Showcase"] as const;
@@ -137,13 +158,15 @@ export const LEVELS_BY_SPORT: Record<Sport, SportScale> = {
     system: "Level",
     tiers: BALL_TIERS,
     groups: BALL_GROUPS,
-    hint: "Highest level you've played.",
+    submenus: BALL_SUBMENUS,
+    hint: "Highest level you've played. Tap Rec League for youth divisions.",
   },
   Softball: {
     system: "Level",
     tiers: BALL_TIERS,
     groups: BALL_GROUPS,
-    hint: "Highest level you've played.",
+    submenus: BALL_SUBMENUS,
+    hint: "Highest level you've played. Tap Rec League for youth divisions.",
   },
 
   Basketball: {
@@ -202,6 +225,17 @@ export function scaleForSport(sport: Sport): SportScale {
 
 export function levelsForSport(sport: Sport): string[] {
   return scaleForSport(sport).tiers;
+}
+
+/** Reverse lookup: submenu child tier → its parent tier (e.g. "Minors (Ages 7–11)" → "Rec League"). */
+export function submenuParentForTier(
+  scale: SportScale,
+  tier: string,
+): string | null {
+  for (const [parent, children] of Object.entries(scale.submenus ?? {})) {
+    if (children.includes(tier)) return parent;
+  }
+  return null;
 }
 
 /** Every tier on a level, primary first. */

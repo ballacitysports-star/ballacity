@@ -15,11 +15,11 @@ import {
   Clock3,
 } from "lucide-react";
 import { SPORTS, type Sport, imageFor } from "@/lib/sample-data";
+import { TierChips } from "@/components/sports/TierChips";
 import { addHostedGame } from "@/lib/hosted-games-store";
 import { SIGNUP_CUTOFF_PRESETS } from "@/lib/live-status";
 import {
   ANY_SKILL,
-  filterTiersForSport,
   parseSkillTiers,
   scaleForSport,
   serializeSkillTiers,
@@ -142,7 +142,6 @@ function Create() {
   // Skill options follow the picked sport's real scale (Flag / 7v7 /
   // Full contact for Football) so a game reads like a profile tier.
   const [skill, setSkill] = useState<string>(ANY_SKILL);
-  const skillOptions = [ANY_SKILL, ...filterTiersForSport(sport)];
   const selectedSkillTiers = parseSkillTiers(sport, skill);
   const skillMulti = scaleForSport(sport).multi ?? false;
   useEffect(() => {
@@ -655,31 +654,27 @@ function Create() {
 
           {/* Skill */}
           <Section title={`Skill level · ${scaleForSport(sport).system}`}>
-            <div className="flex gap-2 overflow-x-auto scrollbar-hide">
-              {skillOptions.map((s) => {
-                const active =
-                  s === ANY_SKILL
-                    ? selectedSkillTiers.length === 0
-                    : selectedSkillTiers.includes(s);
-                return (
-                  <button
-                    type="button"
-                    key={s}
-                    aria-pressed={active}
-                    onClick={() =>
-                      setSkill(s === ANY_SKILL ? ANY_SKILL : toggleSkillTier(sport, skill, s))
-                    }
-                    className={`shrink-0 rounded-full border px-4 py-2 text-sm font-semibold ${
-                      active
-                        ? "border-lime bg-lime text-primary-foreground"
-                        : "border-border bg-surface text-muted-foreground"
-                    }`}
-                  >
-                    {s}
-                  </button>
-                );
-              })}
-            </div>
+            <TierChips
+              scale={scaleForSport(sport)}
+              selected={selectedSkillTiers}
+              size="lg"
+              ariaPrefix={sport}
+              onToggle={(tier) => setSkill(toggleSkillTier(sport, skill, tier))}
+              leading={
+                <button
+                  type="button"
+                  aria-pressed={selectedSkillTiers.length === 0}
+                  onClick={() => setSkill(ANY_SKILL)}
+                  className={`shrink-0 rounded-full border px-4 py-2 text-sm font-semibold ${
+                    selectedSkillTiers.length === 0
+                      ? "border-lime bg-lime text-primary-foreground"
+                      : "border-border bg-surface text-muted-foreground"
+                  }`}
+                >
+                  {ANY_SKILL}
+                </button>
+              }
+            />
             {skillMulti && (
               <p className="mt-2 px-1 text-[11px] text-muted-foreground">
                 Pick a level in each format you welcome — selections combine (e.g. "Flag Rec · 7v7

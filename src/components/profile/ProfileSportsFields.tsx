@@ -1,6 +1,7 @@
 import { X } from "lucide-react";
 import { SPORTS, POSITIONS_BY_SPORT, type Sport } from "@/lib/sample-data";
 import { levelTiers, scaleForSport, toggleSportTier, type SportLevel } from "@/lib/sport-levels";
+import { TierChips } from "@/components/sports/TierChips";
 
 export type SportEntry = { name: Sport; positions?: string[]; level?: SportLevel | null };
 
@@ -56,29 +57,6 @@ export function ProfileSportsFields({
             </div>
             {(() => {
               const scale = scaleForSport(s.name);
-              const chip = (tier: string, groupLabel?: string) => {
-                const active = levelTiers(s.level).includes(tier);
-                const label =
-                  groupLabel && tier.startsWith(`${groupLabel} `)
-                    ? tier.slice(groupLabel.length + 1)
-                    : tier;
-                return (
-                  <button
-                    key={tier}
-                    type="button"
-                    aria-pressed={active}
-                    aria-label={tier}
-                    onClick={() => setLevel(s.name, tier)}
-                    className={`rounded-full border px-2.5 py-1 text-[11px] font-semibold transition-colors ${
-                      active
-                        ? "border-lime bg-lime/15 text-lime"
-                        : "border-border bg-background text-muted-foreground hover:border-lime/40 hover:text-foreground"
-                    }`}
-                  >
-                    {label}
-                  </button>
-                );
-              };
               return (
                 <div className="mt-3">
                   <div className="mb-1.5 flex items-baseline gap-2">
@@ -92,26 +70,12 @@ export function ProfileSportsFields({
                       </span>
                     )}
                   </div>
-                  {scale.groups ? (
-                    <div className="space-y-2">
-                      {scale.groups.map((g) => (
-                        <div key={g.label}>
-                          <div className="mb-1 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/80">
-                            {g.label}
-                          </div>
-                          <div className="flex flex-wrap gap-1.5">
-                            {g.tiers.map((t) => chip(t, g.label))}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="flex flex-wrap gap-1.5">{scale.tiers.map((t) => chip(t))}</div>
-                  )}
-
-                  {scale.hint && (
-                    <p className="mt-1.5 text-[10px] text-muted-foreground">{scale.hint}</p>
-                  )}
+                  <TierChips
+                    scale={scale}
+                    selected={levelTiers(s.level)}
+                    ariaPrefix={s.name}
+                    onToggle={(tier) => setLevel(s.name, tier)}
+                  />
                 </div>
               );
             })()}

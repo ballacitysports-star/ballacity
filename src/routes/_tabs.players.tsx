@@ -91,6 +91,7 @@ import {
   sanitizeSkillForSport,
   scaleForSport,
 } from "@/lib/sport-levels";
+import { TierChips } from "@/components/sports/TierChips";
 import { SportSkillLevels } from "@/components/filters/SportSkillLevels";
 import { hideFinishedGames } from "@/lib/game-time";
 import {
@@ -1371,23 +1372,17 @@ function PostAvailabilityDialog({
                       {scale.system}
                     </span>
                   </div>
-                  <div className="flex flex-wrap gap-2">
-                    {scale.tiers.map((tier) => (
-                      <Chip
-                        key={tier}
-                        active={levels[name] === tier}
-                        onClick={() =>
-                          setLevels((l) => ({
-                            ...l,
-                            [name]: l[name] === tier ? "" : tier,
-                          }))
-                        }
-                      >
-                        {tier}
-                      </Chip>
-                    ))}
-                  </div>
-                  {scale.hint && <p className="mt-1 text-xs text-muted-foreground">{scale.hint}</p>}
+                  <TierChips
+                    scale={scale}
+                    selected={levels[name] ? [levels[name]] : []}
+                    ariaPrefix={name}
+                    onToggle={(tier) =>
+                      setLevels((l) => ({
+                        ...l,
+                        [name]: l[name] === tier ? "" : tier,
+                      }))
+                    }
+                  />
                 </div>
               );
             })
