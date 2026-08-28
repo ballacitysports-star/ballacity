@@ -21,6 +21,13 @@ export type SportScale = {
    * must equal `tiers`, so filters and storage keep using flat tier strings.
    */
   groups?: { label: string; tiers: string[] }[];
+  /**
+   * Optional submenu tiers hidden behind a parent tier chip (e.g. Rec League
+   * → Tee Ball, Coach Pitch, Minors…). Values must be part of `tiers`;
+   * renderers show them only when the parent chip is expanded, while storage
+   * and filters keep using the flat tier strings.
+   */
+  submenus?: Record<string, string[]>;
   /** Allows selecting more than one tier (e.g. one per Football format). */
   multi?: boolean;
 };
