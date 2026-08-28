@@ -12,23 +12,30 @@ export function parseDurationMin(duration: string | null | undefined): number {
   return /h/i.test(duration) ? Math.round(value * 60) : Math.round(value);
 }
 
-/** Timestamp (ms) when a game is expected to end. */
-export function gameEndsAt(game: Pick<Game, "date" | "duration">): number {
+/** A game shape that carries just enough to compute its end. */
+export type GameTiming = Pick<Game, "date" | "duration"> & { endsAt?: string | null };
+
+/** Timestamp (ms) when a game is expected to end (explicit end wins). */
+export function gameEndsAt(game: GameTiming): number {
   const start = new Date(game.date).getTime();
   if (!Number.isFinite(start)) return Number.POSITIVE_INFINITY;
+  if (game.endsAt) {
+    const end = new Date(game.endsAt).getTime();
+    if (Number.isFinite(end) && end > start) return end;
+  }
   return start + parseDurationMin(game.duration) * 60 * 1000;
 }
 
 /** True once a game's end time (plus a short grace period) has passed. */
 export function isGameFinished(
-  game: Pick<Game, "date" | "duration">,
+  game: GameTiming,
   now: number = Date.now(),
 ): boolean {
   return gameEndsAt(game) + GRACE_MS < now;
 }
 
 /** Drop finished games from any list of games. */
-export function hideFinishedGames<T extends Pick<Game, "date" | "duration">>(
+export function hideFinishedGames<T extends GameTiming>(
   games: T[],
   now: number = Date.now(),
 ): T[] {
@@ -36,7 +43,7 @@ export function hideFinishedGames<T extends Pick<Game, "date" | "duration">>(
 }
 
 /** Keep only finished games, for archive/history views. */
-export function onlyFinishedGames<T extends Pick<Game, "date" | "duration">>(
+export function onlyFinishedGames<T extends GameTiming>(
   games: T[],
   now: number = Date.now(),
 ): T[] {

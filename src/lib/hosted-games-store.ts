@@ -405,6 +405,15 @@ export async function updateHostedGame(
   if (patch.neighborhood !== undefined) dbPatch.neighborhood = patch.neighborhood;
   if (patch.date !== undefined) dbPatch.date = patch.date;
   if (patch.duration !== undefined) dbPatch.duration = patch.duration;
+  if ((patch as { endsAt?: string | null }).endsAt !== undefined) {
+    (dbPatch as TablesUpdate<"hosted_games"> & { ends_at?: string | null }).ends_at =
+      (patch as { endsAt?: string | null }).endsAt ?? null;
+  }
+  if ((patch as { allDay?: boolean }).allDay !== undefined) {
+    (dbPatch as TablesUpdate<"hosted_games"> & { all_day?: boolean }).all_day = !!(
+      patch as { allDay?: boolean }
+    ).allDay;
+  }
   if (patch.maxPlayers !== undefined) dbPatch.max_players = patch.maxPlayers;
   if (patch.price !== undefined) dbPatch.price = patch.price;
   if (patch.description !== undefined) dbPatch.description = patch.description;
