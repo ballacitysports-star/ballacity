@@ -5,6 +5,7 @@ import {
   toggleSportSkillTier,
   type SportSkillMap,
 } from "@/lib/sport-filter";
+import { TierChips } from "@/components/sports/TierChips";
 
 /**
  * Per-sport skill level picker for filters. Reads exactly like the Sports
@@ -32,29 +33,6 @@ export function SportSkillLevels({
       {sports.map((sport) => {
         const scale = scaleForSport(sport as Sport);
         const selected = selectedTiersForSport(value, sport);
-        const chip = (tier: string, groupLabel?: string) => {
-          const active = selected.includes(tier);
-          const label =
-            groupLabel && tier.startsWith(`${groupLabel} `)
-              ? tier.slice(groupLabel.length + 1)
-              : tier;
-          return (
-            <button
-              key={tier}
-              type="button"
-              aria-pressed={active}
-              aria-label={`${sport} ${tier}`}
-              onClick={() => onChange(toggleSportSkillTier(value, sport, tier))}
-              className={`rounded-full border px-2.5 py-1 text-[11px] font-semibold transition-colors ${
-                active
-                  ? "border-lime bg-lime/15 text-lime"
-                  : "border-border bg-background text-muted-foreground hover:border-lime/40 hover:text-foreground"
-              }`}
-            >
-              {label}
-            </button>
-          );
-        };
         return (
           <div key={sport} className="rounded-2xl border border-border bg-surface p-3">
             <div className="mb-1.5 flex items-baseline gap-2">
@@ -64,25 +42,12 @@ export function SportSkillLevels({
                 <span className="text-[10px] text-muted-foreground/70">· pick one or more</span>
               )}
             </div>
-            {scale.groups ? (
-              <div className="space-y-2">
-                {scale.groups.map((g) => (
-                  <div key={g.label}>
-                    <div className="mb-1 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/80">
-                      {g.label}
-                    </div>
-                    <div className="flex flex-wrap gap-1.5">
-                      {g.tiers.map((t) => chip(t, g.label))}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="flex flex-wrap gap-1.5">{scale.tiers.map((t) => chip(t))}</div>
-            )}
-            {scale.hint && (
-              <p className="mt-1.5 text-[10px] text-muted-foreground">{scale.hint}</p>
-            )}
+            <TierChips
+              scale={scale}
+              selected={selected}
+              ariaPrefix={sport}
+              onToggle={(tier) => onChange(toggleSportSkillTier(value, sport, tier))}
+            />
           </div>
         );
       })}
