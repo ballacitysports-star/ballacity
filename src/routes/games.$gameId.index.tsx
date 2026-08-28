@@ -38,6 +38,11 @@ import { AgeRequirementFields } from "@/components/games/AgeRequirementFields";
 import { formatWhen, formatWhenDate } from "@/lib/format";
 import { gameEndsAt } from "@/lib/game-time";
 import { AddToCalendarButton } from "@/components/datetime/AddToCalendarButton";
+import { GameReminderCard, GameReminderPicker } from "@/components/GameReminderSettings";
+import {
+  DEFAULT_GAME_REMINDER_OFFSETS,
+  saveMyGameReminderOffsets,
+} from "@/lib/game-reminders";
 import { ReviewsSection } from "@/components/ReviewsSection";
 import { SpotsPill } from "@/components/SpotsPill";
 import { UserAvatar } from "@/components/UserAvatar";
@@ -714,6 +719,10 @@ function GameDetail() {
         };
 
   const [confirmAction, setConfirmAction] = useState<"join" | "leave" | null>(null);
+  // Reminder lead times the player picks while RSVPing.
+  const [reminderOffsets, setReminderOffsets] = useState<number[]>([
+    ...DEFAULT_GAME_REMINDER_OFFSETS,
+  ]);
 
 
   const executeJoinAction = async (preselectedPosition?: string) => {
@@ -913,6 +922,7 @@ function GameDetail() {
             : "Tap to review.",
           link: `/games/${game.id}`,
         }).catch(() => {});
+        void saveMyGameReminderOffsets(game.id, reminderOffsets).catch(() => {});
         toast.success(
           isResubmit
             ? "Request resubmitted. The host will review it."
@@ -941,6 +951,7 @@ function GameDetail() {
       return;
     }
     joinGame(game.id, preselectedPosition);
+    void saveMyGameReminderOffsets(game.id, reminderOffsets).catch(() => {});
     toast.success(`You're in! See you at ${game.location}.`);
     // Notify host in real time that a new player joined.
     if (gameHostId && user && gameHostId !== user.id) {
@@ -1442,11 +1453,16 @@ function GameDetail() {
               timezone: game.timezone ?? null,
               location: [game.location, game.neighborhood].filter(Boolean).join(", "),
               description: game.description ?? undefined,
+              mapUrl: `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
+                [game.location, game.neighborhood].filter(Boolean).join(", "),
+              )}`,
               url: typeof window !== "undefined" ? window.location.href : undefined,
               uid: `game-${game.id}@ballacity`,
             }}
           />
         </div>
+
+        {viewerCountsAsJoined && <GameReminderCard gameId={game.id} />}
 
         {/* Location card */}
         <div className="rounded-3xl border border-border bg-surface overflow-hidden">
@@ -2548,6 +2564,9 @@ function GameDetail() {
                 : "You'll be added to the roster. You can leave later if plans change."}
             </AlertDialogDescription>
           </AlertDialogHeader>
+          {confirmAction === "join" && (
+            <GameReminderPicker value={reminderOffsets} onChange={setReminderOffsets} />
+          )}
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction
