@@ -32,14 +32,27 @@ export const GENERIC_SCALE: SportScale = {
   tiers: ["Beginner", "Casual", "Intermediate", "Advanced"],
 };
 
-const BALL_TIERS = [
-  "Casual / Pickup",
-  "Rec League",
-  "Little League / Youth",
-  "High School",
-  "Travel / Showcase",
-  "College / Adult Competitive",
+/** Little League age divisions, offered as a submenu under Youth. */
+const YOUTH_DIVISIONS = [
+  "Tee Ball (Ages 4–7)",
+  "Coach Pitch / Machine Pitch (Ages 6–8)",
+  "Minors (Ages 7–11)",
+  "Majors (Ages 9–12)",
+  "Intermediate 50/70 (Ages 11–13)",
+  "Junior & Senior League (Ages 12–16)",
 ];
+
+const BALL_GROUPS = [
+  { label: "Recreational", tiers: ["Casual / Pickup", "Rec League"] },
+  { label: "Little League / Youth", tiers: YOUTH_DIVISIONS },
+  {
+    label: "Competitive",
+    tiers: ["High School", "Travel / Showcase", "College / Adult Competitive"],
+  },
+];
+
+const BALL_TIERS = BALL_GROUPS.flatMap((g) => g.tiers);
+
 /** Shared sub-level ladder used by every football format. */
 const FOOTBALL_SUB_TIERS = ["Casual", "Rec", "Competitive", "Travel / Showcase"] as const;
 const FOOTBALL_FORMATS = ["Flag", "7v7", "Full contact"] as const;
@@ -69,14 +82,25 @@ const FOOTBALL_TIER_ALIASES: Record<string, string> = {
 
 const BALL_TIER_ALIASES: Record<string, string> = {
   Rec: "Rec League",
-  "Little League": "Little League / Youth",
+  "Little League": "Minors (Ages 7–11)",
+  "Little League / Youth": "Minors (Ages 7–11)",
+  Youth: "Minors (Ages 7–11)",
+  "Tee Ball": "Tee Ball (Ages 4–7)",
+  "Coach Pitch": "Coach Pitch / Machine Pitch (Ages 6–8)",
+  "Machine Pitch": "Coach Pitch / Machine Pitch (Ages 6–8)",
+  Minors: "Minors (Ages 7–11)",
+  Majors: "Majors (Ages 9–12)",
+  "Intermediate 50/70": "Intermediate 50/70 (Ages 11–13)",
+  "Junior League": "Junior & Senior League (Ages 12–16)",
+  "Senior League": "Junior & Senior League (Ages 12–16)",
   College: "College / Adult Competitive",
   "Minor A": "College / Adult Competitive",
   "Minor AA": "College / Adult Competitive",
   "Minor AAA": "College / Adult Competitive",
-  Major: "College / Adult Competitive",
+  Major: "Majors (Ages 9–12)",
   National: "College / Adult Competitive",
 };
+
 
 const COURT_FIELD_ALIASES: Record<string, string> = {
   Rec: "Rec League",
@@ -110,8 +134,19 @@ const TIER_ALIASES_BY_SPORT: Record<string, Record<string, string>> = {
 const GENERIC_TIER_ALIASES: Record<string, string> = { Pro: "Advanced" };
 
 export const LEVELS_BY_SPORT: Record<Sport, SportScale> = {
-  Baseball: { system: "Level", tiers: BALL_TIERS, hint: "Highest level you've played." },
-  Softball: { system: "Level", tiers: BALL_TIERS, hint: "Highest level you've played." },
+  Baseball: {
+    system: "Level",
+    tiers: BALL_TIERS,
+    groups: BALL_GROUPS,
+    hint: "Highest level you've played.",
+  },
+  Softball: {
+    system: "Level",
+    tiers: BALL_TIERS,
+    groups: BALL_GROUPS,
+    hint: "Highest level you've played.",
+  },
+
   Basketball: {
     system: "Level",
     tiers: [
