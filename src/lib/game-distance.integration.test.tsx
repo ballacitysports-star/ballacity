@@ -30,14 +30,18 @@ function grantLocation(coords = VIEWER) {
     getCurrentPosition: (ok: (p: unknown) => void) =>
       ok({ coords: { latitude: coords.lat, longitude: coords.lng } }),
   };
-  act(() => requestViewerLocation());
+  act(() => {
+    void requestViewerLocation();
+  });
 }
 
 function denyLocation() {
   (navigator as unknown as { geolocation: unknown }).geolocation = {
     getCurrentPosition: (_ok: unknown, fail: (e: unknown) => void) => fail({ code: 1 }),
   };
-  act(() => requestViewerLocation());
+  act(() => {
+    void requestViewerLocation();
+  });
 }
 
 /** Renders every game's card distance, as the feed does. */
