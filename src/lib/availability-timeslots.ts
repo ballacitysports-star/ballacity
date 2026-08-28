@@ -223,7 +223,7 @@ export function formatAvailabilityWindow(a: {
         ? `Next: ${fmtShortDate(next.dateKey)} · All day`
         : `Next: ${fmtShortDate(next.dateKey)} ${fmt12(next.start)}–${fmt12(next.end)}`
       : "";
-const rest = summarizeSlots(slots, slots.length);
+const rest = summarizeSlots(slots);
     return [head, rest].filter(Boolean).join(" · ");
   }
   const parts: string[] = [];
