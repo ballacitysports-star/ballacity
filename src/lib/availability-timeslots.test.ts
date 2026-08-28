@@ -131,8 +131,11 @@ describe("all-day slots", () => {
   });
 
   it("formatAvailabilityWindow shows Next without times for all-day slots", () => {
+    const future = new Date();
+    future.setDate(future.getDate() + 10);
+    const key = toDateKey(future);
     const label = formatAvailabilityWindow({
-      time_slots: [{ date: "2099-09-12", start: "08:00", end: "22:00" }],
+      time_slots: [{ date: key, start: "08:00", end: "22:00" }],
     });
     expect(label).toContain("Next:");
     expect(label).toContain("All day");
