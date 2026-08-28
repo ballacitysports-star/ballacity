@@ -26,6 +26,7 @@ import {
   History,
 } from "lucide-react";
 import { GAMES, SPORTS, imageFor } from "@/lib/sample-data";
+import { TierChips } from "@/components/sports/TierChips";
 import {
   ageGateMessage,
   ageGateState,
@@ -2644,7 +2645,6 @@ function EditGameModal({
   const [sport, setSport] = useState<Game["sport"]>(game.sport);
   const [skill, setSkill] = useState<Game["skill"]>(game.skill);
   // Tier list follows the game's sport, matching the profile scale.
-  const skillOptions = [ANY_SKILL, ...filterTiersForSport(sport)];
   const selectedSkillTiers = parseSkillTiers(sport, skill);
   const skillMulti = scaleForSport(sport).multi ?? false;
   useEffect(() => {

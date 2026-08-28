@@ -15,6 +15,7 @@ import {
   Clock3,
 } from "lucide-react";
 import { SPORTS, type Sport, imageFor } from "@/lib/sample-data";
+import { TierChips } from "@/components/sports/TierChips";
 import { addHostedGame } from "@/lib/hosted-games-store";
 import { SIGNUP_CUTOFF_PRESETS } from "@/lib/live-status";
 import {
@@ -142,7 +143,6 @@ function Create() {
   // Skill options follow the picked sport's real scale (Flag / 7v7 /
   // Full contact for Football) so a game reads like a profile tier.
   const [skill, setSkill] = useState<string>(ANY_SKILL);
-  const skillOptions = [ANY_SKILL, ...filterTiersForSport(sport)];
   const selectedSkillTiers = parseSkillTiers(sport, skill);
   const skillMulti = scaleForSport(sport).multi ?? false;
   useEffect(() => {

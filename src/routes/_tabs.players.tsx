@@ -91,6 +91,7 @@ import {
   sanitizeSkillForSport,
   scaleForSport,
 } from "@/lib/sport-levels";
+import { TierChips } from "@/components/sports/TierChips";
 import { SportSkillLevels } from "@/components/filters/SportSkillLevels";
 import { hideFinishedGames } from "@/lib/game-time";
 import {
