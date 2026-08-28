@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
   deriveLegacyFields,
+  formatAvailabilityWindow,
   formatSlot,
+  isAllDaySlot,
   nextOccurrence,
   normalizeSlots,
   parseTimeSlots,
@@ -91,5 +93,49 @@ describe("formatting", () => {
   it("formats a slot and a summary", () => {
     expect(formatSlot({ weekday: 6, start: "08:00", end: "11:30" })).toBe("Sat 8 AM–11:30 AM");
     expect(summarizeSlots([{ date: "2026-08-01", start: "08:00", end: "10:00" }])).toContain("1 date");
+  });
+});
+
+describe("all-day slots", () => {
+  const TIME_RE = /\d{1,2}(:\d{2})?\s?(AM|PM)/;
+
+  it("isAllDaySlot detects preset and literal full-day windows", () => {
+    expect(isAllDaySlot({ start: "08:00", end: "22:00" })).toBe(true);
+    expect(isAllDaySlot({ start: "00:00", end: "24:00" })).toBe(true);
+    expect(isAllDaySlot({ start: "00:00", end: "23:59" })).toBe(true);
+    expect(isAllDaySlot({ start: "08:00", end: "11:00" })).toBe(false);
+  });
+
+  it("formatSlot shows All day with no times", () => {
+    const label = formatSlot({ date: "2026-09-12", start: "08:00", end: "22:00" });
+    expect(label).toContain("All day");
+    expect(label).not.toMatch(TIME_RE);
+  });
+
+  it("summarizeSlots keeps all-day slots time-free", () => {
+    const label = summarizeSlots([
+      { date: "2026-09-12", start: "08:00", end: "22:00" },
+      { date: "2026-09-13", start: "00:00", end: "24:00" },
+    ]);
+    expect(label).toContain("All day");
+    expect(label).not.toMatch(TIME_RE);
+  });
+
+  it("mixed lists keep times on timed slots only", () => {
+    const label = summarizeSlots([
+      { date: "2026-09-12", start: "08:00", end: "22:00" },
+      { date: "2026-09-13", start: "18:00", end: "20:00" },
+    ]);
+    expect(label).toContain("All day");
+    expect(label).toContain("6 PM–8 PM");
+  });
+
+  it("formatAvailabilityWindow shows Next without times for all-day slots", () => {
+    const label = formatAvailabilityWindow({
+      time_slots: [{ date: "2099-09-12", start: "08:00", end: "22:00" }],
+    });
+    expect(label).toContain("Next:");
+    expect(label).toContain("All day");
+    expect(label).not.toMatch(TIME_RE);
   });
 });
