@@ -32,7 +32,7 @@ export const GENERIC_SCALE: SportScale = {
   tiers: ["Beginner", "Casual", "Intermediate", "Advanced"],
 };
 
-/** Little League age divisions, offered as a submenu under Youth. */
+/** Little League age divisions, offered as a submenu under Rec League. */
 const YOUTH_DIVISIONS = [
   "Tee Ball (Ages 4–7)",
   "Coach Pitch / Machine Pitch (Ages 6–8)",
@@ -43,8 +43,7 @@ const YOUTH_DIVISIONS = [
 ];
 
 const BALL_GROUPS = [
-  { label: "Recreational", tiers: ["Casual / Pickup", "Rec League"] },
-  { label: "Little League / Youth", tiers: YOUTH_DIVISIONS },
+  { label: "Recreational", tiers: ["Casual / Pickup", "Rec League", ...YOUTH_DIVISIONS] },
   {
     label: "Competitive",
     tiers: ["High School", "Travel / Showcase", "College / Adult Competitive"],
