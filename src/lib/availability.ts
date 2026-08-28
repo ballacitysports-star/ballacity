@@ -144,9 +144,9 @@ export async function getAvailabilityById(id: string): Promise<AvailabilityWithA
   if (error) throw error;
   if (!data) return null;
   const row = data as unknown as PlayerAvailability;
-  const { data: prof } = await supabase
+const { data: prof } = await supabase
     .from("profiles")
-    .select("id, display_name, avatar_initials, avatar_url, sport_levels")
+    .select("id, display_name, avatar_initials, avatar_url, sport_levels, bio, city, search_radius_mi")
     .eq("id", row.user_id)
     .maybeSingle();
   return {
@@ -155,6 +155,9 @@ export async function getAvailabilityById(id: string): Promise<AvailabilityWithA
     author_initials: (prof as any)?.avatar_initials ?? null,
     author_avatar_url: (prof as any)?.avatar_url ?? null,
     author_sport_levels: (prof as any)?.sport_levels ?? null,
+    author_bio: (prof as any)?.bio ?? null,
+    author_city: (prof as any)?.city ?? null,
+    author_search_radius_mi: (prof as any)?.search_radius_mi ?? null,
     author_age: await profileAge(row.user_id),
   };
 }
