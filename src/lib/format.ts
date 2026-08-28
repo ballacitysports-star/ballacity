@@ -17,3 +17,12 @@ export function formatWhen(iso: string) {
   if (hrs < 48 && hrs >= 0) return `Tomorrow · ${time}`;
   return `${d.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", timeZone: TZ })} · ${time}`;
 }
+
+/** Date-only "when" line (no time), used for all-day events. */
+export function formatWhenDate(iso: string) {
+  const d = new Date(iso);
+  const hrs = Math.round((d.getTime() - dayAnchorMs()) / HOUR_MS);
+  if (hrs < 24 && hrs >= 0) return `Today`;
+  if (hrs < 48 && hrs >= 0) return `Tomorrow`;
+  return `${d.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", timeZone: TZ })}`;
+}

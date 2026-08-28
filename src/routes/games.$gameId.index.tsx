@@ -35,7 +35,7 @@ import {
 import { useMyAge, fetchProfileAges } from "@/lib/use-my-age";
 import { requesterAgeLabel } from "@/lib/game-age";
 import { AgeRequirementFields } from "@/components/games/AgeRequirementFields";
-import { formatWhen } from "@/lib/format";
+import { formatWhen, formatWhenDate } from "@/lib/format";
 import { gameEndsAt } from "@/lib/game-time";
 import { ReviewsSection } from "@/components/ReviewsSection";
 import { SpotsPill } from "@/components/SpotsPill";
@@ -1409,10 +1409,10 @@ function GameDetail() {
 
         {/* Meta */}
         <div className="grid grid-cols-2 gap-2">
-          <Meta
+<Meta
             icon={<Clock className="h-4 w-4 text-lime" />}
             label="Starts"
-            value={formatWhen(game.date)}
+            value={game.allDay ? formatWhenDate(game.date) : formatWhen(game.date)}
           />
           <Meta
             icon={<Calendar className="h-4 w-4 text-lime" />}
@@ -3282,7 +3282,8 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 }
 
 /** End date + time for the meta grid; falls back to the raw length text. */
-function formatEndsAt(game: Pick<Game, "date" | "duration">): string {
+function formatEndsAt(game: Pick<Game, "date" | "duration" | "allDay">): string {
+  if (game.allDay) return "All day";
   const end = gameEndsAt(game);
   if (!Number.isFinite(end)) return game.duration ?? "—";
   return formatWhen(new Date(end).toISOString());
