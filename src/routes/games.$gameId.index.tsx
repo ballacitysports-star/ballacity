@@ -1409,10 +1409,10 @@ function GameDetail() {
 
         {/* Meta */}
         <div className="grid grid-cols-2 gap-2">
-          <Meta
+<Meta
             icon={<Clock className="h-4 w-4 text-lime" />}
             label="Starts"
-            value={formatWhen(game.date)}
+            value={game.allDay ? formatWhenDate(game.date) : formatWhen(game.date)}
           />
           <Meta
             icon={<Calendar className="h-4 w-4 text-lime" />}
