@@ -3423,12 +3423,12 @@ function formatEndsAt(
   game: Pick<Game, "date" | "duration" | "allDay"> & { endsAt?: string | null },
 ): string {
   const end = gameEndsAt(game);
-  if (game.allDay) {
-    const iso = Number.isFinite(end) ? new Date(end).toISOString() : game.date;
-    return formatWhenDate(iso);
-  }
-  if (!Number.isFinite(end)) return game.duration ?? "—";
-  return formatWhen(new Date(end).toISOString());
+  return formatGameEnds({
+    date: game.date,
+    allDay: game.allDay,
+    duration: game.duration,
+    endsAt: Number.isFinite(end) ? new Date(end).toISOString() : null,
+  });
 }
 
 function Meta({
