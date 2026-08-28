@@ -1,6 +1,7 @@
 import { X } from "lucide-react";
 import { SPORTS, POSITIONS_BY_SPORT, type Sport } from "@/lib/sample-data";
 import { levelTiers, scaleForSport, toggleSportTier, type SportLevel } from "@/lib/sport-levels";
+import { TierChips } from "@/components/sports/TierChips";
 
 export type SportEntry = { name: Sport; positions?: string[]; level?: SportLevel | null };
 
