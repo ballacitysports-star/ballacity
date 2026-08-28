@@ -2823,6 +2823,56 @@ function EditGameModal({
         toast.error(err?.message ?? "Saved game, but couldn't update host settings.");
       }
 
+      // Notify confirmed players when the schedule end changed (end time or
+      // all-day toggle) — their plans and calendar invites depend on it.
+      const prevEndMs = gameEndsAt(game);
+      const nextEndMs = allDay
+        ? prevEndMs
+        : Number.isFinite(endMs)
+          ? endMs
+          : prevEndMs;
+      const endChanged = !allDay && nextEndMs !== prevEndMs;
+      const allDayChanged = !!game.allDay !== allDay;
+      if (endChanged || allDayChanged) {
+        void (async () => {
+          try {
+            const { data: roster } = await supabase
+              .from("game_participants")
+              .select("user_id")
+              .eq("game_id", game.id);
+            const targets = (roster ?? [])
+              .map((r: any) => String(r.user_id))
+              .filter((uid) => uid && uid !== user?.id);
+            const body = allDayChanged
+              ? allDay
+                ? `${title.trim() || game.title} is now an all-day event.`
+                : `${title.trim() || game.title} now ends at ${formatEndsAt({
+                    ...game,
+                    allDay,
+                    endsAt: new Date(nextEndMs).toISOString(),
+                  } as Game)}.`
+              : `New end time: ${formatEndsAt({
+                  ...game,
+                  allDay,
+                  endsAt: new Date(nextEndMs).toISOString(),
+                } as Game)}.`;
+            await Promise.all(
+              targets.map((uid) =>
+                createNotification({
+                  user_id: uid,
+                  type: "game_time_changed",
+                  title: `Schedule updated: ${title.trim() || game.title}`,
+                  body,
+                  link: `/games/${game.id}`,
+                }).catch(() => {}),
+              ),
+            );
+          } catch {
+            /* best effort */
+          }
+        })();
+      }
+
       toast.success("Game updated.");
       onClose();
     } finally {
