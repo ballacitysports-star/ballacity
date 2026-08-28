@@ -45,6 +45,7 @@ import { useAvailabilityGate, availabilityGateMessage } from "@/lib/availability
 import { AvailabilityRequiredNotice } from "@/components/availability/AvailabilityRequiredNotice";
 import { AvailabilityDetailDialog } from "@/components/players/AvailabilityDetailDialog";
 import { shareAvailability } from "@/components/players/share-availability";
+import { ExpandableAboutSection } from "@/components/ExpandableAboutSection";
 
 import { AvailabilitySchedulePicker } from "@/components/availability/AvailabilitySchedulePicker";
 import { useMyBusyBlocks } from "@/lib/availability-conflicts";
