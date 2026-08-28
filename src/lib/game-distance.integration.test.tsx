@@ -8,11 +8,6 @@ import { gameDistanceMi } from "@/lib/game-distance";
 import { __resetViewerLocationForTests, getViewerLocation, requestViewerLocation } from "@/lib/geo";
 
 vi.mock("@/lib/location-denial-telemetry", () => ({ recordDenial: vi.fn(async () => {}) }));
-vi.mock("@/lib/measurement-system", async (orig) => {
-  const mod = (await orig()) as Record<string, unknown>;
-  return mod;
-});
-
 type TestGame = {
   id: string;
   lat: number | null;
