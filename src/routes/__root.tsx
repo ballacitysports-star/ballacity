@@ -18,6 +18,7 @@ import { Toaster } from "@/components/ui/sonner";
 import { runLegacyHostMigration } from "@/lib/legacy-host-migration";
 import { useAuth } from "@/hooks/use-auth";
 import { useNotificationPush } from "@/lib/notifications";
+import { useGameReminderFlush } from "@/lib/game-reminders";
 import { useOneSignal } from "@/lib/onesignal";
 import { logAuthGateDecision, readStoredSupabaseSession } from "@/lib/authgate-log";
 import { clearLastVisited, rememberLastVisited } from "@/lib/last-visited";
@@ -447,6 +448,8 @@ function AuthGate({ children }: { children: React.ReactNode }) {
   const [verifying, setVerifying] = useState(false);
   useNotificationPush();
   useOneSignal();
+  // Delivers due pre-game reminders for the signed-in player.
+  useGameReminderFlush();
 
   // Let push/notification handlers route in-app instead of reloading the page.
 
