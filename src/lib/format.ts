@@ -26,3 +26,14 @@ export function formatWhenDate(iso: string) {
   if (hrs < 48 && hrs >= 0) return `Tomorrow`;
   return `${d.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", timeZone: TZ })}`;
 }
+
+/** Minimal shape needed to format an event's "when" line. */
+export type WhenLike = { date: string; allDay?: boolean | null };
+
+/**
+ * Canonical "when" line for games. All-day events never show a clock time —
+ * they render as the date plus an "All day" marker instead.
+ */
+export function formatGameWhen(game: WhenLike): string {
+  return game.allDay ? `${formatWhenDate(game.date)} · All day` : formatWhen(game.date);
+}

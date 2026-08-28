@@ -2,7 +2,7 @@ import { Link } from "@tanstack/react-router";
 import { motion } from "framer-motion";
 import { MapPin, Users, Clock, Lock, CalendarDays } from "lucide-react";
 import type { Game } from "@/lib/sample-data";
-import { formatWhen } from "@/lib/format";
+import { formatGameWhen } from "@/lib/format";
 import { useIsJoined } from "@/lib/games-store";
 import { useLiveParticipantCount } from "@/lib/game-participants-store";
 import { useJoinGate } from "@/lib/live-status";
@@ -93,7 +93,7 @@ export function GameListRow({ game, index = 0 }: { game: Game; index?: number })
           <div className="mt-0.5 flex items-center gap-2 text-[11px] text-muted-foreground">
             <span className="inline-flex items-center gap-1" suppressHydrationWarning>
               <Clock className="h-3 w-3 text-lime" />
-              {formatWhen(game.date)}
+              {formatGameWhen(game)}
             </span>
             <span className="inline-flex items-center gap-1 truncate">
               <MapPin className="h-3 w-3 text-coral" />

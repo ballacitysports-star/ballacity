@@ -5,7 +5,7 @@ import { MapPin, Users, Clock, Zap, Lock, Flame, MessageCircle, CalendarDays } f
 import { UserAvatar } from "@/components/UserAvatar";
 import { SpotsPill } from "@/components/SpotsPill";
 import type { Game } from "@/lib/sample-data";
-import { formatWhen } from "@/lib/format";
+import { formatGameWhen } from "@/lib/format";
 import { useIsJoined } from "@/lib/games-store";
 import { useLiveParticipantCount } from "@/lib/game-participants-store";
 import { useLiveStatus, useJoinGate } from "@/lib/live-status";
@@ -163,7 +163,7 @@ export function GameCard({ game, index = 0 }: { game: Game; index?: number }) {
           <div className="flex items-center gap-3 text-xs text-muted-foreground">
             <span className="inline-flex items-center gap-1.5" suppressHydrationWarning>
               <Clock className="h-3.5 w-3.5 text-lime" />
-              {formatWhen(game.date)}
+              {formatGameWhen(game)}
             </span>
             <span className="inline-flex items-center gap-1.5">
               <MapPin className="h-3.5 w-3.5 text-coral" />

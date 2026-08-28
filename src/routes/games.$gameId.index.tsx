@@ -35,7 +35,7 @@ import {
 import { useMyAge, fetchProfileAges } from "@/lib/use-my-age";
 import { requesterAgeLabel } from "@/lib/game-age";
 import { AgeRequirementFields } from "@/components/games/AgeRequirementFields";
-import { formatWhen, formatWhenDate } from "@/lib/format";
+import { formatGameWhen, formatWhen } from "@/lib/format";
 import { gameEndsAt } from "@/lib/game-time";
 import { AddToCalendarButton } from "@/components/datetime/AddToCalendarButton";
 import { GameReminderCard, GameReminderPicker } from "@/components/GameReminderSettings";
@@ -201,7 +201,7 @@ export const Route = createFileRoute("/games/$gameId/")({
         kind: "game",
         title: name,
         subtitle: game ? [game.sport, game.neighborhood ?? game.location].filter(Boolean).join(" • ") : "Pickup game on OpenRun",
-        meta: game ? [formatWhen(game.date), game.location, game.price ? `$${game.price}` : "Free"] : [],
+        meta: game ? [formatGameWhen(game), game.location, game.price ? `$${game.price}` : "Free"] : [],
       }),
       jsonLd: game
         ? {
@@ -1424,7 +1424,7 @@ function GameDetail() {
 <Meta
             icon={<Clock className="h-4 w-4 text-lime" />}
             label="Starts"
-            value={game.allDay ? formatWhenDate(game.date) : formatWhen(game.date)}
+            value={formatGameWhen(game)}
           />
           <Meta
             icon={<Calendar className="h-4 w-4 text-lime" />}

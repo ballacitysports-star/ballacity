@@ -34,7 +34,7 @@ import {
 } from "@/lib/payments";
 import { LegalNotice } from "@/components/LegalNotice";
 import { GAMES } from "@/lib/sample-data";
-import { formatWhen } from "@/lib/format";
+import { formatGameWhen } from "@/lib/format";
 import { zodValidator, fallback } from "@tanstack/zod-adapter";
 import { z } from "zod";
 
@@ -552,7 +552,7 @@ function SubmissionCard({ sub, onReviewed }: { sub: PaymentSubmission; onReviewe
           <div className="text-xs font-semibold truncate">{game?.title ?? sub.game_id}</div>
           {game && (
             <div className="text-[11px] text-muted-foreground">
-              {formatWhen(game.date)} · {game.location}
+              {formatGameWhen(game)} · {game.location}
             </div>
           )}
           <div className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1 text-xs">
@@ -715,7 +715,7 @@ function RequestsPanel() {
                 <div className="font-semibold text-sm truncate">{game?.title ?? r.game_id}</div>
                 {game && (
                   <div className="text-[11px] text-muted-foreground">
-                    {formatWhen(game.date)} · {game.location}
+                    {formatGameWhen(game)} · {game.location}
                   </div>
                 )}
                 <div className="text-[11px] text-muted-foreground mt-1">

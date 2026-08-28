@@ -4,7 +4,7 @@ import { type ReactNode, useMemo, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { MapPin, Navigation } from "lucide-react";
 import { GAMES, SPORTS } from "@/lib/sample-data";
-import { formatWhen } from "@/lib/format";
+import { formatGameWhen } from "@/lib/format";
 import { GamesMap, type MapPinItem } from "@/components/GamesMap";
 import { useMyProfile } from "@/lib/user-prefs-store";
 import { useHostedGames } from "@/lib/hosted-games-store";
@@ -214,7 +214,7 @@ function DefaultGameCard({ game }: { game: ActiveGame }) {
           <span className="truncate">{game.location}</span>
         </div>
         <div className="flex items-center justify-between mt-1.5">
-          <span className="text-xs">{formatWhen(game.date)}</span>
+          <span className="text-xs">{formatGameWhen(game)}</span>
           <SpotsPill spotsLeft={spotsLeft} />
         </div>
       </div>
