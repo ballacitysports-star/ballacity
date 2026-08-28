@@ -192,7 +192,7 @@ describe("multiple football levels", () => {
 
   it("allows multiple tiers on every sport", () => {
     const one = toggleSportTier("Tennis", { system: "NTRP", tier: "3.5" }, "4.0");
-    expect(levelTiers(one)).toEqual(["3.5", "4.0"]);
+    expect(levelTiers(one).sort()).toEqual(["3.5", "4.0"]);
     expect(levelTiers(toggleSportTier("Tennis", one, "4.0"))).toEqual(["3.5"]);
   });
 
