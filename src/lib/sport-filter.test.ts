@@ -47,7 +47,7 @@ describe("per-sport skill map", () => {
     expect(parseSportSkillMap("Rec", ["Baseball", "Tennis"])).toEqual({ Baseball: "Rec League" });
   });
 
-  it("keeps Football multi-select and single-select elsewhere", () => {
+  it("keeps every sport multi-select", () => {
     let map = toggleSportSkillTier({}, "Football", "Flag Rec");
     map = toggleSportSkillTier(map, "Football", "7v7 Travel / Showcase");
     expect(map.Football).toBe("Flag Rec · 7v7 Travel / Showcase");
@@ -56,8 +56,8 @@ describe("per-sport skill map", () => {
 
     let t = toggleSportSkillTier({}, "Tennis", "3.5");
     t = toggleSportSkillTier(t, "Tennis", "4.0");
-    expect(t.Tennis).toBe("4.0");
-    expect(countSkillSelections(toggleSportSkillTier(t, "Tennis", "4.0"))).toBe(0);
+    expect(t.Tennis).toBe("3.5 · 4.0");
+    expect(toggleSportSkillTier(t, "Tennis", "4.0").Tennis).toBe("3.5");
   });
 });
 
