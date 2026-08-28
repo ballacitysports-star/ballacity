@@ -511,7 +511,18 @@ export type CalendarEvent = EventWhen & {
   location?: string;
   url?: string;
   uid?: string;
+  /** Directions link (Google/Apple Maps) added to the invite body. */
+  mapUrl?: string;
+  /** Coordinates, emitted as an ics GEO property so map apps can pin it. */
+  geo?: { lat: number; lng: number } | null;
 };
+
+/** Invite body: description + directions + event link, in that order. */
+function calendarBody(event: CalendarEvent): string {
+  return [event.description, event.mapUrl ? `Directions: ${event.mapUrl}` : null, event.url]
+    .filter(Boolean)
+    .join("\n\n");
+}
 
 /** A full .ics document for one event. */
 export function buildIcs(event: CalendarEvent): string {
@@ -534,7 +545,11 @@ export function buildIcs(event: CalendarEvent): string {
     `SUMMARY:${icsEscape(event.title)}`,
   ];
   if (event.location) lines.push(`LOCATION:${icsEscape(event.location)}`);
-  if (event.description) lines.push(`DESCRIPTION:${icsEscape(event.description)}`);
+  const body = calendarBody(event);
+  if (body) lines.push(`DESCRIPTION:${icsEscape(body)}`);
+  if (event.geo && Number.isFinite(event.geo.lat) && Number.isFinite(event.geo.lng)) {
+    lines.push(`GEO:${event.geo.lat};${event.geo.lng}`);
+  }
   if (event.url) lines.push(`URL:${icsEscape(event.url)}`);
   lines.push("END:VEVENT", "END:VCALENDAR");
   return lines.join("\r\n");
@@ -556,7 +571,7 @@ export function googleCalendarUrl(event: CalendarEvent): string {
     ctz: resolveTimeZone(event.timezone),
   });
   if (event.location) params.set("location", event.location);
-  const details = [event.description, event.url].filter(Boolean).join("\n\n");
+  const details = calendarBody(event);
   if (details) params.set("details", details);
   return `https://calendar.google.com/calendar/render?${params.toString()}`;
 }
@@ -573,7 +588,8 @@ export function outlookCalendarUrl(event: CalendarEvent): string {
   });
   if (event.allDay) params.set("allday", "true");
   if (event.location) params.set("location", event.location);
-  if (event.description) params.set("body", event.description);
+  const outlookBody = calendarBody(event);
+  if (outlookBody) params.set("body", outlookBody);
   return `https://outlook.live.com/calendar/0/deeplink/compose?${params.toString()}`;
 }
 
