@@ -131,7 +131,7 @@ export function ProfileShareCard({
     typeof window === "undefined" ? data.path : `${window.location.origin}${data.path}`;
 
   const cardImage = ogImageUrl({
-    kind: data.kind === "player" ? "player" : "profile",
+    kind: data.kind === "gym" ? "venue" : data.kind,
     title: data.displayName,
     subtitle: bioSnippet || lines[0] || kindLabel,
     meta: [
