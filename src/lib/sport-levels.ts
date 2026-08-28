@@ -206,7 +206,6 @@ export const LEVELS_BY_SPORT: Record<Sport, SportScale> = {
     multi: true,
     tiers: FOOTBALL_TIERS,
     groups: FOOTBALL_GROUPS,
-    multi: true,
     hint: "Pick a level in each format you play — you can choose more than one.",
   },
 
