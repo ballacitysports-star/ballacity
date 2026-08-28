@@ -49,11 +49,23 @@ const YOUTH_DIVISIONS = [
   "Junior & Senior League (Ages 12–16)",
 ];
 
+/** Travel ball classifications, offered as a submenu under Travel / Showcase. */
+const TRAVEL_DIVISIONS = [
+  "Travel A / AA",
+  "Travel AAA",
+  "Travel Majors",
+  "Travel Nationals",
+];
+
 /**
- * Youth divisions live behind the "Rec League" chip as a submenu (see
- * `SportScale.submenus`) instead of cluttering the main tier row.
+ * Youth divisions live behind the "Rec League" chip and travel classifications
+ * behind "Travel / Showcase" as submenus (see `SportScale.submenus`) instead
+ * of cluttering the main tier row.
  */
-const BALL_SUBMENUS: Record<string, string[]> = { "Rec League": [...YOUTH_DIVISIONS] };
+const BALL_SUBMENUS: Record<string, string[]> = {
+  "Rec League": [...YOUTH_DIVISIONS],
+  "Travel / Showcase": [...TRAVEL_DIVISIONS],
+};
 
 const BALL_GROUPS = [
   { label: "Recreational", tiers: ["Casual / Pickup", "Rec League"] },
@@ -70,6 +82,7 @@ const BALL_TIERS = [
   ...YOUTH_DIVISIONS,
   "High School",
   "Travel / Showcase",
+  ...TRAVEL_DIVISIONS,
   "College / Adult Competitive",
 ];
 
