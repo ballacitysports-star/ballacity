@@ -30,9 +30,23 @@ type LocationSnapshot = {
   fixedAt: number | null;
   /** True when coords come from the remembered last-granted fix, not a fresh read. */
   remembered: boolean;
+  /** Where the current coords came from — a device fix or a typed-in place. */
+  source: "device" | "manual" | null;
+  /** Label of the manually chosen place, when source is "manual". */
+  label: string | null;
+  /** Why the last attempt failed ("denied" | "blocked" | "timeout" | "unavailable"). */
+  error: "denied" | "blocked" | "timeout" | "unavailable" | null;
 };
 
-const EMPTY: LocationSnapshot = { coords: null, status: "idle", fixedAt: null, remembered: false };
+const EMPTY: LocationSnapshot = {
+  coords: null,
+  status: "idle",
+  fixedAt: null,
+  remembered: false,
+  source: null,
+  label: null,
+  error: null,
+};
 
 let snapshot: LocationSnapshot = EMPTY;
 const listeners = new Set<() => void>();
