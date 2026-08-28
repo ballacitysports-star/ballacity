@@ -7,8 +7,7 @@
 // the UI can hide the chip / prompt for location instead of lying.
 import { useMemo } from "react";
 import type { Game } from "@/lib/sample-data";
-import { haversineKm, useUserLocation, type LatLng } from "@/lib/geo";
-import { MI_PER_KM } from "@/lib/geo";
+import { haversineKm, useUserLocation, MI_PER_KM, type LatLng } from "@/lib/geo";
 
 /** True when the game carries real (non-demo) venue coordinates. */
 export function hasRealGeo(game: Pick<Game, "lat" | "lng" | "pseudoGeo">): boolean {
@@ -30,9 +29,8 @@ export function gameDistanceMi(
 ): number | null {
   if (hasRealGeo(game)) {
     if (!viewer) return null;
-    return haversineKm(viewer, { lat: game.lat as number, lng: game.lng as number }) / MI_PER_KM === 0
-      ? 0
-      : haversineKm(viewer, { lat: game.lat as number, lng: game.lng as number }) * MI_PER_KM;
+    const km = haversineKm(viewer, { lat: game.lat as number, lng: game.lng as number });
+    return km * MI_PER_KM;
   }
   // Demo/legacy rows: fall back to whatever distance was seeded.
   return game.distanceMi ?? null;
