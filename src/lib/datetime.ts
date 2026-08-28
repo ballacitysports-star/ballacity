@@ -545,7 +545,11 @@ export function buildIcs(event: CalendarEvent): string {
     `SUMMARY:${icsEscape(event.title)}`,
   ];
   if (event.location) lines.push(`LOCATION:${icsEscape(event.location)}`);
-  if (event.description) lines.push(`DESCRIPTION:${icsEscape(event.description)}`);
+  const body = calendarBody(event);
+  if (body) lines.push(`DESCRIPTION:${icsEscape(body)}`);
+  if (event.geo && Number.isFinite(event.geo.lat) && Number.isFinite(event.geo.lng)) {
+    lines.push(`GEO:${event.geo.lat};${event.geo.lng}`);
+  }
   if (event.url) lines.push(`URL:${icsEscape(event.url)}`);
   lines.push("END:VEVENT", "END:VCALENDAR");
   return lines.join("\r\n");
