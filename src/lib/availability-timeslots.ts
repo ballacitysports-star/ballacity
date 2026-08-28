@@ -137,8 +137,19 @@ export function fmtShortDate(dateKey: string): string {
   });
 }
 
+/**
+ * True when a slot spans the whole day: either literally 00:00–24:00/23:59,
+ * or matching the "All day" preset window. All-day slots never render times.
+ */
+export function isAllDaySlot(s: TimeSlot): boolean {
+  const preset = TIME_PRESETS.find((p) => p.id === "allday")!;
+  if (s.start === preset.start && s.end === preset.end) return true;
+  return s.start === "00:00" && (s.end === "24:00" || s.end === "23:59");
+}
+
 export function formatSlot(s: TimeSlot): string {
   const when = isDateSlot(s) ? fmtShortDate(s.date) : WEEKDAY_LABELS[s.weekday];
+  if (isAllDaySlot(s)) return `${when} · All day`;
   return `${when} ${fmt12(s.start)}–${fmt12(s.end === "24:00" ? "23:59" : s.end)}`;
 }
 
