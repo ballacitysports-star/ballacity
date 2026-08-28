@@ -406,6 +406,10 @@ export async function updateHostedGame(
   if (patch.title !== undefined) dbPatch.title = patch.title;
   if (patch.location !== undefined) dbPatch.location = patch.location;
   if (patch.neighborhood !== undefined) dbPatch.neighborhood = patch.neighborhood;
+  // Venue coordinates: real geo from the autocomplete/geocoder, or null when
+  // the host cleared/changed the address to something we couldn't resolve.
+  if (patch.lat !== undefined) dbPatch.lat = patch.lat ?? null;
+  if (patch.lng !== undefined) dbPatch.lng = patch.lng ?? null;
   if (patch.date !== undefined) dbPatch.date = patch.date;
   if (patch.duration !== undefined) dbPatch.duration = patch.duration;
   if ((patch as { endsAt?: string | null }).endsAt !== undefined) {
