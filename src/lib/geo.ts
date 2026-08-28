@@ -264,15 +264,23 @@ export function useUserLocation() {
 
   const request = useCallback(() => requestViewerLocation(), []);
   const forget = useCallback(() => clearRememberedLocation(), []);
+  const setManual = useCallback(
+    (coords: LatLng, label?: string) => setManualViewerLocation(coords, label),
+    [],
+  );
 
   return {
     coords: snap.coords,
     status: snap.status,
     fixedAt: snap.fixedAt,
     remembered: snap.remembered,
+    source: snap.source,
+    label: snap.label,
+    error: snap.error,
     explanation: locationStatusExplanation(snap.status, snap.remembered),
     request,
     forget,
+    setManual,
   };
 }
 
