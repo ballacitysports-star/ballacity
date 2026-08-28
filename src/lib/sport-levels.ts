@@ -37,6 +37,7 @@ export type SportScale = {
 export const GENERIC_SCALE: SportScale = {
   system: "Self-rated",
   tiers: ["Beginner", "Casual", "Intermediate", "Advanced"],
+  multi: true,
 };
 
 /** Little League age divisions, offered as a submenu under Rec League. */
@@ -174,6 +175,7 @@ const GENERIC_TIER_ALIASES: Record<string, string> = { Pro: "Advanced" };
 export const LEVELS_BY_SPORT: Record<Sport, SportScale> = {
   Baseball: {
     system: "Level",
+    multi: true,
     tiers: BALL_TIERS,
     groups: BALL_GROUPS,
     submenus: BALL_SUBMENUS,
@@ -181,6 +183,7 @@ export const LEVELS_BY_SPORT: Record<Sport, SportScale> = {
   },
   Softball: {
     system: "Level",
+    multi: true,
     tiers: BALL_TIERS,
     groups: BALL_GROUPS,
     submenus: BALL_SUBMENUS,
@@ -189,6 +192,7 @@ export const LEVELS_BY_SPORT: Record<Sport, SportScale> = {
 
   Basketball: {
     system: "Level",
+    multi: true,
     tiers: [
       "Casual / Pickup",
       "Rec League",
@@ -199,6 +203,7 @@ export const LEVELS_BY_SPORT: Record<Sport, SportScale> = {
   },
   Football: {
     system: "Level",
+    multi: true,
     tiers: FOOTBALL_TIERS,
     groups: FOOTBALL_GROUPS,
     multi: true,
@@ -207,6 +212,7 @@ export const LEVELS_BY_SPORT: Record<Sport, SportScale> = {
 
   Soccer: {
     system: "Level",
+    multi: true,
     tiers: [
       "Casual / Pickup",
       "Rec League",
@@ -217,20 +223,24 @@ export const LEVELS_BY_SPORT: Record<Sport, SportScale> = {
   },
   Tennis: {
     system: "NTRP",
+    multi: true,
     tiers: ["1.5", "2.0", "2.5", "3.0", "3.5", "4.0", "4.5", "5.0"],
     hint: "USTA NTRP rating.",
   },
   Pickleball: {
     system: "DUPR",
+    multi: true,
     tiers: ["2.0", "2.5", "3.0", "3.5", "4.0", "4.5", "5.0"],
     hint: "DUPR rating.",
   },
   Volleyball: {
     system: "USAV",
+    multi: true,
     tiers: ["Casual / Pickup", "Rec (B)", "Intermediate (BB)", "Advanced (A)", "Competitive (AA)"],
   },
   Running: {
     system: "Pace",
+    multi: true,
     tiers: ["12:00+/mi", "11:00/mi", "10:00/mi", "9:00/mi", "8:00/mi", "7:00/mi or faster"],
     hint: "Typical race pace.",
   },
