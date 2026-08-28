@@ -35,7 +35,7 @@ import {
 import { useMyAge, fetchProfileAges } from "@/lib/use-my-age";
 import { requesterAgeLabel } from "@/lib/game-age";
 import { AgeRequirementFields } from "@/components/games/AgeRequirementFields";
-import { formatGameWhen, formatWhen } from "@/lib/format";
+import { formatGameWhen, formatWhen, formatWhenDate } from "@/lib/format";
 import { gameEndsAt } from "@/lib/game-time";
 import { AddToCalendarButton } from "@/components/datetime/AddToCalendarButton";
 import { GameReminderCard, GameReminderPicker } from "@/components/GameReminderSettings";
@@ -3422,8 +3422,11 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 function formatEndsAt(
   game: Pick<Game, "date" | "duration" | "allDay"> & { endsAt?: string | null },
 ): string {
-  if (game.allDay) return "All day";
   const end = gameEndsAt(game);
+  if (game.allDay) {
+    const iso = Number.isFinite(end) ? new Date(end).toISOString() : game.date;
+    return formatWhenDate(iso);
+  }
   if (!Number.isFinite(end)) return game.duration ?? "—";
   return formatWhen(new Date(end).toISOString());
 }
