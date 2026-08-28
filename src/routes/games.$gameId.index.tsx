@@ -37,6 +37,7 @@ import { requesterAgeLabel } from "@/lib/game-age";
 import { AgeRequirementFields } from "@/components/games/AgeRequirementFields";
 import { formatWhen, formatWhenDate } from "@/lib/format";
 import { gameEndsAt } from "@/lib/game-time";
+import { AddToCalendarButton } from "@/components/datetime/AddToCalendarButton";
 import { ReviewsSection } from "@/components/ReviewsSection";
 import { SpotsPill } from "@/components/SpotsPill";
 import { UserAvatar } from "@/components/UserAvatar";
@@ -1431,6 +1432,22 @@ function GameDetail() {
           />
         </div>
 
+        <div className="flex justify-end">
+          <AddToCalendarButton
+            event={{
+              title: game.title,
+              start: game.date,
+              end: new Date(gameEndsAt(game)).toISOString(),
+              allDay: !!game.allDay,
+              timezone: game.timezone ?? null,
+              location: [game.location, game.neighborhood].filter(Boolean).join(", "),
+              description: game.description ?? undefined,
+              url: typeof window !== "undefined" ? window.location.href : undefined,
+              uid: `game-${game.id}@ballacity`,
+            }}
+          />
+        </div>
+
         {/* Location card */}
         <div className="rounded-3xl border border-border bg-surface overflow-hidden">
           <div
@@ -2623,6 +2640,8 @@ function EditGameModal({
     return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
   });
   const [duration, setDuration] = useState(game.duration);
+  const [allDay, setAllDay] = useState(!!game.allDay);
+  const [endLocal, setEndLocal] = useState(() => toLocalInput(gameEndsAt(game)));
   const [maxPlayers, setMaxPlayers] = useState<number>(
     Math.max(2, Math.min(30, Number(game.maxPlayers) || 10)),
   );
@@ -2724,6 +2743,16 @@ function EditGameModal({
       const mp = Math.max(2, Math.min(30, Number(maxPlayers) || game.maxPlayers));
       const pr = Math.max(0, Number(price) || 0);
       const iso = new Date(dateLocal).toISOString();
+      const startMs = new Date(dateLocal).getTime();
+      const endMs = new Date(endLocal).getTime();
+      if (!allDay && Number.isFinite(startMs) && Number.isFinite(endMs) && endMs <= startMs) {
+        toast.error("End time must be after the start time.");
+        return;
+      }
+      const nextDurationMin =
+        !allDay && Number.isFinite(startMs) && Number.isFinite(endMs) && endMs > startMs
+          ? Math.round((endMs - startMs) / 60000)
+          : null;
       const trimmedImage = image.trim();
       const finalImage = trimmedImage || imageFor(sport);
       const updated = await updateHostedGame(game.id, {
@@ -2735,7 +2764,9 @@ function EditGameModal({
         location: location.trim() || game.location,
         neighborhood: neighborhood.trim(),
         date: Number.isFinite(new Date(dateLocal).getTime()) ? iso : game.date,
-        duration: duration.trim() || game.duration,
+        duration: nextDurationMin ? `${nextDurationMin} min` : duration.trim() || game.duration,
+        endsAt: allDay ? null : Number.isFinite(endMs) ? new Date(endMs).toISOString() : null,
+        allDay,
         maxPlayers: mp,
         price: pr,
         indoor,
@@ -3009,14 +3040,43 @@ function EditGameModal({
                 className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm [color-scheme:dark]"
               />
             </Field>
-            <Field label="Duration">
+            <Field label="Ends (date & time)">
               <input
-                value={duration}
-                onChange={(e) => setDuration(e.target.value)}
-                placeholder="90 min"
-                className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm"
+                type="datetime-local"
+                value={endLocal}
+                min={dateLocal}
+                disabled={allDay}
+                onChange={(e) => setEndLocal(e.target.value)}
+                className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm [color-scheme:dark] disabled:opacity-50"
               />
             </Field>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setAllDay((v) => !v)}
+              className={`rounded-full border px-3 py-1.5 text-xs font-semibold ${
+                allDay
+                  ? "border-lime bg-lime/10 text-lime"
+                  : "border-border bg-background text-muted-foreground"
+              }`}
+            >
+              All-day event
+            </button>
+            {!allDay &&
+              [60, 90, 120, 180].map((min) => (
+                <button
+                  key={min}
+                  type="button"
+                  onClick={() => {
+                    const start = new Date(dateLocal).getTime();
+                    if (Number.isFinite(start)) setEndLocal(toLocalInput(start + min * 60000));
+                  }}
+                  className="rounded-full border border-border bg-background px-3 py-1.5 text-xs font-semibold text-muted-foreground"
+                >
+                  {min < 120 ? `${min} min` : `${min / 60} h`}
+                </button>
+              ))}
           </div>
 
           {/* Max players slider */}
@@ -3270,6 +3330,14 @@ function EditToggle({
       </span>
     </button>
   );
+}
+
+/** ms -> value for a <input type="datetime-local"> in local time. */
+function toLocalInput(ms: number): string {
+  if (!Number.isFinite(ms)) return "";
+  const d = new Date(ms);
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
