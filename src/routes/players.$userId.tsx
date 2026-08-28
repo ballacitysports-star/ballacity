@@ -35,6 +35,7 @@ import { useProfileOverrides, useDistanceUnit } from "@/lib/user-prefs-store";
 import { ProfileLinksList } from "@/components/ProfileLinks";
 import { ProfileChannelHeader, ChannelPill } from "@/components/profile/ProfileChannelHeader";
 import { ProfileAboutSheet, AboutBlock, AboutStats } from "@/components/profile/ProfileAboutSheet";
+import { ExpandableAboutSection } from "@/components/ExpandableAboutSection";
 import { BadgeList } from "@/components/BadgeList";
 import {
   Dialog,
