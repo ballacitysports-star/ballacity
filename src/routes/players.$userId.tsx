@@ -345,7 +345,7 @@ function PlayerProfilePage() {
             searchRadiusMi != null ? formatDistance(searchRadiusMi, unit) : undefined,
           sports: sportsList.map((s) => ({
             name: s.name,
-            level: s.level ? formatSportLevel(s.name as any, s.level as any) : null,
+            level: s.level ? formatSportLevel(s.level as any) : null,
           })),
           trustScore: rep.trustScore,
           reviewCount: rep.count,
