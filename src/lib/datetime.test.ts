@@ -193,3 +193,37 @@ describe("calendar export", () => {
   });
 
 });
+
+describe("all-day calendar exports", () => {
+  const allDay = {
+    title: "Open Run Day",
+    start: "2026-09-01T04:00:00.000Z",
+    end: "2026-09-01T04:00:00.000Z",
+    allDay: true,
+    timezone: "America/New_York",
+    viewerTimeZone: "America/New_York",
+  };
+
+  it("emits date-only DTSTART/DTEND with exclusive end and no times", () => {
+    const ics = buildIcs(allDay);
+    expect(ics).toContain("DTSTART;VALUE=DATE:20260901");
+    expect(ics).toContain("DTEND;VALUE=DATE:20260902");
+    expect(ics).toContain("X-MICROSOFT-CDO-ALLDAYEVENT:TRUE");
+    expect(ics).not.toMatch(/DTSTART;TZID/);
+    expect(ics).not.toContain("BEGIN:VTIMEZONE");
+  });
+
+  it("keeps multi-day all-day blocks inclusive of the last day", () => {
+    const ics = buildIcs({ ...allDay, end: "2026-09-04T04:00:00.000Z" });
+    expect(ics).toContain("DTSTART;VALUE=DATE:20260901");
+    expect(ics).toContain("DTEND;VALUE=DATE:20260904");
+  });
+
+  it("uses date-only ranges for Google and Outlook links", () => {
+    expect(googleCalendarUrl(allDay)).toContain("dates=20260901%2F20260902");
+    const outlook = outlookCalendarUrl(allDay);
+    expect(outlook).toContain("allday=true");
+    expect(outlook).toContain("startdt=2026-09-01");
+    expect(outlook).toContain("enddt=2026-09-02");
+  });
+});
