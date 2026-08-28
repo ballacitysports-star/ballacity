@@ -153,8 +153,11 @@ export function formatSlot(s: TimeSlot): string {
   return `${when} ${fmt12(s.start)}–${fmt12(s.end === "24:00" ? "23:59" : s.end)}`;
 }
 
-/** One-line human summary, e.g. "3 dates · Sat 8 AM–11 AM, Sun 6 PM–9 PM". */
-export function summarizeSlots(slots: TimeSlot[], max = 2): string {
+/**
+ * Human summary, e.g. "3 dates · Sat 8 AM–11 AM, Sun 6 PM–9 PM".
+ * Every slot is listed by default — pass `max` only to intentionally truncate.
+ */
+export function summarizeSlots(slots: TimeSlot[], max = Number.POSITIVE_INFINITY): string {
   if (slots.length === 0) return "";
   const dateCount = slots.filter(isDateSlot).length;
   const weekCount = slots.length - dateCount;
