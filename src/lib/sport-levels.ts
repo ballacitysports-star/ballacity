@@ -43,8 +43,7 @@ const YOUTH_DIVISIONS = [
 ];
 
 const BALL_GROUPS = [
-  { label: "Recreational", tiers: ["Casual / Pickup", "Rec League"] },
-  { label: "Little League / Youth", tiers: YOUTH_DIVISIONS },
+  { label: "Recreational", tiers: ["Casual / Pickup", "Rec League", ...YOUTH_DIVISIONS] },
   {
     label: "Competitive",
     tiers: ["High School", "Travel / Showcase", "College / Adult Competitive"],
