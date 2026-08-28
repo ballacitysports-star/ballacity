@@ -46,6 +46,8 @@ import { AvailabilityRequiredNotice } from "@/components/availability/Availabili
 import { AvailabilityDetailDialog } from "@/components/players/AvailabilityDetailDialog";
 import { shareAvailability } from "@/components/players/share-availability";
 import { ExpandableAboutSection } from "@/components/ExpandableAboutSection";
+import { ProfileLinksList } from "@/components/ProfileLinks";
+import type { ProfileLink } from "@/lib/user-prefs-store";
 
 import { AvailabilitySchedulePicker } from "@/components/availability/AvailabilitySchedulePicker";
 import { useMyBusyBlocks } from "@/lib/availability-conflicts";
