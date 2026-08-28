@@ -121,11 +121,6 @@ import type { JoinGate } from "@/lib/live-status";
 import { JoinBlockedReason } from "@/components/JoinBlockedReason";
 
 import { useAuth } from "@/hooks/use-auth";
-import { useAvailabilityGate } from "@/lib/availability-gate";
-import {
-  AvailabilityPromptDialog,
-  availabilityPromptDismissed,
-} from "@/components/availability/AvailabilityPromptDialog";
 import { useMyProfile } from "@/lib/user-prefs-store";
 import { getOrCreateDirectConversation } from "@/lib/messages";
 import { createNotification } from "@/lib/notifications";
@@ -717,10 +712,7 @@ function GameDetail() {
         };
 
   const [confirmAction, setConfirmAction] = useState<"join" | "leave" | null>(null);
-  // Availability nudge before joining (soft — never blocks).
-  const availGate = useAvailabilityGate();
-  const [availPromptOpen, setAvailPromptOpen] = useState(false);
-  const pendingJoinRef = useRef<string | null>(null);
+
 
   const executeJoinAction = async (preselectedPosition?: string) => {
     // Expired invite → block all join actions and steer to discovery.
@@ -962,19 +954,7 @@ function GameDetail() {
   };
 
   const handleJoin = async (preselectedPosition?: string) => {
-    // Soft prompt: first join attempt without any open player availability.
-    if (
-      !isHost &&
-      !viewerCountsAsJoined &&
-      !isPending &&
-      !availGate.loading &&
-      !availGate.hasOpenAvailability &&
-      !availabilityPromptDismissed()
-    ) {
-      pendingJoinRef.current = preselectedPosition ?? null;
-      setAvailPromptOpen(true);
-      return;
-    }
+
     setProcessing(true);
     try {
       await executeJoinAction(preselectedPosition);
@@ -2532,15 +2512,6 @@ function GameDetail() {
         />
       )}
 
-      <AvailabilityPromptDialog
-        open={availPromptOpen}
-        onClose={() => setAvailPromptOpen(false)}
-        onContinue={() => {
-          const pos = pendingJoinRef.current ?? undefined;
-          pendingJoinRef.current = null;
-          void handleJoin(pos);
-        }}
-      />
 
       <AlertDialog
         open={confirmAction !== null}
