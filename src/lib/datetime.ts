@@ -515,6 +515,8 @@ export type CalendarEvent = EventWhen & {
   mapUrl?: string;
   /** Coordinates, emitted as an ics GEO property so map apps can pin it. */
   geo?: { lat: number; lng: number } | null;
+  /** Zone the invite should display in; defaults to the viewer's device zone. */
+  viewerTimeZone?: string | null;
 };
 
 /** Invite body: description + directions + event link, in that order. */
@@ -524,26 +526,65 @@ function calendarBody(event: CalendarEvent): string {
     .join("\n\n");
 }
 
-/** A full .ics document for one event. */
+/** `YYYYMMDDTHHMMSS` wall-clock stamp inside a zone (no trailing Z). */
+function icsLocalStamp(at: Date | string | number, tz: string): string {
+  const date = dateKeyInZone(at, tz).replace(/-/g, "");
+  const time = timeKeyInZone(at, tz).replace(/:/g, "");
+  return `${date}T${time}00`;
+}
+
+function icsOffset(minutes: number): string {
+  const sign = minutes < 0 ? "-" : "+";
+  const abs = Math.abs(minutes);
+  return `${sign}${String(Math.floor(abs / 60)).padStart(2, "0")}${String(abs % 60).padStart(2, "0")}`;
+}
+
+/**
+ * Minimal VTIMEZONE so Apple Calendar and other strict parsers accept the TZID.
+ * Both the start and end offsets are emitted, which covers a DST shift mid-event.
+ */
+function icsVTimezone(tzid: string, start: Date, end: Date): string[] {
+  const startOffset = zoneOffsetMin(start, tzid);
+  const endOffset = zoneOffsetMin(end, tzid);
+  const block = (from: number, to: number, at: Date) => [
+    "BEGIN:STANDARD",
+    `DTSTART:${icsLocalStamp(at, tzid)}`,
+    `TZOFFSETFROM:${icsOffset(from)}`,
+    `TZOFFSETTO:${icsOffset(to)}`,
+    `TZNAME:${timeZoneAbbr(at, tzid)}`,
+    "END:STANDARD",
+  ];
+  const lines = ["BEGIN:VTIMEZONE", `TZID:${tzid}`, ...block(startOffset, startOffset, start)];
+  if (endOffset !== startOffset) lines.push(...block(startOffset, endOffset, end));
+  lines.push("END:VTIMEZONE");
+  return lines;
+}
+
+/** A full .ics document for one event, timed in the viewer's own zone. */
 export function buildIcs(event: CalendarEvent): string {
   const { start, end } = whenBounds(event);
+  const tzid = resolveTimeZone(event.viewerTimeZone ?? deviceTimeZone());
   const uid = event.uid ?? `${icsStamp(start)}-ballacity`;
   const lines = [
     "BEGIN:VCALENDAR",
     "VERSION:2.0",
     "PRODID:-//BallaCity//EN",
     "CALSCALE:GREGORIAN",
+    `X-WR-TIMEZONE:${tzid}`,
+  ];
+  if (!event.allDay) lines.push(...icsVTimezone(tzid, start, end));
+  lines.push(
     "BEGIN:VEVENT",
     `UID:${uid}`,
     `DTSTAMP:${icsStamp(new Date())}`,
     event.allDay
       ? `DTSTART;VALUE=DATE:${dateKeyInZone(start, event.timezone).replace(/-/g, "")}`
-      : `DTSTART:${icsStamp(start)}`,
+      : `DTSTART;TZID=${tzid}:${icsLocalStamp(start, tzid)}`,
     event.allDay
       ? `DTEND;VALUE=DATE:${dateKeyInZone(end, event.timezone).replace(/-/g, "")}`
-      : `DTEND:${icsStamp(end)}`,
+      : `DTEND;TZID=${tzid}:${icsLocalStamp(end, tzid)}`,
     `SUMMARY:${icsEscape(event.title)}`,
-  ];
+  );
   if (event.location) lines.push(`LOCATION:${icsEscape(event.location)}`);
   const body = calendarBody(event);
   if (body) lines.push(`DESCRIPTION:${icsEscape(body)}`);
@@ -554,6 +595,7 @@ export function buildIcs(event: CalendarEvent): string {
   lines.push("END:VEVENT", "END:VCALENDAR");
   return lines.join("\r\n");
 }
+
 
 /** Google Calendar "add event" link. */
 export function googleCalendarUrl(event: CalendarEvent): string {
