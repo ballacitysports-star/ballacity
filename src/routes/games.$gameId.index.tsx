@@ -2639,7 +2639,7 @@ function EditGameModal({
     const pad = (n: number) => String(n).padStart(2, "0");
     return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
   });
-  const [duration, setDuration] = useState(game.duration);
+  const [duration] = useState(game.duration);
   const [allDay, setAllDay] = useState(!!game.allDay);
   const [endLocal, setEndLocal] = useState(() => toLocalInput(gameEndsAt(game)));
   const [maxPlayers, setMaxPlayers] = useState<number>(
