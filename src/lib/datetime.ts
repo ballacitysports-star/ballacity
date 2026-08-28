@@ -511,7 +511,18 @@ export type CalendarEvent = EventWhen & {
   location?: string;
   url?: string;
   uid?: string;
+  /** Directions link (Google/Apple Maps) added to the invite body. */
+  mapUrl?: string;
+  /** Coordinates, emitted as an ics GEO property so map apps can pin it. */
+  geo?: { lat: number; lng: number } | null;
 };
+
+/** Invite body: description + directions + event link, in that order. */
+function calendarBody(event: CalendarEvent): string {
+  return [event.description, event.mapUrl ? `Directions: ${event.mapUrl}` : null, event.url]
+    .filter(Boolean)
+    .join("\n\n");
+}
 
 /** A full .ics document for one event. */
 export function buildIcs(event: CalendarEvent): string {
