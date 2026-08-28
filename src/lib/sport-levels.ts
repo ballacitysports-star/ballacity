@@ -49,11 +49,23 @@ const YOUTH_DIVISIONS = [
   "Junior & Senior League (Ages 12–16)",
 ];
 
+/** Travel ball classifications, offered as a submenu under Travel / Showcase. */
+const TRAVEL_DIVISIONS = [
+  "Travel A / AA",
+  "Travel AAA",
+  "Travel Majors",
+  "Travel Nationals",
+];
+
 /**
- * Youth divisions live behind the "Rec League" chip as a submenu (see
- * `SportScale.submenus`) instead of cluttering the main tier row.
+ * Youth divisions live behind the "Rec League" chip and travel classifications
+ * behind "Travel / Showcase" as submenus (see `SportScale.submenus`) instead
+ * of cluttering the main tier row.
  */
-const BALL_SUBMENUS: Record<string, string[]> = { "Rec League": [...YOUTH_DIVISIONS] };
+const BALL_SUBMENUS: Record<string, string[]> = {
+  "Rec League": [...YOUTH_DIVISIONS],
+  "Travel / Showcase": [...TRAVEL_DIVISIONS],
+};
 
 const BALL_GROUPS = [
   { label: "Recreational", tiers: ["Casual / Pickup", "Rec League"] },
@@ -70,6 +82,7 @@ const BALL_TIERS = [
   ...YOUTH_DIVISIONS,
   "High School",
   "Travel / Showcase",
+  ...TRAVEL_DIVISIONS,
   "College / Adult Competitive",
 ];
 
@@ -114,11 +127,16 @@ const BALL_TIER_ALIASES: Record<string, string> = {
   "Junior League": "Junior & Senior League (Ages 12–16)",
   "Senior League": "Junior & Senior League (Ages 12–16)",
   College: "College / Adult Competitive",
-  "Minor A": "College / Adult Competitive",
-  "Minor AA": "College / Adult Competitive",
-  "Minor AAA": "College / Adult Competitive",
+  "Minor A": "Travel A / AA",
+  "Minor AA": "Travel A / AA",
+  "Minor AAA": "Travel AAA",
   Major: "Majors (Ages 9–12)",
-  National: "College / Adult Competitive",
+  National: "Travel Nationals",
+  "A / AA": "Travel A / AA",
+  "Single-A": "Travel A / AA",
+  AA: "Travel A / AA",
+  AAA: "Travel AAA",
+  Nationals: "Travel Nationals",
 };
 
 
@@ -159,14 +177,14 @@ export const LEVELS_BY_SPORT: Record<Sport, SportScale> = {
     tiers: BALL_TIERS,
     groups: BALL_GROUPS,
     submenus: BALL_SUBMENUS,
-    hint: "Highest level you've played. Tap Rec League for youth divisions.",
+    hint: "Highest level you've played. Tap Rec League or Travel / Showcase for divisions.",
   },
   Softball: {
     system: "Level",
     tiers: BALL_TIERS,
     groups: BALL_GROUPS,
     submenus: BALL_SUBMENUS,
-    hint: "Highest level you've played. Tap Rec League for youth divisions.",
+    hint: "Highest level you've played. Tap Rec League or Travel / Showcase for divisions.",
   },
 
   Basketball: {
