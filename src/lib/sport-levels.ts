@@ -134,8 +134,19 @@ const TIER_ALIASES_BY_SPORT: Record<string, Record<string, string>> = {
 const GENERIC_TIER_ALIASES: Record<string, string> = { Pro: "Advanced" };
 
 export const LEVELS_BY_SPORT: Record<Sport, SportScale> = {
-  Baseball: { system: "Level", tiers: BALL_TIERS, hint: "Highest level you've played." },
-  Softball: { system: "Level", tiers: BALL_TIERS, hint: "Highest level you've played." },
+  Baseball: {
+    system: "Level",
+    tiers: BALL_TIERS,
+    groups: BALL_GROUPS,
+    hint: "Highest level you've played.",
+  },
+  Softball: {
+    system: "Level",
+    tiers: BALL_TIERS,
+    groups: BALL_GROUPS,
+    hint: "Highest level you've played.",
+  },
+
   Basketball: {
     system: "Level",
     tiers: [
