@@ -1,10 +1,11 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useSyncExternalStore } from "react";
 import { recordDenial } from "@/lib/location-denial-telemetry";
 
 export type LatLng = { lat: number; lng: number };
 export type GeoStatus = "idle" | "prompting" | "granted" | "denied" | "unsupported";
 
 const CACHE_KEY = "openrun.userLoc.v1";
+/** How long a stored fix counts as "fresh" before we label it remembered. */
 const CACHE_TTL_MS = 10 * 60 * 1000;
 
 export const MI_PER_KM = 0.621371;
@@ -21,58 +22,180 @@ export function haversineKm(a: LatLng, b: LatLng): number {
   return 2 * R * Math.asin(Math.min(1, Math.sqrt(s)));
 }
 
-function readCache(): LatLng | null {
+type LocationSnapshot = {
+  /** Coordinates currently used for every distance in the UI. */
+  coords: LatLng | null;
+  status: GeoStatus;
+  /** When `coords` were captured (ms epoch), or null when we have none. */
+  fixedAt: number | null;
+  /** True when coords come from the remembered last-granted fix, not a fresh read. */
+  remembered: boolean;
+};
+
+const EMPTY: LocationSnapshot = { coords: null, status: "idle", fixedAt: null, remembered: false };
+
+let snapshot: LocationSnapshot = EMPTY;
+const listeners = new Set<() => void>();
+let hydrated = false;
+
+function emit() {
+  for (const l of [...listeners]) l();
+}
+
+function setSnapshot(next: LocationSnapshot) {
+  snapshot = next;
+  emit();
+}
+
+function readCache(): { coords: LatLng; at: number } | null {
   if (typeof window === "undefined") return null;
-  try {
-    const raw = window.sessionStorage.getItem(CACHE_KEY);
-    if (!raw) return null;
-    const parsed = JSON.parse(raw) as { at: number; coords: LatLng };
-    if (Date.now() - parsed.at > CACHE_TTL_MS) return null;
-    return parsed.coords;
-  } catch {
-    return null;
+  for (const store of [window.localStorage, window.sessionStorage]) {
+    try {
+      const raw = store?.getItem(CACHE_KEY);
+      if (!raw) continue;
+      const parsed = JSON.parse(raw) as { at: number; coords: LatLng };
+      if (
+        !parsed?.coords ||
+        typeof parsed.coords.lat !== "number" ||
+        typeof parsed.coords.lng !== "number"
+      ) {
+        continue;
+      }
+      return { coords: parsed.coords, at: typeof parsed.at === "number" ? parsed.at : 0 };
+    } catch {
+      /* ignore */
+    }
   }
+  return null;
 }
 
 function writeCache(coords: LatLng) {
   if (typeof window === "undefined") return;
+  const payload = JSON.stringify({ at: Date.now(), coords });
+  // localStorage remembers the last granted location across sessions;
+  // sessionStorage keeps older builds/tabs in sync.
   try {
-    window.sessionStorage.setItem(CACHE_KEY, JSON.stringify({ at: Date.now(), coords }));
+    window.localStorage.setItem(CACHE_KEY, payload);
+  } catch {
+    /* ignore */
+  }
+  try {
+    window.sessionStorage.setItem(CACHE_KEY, payload);
   } catch {
     /* ignore */
   }
 }
 
-export function useUserLocation() {
-  const cached = typeof window !== "undefined" ? readCache() : null;
-  const [coords, setCoords] = useState<LatLng | null>(cached);
-  const [status, setStatus] = useState<GeoStatus>(cached ? "granted" : "idle");
-
-  const request = useCallback(() => {
-    if (typeof navigator === "undefined" || !navigator.geolocation) {
-      setStatus("unsupported");
-      void recordDenial(null);
-      return;
+/** Forget the remembered fix (used by "reset location" affordances). */
+export function clearRememberedLocation() {
+  if (typeof window !== "undefined") {
+    try {
+      window.localStorage.removeItem(CACHE_KEY);
+      window.sessionStorage.removeItem(CACHE_KEY);
+    } catch {
+      /* ignore */
     }
-    setStatus("prompting");
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        const next = { lat: pos.coords.latitude, lng: pos.coords.longitude };
-        setCoords(next);
-        setStatus("granted");
-        writeCache(next);
-      },
-      (err) => {
-        setStatus("denied");
-        void recordDenial(err);
-      },
-      { enableHighAccuracy: false, maximumAge: 5 * 60 * 1000, timeout: 10_000 },
-    );
-  }, []);
+  }
+  setSnapshot(EMPTY);
+}
+
+/** Load the remembered fix once, after hydration, so SSR/CSR markup matches. */
+function hydrateOnce() {
+  if (hydrated) return;
+  hydrated = true;
+  const cached = readCache();
+  if (!cached) return;
+  const fresh = Date.now() - cached.at <= CACHE_TTL_MS;
+  setSnapshot({
+    coords: cached.coords,
+    status: "granted",
+    fixedAt: cached.at,
+    remembered: !fresh,
+  });
+}
+
+/** The single viewer location every distance in the app is derived from. */
+export function getViewerLocation(): LocationSnapshot {
+  return snapshot;
+}
+
+/**
+ * Ask the browser for a position. Safe to call repeatedly: after a denial this
+ * re-requests permission, which re-prompts in browsers where the user has since
+ * cleared the block, and keeps the remembered fix visible meanwhile.
+ */
+export function requestViewerLocation(): void {
+  if (typeof navigator === "undefined" || !navigator.geolocation) {
+    setSnapshot({ ...snapshot, status: "unsupported" });
+    void recordDenial(null);
+    return;
+  }
+  setSnapshot({ ...snapshot, status: "prompting" });
+  navigator.geolocation.getCurrentPosition(
+    (pos) => {
+      const coords = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+      writeCache(coords);
+      setSnapshot({ coords, status: "granted", fixedAt: Date.now(), remembered: false });
+    },
+    (err) => {
+      // Keep the remembered coordinates: a denial shouldn't blank out distances
+      // the viewer already saw.
+      setSnapshot({ ...snapshot, status: "denied", remembered: !!snapshot.coords });
+      void recordDenial(err);
+    },
+    { enableHighAccuracy: false, maximumAge: 5 * 60 * 1000, timeout: 10_000 },
+  );
+}
+
+/** Human explanation of the current location state, for tooltips/help text. */
+export function locationStatusExplanation(status: GeoStatus, remembered = false): string {
+  switch (status) {
+    case "granted":
+      return remembered
+        ? "Using your last known location. Refresh it for exact distances."
+        : "Distances are measured from your current location.";
+    case "prompting":
+      return "Waiting for your device to share a position…";
+    case "denied":
+      return "Location is blocked for this site. Allow it in your browser's site settings, then tap again.";
+    case "unsupported":
+      return "This browser can't share a location, so distances can't be measured.";
+    default:
+      return "Share your location to see how far away each game is.";
+  }
+}
+
+export function useUserLocation() {
+  const snap = useSyncExternalStore(
+    (cb) => {
+      listeners.add(cb);
+      return () => listeners.delete(cb);
+    },
+    () => snapshot,
+    () => EMPTY,
+  );
 
   useEffect(() => {
-    // no-op: request is explicit
+    hydrateOnce();
   }, []);
 
-  return { coords, status, request };
+  const request = useCallback(() => requestViewerLocation(), []);
+  const forget = useCallback(() => clearRememberedLocation(), []);
+
+  return {
+    coords: snap.coords,
+    status: snap.status,
+    fixedAt: snap.fixedAt,
+    remembered: snap.remembered,
+    explanation: locationStatusExplanation(snap.status, snap.remembered),
+    request,
+    forget,
+  };
+}
+
+/** Test helper: reset the shared store between cases. */
+export function __resetViewerLocationForTests() {
+  hydrated = false;
+  snapshot = EMPTY;
+  emit();
 }
