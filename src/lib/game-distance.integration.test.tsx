@@ -1,3 +1,4 @@
+// @vitest-environment jsdom
 // Integration tests: the distance rendered on a card and the distance used by
 // feed sorting must come from the same shared viewer-location value.
 import { act, cleanup, render, screen } from "@testing-library/react";
