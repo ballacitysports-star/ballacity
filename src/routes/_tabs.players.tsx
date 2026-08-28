@@ -45,6 +45,7 @@ import { useAvailabilityGate, availabilityGateMessage } from "@/lib/availability
 import { AvailabilityRequiredNotice } from "@/components/availability/AvailabilityRequiredNotice";
 import { AvailabilityDetailDialog } from "@/components/players/AvailabilityDetailDialog";
 import { shareAvailability } from "@/components/players/share-availability";
+import { ExpandableAboutSection } from "@/components/ExpandableAboutSection";
 
 import { AvailabilitySchedulePicker } from "@/components/availability/AvailabilitySchedulePicker";
 import { useMyBusyBlocks } from "@/lib/availability-conflicts";
@@ -1122,7 +1123,42 @@ function AvailabilityCard({
             <dd className="truncate text-xs font-semibold">{s.value}</dd>
           </div>
         ))}
-      </dl>
+</dl>
+
+      {/* About — the player's profile bio + key identity details. */}
+      {(a.author_bio || a.author_city || a.travel_radius_km > 0) && (
+        <div className="mt-3 rounded-2xl border border-border bg-background/40 p-3">
+          {a.author_bio && (
+            <section>
+              <h2 className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                About
+              </h2>
+              <p className="text-sm leading-relaxed text-foreground/90 whitespace-pre-wrap line-clamp-3">
+                {a.author_bio}
+              </p>
+            </section>
+          )}
+          {(a.author_city || a.travel_radius_km > 0) && (
+            <div className={a.author_bio ? "mt-2 border-t border-border/60 pt-2" : ""}>
+              <ExpandableAboutSection label="Details" defaultOpen={!a.author_bio}>
+                <ul className="space-y-1 text-sm text-muted-foreground">
+                  {a.author_city && (
+                    <li className="flex items-center gap-1.5">
+                      <MapPin className="h-3.5 w-3.5 text-lime" /> {a.author_city}
+                    </li>
+                  )}
+                  {a.travel_radius_km > 0 && (
+                    <li className="flex items-center gap-1.5">
+                      <MapPin className="h-3.5 w-3.5 text-lime" />
+                      Travels up to <Distance km={a.travel_radius_km} />
+                    </li>
+                  )}
+                </ul>
+              </ExpandableAboutSection>
+            </div>
+          )}
+        </div>
+      )}
 
       <div className="mt-3 flex gap-2">
         {isMine ? (
