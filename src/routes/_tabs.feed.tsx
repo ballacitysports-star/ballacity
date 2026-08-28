@@ -46,6 +46,7 @@ import { PostDetailsDialog, type PostDetailsTeam } from "@/components/PostDetail
 import type { OrgPost, PostKind } from "@/lib/sample-data";
 import { hideFinishedGames, onlyFinishedGames } from "@/lib/game-time";
 import { collapseSeriesGames } from "@/lib/game-series";
+import { LocationAccessDialog } from "@/components/LocationAccessDialog";
 
 // URL-persisted feed state. Refreshing or sharing the URL preserves search
 // text, sport chip, sort, distance cap, position, view/density toggles, and
@@ -142,7 +143,19 @@ function Feed() {
     remembered: locationRemembered,
     explanation: locationExplanation,
     request: requestLocation,
+    error: locationError,
   } = useUserLocation();
+  const [locationDialogOpen, setLocationDialogOpen] = useState(false);
+  // A tap must always do something: fall back to manual entry when the browser
+  // refuses to hand over a position.
+  const handleLocationTap = async () => {
+    if (geoStatus === "denied" || geoStatus === "unsupported" || locationError) {
+      setLocationDialogOpen(true);
+      return;
+    }
+    const snap = await requestLocation();
+    if (!snap?.coords || snap.status !== "granted") setLocationDialogOpen(true);
+  };
 
   const joinedSet = useMemo(() => new Set(joinedIds), [joinedIds]);
   const hostedIds = useMemo(() => new Set(hosted.map((g) => g.id)), [hosted]);
@@ -741,7 +754,7 @@ function Feed() {
                   <div className="mb-2">
                     <button
                       type="button"
-                      onClick={requestLocation}
+                      onClick={handleLocationTap}
                       title={locationExplanation}
                       className="inline-flex items-center gap-1.5 rounded-full border border-border bg-surface px-3 py-1.5 text-xs font-semibold"
                     >
@@ -755,6 +768,10 @@ function Feed() {
                             : "Use my location to sort and filter by distance"}
                     </button>
                     <p className="mt-1 text-[11px] text-muted-foreground">{locationExplanation}</p>
+                    <LocationAccessDialog
+                      open={locationDialogOpen}
+                      onOpenChange={setLocationDialogOpen}
+                    />
                   </div>
                 )}
               {hiddenByDistance > 0 && (

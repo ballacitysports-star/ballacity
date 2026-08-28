@@ -30,9 +30,23 @@ type LocationSnapshot = {
   fixedAt: number | null;
   /** True when coords come from the remembered last-granted fix, not a fresh read. */
   remembered: boolean;
+  /** Where the current coords came from — a device fix or a typed-in place. */
+  source: "device" | "manual" | null;
+  /** Label of the manually chosen place, when source is "manual". */
+  label: string | null;
+  /** Why the last attempt failed ("denied" | "blocked" | "timeout" | "unavailable"). */
+  error: "denied" | "blocked" | "timeout" | "unavailable" | null;
 };
 
-const EMPTY: LocationSnapshot = { coords: null, status: "idle", fixedAt: null, remembered: false };
+const EMPTY: LocationSnapshot = {
+  coords: null,
+  status: "idle",
+  fixedAt: null,
+  remembered: false,
+  source: null,
+  label: null,
+  error: null,
+};
 
 let snapshot: LocationSnapshot = EMPTY;
 const listeners = new Set<() => void>();
@@ -107,10 +121,12 @@ function hydrateOnce() {
   if (!cached) return;
   const fresh = Date.now() - cached.at <= CACHE_TTL_MS;
   setSnapshot({
+    ...EMPTY,
     coords: cached.coords,
     status: "granted",
     fixedAt: cached.at,
     remembered: !fresh,
+    source: "device",
   });
 }
 
@@ -120,31 +136,98 @@ export function getViewerLocation(): LocationSnapshot {
 }
 
 /**
+ * Set the viewer location from a place the user typed in. This is the fallback
+ * when the browser refuses to share a position (blocked permission, embedded
+ * preview, unsupported browser) — distances still work, just from a chosen spot.
+ */
+export function setManualViewerLocation(coords: LatLng, label?: string): void {
+  writeCache(coords);
+  setSnapshot({
+    coords,
+    status: "granted",
+    fixedAt: Date.now(),
+    remembered: false,
+    source: "manual",
+    label: label ?? null,
+    error: null,
+  });
+}
+
+/**
  * Ask the browser for a position. Safe to call repeatedly: after a denial this
  * re-requests permission, which re-prompts in browsers where the user has since
  * cleared the block, and keeps the remembered fix visible meanwhile.
+ *
+ * Resolves with the resulting snapshot so callers can react (e.g. offer manual
+ * entry) instead of leaving a tap with no visible effect.
  */
-export function requestViewerLocation(): void {
+export function requestViewerLocation(): Promise<LocationSnapshot> {
   if (typeof navigator === "undefined" || !navigator.geolocation) {
-    setSnapshot({ ...snapshot, status: "unsupported" });
+    setSnapshot({ ...snapshot, status: "unsupported", error: "unavailable" });
     void recordDenial(null);
-    return;
+    return Promise.resolve(snapshot);
   }
-  setSnapshot({ ...snapshot, status: "prompting" });
-  navigator.geolocation.getCurrentPosition(
-    (pos) => {
-      const coords = { lat: pos.coords.latitude, lng: pos.coords.longitude };
-      writeCache(coords);
-      setSnapshot({ coords, status: "granted", fixedAt: Date.now(), remembered: false });
-    },
-    (err) => {
-      // Keep the remembered coordinates: a denial shouldn't blank out distances
-      // the viewer already saw.
-      setSnapshot({ ...snapshot, status: "denied", remembered: !!snapshot.coords });
-      void recordDenial(err);
-    },
-    { enableHighAccuracy: false, maximumAge: 5 * 60 * 1000, timeout: 10_000 },
-  );
+  setSnapshot({ ...snapshot, status: "prompting", error: null });
+  return new Promise<LocationSnapshot>((resolve) => {
+    let settled = false;
+    const finish = () => {
+      if (settled) return;
+      settled = true;
+      resolve(snapshot);
+    };
+    // Some embedded contexts never invoke either callback (permissions policy
+    // blocks the request outright); don't leave the UI stuck on "Locating…".
+    const watchdog = setTimeout(() => {
+      if (settled) return;
+      setSnapshot({
+        ...snapshot,
+        status: "denied",
+        remembered: !!snapshot.coords,
+        error: "blocked",
+      });
+      finish();
+    }, 12_000);
+
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        clearTimeout(watchdog);
+        const coords = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+        writeCache(coords);
+        setSnapshot({
+          coords,
+          status: "granted",
+          fixedAt: Date.now(),
+          remembered: false,
+          source: "device",
+          label: null,
+          error: null,
+        });
+        finish();
+      },
+      (err) => {
+        clearTimeout(watchdog);
+        // Keep the remembered coordinates: a denial shouldn't blank out distances
+        // the viewer already saw.
+        const code = err?.code;
+        setSnapshot({
+          ...snapshot,
+          status: "denied",
+          remembered: !!snapshot.coords,
+          error:
+            code === 1
+              ? "denied"
+              : code === 3
+                ? "timeout"
+                : code === 2
+                  ? "unavailable"
+                  : "blocked",
+        });
+        void recordDenial(err);
+        finish();
+      },
+      { enableHighAccuracy: false, maximumAge: 5 * 60 * 1000, timeout: 10_000 },
+    );
+  });
 }
 
 /** Human explanation of the current location state, for tooltips/help text. */
@@ -181,15 +264,23 @@ export function useUserLocation() {
 
   const request = useCallback(() => requestViewerLocation(), []);
   const forget = useCallback(() => clearRememberedLocation(), []);
+  const setManual = useCallback(
+    (coords: LatLng, label?: string) => setManualViewerLocation(coords, label),
+    [],
+  );
 
   return {
     coords: snap.coords,
     status: snap.status,
     fixedAt: snap.fixedAt,
     remembered: snap.remembered,
+    source: snap.source,
+    label: snap.label,
+    error: snap.error,
     explanation: locationStatusExplanation(snap.status, snap.remembered),
     request,
     forget,
+    setManual,
   };
 }
 
