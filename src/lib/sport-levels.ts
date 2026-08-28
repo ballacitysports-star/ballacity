@@ -49,15 +49,29 @@ const YOUTH_DIVISIONS = [
   "Junior & Senior League (Ages 12–16)",
 ];
 
+/**
+ * Youth divisions live behind the "Rec League" chip as a submenu (see
+ * `SportScale.submenus`) instead of cluttering the main tier row.
+ */
+const BALL_SUBMENUS: Record<string, string[]> = { "Rec League": [...YOUTH_DIVISIONS] };
+
 const BALL_GROUPS = [
-  { label: "Recreational", tiers: ["Casual / Pickup", "Rec League", ...YOUTH_DIVISIONS] },
+  { label: "Recreational", tiers: ["Casual / Pickup", "Rec League"] },
   {
     label: "Competitive",
     tiers: ["High School", "Travel / Showcase", "College / Adult Competitive"],
   },
 ];
 
-const BALL_TIERS = BALL_GROUPS.flatMap((g) => g.tiers);
+/** Flat ordered list — submenu tiers stay here so validation keeps working. */
+const BALL_TIERS = [
+  "Casual / Pickup",
+  "Rec League",
+  ...YOUTH_DIVISIONS,
+  "High School",
+  "Travel / Showcase",
+  "College / Adult Competitive",
+];
 
 /** Shared sub-level ladder used by every football format. */
 const FOOTBALL_SUB_TIERS = ["Casual", "Rec", "Competitive", "Travel / Showcase"] as const;
