@@ -7,7 +7,14 @@
 // the UI can hide the chip / prompt for location instead of lying.
 import { useMemo } from "react";
 import type { Game } from "@/lib/sample-data";
-import { haversineKm, useUserLocation, MI_PER_KM, type LatLng } from "@/lib/geo";
+import {
+  haversineKm,
+  useUserLocation,
+  locationStatusExplanation,
+  MI_PER_KM,
+  type GeoStatus,
+  type LatLng,
+} from "@/lib/geo";
 
 /** True when the game carries real (non-demo) venue coordinates. */
 export function hasRealGeo(game: Pick<Game, "lat" | "lng" | "pseudoGeo">): boolean {
@@ -53,7 +60,7 @@ export function gameDistanceState(
 
 /** Hook form: distance for one game against the viewer's current location. */
 export function useGameDistance(game: Pick<Game, "lat" | "lng" | "pseudoGeo" | "distanceMi">) {
-  const { coords, status, request } = useUserLocation();
+  const { coords, status, remembered, fixedAt, request, forget } = useUserLocation();
   const lat = game.lat ?? null;
   const lng = game.lng ?? null;
   const pseudo = !!game.pseudoGeo;
@@ -63,5 +70,27 @@ export function useGameDistance(game: Pick<Game, "lat" | "lng" | "pseudoGeo" | "
     // Primitive deps keep this stable across re-created game objects.
     [lat, lng, pseudo, seeded, coords],
   );
-  return { ...state, viewer: coords, status, requestLocation: request };
+  return {
+    ...state,
+    viewer: coords,
+    status,
+    remembered,
+    fixedAt,
+    explanation:
+      state.reason == null ? null : distanceUnavailableExplanation(state.reason, status, remembered),
+    requestLocation: request,
+    forgetLocation: forget,
+  };
+}
+
+/** Why a card shows no mileage, in plain language for tooltips/help rows. */
+export function distanceUnavailableExplanation(
+  reason: "no-viewer-location" | "no-venue-location",
+  status: GeoStatus,
+  remembered = false,
+): string {
+  if (reason === "no-venue-location") {
+    return "The host hasn't added a mappable address for this venue, so we can't measure the distance.";
+  }
+  return locationStatusExplanation(status, remembered);
 }
