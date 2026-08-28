@@ -227,6 +227,17 @@ export function levelsForSport(sport: Sport): string[] {
   return scaleForSport(sport).tiers;
 }
 
+/** Reverse lookup: submenu child tier → its parent tier (e.g. "Minors (Ages 7–11)" → "Rec League"). */
+export function submenuParentForTier(
+  scale: SportScale,
+  tier: string,
+): string | null {
+  for (const [parent, children] of Object.entries(scale.submenus ?? {})) {
+    if (children.includes(tier)) return parent;
+  }
+  return null;
+}
+
 /** Every tier on a level, primary first. */
 export function levelTiers(level?: SportLevel | null): string[] {
   if (!level?.tier) return [];
