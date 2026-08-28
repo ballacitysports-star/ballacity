@@ -127,11 +127,16 @@ const BALL_TIER_ALIASES: Record<string, string> = {
   "Junior League": "Junior & Senior League (Ages 12–16)",
   "Senior League": "Junior & Senior League (Ages 12–16)",
   College: "College / Adult Competitive",
-  "Minor A": "College / Adult Competitive",
-  "Minor AA": "College / Adult Competitive",
-  "Minor AAA": "College / Adult Competitive",
+  "Minor A": "Travel A / AA",
+  "Minor AA": "Travel A / AA",
+  "Minor AAA": "Travel AAA",
   Major: "Majors (Ages 9–12)",
-  National: "College / Adult Competitive",
+  National: "Travel Nationals",
+  "A / AA": "Travel A / AA",
+  "Single-A": "Travel A / AA",
+  AA: "Travel A / AA",
+  AAA: "Travel AAA",
+  Nationals: "Travel Nationals",
 };
 
 
