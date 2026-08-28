@@ -37,3 +37,40 @@ export type WhenLike = { date: string; allDay?: boolean | null };
 export function formatGameWhen(game: WhenLike): string {
   return game.allDay ? `${formatWhenDate(game.date)} · All day` : formatWhen(game.date);
 }
+
+/** Minimal shape needed to format an event's "ends" line. */
+export type EndsLike = WhenLike & { duration?: string | null; endsAt?: string | null };
+
+/**
+ * Canonical "ends" line for games. All-day events never show a clock time —
+ * they render the end date only (falling back to the start date).
+ */
+export function formatGameEnds(game: EndsLike): string {
+  const start = new Date(game.date).getTime();
+  let end = Number.POSITIVE_INFINITY;
+  if (game.endsAt) {
+    const e = new Date(game.endsAt).getTime();
+    if (Number.isFinite(e) && e > start) end = e;
+  }
+  if (!Number.isFinite(end) && game.duration) {
+    const m = /(\d+(?:\.\d+)?)\s*(h|hour|hr|m|min)/i.exec(game.duration);
+    if (m && Number.isFinite(start)) {
+      const n = Number(m[1]);
+      const mins = /^h/i.test(m[2]!) ? n * 60 : n;
+      end = start + mins * 60_000;
+    }
+  }
+  if (game.allDay) {
+    const iso = Number.isFinite(end) ? new Date(end).toISOString() : game.date;
+    return formatWhenDate(iso);
+  }
+  if (!Number.isFinite(end)) return game.duration ?? "—";
+  return formatWhen(new Date(end).toISOString());
+}
+
+/**
+ * Notification body "when" line. All-day games show the date only, never a time.
+ */
+export function formatNotificationWhen(game: WhenLike): string {
+  return game.allDay ? `${formatWhenDate(game.date)} (all day)` : formatWhen(game.date);
+}
