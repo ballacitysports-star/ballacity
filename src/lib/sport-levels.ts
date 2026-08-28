@@ -158,13 +158,15 @@ export const LEVELS_BY_SPORT: Record<Sport, SportScale> = {
     system: "Level",
     tiers: BALL_TIERS,
     groups: BALL_GROUPS,
-    hint: "Highest level you've played.",
+    submenus: BALL_SUBMENUS,
+    hint: "Highest level you've played. Tap Rec League for youth divisions.",
   },
   Softball: {
     system: "Level",
     tiers: BALL_TIERS,
     groups: BALL_GROUPS,
-    hint: "Highest level you've played.",
+    submenus: BALL_SUBMENUS,
+    hint: "Highest level you've played. Tap Rec League for youth divisions.",
   },
 
   Basketball: {
