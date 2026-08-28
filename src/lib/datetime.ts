@@ -560,6 +560,16 @@ function icsVTimezone(tzid: string, start: Date, end: Date): string[] {
   return lines;
 }
 
+/** All-day calendar range as YYYYMMDD keys; DTEND is exclusive (spec-required). */
+function allDayRangeKeys(event: CalendarEvent): { start: string; end: string } {
+  const { start, end } = whenBounds(event);
+  const startKey = dateKeyInZone(start, event.timezone);
+  // A block that ends exactly at midnight belongs to the previous day.
+  const lastKey = dateKeyInZone(new Date(end.getTime() - 1), event.timezone);
+  const inclusiveLast = lastKey < startKey ? startKey : lastKey;
+  return { start: startKey.replace(/-/g, ""), end: addDaysToKey(inclusiveLast, 1).replace(/-/g, "") };
+}
+
 /** A full .ics document for one event, timed in the viewer's own zone. */
 export function buildIcs(event: CalendarEvent): string {
   const { start, end } = whenBounds(event);
@@ -578,10 +588,10 @@ export function buildIcs(event: CalendarEvent): string {
     `UID:${uid}`,
     `DTSTAMP:${icsStamp(new Date())}`,
     event.allDay
-      ? `DTSTART;VALUE=DATE:${dateKeyInZone(start, event.timezone).replace(/-/g, "")}`
+      ? `DTSTART;VALUE=DATE:${allDayRangeKeys(event).start}`
       : `DTSTART;TZID=${tzid}:${icsLocalStamp(start, tzid)}`,
     event.allDay
-      ? `DTEND;VALUE=DATE:${dateKeyInZone(end, event.timezone).replace(/-/g, "")}`
+      ? `DTEND;VALUE=DATE:${allDayRangeKeys(event).end}`
       : `DTEND;TZID=${tzid}:${icsLocalStamp(end, tzid)}`,
     `SUMMARY:${icsEscape(event.title)}`,
   );
@@ -592,6 +602,9 @@ export function buildIcs(event: CalendarEvent): string {
     lines.push(`GEO:${event.geo.lat};${event.geo.lng}`);
   }
   if (event.url) lines.push(`URL:${icsEscape(event.url)}`);
+  if (event.allDay) {
+    lines.push("X-MICROSOFT-CDO-ALLDAYEVENT:TRUE", "X-FUNAMBOL-ALLDAY:1", "TRANSP:TRANSPARENT");
+  }
   lines.push("END:VEVENT", "END:VCALENDAR");
   return lines.join("\r\n");
 }
@@ -600,11 +613,9 @@ export function buildIcs(event: CalendarEvent): string {
 /** Google Calendar "add event" link. */
 export function googleCalendarUrl(event: CalendarEvent): string {
   const { start, end } = whenBounds(event);
-  const dates = event.allDay
-    ? `${dateKeyInZone(start, event.timezone).replace(/-/g, "")}/${dateKeyInZone(
-        end,
-        event.timezone,
-      ).replace(/-/g, "")}`
+  const allDayKeys = event.allDay ? allDayRangeKeys(event) : null;
+  const dates = allDayKeys
+    ? `${allDayKeys.start}/${allDayKeys.end}`
     : `${icsStamp(start)}/${icsStamp(end)}`;
   const params = new URLSearchParams({
     action: "TEMPLATE",
@@ -628,7 +639,13 @@ export function outlookCalendarUrl(event: CalendarEvent): string {
     startdt: start.toISOString(),
     enddt: end.toISOString(),
   });
-  if (event.allDay) params.set("allday", "true");
+  if (event.allDay) {
+    const keys = allDayRangeKeys(event);
+    const iso = (k: string) => `${k.slice(0, 4)}-${k.slice(4, 6)}-${k.slice(6, 8)}`;
+    params.set("allday", "true");
+    params.set("startdt", iso(keys.start));
+    params.set("enddt", iso(keys.end));
+  }
   if (event.location) params.set("location", event.location);
   const outlookBody = calendarBody(event);
   if (outlookBody) params.set("body", outlookBody);
