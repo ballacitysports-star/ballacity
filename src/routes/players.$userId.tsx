@@ -13,6 +13,7 @@ import {
   UserCheck,
   Building2,
   ShieldCheck,
+  Share2,
 } from "lucide-react";
 import { useFollow } from "@/lib/follows";
 import { toast } from "sonner";
@@ -36,6 +37,7 @@ import { ProfileLinksList } from "@/components/ProfileLinks";
 import { ProfileChannelHeader, ChannelPill } from "@/components/profile/ProfileChannelHeader";
 import { ProfileAboutSheet, AboutBlock, AboutStats } from "@/components/profile/ProfileAboutSheet";
 import { ExpandableAboutSection } from "@/components/ExpandableAboutSection";
+import { PlayerShareCard } from "@/components/PlayerShareCard";
 import { BadgeList } from "@/components/BadgeList";
 import {
   Dialog,
@@ -97,6 +99,7 @@ function PlayerProfilePage() {
   const [aboutOpen, setAboutOpen] = useState(false);
   const [followList, setFollowList] = useState<null | "followers" | "following">(null);
   const [unfollowOpen, setUnfollowOpen] = useState(false);
+  const [shareOpen, setShareOpen] = useState(false);
 
   const overrides = useProfileOverrides(userId);
   const unit = useDistanceUnit();
@@ -319,9 +322,35 @@ function PlayerProfilePage() {
             </ChannelPill>
             <ChannelPill onClick={() => setReviewsOpen(true)}>Reviews · {rep.count}</ChannelPill>
             <ChannelPill onClick={() => setAboutOpen(true)}>About</ChannelPill>
+            <ChannelPill onClick={() => setShareOpen(true)}>
+              <Share2 className="h-4 w-4" /> Share
+            </ChannelPill>
             <UserSafetyMenu userId={userId} displayName={displayName} align="end" />
           </>
         }
+      />
+
+      <PlayerShareCard
+        open={shareOpen}
+        onOpenChange={setShareOpen}
+        data={{
+          userId,
+          displayName,
+          username: username || undefined,
+          initials,
+          avatarUrl,
+          bio,
+          city: city || undefined,
+          travelRadius:
+            searchRadiusMi != null ? formatDistance(searchRadiusMi, unit) : undefined,
+          sports: sportsList.map((s) => ({
+            name: s.name,
+            level: s.level ? formatSportLevel(s.name as any, s.level as any) : null,
+          })),
+          trustScore: rep.trustScore,
+          reviewCount: rep.count,
+          linkCount: links.length,
+        }}
       />
 
       <ProfileAboutSheet open={aboutOpen} onOpenChange={setAboutOpen}>
