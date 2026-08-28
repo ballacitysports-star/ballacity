@@ -136,7 +136,13 @@ function Feed() {
   useFeedPrefsSync();
   const profile = useMyProfile();
   const distanceUnit = useDistanceUnit();
-  const { coords, status: geoStatus, request: requestLocation } = useUserLocation();
+  const {
+    coords,
+    status: geoStatus,
+    remembered: locationRemembered,
+    explanation: locationExplanation,
+    request: requestLocation,
+  } = useUserLocation();
 
   const joinedSet = useMemo(() => new Set(joinedIds), [joinedIds]);
   const hostedIds = useMemo(() => new Set(hosted.map((g) => g.id)), [hosted]);
@@ -729,18 +735,28 @@ function Feed() {
                   See all
                 </Link>
               </div>
-              {prefs.maxDistanceMi != null && !coords && geoStatus !== "unsupported" && (
-                <button
-                  type="button"
-                  onClick={requestLocation}
-                  className="mb-2 inline-flex items-center gap-1.5 rounded-full border border-border bg-surface px-3 py-1.5 text-xs font-semibold"
-                >
-                  <MapPin className="h-3.5 w-3.5 text-coral" />
-                  {geoStatus === "denied"
-                    ? "Location blocked — enable to filter by home court"
-                    : "Use my location to filter by home court distance"}
-                </button>
-              )}
+              {(prefs.maxDistanceMi != null || prefs.sortBy === "nearest") &&
+                geoStatus !== "unsupported" &&
+                (!coords || locationRemembered) && (
+                  <div className="mb-2">
+                    <button
+                      type="button"
+                      onClick={requestLocation}
+                      title={locationExplanation}
+                      className="inline-flex items-center gap-1.5 rounded-full border border-border bg-surface px-3 py-1.5 text-xs font-semibold"
+                    >
+                      <MapPin className="h-3.5 w-3.5 text-coral" />
+                      {geoStatus === "prompting"
+                        ? "Locating…"
+                        : locationRemembered
+                          ? "Using your last known location — refresh"
+                          : geoStatus === "denied"
+                            ? "Location blocked — tap to retry"
+                            : "Use my location to sort and filter by distance"}
+                    </button>
+                    <p className="mt-1 text-[11px] text-muted-foreground">{locationExplanation}</p>
+                  </div>
+                )}
               {hiddenByDistance > 0 && (
                 <p className="mb-2 text-xs text-muted-foreground">
                   {hiddenByDistance} hidden beyond{" "}
