@@ -60,7 +60,8 @@ export function gameDistanceState(
 
 /** Hook form: distance for one game against the viewer's current location. */
 export function useGameDistance(game: Pick<Game, "lat" | "lng" | "pseudoGeo" | "distanceMi">) {
-  const { coords, status, remembered, fixedAt, request, forget } = useUserLocation();
+  const { coords, status, remembered, fixedAt, request, forget, error, source, label } =
+    useUserLocation();
   const lat = game.lat ?? null;
   const lng = game.lng ?? null;
   const pseudo = !!game.pseudoGeo;
