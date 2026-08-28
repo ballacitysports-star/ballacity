@@ -26,7 +26,7 @@ import {
   toggleSkillTier,
 } from "@/lib/sport-levels";
 import { useServerFn } from "@tanstack/react-start";
-import { reverseGeocode } from "@/lib/geocode.functions";
+import { geocodeAddress, reverseGeocode } from "@/lib/geocode.functions";
 import { listMyTeams } from "@/lib/teams.functions";
 import { useQuery } from "@tanstack/react-query";
 import { useMyProfiles } from "@/lib/account-profiles";
@@ -187,6 +187,9 @@ function Create() {
   // the user hasn't typed anything yet. Runs once on mount; manual edits or
   // a profile-city value present at mount take precedence.
   const reverse = useServerFn(reverseGeocode);
+  const geocode = useServerFn(geocodeAddress);
+  // Real venue coordinates, used to compute each viewer's distance to the game.
+  const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(null);
   useEffect(() => {
     if (locationEditedRef.current) return;
     if (location.trim()) return;
@@ -205,6 +208,7 @@ function Create() {
             // Mark as edited so a late-loading profile.city doesn't overwrite.
             locationEditedRef.current = true;
             setLocation(next);
+            setCoords({ lat: pos.coords.latitude, lng: pos.coords.longitude });
           }
         } catch {
           /* silent — user can still type manually */
@@ -224,6 +228,9 @@ function Create() {
   const handleLocationChange = (next: string) => {
     locationEditedRef.current = true;
     setLocation(next);
+    // Typing invalidates any previously picked venue coordinates; we re-resolve
+    // them from the address on publish so distance is always real.
+    setCoords(null);
   };
 
   if (!user) {
@@ -382,6 +389,20 @@ function Create() {
               },
             });
 
+            // Resolve venue coordinates: prefer what the autocomplete gave us,
+            // otherwise geocode the typed address. Missing geo is not fatal —
+            // the game just won't show a distance until it's geocoded.
+            let venue = coords;
+            if (!venue && location.trim()) {
+              try {
+                const res = await geocode({ data: { address: location.trim() } });
+                venue = { lat: res.lat, lng: res.lng };
+                setCoords(venue);
+              } catch {
+                venue = null;
+              }
+            }
+
             const cleanPositions = positionsCleanup(positionsNeeded);
             let firstGameId: string | null = null;
             // One shared series id links all sessions of a multi-day event so
@@ -413,6 +434,8 @@ function Create() {
                 endsAt: plan.endIso,
                 allDay: plan.allDay,
                 timezone: plan.timezone,
+                lat: venue?.lat ?? null,
+                lng: venue?.lng ?? null,
               });
 
               if (!firstGameId) firstGameId = game.id;
@@ -618,6 +641,9 @@ function Create() {
             <LocationAutocomplete
               value={location}
               onChange={handleLocationChange}
+              onPick={(_v, _placeId, geo) => {
+                if (geo) setCoords({ lat: geo.lat, lng: geo.lng });
+              }}
               placeholder="Search court, park or venue"
             />
             {profile?.city && (
