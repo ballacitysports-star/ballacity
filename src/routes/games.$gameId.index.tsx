@@ -94,7 +94,7 @@ import { PlayerFlowPill } from "@/components/PlayerFlowPill";
 import { PaymentRequiredBanner } from "@/components/PaymentRequiredBanner";
 import { HostPaymentsPanel, PlayerPaymentsPanel } from "@/components/GamePaymentsPanel";
 import { PostEngagement } from "@/components/PostEngagement";
-import { Distance } from "@/components/Distance";
+import { GameDistance } from "@/components/GameDistance";
 import { SeriesSessionsStrip } from "@/components/SeriesSessionsStrip";
 
 import {
@@ -1439,7 +1439,7 @@ function GameDetail() {
           <Meta
             icon={<MapPin className="h-4 w-4 text-coral" />}
             label="Distance"
-            value={<Distance mi={game.distanceMi} />}
+            value={<GameDistance game={game} />}
           />
         </div>
 
