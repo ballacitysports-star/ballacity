@@ -410,8 +410,8 @@ export function AvailabilitySchedulePicker({
           )}
         </div>
       )}
-      <div className="flex items-center justify-between gap-2 rounded-2xl border border-border bg-surface/60 px-3 py-2 text-[11px] text-muted-foreground">
-        <span>
+      <div className="flex items-start justify-between gap-2 rounded-2xl border border-border bg-surface/60 px-3 py-2 text-[11px] text-muted-foreground">
+        <span className="min-w-0 flex-1 whitespace-normal break-words">
           {value.length === 0
             ? "Pick dates or weekdays, then set times."
             : summarizeSlots(value)}
