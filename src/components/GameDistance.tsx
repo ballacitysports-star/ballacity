@@ -1,5 +1,7 @@
+import { useState } from "react";
 import { MapPin } from "lucide-react";
 import { Distance } from "@/components/Distance";
+import { LocationAccessDialog } from "@/components/LocationAccessDialog";
 import { useGameDistance } from "@/lib/game-distance";
 import type { Game } from "@/lib/sample-data";
 
