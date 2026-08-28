@@ -107,7 +107,6 @@ import {
 } from "@/lib/hosted-games-store";
 import {
   ANY_SKILL,
-  filterTiersForSport,
   formatSkillValue,
   parseSkillTiers,
   scaleForSport,

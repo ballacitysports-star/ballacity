@@ -20,7 +20,6 @@ import { addHostedGame } from "@/lib/hosted-games-store";
 import { SIGNUP_CUTOFF_PRESETS } from "@/lib/live-status";
 import {
   ANY_SKILL,
-  filterTiersForSport,
   parseSkillTiers,
   scaleForSport,
   serializeSkillTiers,
