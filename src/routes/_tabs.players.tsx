@@ -999,8 +999,11 @@ function AvailabilityCard({
   onOpen: () => void;
   onChanged: () => void;
 }) {
-  const navigate = useNavigate();
+const navigate = useNavigate();
   const when = formatWindow(a);
+  const authorLinks: ProfileLink[] = Array.isArray(a.author_links)
+    ? (a.author_links as ProfileLink[])
+    : [];
 
   const handleMessage = async () => {
     try {
