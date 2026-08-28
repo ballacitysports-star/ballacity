@@ -216,7 +216,9 @@ export function formatAvailabilityWindow(a: {
   if (slots.length > 0) {
     const next = nextOccurrence(slots);
     const head = next
-      ? `Next: ${fmtShortDate(next.dateKey)} ${fmt12(next.start)}–${fmt12(next.end)}`
+      ? isAllDaySlot(next)
+        ? `Next: ${fmtShortDate(next.dateKey)} · All day`
+        : `Next: ${fmtShortDate(next.dateKey)} ${fmt12(next.start)}–${fmt12(next.end)}`
       : "";
     const rest = summarizeSlots(slots);
     return [head, rest].filter(Boolean).join(" · ");
