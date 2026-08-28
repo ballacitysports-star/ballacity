@@ -1125,8 +1125,8 @@ function AvailabilityCard({
         ))}
 </dl>
 
-      {/* About — the player's profile bio + key identity details. */}
-      {(a.author_bio || a.author_city || a.travel_radius_km > 0) && (
+{/* About — the player's profile bio + key identity details + links. */}
+      {(a.author_bio || a.author_city || a.travel_radius_km > 0 || authorLinks.length > 0) && (
         <div className="mt-3 rounded-2xl border border-border bg-background/40 p-3">
           {a.author_bio && (
             <section>
@@ -1138,9 +1138,12 @@ function AvailabilityCard({
               </p>
             </section>
           )}
-          {(a.author_city || a.travel_radius_km > 0) && (
+          {(a.author_city || a.travel_radius_km > 0 || authorLinks.length > 0) && (
             <div className={a.author_bio ? "mt-2 border-t border-border/60 pt-2" : ""}>
-              <ExpandableAboutSection label="Details" defaultOpen={!a.author_bio}>
+              <ExpandableAboutSection
+                label="Details"
+                defaultOpen={!a.author_bio && authorLinks.length === 0}
+              >
                 <ul className="space-y-1 text-sm text-muted-foreground">
                   {a.author_city && (
                     <li className="flex items-center gap-1.5">
@@ -1154,6 +1157,11 @@ function AvailabilityCard({
                     </li>
                   )}
                 </ul>
+                {authorLinks.length > 0 && (
+                  <div className="mt-2">
+                    <ProfileLinksList links={authorLinks} />
+                  </div>
+                )}
               </ExpandableAboutSection>
             </div>
           )}
