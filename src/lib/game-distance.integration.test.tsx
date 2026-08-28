@@ -141,7 +141,7 @@ describe("live distance + feed sorting parity", () => {
   it("explains a denial, offers a retry, and keeps remembered coordinates", () => {
     render(<List games={GAMES} />);
     denyLocation();
-    expect(screen.getByTestId("d-near").textContent).toContain("Retry location");
+    expect(screen.getByTestId("d-near").textContent).toContain("Set location");
     expect(screen.getByTestId("d-near").querySelector("button")?.getAttribute("title")).toMatch(
       /site settings/i,
     );
