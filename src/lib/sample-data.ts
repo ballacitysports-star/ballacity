@@ -56,9 +56,16 @@ export type Game = {
   duration: string; // "90 min"
   location: string;
   neighborhood: string;
-  distanceMi: number;
-  lat: number;
-  lng: number; // pseudo coords for faux map (0-100)
+  /**
+   * Legacy/demo fallback distance. Real games leave this null — distance is
+   * computed live from the viewer's location to the venue coordinates.
+   */
+  distanceMi?: number | null;
+  /** Real venue latitude/longitude; null when the venue was never geocoded. */
+  lat?: number | null;
+  lng?: number | null;
+  /** True for demo rows whose lat/lng are faux-map grid values, not real geo. */
+  pseudoGeo?: boolean;
   maxPlayers: number;
   joined: number;
   /**
@@ -156,7 +163,7 @@ const now = (() => {
 })();
 const inHours = (h: number) => new Date(now + h * 3600_000).toISOString();
 
-export const GAMES: Game[] = [
+const SAMPLE_GAMES: Game[] = [
   {
     id: "g1",
     sport: "Basketball",
@@ -341,6 +348,10 @@ export const GAMES: Game[] = [
     equipment: ["Ball (we'll have one)"],
   },
 ];
+
+// Demo rows use faux-map grid coordinates, so flag them: distance for these
+// falls back to the canned `distanceMi` instead of a real great-circle calc.
+export const GAMES: Game[] = SAMPLE_GAMES.map((g) => ({ ...g, pseudoGeo: true }));
 
 /** Sportsmanship trait tallies drawn from peer reviews. */
 export type SportsmanshipTraits = {
