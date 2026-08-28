@@ -190,9 +190,10 @@ describe("multiple football levels", () => {
     expect(toggleSportTier("Football", lvl, "Full contact Travel / Showcase")).toBeNull();
   });
 
-  it("keeps single-select sports single", () => {
+  it("allows multiple tiers on every sport", () => {
     const one = toggleSportTier("Tennis", { system: "NTRP", tier: "3.5" }, "4.0");
-    expect(levelTiers(one)).toEqual(["4.0"]);
+    expect(levelTiers(one).sort()).toEqual(["3.5", "4.0"]);
+    expect(levelTiers(toggleSportTier("Tennis", one, "4.0"))).toEqual(["3.5"]);
   });
 
   it("round-trips multiple tiers through storage", () => {
