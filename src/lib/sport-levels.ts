@@ -82,14 +82,25 @@ const FOOTBALL_TIER_ALIASES: Record<string, string> = {
 
 const BALL_TIER_ALIASES: Record<string, string> = {
   Rec: "Rec League",
-  "Little League": "Little League / Youth",
+  "Little League": "Minors (Ages 7–11)",
+  "Little League / Youth": "Minors (Ages 7–11)",
+  Youth: "Minors (Ages 7–11)",
+  "Tee Ball": "Tee Ball (Ages 4–7)",
+  "Coach Pitch": "Coach Pitch / Machine Pitch (Ages 6–8)",
+  "Machine Pitch": "Coach Pitch / Machine Pitch (Ages 6–8)",
+  Minors: "Minors (Ages 7–11)",
+  Majors: "Majors (Ages 9–12)",
+  "Intermediate 50/70": "Intermediate 50/70 (Ages 11–13)",
+  "Junior League": "Junior & Senior League (Ages 12–16)",
+  "Senior League": "Junior & Senior League (Ages 12–16)",
   College: "College / Adult Competitive",
   "Minor A": "College / Adult Competitive",
   "Minor AA": "College / Adult Competitive",
   "Minor AAA": "College / Adult Competitive",
-  Major: "College / Adult Competitive",
+  Major: "Majors (Ages 9–12)",
   National: "College / Adult Competitive",
 };
+
 
 const COURT_FIELD_ALIASES: Record<string, string> = {
   Rec: "Rec League",
