@@ -1415,8 +1415,8 @@ function GameDetail() {
           />
           <Meta
             icon={<Calendar className="h-4 w-4 text-lime" />}
-            label="Duration"
-            value={game.duration}
+            label="Ends"
+            value={formatWhen(new Date(gameEndsAt(game)).toISOString())}
           />
           <Meta
             icon={<Users className="h-4 w-4 text-coral" />}
