@@ -3282,7 +3282,8 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 }
 
 /** End date + time for the meta grid; falls back to the raw length text. */
-function formatEndsAt(game: Pick<Game, "date" | "duration">): string {
+function formatEndsAt(game: Pick<Game, "date" | "duration" | "allDay">): string {
+  if (game.allDay) return "All day";
   const end = gameEndsAt(game);
   if (!Number.isFinite(end)) return game.duration ?? "—";
   return formatWhen(new Date(end).toISOString());
