@@ -32,7 +32,7 @@ export const GENERIC_SCALE: SportScale = {
   tiers: ["Beginner", "Casual", "Intermediate", "Advanced"],
 };
 
-/** Little League age divisions, offered as a submenu under Youth. */
+/** Little League age divisions, offered as a submenu under Rec League. */
 const YOUTH_DIVISIONS = [
   "Tee Ball (Ages 4–7)",
   "Coach Pitch / Machine Pitch (Ages 6–8)",
