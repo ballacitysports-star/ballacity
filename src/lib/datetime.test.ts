@@ -173,17 +173,23 @@ describe("calendar export", () => {
     location: "Rucker Park",
   };
 
-  it("builds a valid ics document", () => {
-    const ics = buildIcs(event);
+  it("builds a valid ics document in the viewer's zone", () => {
+    const ics = buildIcs({ ...event, viewerTimeZone: NY });
     expect(ics).toContain("BEGIN:VEVENT");
-    expect(ics).toContain("DTSTART:20260905T220000Z");
+    expect(ics).toContain("X-WR-TIMEZONE:America/New_York");
+    expect(ics).toContain("BEGIN:VTIMEZONE");
+    expect(ics).toContain("TZID:America/New_York");
+    // 22:00Z is 18:00 in New York (EDT).
+    expect(ics).toContain("DTSTART;TZID=America/New_York:20260905T180000");
+    expect(ics).toContain("DTEND;TZID=America/New_York:20260905T193000");
     expect(ics).toContain("SUMMARY:Pickup\\, Run");
     expect(ics.endsWith("END:VCALENDAR")).toBe(true);
   });
 
-  it("builds a google calendar link", () => {
-    const url = googleCalendarUrl(event);
+  it("builds a google calendar link in the viewer's zone", () => {
+    const url = googleCalendarUrl({ ...event, viewerTimeZone: NY });
     expect(url).toContain("20260905T220000Z%2F20260905T233000Z");
     expect(url).toContain("ctz=America%2FNew_York");
   });
+
 });
