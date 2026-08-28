@@ -571,7 +571,7 @@ export function googleCalendarUrl(event: CalendarEvent): string {
     ctz: resolveTimeZone(event.timezone),
   });
   if (event.location) params.set("location", event.location);
-  const details = [event.description, event.url].filter(Boolean).join("\n\n");
+  const details = calendarBody(event);
   if (details) params.set("details", details);
   return `https://calendar.google.com/calendar/render?${params.toString()}`;
 }
@@ -588,7 +588,8 @@ export function outlookCalendarUrl(event: CalendarEvent): string {
   });
   if (event.allDay) params.set("allday", "true");
   if (event.location) params.set("location", event.location);
-  if (event.description) params.set("body", event.description);
+  const outlookBody = calendarBody(event);
+  if (outlookBody) params.set("body", outlookBody);
   return `https://outlook.live.com/calendar/0/deeplink/compose?${params.toString()}`;
 }
 
