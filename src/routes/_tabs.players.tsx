@@ -46,6 +46,8 @@ import { AvailabilityRequiredNotice } from "@/components/availability/Availabili
 import { AvailabilityDetailDialog } from "@/components/players/AvailabilityDetailDialog";
 import { shareAvailability } from "@/components/players/share-availability";
 import { ExpandableAboutSection } from "@/components/ExpandableAboutSection";
+import { ProfileLinksList } from "@/components/ProfileLinks";
+import type { ProfileLink } from "@/lib/user-prefs-store";
 
 import { AvailabilitySchedulePicker } from "@/components/availability/AvailabilitySchedulePicker";
 import { useMyBusyBlocks } from "@/lib/availability-conflicts";
@@ -999,8 +1001,11 @@ function AvailabilityCard({
   onOpen: () => void;
   onChanged: () => void;
 }) {
-  const navigate = useNavigate();
+const navigate = useNavigate();
   const when = formatWindow(a);
+  const authorLinks: ProfileLink[] = Array.isArray(a.author_links)
+    ? (a.author_links as ProfileLink[])
+    : [];
 
   const handleMessage = async () => {
     try {
@@ -1125,8 +1130,8 @@ function AvailabilityCard({
         ))}
 </dl>
 
-      {/* About — the player's profile bio + key identity details. */}
-      {(a.author_bio || a.author_city || a.travel_radius_km > 0) && (
+{/* About — the player's profile bio + key identity details + links. */}
+      {(a.author_bio || a.author_city || a.travel_radius_km > 0 || authorLinks.length > 0) && (
         <div className="mt-3 rounded-2xl border border-border bg-background/40 p-3">
           {a.author_bio && (
             <section>
@@ -1138,9 +1143,12 @@ function AvailabilityCard({
               </p>
             </section>
           )}
-          {(a.author_city || a.travel_radius_km > 0) && (
+          {(a.author_city || a.travel_radius_km > 0 || authorLinks.length > 0) && (
             <div className={a.author_bio ? "mt-2 border-t border-border/60 pt-2" : ""}>
-              <ExpandableAboutSection label="Details" defaultOpen={!a.author_bio}>
+              <ExpandableAboutSection
+                label="Details"
+                defaultOpen={!a.author_bio && authorLinks.length === 0}
+              >
                 <ul className="space-y-1 text-sm text-muted-foreground">
                   {a.author_city && (
                     <li className="flex items-center gap-1.5">
@@ -1154,6 +1162,11 @@ function AvailabilityCard({
                     </li>
                   )}
                 </ul>
+                {authorLinks.length > 0 && (
+                  <div className="mt-2">
+                    <ProfileLinksList links={authorLinks} />
+                  </div>
+                )}
               </ExpandableAboutSection>
             </div>
           )}

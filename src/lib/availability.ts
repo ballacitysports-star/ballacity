@@ -51,8 +51,10 @@ export type AvailabilityWithAuthor = PlayerAvailability & {
   author_bio: string | null;
   /** Author's home city from their profile. */
   author_city: string | null;
-  /** Author's location search radius in miles (capped). */
+/** Author's location search radius in miles (capped). */
   author_search_radius_mi: number | null;
+  /** Author's profile links (website / social) as stored on `profiles.links`. */
+  author_links: unknown;
 };
 
 
@@ -111,8 +113,8 @@ export async function listOpenAvailabilities(
   const ids = Array.from(new Set(rows.map((r) => r.user_id)));
 const { data: profs } = await supabase
     .from("profiles")
-    .select(
-      "id, display_name, avatar_initials, avatar_url, sport_levels, bio, city, search_radius_mi",
+.select(
+      "id, display_name, avatar_initials, avatar_url, sport_levels, bio, city, search_radius_mi, links",
     )
     .in("id", ids);
   const { data: ageRows } = await (supabase.rpc as any)("profile_ages", { _ids: ids });
@@ -128,8 +130,9 @@ const { data: profs } = await supabase
     author_age: ageById[r.user_id] ?? null,
     author_sport_levels: byId[r.user_id]?.sport_levels ?? null,
     author_bio: byId[r.user_id]?.bio ?? null,
-    author_city: byId[r.user_id]?.city ?? null,
+author_city: byId[r.user_id]?.city ?? null,
     author_search_radius_mi: byId[r.user_id]?.search_radius_mi ?? null,
+    author_links: byId[r.user_id]?.links ?? null,
   }));
 
 }
@@ -146,7 +149,7 @@ export async function getAvailabilityById(id: string): Promise<AvailabilityWithA
   const row = data as unknown as PlayerAvailability;
 const { data: prof } = await supabase
     .from("profiles")
-    .select("id, display_name, avatar_initials, avatar_url, sport_levels, bio, city, search_radius_mi")
+.select("id, display_name, avatar_initials, avatar_url, sport_levels, bio, city, search_radius_mi, links")
     .eq("id", row.user_id)
     .maybeSingle();
   return {
@@ -156,8 +159,9 @@ const { data: prof } = await supabase
     author_avatar_url: (prof as any)?.avatar_url ?? null,
     author_sport_levels: (prof as any)?.sport_levels ?? null,
     author_bio: (prof as any)?.bio ?? null,
-    author_city: (prof as any)?.city ?? null,
+author_city: (prof as any)?.city ?? null,
     author_search_radius_mi: (prof as any)?.search_radius_mi ?? null,
+    author_links: (prof as any)?.links ?? null,
     author_age: await profileAge(row.user_id),
   };
 }
