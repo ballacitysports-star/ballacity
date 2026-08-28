@@ -44,6 +44,7 @@ import { TrainerProfileChecklist } from "@/components/TrainerProfileChecklist";
 import { Building2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { hideFinishedGames } from "@/lib/game-time";
+import { ProfileShareCard } from "@/components/ProfileShareCard";
 
 export const Route = createFileRoute("/trainers/$trainerId/")({
   validateSearch: zodValidator(
@@ -186,6 +187,7 @@ function TrainerPage() {
     };
   }, [org.id, qc]);
 
+  const [shareOpen, setShareOpen] = useState(false);
   const orgReviews = useReviewsFor(org.id);
   const orgRep = useMemo(() => computeReputation(orgReviews, "trainer"), [orgReviews]);
 
@@ -201,18 +203,6 @@ function TrainerPage() {
     return Array.from(set);
   }, [org.sports, org.sessionTypes]);
 
-  const share = async () => {
-    const url = typeof window !== "undefined" ? window.location.href : "";
-    if (typeof navigator !== "undefined" && (navigator as any).share) {
-      try {
-        await (navigator as any).share({ title: org.name, url });
-      } catch {
-        /* dismissed */
-      }
-    } else if (typeof navigator !== "undefined" && navigator.clipboard) {
-      await navigator.clipboard.writeText(url);
-    }
-  };
 
   return (
     <div className="mx-auto w-full max-w-md sm:max-w-2xl lg:max-w-4xl pb-40">
@@ -229,13 +219,31 @@ function TrainerPage() {
           <ArrowLeft className="h-4 w-4" />
         </Link>
         <button
-          onClick={share}
+          onClick={() => setShareOpen(true)}
           className="absolute top-4 right-4 grid h-10 w-10 place-items-center rounded-full border border-border bg-background/70 backdrop-blur"
           aria-label="Share trainer profile"
         >
           <Share2 className="h-4 w-4" />
         </button>
       </div>
+
+      <ProfileShareCard
+        open={shareOpen}
+        onOpenChange={setShareOpen}
+        data={{
+          kind: "trainer",
+          path: `/trainers/${org.id}`,
+          displayName: org.name,
+          username: org.handle,
+          initials: org.name.slice(0, 2).toUpperCase(),
+          bio: org.bio || org.tagline || undefined,
+          city: org.city || undefined,
+          sports: (org.sports ?? []).map((s) => ({ name: s })),
+          trustScore: orgRep.count ? orgRep.trustScore : undefined,
+          reviewCount: orgRep.count,
+          extras: [org.ratePerHour ? `$${org.ratePerHour}/hr` : null],
+        }}
+      />
 
       <div className="px-4 -mt-14 relative">
         {/* Identity */}

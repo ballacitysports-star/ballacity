@@ -15,7 +15,6 @@ import {
   ChevronDown,
   Star,
 } from "lucide-react";
-import { toast } from "sonner";
 import { VenueMapPreview } from "@/components/VenueMapPreview";
 import {
   WEEKDAYS,
@@ -28,35 +27,7 @@ import {
 } from "@/lib/org-hours";
 import { directionsHref, emailHref, telHref, websiteHref } from "@/lib/org-listing";
 import { ResponsiveAvatar, ResponsiveImage } from "@/components/ResponsiveImage";
-
-/**
- * Copies text with the clipboard API, falling back to a hidden textarea for
- * insecure contexts / browsers that block clipboard writes.
- */
-async function copyText(text: string): Promise<boolean> {
-  try {
-    if (navigator.clipboard?.writeText) {
-      await navigator.clipboard.writeText(text);
-      return true;
-    }
-  } catch {
-    /* fall through to the legacy path */
-  }
-  try {
-    const ta = document.createElement("textarea");
-    ta.value = text;
-    ta.setAttribute("readonly", "");
-    ta.style.position = "fixed";
-    ta.style.opacity = "0";
-    document.body.appendChild(ta);
-    ta.select();
-    const ok = document.execCommand("copy");
-    document.body.removeChild(ta);
-    return ok;
-  } catch {
-    return false;
-  }
-}
+import { ProfileShareCard } from "@/components/ProfileShareCard";
 
 export type OrgListingRow = {
   id: string;
@@ -134,6 +105,7 @@ export function OrgListingHeader({
 }) {
   const [hoursOpen, setHoursOpen] = useState(false);
   const [lightbox, setLightbox] = useState<number | null>(null);
+  const [shareOpen, setShareOpen] = useState(false);
 
   const hours = parseHours(org.hours);
   const open = resolveOpenState(hours, org.timezone);
@@ -152,6 +124,28 @@ export function OrgListingHeader({
   const mail = emailHref(org.email);
 
   return (
+    <>
+      <ProfileShareCard
+        open={shareOpen}
+        onOpenChange={setShareOpen}
+        data={{
+          kind: "gym",
+          path: `/orgs/${org.id}`,
+          displayName: org.name,
+          username: `@${org.handle}`,
+          initials: org.name.slice(0, 2).toUpperCase(),
+          avatarUrl: org.avatar_url ?? undefined,
+          bio: org.bio ?? undefined,
+          city: org.city ?? org.address ?? undefined,
+          rating: rating ?? null,
+          reviewCount: reviewCount,
+          extras: [
+            org.category,
+            `${memberCount} trainer${memberCount === 1 ? "" : "s"}`,
+            hasAnyHours(hours) ? (open.status === "open" ? "Open now" : "Closed") : null,
+          ],
+        }}
+      />
     <header className="overflow-hidden rounded-2xl border border-border/60 bg-surface">
       {photos.length > 0 ? (
         <div className="flex gap-1 overflow-x-auto">
@@ -278,25 +272,7 @@ export function OrgListingHeader({
           {tel && <ActionButton icon={Phone} label="Call" href={tel} />}
           {site && <ActionButton icon={Globe} label="Website" href={site} />}
           {mail && <ActionButton icon={Mail} label="Email" href={mail} />}
-          <ActionButton
-            icon={Share2}
-            label="Share"
-            onClick={async () => {
-              const url = typeof window !== "undefined" ? window.location.href : "";
-              if (!url) return;
-              try {
-                if (navigator.share) {
-                  await navigator.share({ title: org.name, url });
-                  return;
-                }
-              } catch (err) {
-                // User dismissed the native sheet — nothing to report.
-                if (err instanceof DOMException && err.name === "AbortError") return;
-              }
-              if (await copyText(url)) toast.success("Link copied");
-              else toast.error("Couldn't share this link");
-            }}
-          />
+          <ActionButton icon={Share2} label="Share" onClick={() => setShareOpen(true)} />
         </div>
 
         <div className="divide-y divide-border/60 rounded-2xl border border-border/60">
@@ -391,5 +367,6 @@ export function OrgListingHeader({
         {children}
       </div>
     </header>
+    </>
   );
 }

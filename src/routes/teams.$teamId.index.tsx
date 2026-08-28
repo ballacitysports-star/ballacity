@@ -27,6 +27,7 @@ import {
   type OrgPost,
 } from "@/lib/sample-data";
 import { isMyOrg, ensureOrgById } from "@/lib/org-store";
+import { ProfileShareCard } from "@/components/ProfileShareCard";
 import { PostCard } from "@/components/PostCard";
 import { PostDetailsDialog } from "@/components/PostDetailsDialog";
 
@@ -146,6 +147,7 @@ function TeamPage() {
   const [following, setFollowing] = useState(false);
   const [mounted, setMounted] = useState(false);
   const [composerOpen, setComposerOpen] = useState(false);
+  const [shareOpen, setShareOpen] = useState(false);
   const [openPost, setOpenPost] = useState<OrgPost | null>(null);
 
   useEffect(() => setMounted(true), []);
@@ -247,6 +249,14 @@ function TeamPage() {
                 <Star className="h-3.5 w-3.5" /> Write review
               </Link>
             )}
+            <button
+              type="button"
+              onClick={() => setShareOpen(true)}
+              data-render="ssr-stable"
+              className="rounded-full border border-border bg-surface px-4 py-2.5 text-sm font-bold inline-flex items-center gap-1.5 hover:border-lime/40"
+            >
+              <Share2 className="h-3.5 w-3.5" /> Share
+            </button>
             <motion.button
               whileTap={{ scale: 0.95 }}
               onClick={() => setFollowing((f) => !f)}
@@ -261,6 +271,27 @@ function TeamPage() {
             </motion.button>
           </div>
         </div>
+
+        <ProfileShareCard
+          open={shareOpen}
+          onOpenChange={setShareOpen}
+          data={{
+            kind: orgKind === "trainer" ? "trainer" : "team",
+            path: `/teams/${org.id}`,
+            displayName: org.name,
+            username: org.handle,
+            initials: org.name.slice(0, 2).toUpperCase(),
+            bio: org.bio || org.tagline || undefined,
+            city: org.city || undefined,
+            sports: (org.sports ?? []).map((s) => ({ name: s })),
+            trustScore: orgRep.count ? orgRep.trustScore : undefined,
+            reviewCount: orgRep.count,
+            extras: [
+              org.followers ? `${org.followers.toLocaleString()} followers` : null,
+              org.founded ? `Est. ${org.founded}` : null,
+            ],
+          }}
+        />
 
         <div className="mt-3">
           <h1 className="font-display text-2xl font-bold flex items-center gap-2 leading-tight">
