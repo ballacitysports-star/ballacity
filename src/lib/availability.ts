@@ -47,6 +47,12 @@ export type AvailabilityWithAuthor = PlayerAvailability & {
   author_age: number | null;
   /** Raw `profiles.sport_levels` jsonb for the author — profile tiers win over `skill_level`. */
   author_sport_levels: unknown;
+  /** Author's profile bio / about text, for the About section on the player card. */
+  author_bio: string | null;
+  /** Author's home city from their profile. */
+  author_city: string | null;
+  /** Author's location search radius in miles (capped). */
+  author_search_radius_mi: number | null;
 };
 
 
