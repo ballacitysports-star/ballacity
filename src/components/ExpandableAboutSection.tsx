@@ -44,7 +44,7 @@ export function ExpandableAboutSection({
           />
         </button>
       </CollapsibleTrigger>
-      <CollapsibleContent className="overflow-hidden data-[state=closed]:animate-collapsible-up data-[state=open]:animate-collapsible-down">
+      <CollapsibleContent className="overflow-hidden text-sm data-[state=closed]:animate-accordion-up data-[state=open]:animate-accordion-down">
         <div className="pb-2 pl-1 pr-1 pt-0.5">{children}</div>
       </CollapsibleContent>
     </Collapsible>
