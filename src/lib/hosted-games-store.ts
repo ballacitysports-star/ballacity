@@ -72,9 +72,9 @@ type DbRow = {
   timezone?: string | null;
   location: string;
   neighborhood: string;
-  distance_mi: number | string;
-  lat: number | string;
-  lng: number | string;
+  distance_mi: number | string | null;
+  lat: number | string | null;
+  lng: number | string | null;
   max_players: number;
   joined: number;
   skill: string;
