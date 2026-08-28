@@ -1424,7 +1424,7 @@ function GameDetail() {
 <Meta
             icon={<Clock className="h-4 w-4 text-lime" />}
             label="Starts"
-            value={formatGameWhen(game)}
+            value={game.allDay ? formatWhenDate(game.date) : formatGameWhen(game)}
           />
           <Meta
             icon={<Calendar className="h-4 w-4 text-lime" />}
