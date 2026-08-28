@@ -64,17 +64,21 @@ export function PlayMapView<T extends MapItemLike>(props?: {
     const games = items as unknown as Array<{
       id: string;
       sport: string;
-      lat: number;
-      lng: number;
+      lat?: number | null;
+      lng?: number | null;
       urgent?: boolean;
     }>;
-    return games.map((g) => ({
-      id: g.id,
-      emoji: emojiBySport[g.sport] ?? "📍",
-      lat: g.lat,
-      lng: g.lng,
-      urgent: g.urgent,
-    }));
+    // Games whose venue was never geocoded have no coordinates — skip them
+    // instead of dropping a pin at a placeholder location.
+    return games
+      .filter((g) => typeof g.lat === "number" && typeof g.lng === "number")
+      .map((g) => ({
+        id: g.id,
+        emoji: emojiBySport[g.sport] ?? "📍",
+        lat: g.lat as number,
+        lng: g.lng as number,
+        urgent: g.urgent,
+      }));
   }, [props?.pins, items]);
 
   const [active, setActive] = useState<string>(items[0]?.id ?? "");

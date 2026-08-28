@@ -6,7 +6,7 @@ import { formatGameWhen } from "@/lib/format";
 import { useIsJoined } from "@/lib/games-store";
 import { useLiveParticipantCount } from "@/lib/game-participants-store";
 import { useJoinGate } from "@/lib/live-status";
-import { Distance } from "@/components/Distance";
+import { GameDistance } from "@/components/GameDistance";
 
 const sportEmoji: Record<string, string> = {
   Basketball: "🏀",
@@ -97,7 +97,7 @@ export function GameListRow({ game, index = 0 }: { game: Game; index?: number })
             </span>
             <span className="inline-flex items-center gap-1 truncate">
               <MapPin className="h-3 w-3 text-coral" />
-              <Distance mi={game.distanceMi} />
+              <GameDistance game={game} />
             </span>
             <span className="inline-flex items-center gap-1 tabular-nums">
               <Users className="h-3 w-3 text-lime" />

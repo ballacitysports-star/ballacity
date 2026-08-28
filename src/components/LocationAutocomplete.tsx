@@ -135,6 +135,12 @@ export function LocationAutocomplete({
           const next = mode === "city" ? city || formatted : formatted || city;
           if (next) {
             onChange(next);
+            // Report the device coordinates so callers can store real geo.
+            onPick?.(next, "", {
+              lat: pos.coords.latitude,
+              lng: pos.coords.longitude,
+              formattedAddress: next,
+            });
             toast.success("Location set");
           } else {
             toast.error("No address found");

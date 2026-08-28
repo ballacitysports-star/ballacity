@@ -94,7 +94,8 @@ import { PlayerFlowPill } from "@/components/PlayerFlowPill";
 import { PaymentRequiredBanner } from "@/components/PaymentRequiredBanner";
 import { HostPaymentsPanel, PlayerPaymentsPanel } from "@/components/GamePaymentsPanel";
 import { PostEngagement } from "@/components/PostEngagement";
-import { Distance } from "@/components/Distance";
+import { GameDistance } from "@/components/GameDistance";
+import { geocodeAddress } from "@/lib/geocode.functions";
 import { SeriesSessionsStrip } from "@/components/SeriesSessionsStrip";
 
 import {
@@ -1439,7 +1440,7 @@ function GameDetail() {
           <Meta
             icon={<MapPin className="h-4 w-4 text-coral" />}
             label="Distance"
-            value={<Distance mi={game.distanceMi} />}
+            value={<GameDistance game={game} />}
           />
         </div>
 
@@ -2694,6 +2695,7 @@ function EditGameModal({
 
   // Host-as (team/gym) — only editable before the game starts.
   const hasStarted = computeLiveStatus(game) !== "scheduled";
+  const geocode = useServerFn(geocodeAddress);
   const fetchMyTeams = useServerFn(listMyTeams);
   const fetchMyOrgs = useServerFn(listMyOrgs);
   const myTeamsQuery = useQuery({
@@ -2772,6 +2774,20 @@ function EditGameModal({
         !allDay && Number.isFinite(startMs) && Number.isFinite(endMs) && endMs > startMs
           ? Math.round((endMs - startMs) / 60000)
           : null;
+      // Re-resolve venue coordinates whenever the host edits the address so
+      // viewer-relative distance stays accurate.
+      const nextLocation = location.trim() || game.location;
+      let venue: { lat: number; lng: number } | null = null;
+      let venueChanged = false;
+      if (nextLocation !== game.location) {
+        venueChanged = true;
+        try {
+          const res = await geocode({ data: { address: nextLocation } });
+          venue = { lat: res.lat, lng: res.lng };
+        } catch {
+          venue = null;
+        }
+      }
       const trimmedImage = image.trim();
       const finalImage = trimmedImage || imageFor(sport);
       const updated = await updateHostedGame(game.id, {
@@ -2780,8 +2796,9 @@ function EditGameModal({
         skill,
         minAge,
         maxAge,
-        location: location.trim() || game.location,
+        location: nextLocation,
         neighborhood: neighborhood.trim(),
+        ...(venueChanged ? { lat: venue?.lat ?? null, lng: venue?.lng ?? null } : {}),
         date: Number.isFinite(new Date(dateLocal).getTime()) ? iso : game.date,
         duration: nextDurationMin ? `${nextDurationMin} min` : duration.trim() || game.duration,
         endsAt: allDay ? null : Number.isFinite(endMs) ? new Date(endMs).toISOString() : null,

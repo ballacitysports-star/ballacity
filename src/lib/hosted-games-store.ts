@@ -72,9 +72,9 @@ type DbRow = {
   timezone?: string | null;
   location: string;
   neighborhood: string;
-  distance_mi: number | string;
-  lat: number | string;
-  lng: number | string;
+  distance_mi: number | string | null;
+  lat: number | string | null;
+  lng: number | string | null;
   max_players: number;
   joined: number;
   skill: string;
@@ -117,9 +117,9 @@ function rowToGame(r: DbRow): Game {
     duration: r.duration,
     location: r.location,
     neighborhood: r.neighborhood,
-    distanceMi: Number(r.distance_mi) || 0,
-    lat: Number(r.lat) || 50,
-    lng: Number(r.lng) || 50,
+    distanceMi: r.distance_mi == null ? null : Number(r.distance_mi),
+    lat: r.lat == null ? null : Number(r.lat),
+    lng: r.lng == null ? null : Number(r.lng),
     maxPlayers: r.max_players,
     joined: r.joined,
     skill: r.skill as Game["skill"],
@@ -157,9 +157,9 @@ function gameToInsertRow(g: Game): TablesInsert<"hosted_games"> {
     duration: g.duration,
     location: g.location,
     neighborhood: g.neighborhood ?? "",
-    distance_mi: g.distanceMi ?? 0,
-    lat: g.lat ?? 50,
-    lng: g.lng ?? 50,
+    distance_mi: g.distanceMi ?? null,
+    lat: g.lat ?? null,
+    lng: g.lng ?? null,
     max_players: g.maxPlayers,
     joined: g.joined ?? 0,
     skill: g.skill,
@@ -292,6 +292,9 @@ export type HostedGameInput = {
   allDay?: boolean;
   /** IANA zone the host set the wall-clock times in. */
   timezone?: string | null;
+  /** Real venue coordinates from the address autocomplete / geocoder. */
+  lat?: number | null;
+  lng?: number | null;
 
 };
 
@@ -316,9 +319,9 @@ export async function addHostedGame(input: HostedGameInput): Promise<Game> {
     duration: input.duration?.trim() || "90 min",
     location: input.location || "TBD",
     neighborhood: "",
-    distanceMi: 0,
-    lat: 50,
-    lng: 50,
+    distanceMi: null,
+    lat: input.lat ?? null,
+    lng: input.lng ?? null,
     maxPlayers: input.maxPlayers,
     joined: 0,
     skill: input.skill,
@@ -403,6 +406,10 @@ export async function updateHostedGame(
   if (patch.title !== undefined) dbPatch.title = patch.title;
   if (patch.location !== undefined) dbPatch.location = patch.location;
   if (patch.neighborhood !== undefined) dbPatch.neighborhood = patch.neighborhood;
+  // Venue coordinates: real geo from the autocomplete/geocoder, or null when
+  // the host cleared/changed the address to something we couldn't resolve.
+  if (patch.lat !== undefined) dbPatch.lat = patch.lat ?? null;
+  if (patch.lng !== undefined) dbPatch.lng = patch.lng ?? null;
   if (patch.date !== undefined) dbPatch.date = patch.date;
   if (patch.duration !== undefined) dbPatch.duration = patch.duration;
   if ((patch as { endsAt?: string | null }).endsAt !== undefined) {

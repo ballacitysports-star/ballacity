@@ -562,7 +562,7 @@ export type Database = {
           created_at: string
           date: string
           description: string
-          distance_mi: number
+          distance_mi: number | null
           duration: string
           ends_at: string | null
           equipment: string[]
@@ -575,8 +575,8 @@ export type Database = {
           is_private: boolean
           joined: number
           joins_closed: boolean
-          lat: number
-          lng: number
+          lat: number | null
+          lng: number | null
           location: string
           max_age: number | null
           max_players: number
@@ -605,7 +605,7 @@ export type Database = {
           created_at?: string
           date: string
           description?: string
-          distance_mi?: number
+          distance_mi?: number | null
           duration?: string
           ends_at?: string | null
           equipment?: string[]
@@ -618,8 +618,8 @@ export type Database = {
           is_private?: boolean
           joined?: number
           joins_closed?: boolean
-          lat?: number
-          lng?: number
+          lat?: number | null
+          lng?: number | null
           location?: string
           max_age?: number | null
           max_players?: number
@@ -648,7 +648,7 @@ export type Database = {
           created_at?: string
           date?: string
           description?: string
-          distance_mi?: number
+          distance_mi?: number | null
           duration?: string
           ends_at?: string | null
           equipment?: string[]
@@ -661,8 +661,8 @@ export type Database = {
           is_private?: boolean
           joined?: number
           joins_closed?: boolean
-          lat?: number
-          lng?: number
+          lat?: number | null
+          lng?: number | null
           location?: string
           max_age?: number | null
           max_players?: number
