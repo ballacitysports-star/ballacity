@@ -35,7 +35,7 @@ import {
 import { useMyAge, fetchProfileAges } from "@/lib/use-my-age";
 import { requesterAgeLabel } from "@/lib/game-age";
 import { AgeRequirementFields } from "@/components/games/AgeRequirementFields";
-import { formatGameWhen, formatWhen, formatWhenDate } from "@/lib/format";
+import { formatGameEnds, formatGameWhen, formatWhen, formatWhenDate } from "@/lib/format";
 import { gameEndsAt } from "@/lib/game-time";
 import { AddToCalendarButton } from "@/components/datetime/AddToCalendarButton";
 import { GameReminderCard, GameReminderPicker } from "@/components/GameReminderSettings";
@@ -2845,7 +2845,7 @@ function EditGameModal({
               .filter((uid) => uid && uid !== user?.id);
             const body = allDayChanged
               ? allDay
-                ? `${title.trim() || game.title} is now an all-day event.`
+                ? `${title.trim() || game.title} is now an all-day event on ${formatWhenDate(game.date)}.`
                 : `${title.trim() || game.title} now ends at ${formatEndsAt({
                     ...game,
                     allDay,
