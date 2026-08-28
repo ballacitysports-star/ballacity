@@ -77,6 +77,9 @@ export function useGameDistance(game: Pick<Game, "lat" | "lng" | "pseudoGeo" | "
     status,
     remembered,
     fixedAt,
+    error,
+    source,
+    label,
     explanation:
       state.reason == null ? null : distanceUnavailableExplanation(state.reason, status, remembered),
     requestLocation: request,
