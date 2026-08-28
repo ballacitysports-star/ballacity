@@ -365,7 +365,57 @@ function PlayerProfilePage() {
         </AboutBlock>
       </ProfileAboutSheet>
 
-      <div className="px-4">
+<div className="px-4">
+        {/* About — shown directly on the card */}
+        {(bio || links.length > 0 || searchRadiusMi != null || city) && (
+          <div className="mt-4 rounded-2xl border border-border bg-surface p-4">
+            {bio && (
+              <section>
+                <h2 className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                  About
+                </h2>
+                <p className="text-sm leading-relaxed text-foreground/90 whitespace-pre-wrap">{bio}</p>
+              </section>
+            )}
+            <section className={bio ? "mt-4" : ""}>
+              <h3 className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                Details
+              </h3>
+              <ul className="space-y-1 text-sm text-muted-foreground">
+                {username && <li>{username}</li>}
+                {searchRadiusMi != null && (
+                  <li className="flex items-center gap-1">
+                    <MapPin className="h-3.5 w-3.5 text-lime" />
+                    {city || "Anywhere"} · travels up to {formatDistance(searchRadiusMi, unit)}
+                  </li>
+                )}
+                {!searchRadiusMi && city && <li>{city}</li>}
+                {profile.graduating_class && <li>Class of {profile.graduating_class}</li>}
+              </ul>
+            </section>
+            <section className="mt-4">
+              <h3 className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                Stats
+              </h3>
+              <AboutStats
+                items={[
+                  { k: `${stats.reliability}%`, v: "Reliable" },
+                  { k: stats.sportsmanship, v: "Sport" },
+                  { k: stats.friends, v: "Crew" },
+                ]}
+              />
+            </section>
+            {links.length > 0 && (
+              <section className="mt-4">
+                <h3 className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                  Links
+                </h3>
+                <ProfileLinksList links={links} />
+              </section>
+            )}
+          </div>
+        )}
+
         <PlayerOrgsSection userId={userId} />
 
         {/* Open availability */}
