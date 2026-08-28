@@ -284,7 +284,7 @@ function TeamPage() {
             bio: org.bio || org.tagline || undefined,
             city: org.city || undefined,
             sports: (org.sports ?? []).map((s) => ({ name: s })),
-            rating: orgRep.count ? orgRep.trustScore / 20 : null,
+            trustScore: orgRep.count ? orgRep.trustScore : undefined,
             reviewCount: orgRep.count,
             extras: [
               org.followers ? `${org.followers.toLocaleString()} followers` : null,
