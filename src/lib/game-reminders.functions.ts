@@ -1,5 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { formatNotificationWhen } from "@/lib/format";
 
 /**
  * Delivers the caller's due game reminders as notification rows.
@@ -64,7 +65,10 @@ export const flushMyDueGameReminders = createServerFn({ method: "POST" })
         title: `${game['title']} starts in ${lead}`,
         // All-day games never surface a clock time in reminders.
         body:
-          [game['all_day'] ? "All day event" : null, game['location'] ? `Where: ${game['location']}` : null]
+          [
+            formatNotificationWhen({ date: String(game['date']), allDay: !!game['all_day'] }),
+            game['location'] ? `Where: ${game['location']}` : null,
+          ]
             .filter(Boolean)
             .join(" · ") || null,
         link: `/games/${r.game_id}`,

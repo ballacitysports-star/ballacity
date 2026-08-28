@@ -4,7 +4,7 @@ import { CalendarDays } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import type { Game } from "@/lib/sample-data";
 
-type SessionRow = { id: string; date: string; duration: string };
+type SessionRow = { id: string; date: string; duration: string; all_day?: boolean | null };
 
 function formatSession(dateIso: string): string {
   const d = new Date(dateIso);
@@ -34,7 +34,7 @@ export function SeriesSessionsStrip({ game }: { game: Game }) {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("hosted_games")
-        .select("id, date, duration")
+        .select("id, date, duration, all_day")
         .eq("series_id", seriesId as string)
         .order("date", { ascending: true });
       if (error) throw error;
@@ -65,7 +65,7 @@ export function SeriesSessionsStrip({ game }: { game: Game }) {
                   : "border-border bg-background hover:border-lime/40 hover:text-lime"
               }`}
             >
-              {formatSession(s.date)} · {formatTime(s.date)}
+              {s.all_day ? formatSession(s.date) : `${formatSession(s.date)} · ${formatTime(s.date)}`}
             </Link>
           );
         })}
