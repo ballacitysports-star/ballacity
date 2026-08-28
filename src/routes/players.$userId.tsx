@@ -579,8 +579,9 @@ function PlayerCard({ a }: { a: PlayerAvailability }) {
         )}
       </div>
       {window && (
-        <p className="mt-2 flex items-center gap-1 text-xs text-muted-foreground">
-          <Calendar className="h-3.5 w-3.5" /> {window}
+        <p className="mt-2 flex items-start gap-1 text-xs text-muted-foreground">
+          <Calendar className="mt-0.5 h-3.5 w-3.5 shrink-0" />{" "}
+          <span className="min-w-0 flex-1 whitespace-normal break-words">{window}</span>
         </p>
       )}
       {(a.city || a.travel_radius_km) && (
