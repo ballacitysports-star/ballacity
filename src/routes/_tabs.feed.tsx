@@ -31,6 +31,7 @@ import {
 import { markSportChoice, useProfileSportDefault } from "@/lib/default-sports";
 import { useAuth } from "@/hooks/use-auth";
 import { haversineKm, MI_PER_KM, useUserLocation } from "@/lib/geo";
+import { gameDistanceMi } from "@/lib/game-distance";
 import { formatDistance } from "@/lib/distance";
 
 import { clearScrollRestore, useScrollRestore } from "@/hooks/use-scroll-restore";
@@ -345,7 +346,14 @@ function Feed() {
       .filter((g) => (prefs.moneyFilter === "free" ? g.price === 0 : true))
       .filter((g) => (prefs.moneyFilter === "paid" ? g.price > 0 : true))
 
-      .filter((g) => (prefs.maxDistanceMi != null ? g.distanceMi <= prefs.maxDistanceMi : true))
+      // Distance cap uses the live viewer→venue distance. Games we can't
+      // measure (no viewer location yet, or an ungeocoded venue) are never
+      // hidden — hiding them would look like the game vanished.
+      .filter((g) => {
+        if (prefs.maxDistanceMi == null) return true;
+        const mi = gameDistanceMi(g, coords);
+        return mi == null ? true : mi <= prefs.maxDistanceMi;
+      })
       .filter((g) =>
         q
           ? (
@@ -371,16 +379,18 @@ function Feed() {
           const la = isLocal(a) ? 0 : 1;
           const lb = isLocal(b) ? 0 : 1;
           if (la !== lb) return la - lb;
-          if (a.distanceMi !== b.distanceMi) return a.distanceMi - b.distanceMi;
+          const dA = gameDistanceMi(a, coords) ?? Infinity;
+          const dB = gameDistanceMi(b, coords) ?? Infinity;
+          if (dA !== dB) return dA - dB;
           return +new Date(a.date) - +new Date(b.date);
         }
         // Soonest first; break ties by distance.
         const da = +new Date(a.date) - +new Date(b.date);
         if (da !== 0) return da;
-        return a.distanceMi - b.distanceMi;
+        return (gameDistanceMi(a, coords) ?? Infinity) - (gameDistanceMi(b, coords) ?? Infinity);
       });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [q, hosted, prefs, joinedSet, hostedIds, userCityToken, positionFilter, tab]);
+  }, [q, hosted, prefs, joinedSet, hostedIds, userCityToken, positionFilter, tab, coords]);
 
   const suggestions = useMemo(() => {
     if (!q) return [] as { label: string; sub: string }[];
