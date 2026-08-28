@@ -394,26 +394,38 @@ function PlayerProfilePage() {
                 {profile.graduating_class && <li>Class of {profile.graduating_class}</li>}
               </ul>
             </section>
-            <section className="mt-4">
-              <h3 className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                Stats
-              </h3>
-              <AboutStats
-                items={[
-                  { k: `${stats.reliability}%`, v: "Reliable" },
-                  { k: stats.sportsmanship, v: "Sport" },
-                  { k: stats.friends, v: "Crew" },
-                ]}
-              />
-            </section>
-            {links.length > 0 && (
-              <section className="mt-4">
-                <h3 className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                  Links
-                </h3>
-                <ProfileLinksList links={links} />
-              </section>
-            )}
+<div className="mt-2 border-t border-border/60 pt-1">
+              <ExpandableAboutSection label="Stats">
+                <AboutStats
+                  items={[
+                    { k: `${stats.reliability}%`, v: "Reliable" },
+                    { k: stats.sportsmanship, v: "Sport" },
+                    { k: stats.friends, v: "Crew" },
+                  ]}
+                />
+              </ExpandableAboutSection>
+
+              {links.length > 0 && (
+                <ExpandableAboutSection label="Links" count={links.length}>
+                  <ProfileLinksList links={links} />
+                </ExpandableAboutSection>
+              )}
+
+              <ExpandableAboutSection
+                label="Reputation"
+                badge={
+                  <span className="inline-flex items-center gap-1 rounded-full bg-lime/15 px-2 py-0.5 text-[10px] font-bold text-lime">
+                    {rep.trustScore}
+                  </span>
+                }
+              >
+                <ReputationBadge
+                  rep={rep}
+                  onClick={() => setReviewsOpen(true)}
+                  ariaLabel={`Open reviews for ${displayName}. Trust score ${rep.trustScore}, ${rep.avg.toFixed(1)} out of 5 from ${rep.count} review${rep.count === 1 ? "" : "s"}.`}
+                />
+              </ExpandableAboutSection>
+            </div>
           </div>
         )}
 
