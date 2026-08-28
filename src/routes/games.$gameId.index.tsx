@@ -35,7 +35,7 @@ import {
 import { useMyAge, fetchProfileAges } from "@/lib/use-my-age";
 import { requesterAgeLabel } from "@/lib/game-age";
 import { AgeRequirementFields } from "@/components/games/AgeRequirementFields";
-import { formatGameWhen, formatWhen, formatWhenDate } from "@/lib/format";
+import { formatGameWhen, formatWhen } from "@/lib/format";
 import { gameEndsAt } from "@/lib/game-time";
 import { AddToCalendarButton } from "@/components/datetime/AddToCalendarButton";
 import { GameReminderCard, GameReminderPicker } from "@/components/GameReminderSettings";

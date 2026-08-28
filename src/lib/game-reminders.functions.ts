@@ -62,7 +62,11 @@ export const flushMyDueGameReminders = createServerFn({ method: "POST" })
         user_id: userId,
         type: "game_reminder",
         title: `${game['title']} starts in ${lead}`,
-        body: game['location'] ? `Where: ${game['location']}` : null,
+        // All-day games never surface a clock time in reminders.
+        body:
+          [game['all_day'] ? "All day event" : null, game['location'] ? `Where: ${game['location']}` : null]
+            .filter(Boolean)
+            .join(" · ") || null,
         link: `/games/${r.game_id}`,
       });
       if (insErr) continue;
