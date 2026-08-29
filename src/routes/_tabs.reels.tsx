@@ -270,6 +270,7 @@ function ReelsPage() {
     } catch {
       return;
     }
+    let cancelled = false;
     const load = () =>
       supabase
         .from("highlight_reels")
@@ -277,8 +278,23 @@ function ReelsPage() {
         .eq("user_id", user.id)
         .eq("environment", env)
         .order("created_at", { ascending: false })
-        .then(({ data }) => setReels((data as Reel[]) ?? []));
+        .then(({ data }) => {
+          if (!cancelled) setReels((data as Reel[]) ?? []);
+        });
     load();
+
+    /** Applies one live row change in place so the card updates without a refetch. */
+    const applyRow = (row: Reel | null, event: string) => {
+      if (!row || row.environment !== env) return;
+      setReels((prev) => {
+        if (event === "DELETE") return prev.filter((r) => r.id !== row.id);
+        const i = prev.findIndex((r) => r.id === row.id);
+        if (i === -1) return [row, ...prev];
+        const next = prev.slice();
+        next[i] = { ...next[i], ...row };
+        return next;
+      });
+    };
 
     // Live pipeline progress for this user's reels.
     const channel = supabase
@@ -292,18 +308,46 @@ function ReelsPage() {
           filter: `user_id=eq.${user.id}`,
         },
         (payload) => {
-          const row = payload.new as Reel | null;
-          if (row?.status === "completed" && (payload.old as any)?.status !== "completed") {
+          const row = (payload.eventType === "DELETE" ? payload.old : payload.new) as Reel | null;
+          const newRow = payload.new as Reel | null;
+          if (newRow?.status === "completed" && (payload.old as any)?.status !== "completed") {
             toast.success("Your highlight reel is ready");
           }
-          load();
+          applyRow(row, payload.eventType);
         },
       )
       .subscribe();
+
     return () => {
+      cancelled = true;
       supabase.removeChannel(channel);
     };
-  }, [user, busy]);
+  }, [user]);
+
+  // Safety net: if realtime drops while work is in flight, keep the page fresh.
+  const hasWorkInFlight = reels.some((r) => r.status === "processing");
+  useEffect(() => {
+    if (!user || (!hasWorkInFlight && !busy)) return;
+    let env: string;
+    try {
+      env = getStripeEnvironment();
+    } catch {
+      return;
+    }
+    const id = setInterval(() => {
+      void supabase
+        .from("highlight_reels")
+        .select("*")
+        .eq("user_id", user.id)
+        .eq("environment", env)
+        .order("created_at", { ascending: false })
+        .then(({ data }) => {
+          if (data) setReels(data as Reel[]);
+        });
+    }, 6000);
+    return () => clearInterval(id);
+  }, [user, hasWorkInFlight, busy]);
+
 
   // Deep link from a finished game: open the picker straight away.
   useEffect(() => {
