@@ -242,6 +242,8 @@ function PlayersPage() {
     ageMax: undefined,
     unknownAge: true,
     when: "any",
+    sort: "recent",
+
     view: "list",
     density: "list",
   });
