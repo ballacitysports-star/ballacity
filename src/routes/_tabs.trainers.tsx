@@ -28,6 +28,7 @@ import { toast } from "sonner";
 import { SPORT_CONFIG, SESSION_TYPES } from "@/lib/sport-config";
 import { haversineKm, KM_PER_MI, MI_PER_KM, useUserLocation } from "@/lib/geo";
 import { filterTrainersByVenue } from "@/lib/trainer-feed-filter";
+import { SortSection, SortSummary } from "@/components/filters/SortSection";
 import { useQuery } from "@tanstack/react-query";
 import { listTrainerIdsForOrg, listTrainerOrgs } from "@/lib/trainer-orgs.functions";
 
@@ -623,18 +624,7 @@ function TrainersPage() {
                     />
                   </FilterSection>
 
-                  <FilterSection label="Sort">
-                    <ChipRow
-                      value={sortBy}
-                      onChange={setSortBy}
-                      options={[
-                        { value: "nearest", label: "Nearest" },
-                        { value: "soonest", label: "Soonest available" },
-                        { value: "followers", label: "Most followers" },
-                        { value: "name", label: "Name A–Z" },
-                      ]}
-                    />
-                  </FilterSection>
+                  <SortSection value={sortBy} onChange={setSortBy} options={TRAINER_SORTS} />
                 </>
               }
             />
@@ -645,7 +635,7 @@ function TrainersPage() {
           <span>
             {list.length} {list.length === 1 ? "result" : "results"}
           </span>
-          <span>Sorted by {sortBy}</span>
+          <SortSummary value={sortBy} options={TRAINER_SORTS} />
         </div>
 
         {viewMode === "map" ? (
