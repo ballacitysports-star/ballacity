@@ -23,6 +23,14 @@ import { ACCOUNT_TYPE_META } from "@/lib/account-type";
 import { useMyProfiles } from "@/lib/account-profiles";
 import { ProfileSwitcher } from "@/components/ProfileSwitcher";
 import { useMyProfile } from "@/lib/user-prefs-store";
+import { MyAvatar } from "@/components/UserAvatar";
+import {
+  AVATAR_VISIBILITY_OPTIONS,
+  DEFAULT_AVATAR_VISIBILITY,
+  avatarVisibilityLabel,
+  useAvatarVisibility,
+  type AvatarVisibility,
+} from "@/lib/avatar-privacy";
 import {
   SettingsGroup,
   SettingsLinkRow,
@@ -205,6 +213,8 @@ function SettingsHubPage() {
 
         <ProfileIdentitySection />
 
+        <AvatarPrivacySection />
+
         <MyOrgsSection />
 
         {SECTIONS.map((section) => (
@@ -305,6 +315,79 @@ function ProfileIdentitySection() {
         <p className="mt-2.5 text-xs text-muted-foreground">
           Your player profile is always yours. Add team, trainer, and gym profiles and switch
           between them anytime — the whole app follows the profile you pick.
+        </p>
+      </SettingsStaticRow>
+    </SettingsGroup>
+  );
+}
+
+/** Who can see my profile photo — enforced server-side on every avatar read. */
+function AvatarPrivacySection() {
+  const { user } = useAuth();
+  const { value, saving, update } = useAvatarVisibility();
+
+  if (!user) return null;
+
+  const current = value ?? DEFAULT_AVATAR_VISIBILITY;
+
+  const choose = async (next: AvatarVisibility) => {
+    if (next === current) return;
+    try {
+      await update(next);
+      toast.success(`Photo visible to: ${avatarVisibilityLabel(next)}`);
+    } catch (e: any) {
+      toast.error(e?.message ?? "Couldn't save privacy setting");
+    }
+  };
+
+  return (
+    <SettingsGroup title="Photo privacy">
+      <SettingsStaticRow>
+        <div className="flex items-center gap-3 pb-3">
+          <MyAvatar size="lg" />
+          <div className="min-w-0">
+            <div className="text-sm text-foreground">Who can see your profile photo</div>
+            <div className="text-xs text-muted-foreground">
+              {value === null ? "Loading…" : avatarVisibilityLabel(current)}
+            </div>
+          </div>
+        </div>
+        <div className="space-y-2" role="radiogroup" aria-label="Profile photo visibility">
+          {AVATAR_VISIBILITY_OPTIONS.map((opt) => {
+            const active = current === opt.value;
+            return (
+              <button
+                key={opt.value}
+                type="button"
+                role="radio"
+                aria-checked={active}
+                disabled={saving || value === null}
+                onClick={() => void choose(opt.value)}
+                className={`flex w-full items-start gap-3 rounded-lg px-3 py-2.5 text-left transition disabled:opacity-60 ${
+                  active ? "bg-surface-2" : "hover:bg-surface"
+                }`}
+              >
+                <span
+                  aria-hidden
+                  className={`mt-0.5 grid h-4 w-4 shrink-0 place-items-center rounded-full border ${
+                    active ? "border-lime" : "border-border"
+                  }`}
+                >
+                  {active && <span className="h-2 w-2 rounded-full bg-lime" />}
+                </span>
+                <span className="min-w-0">
+                  <span className="block text-sm text-foreground">{opt.label}</span>
+                  <span className="mt-0.5 block text-xs text-muted-foreground">
+                    {opt.description}
+                  </span>
+                </span>
+              </button>
+            );
+          })}
+        </div>
+        <p className="mt-2 text-xs text-muted-foreground">
+          Your name and initials stay visible either way, so people can still find and recognize
+          you.
         </p>
       </SettingsStaticRow>
     </SettingsGroup>
