@@ -1,7 +1,21 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { pageHead } from "@/lib/seo";
 import { useEffect, useRef, useState } from "react";
-import { Sparkles, Upload, Video, Lock, Loader2, AlertTriangle, ExternalLink, Check } from "lucide-react";
+import {
+  Sparkles,
+  Upload,
+  Video,
+  Lock,
+  Loader2,
+  AlertTriangle,
+  ExternalLink,
+  Check,
+  RefreshCw,
+  Eye,
+} from "lucide-react";
+import { captureVideoFrames } from "@/lib/reel-frames";
+import { processMyReels } from "@/lib/reels.functions";
+import { ReelCoach } from "@/components/reels/ReelCoach";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
@@ -46,12 +60,19 @@ type Reel = {
   game_title: string | null;
   processing_step: string | null;
   completed_at: string | null;
+  attempts?: number | null;
+  ai_sport?: string | null;
+  ai_analysis?: { summary?: string; quality_note?: string } | null;
+  ai_moments?: { label: string; frame?: number; note?: string }[] | null;
+  suggested_clip?: { start_pct?: number; end_pct?: number; why?: string } | null;
 };
 
-function ReelCard({ reel }: { reel: Reel }) {
+function ReelCard({ reel, onRetry }: { reel: Reel; onRetry: (id: string) => Promise<void> }) {
   const [thumb, setThumb] = useState<string | null>(null);
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
   const [open, setOpen] = useState(false);
+  const [retrying, setRetrying] = useState(false);
+  const [showInsights, setShowInsights] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -122,6 +143,27 @@ function ReelCard({ reel }: { reel: Reel }) {
           {reel.status === "failed" && reel.error_message && (
             <p className="mt-1 text-[10px] text-amber-300">{reel.error_message}</p>
           )}
+          {(reel.status === "failed" || isProcessing) && (
+            <button
+              onClick={async () => {
+                setRetrying(true);
+                try {
+                  await onRetry(reel.id);
+                } finally {
+                  setRetrying(false);
+                }
+              }}
+              disabled={retrying}
+              className="mt-1.5 inline-flex items-center gap-1 rounded-full border border-border px-2 py-0.5 text-[10px] font-semibold disabled:opacity-50"
+            >
+              {retrying ? (
+                <Loader2 className="h-3 w-3 animate-spin" />
+              ) : (
+                <RefreshCw className="h-3 w-3" />
+              )}
+              {reel.status === "failed" ? "Try again" : "Resume processing"}
+            </button>
+          )}
         </div>
         {isDone && reel.game_id && (
           <button
@@ -145,6 +187,56 @@ function ReelCard({ reel }: { reel: Reel }) {
           <video src={videoUrl} controls className="w-full rounded-lg" />
         </div>
       )}
+
+      {isDone && (reel.ai_analysis?.summary || (reel.ai_moments ?? []).length > 0) && (
+        <div className="mt-2">
+          <button
+            onClick={() => setShowInsights((v) => !v)}
+            className="inline-flex items-center gap-1 text-[11px] font-semibold text-lime"
+          >
+            <Eye className="h-3.5 w-3.5" />
+            {showInsights ? "Hide what the AI saw" : "What the AI saw"}
+          </button>
+          {showInsights && (
+            <div className="mt-2 rounded-xl border border-border bg-background/60 p-3">
+              {reel.ai_sport && (
+                <p className="text-[10px] font-bold uppercase tracking-wider text-lime">
+                  {reel.ai_sport}
+                </p>
+              )}
+              {reel.ai_analysis?.summary && (
+                <p className="mt-1 text-xs text-muted-foreground">{reel.ai_analysis.summary}</p>
+              )}
+              {(reel.ai_moments ?? []).length > 0 && (
+                <ul className="mt-2 flex flex-wrap gap-1.5">
+                  {(reel.ai_moments ?? []).map((m, i) => (
+                    <li
+                      key={`${m.label}-${i}`}
+                      title={m.note || undefined}
+                      className="rounded-full border border-lime/40 bg-lime/10 px-2 py-0.5 text-[10px] font-semibold text-lime"
+                    >
+                      {m.label}
+                    </li>
+                  ))}
+                </ul>
+              )}
+              {reel.suggested_clip?.why && (
+                <p className="mt-2 text-[11px] text-muted-foreground">
+                  <span className="font-semibold">Best cut:</span> {reel.suggested_clip.why}
+                </p>
+              )}
+              {reel.ai_analysis?.quality_note && (
+                <p className="mt-1 text-[11px] text-muted-foreground">
+                  <span className="font-semibold">Filming tip:</span>{" "}
+                  {reel.ai_analysis.quality_note}
+                </p>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
+      {isDone && <ReelCoach reelId={reel.id} />}
     </li>
   );
 }
@@ -158,6 +250,7 @@ function ReelsPage() {
   const [reels, setReels] = useState<Reel[]>([]);
   const [busy, setBusy] = useState(false);
   const autoOpened = useRef(false);
+  const sweptRef = useRef(false);
   const gameReels = gameId ? reels.filter((r) => r.game_id === gameId) : [];
   const visibleReels = gameId ? gameReels : reels;
 
@@ -219,6 +312,26 @@ function ReelsPage() {
     fileRef.current?.click();
   }, [autoUpload, user, canGenerate]);
 
+  // Sweep anything abandoned mid-flight (tab closed, cold error) once per visit.
+  useEffect(() => {
+    if (!user || sweptRef.current) return;
+    const stuck = reels.some(
+      (r) => r.status === "processing" && r.processing_step !== "completed",
+    );
+    if (!stuck) return;
+    sweptRef.current = true;
+    void processMyReels({ data: {} }).catch(() => {});
+  }, [user, reels]);
+
+
+  /** Runs the pipeline for the caller's queued reels; failures stay non-fatal. */
+  async function kickOffProcessing(reelId?: string) {
+    try {
+      await processMyReels({ data: reelId ? { reelId } : {} });
+    } catch (e: any) {
+      toast.error(e?.message ?? "AI processing could not start — try again");
+    }
+  }
 
   async function handleUpload(file: File) {
     if (!user) return;
@@ -229,28 +342,44 @@ function ReelsPage() {
     setBusy(true);
     try {
       const env = getStripeEnvironment();
-      const path = `${user.id}/${Date.now()}-${file.name.replace(/[^a-zA-Z0-9.-]/g, "_")}`;
+      const base = `${user.id}/${Date.now()}-${file.name.replace(/[^a-zA-Z0-9.-]/g, "_")}`;
       const { error: upErr } = await supabase.storage
         .from("highlight-videos")
-        .upload(path, file, { upsert: false });
+        .upload(base, file, { upsert: false });
       if (upErr) throw upErr;
 
+      // Sample frames in the browser: they become the real thumbnail and the
+      // input the sports AI agent looks at (the server can't run ffmpeg).
+      const framePaths: string[] = [];
+      const frames = await captureVideoFrames(file);
+      for (let i = 0; i < frames.length; i++) {
+        const framePath = `${base}.frame${i + 1}.jpg`;
+        const { error } = await supabase.storage
+          .from("highlight-videos")
+          .upload(framePath, frames[i], { upsert: true, contentType: "image/jpeg" });
+        if (!error) framePaths.push(framePath);
+      }
+
       const usedFree = !isActive;
-      const { error: insErr } = await supabase.from("highlight_reels").insert({
-        user_id: user.id,
-        title: gameTitle
-          ? `Recap · ${gameTitle}`
-          : file.name.replace(/\.[^.]+$/, ""),
-        video_path: path,
-        status: "processing",
-        used_free: usedFree,
-        environment: env,
-        game_id: gameId || null,
-        game_title: gameTitle || null,
-      });
+      const { data: inserted, error: insErr } = await supabase
+        .from("highlight_reels")
+        .insert({
+          user_id: user.id,
+          title: gameTitle ? `Recap · ${gameTitle}` : file.name.replace(/\.[^.]+$/, ""),
+          video_path: base,
+          status: "processing",
+          used_free: usedFree,
+          environment: env,
+          game_id: gameId || null,
+          game_title: gameTitle || null,
+          frame_paths: framePaths.length > 0 ? framePaths : null,
+        } as any)
+        .select("id")
+        .maybeSingle();
       if (insErr) throw insErr;
 
-      toast.success("Reel queued — AI processing started");
+      toast.success("Reel uploaded — AI is working on it now");
+      void kickOffProcessing((inserted as { id?: string } | null)?.id);
     } catch (e: any) {
       toast.error(e?.message ?? "Upload failed");
     } finally {
@@ -428,7 +557,7 @@ function ReelsPage() {
         ) : (
           <ul className="space-y-2">
             {visibleReels.map((r) => (
-              <ReelCard key={r.id} reel={r} />
+              <ReelCard key={r.id} reel={r} onRetry={kickOffProcessing} />
             ))}
           </ul>
         )}
