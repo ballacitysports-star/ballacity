@@ -23,8 +23,15 @@ import { useMyProfile } from "@/lib/user-prefs-store";
 import { useAuth } from "@/hooks/use-auth";
 import { usePersistedSearch } from "@/hooks/use-persisted-search";
 import { Distance } from "@/components/Distance";
+import { SortSection, SortSummary } from "@/components/filters/SortSection";
 
 type SortBy = "nearest" | "followers" | "name";
+
+const TEAM_SORTS = [
+  { value: "nearest" as const, label: "Nearest" },
+  { value: "followers" as const, label: "Most followers" },
+  { value: "name" as const, label: "Name A–Z" },
+];
 
 // Deterministic pseudo-distance (miles) from a string, so sort order is stable.
 function pseudoDistance(id: string): number {
@@ -284,17 +291,8 @@ function TeamsPage() {
                     ]}
                   />
                 </FilterSection>
-                <FilterSection label="Sort">
-                  <ChipRow
-                    value={sortBy}
-                    onChange={setSortBy}
-                    options={[
-                      { value: "nearest", label: "Nearest" },
-                      { value: "followers", label: "Most followers" },
-                      { value: "name", label: "Name A–Z" },
-                    ]}
-                  />
-                </FilterSection>
+                <SortSection value={sortBy} onChange={setSortBy} options={TEAM_SORTS} />
+
               </>
             }
           />
@@ -305,10 +303,7 @@ function TeamsPage() {
         <span>
           {list.length} {list.length === 1 ? "result" : "results"}
         </span>
-        <span>
-          Sorted by{" "}
-          {sortBy === "nearest" ? "nearest" : sortBy === "followers" ? "followers" : "name"}
-        </span>
+        <SortSummary value={sortBy} options={TEAM_SORTS} />
       </div>
 
       {viewMode === "map" ? (
