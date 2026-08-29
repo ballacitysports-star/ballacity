@@ -52,7 +52,7 @@ import {
   shareRecap,
   type RecapSummary,
 } from "@/lib/recaps";
-import { Share2 } from "lucide-react";
+import { EyeOff, Share2, Trash2 } from "lucide-react";
 
 export const Route = createFileRoute("/_tabs/reels")({
   validateSearch: (search: Record<string, unknown>) => ({
