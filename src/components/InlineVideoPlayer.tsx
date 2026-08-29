@@ -9,10 +9,13 @@ import { supabase } from "@/integrations/supabase/client";
  */
 export function InlineVideoPlayer({
   videoPath,
+  videoUrl,
   thumbnailUrl,
   ariaLabel,
 }: {
-  videoPath: string;
+  videoPath?: string;
+  /** Pre-signed URL; when provided, client-side signing is skipped. */
+  videoUrl?: string | null;
   thumbnailUrl?: string | null;
   ariaLabel?: string;
 }) {
@@ -24,6 +27,19 @@ export function InlineVideoPlayer({
     let cancelled = false;
     setUrl(null);
     setFailed(false);
+    if (videoUrl !== undefined) {
+      setUrl(videoUrl);
+      if (!videoUrl) setFailed(true);
+      return () => {
+        cancelled = true;
+      };
+    }
+    if (!videoPath) {
+      setFailed(true);
+      return () => {
+        cancelled = true;
+      };
+    }
     supabase.storage
       .from("highlight-videos")
       .createSignedUrl(videoPath, 3600)
@@ -35,7 +51,7 @@ export function InlineVideoPlayer({
     return () => {
       cancelled = true;
     };
-  }, [videoPath]);
+  }, [videoPath, videoUrl]);
 
   if (playing && url) {
     return (
