@@ -624,3 +624,86 @@ export async function processReel(reel: Reel, supabaseAdmin: any, apiKey: string
     return { id: reel.id, status: finalFail ? "failed" : "retry-pending", error: msg };
   }
 }
+
+/**
+ * Non-destructive restyle: runs the style-dependent steps in memory using the
+ * media analysis already captured for this reel and returns the result WITHOUT
+ * touching the stored row. Powers the side-by-side compare mode, so the athlete
+ * can preview a restyled version before publishing over the current one.
+ */
+export const STYLE_DRAFT_STEPS: Step[] = [
+  "timeline",
+  "editplan",
+  "coach",
+  "metadata",
+  "hashtags",
+  "thumbnail",
+];
+
+export type ReelStyleDraft = {
+  style: Record<string, any>;
+  ai_title: string | null;
+  ai_caption: string | null;
+  ai_hashtags: string[];
+  timeline: { t: number; label: string; note?: string }[];
+  edit_plan: { segments: any[]; why?: string; total?: number } | null;
+  coaching: Record<string, any> | null;
+  thumbnail_path: string | null;
+  overlays: { at: string; text: string }[];
+  created_at: string;
+};
+
+export async function runStyleDraft(
+  reel: Reel,
+  style: Record<string, any>,
+  supabaseAdmin: any,
+  apiKey: string,
+): Promise<ReelStyleDraft> {
+  const progress: Record<string, any> = { ...prepareStyleRegen(reel.step_progress).step_progress };
+  const styledReel: Reel = { ...reel, style_prefs: style };
+
+  for (const step of STYLE_DRAFT_STEPS) {
+    const patch = await STEP_RUNNERS[step](styledReel, progress, { supabaseAdmin, apiKey });
+    Object.assign(progress, patch);
+  }
+
+  // Fresh on-screen text in the new style, timed to the drafted timeline.
+  let overlays: { at: string; text: string }[] = [];
+  try {
+    const { generateReelPackage } = await import("@/lib/reel-coach.server");
+    const pkg = await generateReelPackage(apiKey, {
+      id: reel.id,
+      title: reel.title,
+      game_title: reel.game_title ?? null,
+      status: "completed",
+      style_prefs: style,
+      ai_title: progress.ai_title ?? null,
+      ai_caption: progress.ai_caption ?? null,
+      ai_hashtags: progress.ai_hashtags ?? [],
+      ai_sport: progress.sport ?? null,
+      ai_analysis: progress.analysis ?? null,
+      ai_moments: progress.moments ?? [],
+      ai_timeline: progress.timeline ?? [],
+      ai_edit_plan: progress.edit_plan ?? null,
+      ai_coaching: progress.coaching ?? null,
+      ai_transcript: progress.transcript ?? null,
+      suggested_clip: progress.suggested_clip ?? null,
+    });
+    overlays = pkg.overlays ?? [];
+  } catch {
+    // Overlays are a bonus — the drafted style still previews fine.
+  }
+
+  return {
+    style,
+    ai_title: progress.ai_title ?? null,
+    ai_caption: progress.ai_caption ?? null,
+    ai_hashtags: progress.ai_hashtags ?? [],
+    timeline: progress.timeline ?? [],
+    edit_plan: progress.edit_plan ?? null,
+    coaching: progress.coaching ?? null,
+    thumbnail_path: progress.thumbnail_path ?? null,
+    overlays,
+    created_at: new Date().toISOString(),
+  };
+}

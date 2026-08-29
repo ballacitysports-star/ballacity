@@ -27,6 +27,7 @@ import {
 } from "@/lib/reel-style";
 import { useDefaultSports } from "@/lib/default-sports";
 import { ReelStudio } from "@/components/reels/ReelStudio";
+import { ReelCompare } from "@/components/reels/ReelCompare";
 import { processMyReels, regenerateReelStyle } from "@/lib/reels.functions";
 import { ReelCoach } from "@/components/reels/ReelCoach";
 import { toast } from "sonner";
@@ -371,6 +372,8 @@ function ReelCard({ reel, onRetry }: { reel: Reel; onRetry: (id: string) => Prom
           )}
         </div>
       )}
+
+      {isDone && <ReelCompare reel={reel} />}
 
       {isDone && <ReelCoach reelId={reel.id} />}
     </li>
