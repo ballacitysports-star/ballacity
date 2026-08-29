@@ -914,9 +914,17 @@ function PlayerProfile() {
 function ProfileReelItem({
   reel,
   onChanged,
+  selectable,
+  selected,
+  onToggleSelected,
+  onAttach,
 }: {
   reel: RecapSummary;
   onChanged?: () => void;
+  selectable?: boolean;
+  selected?: boolean;
+  onToggleSelected?: () => void;
+  onAttach?: () => void;
 }) {
   const [thumbUrl, setThumbUrl] = useState<string | null>(null);
 
