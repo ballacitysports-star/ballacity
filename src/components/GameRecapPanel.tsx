@@ -162,7 +162,7 @@ export function GameRecapPanel({
         <p className="text-sm font-semibold">Highlight reel</p>
         <Link
           to="/reels"
-          search={{ game: gameId, title: gameTitle, upload: false }}
+          search={{ game: gameId, title: gameTitle, upload: "" }}
           className="text-xs font-medium text-lime"
         >
           {latest ? "Open in Reels" : "Create one"}
@@ -218,7 +218,7 @@ export function GameRecapPanel({
               <div className="flex items-center gap-2">
                 <Link
                   to="/reels"
-                  search={{ game: gameId, title: gameTitle, upload: false }}
+                  search={{ game: gameId, title: gameTitle, upload: "" }}
                   className="inline-flex items-center gap-1 rounded-full bg-lime px-2.5 py-1 text-[10px] font-bold text-primary-foreground"
                 >
                   <Download className="h-3 w-3" /> Export
