@@ -15,6 +15,7 @@ import {
   Circle,
 } from "lucide-react";
 import { captureClip } from "@/lib/reel-frames";
+import { ReelStudio } from "@/components/reels/ReelStudio";
 import { processMyReels } from "@/lib/reels.functions";
 import { ReelCoach } from "@/components/reels/ReelCoach";
 import { toast } from "sonner";
@@ -76,6 +77,19 @@ type Reel = {
   ai_analysis?: { summary?: string; quality_note?: string } | null;
   ai_moments?: { label: string; frame?: number; note?: string }[] | null;
   suggested_clip?: { start_pct?: number; end_pct?: number; why?: string } | null;
+  ai_timeline?: { t: number; label: string; note?: string }[] | null;
+  ai_edit_plan?: {
+    segments: { start: number; end: number; pace?: string; why?: string }[];
+    why?: string;
+    total?: number;
+  } | null;
+  ai_coaching?: {
+    strengths?: string[];
+    notes?: string[];
+    drills?: string[];
+    confidence?: string;
+  } | null;
+  ai_transcript?: { text?: string } | null;
 };
 
 function ReelCard({ reel, onRetry }: { reel: Reel; onRetry: (id: string) => Promise<void> }) {
@@ -235,9 +249,13 @@ function ReelCard({ reel, onRetry }: { reel: Reel; onRetry: (id: string) => Prom
         )}
       </div>
       {open && videoUrl && (
-        <div className="mt-3">
-          <video src={videoUrl} controls className="w-full rounded-lg" />
-        </div>
+        <ReelStudio
+          videoUrl={videoUrl}
+          timeline={reel.ai_timeline ?? []}
+          editPlan={reel.ai_edit_plan ?? null}
+          coaching={reel.ai_coaching ?? null}
+          transcript={reel.ai_transcript?.text ?? null}
+        />
       )}
 
       {isDone && (reel.ai_analysis?.summary || (reel.ai_moments ?? []).length > 0) && (
