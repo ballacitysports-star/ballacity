@@ -515,7 +515,7 @@ export const listPublicReels = createServerFn({ method: "GET" })
     return Promise.all(
       reels.map(async (r) => {
         const [video, thumb] = await Promise.all([
-          supabaseAdmin.storage.from("highlight-videos").createSignedUrl(r.video_path, 3600),
+          supabaseAdmin.storage.from("highlight-videos").createSignedUrl(r.playback_path ?? r.video_path, 3600),
           r.thumbnail_path
             ? supabaseAdmin.storage.from("highlight-videos").createSignedUrl(r.thumbnail_path, 3600)
             : Promise.resolve({ data: null }),
@@ -547,7 +547,7 @@ export const deleteReels = createServerFn({ method: "POST" })
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { data: rows, error } = await supabaseAdmin
       .from("highlight_reels")
-      .select("id,video_path,thumbnail_path,audio_path,frame_paths")
+      .select("id,video_path,playback_path,thumbnail_path,audio_path,frame_paths")
       .in("id", data.reelIds)
       .eq("user_id", context.userId);
     if (error) throw new Error(error.message);
@@ -556,7 +556,7 @@ export const deleteReels = createServerFn({ method: "POST" })
     if (ids.length === 0) return { deleted: 0 };
 
     const paths = ((rows ?? []) as any[])
-      .flatMap((r) => [r.video_path, r.thumbnail_path, r.audio_path, ...((r.frame_paths as string[] | null) ?? [])])
+      .flatMap((r) => [r.video_path, r.playback_path, r.thumbnail_path, r.audio_path, ...((r.frame_paths as string[] | null) ?? [])])
       .filter((p): p is string => typeof p === "string" && p.length > 0);
     if (paths.length > 0) await supabaseAdmin.storage.from("highlight-videos").remove(paths);
 

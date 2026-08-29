@@ -10,6 +10,8 @@ export type RecapSummary = {
   id: string;
   title: string;
   video_path: string;
+  /** iPhone/Safari-friendly H.264 copy of the clip, when one was needed. */
+  playback_path?: string | null;
   status: string;
   processing_step: string | null;
   /** Live snapshot written by the server pipeline (see `_pipeline`). */
@@ -31,7 +33,7 @@ export type RecapSummary = {
 
 /** Columns needed for status + inline playback. */
 export const RECAP_COLUMNS =
-  "id,title,video_path,status,processing_step,step_progress,thumbnail_path,ai_title,ai_caption,ai_hashtags,error_message,created_at,completed_at,game_id,game_title,ai_sport,hidden_at";
+  "id,title,video_path,playback_path,status,processing_step,step_progress,thumbnail_path,ai_title,ai_caption,ai_hashtags,error_message,created_at,completed_at,game_id,game_title,ai_sport,hidden_at";
 
 const STEP_ORDER = [
   "pending",

@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import { captureClip } from "@/lib/reel-frames";
 import { isWidelyPlayable } from "@/lib/video-support";
+import { transcodeToH264Mp4 } from "@/lib/video-transcode";
 
 import { ReelStylePanel } from "@/components/reels/ReelStylePanel";
 import {
@@ -76,6 +77,8 @@ type Reel = {
   id: string;
   title: string;
   video_path: string;
+  /** iPhone/Safari-friendly H.264 copy, when the source needed converting. */
+  playback_path?: string | null;
   status: string;
   used_free: boolean;
   created_at: string;
@@ -146,7 +149,7 @@ function ReelCard({ reel, onRetry }: { reel: Reel; onRetry: (id: string) => Prom
     if (!videoUrl) {
       const { data } = await supabase.storage
         .from("highlight-videos")
-        .createSignedUrl(reel.video_path, 3600);
+        .createSignedUrl(reel.playback_path ?? reel.video_path, 3600);
       if (data?.signedUrl) setVideoUrl(data.signedUrl);
     }
     setOpen(true);
