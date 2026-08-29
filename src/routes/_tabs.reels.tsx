@@ -60,12 +60,19 @@ type Reel = {
   game_title: string | null;
   processing_step: string | null;
   completed_at: string | null;
+  attempts?: number | null;
+  ai_sport?: string | null;
+  ai_analysis?: { summary?: string; quality_note?: string } | null;
+  ai_moments?: { label: string; frame?: number; note?: string }[] | null;
+  suggested_clip?: { start_pct?: number; end_pct?: number; why?: string } | null;
 };
 
-function ReelCard({ reel }: { reel: Reel }) {
+function ReelCard({ reel, onRetry }: { reel: Reel; onRetry: (id: string) => Promise<void> }) {
   const [thumb, setThumb] = useState<string | null>(null);
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
   const [open, setOpen] = useState(false);
+  const [retrying, setRetrying] = useState(false);
+  const [showInsights, setShowInsights] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
