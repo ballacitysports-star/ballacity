@@ -341,7 +341,7 @@ function ReelsPage() {
     }
     let cancelled = false;
     void supabase
-      .from("games")
+      .from("hosted_games")
       .select("sport")
       .eq("id", gameId)
       .maybeSingle()
