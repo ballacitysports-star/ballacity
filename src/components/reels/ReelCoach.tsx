@@ -9,6 +9,7 @@ type Overlay = { at: string; text: string };
 type Package = {
   sport: string | null;
   caption: string;
+  captions: string[];
   overlays: Overlay[];
   hashtags: string[];
 };
@@ -34,7 +35,11 @@ export function ReelCoach({ reelId }: { reelId: string }) {
   const [packing, setPacking] = useState(false);
   const [tone, setTone] = useState<string | undefined>(undefined);
   const [applied, setApplied] = useState(false);
+  const [captionIdx, setCaptionIdx] = useState(0);
   const inFlight = useRef(false);
+
+  const captionOptions = pkg ? (pkg.captions?.length ? pkg.captions : [pkg.caption]).filter(Boolean) : [];
+  const selectedCaption = captionOptions[Math.min(captionIdx, Math.max(captionOptions.length - 1, 0))] ?? "";
 
   async function send(question: string) {
     const q = question.trim();
@@ -75,6 +80,7 @@ export function ReelCoach({ reelId }: { reelId: string }) {
       const res = await buildReelPackage({ data: { reelId, tone } });
       setPkg(res as Package);
       setApplied(false);
+      setCaptionIdx(0);
     } catch (e: any) {
       toast.error(e?.message ?? "Reel Coach could not build the package");
     } finally {
@@ -88,7 +94,7 @@ export function ReelCoach({ reelId }: { reelId: string }) {
       await applyReelCopy({
         data: {
           reelId,
-          caption: pkg.caption || undefined,
+          caption: selectedCaption || undefined,
           hashtags: pkg.hashtags,
           overlays: pkg.overlays,
         },
@@ -103,7 +109,7 @@ export function ReelCoach({ reelId }: { reelId: string }) {
   async function copyPackage() {
     if (!pkg) return;
     const text = [
-      pkg.caption,
+      selectedCaption,
       "",
       ...pkg.overlays.map((o) => `${o.at} — ${o.text}`),
       "",
@@ -176,10 +182,36 @@ export function ReelCoach({ reelId }: { reelId: string }) {
               </p>
             )}
 
-            {pkg.caption && (
+            {captionOptions.length > 0 && (
               <div>
-                <p className="text-[10px] font-semibold text-muted-foreground">Caption</p>
-                <p className="mt-0.5 whitespace-pre-wrap text-xs">{pkg.caption}</p>
+                <p className="text-[10px] font-semibold text-muted-foreground">
+                  Captions — pick one
+                </p>
+                <div className="mt-1 space-y-1.5">
+                  {captionOptions.map((c, i) => (
+                    <button
+                      key={i}
+                      onClick={() => {
+                        setCaptionIdx(i);
+                        setApplied(false);
+                      }}
+                      className={`flex w-full items-start gap-2 rounded-lg border px-2 py-1.5 text-left text-xs transition-colors ${
+                        i === captionIdx
+                          ? "border-lime bg-lime/10"
+                          : "border-border hover:border-lime/50"
+                      }`}
+                    >
+                      <span
+                        className={`mt-0.5 flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-full border ${
+                          i === captionIdx ? "border-lime bg-lime text-black" : "border-border"
+                        }`}
+                      >
+                        {i === captionIdx && <Check className="h-2.5 w-2.5" />}
+                      </span>
+                      <span className="min-w-0 whitespace-pre-wrap break-words">{c}</span>
+                    </button>
+                  ))}
+                </div>
               </div>
             )}
 

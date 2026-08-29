@@ -18,7 +18,10 @@ export type ReelOverlay = {
 
 export type ReelPackage = {
   sport: string | null;
+  /** The first caption variant, kept for back-compat. */
   caption: string;
+  /** Three distinct caption variants the athlete can pick from. */
+  captions: string[];
   overlays: ReelOverlay[];
   hashtags: string[];
 };
@@ -121,9 +124,9 @@ export async function generateReelPackage(
     [
       "You are Reel Coach, a sports highlight editor for a pickup-sports app.",
       "Return ONLY JSON of this shape:",
-      '{"sport":"basketball","caption":"...","overlays":[{"at":"0:03","text":"..."}],"hashtags":["..."]}',
+      '{"sport":"basketball","captions":["...","...","..."],"overlays":[{"at":"0:03","text":"..."}],"hashtags":["..."]}',
       "Rules:",
-      "- caption: one scroll-stopping caption under 200 characters, may use 1-2 emoji, no hashtags inside it.",
+      "- captions: exactly 3 distinct scroll-stopping caption variants, each under 200 characters, may use 1-2 emoji, no hashtags inside them. Vary the angle: one hype/energy, one storytelling/context, one short and punchy. Do not number or label them.",
       "- overlays: 3 to 5 short on-screen text cards (max 30 characters each) tied to real moments in the clip; `at` is a timestamp like 0:04 or a moment name from the analysis.",
       "- hashtags: 5 to 8 hashtags without the leading #, mixing the sport, the play type, and pickup/highlight tags.",
       "- Never invent scores, stats, opponents, or player names. If a detail is unknown, stay general.",
@@ -152,7 +155,18 @@ export async function generateReelPackage(
         .slice(0, 8)
     : [];
 
-  const caption = String(pkg.caption ?? "").slice(0, 500).trim();
+  const captions: string[] = Array.isArray(pkg.captions)
+    ? pkg.captions
+        .map((c: unknown) => String(c).slice(0, 500).trim())
+        .filter(Boolean)
+        .slice(0, 3)
+    : [];
+  // Back-compat: if the model returned a single caption, use it as variant 1.
+  if (captions.length === 0 && pkg.caption) {
+    captions.push(String(pkg.caption).slice(0, 500).trim());
+  }
+  const caption = captions[0] ?? "";
+
   if (!caption && overlays.length === 0 && hashtags.length === 0) {
     throw new Error("Reel Coach could not build a package — try again");
   }
@@ -160,6 +174,7 @@ export async function generateReelPackage(
   return {
     sport: pkg.sport ? String(pkg.sport).slice(0, 40) : sport,
     caption,
+    captions,
     overlays,
     hashtags,
   };
