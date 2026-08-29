@@ -1,7 +1,21 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { pageHead } from "@/lib/seo";
 import { useEffect, useRef, useState } from "react";
-import { Sparkles, Upload, Video, Lock, Loader2, AlertTriangle, ExternalLink, Check } from "lucide-react";
+import {
+  Sparkles,
+  Upload,
+  Video,
+  Lock,
+  Loader2,
+  AlertTriangle,
+  ExternalLink,
+  Check,
+  RefreshCw,
+  Eye,
+} from "lucide-react";
+import { captureVideoFrames } from "@/lib/reel-frames";
+import { processMyReels } from "@/lib/reels.functions";
+import { ReelCoach } from "@/components/reels/ReelCoach";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
