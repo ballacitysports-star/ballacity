@@ -18,6 +18,7 @@ import { captureClip } from "@/lib/reel-frames";
 import { ReelStylePanel } from "@/components/reels/ReelStylePanel";
 import {
   loadReelStyleForSport,
+  normalizeReelStyle,
   reelStyleSummary,
   saveReelStyleForSport,
   SPORT_STYLE_DEFAULTS,
@@ -26,7 +27,7 @@ import {
 } from "@/lib/reel-style";
 import { useDefaultSports } from "@/lib/default-sports";
 import { ReelStudio } from "@/components/reels/ReelStudio";
-import { processMyReels } from "@/lib/reels.functions";
+import { processMyReels, regenerateReelStyle } from "@/lib/reels.functions";
 import { ReelCoach } from "@/components/reels/ReelCoach";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -100,6 +101,7 @@ type Reel = {
     confidence?: string;
   } | null;
   ai_transcript?: { text?: string } | null;
+  style_prefs?: Record<string, any> | null;
 };
 
 function ReelCard({ reel, onRetry }: { reel: Reel; onRetry: (id: string) => Promise<void> }) {
