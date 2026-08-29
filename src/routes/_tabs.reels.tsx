@@ -143,6 +143,27 @@ function ReelCard({ reel, onRetry }: { reel: Reel; onRetry: (id: string) => Prom
           {reel.status === "failed" && reel.error_message && (
             <p className="mt-1 text-[10px] text-amber-300">{reel.error_message}</p>
           )}
+          {(reel.status === "failed" || isProcessing) && (
+            <button
+              onClick={async () => {
+                setRetrying(true);
+                try {
+                  await onRetry(reel.id);
+                } finally {
+                  setRetrying(false);
+                }
+              }}
+              disabled={retrying}
+              className="mt-1.5 inline-flex items-center gap-1 rounded-full border border-border px-2 py-0.5 text-[10px] font-semibold disabled:opacity-50"
+            >
+              {retrying ? (
+                <Loader2 className="h-3 w-3 animate-spin" />
+              ) : (
+                <RefreshCw className="h-3 w-3" />
+              )}
+              {reel.status === "failed" ? "Try again" : "Resume processing"}
+            </button>
+          )}
         </div>
         {isDone && reel.game_id && (
           <button
