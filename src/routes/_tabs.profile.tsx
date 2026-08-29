@@ -761,7 +761,12 @@ function PlayerProfile() {
                     pageSize={6}
                     keyFor={(g) => g.id}
                     renderItem={(g, i) => (
-                      <ArchiveGameItem game={g} index={i} recaps={recapsByGame[g.id] ?? []} />
+                      <ArchiveGameItem
+                        game={g}
+                        index={i}
+                        recaps={recapsByGame[g.id] ?? []}
+                        onRecapsChanged={() => setRecapTick((t) => t + 1)}
+                      />
                     )}
                     renderSkeleton={() => <GameCardSkeleton />}
                     resetKey="archive-hosting"
@@ -793,7 +798,12 @@ function PlayerProfile() {
                     pageSize={6}
                     keyFor={(g) => g.id}
                     renderItem={(g, i) => (
-                      <ArchiveGameItem game={g} index={i} recaps={recapsByGame[g.id] ?? []} />
+                      <ArchiveGameItem
+                        game={g}
+                        index={i}
+                        recaps={recapsByGame[g.id] ?? []}
+                        onRecapsChanged={() => setRecapTick((t) => t + 1)}
+                      />
                     )}
                     renderSkeleton={() => <GameCardSkeleton />}
                     resetKey="archive-playing"
