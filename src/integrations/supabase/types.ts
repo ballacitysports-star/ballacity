@@ -462,6 +462,7 @@ export type Database = {
           frame_times: number[] | null
           game_id: string | null
           game_title: string | null
+          hidden_at: string | null
           id: string
           last_step_at: string | null
           processing_started_at: string | null
@@ -499,6 +500,7 @@ export type Database = {
           frame_times?: number[] | null
           game_id?: string | null
           game_title?: string | null
+          hidden_at?: string | null
           id?: string
           last_step_at?: string | null
           processing_started_at?: string | null
@@ -536,6 +538,7 @@ export type Database = {
           frame_times?: number[] | null
           game_id?: string | null
           game_title?: string | null
+          hidden_at?: string | null
           id?: string
           last_step_at?: string | null
           processing_started_at?: string | null
