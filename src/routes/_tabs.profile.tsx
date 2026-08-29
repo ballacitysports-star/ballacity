@@ -282,7 +282,7 @@ function PlayerProfile() {
       cancelled = true;
       supabase.removeChannel(channel);
     };
-  }, [profileUser?.id]);
+  }, [profileUser?.id, recapTick]);
 
   useEffect(() => {
     if (user) setConfirmedUser(user);
@@ -913,15 +913,22 @@ function ArchiveGameItem({
   game,
   index,
   recaps,
+  onRecapsChanged,
 }: {
   game: Game;
   index: number;
   recaps: RecapSummary[];
+  onRecapsChanged?: () => void;
 }) {
   return (
     <div>
       <GameCard game={game} index={index} />
-      <GameRecapPanel game={{ id: game.id, title: game.title }} recaps={recaps} />
+      <GameRecapPanel
+        game={{ id: game.id, title: game.title }}
+        recaps={recaps}
+        isOwner
+        onChanged={onRecapsChanged}
+      />
     </div>
   );
 }
