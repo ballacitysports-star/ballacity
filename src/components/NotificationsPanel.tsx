@@ -44,7 +44,10 @@ import {
 import { Switch } from "@/components/ui/switch";
 
 import { resolveNotificationTarget } from "@/lib/deep-links";
-import { useNotificationActorId } from "@/lib/notification-actors";
+import {
+  useNotificationActorId,
+  usePrefetchNotificationActors,
+} from "@/lib/notification-actors";
 import { UserAvatarById } from "@/components/UserAvatar";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -153,6 +156,9 @@ export function NotificationsPanel() {
       supabase.removeChannel(channel);
     };
   }, [user?.id, loading]);
+
+  // Warm every row's avatar (including below the fold) before it scrolls in.
+  usePrefetchNotificationActors(items);
 
   const unreadCount = useMemo(() => items.filter((n) => !n.read_at).length, [items]);
 

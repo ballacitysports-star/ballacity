@@ -33,6 +33,7 @@ import {
 } from "@/lib/messages";
 import { MessageAttachment } from "@/components/MessageAttachment";
 import { UserAvatar, UserAvatarById } from "@/components/UserAvatar";
+import { usePrefetchUserAvatars } from "@/lib/user-avatars";
 import { supabase } from "@/integrations/supabase/client";
 
 export const Route = createFileRoute("/messages/$conversationId")({
@@ -82,6 +83,13 @@ function Thread() {
     for (const x of msgs) m.set(x.id, x);
     return m;
   }, [msgs]);
+
+  // Sender avatars for the whole loaded thread, warmed before rows scroll in.
+  const senderIds = useMemo(
+    () => Array.from(new Set(msgs.map((m) => m.sender_id))),
+    [msgs],
+  );
+  usePrefetchUserAvatars(senderIds);
 
   const reactionsByMsg = useMemo(() => {
     const m = new Map<string, MessageReaction[]>();

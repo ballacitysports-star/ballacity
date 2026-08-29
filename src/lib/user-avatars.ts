@@ -89,8 +89,70 @@ export function invalidateUserAvatar(userId?: string | null) {
   } else {
     cache.clear();
     failed.clear();
+    warmed.clear();
   }
   notify();
+}
+
+/** Photo URLs already handed to the browser so it can warm its own image cache. */
+const warmed = new Set<string>();
+
+function warmImage(url: string | null) {
+  if (!url || warmed.has(url) || typeof window === "undefined") return;
+  warmed.add(url);
+  const img = new Image();
+  img.decoding = "async";
+  img.src = url;
+}
+
+/**
+ * Warms the avatar cache (and the browser image cache) for a batch of user ids
+ * ahead of render, so photos are already decoded by the time a notification or
+ * message row scrolls into view. Safe to call repeatedly — already-known ids and
+ * already-warmed URLs are skipped.
+ */
+export function prefetchUserAvatars(userIds: Array<string | null | undefined>) {
+  const ids = Array.from(
+    new Set(userIds.filter((id): id is string => typeof id === "string" && id.length > 0)),
+  );
+  if (!ids.length) return;
+
+  // Photos we already know about can be handed to the browser immediately.
+  const pending = ids.filter((id) => {
+    const known = cache.get(id);
+    if (known) {
+      warmImage(known.avatarUrl);
+      return false;
+    }
+    return !failed.has(id);
+  });
+
+  if (!pending.length) return;
+
+  const remaining = new Set(pending);
+  const onResolved = () => {
+    remaining.forEach((id) => {
+      const known = cache.get(id);
+      if (known) {
+        warmImage(known.avatarUrl);
+        remaining.delete(id);
+      } else if (failed.has(id)) {
+        remaining.delete(id);
+      }
+    });
+    if (!remaining.size) listeners.delete(onResolved);
+  };
+  listeners.add(onResolved);
+  pending.forEach(request);
+}
+
+/** Prefetches avatars for a list of ids whenever that list changes. */
+export function usePrefetchUserAvatars(userIds: Array<string | null | undefined>) {
+  const key = userIds.filter(Boolean).join(",");
+  useEffect(() => {
+    prefetchUserAvatars(userIds);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [key]);
 }
 
 export function useUserAvatar(userId?: string | null): AvatarLookup {

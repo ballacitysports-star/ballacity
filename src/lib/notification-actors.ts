@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toAppPath } from "@/lib/deep-links";
+import { prefetchUserAvatars } from "@/lib/user-avatars";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -71,6 +72,48 @@ function requestConv(id: string) {
  * the other participant. Returns `null` when the alert isn't person-shaped
  * (payments, reminders, system messages) so callers can keep the icon.
  */
+/**
+ * Warms avatars for a whole page of notifications up front — including the ones
+ * still below the fold — so faces are already decoded when rows scroll in.
+ */
+export function usePrefetchNotificationActors(notifications: Array<{ link?: string | null }>) {
+  const key = notifications.map((n) => n.link ?? "").join("|");
+
+  useEffect(() => {
+    const direct: string[] = [];
+    const convs: string[] = [];
+    notifications.forEach((n) => {
+      const { userId, conversationId } = actorIdFromLink(n.link);
+      if (userId) direct.push(userId);
+      else if (conversationId) convs.push(conversationId);
+    });
+
+    prefetchUserAvatars(direct);
+    if (!convs.length) return;
+
+    const pending = new Set(convs);
+    const resolve = () => {
+      const found: string[] = [];
+      pending.forEach((id) => {
+        if (!convCache.has(id)) return;
+        const other = convCache.get(id);
+        if (other) found.push(other);
+        pending.delete(id);
+      });
+      if (found.length) prefetchUserAvatars(found);
+      if (!pending.size) convListeners.delete(resolve);
+    };
+    convListeners.add(resolve);
+    convs.forEach(requestConv);
+    resolve();
+
+    return () => {
+      convListeners.delete(resolve);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [key]);
+}
+
 export function useNotificationActorId(n: { link?: string | null }): string | null {
   const { userId, conversationId } = actorIdFromLink(n.link);
   const [, bump] = useState(0);
