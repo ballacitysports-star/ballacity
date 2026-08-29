@@ -440,8 +440,11 @@ export type Database = {
       }
       highlight_reels: {
         Row: {
+          ai_analysis: Json | null
           ai_caption: string | null
           ai_hashtags: string[] | null
+          ai_moments: Json | null
+          ai_sport: string | null
           ai_title: string | null
           attempts: number
           completed_at: string | null
@@ -449,6 +452,7 @@ export type Database = {
           environment: string
           error_message: string | null
           failed_at: string | null
+          frame_paths: string[] | null
           game_id: string | null
           game_title: string | null
           id: string
@@ -457,6 +461,7 @@ export type Database = {
           processing_step: string
           status: string
           step_progress: Json
+          suggested_clip: Json | null
           thumbnail_path: string | null
           title: string
           used_free: boolean
@@ -464,8 +469,11 @@ export type Database = {
           video_path: string
         }
         Insert: {
+          ai_analysis?: Json | null
           ai_caption?: string | null
           ai_hashtags?: string[] | null
+          ai_moments?: Json | null
+          ai_sport?: string | null
           ai_title?: string | null
           attempts?: number
           completed_at?: string | null
@@ -473,6 +481,7 @@ export type Database = {
           environment?: string
           error_message?: string | null
           failed_at?: string | null
+          frame_paths?: string[] | null
           game_id?: string | null
           game_title?: string | null
           id?: string
@@ -481,6 +490,7 @@ export type Database = {
           processing_step?: string
           status?: string
           step_progress?: Json
+          suggested_clip?: Json | null
           thumbnail_path?: string | null
           title?: string
           used_free?: boolean
@@ -488,8 +498,11 @@ export type Database = {
           video_path: string
         }
         Update: {
+          ai_analysis?: Json | null
           ai_caption?: string | null
           ai_hashtags?: string[] | null
+          ai_moments?: Json | null
+          ai_sport?: string | null
           ai_title?: string | null
           attempts?: number
           completed_at?: string | null
@@ -497,6 +510,7 @@ export type Database = {
           environment?: string
           error_message?: string | null
           failed_at?: string | null
+          frame_paths?: string[] | null
           game_id?: string | null
           game_title?: string | null
           id?: string
@@ -505,6 +519,7 @@ export type Database = {
           processing_step?: string
           status?: string
           step_progress?: Json
+          suggested_clip?: Json | null
           thumbnail_path?: string | null
           title?: string
           used_free?: boolean
