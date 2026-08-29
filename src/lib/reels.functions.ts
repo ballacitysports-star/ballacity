@@ -1,5 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { normalizeReelStyle } from "@/lib/reel-style";
 
 /**
  * Runs the highlight-reel pipeline for the signed-in user's queued reels.
@@ -106,6 +107,98 @@ export const buildReelPackage = createServerFn({ method: "POST" })
     if (!reel) throw new Error("Reel not found");
 
     return generateReelPackage(apiKey, reel as Record<string, any>, { tone: data.tone });
+  });
+
+/**
+ * Re-runs the style-dependent AI steps (timeline, edit plan, coaching, title,
+ * caption, hashtags, overlays) for a completed reel using the SAME captured
+ * media — frames and audio are not re-read. Only the reel's owner can restyle.
+ */
+export const regenerateReelStyle = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: { reelId: string; style?: unknown }) => {
+    if (!input?.reelId) throw new Error("reelId is required");
+    return { reelId: input.reelId, style: normalizeReelStyle(input.style) };
+  })
+  .handler(async ({ data, context }) => {
+    const apiKey = process.env.LOVABLE_API_KEY;
+    if (!apiKey) throw new Error("AI is not configured yet — please try again later");
+
+    const { MAX_ATTEMPTS, REEL_WORK_COLUMNS, prepareStyleRegen, processReel } = await import(
+      "@/lib/reels-pipeline.server"
+    );
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    const { data: reel, error } = await supabaseAdmin
+      .from("highlight_reels")
+      .select(`${REEL_WORK_COLUMNS},status`)
+      .eq("id", data.reelId)
+      .eq("user_id", context.userId)
+      .maybeSingle();
+    if (error) throw new Error(error.message);
+    if (!reel) throw new Error("Reel not found");
+    if ((reel as any).status !== "completed") {
+      throw new Error("Only finished reels can be restyled — let this one finish first");
+    }
+    const progress = ((reel as any).step_progress ?? {}) as Record<string, any>;
+    if (!progress.analysis && !(progress.moments ?? []).length && !progress.transcript) {
+      throw new Error("This reel has no captured analysis to build on — use Try again instead");
+    }
+
+    const regen = prepareStyleRegen(progress);
+    const { error: upErr } = await supabaseAdmin
+      .from("highlight_reels")
+      .update({
+        style_prefs: data.style as any,
+        status: "processing",
+        processing_step: regen.processing_step,
+        step_progress: regen.step_progress,
+        attempts: 0,
+        error_message: null,
+        ai_title: null,
+        ai_caption: null,
+        ai_hashtags: [],
+        ai_overlays: null,
+        ai_timeline: [],
+        ai_edit_plan: null,
+        ai_coaching: null,
+        thumbnail_path: null,
+      } as any)
+      .eq("id", reel.id);
+    if (upErr) throw new Error(upErr.message);
+
+    const result = await processReel(
+      { ...reel, attempts: 0, processing_step: regen.processing_step, step_progress: regen.step_progress, style_prefs: data.style },
+      supabaseAdmin,
+      apiKey,
+    );
+
+    // Fresh overlays in the new style, timed to the regenerated timeline.
+    if (result.status === "completed") {
+      try {
+        const { REEL_COACH_COLUMNS, generateReelPackage } = await import(
+          "@/lib/reel-coach.server"
+        );
+        const { data: fresh } = await supabaseAdmin
+          .from("highlight_reels")
+          .select(REEL_COACH_COLUMNS)
+          .eq("id", reel.id)
+          .maybeSingle();
+        if (fresh) {
+          const pkg = await generateReelPackage(apiKey, fresh as Record<string, any>);
+          if (pkg.overlays.length > 0) {
+            await supabaseAdmin
+              .from("highlight_reels")
+              .update({ ai_overlays: pkg.overlays as any })
+              .eq("id", reel.id);
+          }
+        }
+      } catch {
+        // Overlays are a bonus — the restyled reel is already saved.
+      }
+    }
+
+    return { ...result, style: data.style, attemptsLimit: MAX_ATTEMPTS };
   });
 
 /** Applies a coach-suggested title/caption/hashtag rewrite to the caller's reel. */

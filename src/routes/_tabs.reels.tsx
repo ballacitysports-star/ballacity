@@ -18,6 +18,7 @@ import { captureClip } from "@/lib/reel-frames";
 import { ReelStylePanel } from "@/components/reels/ReelStylePanel";
 import {
   loadReelStyleForSport,
+  normalizeReelStyle,
   reelStyleSummary,
   saveReelStyleForSport,
   SPORT_STYLE_DEFAULTS,
@@ -26,7 +27,7 @@ import {
 } from "@/lib/reel-style";
 import { useDefaultSports } from "@/lib/default-sports";
 import { ReelStudio } from "@/components/reels/ReelStudio";
-import { processMyReels } from "@/lib/reels.functions";
+import { processMyReels, regenerateReelStyle } from "@/lib/reels.functions";
 import { ReelCoach } from "@/components/reels/ReelCoach";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -100,6 +101,7 @@ type Reel = {
     confidence?: string;
   } | null;
   ai_transcript?: { text?: string } | null;
+  style_prefs?: Record<string, any> | null;
 };
 
 function ReelCard({ reel, onRetry }: { reel: Reel; onRetry: (id: string) => Promise<void> }) {
@@ -108,6 +110,11 @@ function ReelCard({ reel, onRetry }: { reel: Reel; onRetry: (id: string) => Prom
   const [open, setOpen] = useState(false);
   const [retrying, setRetrying] = useState(false);
   const [showInsights, setShowInsights] = useState(false);
+  const [showRestyle, setShowRestyle] = useState(false);
+  const [restyle, setRestyle] = useState<ReelStylePrefs>(() =>
+    normalizeReelStyle(reel.style_prefs),
+  );
+  const [restyling, setRestyling] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -311,6 +318,55 @@ function ReelCard({ reel, onRetry }: { reel: Reel; onRetry: (id: string) => Prom
                   {reel.ai_analysis.quality_note}
                 </p>
               )}
+            </div>
+          )}
+        </div>
+      )}
+
+      {isDone && (
+        <div className="mt-2">
+          <button
+            onClick={() => setShowRestyle((v) => !v)}
+            className="inline-flex items-center gap-1 text-[11px] font-semibold text-lime"
+          >
+            <Sparkles className="h-3.5 w-3.5" />
+            {showRestyle ? "Close restyle" : "Restyle with AI"}
+          </button>
+          {showRestyle && (
+            <div className="mt-2">
+              <ReelStylePanel
+                value={restyle}
+                sport={reel.ai_sport ?? null}
+                onChange={setRestyle}
+                disabled={restyling}
+              />
+              <button
+                onClick={async () => {
+                  setRestyling(true);
+                  try {
+                    await regenerateReelStyle({ data: { reelId: reel.id, style: restyle } });
+                    toast.success("Restyling your reel — same footage, new style");
+                    setShowRestyle(false);
+                  } catch (e: any) {
+                    toast.error(e?.message ?? "Could not restyle this reel");
+                  } finally {
+                    setRestyling(false);
+                  }
+                }}
+                disabled={restyling}
+                className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-lime px-3 py-1.5 text-xs font-bold text-primary-foreground disabled:opacity-50"
+              >
+                {restyling ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <RefreshCw className="h-3.5 w-3.5" />
+                )}
+                Regenerate with this style
+              </button>
+              <p className="mt-1 text-[10px] text-muted-foreground">
+                Reuses the captured footage analysis — only the title, caption, timeline,
+                edit plan, coaching, and overlays are rewritten in the new style.
+              </p>
             </div>
           )}
         </div>
