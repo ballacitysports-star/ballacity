@@ -15,6 +15,8 @@ import {
   Circle,
 } from "lucide-react";
 import { captureClip } from "@/lib/reel-frames";
+import { isWidelyPlayable } from "@/lib/video-support";
+
 import { ReelStylePanel } from "@/components/reels/ReelStylePanel";
 import {
   loadReelStyleForSport,
@@ -645,6 +647,13 @@ function ReelsPage() {
     }
     setBusy(true);
     try {
+      // Some recordings (VP9 wrapped in .mp4) won't decode on iPhone/Safari.
+      if (!(await isWidelyPlayable(file))) {
+        toast.warning(
+          "This clip's video format may not play on iPhone or Safari — an H.264 (.mp4) export works everywhere.",
+        );
+      }
+
       const env = getStripeEnvironment();
       const base = `${user.id}/${Date.now()}-${file.name.replace(/[^a-zA-Z0-9.-]/g, "_")}`;
       const { error: upErr } = await supabase.storage

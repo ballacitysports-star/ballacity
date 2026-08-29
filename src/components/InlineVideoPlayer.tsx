@@ -1,11 +1,15 @@
 import { useEffect, useState } from "react";
-import { Loader2, Play } from "lucide-react";
+import { AlertTriangle, Download, Loader2, Play } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 
 /**
  * Small inline video player for private "highlight-videos" storage objects:
  * resolves a signed URL on mount and shows a poster with a play affordance
  * until the athlete taps to play.
+ *
+ * Some uploads (e.g. screen recordings re-wrapped as .mp4 with a VP9 track)
+ * cannot be decoded by every device — Safari/iOS in particular. Rather than a
+ * silent dead play button, we surface a clear message plus a download link.
  */
 export function InlineVideoPlayer({
   videoPath,
@@ -22,11 +26,14 @@ export function InlineVideoPlayer({
   const [url, setUrl] = useState<string | null>(null);
   const [playing, setPlaying] = useState(false);
   const [failed, setFailed] = useState(false);
+  const [unsupported, setUnsupported] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
     setUrl(null);
     setFailed(false);
+    setUnsupported(false);
+    setPlaying(false);
     if (videoUrl !== undefined) {
       setUrl(videoUrl);
       if (!videoUrl) setFailed(true);
@@ -53,6 +60,58 @@ export function InlineVideoPlayer({
     };
   }, [videoPath, videoUrl]);
 
+  // Probe decodability up front so the poster can tell the truth before a tap.
+  useEffect(() => {
+    if (!url) return;
+    let cancelled = false;
+    const probe = document.createElement("video");
+    probe.preload = "metadata";
+    probe.muted = true;
+    const cleanup = () => {
+      probe.removeAttribute("src");
+      probe.load();
+    };
+    probe.addEventListener("loadedmetadata", () => {
+      if (cancelled) return;
+      // A decodable track reports real dimensions; 0x0 means video is unusable.
+      if (!probe.videoWidth || !probe.videoHeight) setUnsupported(true);
+      cleanup();
+    });
+    probe.addEventListener("error", () => {
+      if (!cancelled) setUnsupported(true);
+      cleanup();
+    });
+    probe.src = url;
+    return () => {
+      cancelled = true;
+      cleanup();
+    };
+  }, [url]);
+
+  if (unsupported && url) {
+    return (
+      <div className="relative aspect-video w-full overflow-hidden rounded-lg bg-black/60">
+        {thumbnailUrl ? (
+          <img src={thumbnailUrl} alt="" className="h-full w-full object-cover opacity-40" />
+        ) : null}
+        <div className="absolute inset-0 grid place-content-center gap-2 p-3 text-center">
+          <p className="inline-flex items-center justify-center gap-1.5 text-xs font-semibold text-foreground">
+            <AlertTriangle className="h-3.5 w-3.5 text-amber-300" />
+            This video&apos;s format isn&apos;t supported on this device
+          </p>
+          <a
+            href={url}
+            target="_blank"
+            rel="noreferrer"
+            className="mx-auto inline-flex items-center gap-1 rounded-full bg-lime px-3 py-1 text-[11px] font-bold text-primary-foreground"
+          >
+            <Download className="h-3 w-3" /> Open or download
+          </a>
+        </div>
+      </div>
+    );
+  }
+
   if (playing && url) {
     return (
       <video
@@ -61,6 +120,10 @@ export function InlineVideoPlayer({
         controls
         autoPlay
         playsInline
+        onError={() => {
+          setUnsupported(true);
+          setPlaying(false);
+        }}
         className="aspect-video w-full rounded-lg bg-black"
         aria-label={ariaLabel}
       />
