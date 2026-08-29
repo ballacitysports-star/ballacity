@@ -647,19 +647,39 @@ function ReelsPage() {
     }
     setBusy(true);
     try {
-      // Some recordings (VP9 wrapped in .mp4) won't decode on iPhone/Safari.
-      if (!(await isWidelyPlayable(file))) {
-        toast.warning(
-          "This clip's video format may not play on iPhone or Safari — an H.264 (.mp4) export works everywhere.",
-        );
-      }
-
       const env = getStripeEnvironment();
       const base = `${user.id}/${Date.now()}-${file.name.replace(/[^a-zA-Z0-9.-]/g, "_")}`;
       const { error: upErr } = await supabase.storage
         .from("highlight-videos")
         .upload(base, file, { upsert: false });
       if (upErr) throw upErr;
+
+      // Some recordings (VP9/AV1 wrapped in .mp4, or .webm) won't decode on
+      // iPhone/Safari. The server can't run an encoder, so build the H.264
+      // fallback here and store it as the playback copy.
+      let playbackPath: string | null = null;
+      if (!(await isWidelyPlayable(file))) {
+        const toastId = toast.loading("Converting for iPhone & Safari playback… 0%");
+        const mp4 = await transcodeToH264Mp4(file, (r) =>
+          toast.loading(`Converting for iPhone & Safari playback… ${Math.round(r * 100)}%`, {
+            id: toastId,
+          }),
+        );
+        if (mp4) {
+          const p = `${base}.h264.mp4`;
+          const { error } = await supabase.storage
+            .from("highlight-videos")
+            .upload(p, mp4, { upsert: true, contentType: "video/mp4" });
+          if (!error) playbackPath = p;
+        }
+        if (playbackPath) toast.success("Converted — this reel now plays everywhere", { id: toastId });
+        else
+          toast.warning(
+            "Couldn't convert this clip in the browser — it may not play on iPhone or Safari.",
+            { id: toastId },
+          );
+      }
+
 
       // Sample frames + audio in the browser: they become the real thumbnail and
       // the input the sports AI agent watches/listens to (the server can't run ffmpeg).
