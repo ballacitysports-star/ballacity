@@ -30,6 +30,8 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { UserAvatar } from "@/components/UserAvatar";
+import { usePrefetchUserAvatars } from "@/lib/user-avatars";
+
 import { ReportUserDialog } from "@/components/ReportUserDialog";
 import { useAuth } from "@/hooks/use-auth";
 import { useBlock } from "@/lib/moderation";
