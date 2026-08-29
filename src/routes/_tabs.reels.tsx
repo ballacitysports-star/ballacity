@@ -15,6 +15,8 @@ import {
   Circle,
 } from "lucide-react";
 import { captureClip } from "@/lib/reel-frames";
+import { isWidelyPlayable } from "@/lib/video-support";
+
 import { ReelStylePanel } from "@/components/reels/ReelStylePanel";
 import {
   loadReelStyleForSport,
