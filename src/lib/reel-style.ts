@@ -178,7 +178,32 @@ export function reelStyleDirectives(input: unknown) {
   };
 }
 
+/**
+ * Per-sport starting points: the editing style that fits each sport's rhythm.
+ * These seed the panel the first time a sport is used; once the athlete tweaks
+ * a sport's style, their override is remembered for that sport instead.
+ */
+export const SPORT_STYLE_DEFAULTS: Record<string, Partial<ReelStylePrefs>> = {
+  Basketball: { vibe: "hype", pacing: "punchy", overlayTheme: "scoreboard" },
+  Soccer: { vibe: "hype", pacing: "balanced", overlayTheme: "scoreboard" },
+  Football: { vibe: "hype", pacing: "punchy", overlayTheme: "bold" },
+  Volleyball: { vibe: "hype", pacing: "punchy", overlayTheme: "scoreboard" },
+  Baseball: { vibe: "broadcast", pacing: "balanced", overlayTheme: "scoreboard" },
+  Softball: { vibe: "hype", pacing: "balanced", overlayTheme: "scoreboard" },
+  Tennis: { vibe: "cinematic", pacing: "balanced", overlayTheme: "minimal" },
+  Pickleball: { vibe: "hype", pacing: "punchy", overlayTheme: "bold" },
+  Running: { vibe: "cinematic", pacing: "slowburn", overlayTheme: "minimal" },
+};
+
+/** The built-in default style for a sport (global default when unknown). */
+export function defaultReelStyleForSport(sport: string | null | undefined): ReelStylePrefs {
+  const preset = sport ? SPORT_STYLE_DEFAULTS[sport] : undefined;
+  return normalizeReelStyle({ ...DEFAULT_REEL_STYLE, ...(preset ?? {}) });
+}
+
 const STORAGE_KEY = "reel-style-prefs.v1";
+
+const sportKey = (sport: string) => `${STORAGE_KEY}.sport.${sport.toLowerCase()}`;
 
 /** Last style the athlete picked, so new uploads keep their preferred look. */
 export function loadReelStyle(): ReelStylePrefs {
@@ -197,5 +222,37 @@ export function saveReelStyle(prefs: ReelStylePrefs) {
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(normalizeReelStyle(prefs)));
   } catch {
     // Storage full or blocked — the in-memory choice still applies to this upload.
+  }
+}
+
+/**
+ * Style for a specific sport: the athlete's saved per-sport override wins,
+ * otherwise the sport's built-in default. Unknown sports fall back to the
+ * global last-used style.
+ */
+export function loadReelStyleForSport(sport: string | null | undefined): ReelStylePrefs {
+  if (!sport) return loadReelStyle();
+  if (typeof window !== "undefined") {
+    try {
+      const raw = window.localStorage.getItem(sportKey(sport));
+      if (raw) return normalizeReelStyle(JSON.parse(raw));
+    } catch {
+      // fall through to the sport default
+    }
+  }
+  return defaultReelStyleForSport(sport);
+}
+
+/** Remember the athlete's style choice for one sport. */
+export function saveReelStyleForSport(sport: string | null | undefined, prefs: ReelStylePrefs) {
+  if (!sport) {
+    saveReelStyle(prefs);
+    return;
+  }
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(sportKey(sport), JSON.stringify(normalizeReelStyle(prefs)));
+  } catch {
+    // ignore
   }
 }
