@@ -1,173 +1,289 @@
 import { useEffect, useState } from "react";
 import { Link } from "@tanstack/react-router";
-import {
-  PlayCircle,
-  Sparkles,
-  BarChart3,
-  Share2,
-  Loader2,
-  AlertTriangle,
-  ChevronUp,
-} from "lucide-react";
 import { toast } from "sonner";
-import { supabase } from "@/integrations/supabase/client";
 import {
-  type RecapSummary,
-  isRecapReady,
+  Clapperboard,
+  Download,
+  Eye,
+  EyeOff,
+  Loader2,
+  Share2,
+  Trash2,
+} from "lucide-react";
+import {
   pickLatestRecap,
-  recapDisplayTitle,
-  recapProgress,
+  recapAttempt,
   recapStepLabel,
   shareRecap,
+  type RecapSummary,
 } from "@/lib/recaps";
-
-const pill =
-  "inline-flex items-center gap-1.5 rounded-full border border-border bg-surface px-3 py-1.5 text-[11px] font-bold transition-colors";
+import { deleteReel, setReelHidden } from "@/lib/reels.functions";
+import { InlineVideoPlayer } from "@/components/InlineVideoPlayer";
 
 /**
- * Recap actions + inline player for a finished game.
- * Watching a highlight never leaves the page it's rendered on.
+ * Per-reel manage controls for the profile card: hide/show and delete.
+ * Shown only when the signed-in viewer owns the game profile.
  */
-export function GameRecapPanel({
-  game,
-  recaps,
+function ReelManageRow({
+  reel,
+  onChanged,
 }: {
-  game: { id: string; title: string };
-  recaps: RecapSummary[];
+  reel: RecapSummary;
+  onChanged?: () => void;
 }) {
-  const latest = pickLatestRecap(recaps);
-  const readyCount = recaps.filter(isRecapReady).length;
-  const pending = recaps.find((r) => r.status === "processing");
-  const [open, setOpen] = useState(false);
-  const [videoUrl, setVideoUrl] = useState<string | null>(null);
-  const [loadingVideo, setLoadingVideo] = useState(false);
+  const [busy, setBusy] = useState<"hide" | "delete" | null>(null);
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const hidden = !!reel.hidden_at;
 
-  useEffect(() => {
-    // A newer recap replaces the currently loaded source.
-    setVideoUrl(null);
-  }, [latest?.id]);
-
-  async function togglePlayer() {
-    if (open) {
-      setOpen(false);
-      return;
+  async function toggleHidden() {
+    setBusy("hide");
+    try {
+      await setReelHidden({ data: { reelId: reel.id, hidden: !hidden } });
+      toast.success(hidden ? "Reel is visible on your profile again" : "Reel hidden from your profile");
+      onChanged?.();
+    } catch (e: any) {
+      toast.error(e?.message ?? "Could not update this reel");
+    } finally {
+      setBusy(null);
     }
-    setOpen(true);
-    if (!latest || videoUrl) return;
-    setLoadingVideo(true);
-    const { data, error } = await supabase.storage
-      .from("highlight-videos")
-      .createSignedUrl(latest.video_path, 3600);
-    setLoadingVideo(false);
-    if (error || !data?.signedUrl) {
-      toast.error("Could not load that highlight");
-      return;
-    }
-    setVideoUrl(data.signedUrl);
   }
 
-  async function handleShare() {
-    const result = await shareRecap(latest, game);
-    if (result === "copied") toast.success("Highlight link copied");
-    if (result === "failed") toast.error("Could not share this highlight");
+  async function handleDelete() {
+    setBusy("delete");
+    try {
+      await deleteReel({ data: { reelId: reel.id } });
+      toast.success("Reel deleted");
+      setConfirmingDelete(false);
+      onChanged?.();
+    } catch (e: any) {
+      toast.error(e?.message ?? "Could not delete this reel");
+    } finally {
+      setBusy(null);
+    }
   }
 
   return (
-    <div className="mt-2 mb-1">
-      {pending && (
-        <div className="mb-2 rounded-xl border border-lime/30 bg-lime/5 px-3 py-2">
-          <div className="flex items-center gap-2 text-[11px] font-bold text-lime">
-            <Loader2 className="h-3.5 w-3.5 animate-spin" />
-            Recap generating · {recapStepLabel(pending)}
-          </div>
-          <div className="mt-1.5 h-1 overflow-hidden rounded-full bg-lime/15">
-            <div
-              className="h-full rounded-full bg-lime transition-all"
-              style={{ width: `${recapProgress(pending)}%` }}
-            />
-          </div>
-          <p className="mt-1 text-[10px] text-muted-foreground">
-            We'll notify you the moment it's ready.
-          </p>
-        </div>
-      )}
-
-      {latest?.status === "failed" && (
-        <div className="mb-2 flex items-start gap-2 rounded-xl border border-amber-400/40 bg-amber-400/5 px-3 py-2 text-[11px] text-amber-300">
-          <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-          <span>Recap generation failed{latest.error_message ? ` — ${latest.error_message}` : ""}. Try generating again.</span>
-        </div>
-      )}
-
-      <div className="flex flex-wrap items-center gap-2">
-        {readyCount > 0 && (
-          <button
-            onClick={togglePlayer}
-            className={`${pill} border-lime/40 bg-lime/10 text-lime`}
-          >
-            {open ? <ChevronUp className="h-3.5 w-3.5" /> : <PlayCircle className="h-3.5 w-3.5" />}
-            {open ? "Hide highlight" : `Watch highlight${readyCount > 1 ? ` (${readyCount})` : ""}`}
-          </button>
+    <div className="flex items-center gap-2">
+      <button
+        onClick={toggleHidden}
+        disabled={busy !== null}
+        className="inline-flex items-center gap-1 rounded-full border border-border px-2.5 py-1 text-[10px] font-semibold text-muted-foreground hover:text-foreground disabled:opacity-50"
+        aria-label={hidden ? `Show ${reel.title} on profile` : `Hide ${reel.title} from profile`}
+      >
+        {busy === "hide" ? (
+          <Loader2 className="h-3 w-3 animate-spin" />
+        ) : hidden ? (
+          <Eye className="h-3 w-3" />
+        ) : (
+          <EyeOff className="h-3 w-3" />
         )}
+        {hidden ? "Show" : "Hide"}
+      </button>
+      {confirmingDelete ? (
+        <>
+          <button
+            onClick={handleDelete}
+            disabled={busy !== null}
+            className="inline-flex items-center gap-1 rounded-full bg-destructive px-2.5 py-1 text-[10px] font-bold text-destructive-foreground disabled:opacity-50"
+          >
+            {busy === "delete" ? (
+              <Loader2 className="h-3 w-3 animate-spin" />
+            ) : (
+              <Trash2 className="h-3 w-3" />
+            )}
+            Confirm delete
+          </button>
+          <button
+            onClick={() => setConfirmingDelete(false)}
+            disabled={busy !== null}
+            className="rounded-full border border-border px-2.5 py-1 text-[10px] font-semibold text-muted-foreground disabled:opacity-50"
+          >
+            Cancel
+          </button>
+        </>
+      ) : (
+        <button
+          onClick={() => setConfirmingDelete(true)}
+          disabled={busy !== null}
+          className="inline-flex items-center gap-1 rounded-full border border-border px-2.5 py-1 text-[10px] font-semibold text-muted-foreground hover:text-destructive disabled:opacity-50"
+          aria-label={`Delete ${reel.title}`}
+        >
+          <Trash2 className="h-3 w-3" />
+          Delete
+        </button>
+      )}
+    </div>
+  );
+}
+
+export function GameRecapPanel({
+  gameId,
+  gameTitle,
+  recaps,
+  isOwner = false,
+  onChanged,
+}: {
+  gameId: string;
+  gameTitle: string;
+  recaps: RecapSummary[];
+  isOwner?: boolean;
+  /** Reload callback fired after hide/show/delete so lists stay fresh. */
+  onChanged?: () => void;
+}) {
+  const [thumbUrl, setThumbUrl] = useState<string | null>(null);
+  const [showHidden, setShowHidden] = useState(false);
+
+  const visibleRecaps = recaps.filter((r) => !r.hidden_at);
+  const hiddenRecaps = recaps.filter((r) => !!r.hidden_at);
+  const latest = pickLatestRecap(visibleRecaps);
+  const readyCount = visibleRecaps.filter((r) => r.status === "completed").length;
+  const pending = visibleRecaps.filter((r) => r.status === "processing" || r.status === "failed");
+
+  useEffect(() => {
+    setThumbUrl(null);
+    if (!latest?.thumbnail_path) return;
+    let cancelled = false;
+    import("@/integrations/supabase/client").then(({ supabase }) => {
+      supabase.storage
+        .from("highlight-videos")
+        .createSignedUrl(latest.thumbnail_path!, 3600)
+        .then(({ data }) => {
+          if (!cancelled) setThumbUrl(data?.signedUrl ?? null);
+        });
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [latest?.id, latest?.thumbnail_path]);
+
+  return (
+    <div className="px-4 py-3">
+      <div className="flex items-center justify-between">
+        <p className="text-sm font-semibold">Highlight reel</p>
         <Link
           to="/reels"
-          search={{ game: game.id, title: game.title, upload: "1" }}
-          className={`${pill} text-foreground hover:border-lime/40`}
+          search={{ game: gameId, title: gameTitle, upload: false }}
+          className="text-xs font-medium text-lime"
         >
-          <Sparkles className="h-3.5 w-3.5 text-lime" />
-          {recaps.length > 0 ? "Generate another recap" : "Generate recap"}
-        </Link>
-        <button onClick={handleShare} className={`${pill} text-foreground hover:border-lime/40`}>
-          <Share2 className="h-3.5 w-3.5" />
-          Share
-        </button>
-        <Link
-          to="/games/$gameId"
-          params={{ gameId: game.id }}
-          className={`${pill} text-muted-foreground hover:text-foreground`}
-        >
-          <BarChart3 className="h-3.5 w-3.5" />
-          Results
+          {latest ? "Open in Reels" : "Create one"}
         </Link>
       </div>
 
-      {open && latest && (
-        <div className="mt-2 overflow-hidden rounded-xl border border-border bg-surface">
-          {loadingVideo && (
-            <div className="grid h-40 place-items-center text-muted-foreground">
-              <Loader2 className="h-5 w-5 animate-spin" />
+      {latest ? (
+        <div className="mt-2">
+          <InlineVideoPlayer
+            videoPath={latest.video_path}
+            thumbnailUrl={thumbUrl}
+            ariaLabel={`Highlight reel for ${gameTitle}`}
+          />
+          <p className="mt-1.5 truncate text-xs text-muted-foreground">
+            {latest.ai_title || latest.title}
+            {readyCount > 1 ? ` · ${readyCount} reels` : ""}
+          </p>
+        </div>
+      ) : pending.length > 0 ? (
+        <div className="mt-2 space-y-1.5">
+          {pending.slice(0, 2).map((r) => {
+            const attempt = recapAttempt(r);
+            return (
+              <div
+                key={r.id}
+                className="flex items-center gap-2 rounded-lg border border-border bg-background/60 px-2.5 py-2"
+              >
+                {r.status === "processing" ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin text-lime" />
+                ) : (
+                  <Clapperboard className="h-3.5 w-3.5 text-amber-300" />
+                )}
+                <p className="min-w-0 flex-1 truncate text-xs text-muted-foreground">
+                  {r.status === "processing"
+                    ? `Processing: ${recapStepLabel(r)}`
+                    : (r.error_message ?? "Processing didn't finish")}
+                  {attempt && attempt > 1 ? ` · retry ${attempt} of 3` : ""}
+                </p>
+              </div>
+            );
+          })}
+        </div>
+      ) : (
+        <p className="mt-2 text-xs text-muted-foreground">
+          Wrap up the game with a short highlight reel.
+        </p>
+      )}
+
+      {isOwner && (
+        <div className="mt-2 space-y-2">
+          {latest && (
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2">
+                <Link
+                  to="/reels"
+                  search={{ game: gameId, title: gameTitle, upload: false }}
+                  className="inline-flex items-center gap-1 rounded-full bg-lime px-2.5 py-1 text-[10px] font-bold text-primary-foreground"
+                >
+                  <Download className="h-3 w-3" /> Export
+                </Link>
+                <button
+                  onClick={async () => {
+                    const r = await shareRecap(latest, { id: gameId, title: gameTitle });
+                    if (r === "copied") toast.success("Highlight link copied");
+                    if (r === "failed") toast.error("Could not share this highlight");
+                  }}
+                  className="inline-flex items-center gap-1 rounded-full border border-border px-2.5 py-1 text-[10px] font-semibold text-muted-foreground"
+                >
+                  <Share2 className="h-3 w-3" /> Share
+                </button>
+              </div>
+              <ReelManageRow reel={latest} onChanged={onChanged} />
             </div>
           )}
-          {videoUrl && (
-            <video
-              src={videoUrl}
-              controls
-              autoPlay
-              playsInline
-              className="w-full bg-black"
-              poster={undefined}
-            />
-          )}
-          <div className="px-3 py-2">
-            <p className="text-xs font-semibold">{recapDisplayTitle(latest)}</p>
-            {latest.ai_caption && (
-              <p className="mt-0.5 text-[11px] text-muted-foreground">{latest.ai_caption}</p>
-            )}
-            {latest.ai_hashtags && latest.ai_hashtags.length > 0 && (
-              <p className="mt-1 text-[10px] font-semibold text-lime">
-                {latest.ai_hashtags.map((h) => `#${h.replace(/^#/, "")}`).join(" ")}
-              </p>
-            )}
-            {recaps.filter(isRecapReady).length > 1 && (
-              <Link
-                to="/reels"
-                search={{ game: game.id, title: game.title, upload: "" }}
-                className="mt-1 inline-block text-[10px] font-bold text-lime underline"
+
+          {/* Other visible reels beyond the featured latest one */}
+          {visibleRecaps
+            .filter((r) => r.id !== latest?.id)
+            .map((r) => (
+              <div
+                key={r.id}
+                className="flex items-center justify-between gap-2 rounded-lg border border-border bg-background/60 px-2.5 py-1.5"
               >
-                View all recaps for this game
-              </Link>
-            )}
-          </div>
+                <p className="min-w-0 flex-1 truncate text-xs text-muted-foreground">
+                  {r.ai_title || r.title}
+                </p>
+                <ReelManageRow reel={r} onChanged={onChanged} />
+              </div>
+            ))}
+
+          {hiddenRecaps.length > 0 && (
+            <div>
+              <button
+                onClick={() => setShowHidden((v) => !v)}
+                className="inline-flex items-center gap-1 text-[11px] font-semibold text-muted-foreground hover:text-foreground"
+              >
+                <EyeOff className="h-3 w-3" />
+                {showHidden
+                  ? "Hide hidden reels"
+                  : `${hiddenRecaps.length} hidden reel${hiddenRecaps.length === 1 ? "" : "s"}`}
+              </button>
+              {showHidden && (
+                <div className="mt-1.5 space-y-1.5">
+                  {hiddenRecaps.map((r) => (
+                    <div
+                      key={r.id}
+                      className="flex items-center justify-between gap-2 rounded-lg border border-dashed border-border bg-background/40 px-2.5 py-1.5"
+                    >
+                      <p className="min-w-0 flex-1 truncate text-xs text-muted-foreground">
+                        <span className="mr-1 rounded bg-surface px-1 py-0.5 text-[9px] font-bold uppercase tracking-wide">
+                          Hidden
+                        </span>
+                        {r.ai_title || r.title}
+                      </p>
+                      <ReelManageRow reel={r} onChanged={onChanged} />
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
         </div>
       )}
     </div>
