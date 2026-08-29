@@ -545,7 +545,7 @@ function ReelsPage() {
         ) : (
           <ul className="space-y-2">
             {visibleReels.map((r) => (
-              <ReelCard key={r.id} reel={r} />
+              <ReelCard key={r.id} reel={r} onRetry={kickOffProcessing} />
             ))}
           </ul>
         )}
