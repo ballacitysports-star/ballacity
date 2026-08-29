@@ -81,6 +81,14 @@ export function ReelStylePanel({
           </h2>
           <p className="mt-1 text-xs text-muted-foreground">
             Set the look before the AI edits — applied to every new reel you upload.
+            {sport ? (
+              <>
+                {" "}
+                Starting points are tuned for{" "}
+                <span className="font-semibold text-foreground">{sport}</span>, and tweaks are
+                remembered per sport.
+              </>
+            ) : null}
           </p>
         </div>
         <span className="shrink-0 rounded-full border border-lime/40 bg-lime/10 px-2 py-1 text-[10px] font-semibold text-lime">
