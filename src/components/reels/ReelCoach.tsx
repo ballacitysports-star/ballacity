@@ -16,10 +16,12 @@ type Package = {
 
 const QUICK_PROMPTS = [
   "Write a punchier caption",
-  "Recruiting-style caption",
+  "Tighten the cut and apply it",
+  "Coach my technique",
   "Which moment should be the thumbnail?",
   "How should I film this better?",
 ];
+
 
 const TONES = ["Hype", "Recruiting", "Funny", "Humble"] as const;
 
