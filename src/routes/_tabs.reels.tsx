@@ -15,6 +15,14 @@ import {
   Circle,
 } from "lucide-react";
 import { captureClip } from "@/lib/reel-frames";
+import { ReelStylePanel } from "@/components/reels/ReelStylePanel";
+import {
+  loadReelStyle,
+  reelStyleSummary,
+  saveReelStyle,
+  DEFAULT_REEL_STYLE,
+  type ReelStylePrefs,
+} from "@/lib/reel-style";
 import { ReelStudio } from "@/components/reels/ReelStudio";
 import { processMyReels } from "@/lib/reels.functions";
 import { ReelCoach } from "@/components/reels/ReelCoach";
@@ -319,6 +327,11 @@ function ReelsPage() {
   const fileRef = useRef<HTMLInputElement>(null);
   const [reels, setReels] = useState<Reel[]>([]);
   const [busy, setBusy] = useState(false);
+  const [style, setStyle] = useState<ReelStylePrefs>(DEFAULT_REEL_STYLE);
+  // Restore the last style after hydration (localStorage is browser-only).
+  useEffect(() => setStyle(loadReelStyle()), []);
+  const styleRef = useRef(style);
+  styleRef.current = style;
   const autoOpened = useRef(false);
   const sweptRef = useRef(false);
   const gameReels = gameId ? reels.filter((r) => r.game_id === gameId) : [];
@@ -501,6 +514,7 @@ function ReelsPage() {
           frame_paths: framePaths.length > 0 ? framePaths : null,
           frame_times: frameTimes.length > 0 ? frameTimes : null,
           audio_path: audioPath,
+          style_prefs: styleRef.current,
 
         } as any)
         .select("id")
@@ -637,6 +651,15 @@ function ReelsPage() {
         </section>
       )}
 
+      <ReelStylePanel
+        value={style}
+        onChange={(next) => {
+          setStyle(next);
+          saveReelStyle(next);
+        }}
+        disabled={busy}
+      />
+
       <section className="mx-5 mb-6">
         <input
           ref={fileRef}
@@ -668,6 +691,9 @@ function ReelsPage() {
             </>
           )}
         </button>
+        <p className="mt-2 text-center text-xs text-muted-foreground">
+          Style: <span className="font-semibold text-lime">{reelStyleSummary(style)}</span>
+        </p>
         {lockedReason && (
           <p className="mt-2 text-center text-xs text-muted-foreground">{lockedReason}</p>
         )}
