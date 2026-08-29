@@ -1,5 +1,6 @@
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useMyProfile } from "@/lib/user-prefs-store";
+import { useUserAvatar } from "@/lib/user-avatars";
 import { cn } from "@/lib/utils";
 
 export type UserAvatarSize = "xs" | "sm" | "md" | "lg";
@@ -70,6 +71,26 @@ export function UserAvatar({
         {label || <span aria-hidden className="block h-2 w-2 rounded-full bg-muted-foreground/50" />}
       </AvatarFallback>
     </Avatar>
+  );
+}
+
+/**
+ * Renders any user's avatar by auth user id — resolves their uploaded photo
+ * from the shared avatar cache and falls back to the passed-in name/initials
+ * (e.g. a game's host snapshot) until it loads.
+ */
+export function UserAvatarById({
+  userId,
+  ...props
+}: Props & { userId?: string | null }) {
+  const resolved = useUserAvatar(userId);
+  return (
+    <UserAvatar
+      {...props}
+      avatarUrl={resolved?.avatarUrl ?? props.avatarUrl ?? null}
+      initials={resolved?.initials ?? props.initials}
+      name={resolved?.name ?? props.name}
+    />
   );
 }
 

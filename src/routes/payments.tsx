@@ -13,6 +13,7 @@ import {
   ExternalLink,
   UserCheck,
 } from "lucide-react";
+import { UserAvatar } from "@/components/UserAvatar";
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/use-auth";
 import {
@@ -469,6 +470,7 @@ function SubmissionCard({ sub, onReviewed }: { sub: PaymentSubmission; onReviewe
     display_name: string | null;
     username: string | null;
     avatar_initials: string | null;
+    avatar_url: string | null;
   } | null>(null);
   const game = GAMES.find((g) => g.id === sub.game_id);
   const meta = sub.payment_type ? paymentTypeMeta(sub.payment_type) : null;
@@ -483,7 +485,7 @@ function SubmissionCard({ sub, onReviewed }: { sub: PaymentSubmission; onReviewe
       const { supabase } = await import("@/integrations/supabase/client");
       const { data } = await supabase
         .from("profiles")
-        .select("display_name, username, avatar_initials")
+        .select("display_name, username, avatar_initials, avatar_url")
         .eq("id", sub.player_id)
         .maybeSingle();
       if (!cancelled) setPlayer(data as any);
@@ -539,9 +541,12 @@ function SubmissionCard({ sub, onReviewed }: { sub: PaymentSubmission; onReviewe
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2 mb-1">
-            <div className="h-7 w-7 rounded-full bg-lime/20 text-lime text-[10px] font-bold inline-flex items-center justify-center shrink-0">
-              {initials}
-            </div>
+            <UserAvatar
+              name={player?.display_name ?? playerLabel}
+              initials={initials}
+              avatarUrl={player?.avatar_url}
+              className="h-7 w-7 text-[10px] shrink-0"
+            />
             <div className="min-w-0">
               <div className="text-sm font-semibold truncate">{playerLabel}</div>
               <div className="text-[10px] text-muted-foreground">

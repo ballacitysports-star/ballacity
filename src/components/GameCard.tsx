@@ -2,7 +2,7 @@ import { ageRequirementLabel } from "@/lib/game-age";
 import type { CSSProperties } from "react";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { MapPin, Users, Clock, Zap, Lock, Flame, MessageCircle, CalendarDays } from "lucide-react";
-import { UserAvatar } from "@/components/UserAvatar";
+import { UserAvatarById } from "@/components/UserAvatar";
 import { SpotsPill } from "@/components/SpotsPill";
 import type { Game } from "@/lib/sample-data";
 import { formatGameWhen } from "@/lib/format";
@@ -197,14 +197,20 @@ export function GameCard({ game, index = 0 }: { game: Game; index?: number }) {
                   className="shrink-0 rounded-full hover:ring-2 hover:ring-lime"
                   aria-label={`View ${game.host.name}'s profile`}
                 >
-                  <UserAvatar
+                  <UserAvatarById
+                    userId={hostUserId}
                     initials={game.host.avatar}
                     name={game.host.name}
                     size="xs"
                   />
                 </button>
               ) : (
-                <UserAvatar initials={game.host.avatar} name={game.host.name} size="xs" />
+                <UserAvatarById
+                  userId={game.hostUserId}
+                  initials={game.host.avatar}
+                  name={game.host.name}
+                  size="xs"
+                />
               )}
 
               {hostUserId ? (
