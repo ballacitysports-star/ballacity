@@ -61,6 +61,8 @@ type Reel = {
   processing_step: string | null;
   completed_at: string | null;
   attempts?: number | null;
+  environment?: string | null;
+
   ai_sport?: string | null;
   ai_analysis?: { summary?: string; quality_note?: string } | null;
   ai_moments?: { label: string; frame?: number; note?: string }[] | null;
