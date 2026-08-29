@@ -1,9 +1,17 @@
 import { useRef, useState } from "react";
-import { Bot, Loader2, Send, Sparkles } from "lucide-react";
+import { Bot, Check, Copy, Hash, Loader2, Send, Sparkles, Type, Wand2 } from "lucide-react";
 import { toast } from "sonner";
-import { askReelCoach, applyReelCopy } from "@/lib/reels.functions";
+import { askReelCoach, applyReelCopy, buildReelPackage } from "@/lib/reels.functions";
 
 type Msg = { role: "user" | "assistant"; content: string };
+
+type Overlay = { at: string; text: string };
+type Package = {
+  sport: string | null;
+  caption: string;
+  overlays: Overlay[];
+  hashtags: string[];
+};
 
 const QUICK_PROMPTS = [
   "Write a punchier caption",
@@ -11,6 +19,8 @@ const QUICK_PROMPTS = [
   "Which moment should be the thumbnail?",
   "How should I film this better?",
 ];
+
+const TONES = ["Hype", "Recruiting", "Funny", "Humble"] as const;
 
 /**
  * Conversational sports agent for a single reel. Grounded server-side in the
