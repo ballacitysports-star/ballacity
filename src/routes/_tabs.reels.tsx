@@ -372,6 +372,8 @@ function ReelCard({ reel, onRetry }: { reel: Reel; onRetry: (id: string) => Prom
         </div>
       )}
 
+      {isDone && <ReelCompare reel={reel} />}
+
       {isDone && <ReelCoach reelId={reel.id} />}
     </li>
   );
