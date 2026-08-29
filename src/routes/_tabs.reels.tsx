@@ -311,6 +311,17 @@ function ReelsPage() {
     fileRef.current?.click();
   }, [autoUpload, user, canGenerate]);
 
+  // Sweep anything abandoned mid-flight (tab closed, cold error) once per visit.
+  useEffect(() => {
+    if (!user || sweptRef.current) return;
+    const stuck = reels.some(
+      (r) => r.status === "processing" && r.processing_step !== "completed",
+    );
+    if (!stuck) return;
+    sweptRef.current = true;
+    void processMyReels({ data: {} }).catch(() => {});
+  }, [user, reels]);
+
 
   /** Runs the pipeline for the caller's queued reels; failures stay non-fatal. */
   async function kickOffProcessing(reelId?: string) {
