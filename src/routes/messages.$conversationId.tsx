@@ -84,6 +84,13 @@ function Thread() {
     return m;
   }, [msgs]);
 
+  // Sender avatars for the whole loaded thread, warmed before rows scroll in.
+  const senderIds = useMemo(
+    () => Array.from(new Set(msgs.map((m) => m.sender_id))),
+    [msgs],
+  );
+  usePrefetchUserAvatars(senderIds);
+
   const reactionsByMsg = useMemo(() => {
     const m = new Map<string, MessageReaction[]>();
     for (const r of reactions) {
