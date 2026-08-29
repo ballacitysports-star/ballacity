@@ -30,6 +30,10 @@ export function ReelCoach({ reelId }: { reelId: string }) {
   const [messages, setMessages] = useState<Msg[]>([]);
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
+  const [pkg, setPkg] = useState<Package | null>(null);
+  const [packing, setPacking] = useState(false);
+  const [tone, setTone] = useState<string | undefined>(undefined);
+  const [applied, setApplied] = useState(false);
   const inFlight = useRef(false);
 
   async function send(question: string) {
