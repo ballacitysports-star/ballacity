@@ -465,6 +465,7 @@ export type Database = {
           hidden_at: string | null
           id: string
           last_step_at: string | null
+          playback_path: string | null
           processing_started_at: string | null
           processing_step: string
           status: string
@@ -503,6 +504,7 @@ export type Database = {
           hidden_at?: string | null
           id?: string
           last_step_at?: string | null
+          playback_path?: string | null
           processing_started_at?: string | null
           processing_step?: string
           status?: string
@@ -541,6 +543,7 @@ export type Database = {
           hidden_at?: string | null
           id?: string
           last_step_at?: string | null
+          playback_path?: string | null
           processing_started_at?: string | null
           processing_step?: string
           status?: string

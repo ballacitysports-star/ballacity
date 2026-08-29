@@ -1,0 +1,1 @@
+ALTER TABLE public.highlight_reels ADD COLUMN IF NOT EXISTS playback_path text;
