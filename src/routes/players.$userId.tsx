@@ -39,6 +39,8 @@ import { ProfileAboutSheet, AboutBlock, AboutStats } from "@/components/profile/
 import { ExpandableAboutSection } from "@/components/ExpandableAboutSection";
 import { PlayerShareCard } from "@/components/PlayerShareCard";
 import { BadgeList } from "@/components/BadgeList";
+import { InlineVideoPlayer } from "@/components/InlineVideoPlayer";
+import { listPublicReels } from "@/lib/reels.functions";
 import {
   Dialog,
   DialogContent,
