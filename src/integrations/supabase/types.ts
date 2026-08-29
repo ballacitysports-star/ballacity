@@ -444,6 +444,7 @@ export type Database = {
           ai_caption: string | null
           ai_hashtags: string[] | null
           ai_moments: Json | null
+          ai_overlays: Json | null
           ai_sport: string | null
           ai_title: string | null
           attempts: number
@@ -473,6 +474,7 @@ export type Database = {
           ai_caption?: string | null
           ai_hashtags?: string[] | null
           ai_moments?: Json | null
+          ai_overlays?: Json | null
           ai_sport?: string | null
           ai_title?: string | null
           attempts?: number
@@ -502,6 +504,7 @@ export type Database = {
           ai_caption?: string | null
           ai_hashtags?: string[] | null
           ai_moments?: Json | null
+          ai_overlays?: Json | null
           ai_sport?: string | null
           ai_title?: string | null
           attempts?: number
