@@ -944,7 +944,17 @@ function ProfileReelItem({
   }, [reel.id, reel.thumbnail_path]);
 
   return (
-    <div className="rounded-2xl border border-border bg-surface p-3">
+    <div
+      className={`rounded-2xl border bg-surface p-3 ${
+        selectable && selected ? "border-lime" : "border-border"
+      }`}
+    >
+      {selectable && (
+        <label className="mb-2 flex items-center gap-2 text-xs text-muted-foreground">
+          <Checkbox checked={!!selected} onCheckedChange={() => onToggleSelected?.()} />
+          Select this reel
+        </label>
+      )}
       {reel.status === "completed" ? (
         <InlineVideoPlayer
           videoPath={reel.video_path}
