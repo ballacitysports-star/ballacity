@@ -14,6 +14,7 @@ import {
   Building2,
   ShieldCheck,
   Share2,
+  Clapperboard,
 } from "lucide-react";
 import { useFollow } from "@/lib/follows";
 import { toast } from "sonner";
@@ -461,6 +462,8 @@ function PlayerProfilePage() {
         )}
 
         <PlayerOrgsSection userId={userId} />
+
+        <PublicReelsSection userId={userId} />
 
         {/* Open availability */}
         {availability && (
