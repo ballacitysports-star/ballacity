@@ -250,3 +250,88 @@ export const applyReelCopy = createServerFn({ method: "POST" })
     if (error) throw new Error(error.message);
     return { updated: true };
   });
+
+/**
+ * Compare mode: builds a restyled DRAFT of a finished reel in memory and returns
+ * it without changing the stored reel, so the athlete can preview the current
+ * version side by side with the restyled one before publishing.
+ */
+export const previewReelStyle = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: { reelId: string; style?: unknown }) => {
+    if (!input?.reelId) throw new Error("reelId is required");
+    return { reelId: input.reelId, style: normalizeReelStyle(input.style) };
+  })
+  .handler(async ({ data, context }) => {
+    const apiKey = process.env.LOVABLE_API_KEY;
+    if (!apiKey) throw new Error("AI is not configured yet — please try again later");
+
+    const { REEL_WORK_COLUMNS, runStyleDraft } = await import("@/lib/reels-pipeline.server");
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    const { data: reel, error } = await supabaseAdmin
+      .from("highlight_reels")
+      .select(`${REEL_WORK_COLUMNS},status`)
+      .eq("id", data.reelId)
+      .eq("user_id", context.userId)
+      .maybeSingle();
+    if (error) throw new Error(error.message);
+    if (!reel) throw new Error("Reel not found");
+    if ((reel as any).status !== "completed") {
+      throw new Error("Only finished reels can be compared — let this one finish first");
+    }
+    const progress = ((reel as any).step_progress ?? {}) as Record<string, any>;
+    if (!progress.analysis && !(progress.moments ?? []).length && !progress.transcript) {
+      throw new Error("This reel has no captured analysis to build on — use Try again instead");
+    }
+
+    return runStyleDraft(reel as any, data.style as any, supabaseAdmin, apiKey);
+  });
+
+/**
+ * Publishes a previewed restyle: writes the drafted copy, timeline, edit plan,
+ * coaching, overlays, thumbnail and style onto the caller's reel. No AI re-run —
+ * the athlete already saw exactly this version in compare mode.
+ */
+export const applyReelStyleDraft = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: { reelId: string; draft: any }) => {
+    if (!input?.reelId) throw new Error("reelId is required");
+    const d = input?.draft;
+    if (!d || typeof d !== "object") throw new Error("Generate a preview first");
+    return {
+      reelId: input.reelId,
+      style: normalizeReelStyle(d.style),
+      ai_title: d.ai_title ? String(d.ai_title).slice(0, 120) : null,
+      ai_caption: d.ai_caption ? String(d.ai_caption).slice(0, 500) : null,
+      ai_hashtags: Array.isArray(d.ai_hashtags)
+        ? d.ai_hashtags.map((h: unknown) => String(h).replace(/^#/, "").trim()).filter(Boolean).slice(0, 8)
+        : [],
+      timeline: Array.isArray(d.timeline) ? d.timeline.slice(0, 8) : [],
+      edit_plan: d.edit_plan ?? null,
+      coaching: d.coaching ?? null,
+      overlays: Array.isArray(d.overlays) ? d.overlays.slice(0, 6) : [],
+      thumbnail_path: d.thumbnail_path ? String(d.thumbnail_path) : null,
+    };
+  })
+  .handler(async ({ data, context }) => {
+    const patch: Record<string, any> = {
+      style_prefs: data.style,
+      ai_title: data.ai_title,
+      ai_caption: data.ai_caption,
+      ai_hashtags: data.ai_hashtags,
+      ai_timeline: data.timeline,
+      ai_edit_plan: data.edit_plan,
+      ai_coaching: data.coaching,
+    };
+    if (data.overlays.length) patch.ai_overlays = data.overlays;
+    if (data.thumbnail_path) patch.thumbnail_path = data.thumbnail_path;
+
+    const { error } = await context.supabase
+      .from("highlight_reels")
+      .update(patch as any)
+      .eq("id", data.reelId)
+      .eq("user_id", context.userId);
+    if (error) throw new Error(error.message);
+    return { published: true, style: data.style };
+  });
