@@ -100,6 +100,21 @@ async function frameDataUrl(supabaseAdmin: any, path: string): Promise<string | 
   }
 }
 
+/** Downloads the extracted WAV and returns raw base64 (no data: prefix). */
+async function audioBase64(supabaseAdmin: any, path: string): Promise<string | null> {
+  try {
+    const { data, error } = await supabaseAdmin.storage.from("highlight-videos").download(path);
+    if (error || !data) return null;
+    const buf = new Uint8Array(await data.arrayBuffer());
+    if (buf.byteLength > 8 * 1024 * 1024) return null;
+    let binary = "";
+    for (let i = 0; i < buf.length; i++) binary += String.fromCharCode(buf[i]);
+    return btoa(binary);
+  } catch {
+    return null;
+  }
+}
+
 type StepCtx = { supabaseAdmin: any; apiKey: string };
 
 const STEP_RUNNERS: Record<
@@ -402,8 +417,23 @@ const STEP_RUNNERS: Record<
   thumbnail: async (reel, progress) => {
     const frames = reel.frame_paths ?? [];
     if (frames.length === 0) return { thumbnail_path: null };
-    const moments = (progress.moments ?? []) as { frame?: number }[];
-    const best = moments[0]?.frame;
+    const times = reel.frame_times ?? [];
+    // Prefer the frame closest to the first play-by-play beat, then the first
+    // detected moment's frame, then the opening frame.
+    const targetT = (progress.timeline ?? [])[0]?.t ?? (progress.moments ?? [])[0]?.t ?? null;
+    if (targetT != null && times.length) {
+      let bestIdx = 0;
+      let bestGap = Infinity;
+      times.forEach((t, i) => {
+        const gap = Math.abs(Number(t) - Number(targetT));
+        if (gap < bestGap && frames[i]) {
+          bestGap = gap;
+          bestIdx = i;
+        }
+      });
+      return { thumbnail_path: frames[bestIdx] ?? frames[0] };
+    }
+    const best = (progress.moments ?? [])[0]?.frame;
     const idx = best && best >= 1 && best <= frames.length ? best - 1 : 0;
     return { thumbnail_path: frames[idx] ?? frames[0] };
   },
@@ -511,6 +541,10 @@ export async function processReel(reel: Reel, supabaseAdmin: any, apiKey: string
         ai_moments: progress.moments ?? [],
         ai_analysis: progress.analysis ?? null,
         suggested_clip: progress.suggested_clip ?? null,
+        ai_timeline: progress.timeline ?? [],
+        ai_edit_plan: progress.edit_plan ?? null,
+        ai_coaching: progress.coaching ?? null,
+        ai_transcript: progress.transcript ?? null,
         completed_at: new Date().toISOString(),
         error_message: null,
         failed_at: null,
