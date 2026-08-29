@@ -468,6 +468,7 @@ export type Database = {
           processing_step: string
           status: string
           step_progress: Json
+          style_prefs: Json | null
           suggested_clip: Json | null
           thumbnail_path: string | null
           title: string
@@ -504,6 +505,7 @@ export type Database = {
           processing_step?: string
           status?: string
           step_progress?: Json
+          style_prefs?: Json | null
           suggested_clip?: Json | null
           thumbnail_path?: string | null
           title?: string
@@ -540,6 +542,7 @@ export type Database = {
           processing_step?: string
           status?: string
           step_progress?: Json
+          style_prefs?: Json | null
           suggested_clip?: Json | null
           thumbnail_path?: string | null
           title?: string

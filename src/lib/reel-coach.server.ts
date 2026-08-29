@@ -6,8 +6,10 @@
  * must stay a thin wrapper.
  */
 
+import { reelStyleDirectives } from "@/lib/reel-style";
+
 export const REEL_COACH_COLUMNS =
-  "id,title,ai_title,ai_caption,ai_hashtags,ai_sport,ai_analysis,ai_moments,ai_overlays,ai_timeline,ai_edit_plan,ai_coaching,ai_transcript,suggested_clip,game_title,status";
+  "id,title,ai_title,ai_caption,ai_hashtags,ai_sport,ai_analysis,ai_moments,ai_overlays,ai_timeline,ai_edit_plan,ai_coaching,ai_transcript,suggested_clip,game_title,status,style_prefs";
 
 export type ReelOverlay = {
   /** Where the text should appear, e.g. "0:03" or "the dunk". */
@@ -148,6 +150,8 @@ export async function generateReelPackage(
       "- Never invent scores, stats, opponents, or player names. If a detail is unknown, stay general.",
       sportHint ? `- Sport voice: ${sportHint}` : "",
       opts.tone ? `- Tone requested by the athlete: ${opts.tone}` : "",
+      `- ${reelStyleDirectives(reel.style_prefs).vibe}`,
+      `- ${reelStyleDirectives(reel.style_prefs).overlay}`,
     ]
       .filter(Boolean)
       .join("\n"),
