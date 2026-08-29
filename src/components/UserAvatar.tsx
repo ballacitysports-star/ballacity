@@ -74,6 +74,26 @@ export function UserAvatar({
 }
 
 /**
+ * Renders any user's avatar by auth user id — resolves their uploaded photo
+ * from the shared avatar cache and falls back to the passed-in name/initials
+ * (e.g. a game's host snapshot) until it loads.
+ */
+export function UserAvatarById({
+  userId,
+  ...props
+}: Props & { userId?: string | null }) {
+  const resolved = useUserAvatar(userId);
+  return (
+    <UserAvatar
+      {...props}
+      avatarUrl={resolved?.avatarUrl ?? props.avatarUrl ?? null}
+      initials={resolved?.initials ?? props.initials}
+      name={resolved?.name ?? props.name}
+    />
+  );
+}
+
+/**
  * Convenience: renders the signed-in user's avatar. Safe to use during
  * hydration — falls through to the neutral placeholder until the profile
  * has loaded.
