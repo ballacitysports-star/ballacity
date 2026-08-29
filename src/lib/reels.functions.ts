@@ -483,6 +483,58 @@ export const setReelsHidden = createServerFn({ method: "POST" })
     return { updated: data.reelIds.length, hidden: data.hidden };
   });
 
+/**
+ * Public, read-only list of a user's visible completed reels for the public
+ * player card. Signed URLs are minted server-side because the storage bucket
+ * only allows owners to read objects directly. No auth required — the rows
+ * are gated by the "Anyone can view visible completed reels" policy and this
+ * function applies the same filter itself.
+ */
+export const listPublicReels = createServerFn({ method: "GET" })
+  .inputValidator((input: { userId: string }) => {
+    if (!input?.userId || typeof input.userId !== "string") {
+      throw new Error("userId is required");
+    }
+    return { userId: input.userId };
+  })
+  .handler(async ({ data }) => {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { RECAP_COLUMNS } = await import("@/lib/recaps");
+
+    const { data: rows, error } = await supabaseAdmin
+      .from("highlight_reels")
+      .select(RECAP_COLUMNS)
+      .eq("user_id", data.userId)
+      .eq("status", "completed")
+      .is("hidden_at", null)
+      .order("created_at", { ascending: false })
+      .limit(12);
+    if (error) throw new Error(error.message);
+
+    const reels = (rows ?? []) as any[];
+    return Promise.all(
+      reels.map(async (r) => {
+        const [video, thumb] = await Promise.all([
+          supabaseAdmin.storage.from("highlight-videos").createSignedUrl(r.video_path, 3600),
+          r.thumbnail_path
+            ? supabaseAdmin.storage.from("highlight-videos").createSignedUrl(r.thumbnail_path, 3600)
+            : Promise.resolve({ data: null }),
+        ]);
+        return {
+          id: r.id as string,
+          title: (r.ai_title as string) || (r.title as string),
+          videoUrl: video.data?.signedUrl ?? null,
+          thumbnailUrl: (thumb as any).data?.signedUrl ?? null,
+          sport: (r.ai_sport as string) ?? null,
+          caption: (r.ai_caption as string) ?? null,
+          hashtags: (r.ai_hashtags as string[]) ?? [],
+          gameTitle: (r.game_title as string) ?? null,
+          createdAt: r.created_at as string,
+        };
+      }),
+    );
+  });
+
 /** Permanently deletes several of the caller's reels, media included. */
 export const deleteReels = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
