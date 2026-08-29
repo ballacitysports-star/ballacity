@@ -986,8 +986,120 @@ function ProfileReelItem({
         </p>
         <ReelManageRow reel={reel} onChanged={onChanged} />
       </div>
+      <div className="mt-2 flex items-center justify-between gap-2">
+        <p className="min-w-0 flex-1 truncate text-[10px] text-muted-foreground">
+          {reel.game_title ? `Linked to ${reel.game_title}` : "Not linked to a game"}
+        </p>
+        <button
+          type="button"
+          onClick={onAttach}
+          className="rounded-full border border-border px-2 py-1 text-[10px] font-semibold text-foreground hover:border-lime"
+        >
+          {reel.game_id ? "Change game" : "Attach to game"}
+        </button>
+      </div>
     </div>
   );
+}
+
+type AttachableGame = { id: string; title: string; sport: string | null; date: string | null };
+
+/** Dialog that links a reel to one of the caller's hosted/joined games. */
+function AttachReelDialog({
+  reel,
+  onClose,
+  onChanged,
+}: {
+  reel: RecapSummary;
+  onClose: () => void;
+  onChanged?: () => void;
+}) {
+  const [games, setGames] = useState<AttachableGame[] | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    listAttachableGames()
+      .then((rows) => {
+        if (!cancelled) setGames(rows as AttachableGame[]);
+      })
+      .catch(() => {
+        if (!cancelled) setGames([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const attach = async (gameId: string | null) => {
+    setBusy(true);
+    try {
+      await attachReelToGame({ data: { reelId: reel.id, gameId } });
+      toast.success(gameId ? "Reel attached to game" : "Game link removed");
+      onChanged?.();
+      onClose();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Couldn't update the reel");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <Dialog open onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle>Attach to game</DialogTitle>
+        </DialogHeader>
+        <p className="text-xs text-muted-foreground">
+          Linking a reel places it with that game in feeds and the Archive.
+        </p>
+        <div className="mt-2 max-h-72 space-y-2 overflow-y-auto">
+          {games === null && <p className="text-xs text-muted-foreground">Loading your games…</p>}
+          {games?.length === 0 && (
+            <p className="text-xs text-muted-foreground">
+              No games yet — host or join a game, then come back.
+            </p>
+          )}
+          {games?.map((g) => (
+            <button
+              key={g.id}
+              type="button"
+              disabled={busy}
+              onClick={() => attach(g.id)}
+              className={`w-full rounded-xl border px-3 py-2 text-left text-xs disabled:opacity-60 ${
+                g.id === reel.game_id ? "border-lime bg-lime/10" : "border-border hover:border-lime"
+              }`}
+            >
+              <span className="block truncate font-semibold text-foreground">{g.title}</span>
+              <span className="block truncate text-[10px] text-muted-foreground">
+                {[g.sport, g.date ? new Date(g.date).toLocaleDateString() : null]
+                  .filter(Boolean)
+                  .join(" · ")}
+              </span>
+            </button>
+          ))}
+        </div>
+        {reel.game_id && (
+          <button
+            type="button"
+            disabled={busy}
+            onClick={() => attach(null)}
+            className="mt-2 w-full rounded-xl border border-border px-3 py-2 text-xs font-semibold text-muted-foreground hover:border-destructive hover:text-destructive disabled:opacity-60"
+          >
+            Remove game link
+          </button>
+        )}
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+type ReelSort = "newest" | "oldest" | "sport";
+
+function reelSport(r: RecapSummary): string | null {
+  const s = (r.ai_sport ?? "").trim();
+  return s ? s : null;
 }
 
 /** Highlight reels strip on the own profile: every reel, game-linked or not. */
@@ -998,6 +1110,74 @@ function ProfileReelsSection({
   recaps: RecapSummary[];
   onChanged?: () => void;
 }) {
+  const [sport, setSport] = useState<string>("all");
+  const [sort, setSort] = useState<ReelSort>("newest");
+  const [selecting, setSelecting] = useState(false);
+  const [selected, setSelected] = useState<string[]>([]);
+  const [attachReel, setAttachReel] = useState<RecapSummary | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  const sports = useMemo(() => {
+    const set = new Set<string>();
+    recaps.forEach((r) => {
+      const s = reelSport(r);
+      if (s) set.add(s);
+    });
+    return Array.from(set).sort((a, b) => a.localeCompare(b));
+  }, [recaps]);
+
+  const visible = useMemo(() => {
+    const filtered =
+      sport === "all"
+        ? recaps
+        : sport === "none"
+          ? recaps.filter((r) => !reelSport(r))
+          : recaps.filter((r) => reelSport(r) === sport);
+    const rows = [...filtered];
+    rows.sort((a, b) => {
+      if (sort === "sport") {
+        const cmp = (reelSport(a) ?? "zzz").localeCompare(reelSport(b) ?? "zzz");
+        if (cmp !== 0) return cmp;
+      }
+      const ta = new Date(a.created_at).getTime();
+      const tb = new Date(b.created_at).getTime();
+      return sort === "oldest" ? ta - tb : tb - ta;
+    });
+    return rows;
+  }, [recaps, sport, sort]);
+
+  const selectedRows = useMemo(
+    () => visible.filter((r) => selected.includes(r.id)),
+    [visible, selected],
+  );
+
+  const toggle = (id: string) =>
+    setSelected((cur) => (cur.includes(id) ? cur.filter((x) => x !== id) : [...cur, id]));
+
+  const runBulk = async (action: "hide" | "show" | "delete") => {
+    const reelIds = selectedRows.map((r) => r.id);
+    if (reelIds.length === 0) return;
+    if (action === "delete" && !confirm(`Delete ${reelIds.length} reel(s)? This can't be undone.`))
+      return;
+    setBusy(true);
+    try {
+      if (action === "delete") {
+        await deleteReels({ data: { reelIds } });
+        toast.success(`Deleted ${reelIds.length} reel(s)`);
+      } else {
+        await setReelsHidden({ data: { reelIds, hidden: action === "hide" } });
+        toast.success(action === "hide" ? "Reels hidden" : "Reels visible again");
+      }
+      setSelected([]);
+      setSelecting(false);
+      onChanged?.();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Bulk action failed");
+    } finally {
+      setBusy(false);
+    }
+  };
+
   if (recaps.length === 0) return null;
   return (
     <section className="mt-5">
@@ -1010,18 +1190,120 @@ function ProfileReelsSection({
             <h2 className="font-display text-sm font-bold uppercase tracking-wider text-foreground">
               Highlight reels
             </h2>
-            <p className="text-[10px] text-muted-foreground">Your reels</p>
+            <p className="text-[10px] text-muted-foreground">
+              {visible.length} of {recaps.length} shown
+            </p>
           </div>
         </div>
         <Link to="/reels" search={{ game: "", title: "", upload: "" }} className="text-xs font-medium text-lime">
           Open Reels
         </Link>
       </div>
+
+      <div className="mb-3 flex flex-wrap items-center gap-2">
+        <Select value={sport} onValueChange={setSport}>
+          <SelectTrigger className="h-8 w-40 text-xs">
+            <SelectValue placeholder="Sport" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All sports</SelectItem>
+            {sports.map((s) => (
+              <SelectItem key={s} value={s}>
+                {s}
+              </SelectItem>
+            ))}
+            <SelectItem value="none">No sport detected</SelectItem>
+          </SelectContent>
+        </Select>
+        <Select value={sort} onValueChange={(v) => setSort(v as ReelSort)}>
+          <SelectTrigger className="h-8 w-40 text-xs">
+            <SelectValue placeholder="Sort" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="newest">Newest first</SelectItem>
+            <SelectItem value="oldest">Oldest first</SelectItem>
+            <SelectItem value="sport">Sport A–Z</SelectItem>
+          </SelectContent>
+        </Select>
+        <button
+          type="button"
+          onClick={() => {
+            setSelecting((s) => !s);
+            setSelected([]);
+          }}
+          className="rounded-full border border-border px-3 py-1.5 text-xs font-semibold text-foreground hover:border-lime"
+        >
+          {selecting ? "Done" : "Select"}
+        </button>
+      </div>
+
+      {selecting && (
+        <div className="mb-3 flex flex-wrap items-center gap-2 rounded-xl border border-border bg-surface px-3 py-2">
+          <span className="text-xs text-muted-foreground">{selectedRows.length} selected</span>
+          <button
+            type="button"
+            onClick={() => setSelected(visible.map((r) => r.id))}
+            className="text-xs font-semibold text-lime"
+          >
+            Select all
+          </button>
+          <button
+            type="button"
+            onClick={() => setSelected([])}
+            className="text-xs font-semibold text-muted-foreground"
+          >
+            Clear
+          </button>
+          <div className="ml-auto flex items-center gap-2">
+            <button
+              type="button"
+              disabled={busy || selectedRows.length === 0}
+              onClick={() => runBulk("hide")}
+              className="rounded-full border border-border px-3 py-1 text-xs font-semibold disabled:opacity-50"
+            >
+              Hide
+            </button>
+            <button
+              type="button"
+              disabled={busy || selectedRows.length === 0}
+              onClick={() => runBulk("show")}
+              className="rounded-full border border-border px-3 py-1 text-xs font-semibold disabled:opacity-50"
+            >
+              Show
+            </button>
+            <button
+              type="button"
+              disabled={busy || selectedRows.length === 0}
+              onClick={() => runBulk("delete")}
+              className="rounded-full border border-destructive/40 px-3 py-1 text-xs font-semibold text-destructive disabled:opacity-50"
+            >
+              Delete
+            </button>
+          </div>
+        </div>
+      )}
+
       <div className="grid gap-3 sm:grid-cols-2">
-        {recaps.map((r) => (
-          <ProfileReelItem key={r.id} reel={r} onChanged={onChanged} />
+        {visible.map((r) => (
+          <ProfileReelItem
+            key={r.id}
+            reel={r}
+            onChanged={onChanged}
+            selectable={selecting}
+            selected={selected.includes(r.id)}
+            onToggleSelected={() => toggle(r.id)}
+            onAttach={() => setAttachReel(r)}
+          />
         ))}
       </div>
+
+      {attachReel && (
+        <AttachReelDialog
+          reel={attachReel}
+          onClose={() => setAttachReel(null)}
+          onChanged={onChanged}
+        />
+      )}
     </section>
   );
 }
