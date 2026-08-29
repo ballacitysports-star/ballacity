@@ -232,10 +232,12 @@ function PlayerProfile() {
 
   // Recaps (highlight reels) per finished game, for the Archive status + inline player.
   const [recapsByGame, setRecapsByGame] = useState<Record<string, RecapSummary[]>>({});
+  const [allRecaps, setAllRecaps] = useState<RecapSummary[]>([]);
   const [recapTick, setRecapTick] = useState(0);
   useEffect(() => {
     if (!profileUser) {
       setRecapsByGame({});
+      setAllRecaps([]);
       return;
     }
     let cancelled = false;
@@ -244,12 +246,13 @@ function PlayerProfile() {
         .from("highlight_reels")
         .select(RECAP_COLUMNS)
         .eq("user_id", profileUser.id)
-        .not("game_id", "is", null)
         .order("created_at", { ascending: false })
         .then(({ data }) => {
           if (cancelled) return;
+          const rows = (data ?? []) as RecapSummary[];
+          setAllRecaps(rows);
           const map: Record<string, RecapSummary[]> = {};
-          ((data ?? []) as RecapSummary[]).forEach((r) => {
+          rows.forEach((r) => {
             if (!r.game_id) return;
             (map[r.game_id] ??= []).push(r);
           });
