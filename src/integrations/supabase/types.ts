@@ -442,18 +442,24 @@ export type Database = {
         Row: {
           ai_analysis: Json | null
           ai_caption: string | null
+          ai_coaching: Json | null
+          ai_edit_plan: Json | null
           ai_hashtags: string[] | null
           ai_moments: Json | null
           ai_overlays: Json | null
           ai_sport: string | null
+          ai_timeline: Json | null
           ai_title: string | null
+          ai_transcript: Json | null
           attempts: number
+          audio_path: string | null
           completed_at: string | null
           created_at: string
           environment: string
           error_message: string | null
           failed_at: string | null
           frame_paths: string[] | null
+          frame_times: number[] | null
           game_id: string | null
           game_title: string | null
           id: string
@@ -472,18 +478,24 @@ export type Database = {
         Insert: {
           ai_analysis?: Json | null
           ai_caption?: string | null
+          ai_coaching?: Json | null
+          ai_edit_plan?: Json | null
           ai_hashtags?: string[] | null
           ai_moments?: Json | null
           ai_overlays?: Json | null
           ai_sport?: string | null
+          ai_timeline?: Json | null
           ai_title?: string | null
+          ai_transcript?: Json | null
           attempts?: number
+          audio_path?: string | null
           completed_at?: string | null
           created_at?: string
           environment?: string
           error_message?: string | null
           failed_at?: string | null
           frame_paths?: string[] | null
+          frame_times?: number[] | null
           game_id?: string | null
           game_title?: string | null
           id?: string
@@ -502,18 +514,24 @@ export type Database = {
         Update: {
           ai_analysis?: Json | null
           ai_caption?: string | null
+          ai_coaching?: Json | null
+          ai_edit_plan?: Json | null
           ai_hashtags?: string[] | null
           ai_moments?: Json | null
           ai_overlays?: Json | null
           ai_sport?: string | null
+          ai_timeline?: Json | null
           ai_title?: string | null
+          ai_transcript?: Json | null
           attempts?: number
+          audio_path?: string | null
           completed_at?: string | null
           created_at?: string
           environment?: string
           error_message?: string | null
           failed_at?: string | null
           frame_paths?: string[] | null
+          frame_times?: number[] | null
           game_id?: string | null
           game_title?: string | null
           id?: string
