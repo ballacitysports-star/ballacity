@@ -27,10 +27,19 @@ export type RecapSummary = {
 export const RECAP_COLUMNS =
   "id,title,video_path,status,processing_step,thumbnail_path,ai_title,ai_caption,ai_hashtags,error_message,created_at,completed_at,game_id,game_title";
 
-const STEP_ORDER = ["pending", "metadata", "hashtags", "thumbnail", "finalize", "completed"];
+const STEP_ORDER = [
+  "pending",
+  "analyze",
+  "metadata",
+  "hashtags",
+  "thumbnail",
+  "finalize",
+  "completed",
+];
 
 const STEP_LABELS: Record<string, string> = {
   pending: "Queued",
+  analyze: "Watching your clip",
   metadata: "Writing title & caption",
   hashtags: "Picking hashtags",
   thumbnail: "Building thumbnail",
