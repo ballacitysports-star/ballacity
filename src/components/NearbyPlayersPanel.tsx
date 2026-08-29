@@ -1,10 +1,18 @@
 import { useMemo, useState } from "react";
 import { Link } from "@tanstack/react-router";
-import { MapPin, Navigation, Users, Swords, Loader2 } from "lucide-react";
+import { ChevronUp, MapPin, Navigation, Users, Swords, Loader2 } from "lucide-react";
 import { useQueries, useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { UserAvatar } from "@/components/UserAvatar";
 import { usePrefetchUserAvatars } from "@/lib/user-avatars";
+import {
+  Drawer,
+  DrawerContent,
+  DrawerDescription,
+  DrawerHeader,
+  DrawerTitle,
+  DrawerTrigger,
+} from "@/components/ui/drawer";
 
 import { Distance } from "@/components/Distance";
 import { geocodeAddress } from "@/lib/geocode.functions";
