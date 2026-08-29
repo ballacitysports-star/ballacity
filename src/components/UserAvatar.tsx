@@ -1,5 +1,6 @@
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useMyProfile } from "@/lib/user-prefs-store";
+import { useUserAvatar } from "@/lib/user-avatars";
 import { cn } from "@/lib/utils";
 
 export type UserAvatarSize = "xs" | "sm" | "md" | "lg";

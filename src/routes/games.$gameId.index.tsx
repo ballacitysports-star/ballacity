@@ -46,7 +46,7 @@ import {
 } from "@/lib/game-reminders";
 import { ReviewsSection } from "@/components/ReviewsSection";
 import { SpotsPill } from "@/components/SpotsPill";
-import { UserAvatar } from "@/components/UserAvatar";
+import { UserAvatar, UserAvatarById } from "@/components/UserAvatar";
 import { computeReputation, useReviewsFor } from "@/lib/reviews";
 import { ReputationBadge } from "@/components/ReputationBadge";
 import { joinGame, leaveGame, useIsJoined } from "@/lib/games-store";
@@ -1512,7 +1512,8 @@ function GameDetail() {
                 }
               : {};
             const avatarEl = (
-              <UserAvatar
+              <UserAvatarById
+                userId={hostId}
                 avatarUrl={(game as { hostAvatarUrl?: string | null }).hostAvatarUrl ?? null}
                 initials={game.host.avatar}
                 name={game.host.name}
