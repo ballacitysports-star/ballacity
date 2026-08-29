@@ -133,21 +133,77 @@ export const askReelCoach = createServerFn({ method: "POST" })
     return { answer };
   });
 
-/** Applies a coach-suggested title/caption/hashtag rewrite to the caller's reel. */
-export const applyReelCopy = createServerFn({ method: "POST" })
+/**
+ * Builds a publish-ready package for one of the caller's reels: an optimized
+ * caption, on-screen text moments tied to the footage, and sport-tailored
+ * hashtags. Read-only — the athlete applies it explicitly.
+ */
+export const buildReelPackage = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input: { reelId: string; title?: string; caption?: string }) => {
+  .inputValidator((input: { reelId: string; tone?: string }) => {
     if (!input?.reelId) throw new Error("reelId is required");
     return {
       reelId: input.reelId,
-      title: input.title ? String(input.title).slice(0, 120) : undefined,
-      caption: input.caption ? String(input.caption).slice(0, 500) : undefined,
+      tone: input.tone ? String(input.tone).slice(0, 120) : undefined,
     };
   })
+  .handler(async ({ data, context }) => {
+    const apiKey = process.env.LOVABLE_API_KEY;
+    if (!apiKey) throw new Error("AI is not configured yet — please try again later");
+
+    const { REEL_COACH_COLUMNS, generateReelPackage } = await import("@/lib/reel-coach.server");
+    const { data: reel, error } = await context.supabase
+      .from("highlight_reels")
+      .select(REEL_COACH_COLUMNS)
+      .eq("id", data.reelId)
+      .eq("user_id", context.userId)
+      .maybeSingle();
+    if (error) throw new Error(error.message);
+    if (!reel) throw new Error("Reel not found");
+
+    return generateReelPackage(apiKey, reel as Record<string, any>, { tone: data.tone });
+  });
+
+/** Applies a coach-suggested title/caption/hashtag rewrite to the caller's reel. */
+export const applyReelCopy = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator(
+    (input: {
+      reelId: string;
+      title?: string;
+      caption?: string;
+      hashtags?: string[];
+      overlays?: { at: string; text: string }[];
+    }) => {
+      if (!input?.reelId) throw new Error("reelId is required");
+      return {
+        reelId: input.reelId,
+        title: input.title ? String(input.title).slice(0, 120) : undefined,
+        caption: input.caption ? String(input.caption).slice(0, 500) : undefined,
+        hashtags: Array.isArray(input.hashtags)
+          ? input.hashtags
+              .map((h) => String(h).replace(/^#/, "").trim())
+              .filter(Boolean)
+              .slice(0, 8)
+          : undefined,
+        overlays: Array.isArray(input.overlays)
+          ? input.overlays
+              .map((o) => ({
+                at: String(o?.at ?? "").slice(0, 24),
+                text: String(o?.text ?? "").slice(0, 60),
+              }))
+              .filter((o) => o.text.length > 0)
+              .slice(0, 6)
+          : undefined,
+      };
+    },
+  )
   .handler(async ({ data, context }) => {
     const patch: Record<string, any> = {};
     if (data.title) patch.ai_title = data.title;
     if (data.caption) patch.ai_caption = data.caption;
+    if (data.hashtags?.length) patch.ai_hashtags = data.hashtags;
+    if (data.overlays?.length) patch.ai_overlays = data.overlays;
     if (Object.keys(patch).length === 0) return { updated: false };
     const { error } = await context.supabase
       .from("highlight_reels")
