@@ -152,35 +152,63 @@ export function NearbyPlayersPanel({
 
 
 
+  const [open, setOpen] = useState(false);
+
   return (
-    <section
-      aria-label="Nearby players"
-      className="mb-4 rounded-3xl border border-border bg-surface/70 p-4"
-    >
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <h2 className="font-display text-lg font-bold leading-tight">Nearby players</h2>
-          <p className="text-xs text-muted-foreground truncate">
-            {originLabel
-              ? `Closest to ${originLabel}`
-              : "Turn on location to find teammates and competitors near you"}
-          </p>
-        </div>
-        {!coords && (
-          <button
-            onClick={request}
-            disabled={status === "prompting"}
-            className="shrink-0 inline-flex items-center gap-1.5 rounded-full border border-border bg-surface px-3 py-1.5 text-xs font-semibold disabled:opacity-60"
-          >
-            {status === "prompting" ? (
-              <Loader2 className="h-3.5 w-3.5 animate-spin" />
-            ) : (
-              <Navigation className="h-3.5 w-3.5 text-lime" />
+    <Drawer open={open} onOpenChange={setOpen}>
+      <DrawerTrigger asChild>
+        <button
+          type="button"
+          aria-label="Open nearby players"
+          className="mb-4 flex w-full items-center justify-between gap-3 rounded-3xl border border-border bg-surface/70 p-4 text-left transition-colors hover:border-lime/60"
+        >
+          <div className="min-w-0">
+            <h2 className="font-display text-lg font-bold leading-tight">Nearby players</h2>
+            <p className="truncate text-xs text-muted-foreground">
+              {originLabel
+                ? `Closest to ${originLabel}`
+                : "Find teammates and competitors near you"}
+            </p>
+          </div>
+          <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-lime px-3 py-1.5 text-xs font-semibold text-primary-foreground">
+            {ranked.length > 0 ? `${ranked.length} near you` : "Explore"}
+            <ChevronUp className="h-3.5 w-3.5" />
+          </span>
+        </button>
+      </DrawerTrigger>
+
+      <DrawerContent className="max-h-[85vh]">
+        <DrawerHeader className="text-left">
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <DrawerTitle className="font-display text-lg font-bold leading-tight">
+                Nearby players
+              </DrawerTitle>
+              <DrawerDescription className="truncate text-xs">
+                {originLabel
+                  ? `Closest to ${originLabel}`
+                  : "Turn on location to find teammates and competitors near you"}
+              </DrawerDescription>
+            </div>
+            {!coords && (
+              <button
+                onClick={request}
+                disabled={status === "prompting"}
+                className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-border bg-surface px-3 py-1.5 text-xs font-semibold disabled:opacity-60"
+              >
+                {status === "prompting" ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <Navigation className="h-3.5 w-3.5 text-lime" />
+                )}
+                Use my location
+              </button>
             )}
-            Use my location
-          </button>
-        )}
-      </div>
+          </div>
+        </DrawerHeader>
+
+        <div className="overflow-y-auto px-4 pb-6">
+
 
       <div className="mt-3 flex gap-2">
         {RELATIONS.map((r) => {
