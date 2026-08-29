@@ -1983,7 +1983,7 @@ function GameDetail() {
                   />
                 );
               }
-              const isRealPlayer = p.kind === "player" && !!p.userId && !p.isMe && !!p.displayName;
+              const linkableUserId = p.kind === "player" ? p.userId : undefined;
               const chip = (
                 <motion.div
                   key={i}
@@ -2003,9 +2003,18 @@ function GameDetail() {
                       : p.isMe
                         ? "border-lime bg-lime/15 text-lime"
                         : "border-border bg-surface"
-                  }`}
+                  } ${linkableUserId ? "cursor-pointer transition-transform hover:scale-105" : ""}`}
                 >
-                  {p.kind === "player" && p.avatarUrl ? (
+                  {p.kind === "player" && linkableUserId ? (
+                    <UserAvatarById
+                      userId={linkableUserId}
+                      avatarUrl={p.avatarUrl ?? null}
+                      initials={p.initials}
+                      name={p.displayName}
+                      size="md"
+                      className="h-full w-full border-0 rounded-full text-xs"
+                    />
+                  ) : p.kind === "player" && p.avatarUrl ? (
                     <img
                       src={p.avatarUrl}
                       alt={p.displayName ?? p.initials}
@@ -2022,12 +2031,12 @@ function GameDetail() {
                   )}
                 </motion.div>
               );
-              if (isRealPlayer && p.kind === "player" && p.userId) {
+              if (linkableUserId) {
                 return (
                   <Link
                     key={i}
                     to="/players/$userId"
-                    params={{ userId: p.userId }}
+                    params={{ userId: linkableUserId }}
                     className="focus:outline-none focus-visible:ring-2 focus-visible:ring-lime rounded-full"
                   >
                     {chip}
