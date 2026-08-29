@@ -155,7 +155,18 @@ export async function generateReelPackage(
         .slice(0, 8)
     : [];
 
-  const caption = String(pkg.caption ?? "").slice(0, 500).trim();
+  const captions: string[] = Array.isArray(pkg.captions)
+    ? pkg.captions
+        .map((c: unknown) => String(c).slice(0, 500).trim())
+        .filter(Boolean)
+        .slice(0, 3)
+    : [];
+  // Back-compat: if the model returned a single caption, use it as variant 1.
+  if (captions.length === 0 && pkg.caption) {
+    captions.push(String(pkg.caption).slice(0, 500).trim());
+  }
+  const caption = captions[0] ?? "";
+
   if (!caption && overlays.length === 0 && hashtags.length === 0) {
     throw new Error("Reel Coach could not build a package — try again");
   }
@@ -163,6 +174,7 @@ export async function generateReelPackage(
   return {
     sport: pkg.sport ? String(pkg.sport).slice(0, 40) : sport,
     caption,
+    captions,
     overlays,
     hashtags,
   };
