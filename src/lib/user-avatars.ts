@@ -192,6 +192,7 @@ async function flush() {
     avatar_hidden: boolean | null;
   }>;
 
+  const now = Date.now();
   ids.forEach((id) => {
     const row = rows.find((r) => r.id === id);
     failed.delete(id);
@@ -201,12 +202,21 @@ async function flush() {
       avatarUrl: row?.avatar_url ?? null,
       hidden: !!row?.avatar_hidden,
     });
+    fetchedAt.set(id, now);
   });
+  persist();
   notify();
 }
 
 function request(id: string) {
-  if (cache.has(id) || inflight.has(id) || queue.has(id)) return;
+  hydrate();
+  if (cache.has(id)) {
+    if (isFresh(fetchedAt.get(id) ?? 0)) return;
+    // Expired snapshot: drop it and fetch again.
+    cache.delete(id);
+    fetchedAt.delete(id);
+  }
+  if (inflight.has(id) || queue.has(id)) return;
   queue.add(id);
   if (flushTimer) clearTimeout(flushTimer);
   flushTimer = setTimeout(() => void flush(), 30);
@@ -216,11 +226,15 @@ function request(id: string) {
 export function invalidateUserAvatar(userId?: string | null) {
   if (userId) {
     cache.delete(userId);
+    fetchedAt.delete(userId);
     failed.delete(userId);
+    persist();
   } else {
     cache.clear();
+    fetchedAt.clear();
     failed.clear();
     warmed.clear();
+    clearStore();
   }
   notify();
 }
@@ -247,6 +261,7 @@ export function prefetchUserAvatars(userIds: Array<string | null | undefined>) {
     new Set(userIds.filter((id): id is string => typeof id === "string" && id.length > 0)),
   );
   if (!ids.length) return;
+  hydrate();
 
   // Photos we already know about can be handed to the browser immediately.
   const pending = ids.filter((id) => {
