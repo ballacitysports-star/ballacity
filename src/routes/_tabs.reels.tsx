@@ -323,6 +323,55 @@ function ReelCard({ reel, onRetry }: { reel: Reel; onRetry: (id: string) => Prom
         </div>
       )}
 
+      {isDone && (
+        <div className="mt-2">
+          <button
+            onClick={() => setShowRestyle((v) => !v)}
+            className="inline-flex items-center gap-1 text-[11px] font-semibold text-lime"
+          >
+            <Sparkles className="h-3.5 w-3.5" />
+            {showRestyle ? "Close restyle" : "Restyle with AI"}
+          </button>
+          {showRestyle && (
+            <div className="mt-2">
+              <ReelStylePanel
+                value={restyle}
+                sport={reel.ai_sport ?? null}
+                onChange={setRestyle}
+                disabled={restyling}
+              />
+              <button
+                onClick={async () => {
+                  setRestyling(true);
+                  try {
+                    await regenerateReelStyle({ data: { reelId: reel.id, style: restyle } });
+                    toast.success("Restyling your reel — same footage, new style");
+                    setShowRestyle(false);
+                  } catch (e: any) {
+                    toast.error(e?.message ?? "Could not restyle this reel");
+                  } finally {
+                    setRestyling(false);
+                  }
+                }}
+                disabled={restyling}
+                className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-lime px-3 py-1.5 text-xs font-bold text-primary-foreground disabled:opacity-50"
+              >
+                {restyling ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <RefreshCw className="h-3.5 w-3.5" />
+                )}
+                Regenerate with this style
+              </button>
+              <p className="mt-1 text-[10px] text-muted-foreground">
+                Reuses the captured footage analysis — only the title, caption, timeline,
+                edit plan, coaching, and overlays are rewritten in the new style.
+              </p>
+            </div>
+          )}
+        </div>
+      )}
+
       {isDone && <ReelCoach reelId={reel.id} />}
     </li>
   );
