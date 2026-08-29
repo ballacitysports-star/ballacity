@@ -41,6 +41,20 @@ import { leaveGame } from "@/lib/games-store";
 import { hideFinishedGames, onlyFinishedGames, gameEndsAt } from "@/lib/game-time";
 import { supabase } from "@/integrations/supabase/client";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Checkbox } from "@/components/ui/checkbox";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  attachReelToGame,
+  deleteReels,
+  listAttachableGames,
+  setReelsHidden,
+} from "@/lib/reels.functions";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { BadgeList } from "@/components/BadgeList";
 import { makeBadgeStats } from "@/lib/badges";
