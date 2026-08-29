@@ -9,6 +9,7 @@ type Overlay = { at: string; text: string };
 type Package = {
   sport: string | null;
   caption: string;
+  captions: string[];
   overlays: Overlay[];
   hashtags: string[];
 };
