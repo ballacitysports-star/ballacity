@@ -6,6 +6,8 @@ import { useServerFn } from "@tanstack/react-start";
 import { PlayMapView, pseudoLatLngFromId } from "@/components/PlayMapView";
 import type { MapPinItem } from "@/components/GamesMap";
 import { UserAvatar } from "@/components/UserAvatar";
+import { prefetchUserAvatars, usePrefetchUserAvatars } from "@/lib/user-avatars";
+
 import type { AvailabilityWithAuthor } from "@/lib/availability";
 import { SPORTS } from "@/lib/sample-data";
 import { geocodeAddress } from "@/lib/geocode.functions";
