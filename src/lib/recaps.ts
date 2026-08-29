@@ -12,6 +12,8 @@ export type RecapSummary = {
   video_path: string;
   status: string;
   processing_step: string | null;
+  /** Live snapshot written by the server pipeline (see `_pipeline`). */
+  step_progress?: Record<string, any> | null;
   thumbnail_path: string | null;
   ai_title: string | null;
   ai_caption: string | null;
@@ -25,7 +27,7 @@ export type RecapSummary = {
 
 /** Columns needed for status + inline playback. */
 export const RECAP_COLUMNS =
-  "id,title,video_path,status,processing_step,thumbnail_path,ai_title,ai_caption,ai_hashtags,error_message,created_at,completed_at,game_id,game_title";
+  "id,title,video_path,status,processing_step,step_progress,thumbnail_path,ai_title,ai_caption,ai_hashtags,error_message,created_at,completed_at,game_id,game_title";
 
 const STEP_ORDER = [
   "pending",
@@ -37,6 +39,10 @@ const STEP_ORDER = [
   "completed",
 ];
 
+/** Pipeline steps in run order (mirrors `STEPS` in reels-pipeline.server.ts). */
+export const RECAP_STEPS = ["analyze", "metadata", "hashtags", "thumbnail", "finalize"] as const;
+export type RecapStep = (typeof RECAP_STEPS)[number];
+
 const STEP_LABELS: Record<string, string> = {
   pending: "Queued",
   analyze: "Watching your clip",
@@ -47,21 +53,86 @@ const STEP_LABELS: Record<string, string> = {
   completed: "Ready",
 };
 
+type ProgressInput = Pick<RecapSummary, "status" | "processing_step"> & {
+  step_progress?: Record<string, any> | null;
+};
+
+type Snapshot = {
+  active: string | null;
+  done: string[];
+  failed: string | null;
+  percent: number;
+  attempt: number;
+};
+
+/** Reads the server-written live snapshot, when present. */
+function snapshotOf(recap: ProgressInput): Snapshot | null {
+  const raw = recap.step_progress?.["_pipeline"];
+  if (!raw || typeof raw !== "object") return null;
+  const done = Array.isArray(raw.done) ? raw.done.map(String) : [];
+  const percent = Number(raw.percent);
+  return {
+    active: raw.active ? String(raw.active) : null,
+    done,
+    failed: raw.failed ? String(raw.failed) : null,
+    percent: Number.isFinite(percent) ? percent : 0,
+    attempt: Number(raw.attempt) || 1,
+  };
+}
+
 /** Human label for the current pipeline position. */
-export function recapStepLabel(recap: Pick<RecapSummary, "status" | "processing_step">): string {
+export function recapStepLabel(recap: ProgressInput): string {
   if (recap.status === "completed") return "Ready to watch";
   if (recap.status === "failed") return "Generation failed";
+  const snap = snapshotOf(recap);
+  if (snap?.active) return STEP_LABELS[snap.active] ?? "Processing";
   return STEP_LABELS[String(recap.processing_step ?? "pending")] ?? "Processing";
 }
 
-/** Rough completion percentage (0-100) for the progress bar. */
-export function recapProgress(recap: Pick<RecapSummary, "status" | "processing_step">): number {
+/** Completion percentage (0-100) for the progress bar. */
+export function recapProgress(recap: ProgressInput): number {
   if (recap.status === "completed") return 100;
+  const snap = snapshotOf(recap);
+  if (snap && snap.percent > 0) return Math.min(100, snap.percent);
   if (recap.status === "failed") return 100;
   const idx = STEP_ORDER.indexOf(String(recap.processing_step ?? "pending"));
   const safe = idx < 0 ? 0 : idx;
   return Math.max(8, Math.round((safe / (STEP_ORDER.length - 1)) * 100));
 }
+
+export type RecapStepState = {
+  step: RecapStep;
+  label: string;
+  state: "done" | "active" | "failed" | "pending";
+};
+
+/**
+ * Per-step status for the progress checklist. Falls back to `processing_step`
+ * for rows processed before live snapshots existed.
+ */
+export function recapStepStates(recap: ProgressInput): RecapStepState[] {
+  const snap = snapshotOf(recap);
+  const fallbackIdx = RECAP_STEPS.indexOf(String(recap.processing_step) as RecapStep);
+  return RECAP_STEPS.map((step, i) => {
+    let state: RecapStepState["state"];
+    if (recap.status === "completed") state = "done";
+    else if (snap) {
+      if (snap.done.includes(step)) state = "done";
+      else if (snap.failed === step) state = "failed";
+      else if (snap.active === step) state = recap.status === "failed" ? "pending" : "active";
+      else state = "pending";
+    } else if (i <= fallbackIdx) state = "done";
+    else if (i === fallbackIdx + 1 && recap.status === "processing") state = "active";
+    else state = "pending";
+    return { step, label: STEP_LABELS[step] ?? step, state };
+  });
+}
+
+/** Retry count reported by the pipeline, when known. */
+export function recapAttempt(recap: ProgressInput): number | null {
+  return snapshotOf(recap)?.attempt ?? null;
+}
+
 
 export function isRecapReady(recap: Pick<RecapSummary, "status">) {
   return recap.status === "completed";

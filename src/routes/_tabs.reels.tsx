@@ -12,6 +12,7 @@ import {
   Check,
   RefreshCw,
   Eye,
+  Circle,
 } from "lucide-react";
 import { captureVideoFrames } from "@/lib/reel-frames";
 import { processMyReels } from "@/lib/reels.functions";
@@ -25,7 +26,14 @@ import { PaymentTestModeBanner } from "@/components/PaymentTestModeBanner";
 import { getStripeEnvironment } from "@/lib/stripe";
 import { createPortalSession } from "@/utils/payments.functions";
 import { FREE_TIER } from "@/lib/catalog";
-import { recapProgress, recapStepLabel, shareRecap, type RecapSummary } from "@/lib/recaps";
+import {
+  recapAttempt,
+  recapProgress,
+  recapStepLabel,
+  recapStepStates,
+  shareRecap,
+  type RecapSummary,
+} from "@/lib/recaps";
 import { Share2 } from "lucide-react";
 
 export const Route = createFileRoute("/_tabs/reels")({
@@ -59,6 +67,7 @@ type Reel = {
   game_id: string | null;
   game_title: string | null;
   processing_step: string | null;
+  step_progress?: Record<string, any> | null;
   completed_at: string | null;
   attempts?: number | null;
   environment?: string | null;
@@ -104,6 +113,7 @@ function ReelCard({ reel, onRetry }: { reel: Reel; onRetry: (id: string) => Prom
   const isDone = reel.status === "completed";
   const displayTitle = reel.ai_title || reel.title;
   const isProcessing = reel.status === "processing";
+  const attempt = recapAttempt(reel as unknown as RecapSummary);
 
   return (
     <li className="rounded-xl border border-border bg-surface p-3">
@@ -131,17 +141,57 @@ function ReelCard({ reel, onRetry }: { reel: Reel; onRetry: (id: string) => Prom
           )}
           {isProcessing && (
             <div className="mt-1.5">
-              <div className="h-1 overflow-hidden rounded-full bg-lime/15">
+              <div className="flex items-center justify-between text-[10px] font-semibold text-lime">
+                <span>{recapStepLabel(reel as unknown as RecapSummary)}</span>
+                <span>{recapProgress(reel as unknown as RecapSummary)}%</span>
+              </div>
+              <div
+                className="mt-1 h-1 overflow-hidden rounded-full bg-lime/15"
+                role="progressbar"
+                aria-valuemin={0}
+                aria-valuemax={100}
+                aria-valuenow={recapProgress(reel as unknown as RecapSummary)}
+                aria-label="Reel processing progress"
+              >
                 <div
                   className="h-full rounded-full bg-lime transition-all"
                   style={{ width: `${recapProgress(reel as unknown as RecapSummary)}%` }}
                 />
               </div>
-              <p className="mt-1 text-[10px] font-semibold text-lime">
-                {recapStepLabel(reel as unknown as RecapSummary)} — we'll notify you when it's ready
+              <ul className="mt-1.5 space-y-0.5">
+                {recapStepStates(reel as unknown as RecapSummary).map((s) => (
+                  <li
+                    key={s.step}
+                    className={`flex items-center gap-1.5 text-[10px] ${
+                      s.state === "active"
+                        ? "font-semibold text-lime"
+                        : s.state === "done"
+                          ? "text-muted-foreground"
+                          : s.state === "failed"
+                            ? "text-amber-300"
+                            : "text-muted-foreground/60"
+                    }`}
+                  >
+                    {s.state === "done" ? (
+                      <Check className="h-3 w-3 shrink-0" />
+                    ) : s.state === "active" ? (
+                      <Loader2 className="h-3 w-3 shrink-0 animate-spin" />
+                    ) : s.state === "failed" ? (
+                      <AlertTriangle className="h-3 w-3 shrink-0" />
+                    ) : (
+                      <Circle className="h-3 w-3 shrink-0" />
+                    )}
+                    {s.label}
+                  </li>
+                ))}
+              </ul>
+              <p className="mt-1 text-[10px] text-muted-foreground">
+                We'll notify you when it's ready
+                {attempt && attempt > 1 ? ` · retry ${attempt} of 3` : ""}
               </p>
             </div>
           )}
+
           {reel.status === "failed" && reel.error_message && (
             <p className="mt-1 text-[10px] text-amber-300">{reel.error_message}</p>
           )}
