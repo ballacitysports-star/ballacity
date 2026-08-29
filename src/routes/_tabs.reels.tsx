@@ -330,8 +330,40 @@ function ReelsPage() {
   const [reels, setReels] = useState<Reel[]>([]);
   const [busy, setBusy] = useState(false);
   const [style, setStyle] = useState<ReelStylePrefs>(DEFAULT_REEL_STYLE);
-  // Restore the last style after hydration (localStorage is browser-only).
-  useEffect(() => setStyle(loadReelStyle()), []);
+  // Sport context for style defaults: the game's sport when uploading from a
+  // game, otherwise the athlete's first profile sport.
+  const { sports: profileSports, loaded: profileLoaded } = useDefaultSports();
+  const [gameSport, setGameSport] = useState<string | null>(null);
+  useEffect(() => {
+    if (!gameId) {
+      setGameSport(null);
+      return;
+    }
+    let cancelled = false;
+    void supabase
+      .from("games")
+      .select("sport")
+      .eq("id", gameId)
+      .maybeSingle()
+      .then(({ data }) => {
+        if (!cancelled) setGameSport((data as { sport?: string } | null)?.sport ?? null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [gameId]);
+  const activeSport =
+    [gameSport, ...profileSports].find(
+      (s): s is string => !!s && s in SPORT_STYLE_DEFAULTS,
+    ) ?? null;
+  // Restore the style after hydration (localStorage is browser-only), then
+  // re-seed whenever the active sport resolves or changes. Per-sport overrides
+  // the athlete saved win; otherwise the sport's built-in default applies.
+  useEffect(() => {
+    if (gameId && gameSport === null) return; // wait for the game's sport
+    if (!gameId && !profileLoaded) return; // wait for profile sports
+    setStyle(loadReelStyleForSport(activeSport));
+  }, [activeSport, gameId, gameSport, profileLoaded]);
   const styleRef = useRef(style);
   styleRef.current = style;
   const autoOpened = useRef(false);
