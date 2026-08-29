@@ -44,6 +44,13 @@ export function PlayMapView<T extends MapItemLike>(props?: {
    * the URL, so the back button restores them.
    */
   getHref?: (item: T) => { to: string; params?: Record<string, string> } | null;
+  /**
+   * Called with the items inside the current map viewport whenever the user
+   * pans or zooms. Callers use it to prioritize loading (e.g. avatars) for
+   * what is actually on screen.
+   */
+  onVisibleItemsChange?: (items: T[]) => void;
+
 }) {
   const { user } = useAuth();
   const profile = useMyProfile(user);
@@ -89,6 +96,14 @@ export function PlayMapView<T extends MapItemLike>(props?: {
   );
   const activeItem =
     visibleItems.find((it) => it.id === active) ?? visibleItems[0] ?? null;
+
+  const onVisibleItemsChange = props?.onVisibleItemsChange;
+  useEffect(() => {
+    onVisibleItemsChange?.(visibleItems);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [visibleItems]);
+
+
 
   const renderCard =
     props?.renderCard ??
