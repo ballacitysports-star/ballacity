@@ -307,6 +307,8 @@ export function NearbyPlayersPanel({
           </div>
         </div>
       ))}
-    </section>
+        </div>
+      </DrawerContent>
+    </Drawer>
   );
 }
