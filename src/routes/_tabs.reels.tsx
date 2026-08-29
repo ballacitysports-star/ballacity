@@ -14,7 +14,7 @@ import {
   Eye,
   Circle,
 } from "lucide-react";
-import { captureVideoFrames } from "@/lib/reel-frames";
+import { captureClip } from "@/lib/reel-frames";
 import { processMyReels } from "@/lib/reels.functions";
 import { ReelCoach } from "@/components/reels/ReelCoach";
 import { toast } from "sonner";
