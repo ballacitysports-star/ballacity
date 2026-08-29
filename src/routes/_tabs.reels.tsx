@@ -17,12 +17,14 @@ import {
 import { captureClip } from "@/lib/reel-frames";
 import { ReelStylePanel } from "@/components/reels/ReelStylePanel";
 import {
-  loadReelStyle,
+  loadReelStyleForSport,
   reelStyleSummary,
-  saveReelStyle,
+  saveReelStyleForSport,
+  SPORT_STYLE_DEFAULTS,
   DEFAULT_REEL_STYLE,
   type ReelStylePrefs,
 } from "@/lib/reel-style";
+import { useDefaultSports } from "@/lib/default-sports";
 import { ReelStudio } from "@/components/reels/ReelStudio";
 import { processMyReels } from "@/lib/reels.functions";
 import { ReelCoach } from "@/components/reels/ReelCoach";
