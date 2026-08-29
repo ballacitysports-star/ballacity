@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Link } from "@tanstack/react-router";
 import { Bookmark, BookmarkPlus, Check, Trash2, X } from "lucide-react";
 import { FilterSection } from "@/components/FilterSheet";
+import { SortSection } from "@/components/filters/SortSection";
 import { SPORTS, type Sport } from "@/lib/sample-data";
 import { distancePresets } from "@/lib/distance";
 import {
@@ -319,16 +320,14 @@ export function FeedPreferencesBody() {
         />
       </FilterSection>
 
-      <FilterSection label="Order">
-        <Segmented
-          value={prefs.sortBy}
-          onChange={(v) => patch({ sortBy: v })}
-          options={[
-            { value: "nearest" as const, label: "Nearest first" },
-            { value: "soonest" as const, label: "Soonest first" },
-          ]}
-        />
-      </FilterSection>
+      <SortSection
+        value={prefs.sortBy}
+        onChange={(v) => patch({ sortBy: v })}
+        options={[
+          { value: "nearest" as const, label: "Nearest first" },
+          { value: "soonest" as const, label: "Soonest first" },
+        ]}
+      />
 
       <FilterSection label="Feed layout">
         <p className="mb-2 text-xs text-muted-foreground">
