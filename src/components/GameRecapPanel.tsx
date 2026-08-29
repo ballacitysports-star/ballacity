@@ -24,7 +24,7 @@ import { InlineVideoPlayer } from "@/components/InlineVideoPlayer";
  * Per-reel manage controls for the profile card: hide/show and delete.
  * Shown only when the signed-in viewer owns the game profile.
  */
-function ReelManageRow({
+export function ReelManageRow({
   reel,
   onChanged,
 }: {

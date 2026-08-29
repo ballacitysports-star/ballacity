@@ -476,6 +476,10 @@ function PlayerProfile() {
       </ProfileAboutSheet>
 
       <div className="px-4">
+        <ProfileReelsSection
+          recaps={allRecaps}
+          onChanged={() => setRecapTick((t) => t + 1)}
+        />
         <ChannelTabs
           className="mt-5"
           value={activeTab}
