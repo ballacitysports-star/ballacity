@@ -52,6 +52,9 @@ export function ReelCoach({ reelId }: { reelId: string }) {
     try {
       const res = await askReelCoach({ data: { reelId, question: q, history } });
       setMessages((m) => [...m, { role: "assistant", content: res.answer }]);
+      // The agent can apply copy, overlays, or a new cut list itself.
+      if (res.actions?.length) toast.success(res.actions.join(" · "));
+
     } catch (e: any) {
       toast.error(e?.message ?? "Reel Coach is unavailable right now");
       setMessages((m) => m.slice(0, -1));
