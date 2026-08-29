@@ -712,6 +712,7 @@ function ReelsPage() {
           user_id: user.id,
           title: gameTitle ? `Recap · ${gameTitle}` : file.name.replace(/\.[^.]+$/, ""),
           video_path: base,
+          playback_path: playbackPath,
           status: "processing",
           used_free: usedFree,
           environment: env,
