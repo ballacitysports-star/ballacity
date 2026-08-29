@@ -113,45 +113,67 @@ const STEP_RUNNERS: Record<
    * were captured (older uploads, unsupported browsers).
    */
   analyze: async (reel, _p, { supabaseAdmin, apiKey }) => {
-    const paths = (reel.frame_paths ?? []).slice(0, 4);
-    const images: string[] = [];
-    for (const p of paths) {
-      const url = await frameDataUrl(supabaseAdmin, p);
-      if (url) images.push(url);
+    // Denser sampling: up to 10 frames, spread across whatever the browser captured.
+    const all = reel.frame_paths ?? [];
+    const times = reel.frame_times ?? [];
+    const stride = Math.max(1, Math.ceil(all.length / 10));
+    const picked: { path: string; t: number | null; index: number }[] = [];
+    for (let i = 0; i < all.length; i += stride) {
+      picked.push({ path: all[i], t: times[i] ?? null, index: i + 1 });
+    }
+
+    const images: { url: string; t: number | null; index: number }[] = [];
+    for (const p of picked) {
+      const url = await frameDataUrl(supabaseAdmin, p.path);
+      if (url) images.push({ url, t: p.t, index: p.index });
     }
     if (images.length === 0) {
       return { analysis: null, moments: [], sport: null, suggested_clip: null };
     }
+    const duration = times.length ? Math.max(...times) : null;
+    const stamps = images
+      .map((im, i) => `frame ${i + 1}${im.t != null ? ` @ ${im.t}s` : ""}`)
+      .join(", ");
     const parts: Array<Record<string, any>> = [
       {
         type: "text",
-        text: `These frames are sampled evenly across a sports highlight clip titled "${reel.title}"${
+        text: `These frames are sampled across a sports highlight clip titled "${reel.title}"${
           reel.game_title ? ` from the game "${reel.game_title}"` : ""
-        }. Frame 1 is near the start, the last frame near the end. Describe what is happening.`,
+        }${duration ? `, about ${Math.round(duration)}s long` : ""}. In order: ${stamps}. Describe what is happening and when.`,
       },
-      ...images.map((url) => ({ type: "image_url", image_url: { url } })),
+      ...images.map((im) => ({ type: "image_url", image_url: { url: im.url } })),
     ];
     const out = await callLovableAIParts(
       parts,
       [
         "You are a sports video analyst. Respond ONLY with JSON:",
         '{"sport":"basketball|football|soccer|baseball|softball|volleyball|tennis|pickleball|running|other",',
-        '"summary":"2 sentences on what happens","moments":[{"label":"short play name","frame":1,"note":"one line"}],',
+        '"summary":"2 sentences on what happens","moments":[{"label":"short play name","frame":1,"t":2.5,"note":"one line"}],',
         '"suggested_clip":{"start_pct":0,"end_pct":100,"why":"one line"},"quality_note":"one line on lighting/shake/framing"}',
-        "Max 5 moments. Never invent scores or player names.",
+        "Use the frame timestamps given in the prompt for `t` (seconds). Max 8 moments. Never invent scores or player names.",
       ].join(" "),
       apiKey,
     );
+    const frameTime = (frame: number) => {
+      const im = images[Math.max(0, Math.min(images.length - 1, frame - 1))];
+      return im?.t ?? null;
+    };
     const moments = Array.isArray(out.moments)
-      ? out.moments.slice(0, 5).map((m: any) => ({
-          label: String(m?.label ?? "Highlight").slice(0, 60),
-          frame: Number(m?.frame) || 1,
-          note: String(m?.note ?? "").slice(0, 160),
-        }))
+      ? out.moments.slice(0, 8).map((m: any) => {
+          const frame = Number(m?.frame) || 1;
+          const t = Number.isFinite(Number(m?.t)) ? Number(m.t) : frameTime(frame);
+          return {
+            label: String(m?.label ?? "Highlight").slice(0, 60),
+            frame,
+            t: t != null ? Math.round(t * 100) / 100 : null,
+            note: String(m?.note ?? "").slice(0, 160),
+          };
+        })
       : [];
     return {
       sport: out.sport ? String(out.sport).slice(0, 40) : null,
       moments,
+      duration,
       analysis: {
         summary: String(out.summary ?? "").slice(0, 600),
         quality_note: String(out.quality_note ?? "").slice(0, 300),
@@ -166,6 +188,184 @@ const STEP_RUNNERS: Record<
         : null,
     };
   },
+
+  /**
+   * Spoken-word captions. The browser extracted a 16 kHz mono WAV at upload
+   * time; silent or undecodable clips simply skip this step.
+   */
+  transcribe: async (reel, _p, { supabaseAdmin, apiKey }) => {
+    if (!reel.audio_path) return { transcript: null };
+    const b64 = await audioBase64(supabaseAdmin, reel.audio_path);
+    if (!b64) return { transcript: null };
+    try {
+      const out = await callLovableAIParts(
+        [
+          {
+            type: "text",
+            text: "Transcribe the speech in this sports clip audio. Ignore crowd noise and music.",
+          },
+          { type: "input_audio", input_audio: { data: b64, format: "wav" } },
+        ],
+        [
+          "You transcribe short sports clips. Respond ONLY with JSON:",
+          '{"text":"full transcript or empty string","segments":[{"t":1.2,"text":"..."}]}',
+          "`t` is seconds from the clip start. Max 40 segments. If there is no intelligible speech, return an empty text and an empty segments array.",
+        ].join(" "),
+        apiKey,
+      );
+      const segments = Array.isArray(out.segments)
+        ? out.segments
+            .slice(0, 40)
+            .map((s: any) => ({
+              t: Math.max(0, Number(s?.t) || 0),
+              text: String(s?.text ?? "").slice(0, 200),
+            }))
+            .filter((s: { text: string }) => s.text.length > 0)
+        : [];
+      const text = String(out.text ?? "").slice(0, 4000);
+      if (!text && segments.length === 0) return { transcript: null };
+      return { transcript: { text, segments } };
+    } catch {
+      // Transcription is a bonus — never fail the whole reel over it.
+      return { transcript: null };
+    }
+  },
+
+  /** Play-by-play: timestamped moments the athlete can jump to. */
+  timeline: async (reel, progress, { apiKey }) => {
+    const moments = (progress.moments ?? []) as any[];
+    if (!progress.analysis?.summary && moments.length === 0) return { timeline: [] };
+    const out = await callLovableAI(
+      [
+        `Clip: "${reel.title}"${reel.game_title ? ` (game: ${reel.game_title})` : ""}.`,
+        progress.duration ? `Duration: ${Math.round(progress.duration)}s.` : "",
+        `Sport: ${progress.sport ?? "unknown"}.`,
+        progress.analysis?.summary ? `What the footage shows: ${progress.analysis.summary}` : "",
+        moments.length
+          ? `Detected moments: ${moments
+              .map((m) => `${m.t != null ? `${m.t}s` : `frame ${m.frame}`} — ${m.label}${m.note ? ` (${m.note})` : ""}`)
+              .join("; ")}`
+          : "",
+        progress.transcript?.text ? `Spoken audio: ${progress.transcript.text.slice(0, 800)}` : "",
+        "Write the play-by-play for this clip.",
+      ]
+        .filter(Boolean)
+        .join("\n"),
+      [
+        "You are a sports play-by-play writer. Respond ONLY with JSON:",
+        '{"timeline":[{"t":1.5,"label":"short call (max 40 chars)","note":"one short line"}]}',
+        "3 to 8 entries, ordered by time, `t` in seconds inside the clip. Only describe what the analysis and audio support — never invent scores, counts, or names.",
+      ].join(" "),
+      apiKey,
+    );
+    const timeline = Array.isArray(out.timeline)
+      ? out.timeline
+          .slice(0, 8)
+          .map((e: any) => ({
+            t: Math.max(0, Math.round((Number(e?.t) || 0) * 100) / 100),
+            label: String(e?.label ?? "").slice(0, 60),
+            note: String(e?.note ?? "").slice(0, 160),
+          }))
+          .filter((e: { label: string }) => e.label.length > 0)
+          .sort((a: { t: number }, b: { t: number }) => a.t - b.t)
+      : [];
+    return { timeline };
+  },
+
+  /** Cut list: which segments to keep, in what order, at what pace. */
+  editplan: async (_reel, progress, { apiKey }) => {
+    const duration = Number(progress.duration) || 0;
+    const timeline = (progress.timeline ?? []) as any[];
+    if (!duration && timeline.length === 0) return { edit_plan: null };
+    const out = await callLovableAI(
+      [
+        duration ? `Clip duration: ${Math.round(duration * 10) / 10}s.` : "Clip duration unknown.",
+        `Sport: ${progress.sport ?? "unknown"}.`,
+        timeline.length
+          ? `Play-by-play: ${timeline.map((e) => `${e.t}s ${e.label}`).join("; ")}`
+          : "",
+        progress.analysis?.summary ? `Footage: ${progress.analysis.summary}` : "",
+        "Build the edit for a short social highlight.",
+      ]
+        .filter(Boolean)
+        .join("\n"),
+      [
+        "You are a highlight editor. Respond ONLY with JSON:",
+        '{"segments":[{"start":1.2,"end":4.0,"pace":"normal|slowmo|hold|quick","why":"one short line"}],"why":"one line on the overall cut"}',
+        "2 to 5 segments in playback order, each 0.8s or longer, all times inside the clip duration, no overlaps. Keep the total under 25 seconds.",
+      ].join(" "),
+      apiKey,
+    );
+    const cap = duration || 600;
+    const PACES = ["normal", "slowmo", "hold", "quick"];
+    const segments = Array.isArray(out.segments)
+      ? out.segments
+          .slice(0, 5)
+          .map((s: any) => {
+            const start = Math.max(0, Math.min(cap, Number(s?.start) || 0));
+            const rawEnd = Number(s?.end) || start + 2;
+            const end = Math.max(start + 0.5, Math.min(cap, rawEnd));
+            const pace = PACES.includes(String(s?.pace)) ? String(s.pace) : "normal";
+            return {
+              start: Math.round(start * 100) / 100,
+              end: Math.round(end * 100) / 100,
+              pace,
+              why: String(s?.why ?? "").slice(0, 160),
+            };
+          })
+          .sort((a: { start: number }, b: { start: number }) => a.start - b.start)
+      : [];
+    if (segments.length === 0) return { edit_plan: null };
+    return {
+      edit_plan: {
+        segments,
+        why: String(out.why ?? "").slice(0, 240),
+        total: Math.round(segments.reduce((n: number, s: any) => n + (s.end - s.start), 0) * 10) / 10,
+      },
+    };
+  },
+
+  /** Sport-aware coaching report: what looked good, what to fix, drills. */
+  coach: async (_reel, progress, { apiKey }) => {
+    if (!progress.analysis?.summary) return { coaching: null };
+    const out = await callLovableAI(
+      [
+        `Sport: ${progress.sport ?? "unknown"}.`,
+        `Footage: ${progress.analysis.summary}`,
+        progress.analysis.quality_note ? `Footage quality: ${progress.analysis.quality_note}` : "",
+        (progress.timeline ?? []).length
+          ? `Play-by-play: ${(progress.timeline ?? []).map((e: any) => `${e.t}s ${e.label}`).join("; ")}`
+          : "",
+        "Coach this athlete on what you can actually see.",
+      ]
+        .filter(Boolean)
+        .join("\n"),
+      [
+        "You are an amateur-level sports coach. Respond ONLY with JSON:",
+        '{"strengths":["..."],"notes":["..."],"drills":["..."],"confidence":"one line on how much the footage supports this"}',
+        "2 to 3 items per list, each under 140 characters, technique-specific to the sport. If the footage is too short, blurry, or far away to judge technique, say so in `confidence` and keep the notes general instead of inventing detail.",
+      ].join(" "),
+      apiKey,
+    );
+    const list = (v: unknown) =>
+      Array.isArray(v)
+        ? v
+            .map((x) => String(x).slice(0, 200).trim())
+            .filter(Boolean)
+            .slice(0, 3)
+        : [];
+    const coaching = {
+      strengths: list(out.strengths),
+      notes: list(out.notes),
+      drills: list(out.drills),
+      confidence: String(out.confidence ?? "").slice(0, 240),
+    };
+    if (!coaching.strengths.length && !coaching.notes.length && !coaching.drills.length) {
+      return { coaching: null };
+    }
+    return { coaching };
+  },
+
   metadata: async (reel, progress, { apiKey }) => {
     const context = progress.analysis?.summary
       ? `What the footage shows: ${progress.analysis.summary}. Detected sport: ${progress.sport ?? "unknown"}. Key moments: ${(
