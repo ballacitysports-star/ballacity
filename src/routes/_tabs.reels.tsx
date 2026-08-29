@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import { captureClip } from "@/lib/reel-frames";
 import { isWidelyPlayable } from "@/lib/video-support";
+import { transcodeToH264Mp4 } from "@/lib/video-transcode";
 
 import { ReelStylePanel } from "@/components/reels/ReelStylePanel";
 import {
@@ -76,6 +77,8 @@ type Reel = {
   id: string;
   title: string;
   video_path: string;
+  /** iPhone/Safari-friendly H.264 copy, when the source needed converting. */
+  playback_path?: string | null;
   status: string;
   used_free: boolean;
   created_at: string;
@@ -146,7 +149,7 @@ function ReelCard({ reel, onRetry }: { reel: Reel; onRetry: (id: string) => Prom
     if (!videoUrl) {
       const { data } = await supabase.storage
         .from("highlight-videos")
-        .createSignedUrl(reel.video_path, 3600);
+        .createSignedUrl(reel.playback_path ?? reel.video_path, 3600);
       if (data?.signedUrl) setVideoUrl(data.signedUrl);
     }
     setOpen(true);
@@ -647,19 +650,39 @@ function ReelsPage() {
     }
     setBusy(true);
     try {
-      // Some recordings (VP9 wrapped in .mp4) won't decode on iPhone/Safari.
-      if (!(await isWidelyPlayable(file))) {
-        toast.warning(
-          "This clip's video format may not play on iPhone or Safari — an H.264 (.mp4) export works everywhere.",
-        );
-      }
-
       const env = getStripeEnvironment();
       const base = `${user.id}/${Date.now()}-${file.name.replace(/[^a-zA-Z0-9.-]/g, "_")}`;
       const { error: upErr } = await supabase.storage
         .from("highlight-videos")
         .upload(base, file, { upsert: false });
       if (upErr) throw upErr;
+
+      // Some recordings (VP9/AV1 wrapped in .mp4, or .webm) won't decode on
+      // iPhone/Safari. The server can't run an encoder, so build the H.264
+      // fallback here and store it as the playback copy.
+      let playbackPath: string | null = null;
+      if (!(await isWidelyPlayable(file))) {
+        const toastId = toast.loading("Converting for iPhone & Safari playback… 0%");
+        const mp4 = await transcodeToH264Mp4(file, (r) =>
+          toast.loading(`Converting for iPhone & Safari playback… ${Math.round(r * 100)}%`, {
+            id: toastId,
+          }),
+        );
+        if (mp4) {
+          const p = `${base}.h264.mp4`;
+          const { error } = await supabase.storage
+            .from("highlight-videos")
+            .upload(p, mp4, { upsert: true, contentType: "video/mp4" });
+          if (!error) playbackPath = p;
+        }
+        if (playbackPath) toast.success("Converted — this reel now plays everywhere", { id: toastId });
+        else
+          toast.warning(
+            "Couldn't convert this clip in the browser — it may not play on iPhone or Safari.",
+            { id: toastId },
+          );
+      }
+
 
       // Sample frames + audio in the browser: they become the real thumbnail and
       // the input the sports AI agent watches/listens to (the server can't run ffmpeg).
@@ -692,6 +715,7 @@ function ReelsPage() {
           user_id: user.id,
           title: gameTitle ? `Recap · ${gameTitle}` : file.name.replace(/\.[^.]+$/, ""),
           video_path: base,
+          playback_path: playbackPath,
           status: "processing",
           used_free: usedFree,
           environment: env,

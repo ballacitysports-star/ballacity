@@ -31,6 +31,7 @@ type CompareReel = {
   id: string;
   title: string;
   video_path: string;
+  playback_path?: string | null;
   ai_title: string | null;
   ai_caption: string | null;
   ai_hashtags: string[] | null;
@@ -95,14 +96,14 @@ export function ReelCompare({ reel }: { reel: CompareReel }) {
     let cancelled = false;
     void supabase.storage
       .from("highlight-videos")
-      .createSignedUrl(reel.video_path, 3600)
+      .createSignedUrl(reel.playback_path ?? reel.video_path, 3600)
       .then(({ data }) => {
         if (!cancelled) setVideoUrl(data?.signedUrl ?? null);
       });
     return () => {
       cancelled = true;
     };
-  }, [open, videoUrl, reel.video_path]);
+  }, [open, videoUrl, reel.playback_path, reel.video_path]);
 
   async function generate() {
     setGenerating(true);

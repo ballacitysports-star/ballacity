@@ -971,7 +971,7 @@ function ProfileReelItem({
       )}
       {reel.status === "completed" ? (
         <InlineVideoPlayer
-          videoPath={reel.video_path}
+          videoPath={reel.playback_path ?? reel.video_path}
           thumbnailUrl={thumbUrl}
           ariaLabel={`Highlight reel ${reel.ai_title || reel.title}`}
         />
