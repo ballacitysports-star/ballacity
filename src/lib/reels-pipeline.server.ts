@@ -318,7 +318,10 @@ export async function processReel(reel: Reel, supabaseAdmin: any, apiKey: string
   } catch (e: any) {
     const msg = e?.message ?? String(e);
     const finalFail = reel.attempts + 1 >= MAX_ATTEMPTS;
+    const failedStep = (progress._pipeline?.active ?? null) as Step | null;
+    progress._pipeline = snapshot(done, null, attempt, failedStep);
     // Persist progress so the next attempt resumes from the failed step (not from scratch).
+
     await supabaseAdmin
       .from("highlight_reels")
       .update({
