@@ -1,5 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { normalizeReelStyle } from "@/lib/reel-style";
 
 /**
  * Runs the highlight-reel pipeline for the signed-in user's queued reels.
