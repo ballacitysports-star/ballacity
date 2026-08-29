@@ -20,6 +20,8 @@ export type AvatarLookup = PublicAvatar & { status: AvatarStatus; retry: () => v
  * only returned to viewers allowed to see it.
  */
 const cache = new Map<string, PublicAvatar>();
+/** When each cached entry was fetched, for TTL expiry across sessions. */
+const fetchedAt = new Map<string, number>();
 const failed = new Set<string>();
 const inflight = new Set<string>();
 const listeners = new Set<() => void>();
@@ -30,6 +32,135 @@ let flushTimer: ReturnType<typeof setTimeout> | null = null;
 function notify() {
   listeners.forEach((l) => l());
 }
+
+/* ------------------------------------------------------------------ *
+ * Cross-session persistence
+ *
+ * Avatar results are viewer-specific (privacy rules depend on who is
+ * asking), so the stored snapshot is stamped with the viewer's id and
+ * dropped whenever the signed-in account changes. Entries expire after
+ * TTL_MS so photo/privacy changes are picked up on a later visit.
+ * ------------------------------------------------------------------ */
+
+const STORE_KEY = "ballacity.avatarCache.v1";
+const TTL_MS = 12 * 60 * 60 * 1000; // 12 hours
+const MAX_ENTRIES = 400;
+
+type StoredEntry = { n: string | null; i: string | null; u: string | null; h: boolean; t: number };
+type StoredShape = { viewer: string | null; entries: Record<string, StoredEntry> };
+
+let hydrated = false;
+let viewerId: string | null = null;
+let viewerChecked = false;
+let saveTimer: ReturnType<typeof setTimeout> | null = null;
+
+function isFresh(t: number) {
+  return Date.now() - t < TTL_MS;
+}
+
+function readStore(): StoredShape | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = window.localStorage.getItem(STORE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as StoredShape;
+    if (!parsed || typeof parsed !== "object" || !parsed.entries) return null;
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
+function persist() {
+  if (typeof window === "undefined") return;
+  if (saveTimer) clearTimeout(saveTimer);
+  saveTimer = setTimeout(() => {
+    saveTimer = null;
+    try {
+      // Keep the newest entries only, so the snapshot can't grow unbounded.
+      const rows = Array.from(cache.entries())
+        .map(([id, v]) => [id, v, fetchedAt.get(id) ?? 0] as const)
+        .filter(([, , t]) => isFresh(t))
+        .sort((a, b) => b[2] - a[2])
+        .slice(0, MAX_ENTRIES);
+
+      const entries: Record<string, StoredEntry> = {};
+      rows.forEach(([id, v, t]) => {
+        entries[id] = { n: v.name, i: v.initials, u: v.avatarUrl, h: v.hidden, t };
+      });
+
+      const payload: StoredShape = { viewer: viewerId, entries };
+      window.localStorage.setItem(STORE_KEY, JSON.stringify(payload));
+    } catch {
+      // Storage full or unavailable — the in-memory cache still works.
+    }
+  }, 400);
+}
+
+function clearStore() {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.removeItem(STORE_KEY);
+  } catch {
+    /* ignore */
+  }
+}
+
+/** Loads the persisted snapshot (once) and verifies it belongs to this viewer. */
+function hydrate() {
+  if (hydrated || typeof window === "undefined") return;
+  hydrated = true;
+
+  const stored = readStore();
+  if (stored) {
+    Object.entries(stored.entries).forEach(([id, e]) => {
+      if (!e || !isFresh(e.t)) return;
+      cache.set(id, { name: e.n, initials: e.i, avatarUrl: e.u, hidden: !!e.h });
+      fetchedAt.set(id, e.t);
+    });
+  }
+
+  if (!viewerChecked) {
+    viewerChecked = true;
+    void supabase.auth
+      .getUser()
+      .then(({ data }) => {
+        const me = data.user?.id ?? null;
+        viewerId = me;
+        if (stored && stored.viewer !== me) {
+          // Different account (or signed out vs in) — privacy answers differ.
+          cache.clear();
+          fetchedAt.clear();
+          failed.clear();
+          warmed.clear();
+          clearStore();
+          notify();
+        } else {
+          persist();
+        }
+      })
+      .catch(() => {
+        /* offline — keep the snapshot we already hydrated */
+      });
+  }
+}
+
+if (typeof window !== "undefined") {
+  // Sign-in/sign-out changes who may see which photos: start clean.
+  supabase.auth.onAuthStateChange((event, session) => {
+    if (event !== "SIGNED_IN" && event !== "SIGNED_OUT" && event !== "USER_UPDATED") return;
+    const next = session?.user?.id ?? null;
+    if (next === viewerId) return;
+    viewerId = next;
+    cache.clear();
+    fetchedAt.clear();
+    failed.clear();
+    warmed.clear();
+    clearStore();
+    notify();
+  });
+}
+
 
 async function flush() {
   flushTimer = null;
