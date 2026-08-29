@@ -23,11 +23,13 @@ export type RecapSummary = {
   completed_at: string | null;
   game_id: string | null;
   game_title: string | null;
+  /** When set, the reel is hidden from the profile card (owner can re-show). */
+  hidden_at?: string | null;
 };
 
 /** Columns needed for status + inline playback. */
 export const RECAP_COLUMNS =
-  "id,title,video_path,status,processing_step,step_progress,thumbnail_path,ai_title,ai_caption,ai_hashtags,error_message,created_at,completed_at,game_id,game_title";
+  "id,title,video_path,status,processing_step,step_progress,thumbnail_path,ai_title,ai_caption,ai_hashtags,error_message,created_at,completed_at,game_id,game_title,hidden_at";
 
 const STEP_ORDER = [
   "pending",

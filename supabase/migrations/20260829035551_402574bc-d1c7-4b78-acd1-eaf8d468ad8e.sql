@@ -1,0 +1,1 @@
+ALTER TABLE public.highlight_reels ADD COLUMN IF NOT EXISTS hidden_at timestamp with time zone;

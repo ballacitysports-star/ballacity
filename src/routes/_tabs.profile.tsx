@@ -232,6 +232,7 @@ function PlayerProfile() {
 
   // Recaps (highlight reels) per finished game, for the Archive status + inline player.
   const [recapsByGame, setRecapsByGame] = useState<Record<string, RecapSummary[]>>({});
+  const [recapTick, setRecapTick] = useState(0);
   useEffect(() => {
     if (!profileUser) {
       setRecapsByGame({});
@@ -281,7 +282,7 @@ function PlayerProfile() {
       cancelled = true;
       supabase.removeChannel(channel);
     };
-  }, [profileUser?.id]);
+  }, [profileUser?.id, recapTick]);
 
   useEffect(() => {
     if (user) setConfirmedUser(user);
@@ -760,7 +761,12 @@ function PlayerProfile() {
                     pageSize={6}
                     keyFor={(g) => g.id}
                     renderItem={(g, i) => (
-                      <ArchiveGameItem game={g} index={i} recaps={recapsByGame[g.id] ?? []} />
+                      <ArchiveGameItem
+                        game={g}
+                        index={i}
+                        recaps={recapsByGame[g.id] ?? []}
+                        onRecapsChanged={() => setRecapTick((t) => t + 1)}
+                      />
                     )}
                     renderSkeleton={() => <GameCardSkeleton />}
                     resetKey="archive-hosting"
@@ -792,7 +798,12 @@ function PlayerProfile() {
                     pageSize={6}
                     keyFor={(g) => g.id}
                     renderItem={(g, i) => (
-                      <ArchiveGameItem game={g} index={i} recaps={recapsByGame[g.id] ?? []} />
+                      <ArchiveGameItem
+                        game={g}
+                        index={i}
+                        recaps={recapsByGame[g.id] ?? []}
+                        onRecapsChanged={() => setRecapTick((t) => t + 1)}
+                      />
                     )}
                     renderSkeleton={() => <GameCardSkeleton />}
                     resetKey="archive-playing"
@@ -912,15 +923,22 @@ function ArchiveGameItem({
   game,
   index,
   recaps,
+  onRecapsChanged,
 }: {
   game: Game;
   index: number;
   recaps: RecapSummary[];
+  onRecapsChanged?: () => void;
 }) {
   return (
     <div>
       <GameCard game={game} index={index} />
-      <GameRecapPanel game={{ id: game.id, title: game.title }} recaps={recaps} />
+      <GameRecapPanel
+        game={{ id: game.id, title: game.title }}
+        recaps={recaps}
+        isOwner
+        onChanged={onRecapsChanged}
+      />
     </div>
   );
 }
