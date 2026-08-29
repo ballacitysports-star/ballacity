@@ -32,6 +32,10 @@ export const RECAP_COLUMNS =
 const STEP_ORDER = [
   "pending",
   "analyze",
+  "transcribe",
+  "timeline",
+  "editplan",
+  "coach",
   "metadata",
   "hashtags",
   "thumbnail",
