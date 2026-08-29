@@ -89,6 +89,7 @@ export function invalidateUserAvatar(userId?: string | null) {
   } else {
     cache.clear();
     failed.clear();
+    warmed.clear();
   }
   notify();
 }
