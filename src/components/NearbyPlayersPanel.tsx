@@ -267,6 +267,7 @@ export function NearbyPlayersPanel({
                 key={p.user_id}
                 to="/players/$userId"
                 params={{ userId: p.user_id }}
+                onClick={() => setOpen(false)}
                 className="w-40 shrink-0 rounded-2xl border border-border bg-surface p-3"
               >
                 <UserAvatar
