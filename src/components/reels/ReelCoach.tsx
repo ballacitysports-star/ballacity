@@ -16,10 +16,12 @@ type Package = {
 
 const QUICK_PROMPTS = [
   "Write a punchier caption",
-  "Recruiting-style caption",
+  "Tighten the cut and apply it",
+  "Coach my technique",
   "Which moment should be the thumbnail?",
   "How should I film this better?",
 ];
+
 
 const TONES = ["Hype", "Recruiting", "Funny", "Humble"] as const;
 
@@ -52,6 +54,9 @@ export function ReelCoach({ reelId }: { reelId: string }) {
     try {
       const res = await askReelCoach({ data: { reelId, question: q, history } });
       setMessages((m) => [...m, { role: "assistant", content: res.answer }]);
+      // The agent can apply copy, overlays, or a new cut list itself.
+      if (res.actions?.length) toast.success(res.actions.join(" · "));
+
     } catch (e: any) {
       toast.error(e?.message ?? "Reel Coach is unavailable right now");
       setMessages((m) => m.slice(0, -1));

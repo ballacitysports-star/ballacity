@@ -32,6 +32,10 @@ export const RECAP_COLUMNS =
 const STEP_ORDER = [
   "pending",
   "analyze",
+  "transcribe",
+  "timeline",
+  "editplan",
+  "coach",
   "metadata",
   "hashtags",
   "thumbnail",
@@ -40,18 +44,33 @@ const STEP_ORDER = [
 ];
 
 /** Pipeline steps in run order (mirrors `STEPS` in reels-pipeline.server.ts). */
-export const RECAP_STEPS = ["analyze", "metadata", "hashtags", "thumbnail", "finalize"] as const;
+export const RECAP_STEPS = [
+  "analyze",
+  "transcribe",
+  "timeline",
+  "editplan",
+  "coach",
+  "metadata",
+  "hashtags",
+  "thumbnail",
+  "finalize",
+] as const;
 export type RecapStep = (typeof RECAP_STEPS)[number];
 
 const STEP_LABELS: Record<string, string> = {
   pending: "Queued",
   analyze: "Watching your clip",
+  transcribe: "Listening to the audio",
+  timeline: "Building play-by-play",
+  editplan: "Planning the cut",
+  coach: "Coaching notes",
   metadata: "Writing title & caption",
   hashtags: "Picking hashtags",
   thumbnail: "Building thumbnail",
   finalize: "Finishing up",
   completed: "Ready",
 };
+
 
 type ProgressInput = Pick<RecapSummary, "status" | "processing_step"> & {
   step_progress?: Record<string, any> | null;
