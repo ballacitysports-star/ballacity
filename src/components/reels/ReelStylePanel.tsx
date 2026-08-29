@@ -59,10 +59,13 @@ export function ReelStylePanel({
   value,
   onChange,
   disabled,
+  sport,
 }: {
   value: ReelStylePrefs;
   onChange: (next: ReelStylePrefs) => void;
   disabled?: boolean;
+  /** Sport this style applies to — defaults are tuned per sport. */
+  sport?: string | null;
 }) {
   return (
     <section
