@@ -284,17 +284,8 @@ function TeamsPage() {
                     ]}
                   />
                 </FilterSection>
-                <FilterSection label="Sort">
-                  <ChipRow
-                    value={sortBy}
-                    onChange={setSortBy}
-                    options={[
-                      { value: "nearest", label: "Nearest" },
-                      { value: "followers", label: "Most followers" },
-                      { value: "name", label: "Name A–Z" },
-                    ]}
-                  />
-                </FilterSection>
+                <SortSection value={sortBy} onChange={setSortBy} options={TEAM_SORTS} />
+
               </>
             }
           />
