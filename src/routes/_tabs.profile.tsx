@@ -232,6 +232,7 @@ function PlayerProfile() {
 
   // Recaps (highlight reels) per finished game, for the Archive status + inline player.
   const [recapsByGame, setRecapsByGame] = useState<Record<string, RecapSummary[]>>({});
+  const [recapTick, setRecapTick] = useState(0);
   useEffect(() => {
     if (!profileUser) {
       setRecapsByGame({});

@@ -117,19 +117,19 @@ function ReelManageRow({
 }
 
 export function GameRecapPanel({
-  gameId,
-  gameTitle,
+  game,
   recaps,
   isOwner = false,
   onChanged,
 }: {
-  gameId: string;
-  gameTitle: string;
+  game: { id: string; title: string };
   recaps: RecapSummary[];
   isOwner?: boolean;
   /** Reload callback fired after hide/show/delete so lists stay fresh. */
   onChanged?: () => void;
 }) {
+  const gameId = game.id;
+  const gameTitle = game.title;
   const [thumbUrl, setThumbUrl] = useState<string | null>(null);
   const [showHidden, setShowHidden] = useState(false);
 
