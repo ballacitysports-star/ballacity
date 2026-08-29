@@ -12,6 +12,7 @@ import {
   Check,
   RefreshCw,
   Eye,
+  Circle,
 } from "lucide-react";
 import { captureVideoFrames } from "@/lib/reel-frames";
 import { processMyReels } from "@/lib/reels.functions";
@@ -25,7 +26,14 @@ import { PaymentTestModeBanner } from "@/components/PaymentTestModeBanner";
 import { getStripeEnvironment } from "@/lib/stripe";
 import { createPortalSession } from "@/utils/payments.functions";
 import { FREE_TIER } from "@/lib/catalog";
-import { recapProgress, recapStepLabel, shareRecap, type RecapSummary } from "@/lib/recaps";
+import {
+  recapAttempt,
+  recapProgress,
+  recapStepLabel,
+  recapStepStates,
+  shareRecap,
+  type RecapSummary,
+} from "@/lib/recaps";
 import { Share2 } from "lucide-react";
 
 export const Route = createFileRoute("/_tabs/reels")({
@@ -59,6 +67,7 @@ type Reel = {
   game_id: string | null;
   game_title: string | null;
   processing_step: string | null;
+  step_progress?: Record<string, any> | null;
   completed_at: string | null;
   attempts?: number | null;
   environment?: string | null;
@@ -104,6 +113,7 @@ function ReelCard({ reel, onRetry }: { reel: Reel; onRetry: (id: string) => Prom
   const isDone = reel.status === "completed";
   const displayTitle = reel.ai_title || reel.title;
   const isProcessing = reel.status === "processing";
+  const attempt = recapAttempt(reel as unknown as RecapSummary);
 
   return (
     <li className="rounded-xl border border-border bg-surface p-3">
