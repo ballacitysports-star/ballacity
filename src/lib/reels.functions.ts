@@ -151,7 +151,7 @@ export const applyReelCopy = createServerFn({ method: "POST" })
     if (Object.keys(patch).length === 0) return { updated: false };
     const { error } = await context.supabase
       .from("highlight_reels")
-      .update(patch)
+      .update(patch as any)
       .eq("id", data.reelId)
       .eq("user_id", context.userId);
     if (error) throw new Error(error.message);
