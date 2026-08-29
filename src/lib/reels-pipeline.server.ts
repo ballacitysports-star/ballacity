@@ -9,6 +9,8 @@
  * so a retry resumes from the first step that never completed.
  */
 
+import { reelStyleDirectives } from "@/lib/reel-style";
+
 export const MAX_ATTEMPTS = 3;
 export const STUCK_AFTER_MS = 10 * 60 * 1000;
 export const BATCH_SIZE = 5;
@@ -39,10 +41,11 @@ export type Reel = {
   frame_paths?: string[] | null;
   frame_times?: number[] | null;
   audio_path?: string | null;
+  style_prefs?: Record<string, any> | null;
 };
 
 export const REEL_WORK_COLUMNS =
-  "id,user_id,title,video_path,attempts,processing_step,step_progress,game_id,game_title,frame_paths,frame_times,audio_path";
+  "id,user_id,title,video_path,attempts,processing_step,step_progress,game_id,game_title,frame_paths,frame_times,audio_path,style_prefs";
 
 async function callLovableAI(prompt: string, system: string, apiKey: string) {
   return callLovableAIParts([{ type: "text", text: prompt }], system, apiKey);
@@ -300,6 +303,7 @@ const STEP_RUNNERS: Record<
           ? `Play-by-play: ${timeline.map((e) => `${e.t}s ${e.label}`).join("; ")}`
           : "",
         progress.analysis?.summary ? `Footage: ${progress.analysis.summary}` : "",
+        `Requested style: ${reelStyleDirectives(_reel.style_prefs).summary}.`,
         "Build the edit for a short social highlight.",
       ]
         .filter(Boolean)
@@ -308,6 +312,7 @@ const STEP_RUNNERS: Record<
         "You are a highlight editor. Respond ONLY with JSON:",
         '{"segments":[{"start":1.2,"end":4.0,"pace":"normal|slowmo|hold|quick","why":"one short line"}],"why":"one line on the overall cut"}',
         "2 to 5 segments in playback order, each 0.8s or longer, all times inside the clip duration, no overlaps. Keep the total under 25 seconds.",
+        reelStyleDirectives(_reel.style_prefs).edit,
       ].join(" "),
       apiKey,
     );
@@ -391,7 +396,9 @@ const STEP_RUNNERS: Record<
       : "";
     const out = await callLovableAI(
       `Original filename/title: "${reel.title}". ${context} Generate an engaging title and caption for this sports highlight clip.`,
-      'Respond ONLY with JSON: {"title":"...","caption":"..."}. Title max 60 chars, caption max 200 chars.',
+      `Respond ONLY with JSON: {"title":"...","caption":"..."}. Title max 60 chars, caption max 200 chars. ${
+        reelStyleDirectives(reel.style_prefs).copy
+      }`,
       apiKey,
     );
     return {
@@ -399,12 +406,14 @@ const STEP_RUNNERS: Record<
       ai_caption: String(out.caption ?? "").slice(0, 500),
     };
   },
-  hashtags: async (_reel, progress, { apiKey }) => {
+  hashtags: async (reel, progress, { apiKey }) => {
     const out = await callLovableAI(
       `Title: "${progress.ai_title}". Caption: "${progress.ai_caption}". Sport: ${
         progress.sport ?? "unknown"
       }. Generate 3-5 trending hashtags.`,
-      'Respond ONLY with JSON: {"hashtags":["..."]}. Max 8 hashtags, no leading #.',
+      `Respond ONLY with JSON: {"hashtags":["..."]}. Max 8 hashtags, no leading #. ${
+        reelStyleDirectives(reel.style_prefs).vibe
+      }`,
       apiKey,
     );
     return {
