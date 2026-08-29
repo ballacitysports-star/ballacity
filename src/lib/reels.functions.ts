@@ -392,3 +392,127 @@ export const deleteReel = createServerFn({ method: "POST" })
     if (delError) throw new Error(delError.message);
     return { deleted: true };
   });
+
+/** Games the caller can attach a reel to: ones they host or joined. */
+export const listAttachableGames = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const { data: hosted } = await context.supabase
+      .from("hosted_games")
+      .select("id,title,sport,date")
+      .eq("host_id", context.userId)
+      .order("date", { ascending: false })
+      .limit(60);
+
+    const { data: joins } = await context.supabase
+      .from("game_participants")
+      .select("game_id")
+      .eq("user_id", context.userId)
+      .limit(120);
+
+    const joinedIds = ((joins ?? []) as any[])
+      .map((r) => r.game_id as string)
+      .filter((id) => !((hosted ?? []) as any[]).some((g) => g.id === id));
+
+    let joined: any[] = [];
+    if (joinedIds.length > 0) {
+      const { data } = await context.supabase
+        .from("hosted_games")
+        .select("id,title,sport,date")
+        .in("id", joinedIds)
+        .order("date", { ascending: false });
+      joined = (data ?? []) as any[];
+    }
+
+    const seen = new Set<string>();
+    return [...((hosted ?? []) as any[]), ...joined]
+      .filter((g) => (seen.has(g.id) ? false : (seen.add(g.id), true)))
+      .map((g) => ({
+        id: g.id as string,
+        title: (g.title as string) ?? "Game",
+        sport: (g.sport as string) ?? null,
+        date: (g.date as string) ?? null,
+      }));
+  });
+
+/** Links a game-less reel to a game (or clears the link when gameId is empty). */
+export const attachReelToGame = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: { reelId: string; gameId: string | null }) => {
+    if (!input?.reelId) throw new Error("reelId is required");
+    const gameId = typeof input.gameId === "string" && input.gameId ? input.gameId : null;
+    return { reelId: input.reelId, gameId };
+  })
+  .handler(async ({ data, context }) => {
+    let patch: Record<string, unknown> = { game_id: null, game_title: null };
+    if (data.gameId) {
+      const { data: game, error: gErr } = await context.supabase
+        .from("hosted_games")
+        .select("id,title")
+        .eq("id", data.gameId)
+        .maybeSingle();
+      if (gErr) throw new Error(gErr.message);
+      if (!game) throw new Error("That game is no longer available");
+      patch = { game_id: (game as any).id, game_title: (game as any).title };
+    }
+
+    const { error } = await context.supabase
+      .from("highlight_reels")
+      .update(patch as any)
+      .eq("id", data.reelId)
+      .eq("user_id", context.userId);
+    if (error) throw new Error(error.message);
+    return { gameId: data.gameId };
+  });
+
+/** Hides or re-shows several of the caller's reels in one request. */
+export const setReelsHidden = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: { reelIds: string[]; hidden: boolean }) => {
+    const reelIds = Array.isArray(input?.reelIds) ? input.reelIds.filter(Boolean) : [];
+    if (reelIds.length === 0) throw new Error("Select at least one reel");
+    return { reelIds: reelIds.slice(0, 100), hidden: input.hidden === true };
+  })
+  .handler(async ({ data, context }) => {
+    const { error } = await context.supabase
+      .from("highlight_reels")
+      .update({ hidden_at: data.hidden ? new Date().toISOString() : null } as any)
+      .in("id", data.reelIds)
+      .eq("user_id", context.userId);
+    if (error) throw new Error(error.message);
+    return { updated: data.reelIds.length, hidden: data.hidden };
+  });
+
+/** Permanently deletes several of the caller's reels, media included. */
+export const deleteReels = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: { reelIds: string[] }) => {
+    const reelIds = Array.isArray(input?.reelIds) ? input.reelIds.filter(Boolean) : [];
+    if (reelIds.length === 0) throw new Error("Select at least one reel");
+    return { reelIds: reelIds.slice(0, 100) };
+  })
+  .handler(async ({ data, context }) => {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: rows, error } = await supabaseAdmin
+      .from("highlight_reels")
+      .select("id,video_path,thumbnail_path,audio_path,frame_paths")
+      .in("id", data.reelIds)
+      .eq("user_id", context.userId);
+    if (error) throw new Error(error.message);
+
+    const ids = ((rows ?? []) as any[]).map((r) => r.id as string);
+    if (ids.length === 0) return { deleted: 0 };
+
+    const paths = ((rows ?? []) as any[])
+      .flatMap((r) => [r.video_path, r.thumbnail_path, r.audio_path, ...((r.frame_paths as string[] | null) ?? [])])
+      .filter((p): p is string => typeof p === "string" && p.length > 0);
+    if (paths.length > 0) await supabaseAdmin.storage.from("highlight-videos").remove(paths);
+
+    const { error: delError } = await supabaseAdmin
+      .from("highlight_reels")
+      .delete()
+      .in("id", ids)
+      .eq("user_id", context.userId);
+    if (delError) throw new Error(delError.message);
+    return { deleted: ids.length };
+  });
