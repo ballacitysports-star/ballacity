@@ -250,6 +250,7 @@ function ReelsPage() {
   const [reels, setReels] = useState<Reel[]>([]);
   const [busy, setBusy] = useState(false);
   const autoOpened = useRef(false);
+  const sweptRef = useRef(false);
   const gameReels = gameId ? reels.filter((r) => r.game_id === gameId) : [];
   const visibleReels = gameId ? gameReels : reels;
 
