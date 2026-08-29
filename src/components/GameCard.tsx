@@ -2,7 +2,7 @@ import { ageRequirementLabel } from "@/lib/game-age";
 import type { CSSProperties } from "react";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { MapPin, Users, Clock, Zap, Lock, Flame, MessageCircle, CalendarDays } from "lucide-react";
-import { UserAvatar, UserAvatarById } from "@/components/UserAvatar";
+import { UserAvatarById } from "@/components/UserAvatar";
 import { SpotsPill } from "@/components/SpotsPill";
 import type { Game } from "@/lib/sample-data";
 import { formatGameWhen } from "@/lib/format";
