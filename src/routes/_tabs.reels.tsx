@@ -444,16 +444,28 @@ function ReelsPage() {
         .upload(base, file, { upsert: false });
       if (upErr) throw upErr;
 
-      // Sample frames in the browser: they become the real thumbnail and the
-      // input the sports AI agent looks at (the server can't run ffmpeg).
+      // Sample frames + audio in the browser: they become the real thumbnail and
+      // the input the sports AI agent watches/listens to (the server can't run ffmpeg).
       const framePaths: string[] = [];
-      const frames = await captureVideoFrames(file);
+      const frameTimes: number[] = [];
+      const { frames, audio } = await captureClip(file);
       for (let i = 0; i < frames.length; i++) {
         const framePath = `${base}.frame${i + 1}.jpg`;
         const { error } = await supabase.storage
           .from("highlight-videos")
-          .upload(framePath, frames[i], { upsert: true, contentType: "image/jpeg" });
-        if (!error) framePaths.push(framePath);
+          .upload(framePath, frames[i].blob, { upsert: true, contentType: "image/jpeg" });
+        if (!error) {
+          framePaths.push(framePath);
+          frameTimes.push(frames[i].t);
+        }
+      }
+      let audioPath: string | null = null;
+      if (audio) {
+        const p = `${base}.audio.wav`;
+        const { error } = await supabase.storage
+          .from("highlight-videos")
+          .upload(p, audio, { upsert: true, contentType: "audio/wav" });
+        if (!error) audioPath = p;
       }
 
       const usedFree = !isActive;
@@ -469,6 +481,9 @@ function ReelsPage() {
           game_id: gameId || null,
           game_title: gameTitle || null,
           frame_paths: framePaths.length > 0 ? framePaths : null,
+          frame_times: frameTimes.length > 0 ? frameTimes : null,
+          audio_path: audioPath,
+
         } as any)
         .select("id")
         .maybeSingle();
