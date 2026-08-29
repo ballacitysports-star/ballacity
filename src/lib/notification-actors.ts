@@ -51,7 +51,7 @@ async function flushConvs() {
     .from("conversation_participants" as any)
     .select("conversation_id, user_id")
     .in("conversation_id", ids);
-  const rows = (data ?? []) as Array<{ conversation_id: string; user_id: string }>;
+  const rows = (data ?? []) as unknown as Array<{ conversation_id: string; user_id: string }>;
   ids.forEach((id) => {
     const other = rows.find((r) => r.conversation_id === id && r.user_id !== me);
     convCache.set(id, other?.user_id ?? null);
