@@ -122,6 +122,8 @@ function ReelCard({ reel, onRetry }: { reel: Reel; onRetry: (id: string) => Prom
     normalizeReelStyle(reel.style_prefs),
   );
   const [restyling, setRestyling] = useState(false);
+  const [manageBusy, setManageBusy] = useState<"hide" | "delete" | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -273,6 +275,81 @@ function ReelCard({ reel, onRetry }: { reel: Reel; onRetry: (id: string) => Prom
           </button>
         )}
       </div>
+      {/* Visibility + deletion controls; realtime patches the row after each change. */}
+      <div className="mt-2 flex items-center gap-2">
+        <button
+          onClick={async () => {
+            setManageBusy("hide");
+            try {
+              await setReelHidden({ data: { reelId: reel.id, hidden: !reel.hidden_at } });
+              toast.success(
+                reel.hidden_at ? "Reel is visible on your profile again" : "Reel hidden from your profile",
+              );
+            } catch (e: any) {
+              toast.error(e?.message ?? "Could not update this reel");
+            } finally {
+              setManageBusy(null);
+            }
+          }}
+          disabled={manageBusy !== null}
+          className="inline-flex items-center gap-1 rounded-full border border-border px-2.5 py-1 text-[10px] font-semibold text-muted-foreground hover:text-foreground disabled:opacity-50"
+          aria-label={reel.hidden_at ? "Show reel on profile" : "Hide reel from profile"}
+        >
+          {manageBusy === "hide" ? (
+            <Loader2 className="h-3 w-3 animate-spin" />
+          ) : reel.hidden_at ? (
+            <Eye className="h-3 w-3" />
+          ) : (
+            <EyeOff className="h-3 w-3" />
+          )}
+          {reel.hidden_at ? "Show on profile" : "Hide from profile"}
+        </button>
+        {confirmDelete ? (
+          <>
+            <button
+              onClick={async () => {
+                setManageBusy("delete");
+                try {
+                  await deleteReel({ data: { reelId: reel.id } });
+                  toast.success("Reel deleted");
+                } catch (e: any) {
+                  toast.error(e?.message ?? "Could not delete this reel");
+                } finally {
+                  setManageBusy(null);
+                  setConfirmDelete(false);
+                }
+              }}
+              disabled={manageBusy !== null}
+              className="inline-flex items-center gap-1 rounded-full bg-destructive px-2.5 py-1 text-[10px] font-bold text-destructive-foreground disabled:opacity-50"
+            >
+              {manageBusy === "delete" ? (
+                <Loader2 className="h-3 w-3 animate-spin" />
+              ) : (
+                <Trash2 className="h-3 w-3" />
+              )}
+              Confirm delete
+            </button>
+            <button
+              onClick={() => setConfirmDelete(false)}
+              disabled={manageBusy !== null}
+              className="rounded-full border border-border px-2.5 py-1 text-[10px] font-semibold text-muted-foreground disabled:opacity-50"
+            >
+              Cancel
+            </button>
+          </>
+        ) : (
+          <button
+            onClick={() => setConfirmDelete(true)}
+            disabled={manageBusy !== null}
+            className="inline-flex items-center gap-1 rounded-full border border-border px-2.5 py-1 text-[10px] font-semibold text-muted-foreground hover:text-destructive disabled:opacity-50"
+            aria-label="Delete reel"
+          >
+            <Trash2 className="h-3 w-3" />
+            Delete
+          </button>
+        )}
+      </div>
+
       {open && videoUrl && (
         <ReelStudio
           videoUrl={videoUrl}
