@@ -187,6 +187,56 @@ function ReelCard({ reel, onRetry }: { reel: Reel; onRetry: (id: string) => Prom
           <video src={videoUrl} controls className="w-full rounded-lg" />
         </div>
       )}
+
+      {isDone && (reel.ai_analysis?.summary || (reel.ai_moments ?? []).length > 0) && (
+        <div className="mt-2">
+          <button
+            onClick={() => setShowInsights((v) => !v)}
+            className="inline-flex items-center gap-1 text-[11px] font-semibold text-lime"
+          >
+            <Eye className="h-3.5 w-3.5" />
+            {showInsights ? "Hide what the AI saw" : "What the AI saw"}
+          </button>
+          {showInsights && (
+            <div className="mt-2 rounded-xl border border-border bg-background/60 p-3">
+              {reel.ai_sport && (
+                <p className="text-[10px] font-bold uppercase tracking-wider text-lime">
+                  {reel.ai_sport}
+                </p>
+              )}
+              {reel.ai_analysis?.summary && (
+                <p className="mt-1 text-xs text-muted-foreground">{reel.ai_analysis.summary}</p>
+              )}
+              {(reel.ai_moments ?? []).length > 0 && (
+                <ul className="mt-2 flex flex-wrap gap-1.5">
+                  {(reel.ai_moments ?? []).map((m, i) => (
+                    <li
+                      key={`${m.label}-${i}`}
+                      title={m.note || undefined}
+                      className="rounded-full border border-lime/40 bg-lime/10 px-2 py-0.5 text-[10px] font-semibold text-lime"
+                    >
+                      {m.label}
+                    </li>
+                  ))}
+                </ul>
+              )}
+              {reel.suggested_clip?.why && (
+                <p className="mt-2 text-[11px] text-muted-foreground">
+                  <span className="font-semibold">Best cut:</span> {reel.suggested_clip.why}
+                </p>
+              )}
+              {reel.ai_analysis?.quality_note && (
+                <p className="mt-1 text-[11px] text-muted-foreground">
+                  <span className="font-semibold">Filming tip:</span>{" "}
+                  {reel.ai_analysis.quality_note}
+                </p>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
+      {isDone && <ReelCoach reelId={reel.id} />}
     </li>
   );
 }
