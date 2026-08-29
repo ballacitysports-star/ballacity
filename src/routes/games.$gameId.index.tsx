@@ -3532,6 +3532,7 @@ function RosterPlayerRow({
   const [busy, setBusy] = useState(false);
   const [name, setName] = useState<string>("Player");
   const [initials, setInitials] = useState<string>("P");
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [latestSub, setLatestSub] = useState<{
     id: string;
     status: "verified" | "pending" | "rejected";
@@ -3579,7 +3580,7 @@ function RosterPlayerRow({
     (async () => {
       const profRes = await supabase
         .from("profiles")
-        .select("display_name, avatar_initials")
+        .select("display_name, avatar_initials, avatar_url")
         .eq("id", req.player_id)
         .maybeSingle();
       if (!cancel) {
@@ -3588,6 +3589,7 @@ function RosterPlayerRow({
           const n = d.display_name ?? "Player";
           setName(n);
           setInitials((d.avatar_initials ?? n.slice(0, 2)).toUpperCase());
+          setAvatarUrl(d.avatar_url ?? null);
         }
       }
       await loadPayment();
@@ -3857,9 +3859,14 @@ function RosterPlayerRow({
         <Link
           to="/players/$userId"
           params={{ userId: req.player_id }}
-          className="grid h-10 w-10 place-items-center rounded-full bg-lime-gradient text-xs font-bold text-primary-foreground"
+          className="shrink-0"
         >
-          {initials.slice(0, 2)}
+          <UserAvatar
+            name={name}
+            initials={initials.slice(0, 2)}
+            avatarUrl={avatarUrl}
+            className="h-10 w-10 text-xs"
+          />
         </Link>
         <div className="min-w-0 flex-1">
           <div className="text-sm font-semibold truncate">{name}</div>
@@ -4059,7 +4066,7 @@ function HostRequestRow({
     (async () => {
       const { data } = await supabase
         .from("profiles")
-        .select("display_name, avatar_initials")
+        .select("display_name, avatar_initials, avatar_url")
         .eq("id", req.player_id)
         .maybeSingle();
       if (data) setName((data as any).display_name ?? "Player");
@@ -4192,17 +4199,19 @@ function HostPendingChip({
   const [busy, setBusy] = useState(false);
   const [name, setName] = useState<string>("Player");
   const [initials, setInitials] = useState<string>("?");
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   useEffect(() => {
     (async () => {
       const { data } = await supabase
         .from("profiles")
-        .select("display_name, avatar_initials")
+        .select("display_name, avatar_initials, avatar_url")
         .eq("id", req.player_id)
         .maybeSingle();
       if (data) {
         const dn = (data as any).display_name ?? "Player";
         setName(dn);
         setInitials(((data as any).avatar_initials ?? dn.slice(0, 2)).toUpperCase());
+        setAvatarUrl((data as any).avatar_url ?? null);
       }
     })();
   }, [req.player_id]);
@@ -4259,7 +4268,16 @@ function HostPendingChip({
             : "border-coral/60 bg-coral/10 text-coral hover:bg-coral/20"
         }`}
       >
-        {initials}
+        {avatarUrl ? (
+          <UserAvatar
+            name={name}
+            initials={initials}
+            avatarUrl={avatarUrl}
+            className="h-full w-full border-0 text-xs"
+          />
+        ) : (
+          initials
+        )}
         <span className="absolute -bottom-1 -right-1 grid h-4 w-4 place-items-center rounded-full bg-coral text-[8px] text-white">
           <Clock className="h-2.5 w-2.5" />
         </span>
