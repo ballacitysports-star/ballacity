@@ -111,6 +111,17 @@ import {
   type SportSkillMap,
 } from "@/lib/sport-filter";
 import { markSportChoice, useProfileSportDefault, useDefaultSports } from "@/lib/default-sports";
+import { SortSection, SortSummary } from "@/components/filters/SortSection";
+import { haversineKm, MI_PER_KM, useUserLocation } from "@/lib/geo";
+
+type PlayersSortBy = "recent" | "soonest" | "nearest" | "name";
+
+const PLAYER_SORTS = [
+  { value: "recent" as const, label: "Recently posted" },
+  { value: "soonest" as const, label: "Soonest available" },
+  { value: "nearest" as const, label: "Nearest" },
+  { value: "name" as const, label: "Name A–Z" },
+];
 
 // URL-persisted Players state. Refreshing or sharing the URL restores the
 // exact view: search text, sport chip, skill, distance cap, age range,
@@ -125,6 +136,7 @@ const playersSearchSchema = z.object({
   ageMax: fallback(z.number().optional(), undefined).default(undefined),
   unknownAge: fallback(z.boolean(), true).default(true),
   when: fallback(z.string(), "any").default("any"),
+  sort: fallback(z.string(), "recent").default("recent"),
   view: fallback(z.string(), "list").default("list"),
   density: fallback(z.string(), "list").default("list"),
   // "browse" (everyone's availability) | "mine" (your posts + requests).
@@ -248,6 +260,10 @@ function PlayersPage() {
     search.when === "today" || search.when === "week" || search.when === "weekend"
       ? search.when
       : "any";
+  const sortBy: PlayersSortBy =
+    search.sort === "soonest" || search.sort === "nearest" || search.sort === "name"
+      ? search.sort
+      : "recent";
   const viewMode: ViewMode = search.view === "map" ? "map" : "list";
   const density: Density = search.density === "grid" ? "grid" : "list";
 
@@ -284,6 +300,7 @@ function PlayersPage() {
   const setAgeMax = (v: number | "") => updateSearch({ ageMax: v === "" ? undefined : v });
   const setIncludeUnknownAge = (v: boolean) => updateSearch({ unknownAge: v });
   const setWhen = (v: "any" | "today" | "week" | "weekend") => updateSearch({ when: v });
+  const setSortBy = (v: PlayersSortBy) => updateSearch({ sort: v });
   const switchView = (v: ViewMode) => updateSearch({ view: v });
   const switchDensity = (d: Density) => updateSearch({ density: d });
 
@@ -454,9 +471,30 @@ function PlayersPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [list, q, sportsKey, search.skill, maxDistance, ageMin, ageMax, includeUnknownAge, when]);
 
+  const { coords } = useUserLocation();
+  const sorted = useMemo(() => {
+    if (!filtered) return null;
+    const soonest = (a: AvailabilityWithAuthor) => {
+      const dates = summarizeSlotDates(a);
+      return dates.length ? dates[0]! : "9999-12-31";
+    };
+    const distMi = (a: AvailabilityWithAuthor) => {
+      if (!coords || a.lat == null || a.lng == null) return Number.POSITIVE_INFINITY;
+      return haversineKm(coords, { lat: a.lat, lng: a.lng }) * MI_PER_KM;
+    };
+    const out = [...filtered];
+    out.sort((a, b) => {
+      if (sortBy === "name") return a.author_name.localeCompare(b.author_name);
+      if (sortBy === "soonest") return soonest(a).localeCompare(soonest(b));
+      if (sortBy === "nearest") return distMi(a) - distMi(b);
+      return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+    });
+    return out;
+  }, [filtered, sortBy, coords]);
+
   // Search results: warm the first screenful eagerly, the rest speculatively,
   // then let the viewport observer promote rows as they approach the screen.
-  const resultIds = useMemo(() => (filtered ?? []).map((a) => a.user_id), [filtered]);
+  const resultIds = useMemo(() => (sorted ?? []).map((a) => a.user_id), [sorted]);
   usePrefetchUserAvatars(resultIds.slice(0, 8), "high");
   usePrefetchUserAvatars(resultIds.slice(8), "low");
   const avatarRowRef = useAvatarViewportPriority();
@@ -581,6 +619,7 @@ function PlayersPage() {
               setAgeMin("");
               setAgeMax("");
               setIncludeUnknownAge(true);
+              setSortBy("recent");
             }}
             sheet={
               <PlayersFilterBody
@@ -600,6 +639,8 @@ function PlayersPage() {
                 setAgeMax={setAgeMax}
                 includeUnknownAge={includeUnknownAge}
                 setIncludeUnknownAge={setIncludeUnknownAge}
+                sortBy={sortBy}
+                setSortBy={setSortBy}
               />
             }
           />
@@ -639,10 +680,10 @@ function PlayersPage() {
           </div>
 
           {viewMode === "map" ? (
-            <PlayersMapView players={filtered ?? []} />
-          ) : filtered === null ? (
+            <PlayersMapView players={sorted ?? []} />
+          ) : sorted === null ? (
             <LoadingRows />
-          ) : filtered.length === 0 ? (
+          ) : sorted.length === 0 ? (
             <EmptyState
               title={list && list.length > 0 ? "No matches" : "No one's posted yet"}
               body={
@@ -672,8 +713,9 @@ function PlayersPage() {
             <>
               <div className="mb-2 flex items-center justify-between gap-2">
                 <h2 className="font-display text-sm font-bold uppercase tracking-wider text-muted-foreground">
-                  {filtered.length} player{filtered.length === 1 ? "" : "s"} available
+                  {sorted.length} player{sorted.length === 1 ? "" : "s"} available
                 </h2>
+                <SortSummary value={sortBy} options={PLAYER_SORTS} />
               </div>
               <ul
                 className={
@@ -682,7 +724,7 @@ function PlayersPage() {
                     : "space-y-3 pb-6"
                 }
               >
-                {filtered.map((a) => (
+                {sorted.map((a) => (
                   <AvailabilityCard
                     key={a.id}
                     a={a}
@@ -774,6 +816,8 @@ function PlayersFilterBody({
   setAgeMax,
   includeUnknownAge,
   setIncludeUnknownAge,
+  sortBy,
+  setSortBy,
 }: {
   sports: string[];
   onToggleSport: (v: string | null) => void;
@@ -788,6 +832,8 @@ function PlayersFilterBody({
   setAgeMax: (v: number | "") => void;
   includeUnknownAge: boolean;
   setIncludeUnknownAge: (v: boolean) => void;
+  sortBy: PlayersSortBy;
+  setSortBy: (v: PlayersSortBy) => void;
 }) {
   const unit = useDistanceUnit();
   // Round presets in the viewer's unit; the stored value stays in miles.
@@ -797,6 +843,8 @@ function PlayersFilterBody({
   }));
   return (
     <>
+      <SortSection value={sortBy} onChange={setSortBy} options={PLAYER_SORTS} />
+
       <FilterSection label="Sports (Players)">
         <div className="flex flex-wrap gap-2">
           <Chip active={sports.length === 0} onClick={onClearSports}>
