@@ -27,6 +27,7 @@ import {
 } from "@/lib/reel-style";
 import { useDefaultSports } from "@/lib/default-sports";
 import { ReelStudio } from "@/components/reels/ReelStudio";
+import { ReelCompare } from "@/components/reels/ReelCompare";
 import { processMyReels, regenerateReelStyle } from "@/lib/reels.functions";
 import { ReelCoach } from "@/components/reels/ReelCoach";
 import { toast } from "sonner";
