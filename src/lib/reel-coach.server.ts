@@ -18,7 +18,10 @@ export type ReelOverlay = {
 
 export type ReelPackage = {
   sport: string | null;
+  /** The first caption variant, kept for back-compat. */
   caption: string;
+  /** Three distinct caption variants the athlete can pick from. */
+  captions: string[];
   overlays: ReelOverlay[];
   hashtags: string[];
 };
