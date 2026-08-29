@@ -110,6 +110,11 @@ function ReelCard({ reel, onRetry }: { reel: Reel; onRetry: (id: string) => Prom
   const [open, setOpen] = useState(false);
   const [retrying, setRetrying] = useState(false);
   const [showInsights, setShowInsights] = useState(false);
+  const [showRestyle, setShowRestyle] = useState(false);
+  const [restyle, setRestyle] = useState<ReelStylePrefs>(() =>
+    normalizeReelStyle(reel.style_prefs),
+  );
+  const [restyling, setRestyling] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
