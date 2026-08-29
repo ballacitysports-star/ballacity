@@ -312,6 +312,15 @@ function ReelsPage() {
   }, [autoUpload, user, canGenerate]);
 
 
+  /** Runs the pipeline for the caller's queued reels; failures stay non-fatal. */
+  async function kickOffProcessing(reelId?: string) {
+    try {
+      await processMyReels({ data: reelId ? { reelId } : {} });
+    } catch (e: any) {
+      toast.error(e?.message ?? "AI processing could not start — try again");
+    }
+  }
+
   async function handleUpload(file: File) {
     if (!user) return;
     if (!canGenerate) {
@@ -321,28 +330,44 @@ function ReelsPage() {
     setBusy(true);
     try {
       const env = getStripeEnvironment();
-      const path = `${user.id}/${Date.now()}-${file.name.replace(/[^a-zA-Z0-9.-]/g, "_")}`;
+      const base = `${user.id}/${Date.now()}-${file.name.replace(/[^a-zA-Z0-9.-]/g, "_")}`;
       const { error: upErr } = await supabase.storage
         .from("highlight-videos")
-        .upload(path, file, { upsert: false });
+        .upload(base, file, { upsert: false });
       if (upErr) throw upErr;
 
+      // Sample frames in the browser: they become the real thumbnail and the
+      // input the sports AI agent looks at (the server can't run ffmpeg).
+      const framePaths: string[] = [];
+      const frames = await captureVideoFrames(file);
+      for (let i = 0; i < frames.length; i++) {
+        const framePath = `${base}.frame${i + 1}.jpg`;
+        const { error } = await supabase.storage
+          .from("highlight-videos")
+          .upload(framePath, frames[i], { upsert: true, contentType: "image/jpeg" });
+        if (!error) framePaths.push(framePath);
+      }
+
       const usedFree = !isActive;
-      const { error: insErr } = await supabase.from("highlight_reels").insert({
-        user_id: user.id,
-        title: gameTitle
-          ? `Recap · ${gameTitle}`
-          : file.name.replace(/\.[^.]+$/, ""),
-        video_path: path,
-        status: "processing",
-        used_free: usedFree,
-        environment: env,
-        game_id: gameId || null,
-        game_title: gameTitle || null,
-      });
+      const { data: inserted, error: insErr } = await supabase
+        .from("highlight_reels")
+        .insert({
+          user_id: user.id,
+          title: gameTitle ? `Recap · ${gameTitle}` : file.name.replace(/\.[^.]+$/, ""),
+          video_path: base,
+          status: "processing",
+          used_free: usedFree,
+          environment: env,
+          game_id: gameId || null,
+          game_title: gameTitle || null,
+          frame_paths: framePaths.length > 0 ? framePaths : null,
+        } as any)
+        .select("id")
+        .maybeSingle();
       if (insErr) throw insErr;
 
-      toast.success("Reel queued — AI processing started");
+      toast.success("Reel uploaded — AI is working on it now");
+      void kickOffProcessing((inserted as { id?: string } | null)?.id);
     } catch (e: any) {
       toast.error(e?.message ?? "Upload failed");
     } finally {
