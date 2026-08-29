@@ -13,7 +13,17 @@ export const MAX_ATTEMPTS = 3;
 export const STUCK_AFTER_MS = 10 * 60 * 1000;
 export const BATCH_SIZE = 5;
 
-export const STEPS = ["analyze", "metadata", "hashtags", "thumbnail", "finalize"] as const;
+export const STEPS = [
+  "analyze",
+  "transcribe",
+  "timeline",
+  "editplan",
+  "coach",
+  "metadata",
+  "hashtags",
+  "thumbnail",
+  "finalize",
+] as const;
 export type Step = (typeof STEPS)[number];
 
 export type Reel = {
@@ -27,10 +37,12 @@ export type Reel = {
   game_id: string | null;
   game_title?: string | null;
   frame_paths?: string[] | null;
+  frame_times?: number[] | null;
+  audio_path?: string | null;
 };
 
 export const REEL_WORK_COLUMNS =
-  "id,user_id,title,video_path,attempts,processing_step,step_progress,game_id,game_title,frame_paths";
+  "id,user_id,title,video_path,attempts,processing_step,step_progress,game_id,game_title,frame_paths,frame_times,audio_path";
 
 async function callLovableAI(prompt: string, system: string, apiKey: string) {
   return callLovableAIParts([{ type: "text", text: prompt }], system, apiKey);
