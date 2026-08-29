@@ -4,8 +4,9 @@ import { zodValidator, fallback } from "@tanstack/zod-adapter";
 import { z } from "zod";
 import { formatSportLevel } from "@/lib/sport-levels";
 
-import { Settings, Shield, Clock, Star, Crown, Users } from "lucide-react";
-import { GameRecapPanel } from "@/components/GameRecapPanel";
+import { Settings, Shield, Clock, Star, Crown, Users, Clapperboard, Loader2 } from "lucide-react";
+import { GameRecapPanel, ReelManageRow } from "@/components/GameRecapPanel";
+import { InlineVideoPlayer } from "@/components/InlineVideoPlayer";
 import { RECAP_COLUMNS, type RecapSummary } from "@/lib/recaps";
 import { useFollow } from "@/lib/follows";
 import { FollowSheet } from "@/components/FollowSheet";
@@ -232,10 +233,12 @@ function PlayerProfile() {
 
   // Recaps (highlight reels) per finished game, for the Archive status + inline player.
   const [recapsByGame, setRecapsByGame] = useState<Record<string, RecapSummary[]>>({});
+  const [allRecaps, setAllRecaps] = useState<RecapSummary[]>([]);
   const [recapTick, setRecapTick] = useState(0);
   useEffect(() => {
     if (!profileUser) {
       setRecapsByGame({});
+      setAllRecaps([]);
       return;
     }
     let cancelled = false;
@@ -244,12 +247,13 @@ function PlayerProfile() {
         .from("highlight_reels")
         .select(RECAP_COLUMNS)
         .eq("user_id", profileUser.id)
-        .not("game_id", "is", null)
         .order("created_at", { ascending: false })
         .then(({ data }) => {
           if (cancelled) return;
+          const rows = (data ?? []) as RecapSummary[];
+          setAllRecaps(rows);
           const map: Record<string, RecapSummary[]> = {};
-          ((data ?? []) as RecapSummary[]).forEach((r) => {
+          rows.forEach((r) => {
             if (!r.game_id) return;
             (map[r.game_id] ??= []).push(r);
           });
@@ -473,6 +477,10 @@ function PlayerProfile() {
       </ProfileAboutSheet>
 
       <div className="px-4">
+        <ProfileReelsSection
+          recaps={allRecaps}
+          onChanged={() => setRecapTick((t) => t + 1)}
+        />
         <ChannelTabs
           className="mt-5"
           value={activeTab}
@@ -899,6 +907,104 @@ function PlayerProfile() {
         </Dialog>
       </div>
     </div>
+  );
+}
+
+/** A single reel on the profile: playable when completed, with manage controls. */
+function ProfileReelItem({
+  reel,
+  onChanged,
+}: {
+  reel: RecapSummary;
+  onChanged?: () => void;
+}) {
+  const [thumbUrl, setThumbUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    setThumbUrl(null);
+    if (!reel.thumbnail_path) return;
+    let cancelled = false;
+    supabase.storage
+      .from("highlight-videos")
+      .createSignedUrl(reel.thumbnail_path, 3600)
+      .then(({ data }) => {
+        if (!cancelled) setThumbUrl(data?.signedUrl ?? null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [reel.id, reel.thumbnail_path]);
+
+  return (
+    <div className="rounded-2xl border border-border bg-surface p-3">
+      {reel.status === "completed" ? (
+        <InlineVideoPlayer
+          videoPath={reel.video_path}
+          thumbnailUrl={thumbUrl}
+          ariaLabel={`Highlight reel ${reel.ai_title || reel.title}`}
+        />
+      ) : (
+        <div className="flex items-center gap-2 rounded-lg border border-border bg-background/60 px-2.5 py-2">
+          {reel.status === "processing" ? (
+            <Loader2 className="h-3.5 w-3.5 animate-spin text-lime" />
+          ) : (
+            <Clapperboard className="h-3.5 w-3.5 text-amber-300" />
+          )}
+          <p className="min-w-0 flex-1 truncate text-xs text-muted-foreground">
+            {reel.status === "processing"
+              ? "Processing…"
+              : (reel.error_message ?? "Processing didn't finish")}
+          </p>
+        </div>
+      )}
+      <div className="mt-2 flex items-center justify-between gap-2">
+        <p className="min-w-0 flex-1 truncate text-xs text-muted-foreground">
+          {reel.hidden_at && (
+            <span className="mr-1 rounded bg-surface px-1 py-0.5 text-[9px] font-bold uppercase tracking-wide">
+              Hidden
+            </span>
+          )}
+          {reel.ai_title || reel.title}
+        </p>
+        <ReelManageRow reel={reel} onChanged={onChanged} />
+      </div>
+    </div>
+  );
+}
+
+/** Highlight reels strip on the own profile: every reel, game-linked or not. */
+function ProfileReelsSection({
+  recaps,
+  onChanged,
+}: {
+  recaps: RecapSummary[];
+  onChanged?: () => void;
+}) {
+  if (recaps.length === 0) return null;
+  return (
+    <section className="mt-5">
+      <div className="mb-3 flex items-center justify-between gap-3">
+        <div className="flex items-center gap-2">
+          <span className="grid h-8 w-8 place-items-center rounded-2xl border border-lime/30 bg-lime/10 text-lime">
+            <Clapperboard className="h-4 w-4" />
+          </span>
+          <div>
+            <h2 className="font-display text-sm font-bold uppercase tracking-wider text-foreground">
+              Highlight reels
+            </h2>
+            <p className="text-[10px] text-muted-foreground">Your reels</p>
+          </div>
+        </div>
+        <Link to="/reels" search={{ game: "", title: "", upload: "" }} className="text-xs font-medium text-lime">
+          Open Reels
+        </Link>
+      </div>
+      <div className="grid gap-3 sm:grid-cols-2">
+        {recaps.map((r) => (
+          <ProfileReelItem key={r.id} reel={r} onChanged={onChanged} />
+        ))}
+      </div>
+    </section>
   );
 }
 
