@@ -335,3 +335,60 @@ export const applyReelStyleDraft = createServerFn({ method: "POST" })
     if (error) throw new Error(error.message);
     return { published: true, style: data.style };
   });
+
+/** Hides or re-shows one of the caller's reels on their profile card. */
+export const setReelHidden = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: { reelId: string; hidden: boolean }) => {
+    if (!input?.reelId) throw new Error("reelId is required");
+    return { reelId: input.reelId, hidden: input.hidden === true };
+  })
+  .handler(async ({ data, context }) => {
+    const { error } = await context.supabase
+      .from("highlight_reels")
+      .update({ hidden_at: data.hidden ? new Date().toISOString() : null } as any)
+      .eq("id", data.reelId)
+      .eq("user_id", context.userId);
+    if (error) throw new Error(error.message);
+    return { hidden: data.hidden };
+  });
+
+/**
+ * Permanently deletes one of the caller's reels: removes the stored video,
+ * thumbnail, audio, and captured frames, then the row itself.
+ */
+export const deleteReel = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: { reelId: string }) => {
+    if (!input?.reelId) throw new Error("reelId is required");
+    return { reelId: input.reelId };
+  })
+  .handler(async ({ data, context }) => {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: reel, error } = await supabaseAdmin
+      .from("highlight_reels")
+      .select("id,user_id,video_path,thumbnail_path,audio_path,frame_paths")
+      .eq("id", data.reelId)
+      .eq("user_id", context.userId)
+      .maybeSingle();
+    if (error) throw new Error(error.message);
+    if (!reel) throw new Error("Reel not found");
+
+    const paths = [
+      (reel as any).video_path,
+      (reel as any).thumbnail_path,
+      (reel as any).audio_path,
+      ...(((reel as any).frame_paths as string[] | null) ?? []),
+    ].filter((p): p is string => typeof p === "string" && p.length > 0);
+    if (paths.length > 0) {
+      await supabaseAdmin.storage.from("highlight-videos").remove(paths);
+    }
+
+    const { error: delError } = await supabaseAdmin
+      .from("highlight_reels")
+      .delete()
+      .eq("id", data.reelId)
+      .eq("user_id", context.userId);
+    if (delError) throw new Error(delError.message);
+    return { deleted: true };
+  });
