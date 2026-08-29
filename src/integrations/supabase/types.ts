@@ -1359,6 +1359,7 @@ export type Database = {
           active_profile_id: string | null
           avatar_initials: string | null
           avatar_url: string | null
+          avatar_visibility: string
           bio: string | null
           birthday: string | null
           city: string | null
@@ -1382,6 +1383,7 @@ export type Database = {
           active_profile_id?: string | null
           avatar_initials?: string | null
           avatar_url?: string | null
+          avatar_visibility?: string
           bio?: string | null
           birthday?: string | null
           city?: string | null
@@ -1405,6 +1407,7 @@ export type Database = {
           active_profile_id?: string | null
           avatar_initials?: string | null
           avatar_url?: string | null
+          avatar_visibility?: string
           bio?: string | null
           birthday?: string | null
           city?: string | null
@@ -2366,8 +2369,23 @@ export type Database = {
           id: string
         }[]
       }
+      shares_game_or_chat: {
+        Args: { _a: string; _b: string }
+        Returns: boolean
+      }
       try_uuid: { Args: { _v: string }; Returns: string }
       unsend_message: { Args: { _id: string }; Returns: undefined }
+      visible_avatars: {
+        Args: { _ids: string[] }
+        Returns: {
+          avatar_hidden: boolean
+          avatar_initials: string
+          avatar_url: string
+          avatar_visibility: string
+          display_name: string
+          id: string
+        }[]
+      }
     }
     Enums: {
       app_role: "admin" | "moderator" | "superadmin"

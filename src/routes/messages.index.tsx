@@ -12,7 +12,7 @@ import {
   declineConversation,
   type ConversationWithMeta,
 } from "@/lib/messages";
-import { UserAvatar } from "@/components/UserAvatar";
+import { UserAvatarById } from "@/components/UserAvatar";
 import { supabase } from "@/integrations/supabase/client";
 import { NotificationsPanel } from "@/components/NotificationsPanel";
 
@@ -185,7 +185,8 @@ function MessagesInbox() {
                     params={{ conversationId: c.id }}
                     className="flex items-center gap-3 flex-1 min-w-0"
                   >
-                    <UserAvatar
+                    <UserAvatarById
+                      userId={c.other_user_id}
                       avatarUrl={c.other_avatar_url}
                       initials={c.other_initials}
                       name={c.other_display_name}

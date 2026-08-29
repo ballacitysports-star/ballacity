@@ -32,7 +32,7 @@ import {
   type MessageReaction,
 } from "@/lib/messages";
 import { MessageAttachment } from "@/components/MessageAttachment";
-import { UserAvatar } from "@/components/UserAvatar";
+import { UserAvatar, UserAvatarById } from "@/components/UserAvatar";
 import { supabase } from "@/integrations/supabase/client";
 
 export const Route = createFileRoute("/messages/$conversationId")({
@@ -377,7 +377,8 @@ function Thread() {
             aria-label={`View ${other.display_name}'s profile`}
             className="relative"
           >
-            <UserAvatar
+            <UserAvatarById
+              userId={other.user_id}
               avatarUrl={other.avatar_url}
               initials={other.avatar_initials}
               name={other.display_name}
@@ -458,7 +459,26 @@ function Thread() {
             }, {});
 
             return (
-              <div key={m.id} className={`flex ${mine ? "justify-end" : "justify-start"}`}>
+              <div
+                key={m.id}
+                className={`flex items-end gap-2 ${mine ? "justify-end" : "justify-start"}`}
+              >
+                {!mine && (
+                  <Link
+                    to="/players/$userId"
+                    params={{ userId: m.sender_id }}
+                    aria-label={`View ${other?.display_name ?? "player"}'s profile`}
+                    className="shrink-0 self-end"
+                  >
+                    <UserAvatarById
+                      userId={m.sender_id}
+                      avatarUrl={other?.avatar_url}
+                      initials={other?.avatar_initials}
+                      name={other?.display_name}
+                      size="sm"
+                    />
+                  </Link>
+                )}
                 <div className="max-w-[78%] group relative">
                   {parent && (
                     <div

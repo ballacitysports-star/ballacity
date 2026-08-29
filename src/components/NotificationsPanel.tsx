@@ -44,6 +44,8 @@ import {
 import { Switch } from "@/components/ui/switch";
 
 import { resolveNotificationTarget } from "@/lib/deep-links";
+import { useNotificationActorId } from "@/lib/notification-actors";
+import { UserAvatarById } from "@/components/UserAvatar";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
@@ -356,11 +358,7 @@ function SwipeableAlert({
           }}
           className="flex flex-1 min-w-0 gap-3 text-left"
         >
-          <div
-            className={`grid h-10 w-10 shrink-0 place-items-center rounded-xl ${unread ? "bg-lime/15 text-lime" : "bg-muted/30 text-muted-foreground"}`}
-          >
-            <Icon className="h-5 w-5" />
-          </div>
+          <NotificationAvatar n={n} Icon={Icon} unread={unread} />
           <div className="flex-1 min-w-0">
             <div className="flex items-start justify-between gap-2">
               <h3 className="font-semibold text-sm leading-tight flex items-center gap-1">
@@ -404,6 +402,43 @@ function SwipeableAlert({
         </div>
       </motion.div>
     </motion.div>
+  );
+}
+
+/**
+ * Face-first alert icon: shows the avatar of the person the notification is
+ * about (follower, chat partner, requester) with a skeleton while it resolves,
+ * and falls back to the category icon for system alerts.
+ */
+function NotificationAvatar({
+  n,
+  Icon,
+  unread,
+}: {
+  n: Notification;
+  Icon: typeof Bell;
+  unread: boolean;
+}) {
+  const actorId = useNotificationActorId(n);
+  const tone = unread ? "bg-lime/15 text-lime" : "bg-muted/30 text-muted-foreground";
+
+  if (actorId) {
+    return (
+      <div className="relative h-10 w-10 shrink-0">
+        <UserAvatarById userId={actorId} size="md" rounded="square" />
+        <span
+          className={`absolute -bottom-1 -right-1 grid h-5 w-5 place-items-center rounded-full ring-2 ring-surface ${unread ? "bg-lime text-primary-foreground" : "bg-muted text-muted-foreground"}`}
+        >
+          <Icon className="h-3 w-3" aria-hidden />
+        </span>
+      </div>
+    );
+  }
+
+  return (
+    <div className={`grid h-10 w-10 shrink-0 place-items-center rounded-xl ${tone}`}>
+      <Icon className="h-5 w-5" />
+    </div>
   );
 }
 
