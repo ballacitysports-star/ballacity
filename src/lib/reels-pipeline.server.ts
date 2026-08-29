@@ -282,12 +282,15 @@ export async function processReel(reel: Reel, supabaseAdmin: any, apiKey: string
         .eq("id", reel.id);
     }
 
+    progress._pipeline = { ...snapshot(done, null, attempt), percent: 100 };
 
     await supabaseAdmin
       .from("highlight_reels")
       .update({
         status: "completed",
         processing_step: "completed",
+        step_progress: progress,
+
         ai_title: progress.ai_title ?? null,
         ai_caption: progress.ai_caption ?? null,
         ai_hashtags: progress.ai_hashtags ?? [],
