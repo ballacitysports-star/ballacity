@@ -449,6 +449,30 @@ const STEP_RUNNERS: Record<
   finalize: async () => ({ finalized_at: new Date().toISOString() }),
 };
 
+/**
+ * Style regeneration: keep everything the captured media produced (visual
+ * analysis, detected sport/moments, transcript) and drop every style-dependent
+ * artifact so the pipeline rewrites them with the new style. Resuming after
+ * "transcribe" re-runs timeline → editplan → coach → metadata → hashtags →
+ * thumbnail without re-reading the video, frames, or audio.
+ */
+export const CAPTURED_MEDIA_KEYS = [
+  "sport",
+  "moments",
+  "duration",
+  "analysis",
+  "suggested_clip",
+  "transcript",
+] as const;
+
+export function prepareStyleRegen(progress: Record<string, any> | null) {
+  const kept: Record<string, any> = {};
+  for (const key of CAPTURED_MEDIA_KEYS) {
+    if (progress?.[key] != null) kept[key] = progress[key];
+  }
+  return { step_progress: kept, processing_step: "transcribe" };
+}
+
 function firstStep(current: string): Step {
   // "pending"/unknown → start at the first step; otherwise resume after the last completed one.
   if (!STEPS.includes(current as Step)) return STEPS[0];
