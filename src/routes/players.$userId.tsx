@@ -89,6 +89,82 @@ type ProfileRow = {
   links: any;
 };
 
+type PublicReel = {
+  id: string;
+  title: string;
+  videoUrl: string | null;
+  thumbnailUrl: string | null;
+  sport: string | null;
+  caption: string | null;
+  hashtags: string[];
+  gameTitle: string | null;
+  createdAt: string;
+};
+
+/** Read-only highlight reels shown on the public player card. */
+function PublicReelsSection({ userId }: { userId: string }) {
+  const [reels, setReels] = useState<PublicReel[]>([]);
+  const [loaded, setLoaded] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    setLoaded(false);
+    listPublicReels({ data: { userId } })
+      .then((rows) => {
+        if (!cancelled) setReels((rows as PublicReel[]) ?? []);
+      })
+      .catch(() => {
+        if (!cancelled) setReels([]);
+      })
+      .finally(() => {
+        if (!cancelled) setLoaded(true);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [userId]);
+
+  if (!loaded || reels.length === 0) return null;
+
+  return (
+    <div className="mt-6">
+      <h2 className="mb-2 flex items-center gap-1.5 font-display text-sm font-bold uppercase tracking-wider text-muted-foreground">
+        <Clapperboard className="h-4 w-4" /> Highlight reels
+      </h2>
+      <div className="space-y-3">
+        {reels.map((reel) => (
+          <div key={reel.id} className="rounded-2xl border border-border bg-surface p-3">
+            <InlineVideoPlayer
+              videoUrl={reel.videoUrl}
+              thumbnailUrl={reel.thumbnailUrl}
+              ariaLabel={`Highlight reel ${reel.title}`}
+            />
+            <div className="mt-2 flex items-center gap-2">
+              <p className="min-w-0 flex-1 truncate text-sm font-semibold">{reel.title}</p>
+              {reel.sport && (
+                <span className="shrink-0 rounded-full bg-lime/15 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-lime">
+                  {reel.sport}
+                </span>
+              )}
+            </div>
+            {reel.gameTitle && (
+              <p className="mt-0.5 truncate text-xs text-muted-foreground">{reel.gameTitle}</p>
+            )}
+            {reel.caption && (
+              <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">{reel.caption}</p>
+            )}
+            {reel.hashtags.length > 0 && (
+              <p className="mt-1 truncate text-[11px] text-lime">
+                {reel.hashtags.map((t) => (t.startsWith("#") ? t : `#${t}`)).join(" ")}
+              </p>
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function PlayerProfilePage() {
   const { userId } = Route.useParams();
   const { user } = useAuth();
