@@ -475,8 +475,11 @@ function PlayersPage() {
   const sorted = useMemo(() => {
     if (!filtered) return null;
     const soonest = (a: AvailabilityWithAuthor) => {
-      const dates = summarizeSlotDates(a);
-      return dates.length ? dates[0]! : "9999-12-31";
+      const dates = parseTimeSlots(a.time_slots ?? [])
+        .map((sl) => ("date" in sl ? sl.date : null))
+        .filter((d): d is string => Boolean(d))
+        .sort();
+      return dates[0] ?? a.starts_on ?? "9999-12-31";
     };
     const distMi = (a: AvailabilityWithAuthor) => {
       if (!coords || a.lat == null || a.lng == null) return Number.POSITIVE_INFINITY;
