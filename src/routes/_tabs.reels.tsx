@@ -687,9 +687,10 @@ function ReelsPage() {
 
       <ReelStylePanel
         value={style}
+        sport={activeSport}
         onChange={(next) => {
           setStyle(next);
-          saveReelStyle(next);
+          saveReelStyleForSport(activeSport, next);
         }}
         disabled={busy}
       />
