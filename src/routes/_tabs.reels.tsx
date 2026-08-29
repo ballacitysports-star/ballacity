@@ -28,7 +28,12 @@ import {
 import { useDefaultSports } from "@/lib/default-sports";
 import { ReelStudio } from "@/components/reels/ReelStudio";
 import { ReelCompare } from "@/components/reels/ReelCompare";
-import { processMyReels, regenerateReelStyle } from "@/lib/reels.functions";
+import {
+  deleteReel,
+  processMyReels,
+  regenerateReelStyle,
+  setReelHidden,
+} from "@/lib/reels.functions";
 import { ReelCoach } from "@/components/reels/ReelCoach";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -103,6 +108,7 @@ type Reel = {
   } | null;
   ai_transcript?: { text?: string } | null;
   style_prefs?: Record<string, any> | null;
+  hidden_at?: string | null;
 };
 
 function ReelCard({ reel, onRetry }: { reel: Reel; onRetry: (id: string) => Promise<void> }) {
@@ -167,6 +173,7 @@ function ReelCard({ reel, onRetry }: { reel: Reel; onRetry: (id: string) => Prom
           <p className="text-xs text-muted-foreground">
             {reel.status} · {new Date(reel.created_at).toLocaleDateString()}
             {reel.used_free && " · free"}
+            {reel.hidden_at && " · hidden on profile"}
           </p>
           {reel.ai_caption && (
             <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">{reel.ai_caption}</p>
