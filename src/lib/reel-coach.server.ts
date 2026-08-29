@@ -7,7 +7,7 @@
  */
 
 export const REEL_COACH_COLUMNS =
-  "id,title,ai_title,ai_caption,ai_hashtags,ai_sport,ai_analysis,ai_moments,suggested_clip,game_title,status";
+  "id,title,ai_title,ai_caption,ai_hashtags,ai_sport,ai_analysis,ai_moments,ai_overlays,ai_timeline,ai_edit_plan,ai_coaching,ai_transcript,suggested_clip,game_title,status";
 
 export type ReelOverlay = {
   /** Where the text should appear, e.g. "0:03" or "the dunk". */
@@ -41,6 +41,22 @@ export function buildReelGrounding(r: Record<string, any>): string {
           .map((m: any) => [m.timestamp ?? m.t, m.label].filter(Boolean).join(" — "))
           .join("; ")}`
       : "",
+    (r.ai_timeline ?? []).length
+      ? `Play-by-play: ${(r.ai_timeline ?? [])
+          .map((e: any) => `${e.t}s ${e.label}${e.note ? ` (${e.note})` : ""}`)
+          .join("; ")}`
+      : "",
+    r.ai_edit_plan?.segments?.length
+      ? `Planned cut: ${r.ai_edit_plan.segments
+          .map((s: any) => `${s.start}-${s.end}s ${s.pace}`)
+          .join("; ")}${r.ai_edit_plan.why ? ` — ${r.ai_edit_plan.why}` : ""}`
+      : "",
+    r.ai_coaching
+      ? `Coaching — strengths: ${(r.ai_coaching.strengths ?? []).join("; ")} | fix: ${(
+          r.ai_coaching.notes ?? []
+        ).join("; ")} | drills: ${(r.ai_coaching.drills ?? []).join("; ")}`
+      : "",
+    r.ai_transcript?.text ? `Spoken audio: ${String(r.ai_transcript.text).slice(0, 600)}` : "",
     r.suggested_clip?.start != null
       ? `Suggested clip window: ${r.suggested_clip.start}s to ${r.suggested_clip.end}s`
       : "",

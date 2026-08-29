@@ -67,70 +67,14 @@ export const askReelCoach = createServerFn({ method: "POST" })
     const apiKey = process.env.LOVABLE_API_KEY;
     if (!apiKey) throw new Error("AI is not configured yet — please try again later");
 
-    const { data: reel, error } = await context.supabase
-      .from("highlight_reels")
-      .select(
-        "id,title,ai_title,ai_caption,ai_hashtags,ai_sport,ai_analysis,ai_moments,suggested_clip,game_title,status",
-      )
-      .eq("id", data.reelId)
-      .eq("user_id", context.userId)
-      .maybeSingle();
-    if (error) throw new Error(error.message);
-    if (!reel) throw new Error("Reel not found");
-
-    const r = reel as Record<string, any>;
-    const grounding = [
-      `Reel title: ${r.ai_title || r.title}`,
-      r.game_title ? `Game: ${r.game_title}` : "",
-      r.ai_sport ? `Sport: ${r.ai_sport}` : "",
-      r.ai_caption ? `Current caption: ${r.ai_caption}` : "",
-      (r.ai_hashtags ?? []).length ? `Hashtags: ${(r.ai_hashtags ?? []).join(", ")}` : "",
-      r.ai_analysis?.summary ? `What the footage shows: ${r.ai_analysis.summary}` : "",
-      r.ai_analysis?.quality_note ? `Footage quality: ${r.ai_analysis.quality_note}` : "",
-      (r.ai_moments ?? []).length
-        ? `Key moments: ${(r.ai_moments ?? []).map((m: any) => m.label).join(", ")}`
-        : "",
-    ]
-      .filter(Boolean)
-      .join("\n");
-
-    const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        "Lovable-API-Key": apiKey,
-        "X-Lovable-AIG-SDK": "fetch",
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: "google/gemini-3-flash-preview",
-        messages: [
-          {
-            role: "system",
-            content: [
-              "You are Reel Coach, a friendly sports highlight editor inside a pickup-sports app.",
-              "Help the athlete improve this reel: captions, titles, hashtags, which moment to feature, and how to film better next time.",
-              "Be concrete and brief (max 120 words). Never invent scores, stats, or player names.",
-              "Here is everything known about the reel:",
-              grounding || "No AI analysis is available for this reel yet.",
-            ].join("\n"),
-          },
-          ...data.history.map((m) => ({ role: m.role, content: m.content })),
-          { role: "user", content: data.question },
-        ],
-      }),
+    const { runReelCoachAgent } = await import("@/lib/reel-agent.server");
+    return runReelCoachAgent(apiKey, {
+      supabase: context.supabase,
+      userId: context.userId,
+      reelId: data.reelId,
+      question: data.question,
+      history: data.history,
     });
-
-    if (!res.ok) {
-      if (res.status === 429) throw new Error("Reel Coach is busy — try again in a moment");
-      if (res.status === 402)
-        throw new Error("AI credits exhausted — add credits to keep using Reel Coach");
-      const body = await res.text().catch(() => "");
-      throw new Error(`Reel Coach failed (${res.status}): ${body.slice(0, 200)}`);
-    }
-    const json = await res.json();
-    const answer = String(json?.choices?.[0]?.message?.content ?? "").trim();
-    if (!answer) throw new Error("Reel Coach had nothing to say — try rephrasing");
-    return { answer };
   });
 
 /**
