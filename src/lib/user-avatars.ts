@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 
 export type AvatarStatus = "loading" | "ready" | "error";
@@ -26,8 +26,20 @@ const failed = new Set<string>();
 const inflight = new Set<string>();
 const listeners = new Set<() => void>();
 
-let queue = new Set<string>();
+/**
+ * Two-tier fetch queue. Rows that are on screen (or about to scroll into it)
+ * go into `highQueue` and are always fetched first; speculative prefetches for
+ * far-away rows wait in `lowQueue`. On slow networks this keeps the batch the
+ * user is actually looking at from queueing behind hundreds of off-screen ids.
+ */
+export type AvatarPriority = "high" | "low";
+
+let highQueue = new Set<string>();
+let lowQueue = new Set<string>();
+/** Max ids per RPC round-trip, so a huge low-priority list can't block a batch. */
+const MAX_BATCH = 48;
 let flushTimer: ReturnType<typeof setTimeout> | null = null;
+
 
 function notify() {
   listeners.forEach((l) => l());
@@ -162,12 +174,38 @@ if (typeof window !== "undefined") {
 }
 
 
+/** Pulls the next batch: everything urgent first, then filler from the low tier. */
+function takeBatch(): string[] {
+  const batch: string[] = [];
+  for (const id of highQueue) {
+    if (batch.length >= MAX_BATCH) break;
+    batch.push(id);
+  }
+  batch.forEach((id) => highQueue.delete(id));
+  if (batch.length < MAX_BATCH) {
+    const filler: string[] = [];
+    for (const id of lowQueue) {
+      if (batch.length + filler.length >= MAX_BATCH) break;
+      filler.push(id);
+    }
+    filler.forEach((id) => lowQueue.delete(id));
+    batch.push(...filler);
+  }
+  return batch;
+}
+
+function schedule(delay = 30) {
+  if (flushTimer) clearTimeout(flushTimer);
+  flushTimer = setTimeout(() => void flush(), delay);
+}
+
 async function flush() {
   flushTimer = null;
-  const ids = Array.from(queue);
-  queue = new Set();
+  const ids = takeBatch();
   if (!ids.length) return;
   ids.forEach((id) => inflight.add(id));
+  // Anything left over goes out in the next round-trip, high tier first again.
+  if (highQueue.size || lowQueue.size) schedule(highQueue.size ? 0 : 120);
 
   const { data, error } = await supabase.rpc("visible_avatars" as never, {
     _ids: ids,
@@ -208,7 +246,7 @@ async function flush() {
   notify();
 }
 
-function request(id: string) {
+function request(id: string, priority: AvatarPriority = "high") {
   hydrate();
   if (cache.has(id)) {
     if (isFresh(fetchedAt.get(id) ?? 0)) return;
@@ -216,11 +254,30 @@ function request(id: string) {
     cache.delete(id);
     fetchedAt.delete(id);
   }
-  if (inflight.has(id) || queue.has(id)) return;
-  queue.add(id);
-  if (flushTimer) clearTimeout(flushTimer);
-  flushTimer = setTimeout(() => void flush(), 30);
+  if (inflight.has(id)) return;
+  if (priority === "high") {
+    if (highQueue.has(id)) return;
+    lowQueue.delete(id);
+    highQueue.add(id);
+    schedule(30);
+    return;
+  }
+  if (highQueue.has(id) || lowQueue.has(id)) return;
+  lowQueue.add(id);
+  // Speculative work waits a beat so on-screen rows win the first round-trip.
+  if (!flushTimer) schedule(150);
 }
+
+/**
+ * Bumps ids to the front of the fetch queue — used when a row is about to
+ * enter the viewport, so its photo loads before rows still far down the list.
+ */
+export function promoteUserAvatars(userIds: Array<string | null | undefined>) {
+  userIds.forEach((id) => {
+    if (typeof id === "string" && id) request(id, "high");
+  });
+}
+
 
 /** Drops cached entries so a freshly-saved photo or privacy change is picked up app-wide. */
 export function invalidateUserAvatar(userId?: string | null) {
@@ -256,7 +313,10 @@ function warmImage(url: string | null) {
  * message row scrolls into view. Safe to call repeatedly — already-known ids and
  * already-warmed URLs are skipped.
  */
-export function prefetchUserAvatars(userIds: Array<string | null | undefined>) {
+export function prefetchUserAvatars(
+  userIds: Array<string | null | undefined>,
+  priority: AvatarPriority = "low",
+) {
   const ids = Array.from(
     new Set(userIds.filter((id): id is string => typeof id === "string" && id.length > 0)),
   );
@@ -289,17 +349,76 @@ export function prefetchUserAvatars(userIds: Array<string | null | undefined>) {
     if (!remaining.size) listeners.delete(onResolved);
   };
   listeners.add(onResolved);
-  pending.forEach(request);
+  pending.forEach((id) => request(id, priority));
 }
 
+
 /** Prefetches avatars for a list of ids whenever that list changes. */
-export function usePrefetchUserAvatars(userIds: Array<string | null | undefined>) {
+export function usePrefetchUserAvatars(
+  userIds: Array<string | null | undefined>,
+  priority: AvatarPriority = "low",
+) {
   const key = userIds.filter(Boolean).join(",");
   useEffect(() => {
-    prefetchUserAvatars(userIds);
+    prefetchUserAvatars(userIds, priority);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [key]);
+  }, [key, priority]);
 }
+
+/**
+ * Viewport-priority prefetching. Attach the returned ref to each row along
+ * with the user ids it shows; rows within `rootMargin` of the viewport get
+ * their avatars promoted to the front of the fetch queue, so on slow networks
+ * the photos you are about to see load before the rest of the list.
+ */
+export function useAvatarViewportPriority(rootMargin = "600px 0px") {
+  const idsByEl = useRef(new WeakMap<Element, string[]>());
+  const observerRef = useRef<IntersectionObserver | null>(null);
+
+  const getObserver = () => {
+    if (typeof window === "undefined" || typeof IntersectionObserver === "undefined") return null;
+    if (!observerRef.current) {
+      observerRef.current = new IntersectionObserver(
+        (entries) => {
+          entries.forEach((entry) => {
+            if (!entry.isIntersecting) return;
+            const ids = idsByEl.current.get(entry.target);
+            if (ids?.length) {
+              prefetchUserAvatars(ids, "high");
+              promoteUserAvatars(ids);
+            }
+            observerRef.current?.unobserve(entry.target);
+          });
+        },
+        { rootMargin },
+      );
+    }
+    return observerRef.current;
+  };
+
+  useEffect(() => {
+    return () => {
+      observerRef.current?.disconnect();
+      observerRef.current = null;
+    };
+  }, [rootMargin]);
+
+  /** `ref={rowRef([userId])}` on the row element. */
+  const rowRef = useCallback(
+    (ids: Array<string | null | undefined>) => (el: Element | null) => {
+      if (!el) return;
+      const clean = ids.filter((id): id is string => typeof id === "string" && !!id);
+      if (!clean.length) return;
+      idsByEl.current.set(el, clean);
+      getObserver()?.observe(el);
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [rootMargin],
+  );
+
+  return rowRef;
+}
+
 
 export function useUserAvatar(userId?: string | null): AvatarLookup {
   const [, bump] = useState(0);

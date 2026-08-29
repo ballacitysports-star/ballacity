@@ -6,6 +6,8 @@ import { useServerFn } from "@tanstack/react-start";
 import { PlayMapView, pseudoLatLngFromId } from "@/components/PlayMapView";
 import type { MapPinItem } from "@/components/GamesMap";
 import { UserAvatar } from "@/components/UserAvatar";
+import { prefetchUserAvatars, usePrefetchUserAvatars } from "@/lib/user-avatars";
+
 import type { AvailabilityWithAuthor } from "@/lib/availability";
 import { SPORTS } from "@/lib/sample-data";
 import { geocodeAddress } from "@/lib/geocode.functions";
@@ -57,12 +59,26 @@ export function PlayersMapView({ players }: { players: AvailabilityWithAuthor[] 
     return { id: p.id, emoji, lat, lng };
   });
 
+  // Everyone plotted on the map is a candidate, but the people inside the
+  // current viewport get their photos first so cards feel instant while panning.
+  usePrefetchUserAvatars(
+    players.map((p) => p.user_id),
+    "low",
+  );
+
   return (
     <PlayMapView<AvailabilityWithAuthor>
       items={players}
       pins={pins}
       noun="player"
       emptyLabel="No players in this area."
+      onVisibleItemsChange={(visible) =>
+        prefetchUserAvatars(
+          visible.map((p) => p.user_id),
+          "high",
+        )
+      }
+
       renderCard={(p) => (
         <Link
           to="/players/$userId"

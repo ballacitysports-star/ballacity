@@ -30,6 +30,8 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { UserAvatar } from "@/components/UserAvatar";
+import { usePrefetchUserAvatars } from "@/lib/user-avatars";
+
 import { ReportUserDialog } from "@/components/ReportUserDialog";
 import { useAuth } from "@/hooks/use-auth";
 import { useBlock } from "@/lib/moderation";
@@ -174,6 +176,13 @@ function FollowList({
     io.observe(node);
     return () => io.disconnect();
   }, [hasNextPage, isFetchingNextPage, fetchNextPage]);
+
+  // Search results: first rows urgent, the rest speculative.
+  const ids = filtered.map((u) => u.id);
+  usePrefetchUserAvatars(ids.slice(0, 10), "high");
+  usePrefetchUserAvatars(ids.slice(10), "low");
+
+
 
   return (
     <div className="max-h-[60dvh] overflow-y-auto px-2 pb-3 pt-1">

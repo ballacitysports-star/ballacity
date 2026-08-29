@@ -26,6 +26,11 @@ import { toast } from "sonner";
 import { Logo } from "@/components/Logo";
 import { SportChips } from "@/components/SportChips";
 import { MyAvatar, UserAvatar } from "@/components/UserAvatar";
+import {
+  usePrefetchUserAvatars,
+  useAvatarViewportPriority,
+} from "@/lib/user-avatars";
+
 import { useAuth } from "@/hooks/use-auth";
 import { useUnreadNotificationCount } from "@/lib/notifications";
 import { SPORTS } from "@/lib/sample-data";
@@ -449,6 +454,15 @@ function PlayersPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [list, q, sportsKey, search.skill, maxDistance, ageMin, ageMax, includeUnknownAge, when]);
 
+  // Search results: warm the first screenful eagerly, the rest speculatively,
+  // then let the viewport observer promote rows as they approach the screen.
+  const resultIds = useMemo(() => (filtered ?? []).map((a) => a.user_id), [filtered]);
+  usePrefetchUserAvatars(resultIds.slice(0, 8), "high");
+  usePrefetchUserAvatars(resultIds.slice(8), "low");
+  const avatarRowRef = useAvatarViewportPriority();
+
+
+
   return (
     <div className="mx-auto w-full max-w-md sm:max-w-2xl lg:max-w-4xl px-4 pt-6">
       <div className="flex items-center justify-between mb-5">
@@ -672,6 +686,7 @@ function PlayersPage() {
                   <AvailabilityCard
                     key={a.id}
                     a={a}
+                    rowRef={avatarRowRef}
                     isMine={user?.id === a.user_id}
                     hasHostedGames={myUpcomingHosted.length > 0}
                     onContact={() =>
@@ -681,6 +696,7 @@ function PlayersPage() {
                     onChanged={() => setReloadTick((t) => t + 1)}
                   />
                 ))}
+
               </ul>
             </>
           )}
@@ -994,6 +1010,7 @@ function AvailabilityCard({
   onContact,
   onOpen,
   onChanged,
+  rowRef,
 }: {
   a: AvailabilityWithAuthor;
   isMine: boolean;
@@ -1001,7 +1018,10 @@ function AvailabilityCard({
   onContact: () => void;
   onOpen: () => void;
   onChanged: () => void;
+  /** Marks the row so its avatar is prioritized as it nears the viewport. */
+  rowRef?: (ids: Array<string | null | undefined>) => (el: Element | null) => void;
 }) {
+
 const navigate = useNavigate();
   const when = formatWindow(a);
   const authorLinks: ProfileLink[] = Array.isArray(a.author_links)
@@ -1029,7 +1049,8 @@ const navigate = useNavigate();
   };
 
   return (
-    <li className="rounded-2xl border border-border bg-surface p-4">
+    <li ref={rowRef?.([a.user_id])} className="rounded-2xl border border-border bg-surface p-4">
+
       <div className="flex items-start gap-3">
         <Link
           to="/players/$userId"

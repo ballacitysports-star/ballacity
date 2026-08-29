@@ -4,6 +4,8 @@ import { MapPin, Navigation, Users, Swords, Loader2 } from "lucide-react";
 import { useQueries, useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { UserAvatar } from "@/components/UserAvatar";
+import { usePrefetchUserAvatars } from "@/lib/user-avatars";
+
 import { Distance } from "@/components/Distance";
 import { geocodeAddress } from "@/lib/geocode.functions";
 import { haversineKm, useUserLocation, type LatLng } from "@/lib/geo";
@@ -133,6 +135,14 @@ export function NearbyPlayersPanel({
 
   const resolving =
     !!origin && cityQueries.some((q) => q.isLoading) && ranked.length === 0;
+
+  // Nearest players render first, so their photos get the urgent tier.
+  usePrefetchUserAvatars(
+    ranked.map((r) => r.player.user_id),
+    "high",
+  );
+
+
 
   return (
     <section
