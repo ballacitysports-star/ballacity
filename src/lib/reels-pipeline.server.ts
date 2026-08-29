@@ -205,17 +205,55 @@ function firstStep(current: string): Step {
   return STEPS[idx + 1] ?? STEPS[STEPS.length - 1];
 }
 
+/**
+ * Live progress snapshot the UI reads while the pipeline runs.
+ * `processing_step` only advances once a step *finishes* (so retries resume
+ * correctly), so the currently-running step and percent live here instead.
+ */
+export type PipelineSnapshot = {
+  active: Step | null;
+  done: Step[];
+  failed?: Step | null;
+  percent: number;
+  attempt: number;
+  updated_at: string;
+};
+
+function snapshot(
+  done: Step[],
+  active: Step | null,
+  attempt: number,
+  failed?: Step | null,
+): PipelineSnapshot {
+  // Half credit for the step in flight so the bar always moves.
+  const units = done.length + (active ? 0.5 : 0);
+  return {
+    active,
+    done,
+    failed: failed ?? null,
+    percent: Math.min(99, Math.max(4, Math.round((units / STEPS.length) * 100))),
+    attempt,
+    updated_at: new Date().toISOString(),
+  };
+}
+
 export async function processReel(reel: Reel, supabaseAdmin: any, apiKey: string) {
   const progress: Record<string, any> = { ...(reel.step_progress ?? {}) };
   const startStep = firstStep(reel.processing_step);
   const startIdx = STEPS.indexOf(startStep);
   const resumed = reel.processing_step !== "pending" && startIdx > 0;
+  const attempt = reel.attempts + 1;
+  const done: Step[] = STEPS.slice(0, startIdx);
+
+  progress._pipeline = snapshot(done, startStep, attempt);
 
   await supabaseAdmin
     .from("highlight_reels")
     .update({
-      attempts: reel.attempts + 1,
+      attempts: attempt,
       processing_started_at: new Date().toISOString(),
+      step_progress: progress,
+      last_step_at: new Date().toISOString(),
       error_message: null,
     })
     .eq("id", reel.id);
@@ -223,8 +261,17 @@ export async function processReel(reel: Reel, supabaseAdmin: any, apiKey: string
   try {
     for (let i = startIdx; i < STEPS.length; i++) {
       const step = STEPS[i];
+      // Announce the step *before* running it so the card shows what's happening now.
+      progress._pipeline = snapshot(done, step, attempt);
+      await supabaseAdmin
+        .from("highlight_reels")
+        .update({ step_progress: progress, last_step_at: new Date().toISOString() })
+        .eq("id", reel.id);
+
       const patch = await STEP_RUNNERS[step](reel, progress, { supabaseAdmin, apiKey });
       Object.assign(progress, patch);
+      done.push(step);
+      progress._pipeline = snapshot(done, STEPS[i + 1] ?? null, attempt);
       await supabaseAdmin
         .from("highlight_reels")
         .update({
@@ -234,6 +281,7 @@ export async function processReel(reel: Reel, supabaseAdmin: any, apiKey: string
         })
         .eq("id", reel.id);
     }
+
 
     await supabaseAdmin
       .from("highlight_reels")
