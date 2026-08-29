@@ -13,6 +13,7 @@ import {
   type ConversationWithMeta,
 } from "@/lib/messages";
 import { UserAvatarById } from "@/components/UserAvatar";
+import { usePrefetchUserAvatars } from "@/lib/user-avatars";
 import { supabase } from "@/integrations/supabase/client";
 import { NotificationsPanel } from "@/components/NotificationsPanel";
 
@@ -91,6 +92,9 @@ function MessagesInbox() {
   }
 
   const list = msgTab === "primary" ? primary : requests;
+
+  // Warm photos for every thread in both tabs, not just the visible ones.
+  usePrefetchUserAvatars(useMemo(() => [...primary, ...requests].map((c) => c.other_user_id), [primary, requests]));
 
   const handleAccept = async (id: string) => {
     try {

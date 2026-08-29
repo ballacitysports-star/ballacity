@@ -33,6 +33,7 @@ import {
 } from "@/lib/messages";
 import { MessageAttachment } from "@/components/MessageAttachment";
 import { UserAvatar, UserAvatarById } from "@/components/UserAvatar";
+import { usePrefetchUserAvatars } from "@/lib/user-avatars";
 import { supabase } from "@/integrations/supabase/client";
 
 export const Route = createFileRoute("/messages/$conversationId")({
