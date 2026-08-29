@@ -224,3 +224,35 @@ export function saveReelStyle(prefs: ReelStylePrefs) {
     // Storage full or blocked — the in-memory choice still applies to this upload.
   }
 }
+
+/**
+ * Style for a specific sport: the athlete's saved per-sport override wins,
+ * otherwise the sport's built-in default. Unknown sports fall back to the
+ * global last-used style.
+ */
+export function loadReelStyleForSport(sport: string | null | undefined): ReelStylePrefs {
+  if (!sport) return loadReelStyle();
+  if (typeof window !== "undefined") {
+    try {
+      const raw = window.localStorage.getItem(sportKey(sport));
+      if (raw) return normalizeReelStyle(JSON.parse(raw));
+    } catch {
+      // fall through to the sport default
+    }
+  }
+  return defaultReelStyleForSport(sport);
+}
+
+/** Remember the athlete's style choice for one sport. */
+export function saveReelStyleForSport(sport: string | null | undefined, prefs: ReelStylePrefs) {
+  if (!sport) {
+    saveReelStyle(prefs);
+    return;
+  }
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(sportKey(sport), JSON.stringify(normalizeReelStyle(prefs)));
+  } catch {
+    // ignore
+  }
+}
