@@ -35,6 +35,14 @@ import { listTrainerIdsForOrg, listTrainerOrgs } from "@/lib/trainer-orgs.functi
 import { Slider } from "@/components/ui/slider";
 
 type SortBy = "nearest" | "soonest" | "followers" | "name";
+
+const TRAINER_SORTS = [
+  { value: "nearest" as const, label: "Nearest" },
+  { value: "soonest" as const, label: "Soonest available" },
+  { value: "followers" as const, label: "Most followers" },
+  { value: "name" as const, label: "Name A–Z" },
+];
+
 type Avail = "any" | "soon" | "recruiting" | "weekly" | "casual";
 
 // Lower = sooner. Used for the "Soonest available" sort.
