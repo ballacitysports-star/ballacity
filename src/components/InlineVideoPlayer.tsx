@@ -16,12 +16,15 @@ export function InlineVideoPlayer({
   videoUrl,
   thumbnailUrl,
   ariaLabel,
+  repair,
 }: {
   videoPath?: string;
   /** Pre-signed URL; when provided, client-side signing is skipped. */
   videoUrl?: string | null;
   thumbnailUrl?: string | null;
   ariaLabel?: string;
+  /** Owner-only: lets the viewer re-encode an undecodable clip in the browser. */
+  repair?: { reelId: string; videoPath: string; onRepaired?: () => void };
 }) {
   const [url, setUrl] = useState<string | null>(null);
   const [playing, setPlaying] = useState(false);
