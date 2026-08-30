@@ -175,6 +175,11 @@ export function GameRecapPanel({
             videoPath={latest.playback_path ?? latest.video_path}
             thumbnailUrl={thumbUrl}
             ariaLabel={`Highlight reel for ${gameTitle}`}
+            repair={
+              isOwner
+                ? { reelId: latest.id, videoPath: latest.video_path, onRepaired: onChanged }
+                : undefined
+            }
           />
           <p className="mt-1.5 truncate text-xs text-muted-foreground">
             {latest.ai_title || latest.title}

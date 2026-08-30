@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { AlertTriangle, Download, Loader2, Play } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { RepairPlaybackButton } from "@/components/reels/RepairPlaybackButton";
 
 /**
  * Small inline video player for private "highlight-videos" storage objects:
@@ -16,12 +17,15 @@ export function InlineVideoPlayer({
   videoUrl,
   thumbnailUrl,
   ariaLabel,
+  repair,
 }: {
   videoPath?: string;
   /** Pre-signed URL; when provided, client-side signing is skipped. */
   videoUrl?: string | null;
   thumbnailUrl?: string | null;
   ariaLabel?: string;
+  /** Owner-only: lets the viewer re-encode an undecodable clip in the browser. */
+  repair?: { reelId: string; videoPath: string; onRepaired?: () => void };
 }) {
   const [url, setUrl] = useState<string | null>(null);
   const [playing, setPlaying] = useState(false);
@@ -99,6 +103,13 @@ export function InlineVideoPlayer({
             <AlertTriangle className="h-3.5 w-3.5 text-amber-300" />
             This video&apos;s format isn&apos;t supported on this device
           </p>
+          {repair ? (
+            <RepairPlaybackButton
+              reelId={repair.reelId}
+              videoPath={repair.videoPath}
+              onRepaired={repair.onRepaired}
+            />
+          ) : null}
           <a
             href={url}
             target="_blank"

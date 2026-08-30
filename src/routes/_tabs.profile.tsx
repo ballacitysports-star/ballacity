@@ -974,6 +974,7 @@ function ProfileReelItem({
           videoPath={reel.playback_path ?? reel.video_path}
           thumbnailUrl={thumbUrl}
           ariaLabel={`Highlight reel ${reel.ai_title || reel.title}`}
+          repair={{ reelId: reel.id, videoPath: reel.video_path, onRepaired: onChanged }}
         />
       ) : (
         <div className="flex items-center gap-2 rounded-lg border border-border bg-background/60 px-2.5 py-2">
