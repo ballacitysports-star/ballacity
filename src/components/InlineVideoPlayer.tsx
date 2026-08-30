@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { AlertTriangle, Download, Loader2, Play } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { RepairPlaybackButton } from "@/components/reels/RepairPlaybackButton";
 
 /**
  * Small inline video player for private "highlight-videos" storage objects:
