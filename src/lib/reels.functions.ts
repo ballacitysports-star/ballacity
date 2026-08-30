@@ -354,6 +354,28 @@ export const setReelHidden = createServerFn({ method: "POST" })
   });
 
 /**
+ * Records the widely-playable H.264 copy for one of the caller's reels.
+ * Used by the in-browser repair flow for clips uploaded before automatic
+ * transcoding existed (VP9/AV1 in .mp4 that Safari/iOS can't decode).
+ */
+export const setReelPlaybackPath = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: { reelId: string; playbackPath: string }) => {
+    if (!input?.reelId) throw new Error("reelId is required");
+    if (!input?.playbackPath) throw new Error("playbackPath is required");
+    return { reelId: input.reelId, playbackPath: input.playbackPath };
+  })
+  .handler(async ({ data, context }) => {
+    const { error } = await context.supabase
+      .from("highlight_reels")
+      .update({ playback_path: data.playbackPath } as any)
+      .eq("id", data.reelId)
+      .eq("user_id", context.userId);
+    if (error) throw new Error(error.message);
+    return { playbackPath: data.playbackPath };
+  });
+
+/**
  * Permanently deletes one of the caller's reels: removes the stored video,
  * thumbnail, audio, and captured frames, then the row itself.
  */
