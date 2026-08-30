@@ -102,6 +102,13 @@ export function InlineVideoPlayer({
             <AlertTriangle className="h-3.5 w-3.5 text-amber-300" />
             This video&apos;s format isn&apos;t supported on this device
           </p>
+          {repair ? (
+            <RepairPlaybackButton
+              reelId={repair.reelId}
+              videoPath={repair.videoPath}
+              onRepaired={repair.onRepaired}
+            />
+          ) : null}
           <a
             href={url}
             target="_blank"
