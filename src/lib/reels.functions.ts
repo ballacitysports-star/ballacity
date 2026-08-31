@@ -536,8 +536,11 @@ export const listPublicReels = createServerFn({ method: "GET" })
     const reels = (rows ?? []) as any[];
     return Promise.all(
       reels.map(async (r) => {
-        const [video, thumb] = await Promise.all([
+        const [video, original, thumb] = await Promise.all([
           supabaseAdmin.storage.from("highlight-videos").createSignedUrl(r.playback_path ?? r.video_path, 3600),
+          r.playback_path
+            ? supabaseAdmin.storage.from("highlight-videos").createSignedUrl(r.video_path, 3600)
+            : Promise.resolve({ data: null }),
           r.thumbnail_path
             ? supabaseAdmin.storage.from("highlight-videos").createSignedUrl(r.thumbnail_path, 3600)
             : Promise.resolve({ data: null }),
