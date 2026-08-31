@@ -78,6 +78,17 @@ function PlayerCardPage() {
     };
   }, [userId]);
 
+  // Live-update when this player publishes (or finishes processing) a reel.
+  useReelRealtime(
+    () => {
+      void listPublicReels({ data: { userId } })
+        .then((r) => setReels((r as PublicReel[]) ?? []))
+        .catch(() => {});
+    },
+    { userId },
+  );
+
+
   // Highlight the tab for whichever section is in view while scrolling.
   useEffect(() => {
     if (loading) return;
