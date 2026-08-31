@@ -352,9 +352,8 @@ const PUBLIC_ROUTES = [
   "/auth",
   "/reset-password",
   "/.lovable/oauth/consent",
-  // Shareable, sign-in-free surfaces.
+  // Shareable, sign-in-free surface.
   "/highlights",
-  "/players",
 ];
 const TAB_PATHS = [
   "/feed",
