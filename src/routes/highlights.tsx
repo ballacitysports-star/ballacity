@@ -132,74 +132,43 @@ function HighlightFeedPage() {
   const visible = sortItems(items, sort);
 
   return (
-    <div className="min-h-dvh pb-24 pt-[env(safe-area-inset-top)]">
-      <header className="sticky top-0 z-10 border-b border-border bg-background/95 px-4 py-3 backdrop-blur">
-        <div className="mx-auto flex w-full max-w-2xl items-center gap-2">
-          <Link
-            to="/"
-            className="grid h-9 w-9 place-items-center rounded-full border border-border"
-            aria-label="Back"
-          >
-            <ArrowLeft className="h-4 w-4" />
+    <div className="min-h-dvh bg-background pb-24 pt-[env(safe-area-inset-top)]">
+      {/* Instagram-style top bar: wordmark left, actions right. */}
+      <header className="sticky top-0 z-10 border-b border-border/70 bg-background/90 backdrop-blur">
+        <div className="mx-auto flex w-full max-w-[470px] items-center gap-3 px-4 py-3">
+          <Link to="/" className="shrink-0 text-muted-foreground" aria-label="Back">
+            <ArrowLeft className="h-5 w-5" />
           </Link>
-          <div className="min-w-0 flex-1">
-            <h1 className="truncate text-lg font-bold">Highlight feed</h1>
-            <p className="truncate text-xs text-muted-foreground">
-              The newest reels from players near and far
-            </p>
-          </div>
+          <h1 className="flex-1 truncate text-xl font-black tracking-tight">Highlights</h1>
           <Link
             to="/reels"
             search={{ game: "", title: "", upload: "" }}
-            className="inline-flex items-center gap-1 rounded-full bg-lime px-3 py-1.5 text-xs font-bold text-primary-foreground"
+            className="shrink-0 text-foreground"
+            aria-label="Post a reel"
           >
-            <Sparkles className="h-3.5 w-3.5" /> Post a reel
+            <PlusSquare className="h-6 w-6" />
           </Link>
+          <button
+            type="button"
+            onClick={() => setSort((s) => (s === "newest" ? "oldest" : s === "oldest" ? "sport" : "newest"))}
+            className="shrink-0 text-muted-foreground"
+            aria-label={`Sort: ${SORT_LABEL[sort]}`}
+            title={`Sort: ${SORT_LABEL[sort]}`}
+          >
+            <ArrowUpDown className="h-5 w-5" />
+          </button>
         </div>
-        <div className="mx-auto mt-2 grid w-full max-w-2xl grid-cols-2 gap-2">
-          <label className="min-w-0">
-            <span className="sr-only">Filter by sport</span>
-            <select
-              value={sport ?? ""}
-              onChange={(e) => setSport(e.target.value || null)}
-              className="w-full truncate rounded-full border border-border bg-surface px-3 py-2 text-xs font-semibold capitalize"
-            >
-              <option value="">All sports</option>
-              {sports.map((s) => (
-                <option key={s} value={s} className="capitalize">
-                  {s}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="min-w-0">
-            <span className="sr-only">Sort reels</span>
-            <select
-              value={sort}
-              onChange={(e) => setSort(e.target.value as SortMode)}
-              className="w-full truncate rounded-full border border-border bg-surface px-3 py-2 text-xs font-semibold"
-            >
-              <option value="newest">Newest first</option>
-              <option value="oldest">Oldest first</option>
-              <option value="sport">Sport A–Z</option>
-            </select>
-          </label>
+
+        {/* Stories rail — one ring per sport, doubling as the filter. */}
+        <div className="mx-auto flex w-full max-w-[470px] gap-4 overflow-x-auto px-4 pb-3">
+          <StoryRing active={!sport} onClick={() => setSport(null)} label="All" />
+          {sports.map((s) => (
+            <StoryRing key={s} active={sport === s} onClick={() => setSport(s)} label={s} />
+          ))}
         </div>
-        {sports.length > 0 && (
-          <div className="mx-auto mt-2 hidden w-full max-w-2xl gap-2 overflow-x-auto pb-1 sm:flex">
-            <FilterChip active={!sport} onClick={() => setSport(null)}>
-              All sports
-            </FilterChip>
-            {sports.map((s) => (
-              <FilterChip key={s} active={sport === s} onClick={() => setSport(s)}>
-                {s}
-              </FilterChip>
-            ))}
-          </div>
-        )}
       </header>
 
-      <main className="mx-auto w-full max-w-2xl px-0 py-4 sm:px-4">
+      <main className="mx-auto w-full max-w-[470px]">
         {loading ? (
           <div className="grid place-items-center py-16 text-muted-foreground">
             <Loader2 className="h-5 w-5 animate-spin" />
@@ -207,7 +176,7 @@ function HighlightFeedPage() {
         ) : error ? (
           <p className="px-4 py-16 text-center text-sm text-muted-foreground">{error}</p>
         ) : items.length === 0 ? (
-          <div className="mx-4 rounded-2xl border border-dashed border-border p-8 text-center">
+          <div className="mx-4 mt-6 rounded-2xl border border-dashed border-border p-8 text-center">
             <Clapperboard className="mx-auto h-6 w-6 text-lime" />
             <p className="mt-2 text-sm font-semibold">No highlights here yet</p>
             <p className="mt-1 text-xs text-muted-foreground">
@@ -222,7 +191,7 @@ function HighlightFeedPage() {
             </Link>
           </div>
         ) : (
-          <ul className="space-y-6 sm:space-y-5">
+          <ul className="divide-y divide-border/70">
             {visible.map((item) => (
               <FeedReelCard key={item.id} item={item} />
             ))}
@@ -236,34 +205,51 @@ function HighlightFeedPage() {
           </div>
         )}
         {done && items.length > 0 && (
-          <p className="py-6 text-center text-xs text-muted-foreground">You're all caught up.</p>
+          <p className="py-6 text-center text-xs text-muted-foreground">You&apos;re all caught up.</p>
         )}
       </main>
     </div>
   );
 }
 
-function FilterChip({
+const SORT_LABEL: Record<SortMode, string> = {
+  newest: "Newest first",
+  oldest: "Oldest first",
+  sport: "Sport A–Z",
+};
+
+/** Circular story bubble used as the sport filter, Instagram-style. */
+function StoryRing({
   active,
   onClick,
-  children,
+  label,
 }: {
   active: boolean;
   onClick: () => void;
-  children: React.ReactNode;
+  label: string;
 }) {
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={`shrink-0 whitespace-nowrap rounded-full border px-3 py-1 text-xs font-semibold capitalize ${
-        active ? "border-lime bg-lime/10 text-lime" : "border-border text-muted-foreground"
-      }`}
-    >
-      {children}
+    <button type="button" onClick={onClick} className="flex w-16 shrink-0 flex-col items-center gap-1">
+      <span
+        className={`grid h-16 w-16 place-items-center rounded-full p-[2px] ${
+          active
+            ? "bg-gradient-to-tr from-lime via-lime/70 to-primary"
+            : "bg-border"
+        }`}
+      >
+        <span className="grid h-full w-full place-items-center rounded-full bg-background">
+          <span className="grid h-[calc(100%-4px)] w-[calc(100%-4px)] place-items-center rounded-full bg-surface text-sm font-black uppercase text-foreground">
+            {label.slice(0, 2)}
+          </span>
+        </span>
+      </span>
+      <span className="w-full truncate text-center text-[11px] capitalize text-muted-foreground">
+        {label}
+      </span>
     </button>
   );
 }
+
 
 type SortMode = "newest" | "oldest" | "sport";
 
