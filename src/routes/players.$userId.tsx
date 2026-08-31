@@ -96,6 +96,7 @@ type PublicReel = {
   id: string;
   title: string;
   videoUrl: string | null;
+  fallbackVideoUrl?: string | null;
   thumbnailUrl: string | null;
   sport: string | null;
   caption: string | null;
@@ -142,6 +143,7 @@ function PublicReelsSection({ userId }: { userId: string }) {
           <div key={reel.id} className="rounded-2xl border border-border bg-surface p-3">
             <InlineVideoPlayer
               videoUrl={reel.videoUrl}
+              fallbackVideoUrl={reel.fallbackVideoUrl}
               thumbnailUrl={reel.thumbnailUrl}
               ariaLabel={`Highlight reel ${reel.title}`}
             />
