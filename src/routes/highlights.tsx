@@ -54,28 +54,47 @@ function HighlightFeedPage() {
   }, []);
 
   // First page (and every filter change) resets the scroll list.
+  const loadFirstPage = useCallback(
+    (opts?: { silent?: boolean }) => {
+      if (!opts?.silent) setLoading(true);
+      setError(null);
+      return listHighlightFeed({ data: { sport, cursor: null } })
+        .then((res) => {
+          setItems((prev) => {
+            if (!opts?.silent) return res.items;
+            // Merge: keep already-loaded older pages, refresh/prepend the newest.
+            const fresh = new Map(res.items.map((r) => [r.id, r]));
+            const rest = prev.filter((r) => !fresh.has(r.id));
+            return [...res.items, ...rest];
+          });
+          if (!opts?.silent) {
+            setCursor(res.nextCursor);
+            setDone(!res.nextCursor);
+          }
+        })
+        .catch((e: unknown) => {
+          if (!opts?.silent) setError(e instanceof Error ? e.message : "Couldn't load the feed");
+        })
+        .finally(() => {
+          if (!opts?.silent) setLoading(false);
+        });
+    },
+    [sport],
+  );
+
   useEffect(() => {
-    let cancelled = false;
-    setLoading(true);
-    setError(null);
     setDone(false);
-    listHighlightFeed({ data: { sport, cursor: null } })
-      .then((res) => {
-        if (cancelled) return;
-        setItems(res.items);
-        setCursor(res.nextCursor);
-        setDone(!res.nextCursor);
-      })
-      .catch((e: unknown) => {
-        if (!cancelled) setError(e instanceof Error ? e.message : "Couldn't load the feed");
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [sport]);
+    void loadFirstPage();
+  }, [loadFirstPage]);
+
+  // New reels (and reels that just finished processing) show up live.
+  useReelRealtime(() => {
+    void loadFirstPage({ silent: true });
+    void listHighlightFeedSports()
+      .then(setSports)
+      .catch(() => {});
+  });
+
 
   const loadMore = useCallback(async () => {
     if (!cursor || loadingMore || done) return;
