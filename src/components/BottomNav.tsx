@@ -71,8 +71,8 @@ export function BottomNav() {
         to={it.to}
         aria-label={it.label}
         className="relative flex min-w-11 min-h-11 flex-1 items-center justify-center py-2.5 transition-transform active:scale-95"
-      >
-{it.render
+>
+        {it.render
           ? it.render(active)
           : Icon ? (
               <Icon
