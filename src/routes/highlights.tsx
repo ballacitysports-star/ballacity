@@ -338,6 +338,7 @@ function FeedReelCard({ item }: { item: HighlightFeedItem }) {
       <div className="[&_.aspect-video]:aspect-[4/5] sm:[&_.aspect-video]:aspect-video [&_.rounded-lg]:rounded-none sm:[&_.rounded-lg]:rounded-lg">
         <InlineVideoPlayer
           videoUrl={item.videoUrl}
+          fallbackVideoUrl={item.fallbackVideoUrl}
           thumbnailUrl={item.thumbnailUrl}
           ariaLabel={`Highlight reel: ${item.title}`}
         />
