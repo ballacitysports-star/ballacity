@@ -236,3 +236,27 @@ const rest = summarizeSlots(slots);
   if (a.recurring_days?.length) parts.push(a.recurring_days.join(" · "));
   return parts.join(" · ");
 }
+
+/**
+ * Compact one-line label for list cards: the next occurrence plus a short
+ * "+N more dates" tail instead of listing every slot.
+ */
+export function formatAvailabilityWindowShort(a: {
+  time_slots?: unknown;
+  starts_on?: string | null;
+  ends_on?: string | null;
+  recurring_days?: string[] | null;
+}): string {
+  const slots = parseTimeSlots(a.time_slots ?? []);
+  if (slots.length > 0) {
+    const next = nextOccurrence(slots);
+    const head = next
+      ? isAllDaySlot(next)
+        ? `${fmtShortDate(next.dateKey)} · All day`
+        : `${fmtShortDate(next.dateKey)} ${fmt12(next.start)}–${fmt12(next.end)}`
+      : formatSlot(slots[0]!);
+    const extra = slots.length - 1;
+    return extra > 0 ? `${head} · +${extra} more` : head;
+  }
+  return formatAvailabilityWindow(a);
+}
