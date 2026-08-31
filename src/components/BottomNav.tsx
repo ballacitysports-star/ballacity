@@ -1,5 +1,5 @@
 import { Link, useLocation } from "@tanstack/react-router";
-import { Home, Users, Shield, PlusSquare, Heart } from "lucide-react";
+import { Home, Users, Shield, Clapperboard, Heart } from "lucide-react";
 import { MyAvatar } from "@/components/UserAvatar";
 
 type NavItem = {
@@ -8,11 +8,10 @@ type NavItem = {
   icon?: typeof Home;
   match?: (pathname: string) => boolean;
   render?: (active: boolean) => React.ReactNode;
-  gradient?: boolean;
 };
 
 /**
- * Instagram-style 6-tab bottom bar: Home, Available Players, Teams, Create, Notifications, Profile.
+ * Instagram-style 6-tab bottom bar: Home, Available Players, Teams, Highlights, Activity, Profile.
  */
 const items: NavItem[] = [
   {
@@ -36,11 +35,10 @@ const items: NavItem[] = [
     match: (p) => p.startsWith("/teams"),
   },
   {
-    to: "/create",
-    icon: PlusSquare,
-    label: "Create",
-    match: (p) => p.startsWith("/create"),
-    gradient: true,
+    to: "/highlights",
+    icon: Clapperboard,
+    label: "Highlights",
+    match: (p) => p === "/highlights" || p.startsWith("/highlights"),
   },
   {
     to: "/notifications",
@@ -73,22 +71,16 @@ export function BottomNav() {
         to={it.to}
         aria-label={it.label}
         className="relative flex min-w-11 min-h-11 flex-1 items-center justify-center py-2.5 transition-transform active:scale-95"
-      >
+>
         {it.render
           ? it.render(active)
           : Icon ? (
               <Icon
                 className={`h-6 w-6 ${
-                  it.gradient
-                    ? active
-                      ? "text-transparent [stroke:url(#ig-grad)]"
-                      : "text-foreground"
-                    : active
-                      ? "text-foreground"
-                      : "text-muted-foreground"
+                  active ? "text-foreground" : "text-muted-foreground"
                 }`}
                 strokeWidth={iconStroke}
-                fill={active && !it.gradient ? "currentColor" : "none"}
+                fill={active ? "currentColor" : "none"}
               />
             ) : null}
         <span className="sr-only">{it.label}</span>
@@ -97,19 +89,7 @@ export function BottomNav() {
   };
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-40 border-t border-border bg-background/95 backdrop-blur-xl pb-[max(env(safe-area-inset-bottom),0px)]">
-      {/* SVG gradient stroke definition, used by the Create tab icon. */}
-      <svg width="0" height="0" className="absolute" aria-hidden>
-        <defs>
-          <linearGradient id="ig-grad" x1="0%" y1="0%" x2="100%" y2="100%">
-            <stop offset="0%" stopColor="#f09433" />
-            <stop offset="25%" stopColor="#e6683c" />
-            <stop offset="50%" stopColor="#dc2743" />
-            <stop offset="75%" stopColor="#cc2366" />
-            <stop offset="100%" stopColor="#bc1888" />
-          </linearGradient>
-        </defs>
-      </svg>
+<nav className="fixed bottom-0 left-0 right-0 z-40 border-t border-border bg-background/95 backdrop-blur-xl pb-[max(env(safe-area-inset-bottom),0px)]">
       <div
         className="mx-auto flex max-w-md sm:max-w-xl items-center justify-around"
         role="group"
