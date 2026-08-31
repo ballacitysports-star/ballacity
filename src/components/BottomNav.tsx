@@ -72,21 +72,15 @@ export function BottomNav() {
         aria-label={it.label}
         className="relative flex min-w-11 min-h-11 flex-1 items-center justify-center py-2.5 transition-transform active:scale-95"
       >
-        {it.render
+{it.render
           ? it.render(active)
           : Icon ? (
               <Icon
                 className={`h-6 w-6 ${
-                  it.gradient
-                    ? active
-                      ? "text-transparent [stroke:url(#ig-grad)]"
-                      : "text-foreground"
-                    : active
-                      ? "text-foreground"
-                      : "text-muted-foreground"
+                  active ? "text-foreground" : "text-muted-foreground"
                 }`}
                 strokeWidth={iconStroke}
-                fill={active && !it.gradient ? "currentColor" : "none"}
+                fill={active ? "currentColor" : "none"}
               />
             ) : null}
         <span className="sr-only">{it.label}</span>
