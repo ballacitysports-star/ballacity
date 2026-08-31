@@ -11,6 +11,8 @@ import {
   listHighlightFeedSports,
   type HighlightFeedItem,
 } from "@/lib/highlight-feed.functions";
+import { useReelRealtime } from "@/hooks/use-reel-realtime";
+
 
 export const Route = createFileRoute("/highlights")({
   head: () =>
