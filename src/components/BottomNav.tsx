@@ -1,5 +1,5 @@
 import { Link, useLocation } from "@tanstack/react-router";
-import { Home, Users, Shield, PlusSquare, Heart } from "lucide-react";
+import { Home, Users, Shield, Clapperboard, Heart } from "lucide-react";
 import { MyAvatar } from "@/components/UserAvatar";
 
 type NavItem = {
@@ -8,11 +8,10 @@ type NavItem = {
   icon?: typeof Home;
   match?: (pathname: string) => boolean;
   render?: (active: boolean) => React.ReactNode;
-  gradient?: boolean;
 };
 
 /**
- * Instagram-style 6-tab bottom bar: Home, Available Players, Teams, Create, Notifications, Profile.
+ * Instagram-style 6-tab bottom bar: Home, Available Players, Teams, Highlights, Activity, Profile.
  */
 const items: NavItem[] = [
   {
@@ -36,11 +35,10 @@ const items: NavItem[] = [
     match: (p) => p.startsWith("/teams"),
   },
   {
-    to: "/create",
-    icon: PlusSquare,
-    label: "Create",
-    match: (p) => p.startsWith("/create"),
-    gradient: true,
+    to: "/highlights",
+    icon: Clapperboard,
+    label: "Highlights",
+    match: (p) => p === "/highlights" || p.startsWith("/highlights"),
   },
   {
     to: "/notifications",
