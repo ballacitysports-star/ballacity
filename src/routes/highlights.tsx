@@ -5,6 +5,7 @@ import { pageHead } from "@/lib/seo";
 import { InlineVideoPlayer } from "@/components/InlineVideoPlayer";
 import { FollowButton } from "@/components/FollowButton";
 import { PostEngagement } from "@/components/PostEngagement";
+import { FlagReelButton } from "@/components/FlagReelButton";
 import {
   listHighlightFeed,
   listHighlightFeedSports,
@@ -32,6 +33,7 @@ function HighlightFeedPage() {
   const [items, setItems] = useState<HighlightFeedItem[]>([]);
   const [sports, setSports] = useState<string[]>([]);
   const [sport, setSport] = useState<string | null>(null);
+  const [sort, setSort] = useState<SortMode>("newest");
   const [cursor, setCursor] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -106,6 +108,8 @@ function HighlightFeedPage() {
     return () => io.disconnect();
   }, [loadMore]);
 
+  const visible = sortItems(items, sort);
+
   return (
     <div className="min-h-dvh pb-24 pt-[env(safe-area-inset-top)]">
       <header className="sticky top-0 z-10 border-b border-border bg-background/95 px-4 py-3 backdrop-blur">
@@ -131,8 +135,37 @@ function HighlightFeedPage() {
             <Sparkles className="h-3.5 w-3.5" /> Post a reel
           </Link>
         </div>
+        <div className="mx-auto mt-2 grid w-full max-w-2xl grid-cols-2 gap-2">
+          <label className="min-w-0">
+            <span className="sr-only">Filter by sport</span>
+            <select
+              value={sport ?? ""}
+              onChange={(e) => setSport(e.target.value || null)}
+              className="w-full truncate rounded-full border border-border bg-surface px-3 py-2 text-xs font-semibold capitalize"
+            >
+              <option value="">All sports</option>
+              {sports.map((s) => (
+                <option key={s} value={s} className="capitalize">
+                  {s}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="min-w-0">
+            <span className="sr-only">Sort reels</span>
+            <select
+              value={sort}
+              onChange={(e) => setSort(e.target.value as SortMode)}
+              className="w-full truncate rounded-full border border-border bg-surface px-3 py-2 text-xs font-semibold"
+            >
+              <option value="newest">Newest first</option>
+              <option value="oldest">Oldest first</option>
+              <option value="sport">Sport A–Z</option>
+            </select>
+          </label>
+        </div>
         {sports.length > 0 && (
-          <div className="mx-auto mt-2 flex w-full max-w-2xl gap-2 overflow-x-auto pb-1">
+          <div className="mx-auto mt-2 hidden w-full max-w-2xl gap-2 overflow-x-auto pb-1 sm:flex">
             <FilterChip active={!sport} onClick={() => setSport(null)}>
               All sports
             </FilterChip>
@@ -145,15 +178,15 @@ function HighlightFeedPage() {
         )}
       </header>
 
-      <main className="mx-auto w-full max-w-2xl px-4 py-4">
+      <main className="mx-auto w-full max-w-2xl px-0 py-4 sm:px-4">
         {loading ? (
           <div className="grid place-items-center py-16 text-muted-foreground">
             <Loader2 className="h-5 w-5 animate-spin" />
           </div>
         ) : error ? (
-          <p className="py-16 text-center text-sm text-muted-foreground">{error}</p>
+          <p className="px-4 py-16 text-center text-sm text-muted-foreground">{error}</p>
         ) : items.length === 0 ? (
-          <div className="rounded-2xl border border-dashed border-border p-8 text-center">
+          <div className="mx-4 rounded-2xl border border-dashed border-border p-8 text-center">
             <Clapperboard className="mx-auto h-6 w-6 text-lime" />
             <p className="mt-2 text-sm font-semibold">No highlights here yet</p>
             <p className="mt-1 text-xs text-muted-foreground">
@@ -168,8 +201,8 @@ function HighlightFeedPage() {
             </Link>
           </div>
         ) : (
-          <ul className="space-y-5">
-            {items.map((item) => (
+          <ul className="space-y-6 sm:space-y-5">
+            {visible.map((item) => (
               <FeedReelCard key={item.id} item={item} />
             ))}
           </ul>
@@ -211,6 +244,24 @@ function FilterChip({
   );
 }
 
+type SortMode = "newest" | "oldest" | "sport";
+
+/** Client-side ordering for the reels already loaded into the scroll list. */
+function sortItems(items: HighlightFeedItem[], mode: SortMode): HighlightFeedItem[] {
+  const copy = [...items];
+  if (mode === "oldest") {
+    return copy.sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+  }
+  if (mode === "sport") {
+    return copy.sort(
+      (a, b) =>
+        (a.sport ?? "zzz").localeCompare(b.sport ?? "zzz") ||
+        b.createdAt.localeCompare(a.createdAt),
+    );
+  }
+  return copy.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+}
+
 function relativeTime(iso: string): string {
   const diff = Date.now() - new Date(iso).getTime();
   const mins = Math.round(diff / 60000);
@@ -227,7 +278,7 @@ function FeedReelCard({ item }: { item: HighlightFeedItem }) {
   const [showComments, setShowComments] = useState(false);
   const gameDate = item.game?.date ? new Date(item.game.date) : null;
   return (
-    <li className="overflow-hidden rounded-2xl border border-border bg-surface">
+    <li className="overflow-hidden border-y border-border bg-surface sm:rounded-2xl sm:border">
       <div className="flex items-center gap-3 p-3">
         <Link
           to="/players/$userId"
@@ -261,11 +312,15 @@ function FeedReelCard({ item }: { item: HighlightFeedItem }) {
         <FollowButton userId={item.author.id} size="sm" />
       </div>
 
-      <InlineVideoPlayer
-        videoUrl={item.videoUrl}
-        thumbnailUrl={item.thumbnailUrl}
-        ariaLabel={`Highlight reel: ${item.title}`}
-      />
+      {/* Bigger media on phones: full-bleed, square-ish frame instead of a
+          letterboxed 16:9 strip. */}
+      <div className="[&_.aspect-video]:aspect-[4/5] sm:[&_.aspect-video]:aspect-video [&_.rounded-lg]:rounded-none sm:[&_.rounded-lg]:rounded-lg">
+        <InlineVideoPlayer
+          videoUrl={item.videoUrl}
+          thumbnailUrl={item.thumbnailUrl}
+          ariaLabel={`Highlight reel: ${item.title}`}
+        />
+      </div>
 
       <div className="space-y-2 p-3">
         <p className="text-sm font-semibold">{item.title}</p>
@@ -317,6 +372,9 @@ function FeedReelCard({ item }: { item: HighlightFeedItem }) {
             <MessageCircle className="h-3.5 w-3.5" />
             {showComments ? "Hide comments" : "Comments"}
           </button>
+          <div className="ml-auto">
+            <FlagReelButton reelId={item.id} authorId={item.author.id} />
+          </div>
         </div>
         {showComments && (
           <div className="border-t border-border pt-1">
