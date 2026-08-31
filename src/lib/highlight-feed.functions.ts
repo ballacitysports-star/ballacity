@@ -121,6 +121,7 @@ export const listHighlightFeed = createServerFn({ method: "GET" })
           hashtags: ((r.ai_hashtags as string[]) ?? []).slice(0, 6),
           sport: (r.ai_sport as string) ?? (game?.sport as string) ?? null,
           videoUrl: video.data?.signedUrl ?? null,
+          fallbackVideoUrl: (original as any)?.data?.signedUrl ?? null,
           thumbnailUrl: (thumb as any)?.data?.signedUrl ?? null,
           createdAt: r.created_at as string,
           author: {
