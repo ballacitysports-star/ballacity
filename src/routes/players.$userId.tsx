@@ -107,25 +107,28 @@ function PublicReelsSection({ userId }: { userId: string }) {
   const [reels, setReels] = useState<PublicReel[]>([]);
   const [loaded, setLoaded] = useState(false);
 
+  const load = useCallback(
+    (opts?: { silent?: boolean }) => {
+      if (!opts?.silent) setLoaded(false);
+      return listPublicReels({ data: { userId } })
+        .then((rows) => setReels((rows as PublicReel[]) ?? []))
+        .catch(() => {
+          if (!opts?.silent) setReels([]);
+        })
+        .finally(() => setLoaded(true));
+    },
+    [userId],
+  );
+
   useEffect(() => {
-    let cancelled = false;
-    setLoaded(false);
-    listPublicReels({ data: { userId } })
-      .then((rows) => {
-        if (!cancelled) setReels((rows as PublicReel[]) ?? []);
-      })
-      .catch(() => {
-        if (!cancelled) setReels([]);
-      })
-      .finally(() => {
-        if (!cancelled) setLoaded(true);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [userId]);
+    void load();
+  }, [load]);
+
+  // Newly uploaded / newly finished reels appear without a refresh.
+  useReelRealtime(() => void load({ silent: true }), { userId });
 
   if (!loaded || reels.length === 0) return null;
+
 
   return (
     <div className="mt-6">
