@@ -1,6 +1,8 @@
 import { createFileRoute, Link, useNavigate, Navigate } from "@tanstack/react-router";
 import { pageHead, ogImageUrl } from "@/lib/seo";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { useReelRealtime } from "@/hooks/use-reel-realtime";
+
 import {
   ArrowLeft,
   MessageCircle,
