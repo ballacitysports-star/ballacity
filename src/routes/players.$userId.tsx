@@ -43,7 +43,6 @@ import { BadgeList } from "@/components/BadgeList";
 import { InlineVideoPlayer } from "@/components/InlineVideoPlayer";
 import { listPublicReels } from "@/lib/reels.functions";
 import { PostEngagement } from "@/components/PostEngagement";
-import { MessageCircle } from "lucide-react";
 import {
   Dialog,
   DialogContent,
