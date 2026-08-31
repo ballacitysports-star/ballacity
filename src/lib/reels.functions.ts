@@ -549,6 +549,8 @@ export const listPublicReels = createServerFn({ method: "GET" })
           id: r.id as string,
           title: (r.ai_title as string) || (r.title as string),
           videoUrl: video.data?.signedUrl ?? null,
+          /** Original upload, tried automatically if the primary copy won't decode. */
+          fallbackVideoUrl: (original as any)?.data?.signedUrl ?? null,
           thumbnailUrl: (thumb as any).data?.signedUrl ?? null,
           sport: (r.ai_sport as string) ?? null,
           caption: (r.ai_caption as string) ?? null,
