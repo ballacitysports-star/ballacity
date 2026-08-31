@@ -48,6 +48,7 @@ import { Route as OnboardingAccountTypeRouteImport } from './routes/onboarding.a
 import { Route as OnboardingWelcomeRouteImport } from './routes/onboarding.welcome'
 import { Route as OrgsIndexRouteImport } from './routes/orgs.index'
 import { Route as OrgsCreateRouteImport } from './routes/orgs.create'
+import { Route as PlayerCardUserIdRouteImport } from './routes/player-card.$userId'
 import { Route as PlayersUserIdRouteImport } from './routes/players.$userId'
 import { Route as ProfileEditRouteImport } from './routes/profile.edit'
 import { Route as ReviewNewRouteImport } from './routes/review.new'
@@ -265,6 +266,11 @@ const OrgsCreateRoute = OrgsCreateRouteImport.update({
   path: '/orgs/create',
   getParentRoute: () => rootRouteImport,
 } as any)
+const PlayerCardUserIdRoute = PlayerCardUserIdRouteImport.update({
+  id: '/player-card/$userId',
+  path: '/player-card/$userId',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const PlayersUserIdRoute = PlayersUserIdRouteImport.update({
   id: '/players/$userId',
   path: '/players/$userId',
@@ -405,6 +411,7 @@ export interface FileRoutesByFullPath {
   '/onboarding/account-type': typeof OnboardingAccountTypeRoute
   '/onboarding/welcome': typeof OnboardingWelcomeRoute
   '/orgs/create': typeof OrgsCreateRoute
+  '/player-card/$userId': typeof PlayerCardUserIdRoute
   '/players/$userId': typeof PlayersUserIdRoute
   '/profile/edit': typeof ProfileEditRoute
   '/review/new': typeof ReviewNewRoute
@@ -464,6 +471,7 @@ export interface FileRoutesByTo {
   '/onboarding/account-type': typeof OnboardingAccountTypeRoute
   '/onboarding/welcome': typeof OnboardingWelcomeRoute
   '/orgs/create': typeof OrgsCreateRoute
+  '/player-card/$userId': typeof PlayerCardUserIdRoute
   '/players/$userId': typeof PlayersUserIdRoute
   '/profile/edit': typeof ProfileEditRoute
   '/review/new': typeof ReviewNewRoute
@@ -526,6 +534,7 @@ export interface FileRoutesById {
   '/onboarding/account-type': typeof OnboardingAccountTypeRoute
   '/onboarding/welcome': typeof OnboardingWelcomeRoute
   '/orgs/create': typeof OrgsCreateRoute
+  '/player-card/$userId': typeof PlayerCardUserIdRoute
   '/players/$userId': typeof PlayersUserIdRoute
   '/profile/edit': typeof ProfileEditRoute
   '/review/new': typeof ReviewNewRoute
@@ -588,6 +597,7 @@ export interface FileRouteTypes {
     | '/onboarding/account-type'
     | '/onboarding/welcome'
     | '/orgs/create'
+    | '/player-card/$userId'
     | '/players/$userId'
     | '/profile/edit'
     | '/review/new'
@@ -647,6 +657,7 @@ export interface FileRouteTypes {
     | '/onboarding/account-type'
     | '/onboarding/welcome'
     | '/orgs/create'
+    | '/player-card/$userId'
     | '/players/$userId'
     | '/profile/edit'
     | '/review/new'
@@ -708,6 +719,7 @@ export interface FileRouteTypes {
     | '/onboarding/account-type'
     | '/onboarding/welcome'
     | '/orgs/create'
+    | '/player-card/$userId'
     | '/players/$userId'
     | '/profile/edit'
     | '/review/new'
@@ -760,6 +772,7 @@ export interface RootRouteChildren {
   OnboardingAccountTypeRoute: typeof OnboardingAccountTypeRoute
   OnboardingWelcomeRoute: typeof OnboardingWelcomeRoute
   OrgsCreateRoute: typeof OrgsCreateRoute
+  PlayerCardUserIdRoute: typeof PlayerCardUserIdRoute
   PlayersUserIdRoute: typeof PlayersUserIdRoute
   ProfileEditRoute: typeof ProfileEditRoute
   ReviewNewRoute: typeof ReviewNewRoute
@@ -1056,6 +1069,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof OrgsCreateRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/player-card/$userId': {
+      id: '/player-card/$userId'
+      path: '/player-card/$userId'
+      fullPath: '/player-card/$userId'
+      preLoaderRoute: typeof PlayerCardUserIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/players/$userId': {
       id: '/players/$userId'
       path: '/players/$userId'
@@ -1280,6 +1300,7 @@ const rootRouteChildren: RootRouteChildren = {
   OnboardingAccountTypeRoute: OnboardingAccountTypeRoute,
   OnboardingWelcomeRoute: OnboardingWelcomeRoute,
   OrgsCreateRoute: OrgsCreateRoute,
+  PlayerCardUserIdRoute: PlayerCardUserIdRoute,
   PlayersUserIdRoute: PlayersUserIdRoute,
   ProfileEditRoute: ProfileEditRoute,
   ReviewNewRoute: ReviewNewRoute,
