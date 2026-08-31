@@ -14,6 +14,7 @@ import {
   toggleReaction,
   updateComment,
   type ReactionEmoji,
+  type EngagementSubjectType,
 } from "@/lib/post-engagement.functions";
 import { UserAvatar } from "@/components/UserAvatar";
 import { useAuth } from "@/hooks/use-auth";
@@ -26,7 +27,7 @@ import {
 } from "@/components/ui/popover";
 
 type Props = {
-  subjectType: "team_post" | "game";
+  subjectType: EngagementSubjectType;
   subjectId: string;
 };
 

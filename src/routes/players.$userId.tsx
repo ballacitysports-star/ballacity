@@ -42,6 +42,7 @@ import { PlayerShareCard } from "@/components/PlayerShareCard";
 import { BadgeList } from "@/components/BadgeList";
 import { InlineVideoPlayer } from "@/components/InlineVideoPlayer";
 import { listPublicReels } from "@/lib/reels.functions";
+import { PostEngagement } from "@/components/PostEngagement";
 import {
   Dialog,
   DialogContent,
@@ -158,9 +159,29 @@ function PublicReelsSection({ userId }: { userId: string }) {
                 {reel.hashtags.map((t) => (t.startsWith("#") ? t : `#${t}`)).join(" ")}
               </p>
             )}
+            <ReelComments reelId={reel.id} />
           </div>
         ))}
       </div>
+    </div>
+  );
+}
+
+/** Collapsible discussion thread under a public reel. */
+function ReelComments({ reelId }: { reelId: string }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="mt-2 border-t border-border pt-2">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        aria-expanded={open}
+        className="inline-flex items-center gap-1 text-xs font-semibold text-muted-foreground hover:text-lime"
+      >
+        <MessageCircle className="h-3.5 w-3.5" />
+        {open ? "Hide comments" : "Comments"}
+      </button>
+      {open && <PostEngagement subjectType="highlight_reel" subjectId={reelId} />}
     </div>
   );
 }

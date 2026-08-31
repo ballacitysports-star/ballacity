@@ -7,7 +7,8 @@ import type { Database } from "@/integrations/supabase/types";
 export const REACTION_EMOJI = ["👍", "❤️", "🔥", "😂", "🎉", "👏"] as const;
 export type ReactionEmoji = (typeof REACTION_EMOJI)[number];
 
-const SubjectType = z.enum(["team_post", "game"]);
+const SubjectType = z.enum(["team_post", "game", "highlight_reel"]);
+export type EngagementSubjectType = z.infer<typeof SubjectType>;
 const Subject = z.object({
   subjectType: SubjectType,
   subjectId: z.string().min(1).max(200),
@@ -33,7 +34,7 @@ function publicClient() {
 
 export type CommentRow = {
   id: string;
-  subjectType: "team_post" | "game";
+  subjectType: EngagementSubjectType;
   subjectId: string;
   authorId: string;
   authorName: string | null;

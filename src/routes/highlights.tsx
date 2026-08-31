@@ -1,8 +1,10 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { ArrowLeft, Clapperboard, Loader2, MapPin, Sparkles } from "lucide-react";
+import { ArrowLeft, Clapperboard, Loader2, MapPin, MessageCircle, Sparkles } from "lucide-react";
 import { pageHead } from "@/lib/seo";
 import { InlineVideoPlayer } from "@/components/InlineVideoPlayer";
+import { FollowButton } from "@/components/FollowButton";
+import { PostEngagement } from "@/components/PostEngagement";
 import {
   listHighlightFeed,
   listHighlightFeedSports,
@@ -222,6 +224,7 @@ function relativeTime(iso: string): string {
 }
 
 function FeedReelCard({ item }: { item: HighlightFeedItem }) {
+  const [showComments, setShowComments] = useState(false);
   const gameDate = item.game?.date ? new Date(item.game.date) : null;
   return (
     <li className="overflow-hidden rounded-2xl border border-border bg-surface">
@@ -255,6 +258,7 @@ function FeedReelCard({ item }: { item: HighlightFeedItem }) {
             {relativeTime(item.createdAt)}
           </p>
         </div>
+        <FollowButton userId={item.author.id} size="sm" />
       </div>
 
       <InlineVideoPlayer
@@ -296,13 +300,29 @@ function FeedReelCard({ item }: { item: HighlightFeedItem }) {
             {item.hashtags.map((h) => `#${h}`).join(" ")}
           </p>
         )}
-        <Link
-          to="/players/$userId"
-          params={{ userId: item.author.id }}
-          className="inline-block text-xs font-semibold text-lime underline"
-        >
-          View full profile
-        </Link>
+        <div className="flex items-center gap-3">
+          <Link
+            to="/players/$userId"
+            params={{ userId: item.author.id }}
+            className="text-xs font-semibold text-lime underline"
+          >
+            View full profile
+          </Link>
+          <button
+            type="button"
+            onClick={() => setShowComments((v) => !v)}
+            aria-expanded={showComments}
+            className="inline-flex items-center gap-1 text-xs font-semibold text-muted-foreground hover:text-lime"
+          >
+            <MessageCircle className="h-3.5 w-3.5" />
+            {showComments ? "Hide comments" : "Comments"}
+          </button>
+        </div>
+        {showComments && (
+          <div className="border-t border-border pt-1">
+            <PostEngagement subjectType="highlight_reel" subjectId={item.id} />
+          </div>
+        )}
       </div>
     </li>
   );
