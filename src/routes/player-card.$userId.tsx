@@ -5,6 +5,8 @@ import { pageHead, ogImageUrl } from "@/lib/seo";
 import { InlineVideoPlayer } from "@/components/InlineVideoPlayer";
 import { listPublicReels } from "@/lib/reels.functions";
 import { getPlayerCard, type PlayerCardData } from "@/lib/player-card.functions";
+import { useReelRealtime } from "@/hooks/use-reel-realtime";
+
 
 export const Route = createFileRoute("/player-card/$userId")({
   head: ({ params }) => ({
@@ -77,6 +79,17 @@ function PlayerCardPage() {
       cancelled = true;
     };
   }, [userId]);
+
+  // Live-update when this player publishes (or finishes processing) a reel.
+  useReelRealtime(
+    () => {
+      void listPublicReels({ data: { userId } })
+        .then((r) => setReels((r as PublicReel[]) ?? []))
+        .catch(() => {});
+    },
+    { userId },
+  );
+
 
   // Highlight the tab for whichever section is in view while scrolling.
   useEffect(() => {
