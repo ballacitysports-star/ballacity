@@ -96,10 +96,15 @@ export const listHighlightFeed = createServerFn({ method: "GET" })
 
     const items: HighlightFeedItem[] = await Promise.all(
       page.map(async (r) => {
-        const [video, thumb] = await Promise.all([
+        const [video, original, thumb] = await Promise.all([
           supabaseAdmin.storage
             .from("highlight-videos")
             .createSignedUrl(r.playback_path ?? r.video_path, 3600),
+          r.playback_path
+            ? supabaseAdmin.storage
+                .from("highlight-videos")
+                .createSignedUrl(r.video_path, 3600)
+            : Promise.resolve({ data: null as { signedUrl?: string } | null }),
           r.thumbnail_path
             ? supabaseAdmin.storage
                 .from("highlight-videos")
