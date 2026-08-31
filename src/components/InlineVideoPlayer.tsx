@@ -104,7 +104,7 @@ export function InlineVideoPlayer({
       cancelled = true;
       cleanup();
     };
-  }, [url]);
+  }, [url, fallbackVideoUrl, triedFallback]);
 
   if (unsupported && url) {
     return (
