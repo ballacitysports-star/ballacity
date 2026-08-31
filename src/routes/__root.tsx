@@ -354,6 +354,7 @@ const PUBLIC_ROUTES = [
   "/.lovable/oauth/consent",
   // Shareable, sign-in-free surface.
   "/highlights",
+  "/player-card",
 ];
 const TAB_PATHS = [
   "/feed",
