@@ -5,6 +5,8 @@ import { pageHead, ogImageUrl } from "@/lib/seo";
 import { InlineVideoPlayer } from "@/components/InlineVideoPlayer";
 import { listPublicReels } from "@/lib/reels.functions";
 import { getPlayerCard, type PlayerCardData } from "@/lib/player-card.functions";
+import { useReelRealtime } from "@/hooks/use-reel-realtime";
+
 
 export const Route = createFileRoute("/player-card/$userId")({
   head: ({ params }) => ({
