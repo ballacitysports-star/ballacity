@@ -15,6 +15,7 @@ import { RepairPlaybackButton } from "@/components/reels/RepairPlaybackButton";
 export function InlineVideoPlayer({
   videoPath,
   videoUrl,
+  fallbackVideoUrl,
   thumbnailUrl,
   ariaLabel,
   repair,
@@ -22,6 +23,8 @@ export function InlineVideoPlayer({
   videoPath?: string;
   /** Pre-signed URL; when provided, client-side signing is skipped. */
   videoUrl?: string | null;
+  /** Second copy of the same clip, tried automatically if the first won't decode. */
+  fallbackVideoUrl?: string | null;
   thumbnailUrl?: string | null;
   ariaLabel?: string;
   /** Owner-only: lets the viewer re-encode an undecodable clip in the browser. */
@@ -31,6 +34,7 @@ export function InlineVideoPlayer({
   const [playing, setPlaying] = useState(false);
   const [failed, setFailed] = useState(false);
   const [unsupported, setUnsupported] = useState(false);
+  const [triedFallback, setTriedFallback] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -38,6 +42,7 @@ export function InlineVideoPlayer({
     setFailed(false);
     setUnsupported(false);
     setPlaying(false);
+    setTriedFallback(false);
     if (videoUrl !== undefined) {
       setUrl(videoUrl);
       if (!videoUrl) setFailed(true);
