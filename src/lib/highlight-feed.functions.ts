@@ -17,6 +17,11 @@ export type HighlightFeedItem = {
   hashtags: string[];
   sport: string | null;
   videoUrl: string | null;
+  /**
+   * Original upload, signed as a second chance: when the device can't decode
+   * the primary copy the player silently retries this one.
+   */
+  fallbackVideoUrl: string | null;
   thumbnailUrl: string | null;
   createdAt: string;
   author: {
