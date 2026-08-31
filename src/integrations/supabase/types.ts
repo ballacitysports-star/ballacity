@@ -1404,6 +1404,7 @@ export type Database = {
           active_profile_id: string | null
           avatar_initials: string | null
           avatar_url: string | null
+          avatar_url_private: string | null
           avatar_visibility: string
           bio: string | null
           birthday: string | null
@@ -1428,6 +1429,7 @@ export type Database = {
           active_profile_id?: string | null
           avatar_initials?: string | null
           avatar_url?: string | null
+          avatar_url_private?: string | null
           avatar_visibility?: string
           bio?: string | null
           birthday?: string | null
@@ -1452,6 +1454,7 @@ export type Database = {
           active_profile_id?: string | null
           avatar_initials?: string | null
           avatar_url?: string | null
+          avatar_url_private?: string | null
           avatar_visibility?: string
           bio?: string | null
           birthday?: string | null
