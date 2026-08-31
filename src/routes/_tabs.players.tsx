@@ -63,7 +63,6 @@ import {
   slotsHitRange,
   fmtShortDate,
   fmt12,
-  formatAvailabilityWindow,
   formatAvailabilityWindowShort,
   type TimeSlot,
 } from "@/lib/availability-timeslots";
