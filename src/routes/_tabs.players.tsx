@@ -64,6 +64,7 @@ import {
   fmtShortDate,
   fmt12,
   formatAvailabilityWindow,
+  formatAvailabilityWindowShort,
   type TimeSlot,
 } from "@/lib/availability-timeslots";
 import { RequestStatusPanel } from "@/components/RequestStatusPanel";
@@ -1317,7 +1318,7 @@ const navigate = useNavigate();
   );
 }
 
-const formatWindow = (a: PlayerAvailability): string => formatAvailabilityWindow(a);
+const formatWindow = (a: PlayerAvailability): string => formatAvailabilityWindowShort(a);
 
 function fmtDate(iso: string) {
   const d = new Date(iso + "T00:00:00");
