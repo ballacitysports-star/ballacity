@@ -590,3 +590,72 @@ export const deleteReels = createServerFn({ method: "POST" })
     if (delError) throw new Error(delError.message);
     return { deleted: ids.length };
   });
+
+/**
+ * Best guess at the game a freshly uploaded clip belongs to.
+ *
+ * Uploads rarely happen from the game screen, so we pick the caller's closest
+ * game in time (hosted or joined) — recently finished ones first — and hand the
+ * uploader its title, sport, and kickoff so the reel is linked automatically and
+ * the public player card shows the right sport and timing.
+ */
+export const suggestGameForReel = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: { at?: string } | undefined) => ({
+    at: typeof input?.at === "string" && input.at ? input.at : null,
+  }))
+  .handler(async ({ data, context }) => {
+    const at = data.at ? new Date(data.at) : new Date();
+    const anchor = Number.isNaN(at.getTime()) ? new Date() : at;
+
+    const [{ data: hosted }, { data: joins }] = await Promise.all([
+      context.supabase
+        .from("hosted_games")
+        .select("id,title,sport,date")
+        .eq("host_id", context.userId)
+        .order("date", { ascending: false })
+        .limit(40),
+      context.supabase
+        .from("game_participants")
+        .select("game_id")
+        .eq("user_id", context.userId)
+        .limit(120),
+    ]);
+
+    const hostedRows = ((hosted ?? []) as any[]).map((g) => ({ ...g }));
+    const joinedIds = ((joins ?? []) as any[])
+      .map((r) => r.game_id as string)
+      .filter((id) => !hostedRows.some((g) => g.id === id));
+
+    let joinedRows: any[] = [];
+    if (joinedIds.length > 0) {
+      const { data: rows } = await context.supabase
+        .from("hosted_games")
+        .select("id,title,sport,date")
+        .in("id", joinedIds)
+        .order("date", { ascending: false })
+        .limit(40);
+      joinedRows = (rows ?? []) as any[];
+    }
+
+    // Within 14 days before the upload (or 1 day after, for early uploads).
+    const WINDOW_BEFORE = 14 * 24 * 60 * 60 * 1000;
+    const WINDOW_AFTER = 24 * 60 * 60 * 1000;
+    const candidates = [...hostedRows, ...joinedRows]
+      .filter((g) => typeof g.date === "string")
+      .map((g) => {
+        const delta = anchor.getTime() - new Date(g.date as string).getTime();
+        return { g, delta };
+      })
+      .filter(({ delta }) => delta >= -WINDOW_AFTER && delta <= WINDOW_BEFORE)
+      .sort((a, b) => Math.abs(a.delta) - Math.abs(b.delta));
+
+    const best = candidates[0]?.g;
+    if (!best) return null;
+    return {
+      id: best.id as string,
+      title: (best.title as string) ?? "Game",
+      sport: (best.sport as string) ?? null,
+      date: (best.date as string) ?? null,
+    };
+  });

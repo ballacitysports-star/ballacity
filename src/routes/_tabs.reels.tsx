@@ -16,7 +16,8 @@ import {
 } from "lucide-react";
 import { captureClip } from "@/lib/reel-frames";
 import { isWidelyPlayable } from "@/lib/video-support";
-import { transcodeToH264Mp4 } from "@/lib/video-transcode";
+import { convertToPlayableMp4 } from "@/lib/video-transcode";
+import { RepairPlaybackButton } from "@/components/reels/RepairPlaybackButton";
 
 import { ReelStylePanel } from "@/components/reels/ReelStylePanel";
 import {
@@ -32,10 +33,12 @@ import { useDefaultSports } from "@/lib/default-sports";
 import { ReelStudio } from "@/components/reels/ReelStudio";
 import { ReelCompare } from "@/components/reels/ReelCompare";
 import {
+  applyReelCopy,
   deleteReel,
   processMyReels,
   regenerateReelStyle,
   setReelHidden,
+  suggestGameForReel,
 } from "@/lib/reels.functions";
 import { ReelCoach } from "@/components/reels/ReelCoach";
 import { toast } from "sonner";
@@ -55,7 +58,7 @@ import {
   shareRecap,
   type RecapSummary,
 } from "@/lib/recaps";
-import { EyeOff, Share2, Trash2 } from "lucide-react";
+import { EyeOff, Film, Pencil, Share2, Trash2 } from "lucide-react";
 
 export const Route = createFileRoute("/_tabs/reels")({
   validateSearch: (search: Record<string, unknown>) => ({
@@ -129,6 +132,9 @@ function ReelCard({ reel, onRetry }: { reel: Reel; onRetry: (id: string) => Prom
   const [restyling, setRestyling] = useState(false);
   const [manageBusy, setManageBusy] = useState<"hide" | "delete" | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [renaming, setRenaming] = useState(false);
+  const [nameDraft, setNameDraft] = useState("");
+  const [savingName, setSavingName] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -353,7 +359,80 @@ function ReelCard({ reel, onRetry }: { reel: Reel; onRetry: (id: string) => Prom
             Delete
           </button>
         )}
+        <button
+          onClick={() => {
+            setNameDraft(displayTitle);
+            setRenaming(true);
+          }}
+          disabled={manageBusy !== null}
+          className="inline-flex items-center gap-1 rounded-full border border-border px-2.5 py-1 text-[10px] font-semibold text-muted-foreground hover:text-foreground disabled:opacity-50"
+        >
+          <Pencil className="h-3 w-3" /> Rename
+        </button>
       </div>
+
+      {/* Name this highlight before it goes out on the public feed. */}
+      {renaming && (
+        <form
+          className="mt-2 flex items-center gap-2"
+          onSubmit={async (e) => {
+            e.preventDefault();
+            const title = nameDraft.trim();
+            if (!title) return;
+            setSavingName(true);
+            try {
+              await applyReelCopy({ data: { reelId: reel.id, title } });
+              toast.success("Reel title updated");
+              setRenaming(false);
+            } catch (err: any) {
+              toast.error(err?.message ?? "Could not rename this reel");
+            } finally {
+              setSavingName(false);
+            }
+          }}
+        >
+          <input
+            value={nameDraft}
+            onChange={(e) => setNameDraft(e.target.value)}
+            maxLength={120}
+            autoFocus
+            placeholder="Name this highlight"
+            className="min-w-0 flex-1 rounded-lg border border-border bg-background px-2.5 py-1.5 text-xs"
+            aria-label="Reel title"
+          />
+          <button
+            type="submit"
+            disabled={savingName || !nameDraft.trim()}
+            className="rounded-lg bg-lime px-2.5 py-1.5 text-[11px] font-bold text-primary-foreground disabled:opacity-50"
+          >
+            {savingName ? "Saving…" : "Save"}
+          </button>
+          <button
+            type="button"
+            onClick={() => setRenaming(false)}
+            className="rounded-lg border border-border px-2.5 py-1.5 text-[11px] font-semibold text-muted-foreground"
+          >
+            Cancel
+          </button>
+        </form>
+      )}
+
+      {/* Owner-side playback repair: converts screen recordings that only play
+          in some browsers into a baseline H.264 copy that plays everywhere. */}
+      {isDone && (
+        <div className="mt-2 flex items-center justify-between gap-2 rounded-xl border border-border bg-background/60 p-2">
+          <p className="min-w-0 flex-1 text-[10px] text-muted-foreground">
+            {reel.playback_path
+              ? "iPhone & Safari copy ready."
+              : "Screen recording? Convert it so it plays on iPhone and Safari."}
+          </p>
+          <RepairPlaybackButton
+            reelId={reel.id}
+            videoPath={reel.video_path}
+            label={reel.playback_path ? "Re-run fix" : "Fix playback"}
+          />
+        </div>
+      )}
 
       {open && videoUrl && (
         <ReelStudio
