@@ -89,19 +89,7 @@ export function BottomNav() {
   };
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-40 border-t border-border bg-background/95 backdrop-blur-xl pb-[max(env(safe-area-inset-bottom),0px)]">
-      {/* SVG gradient stroke definition, used by the Create tab icon. */}
-      <svg width="0" height="0" className="absolute" aria-hidden>
-        <defs>
-          <linearGradient id="ig-grad" x1="0%" y1="0%" x2="100%" y2="100%">
-            <stop offset="0%" stopColor="#f09433" />
-            <stop offset="25%" stopColor="#e6683c" />
-            <stop offset="50%" stopColor="#dc2743" />
-            <stop offset="75%" stopColor="#cc2366" />
-            <stop offset="100%" stopColor="#bc1888" />
-          </linearGradient>
-        </defs>
-      </svg>
+<nav className="fixed bottom-0 left-0 right-0 z-40 border-t border-border bg-background/95 backdrop-blur-xl pb-[max(env(safe-area-inset-bottom),0px)]">
       <div
         className="mx-auto flex max-w-md sm:max-w-xl items-center justify-around"
         role="group"
