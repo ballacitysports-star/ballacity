@@ -104,3 +104,36 @@ export async function reportUser(
   } as any);
   if (error) throw error;
 }
+
+export type ReelQualityIssue =
+  | "blurry"
+  | "wrong_game"
+  | "not_a_highlight"
+  | "duplicate"
+  | "other";
+
+export const REEL_QUALITY_ISSUES: { value: ReelQualityIssue; label: string }[] = [
+  { value: "blurry", label: "Blurry, dark, or shaky footage" },
+  { value: "wrong_game", label: "Wrong sport or wrong game" },
+  { value: "not_a_highlight", label: "Not really a highlight" },
+  { value: "duplicate", label: "Duplicate of another reel" },
+  { value: "other", label: "Something else" },
+];
+
+/**
+ * Flags a highlight reel as low quality. Reuses the moderation queue that
+ * backs user reports, tagging the reel id in the details so reviewers can
+ * jump straight to the clip.
+ */
+export async function flagReelQuality(
+  reelId: string,
+  authorId: string,
+  issue: ReelQualityIssue,
+  note?: string,
+) {
+  const label = REEL_QUALITY_ISSUES.find((i) => i.value === issue)?.label ?? issue;
+  const details = [`Low-quality highlight reel ${reelId}`, label, note?.trim()]
+    .filter(Boolean)
+    .join(" — ");
+  await reportUser(authorId, "inappropriate", details);
+}
