@@ -1,8 +1,10 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { ArrowLeft, Clapperboard, Loader2, MapPin, Sparkles } from "lucide-react";
+import { ArrowLeft, Clapperboard, Loader2, MapPin, MessageCircle, Sparkles } from "lucide-react";
 import { pageHead } from "@/lib/seo";
 import { InlineVideoPlayer } from "@/components/InlineVideoPlayer";
+import { FollowButton } from "@/components/FollowButton";
+import { PostEngagement } from "@/components/PostEngagement";
 import {
   listHighlightFeed,
   listHighlightFeedSports,
