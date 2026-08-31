@@ -15,7 +15,7 @@ import {
   Circle,
 } from "lucide-react";
 import { captureClip } from "@/lib/reel-frames";
-import { isWidelyPlayable } from "@/lib/video-support";
+import { needsPlaybackConversion } from "@/lib/video-support";
 import { convertToPlayableMp4 } from "@/lib/video-transcode";
 import { RepairPlaybackButton } from "@/components/reels/RepairPlaybackButton";
 
