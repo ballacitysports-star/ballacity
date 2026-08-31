@@ -34,7 +34,7 @@ function publicClient() {
 
 export type CommentRow = {
   id: string;
-  subjectType: "team_post" | "game";
+  subjectType: EngagementSubjectType;
   subjectId: string;
   authorId: string;
   authorName: string | null;
