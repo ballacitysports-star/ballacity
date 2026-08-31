@@ -910,6 +910,12 @@ function ReelsPage() {
         <p className="mt-1 text-sm text-muted-foreground">
           Upload a clip and let AI generate your highlight.
         </p>
+        <Link
+          to="/highlights"
+          className="mt-3 inline-flex items-center gap-1.5 rounded-full border border-lime/40 bg-lime/10 px-3 py-1.5 text-xs font-bold text-lime"
+        >
+          <Film className="h-3.5 w-3.5" /> Browse the public highlight feed
+        </Link>
       </header>
 
       {gameId && (
@@ -994,6 +1000,52 @@ function ReelsPage() {
       />
 
       <section className="mx-5 mb-6">
+        {/* Name the highlight before publishing — this is the title shown on the
+            public highlight feed and on the player card. */}
+        <label className="mb-1.5 block text-xs font-semibold text-muted-foreground" htmlFor="reel-title">
+          Reel title
+        </label>
+        <input
+          id="reel-title"
+          value={titleDraft}
+          onChange={(e) => setTitleDraft(e.target.value)}
+          maxLength={120}
+          placeholder="e.g. Sunday basketball buzzer beater"
+          className="mb-2 w-full rounded-xl border border-border bg-background px-3 py-2.5 text-sm"
+        />
+        <p className="mb-3 text-[11px] text-muted-foreground">
+          Optional — we'll fall back to the game name or file name. You can rename any reel later.
+        </p>
+
+        {!gameId && autoGame && (
+          <label className="mb-3 flex cursor-pointer items-start gap-2 rounded-xl border border-border bg-surface p-3">
+            <input
+              type="checkbox"
+              checked={autoLink}
+              onChange={(e) => setAutoLink(e.target.checked)}
+              className="mt-0.5 h-4 w-4 accent-lime"
+            />
+            <span className="min-w-0 flex-1">
+              <span className="block text-xs font-semibold">Link this reel to {autoGame.title}</span>
+              <span className="block text-[11px] text-muted-foreground">
+                {[
+                  autoGame.sport,
+                  autoGame.date
+                    ? new Date(autoGame.date).toLocaleDateString(undefined, {
+                        weekday: "short",
+                        month: "short",
+                        day: "numeric",
+                      })
+                    : null,
+                ]
+                  .filter(Boolean)
+                  .join(" · ")}{" "}
+                — keeps the sport and timing right on your public card.
+              </span>
+            </span>
+          </label>
+        )}
+
         <input
           ref={fileRef}
           type="file"
