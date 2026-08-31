@@ -16,7 +16,8 @@ import {
 } from "lucide-react";
 import { captureClip } from "@/lib/reel-frames";
 import { isWidelyPlayable } from "@/lib/video-support";
-import { transcodeToH264Mp4 } from "@/lib/video-transcode";
+import { convertToPlayableMp4 } from "@/lib/video-transcode";
+import { RepairPlaybackButton } from "@/components/reels/RepairPlaybackButton";
 
 import { ReelStylePanel } from "@/components/reels/ReelStylePanel";
 import {
@@ -32,10 +33,12 @@ import { useDefaultSports } from "@/lib/default-sports";
 import { ReelStudio } from "@/components/reels/ReelStudio";
 import { ReelCompare } from "@/components/reels/ReelCompare";
 import {
+  applyReelCopy,
   deleteReel,
   processMyReels,
   regenerateReelStyle,
   setReelHidden,
+  suggestGameForReel,
 } from "@/lib/reels.functions";
 import { ReelCoach } from "@/components/reels/ReelCoach";
 import { toast } from "sonner";
@@ -55,7 +58,7 @@ import {
   shareRecap,
   type RecapSummary,
 } from "@/lib/recaps";
-import { EyeOff, Share2, Trash2 } from "lucide-react";
+import { EyeOff, Film, Pencil, Share2, Trash2 } from "lucide-react";
 
 export const Route = createFileRoute("/_tabs/reels")({
   validateSearch: (search: Record<string, unknown>) => ({
@@ -129,6 +132,9 @@ function ReelCard({ reel, onRetry }: { reel: Reel; onRetry: (id: string) => Prom
   const [restyling, setRestyling] = useState(false);
   const [manageBusy, setManageBusy] = useState<"hide" | "delete" | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [renaming, setRenaming] = useState(false);
+  const [nameDraft, setNameDraft] = useState("");
+  const [savingName, setSavingName] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -353,7 +359,80 @@ function ReelCard({ reel, onRetry }: { reel: Reel; onRetry: (id: string) => Prom
             Delete
           </button>
         )}
+        <button
+          onClick={() => {
+            setNameDraft(displayTitle);
+            setRenaming(true);
+          }}
+          disabled={manageBusy !== null}
+          className="inline-flex items-center gap-1 rounded-full border border-border px-2.5 py-1 text-[10px] font-semibold text-muted-foreground hover:text-foreground disabled:opacity-50"
+        >
+          <Pencil className="h-3 w-3" /> Rename
+        </button>
       </div>
+
+      {/* Name this highlight before it goes out on the public feed. */}
+      {renaming && (
+        <form
+          className="mt-2 flex items-center gap-2"
+          onSubmit={async (e) => {
+            e.preventDefault();
+            const title = nameDraft.trim();
+            if (!title) return;
+            setSavingName(true);
+            try {
+              await applyReelCopy({ data: { reelId: reel.id, title } });
+              toast.success("Reel title updated");
+              setRenaming(false);
+            } catch (err: any) {
+              toast.error(err?.message ?? "Could not rename this reel");
+            } finally {
+              setSavingName(false);
+            }
+          }}
+        >
+          <input
+            value={nameDraft}
+            onChange={(e) => setNameDraft(e.target.value)}
+            maxLength={120}
+            autoFocus
+            placeholder="Name this highlight"
+            className="min-w-0 flex-1 rounded-lg border border-border bg-background px-2.5 py-1.5 text-xs"
+            aria-label="Reel title"
+          />
+          <button
+            type="submit"
+            disabled={savingName || !nameDraft.trim()}
+            className="rounded-lg bg-lime px-2.5 py-1.5 text-[11px] font-bold text-primary-foreground disabled:opacity-50"
+          >
+            {savingName ? "Saving…" : "Save"}
+          </button>
+          <button
+            type="button"
+            onClick={() => setRenaming(false)}
+            className="rounded-lg border border-border px-2.5 py-1.5 text-[11px] font-semibold text-muted-foreground"
+          >
+            Cancel
+          </button>
+        </form>
+      )}
+
+      {/* Owner-side playback repair: converts screen recordings that only play
+          in some browsers into a baseline H.264 copy that plays everywhere. */}
+      {isDone && (
+        <div className="mt-2 flex items-center justify-between gap-2 rounded-xl border border-border bg-background/60 p-2">
+          <p className="min-w-0 flex-1 text-[10px] text-muted-foreground">
+            {reel.playback_path
+              ? "iPhone & Safari copy ready."
+              : "Screen recording? Convert it so it plays on iPhone and Safari."}
+          </p>
+          <RepairPlaybackButton
+            reelId={reel.id}
+            videoPath={reel.video_path}
+            label={reel.playback_path ? "Re-run fix" : "Fix playback"}
+          />
+        </div>
+      )}
 
       {open && videoUrl && (
         <ReelStudio
@@ -478,6 +557,13 @@ function ReelsPage() {
   const [reels, setReels] = useState<Reel[]>([]);
   const [busy, setBusy] = useState(false);
   const [style, setStyle] = useState<ReelStylePrefs>(DEFAULT_REEL_STYLE);
+  /** Athlete-chosen name for the next upload (e.g. "Sunday soccer hat trick"). */
+  const [titleDraft, setTitleDraft] = useState("");
+  /** Best-guess game for an upload started outside a game screen. */
+  const [autoGame, setAutoGame] = useState<
+    { id: string; title: string; sport: string | null; date: string | null } | null
+  >(null);
+  const [autoLink, setAutoLink] = useState(true);
   // Sport context for style defaults: the game's sport when uploading from a
   // game, otherwise the athlete's first profile sport.
   const { sports: profileSports, loaded: profileLoaded } = useDefaultSports();
@@ -500,8 +586,28 @@ function ReelsPage() {
       cancelled = true;
     };
   }, [gameId]);
+  // Without an explicit ?game=, look up the athlete's closest game in time so
+  // the reel links itself and the public card shows the right sport and timing.
+  useEffect(() => {
+    if (!user || gameId) {
+      setAutoGame(null);
+      return;
+    }
+    let cancelled = false;
+    void suggestGameForReel({ data: {} })
+      .then((g) => {
+        if (!cancelled) setAutoGame(g ?? null);
+      })
+      .catch(() => {
+        if (!cancelled) setAutoGame(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [user, gameId]);
+
   const activeSport =
-    [gameSport, ...profileSports].find(
+    [gameSport, autoGame?.sport ?? null, ...profileSports].find(
       (s): s is string => !!s && s in SPORT_STYLE_DEFAULTS,
     ) ?? null;
   // Restore the style after hydration (localStorage is browser-only), then
@@ -663,22 +769,25 @@ function ReelsPage() {
       let playbackPath: string | null = null;
       if (!(await isWidelyPlayable(file))) {
         const toastId = toast.loading("Converting for iPhone & Safari playback… 0%");
-        const mp4 = await transcodeToH264Mp4(file, (r) =>
-          toast.loading(`Converting for iPhone & Safari playback… ${Math.round(r * 100)}%`, {
-            id: toastId,
-          }),
+        const converted = await convertToPlayableMp4(file, (r, pass) =>
+          toast.loading(
+            pass === "standard"
+              ? `Converting for iPhone & Safari playback… ${Math.round(r * 100)}%`
+              : `Retrying with lighter settings (${pass})… ${Math.round(r * 100)}%`,
+            { id: toastId },
+          ),
         );
-        if (mp4) {
+        if (converted) {
           const p = `${base}.h264.mp4`;
           const { error } = await supabase.storage
             .from("highlight-videos")
-            .upload(p, mp4, { upsert: true, contentType: "video/mp4" });
+            .upload(p, converted.blob, { upsert: true, contentType: "video/mp4" });
           if (!error) playbackPath = p;
         }
         if (playbackPath) toast.success("Converted — this reel now plays everywhere", { id: toastId });
         else
           toast.warning(
-            "Couldn't convert this clip in the browser — it may not play on iPhone or Safari.",
+            "Couldn't convert this clip here — use \"Fix playback\" on the reel below, or try desktop Chrome.",
             { id: toastId },
           );
       }
@@ -709,18 +818,30 @@ function ReelsPage() {
       }
 
       const usedFree = !isActive;
+      // Link to the game the athlete came from, or the auto-detected one.
+      const linkedGame = gameId
+        ? { id: gameId, title: gameTitle || "Game", sport: gameSport }
+        : autoLink && autoGame
+          ? { id: autoGame.id, title: autoGame.title, sport: autoGame.sport }
+          : null;
+      const chosenTitle = titleDraft.trim();
       const { data: inserted, error: insErr } = await supabase
         .from("highlight_reels")
         .insert({
           user_id: user.id,
-          title: gameTitle ? `Recap · ${gameTitle}` : file.name.replace(/\.[^.]+$/, ""),
+          title:
+            chosenTitle ||
+            (linkedGame ? `Recap · ${linkedGame.title}` : file.name.replace(/\.[^.]+$/, "")),
           video_path: base,
           playback_path: playbackPath,
           status: "processing",
           used_free: usedFree,
           environment: env,
-          game_id: gameId || null,
-          game_title: gameTitle || null,
+          game_id: linkedGame?.id ?? null,
+          game_title: linkedGame?.title ?? null,
+          // Seed the sport from the linked game so the public card is right even
+          // before the AI pass finishes; the pipeline refines it afterwards.
+          ai_sport: linkedGame?.sport ?? null,
           frame_paths: framePaths.length > 0 ? framePaths : null,
           frame_times: frameTimes.length > 0 ? frameTimes : null,
           audio_path: audioPath,
@@ -731,6 +852,7 @@ function ReelsPage() {
         .maybeSingle();
       if (insErr) throw insErr;
 
+      setTitleDraft("");
       toast.success("Reel uploaded — AI is working on it now");
       void kickOffProcessing((inserted as { id?: string } | null)?.id);
     } catch (e: any) {
@@ -788,6 +910,12 @@ function ReelsPage() {
         <p className="mt-1 text-sm text-muted-foreground">
           Upload a clip and let AI generate your highlight.
         </p>
+        <Link
+          to="/highlights"
+          className="mt-3 inline-flex items-center gap-1.5 rounded-full border border-lime/40 bg-lime/10 px-3 py-1.5 text-xs font-bold text-lime"
+        >
+          <Film className="h-3.5 w-3.5" /> Browse the public highlight feed
+        </Link>
       </header>
 
       {gameId && (
@@ -872,6 +1000,52 @@ function ReelsPage() {
       />
 
       <section className="mx-5 mb-6">
+        {/* Name the highlight before publishing — this is the title shown on the
+            public highlight feed and on the player card. */}
+        <label className="mb-1.5 block text-xs font-semibold text-muted-foreground" htmlFor="reel-title">
+          Reel title
+        </label>
+        <input
+          id="reel-title"
+          value={titleDraft}
+          onChange={(e) => setTitleDraft(e.target.value)}
+          maxLength={120}
+          placeholder="e.g. Sunday basketball buzzer beater"
+          className="mb-2 w-full rounded-xl border border-border bg-background px-3 py-2.5 text-sm"
+        />
+        <p className="mb-3 text-[11px] text-muted-foreground">
+          Optional — we'll fall back to the game name or file name. You can rename any reel later.
+        </p>
+
+        {!gameId && autoGame && (
+          <label className="mb-3 flex cursor-pointer items-start gap-2 rounded-xl border border-border bg-surface p-3">
+            <input
+              type="checkbox"
+              checked={autoLink}
+              onChange={(e) => setAutoLink(e.target.checked)}
+              className="mt-0.5 h-4 w-4 accent-lime"
+            />
+            <span className="min-w-0 flex-1">
+              <span className="block text-xs font-semibold">Link this reel to {autoGame.title}</span>
+              <span className="block text-[11px] text-muted-foreground">
+                {[
+                  autoGame.sport,
+                  autoGame.date
+                    ? new Date(autoGame.date).toLocaleDateString(undefined, {
+                        weekday: "short",
+                        month: "short",
+                        day: "numeric",
+                      })
+                    : null,
+                ]
+                  .filter(Boolean)
+                  .join(" · ")}{" "}
+                — keeps the sport and timing right on your public card.
+              </span>
+            </span>
+          </label>
+        )}
+
         <input
           ref={fileRef}
           type="file"

@@ -13,6 +13,7 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as TabsRouteImport } from './routes/_tabs'
 import { Route as AdminRouteImport } from './routes/admin'
 import { Route as AuthRouteImport } from './routes/auth'
+import { Route as HighlightsRouteImport } from './routes/highlights'
 import { Route as McpRouteImport } from './routes/mcp'
 import { Route as PaymentsRouteImport } from './routes/payments'
 import { Route as PickupRouteImport } from './routes/pickup'
@@ -85,6 +86,11 @@ const AdminRoute = AdminRouteImport.update({
 const AuthRoute = AuthRouteImport.update({
   id: '/auth',
   path: '/auth',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const HighlightsRoute = HighlightsRouteImport.update({
+  id: '/highlights',
+  path: '/highlights',
   getParentRoute: () => rootRouteImport,
 } as any)
 const McpRoute = McpRouteImport.update({
@@ -366,6 +372,7 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/admin': typeof AdminRouteWithChildren
   '/auth': typeof AuthRoute
+  '/highlights': typeof HighlightsRoute
   '/mcp': typeof McpRoute
   '/payments': typeof PaymentsRoute
   '/pickup': typeof PickupRoute
@@ -425,6 +432,7 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/admin': typeof AdminRouteWithChildren
   '/auth': typeof AuthRoute
+  '/highlights': typeof HighlightsRoute
   '/mcp': typeof McpRoute
   '/payments': typeof PaymentsRoute
   '/pickup': typeof PickupRoute
@@ -485,6 +493,7 @@ export interface FileRoutesById {
   '/_tabs': typeof TabsRouteWithChildren
   '/admin': typeof AdminRouteWithChildren
   '/auth': typeof AuthRoute
+  '/highlights': typeof HighlightsRoute
   '/mcp': typeof McpRoute
   '/payments': typeof PaymentsRoute
   '/pickup': typeof PickupRoute
@@ -546,6 +555,7 @@ export interface FileRouteTypes {
     | '/'
     | '/admin'
     | '/auth'
+    | '/highlights'
     | '/mcp'
     | '/payments'
     | '/pickup'
@@ -605,6 +615,7 @@ export interface FileRouteTypes {
     | '/'
     | '/admin'
     | '/auth'
+    | '/highlights'
     | '/mcp'
     | '/payments'
     | '/pickup'
@@ -664,6 +675,7 @@ export interface FileRouteTypes {
     | '/_tabs'
     | '/admin'
     | '/auth'
+    | '/highlights'
     | '/mcp'
     | '/payments'
     | '/pickup'
@@ -725,6 +737,7 @@ export interface RootRouteChildren {
   TabsRoute: typeof TabsRouteWithChildren
   AdminRoute: typeof AdminRouteWithChildren
   AuthRoute: typeof AuthRoute
+  HighlightsRoute: typeof HighlightsRoute
   McpRoute: typeof McpRoute
   PaymentsRoute: typeof PaymentsRoute
   PickupRoute: typeof PickupRoute
@@ -796,6 +809,13 @@ declare module '@tanstack/react-router' {
       path: '/auth'
       fullPath: '/auth'
       preLoaderRoute: typeof AuthRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/highlights': {
+      id: '/highlights'
+      path: '/highlights'
+      fullPath: '/highlights'
+      preLoaderRoute: typeof HighlightsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/mcp': {
@@ -1236,6 +1256,7 @@ const rootRouteChildren: RootRouteChildren = {
   TabsRoute: TabsRouteWithChildren,
   AdminRoute: AdminRouteWithChildren,
   AuthRoute: AuthRoute,
+  HighlightsRoute: HighlightsRoute,
   McpRoute: McpRoute,
   PaymentsRoute: PaymentsRoute,
   PickupRoute: PickupRoute,
