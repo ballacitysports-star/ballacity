@@ -31,6 +31,7 @@ type PublicReel = {
   id: string;
   title: string;
   videoUrl: string | null;
+  fallbackVideoUrl?: string | null;
   thumbnailUrl: string | null;
   sport: string | null;
   caption: string | null;
@@ -249,6 +250,7 @@ function PlayerCardPage() {
               <article key={reel.id} className="overflow-hidden rounded-2xl border border-border bg-surface">
                 <InlineVideoPlayer
                   videoUrl={reel.videoUrl}
+                  fallbackVideoUrl={reel.fallbackVideoUrl}
                   thumbnailUrl={reel.thumbnailUrl}
                   ariaLabel={`Highlight reel ${reel.title}`}
                 />

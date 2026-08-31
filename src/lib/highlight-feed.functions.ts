@@ -17,6 +17,11 @@ export type HighlightFeedItem = {
   hashtags: string[];
   sport: string | null;
   videoUrl: string | null;
+  /**
+   * Original upload, signed as a second chance: when the device can't decode
+   * the primary copy the player silently retries this one.
+   */
+  fallbackVideoUrl: string | null;
   thumbnailUrl: string | null;
   createdAt: string;
   author: {
@@ -91,10 +96,15 @@ export const listHighlightFeed = createServerFn({ method: "GET" })
 
     const items: HighlightFeedItem[] = await Promise.all(
       page.map(async (r) => {
-        const [video, thumb] = await Promise.all([
+        const [video, original, thumb] = await Promise.all([
           supabaseAdmin.storage
             .from("highlight-videos")
             .createSignedUrl(r.playback_path ?? r.video_path, 3600),
+          r.playback_path
+            ? supabaseAdmin.storage
+                .from("highlight-videos")
+                .createSignedUrl(r.video_path, 3600)
+            : Promise.resolve({ data: null as { signedUrl?: string } | null }),
           r.thumbnail_path
             ? supabaseAdmin.storage
                 .from("highlight-videos")
@@ -111,6 +121,7 @@ export const listHighlightFeed = createServerFn({ method: "GET" })
           hashtags: ((r.ai_hashtags as string[]) ?? []).slice(0, 6),
           sport: (r.ai_sport as string) ?? (game?.sport as string) ?? null,
           videoUrl: video.data?.signedUrl ?? null,
+          fallbackVideoUrl: (original as any)?.data?.signedUrl ?? null,
           thumbnailUrl: (thumb as any)?.data?.signedUrl ?? null,
           createdAt: r.created_at as string,
           author: {

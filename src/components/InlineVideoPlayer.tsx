@@ -15,6 +15,7 @@ import { RepairPlaybackButton } from "@/components/reels/RepairPlaybackButton";
 export function InlineVideoPlayer({
   videoPath,
   videoUrl,
+  fallbackVideoUrl,
   thumbnailUrl,
   ariaLabel,
   repair,
@@ -22,6 +23,8 @@ export function InlineVideoPlayer({
   videoPath?: string;
   /** Pre-signed URL; when provided, client-side signing is skipped. */
   videoUrl?: string | null;
+  /** Second copy of the same clip, tried automatically if the first won't decode. */
+  fallbackVideoUrl?: string | null;
   thumbnailUrl?: string | null;
   ariaLabel?: string;
   /** Owner-only: lets the viewer re-encode an undecodable clip in the browser. */
@@ -31,6 +34,7 @@ export function InlineVideoPlayer({
   const [playing, setPlaying] = useState(false);
   const [failed, setFailed] = useState(false);
   const [unsupported, setUnsupported] = useState(false);
+  const [triedFallback, setTriedFallback] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -38,6 +42,7 @@ export function InlineVideoPlayer({
     setFailed(false);
     setUnsupported(false);
     setPlaying(false);
+    setTriedFallback(false);
     if (videoUrl !== undefined) {
       setUrl(videoUrl);
       if (!videoUrl) setFailed(true);
@@ -75,22 +80,31 @@ export function InlineVideoPlayer({
       probe.removeAttribute("src");
       probe.load();
     };
+    // When the primary copy won't decode, silently switch to the other copy of
+    // the same clip before telling the athlete anything is wrong.
+    const giveUp = () => {
+      if (cancelled) return;
+      if (fallbackVideoUrl && !triedFallback && fallbackVideoUrl !== url) {
+        setTriedFallback(true);
+        setUrl(fallbackVideoUrl);
+      } else {
+        setUnsupported(true);
+      }
+      cleanup();
+    };
     probe.addEventListener("loadedmetadata", () => {
       if (cancelled) return;
       // A decodable track reports real dimensions; 0x0 means video is unusable.
-      if (!probe.videoWidth || !probe.videoHeight) setUnsupported(true);
-      cleanup();
+      if (!probe.videoWidth || !probe.videoHeight) giveUp();
+      else cleanup();
     });
-    probe.addEventListener("error", () => {
-      if (!cancelled) setUnsupported(true);
-      cleanup();
-    });
+    probe.addEventListener("error", giveUp);
     probe.src = url;
     return () => {
       cancelled = true;
       cleanup();
     };
-  }, [url]);
+  }, [url, fallbackVideoUrl, triedFallback]);
 
   if (unsupported && url) {
     return (
@@ -132,6 +146,11 @@ export function InlineVideoPlayer({
         autoPlay
         playsInline
         onError={() => {
+          if (fallbackVideoUrl && !triedFallback && fallbackVideoUrl !== url) {
+            setTriedFallback(true);
+            setUrl(fallbackVideoUrl);
+            return;
+          }
           setUnsupported(true);
           setPlaying(false);
         }}
