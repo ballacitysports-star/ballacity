@@ -557,6 +557,13 @@ function ReelsPage() {
   const [reels, setReels] = useState<Reel[]>([]);
   const [busy, setBusy] = useState(false);
   const [style, setStyle] = useState<ReelStylePrefs>(DEFAULT_REEL_STYLE);
+  /** Athlete-chosen name for the next upload (e.g. "Sunday soccer hat trick"). */
+  const [titleDraft, setTitleDraft] = useState("");
+  /** Best-guess game for an upload started outside a game screen. */
+  const [autoGame, setAutoGame] = useState<
+    { id: string; title: string; sport: string | null; date: string | null } | null
+  >(null);
+  const [autoLink, setAutoLink] = useState(true);
   // Sport context for style defaults: the game's sport when uploading from a
   // game, otherwise the athlete's first profile sport.
   const { sports: profileSports, loaded: profileLoaded } = useDefaultSports();
@@ -579,8 +586,28 @@ function ReelsPage() {
       cancelled = true;
     };
   }, [gameId]);
+  // Without an explicit ?game=, look up the athlete's closest game in time so
+  // the reel links itself and the public card shows the right sport and timing.
+  useEffect(() => {
+    if (!user || gameId) {
+      setAutoGame(null);
+      return;
+    }
+    let cancelled = false;
+    void suggestGameForReel({ data: {} })
+      .then((g) => {
+        if (!cancelled) setAutoGame(g ?? null);
+      })
+      .catch(() => {
+        if (!cancelled) setAutoGame(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [user, gameId]);
+
   const activeSport =
-    [gameSport, ...profileSports].find(
+    [gameSport, autoGame?.sport ?? null, ...profileSports].find(
       (s): s is string => !!s && s in SPORT_STYLE_DEFAULTS,
     ) ?? null;
   // Restore the style after hydration (localStorage is browser-only), then
@@ -742,22 +769,25 @@ function ReelsPage() {
       let playbackPath: string | null = null;
       if (!(await isWidelyPlayable(file))) {
         const toastId = toast.loading("Converting for iPhone & Safari playback… 0%");
-        const mp4 = await transcodeToH264Mp4(file, (r) =>
-          toast.loading(`Converting for iPhone & Safari playback… ${Math.round(r * 100)}%`, {
-            id: toastId,
-          }),
+        const converted = await convertToPlayableMp4(file, (r, pass) =>
+          toast.loading(
+            pass === "standard"
+              ? `Converting for iPhone & Safari playback… ${Math.round(r * 100)}%`
+              : `Retrying with lighter settings (${pass})… ${Math.round(r * 100)}%`,
+            { id: toastId },
+          ),
         );
-        if (mp4) {
+        if (converted) {
           const p = `${base}.h264.mp4`;
           const { error } = await supabase.storage
             .from("highlight-videos")
-            .upload(p, mp4, { upsert: true, contentType: "video/mp4" });
+            .upload(p, converted.blob, { upsert: true, contentType: "video/mp4" });
           if (!error) playbackPath = p;
         }
         if (playbackPath) toast.success("Converted — this reel now plays everywhere", { id: toastId });
         else
           toast.warning(
-            "Couldn't convert this clip in the browser — it may not play on iPhone or Safari.",
+            "Couldn't convert this clip here — use \"Fix playback\" on the reel below, or try desktop Chrome.",
             { id: toastId },
           );
       }
@@ -788,18 +818,30 @@ function ReelsPage() {
       }
 
       const usedFree = !isActive;
+      // Link to the game the athlete came from, or the auto-detected one.
+      const linkedGame = gameId
+        ? { id: gameId, title: gameTitle || "Game", sport: gameSport }
+        : autoLink && autoGame
+          ? { id: autoGame.id, title: autoGame.title, sport: autoGame.sport }
+          : null;
+      const chosenTitle = titleDraft.trim();
       const { data: inserted, error: insErr } = await supabase
         .from("highlight_reels")
         .insert({
           user_id: user.id,
-          title: gameTitle ? `Recap · ${gameTitle}` : file.name.replace(/\.[^.]+$/, ""),
+          title:
+            chosenTitle ||
+            (linkedGame ? `Recap · ${linkedGame.title}` : file.name.replace(/\.[^.]+$/, "")),
           video_path: base,
           playback_path: playbackPath,
           status: "processing",
           used_free: usedFree,
           environment: env,
-          game_id: gameId || null,
-          game_title: gameTitle || null,
+          game_id: linkedGame?.id ?? null,
+          game_title: linkedGame?.title ?? null,
+          // Seed the sport from the linked game so the public card is right even
+          // before the AI pass finishes; the pipeline refines it afterwards.
+          ai_sport: linkedGame?.sport ?? null,
           frame_paths: framePaths.length > 0 ? framePaths : null,
           frame_times: frameTimes.length > 0 ? frameTimes : null,
           audio_path: audioPath,
@@ -810,6 +852,7 @@ function ReelsPage() {
         .maybeSingle();
       if (insErr) throw insErr;
 
+      setTitleDraft("");
       toast.success("Reel uploaded — AI is working on it now");
       void kickOffProcessing((inserted as { id?: string } | null)?.id);
     } catch (e: any) {
