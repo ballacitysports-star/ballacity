@@ -763,16 +763,17 @@ function ReelsPage() {
         .upload(base, file, { upsert: false });
       if (upErr) throw upErr;
 
-      // Some recordings (VP9/AV1 wrapped in .mp4, or .webm) won't decode on
-      // iPhone/Safari. The server can't run an encoder, so build the H.264
-      // fallback here and store it as the playback copy.
+      // Every upload lands playable: unless the clip is provably H.264 in an
+      // MP4 container, we build the iPhone/Safari-safe H.264 copy right here
+      // (the server runtime has no encoder) instead of waiting for a manual
+      // "Fix playback" tap.
       let playbackPath: string | null = null;
-      if (!(await isWidelyPlayable(file))) {
-        const toastId = toast.loading("Converting for iPhone & Safari playback… 0%");
+      if (await needsPlaybackConversion(file)) {
+        const toastId = toast.loading("Making this clip play everywhere… 0%");
         const converted = await convertToPlayableMp4(file, (r, pass) =>
           toast.loading(
             pass === "standard"
-              ? `Converting for iPhone & Safari playback… ${Math.round(r * 100)}%`
+              ? `Making this clip play everywhere… ${Math.round(r * 100)}%`
               : `Retrying with lighter settings (${pass})… ${Math.round(r * 100)}%`,
             { id: toastId },
           ),
@@ -784,13 +785,14 @@ function ReelsPage() {
             .upload(p, converted.blob, { upsert: true, contentType: "video/mp4" });
           if (!error) playbackPath = p;
         }
-        if (playbackPath) toast.success("Converted — this reel now plays everywhere", { id: toastId });
+        if (playbackPath) toast.success("Ready — this reel plays on every device", { id: toastId });
         else
           toast.warning(
-            "Couldn't convert this clip here — use \"Fix playback\" on the reel below, or try desktop Chrome.",
+            "Couldn't convert this clip here — it will still upload, and the original plays on most devices.",
             { id: toastId },
           );
       }
+
 
 
       // Sample frames + audio in the browser: they become the real thumbnail and
