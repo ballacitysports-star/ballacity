@@ -146,6 +146,11 @@ export function InlineVideoPlayer({
         autoPlay
         playsInline
         onError={() => {
+          if (fallbackVideoUrl && !triedFallback && fallbackVideoUrl !== url) {
+            setTriedFallback(true);
+            setUrl(fallbackVideoUrl);
+            return;
+          }
           setUnsupported(true);
           setPlaying(false);
         }}
