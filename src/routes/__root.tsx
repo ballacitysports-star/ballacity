@@ -347,7 +347,15 @@ function maybeReloadForStaleChunk(reason: unknown) {
   window.location.reload();
 }
 
-const PUBLIC_ROUTES = ["/", "/auth", "/reset-password", "/.lovable/oauth/consent"];
+const PUBLIC_ROUTES = [
+  "/",
+  "/auth",
+  "/reset-password",
+  "/.lovable/oauth/consent",
+  // Shareable, sign-in-free surfaces.
+  "/highlights",
+  "/players",
+];
 const TAB_PATHS = [
   "/feed",
   "/players",
