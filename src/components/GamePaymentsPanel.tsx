@@ -27,7 +27,7 @@ import { createNotification } from "@/lib/notifications";
 import { UserAvatar } from "@/components/UserAvatar";
 
 
-type Filter = "all" | "pending" | "verified" | "rejected";
+type Filter = "all" | "pending" | "verified" | "rejected" | "disputed";
 
 function fmtWhen(iso: string | null): string {
   if (!iso) return "";
@@ -743,7 +743,7 @@ export function PlayerPaymentsPanel({
       </div>
 
       <PaymentSafetyNotice
-        counterpartyId={hostId ?? null}
+        counterpartyId={settings?.host_id ?? null}
         counterpartyLabel="this host"
         gameId={gameId}
       />
