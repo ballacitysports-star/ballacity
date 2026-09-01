@@ -49,6 +49,7 @@ import { Route as AccountPrivacyRouteImport } from './routes/account.privacy'
 import { Route as AccountSecurityRouteImport } from './routes/account.security'
 import { Route as AdminIndexRouteImport } from './routes/admin.index'
 import { Route as AdminAuditRouteImport } from './routes/admin.audit'
+import { Route as AdminComplianceRouteImport } from './routes/admin.compliance'
 import { Route as AdminLegalRouteImport } from './routes/admin.legal'
 import { Route as AdminLocationAnalyticsRouteImport } from './routes/admin.location-analytics'
 import { Route as AdminModerationRouteImport } from './routes/admin.moderation'
@@ -285,6 +286,11 @@ const AdminAuditRoute = AdminAuditRouteImport.update({
   path: '/admin/audit',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AdminComplianceRoute = AdminComplianceRouteImport.update({
+  id: '/admin/compliance',
+  path: '/admin/compliance',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AdminLegalRoute = AdminLegalRouteImport.update({
   id: '/admin/legal',
   path: '/admin/legal',
@@ -497,6 +503,7 @@ export interface FileRoutesByFullPath {
   '/account/privacy': typeof AccountPrivacyRoute
   '/account/security': typeof AccountSecurityRoute
   '/admin/audit': typeof AdminAuditRoute
+  '/admin/compliance': typeof AdminComplianceRoute
   '/admin/legal': typeof AdminLegalRoute
   '/admin/location-analytics': typeof AdminLocationAnalyticsRoute
   '/admin/moderation': typeof AdminModerationRoute
@@ -572,6 +579,7 @@ export interface FileRoutesByTo {
   '/account/privacy': typeof AccountPrivacyRoute
   '/account/security': typeof AccountSecurityRoute
   '/admin/audit': typeof AdminAuditRoute
+  '/admin/compliance': typeof AdminComplianceRoute
   '/admin/legal': typeof AdminLegalRoute
   '/admin/location-analytics': typeof AdminLocationAnalyticsRoute
   '/admin/moderation': typeof AdminModerationRoute
@@ -648,6 +656,7 @@ export interface FileRoutesById {
   '/account/privacy': typeof AccountPrivacyRoute
   '/account/security': typeof AccountSecurityRoute
   '/admin/audit': typeof AdminAuditRoute
+  '/admin/compliance': typeof AdminComplianceRoute
   '/admin/legal': typeof AdminLegalRoute
   '/admin/location-analytics': typeof AdminLocationAnalyticsRoute
   '/admin/moderation': typeof AdminModerationRoute
@@ -725,6 +734,7 @@ export interface FileRouteTypes {
     | '/account/privacy'
     | '/account/security'
     | '/admin/audit'
+    | '/admin/compliance'
     | '/admin/legal'
     | '/admin/location-analytics'
     | '/admin/moderation'
@@ -800,6 +810,7 @@ export interface FileRouteTypes {
     | '/account/privacy'
     | '/account/security'
     | '/admin/audit'
+    | '/admin/compliance'
     | '/admin/legal'
     | '/admin/location-analytics'
     | '/admin/moderation'
@@ -875,6 +886,7 @@ export interface FileRouteTypes {
     | '/account/privacy'
     | '/account/security'
     | '/admin/audit'
+    | '/admin/compliance'
     | '/admin/legal'
     | '/admin/location-analytics'
     | '/admin/moderation'
@@ -943,6 +955,7 @@ export interface RootRouteChildren {
   AccountPrivacyRoute: typeof AccountPrivacyRoute
   AccountSecurityRoute: typeof AccountSecurityRoute
   AdminAuditRoute: typeof AdminAuditRoute
+  AdminComplianceRoute: typeof AdminComplianceRoute
   AdminLegalRoute: typeof AdminLegalRoute
   AdminLocationAnalyticsRoute: typeof AdminLocationAnalyticsRoute
   AdminModerationRoute: typeof AdminModerationRoute
@@ -1257,6 +1270,13 @@ declare module '@tanstack/react-router' {
       path: '/admin/audit'
       fullPath: '/admin/audit'
       preLoaderRoute: typeof AdminAuditRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/admin/compliance': {
+      id: '/admin/compliance'
+      path: '/admin/compliance'
+      fullPath: '/admin/compliance'
+      preLoaderRoute: typeof AdminComplianceRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/admin/legal': {
@@ -1574,6 +1594,7 @@ const rootRouteChildren: RootRouteChildren = {
   AccountPrivacyRoute: AccountPrivacyRoute,
   AccountSecurityRoute: AccountSecurityRoute,
   AdminAuditRoute: AdminAuditRoute,
+  AdminComplianceRoute: AdminComplianceRoute,
   AdminLegalRoute: AdminLegalRoute,
   AdminLocationAnalyticsRoute: AdminLocationAnalyticsRoute,
   AdminModerationRoute: AdminModerationRoute,
