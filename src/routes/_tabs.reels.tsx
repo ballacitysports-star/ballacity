@@ -41,6 +41,11 @@ import {
   suggestGameForReel,
 } from "@/lib/reels.functions";
 import { ReelCoach } from "@/components/reels/ReelCoach";
+import {
+  AiDisclosureDialog,
+  AiDisclosureNotice,
+} from "@/components/reels/AiVideoDisclosure";
+import { useMyPrivacy } from "@/lib/privacy";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { validateVideoMeta } from "@/lib/video-validation";
