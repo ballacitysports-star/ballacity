@@ -1054,8 +1054,20 @@ function GameDetail() {
     })),
   ];
 
+  const reportedHostId = settings?.host_id ?? game.hostUserId ?? null;
+
   return (
     <div className="pb-32">
+      {reportedHostId && (
+        <ReportDialog
+          open={reportGameOpen}
+          onOpenChange={setReportGameOpen}
+          subjectType="game"
+          reportedId={reportedHostId}
+          subjectLabel={game.title}
+          gameId={game.id}
+        />
+      )}
       {/* Hero */}
       <div className="relative h-72">
         <img src={game.image} alt={game.title} className="h-full w-full object-cover" />
