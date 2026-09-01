@@ -724,12 +724,33 @@ function ReelsPage() {
   }, [user, hasWorkInFlight, busy]);
 
 
-  // Deep link from a finished game: open the picker straight away.
+  /**
+   * Nothing is uploaded until the AI disclosure has been seen and accepted at
+   * least once; after that the short notice on the page carries the reminder.
+   */
+  function startUpload() {
+    if (!privacyPrefs.ai_disclosure_ack_at) {
+      setDisclosureOpen(true);
+      return;
+    }
+    fileRef.current?.click();
+  }
+
+  async function ackDisclosure() {
+    try {
+      await updatePrivacy({ ai_disclosure_ack_at: new Date().toISOString() });
+    } catch {
+      // Acknowledgement is a convenience record; never block the upload on it.
+    }
+  }
+
+  // Deep link from a finished game: still show the disclosure before the picker.
   useEffect(() => {
     if (autoUpload !== "1" || autoOpened.current || !user || !canGenerate) return;
     autoOpened.current = true;
-    fileRef.current?.click();
-  }, [autoUpload, user, canGenerate]);
+    startUpload();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoUpload, user, canGenerate, privacyPrefs.ai_disclosure_ack_at]);
 
   // Sweep anything abandoned mid-flight (tab closed, cold error) once per visit.
   useEffect(() => {
