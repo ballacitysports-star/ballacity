@@ -40,6 +40,9 @@ import {
 } from "@/components/ui/dialog";
 import type { PlanEntry, MigrationResult } from "@/lib/legacy-host-migration";
 import { toast } from "sonner";
+import { getLegalConsentStats } from "@/lib/legal-consent.functions";
+import { LEGAL_DOCUMENT_LIST, currentVersion } from "@/lib/legal-documents";
+
 import { supabase } from "@/integrations/supabase/client";
 
 export const Route = createFileRoute("/admin")({
