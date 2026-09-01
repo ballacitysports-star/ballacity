@@ -3,7 +3,7 @@ import {
   defaultGamePolicy,
   normalizeGamePolicy,
   validateGamePolicy,
-  policySummaryLines,
+  gamePolicyLines,
   HOST_ACK_ITEMS,
 } from "./game-policy";
 
@@ -24,7 +24,7 @@ describe("game policy", () => {
   });
 
   it("rejects a minimum above the player limit", () => {
-    const res = validateGamePolicy(normalizeGamePolicy({ maxPlayers: 6, minPlayers: 8 }));
+    const res = validateGamePolicy({ ...defaultGamePolicy(6), minPlayers: 8 });
     expect(res.ok).toBe(false);
   });
 
@@ -40,7 +40,7 @@ describe("game policy", () => {
   });
 
   it("always surfaces payment and approval as critical lines", () => {
-    const lines = policySummaryLines(
+    const lines = gamePolicyLines(
       normalizeGamePolicy({ entryFee: 12, requiresApproval: true, refundPolicy: "No refunds." }),
     );
     const critical = lines.filter((l) => l.critical).map((l) => l.label);
