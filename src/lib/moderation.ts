@@ -20,7 +20,10 @@ export type ReportReason =
   | "illegal"
   | "payment_scam"
   | "payment_not_received"
-  | "payment_pressure";
+  | "payment_pressure"
+  | "unsafe_conditions"
+  | "injury_risk";
+
 
 export type ReportSubjectType = "user" | "game" | "message" | "reel" | "payment";
 
