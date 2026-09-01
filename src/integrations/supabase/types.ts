@@ -2499,6 +2499,7 @@ export type Database = {
           id: string
         }[]
       }
+      profile_visibility_of: { Args: { _user: string }; Returns: string }
       public_privacy_flags: {
         Args: { _ids: string[] }
         Returns: {
