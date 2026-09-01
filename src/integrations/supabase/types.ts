@@ -1488,6 +1488,7 @@ export type Database = {
           graduating_class: number | null
           id: string
           links: Json
+          moderation_state: string
           search_radius_mi: number | null
           sport: string | null
           sport_levels: Json
@@ -1513,6 +1514,7 @@ export type Database = {
           graduating_class?: number | null
           id: string
           links?: Json
+          moderation_state?: string
           search_radius_mi?: number | null
           sport?: string | null
           sport_levels?: Json
@@ -1538,6 +1540,7 @@ export type Database = {
           graduating_class?: number | null
           id?: string
           links?: Json
+          moderation_state?: string
           search_radius_mi?: number | null
           sport?: string | null
           sport_levels?: Json
@@ -2272,31 +2275,58 @@ export type Database = {
       }
       user_reports: {
         Row: {
+          conversation_id: string | null
           created_at: string
           details: string | null
+          game_id: string | null
           id: string
+          message_id: string | null
           reason: string
+          reel_id: string | null
           reported_id: string
           reporter_id: string
+          resolution_notes: string | null
+          reviewed_at: string | null
+          reviewed_by: string | null
           status: string
+          subject_type: string
+          updated_at: string
         }
         Insert: {
+          conversation_id?: string | null
           created_at?: string
           details?: string | null
+          game_id?: string | null
           id?: string
+          message_id?: string | null
           reason: string
+          reel_id?: string | null
           reported_id: string
           reporter_id: string
+          resolution_notes?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
           status?: string
+          subject_type?: string
+          updated_at?: string
         }
         Update: {
+          conversation_id?: string | null
           created_at?: string
           details?: string | null
+          game_id?: string | null
           id?: string
+          message_id?: string | null
           reason?: string
+          reel_id?: string | null
           reported_id?: string
           reporter_id?: string
+          resolution_notes?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
           status?: string
+          subject_type?: string
+          updated_at?: string
         }
         Relationships: []
       }
@@ -2357,6 +2387,10 @@ export type Database = {
           bucket: string
           path: string
         }[]
+      }
+      blocks_exist_between: {
+        Args: { _a: string; _b: string }
+        Returns: boolean
       }
       can_notify: {
         Args: { _caller: string; _target: string }
@@ -2460,6 +2494,7 @@ export type Database = {
         Args: { _reviewee_id: string; _user: string }
         Returns: boolean
       }
+      is_moderator: { Args: { _user_id: string }; Returns: boolean }
       is_org_member: { Args: { _org: string; _user: string }; Returns: boolean }
       is_superadmin: { Args: { _user_id: string }; Returns: boolean }
       is_trainer_org_admin: {

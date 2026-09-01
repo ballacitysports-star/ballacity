@@ -16,6 +16,8 @@ import {
   Moon,
   Pencil,
   Shield,
+  ShieldOff,
+
   Sun,
   Trash2,
   UserCog,
@@ -145,6 +147,17 @@ const SECTIONS: Section[] = [
     ],
   },
   {
+    title: "Safety",
+    items: [
+      {
+        to: "/account/blocked",
+        label: "Blocked users",
+        description: "See who you've blocked and unblock accounts",
+        icon: ShieldOff,
+      },
+    ],
+  },
+  {
     title: "Legal & Privacy",
     items: [
       {
@@ -161,6 +174,7 @@ const SECTIONS: Section[] = [
       },
     ],
   },
+
 ];
 
 

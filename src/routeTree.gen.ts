@@ -37,11 +37,13 @@ import { Route as TabsProfileRouteImport } from './routes/_tabs.profile'
 import { Route as TabsReelsRouteImport } from './routes/_tabs.reels'
 import { Route as TabsTeamsRouteImport } from './routes/_tabs.teams'
 import { Route as TabsTrainersRouteImport } from './routes/_tabs.trainers'
+import { Route as AccountBlockedRouteImport } from './routes/account.blocked'
 import { Route as AccountLegalRouteImport } from './routes/account.legal'
 import { Route as AccountNotificationsRouteImport } from './routes/account.notifications'
 import { Route as AccountPrivacyRouteImport } from './routes/account.privacy'
 import { Route as AccountSecurityRouteImport } from './routes/account.security'
 import { Route as AdminLocationAnalyticsRouteImport } from './routes/admin.location-analytics'
+import { Route as AdminModerationRouteImport } from './routes/admin.moderation'
 import { Route as CheckoutReturnRouteImport } from './routes/checkout.return'
 import { Route as DevOgPreviewRouteImport } from './routes/dev.og-preview'
 import { Route as DevRouteDoctorRouteImport } from './routes/dev.route-doctor'
@@ -215,6 +217,11 @@ const TabsTrainersRoute = TabsTrainersRouteImport.update({
   path: '/trainers',
   getParentRoute: () => TabsRoute,
 } as any)
+const AccountBlockedRoute = AccountBlockedRouteImport.update({
+  id: '/account/blocked',
+  path: '/account/blocked',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AccountLegalRoute = AccountLegalRouteImport.update({
   id: '/account/legal',
   path: '/account/legal',
@@ -238,6 +245,11 @@ const AccountSecurityRoute = AccountSecurityRouteImport.update({
 const AdminLocationAnalyticsRoute = AdminLocationAnalyticsRouteImport.update({
   id: '/location-analytics',
   path: '/location-analytics',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminModerationRoute = AdminModerationRouteImport.update({
+  id: '/moderation',
+  path: '/moderation',
   getParentRoute: () => AdminRoute,
 } as any)
 const CheckoutReturnRoute = CheckoutReturnRouteImport.update({
@@ -426,11 +438,13 @@ export interface FileRoutesByFullPath {
   '/reels': typeof TabsReelsRoute
   '/teams': typeof TabsTeamsRoute
   '/trainers': typeof TabsTrainersRoute
+  '/account/blocked': typeof AccountBlockedRoute
   '/account/legal': typeof AccountLegalRoute
   '/account/notifications': typeof AccountNotificationsRoute
   '/account/privacy': typeof AccountPrivacyRoute
   '/account/security': typeof AccountSecurityRoute
   '/admin/location-analytics': typeof AdminLocationAnalyticsRoute
+  '/admin/moderation': typeof AdminModerationRoute
   '/checkout/return': typeof CheckoutReturnRoute
   '/dev/og-preview': typeof DevOgPreviewRoute
   '/dev/route-doctor': typeof DevRouteDoctorRoute
@@ -491,11 +505,13 @@ export interface FileRoutesByTo {
   '/reels': typeof TabsReelsRoute
   '/teams': typeof TabsTeamsRoute
   '/trainers': typeof TabsTrainersRoute
+  '/account/blocked': typeof AccountBlockedRoute
   '/account/legal': typeof AccountLegalRoute
   '/account/notifications': typeof AccountNotificationsRoute
   '/account/privacy': typeof AccountPrivacyRoute
   '/account/security': typeof AccountSecurityRoute
   '/admin/location-analytics': typeof AdminLocationAnalyticsRoute
+  '/admin/moderation': typeof AdminModerationRoute
   '/checkout/return': typeof CheckoutReturnRoute
   '/dev/og-preview': typeof DevOgPreviewRoute
   '/dev/route-doctor': typeof DevRouteDoctorRoute
@@ -557,11 +573,13 @@ export interface FileRoutesById {
   '/_tabs/reels': typeof TabsReelsRoute
   '/_tabs/teams': typeof TabsTeamsRoute
   '/_tabs/trainers': typeof TabsTrainersRoute
+  '/account/blocked': typeof AccountBlockedRoute
   '/account/legal': typeof AccountLegalRoute
   '/account/notifications': typeof AccountNotificationsRoute
   '/account/privacy': typeof AccountPrivacyRoute
   '/account/security': typeof AccountSecurityRoute
   '/admin/location-analytics': typeof AdminLocationAnalyticsRoute
+  '/admin/moderation': typeof AdminModerationRoute
   '/checkout/return': typeof CheckoutReturnRoute
   '/dev/og-preview': typeof DevOgPreviewRoute
   '/dev/route-doctor': typeof DevRouteDoctorRoute
@@ -624,11 +642,13 @@ export interface FileRouteTypes {
     | '/reels'
     | '/teams'
     | '/trainers'
+    | '/account/blocked'
     | '/account/legal'
     | '/account/notifications'
     | '/account/privacy'
     | '/account/security'
     | '/admin/location-analytics'
+    | '/admin/moderation'
     | '/checkout/return'
     | '/dev/og-preview'
     | '/dev/route-doctor'
@@ -689,11 +709,13 @@ export interface FileRouteTypes {
     | '/reels'
     | '/teams'
     | '/trainers'
+    | '/account/blocked'
     | '/account/legal'
     | '/account/notifications'
     | '/account/privacy'
     | '/account/security'
     | '/admin/location-analytics'
+    | '/admin/moderation'
     | '/checkout/return'
     | '/dev/og-preview'
     | '/dev/route-doctor'
@@ -754,11 +776,13 @@ export interface FileRouteTypes {
     | '/_tabs/reels'
     | '/_tabs/teams'
     | '/_tabs/trainers'
+    | '/account/blocked'
     | '/account/legal'
     | '/account/notifications'
     | '/account/privacy'
     | '/account/security'
     | '/admin/location-analytics'
+    | '/admin/moderation'
     | '/checkout/return'
     | '/dev/og-preview'
     | '/dev/route-doctor'
@@ -812,6 +836,7 @@ export interface RootRouteChildren {
   TermsRoute: typeof TermsRoute
   Char91DotmcpChar93ListToolsRoute: typeof Char91DotmcpChar93ListToolsRoute
   Char91DotwellKnownChar93OauthProtectedResourceRoute: typeof Char91DotwellKnownChar93OauthProtectedResourceRoute
+  AccountBlockedRoute: typeof AccountBlockedRoute
   AccountLegalRoute: typeof AccountLegalRoute
   AccountNotificationsRoute: typeof AccountNotificationsRoute
   AccountPrivacyRoute: typeof AccountPrivacyRoute
@@ -1044,6 +1069,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof TabsTrainersRouteImport
       parentRoute: typeof TabsRoute
     }
+    '/account/blocked': {
+      id: '/account/blocked'
+      path: '/account/blocked'
+      fullPath: '/account/blocked'
+      preLoaderRoute: typeof AccountBlockedRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/account/legal': {
       id: '/account/legal'
       path: '/account/legal'
@@ -1077,6 +1109,13 @@ declare module '@tanstack/react-router' {
       path: '/location-analytics'
       fullPath: '/admin/location-analytics'
       preLoaderRoute: typeof AdminLocationAnalyticsRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/moderation': {
+      id: '/admin/moderation'
+      path: '/moderation'
+      fullPath: '/admin/moderation'
+      preLoaderRoute: typeof AdminModerationRouteImport
       parentRoute: typeof AdminRoute
     }
     '/checkout/return': {
@@ -1327,10 +1366,12 @@ const TabsRouteWithChildren = TabsRoute._addFileChildren(TabsRouteChildren)
 
 interface AdminRouteChildren {
   AdminLocationAnalyticsRoute: typeof AdminLocationAnalyticsRoute
+  AdminModerationRoute: typeof AdminModerationRoute
 }
 
 const AdminRouteChildren: AdminRouteChildren = {
   AdminLocationAnalyticsRoute: AdminLocationAnalyticsRoute,
+  AdminModerationRoute: AdminModerationRoute,
 }
 
 const AdminRouteWithChildren = AdminRoute._addFileChildren(AdminRouteChildren)
@@ -1372,6 +1413,7 @@ const rootRouteChildren: RootRouteChildren = {
   Char91DotmcpChar93ListToolsRoute: Char91DotmcpChar93ListToolsRoute,
   Char91DotwellKnownChar93OauthProtectedResourceRoute:
     Char91DotwellKnownChar93OauthProtectedResourceRoute,
+  AccountBlockedRoute: AccountBlockedRoute,
   AccountLegalRoute: AccountLegalRoute,
   AccountNotificationsRoute: AccountNotificationsRoute,
   AccountPrivacyRoute: AccountPrivacyRoute,
