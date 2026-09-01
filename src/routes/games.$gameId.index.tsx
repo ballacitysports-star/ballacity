@@ -24,7 +24,9 @@ import {
   Home,
   ShieldCheck,
   History,
+  Flag,
 } from "lucide-react";
+import { ReportDialog } from "@/components/ReportDialog";
 import { GAMES, SPORTS, imageFor } from "@/lib/sample-data";
 import { TierChips } from "@/components/sports/TierChips";
 import {
