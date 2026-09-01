@@ -41,6 +41,12 @@ import {
   suggestGameForReel,
 } from "@/lib/reels.functions";
 import { ReelCoach } from "@/components/reels/ReelCoach";
+import {
+  AiDisclosureDialog,
+  AiDisclosureNotice,
+} from "@/components/reels/AiVideoDisclosure";
+import { useMyPrivacy } from "@/lib/privacy";
+import { AI_RESULTS_CAVEAT } from "@/lib/ai-video-privacy";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { validateVideoMeta } from "@/lib/video-validation";
@@ -455,9 +461,12 @@ function ReelCard({ reel, onRetry }: { reel: Reel; onRetry: (id: string) => Prom
             <Eye className="h-3.5 w-3.5" />
             {showInsights ? "Hide what the AI saw" : "What the AI saw"}
           </button>
-          {showInsights && (
-            <div className="mt-2 rounded-xl border border-border bg-background/60 p-3">
-              {reel.ai_sport && (
+           {showInsights && (
+             <div className="mt-2 rounded-xl border border-border bg-background/60 p-3">
+               <p className="mb-2 text-[10px] italic text-muted-foreground">
+                 {AI_RESULTS_CAVEAT}
+               </p>
+               {reel.ai_sport && (
                 <p className="text-[10px] font-bold uppercase tracking-wider text-lime">
                   {reel.ai_sport}
                 </p>
@@ -558,6 +567,8 @@ function ReelsPage() {
   const fileRef = useRef<HTMLInputElement>(null);
   const [reels, setReels] = useState<Reel[]>([]);
   const [busy, setBusy] = useState(false);
+  const [disclosureOpen, setDisclosureOpen] = useState(false);
+  const { prefs: privacyPrefs, update: updatePrivacy } = useMyPrivacy();
   const [style, setStyle] = useState<ReelStylePrefs>(DEFAULT_REEL_STYLE);
   /** Athlete-chosen name for the next upload (e.g. "Sunday soccer hat trick"). */
   const [titleDraft, setTitleDraft] = useState("");
@@ -722,12 +733,33 @@ function ReelsPage() {
   }, [user, hasWorkInFlight, busy]);
 
 
-  // Deep link from a finished game: open the picker straight away.
+  /**
+   * Nothing is uploaded until the AI disclosure has been seen and accepted at
+   * least once; after that the short notice on the page carries the reminder.
+   */
+  function startUpload() {
+    if (!privacyPrefs.ai_disclosure_ack_at) {
+      setDisclosureOpen(true);
+      return;
+    }
+    fileRef.current?.click();
+  }
+
+  async function ackDisclosure() {
+    try {
+      await updatePrivacy({ ai_disclosure_ack_at: new Date().toISOString() });
+    } catch {
+      // Acknowledgement is a convenience record; never block the upload on it.
+    }
+  }
+
+  // Deep link from a finished game: still show the disclosure before the picker.
   useEffect(() => {
     if (autoUpload !== "1" || autoOpened.current || !user || !canGenerate) return;
     autoOpened.current = true;
-    fileRef.current?.click();
-  }, [autoUpload, user, canGenerate]);
+    startUpload();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoUpload, user, canGenerate, privacyPrefs.ai_disclosure_ack_at]);
 
   // Sweep anything abandoned mid-flight (tab closed, cold error) once per visit.
   useEffect(() => {
@@ -1056,6 +1088,8 @@ function ReelsPage() {
           </label>
         )}
 
+        <AiDisclosureNotice />
+
         <input
           ref={fileRef}
           type="file"
@@ -1067,8 +1101,20 @@ function ReelsPage() {
             e.target.value = "";
           }}
         />
+        <AiDisclosureDialog
+          open={disclosureOpen}
+          onOpenChange={setDisclosureOpen}
+          busy={busy}
+          onContinue={() => {
+            setDisclosureOpen(false);
+            // Acknowledgement is remembered so the full disclosure is shown once,
+            // while the short notice above stays on the page for every upload.
+            void ackDisclosure();
+            fileRef.current?.click();
+          }}
+        />
         <button
-          onClick={() => (canGenerate ? fileRef.current?.click() : handleSubscribe())}
+          onClick={() => (canGenerate ? startUpload() : handleSubscribe())}
           disabled={busy || !user}
           className="flex w-full items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-border bg-surface/50 py-8 text-sm font-medium disabled:opacity-50"
         >

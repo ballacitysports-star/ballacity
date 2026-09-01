@@ -23,6 +23,13 @@ export type PrivacyPreferences = {
   allow_invites: ContactScope;
   marketing_emails: boolean;
   ai_processing: boolean;
+  /**
+   * Separate, explicit consent for using uploaded videos as AI training data.
+   * Never implied by `ai_processing`; no training pipeline reads videos today.
+   */
+  ai_training_opt_in: boolean;
+  /** When the AI video disclosure was last acknowledged (ISO string). */
+  ai_disclosure_ack_at: string | null;
 };
 
 export const DEFAULT_PRIVACY: PrivacyPreferences = {
@@ -34,6 +41,8 @@ export const DEFAULT_PRIVACY: PrivacyPreferences = {
   allow_invites: "everyone",
   marketing_emails: false,
   ai_processing: true,
+  ai_training_opt_in: false,
+  ai_disclosure_ack_at: null,
 };
 
 export const PROFILE_VISIBILITY_OPTIONS: Array<{

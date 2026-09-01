@@ -20,7 +20,7 @@ import {
   Pencil,
   Shield,
   ShieldOff,
-
+  Sparkles,
   Sun,
   Trash2,
   UserCog,
@@ -190,8 +190,14 @@ const SECTIONS: Section[] = [
       {
         to: "/account/privacy",
         label: "Privacy",
-        description: "Profile & location visibility, messages, AI, delete account",
+        description: "Profile & location visibility, messages, delete account",
         icon: Shield,
+      },
+      {
+        to: "/account/ai-privacy",
+        label: "AI & Video Privacy",
+        description: "How AI analyzes your clips, and delete AI results or videos",
+        icon: Sparkles,
       },
       {
         to: "/account/legal",

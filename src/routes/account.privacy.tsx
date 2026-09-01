@@ -257,6 +257,16 @@ function PrivacySettingsPage() {
               />
             }
           />
+          <SettingsStaticRow>
+            <p className="text-xs text-muted-foreground">
+              See exactly what AI does with your clips, what is kept, and delete AI results or
+              videos in{" "}
+              <Link to="/account/ai-privacy" className="font-semibold text-lime underline">
+                AI &amp; Video Privacy
+              </Link>
+              .
+            </p>
+          </SettingsStaticRow>
         </SettingsGroup>
 
         <SettingsGroup title="Your data">
