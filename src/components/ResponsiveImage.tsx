@@ -7,6 +7,7 @@ import {
   type ResizeMode,
 } from "@/lib/image-variants";
 import { useBlockedImage } from "@/lib/blocked-images";
+import { useMediaUrl } from "@/hooks/use-media-url";
 
 type Props = Omit<ImgHTMLAttributes<HTMLImageElement>, "srcSet"> & {
   src: string | null | undefined;
