@@ -26,6 +26,7 @@ import { Route as ShopRouteImport } from './routes/shop'
 import { Route as SitemapDotxmlRouteImport } from './routes/sitemap[.]xml'
 import { Route as SuperadminRouteImport } from './routes/superadmin'
 import { Route as TermsRouteImport } from './routes/terms'
+import { Route as TrustCenterRouteImport } from './routes/trust-center'
 import { Route as Char91DotmcpChar93ListToolsRouteImport } from './routes/[.mcp]/list-tools'
 import { Route as Char91DotwellKnownChar93OauthProtectedResourceRouteImport } from './routes/[.well-known]/oauth-protected-resource'
 import { Route as TabsCreateRouteImport } from './routes/_tabs.create'
@@ -159,6 +160,11 @@ const SuperadminRoute = SuperadminRouteImport.update({
 const TermsRoute = TermsRouteImport.update({
   id: '/terms',
   path: '/terms',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const TrustCenterRoute = TrustCenterRouteImport.update({
+  id: '/trust-center',
+  path: '/trust-center',
   getParentRoute: () => rootRouteImport,
 } as any)
 const Char91DotmcpChar93ListToolsRoute =
@@ -433,6 +439,7 @@ export interface FileRoutesByFullPath {
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/superadmin': typeof SuperadminRoute
   '/terms': typeof TermsRoute
+  '/trust-center': typeof TrustCenterRoute
   '/.mcp/list-tools': typeof Char91DotmcpChar93ListToolsRoute
   '/.well-known/oauth-protected-resource': typeof Char91DotwellKnownChar93OauthProtectedResourceRoute
   '/create': typeof TabsCreateRoute
@@ -501,6 +508,7 @@ export interface FileRoutesByTo {
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/superadmin': typeof SuperadminRoute
   '/terms': typeof TermsRoute
+  '/trust-center': typeof TrustCenterRoute
   '/.mcp/list-tools': typeof Char91DotmcpChar93ListToolsRoute
   '/.well-known/oauth-protected-resource': typeof Char91DotwellKnownChar93OauthProtectedResourceRoute
   '/create': typeof TabsCreateRoute
@@ -570,6 +578,7 @@ export interface FileRoutesById {
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/superadmin': typeof SuperadminRoute
   '/terms': typeof TermsRoute
+  '/trust-center': typeof TrustCenterRoute
   '/.mcp/list-tools': typeof Char91DotmcpChar93ListToolsRoute
   '/.well-known/oauth-protected-resource': typeof Char91DotwellKnownChar93OauthProtectedResourceRoute
   '/_tabs/create': typeof TabsCreateRoute
@@ -640,6 +649,7 @@ export interface FileRouteTypes {
     | '/sitemap.xml'
     | '/superadmin'
     | '/terms'
+    | '/trust-center'
     | '/.mcp/list-tools'
     | '/.well-known/oauth-protected-resource'
     | '/create'
@@ -708,6 +718,7 @@ export interface FileRouteTypes {
     | '/sitemap.xml'
     | '/superadmin'
     | '/terms'
+    | '/trust-center'
     | '/.mcp/list-tools'
     | '/.well-known/oauth-protected-resource'
     | '/create'
@@ -776,6 +787,7 @@ export interface FileRouteTypes {
     | '/sitemap.xml'
     | '/superadmin'
     | '/terms'
+    | '/trust-center'
     | '/.mcp/list-tools'
     | '/.well-known/oauth-protected-resource'
     | '/_tabs/create'
@@ -846,6 +858,7 @@ export interface RootRouteChildren {
   SitemapDotxmlRoute: typeof SitemapDotxmlRoute
   SuperadminRoute: typeof SuperadminRoute
   TermsRoute: typeof TermsRoute
+  TrustCenterRoute: typeof TrustCenterRoute
   Char91DotmcpChar93ListToolsRoute: typeof Char91DotmcpChar93ListToolsRoute
   Char91DotwellKnownChar93OauthProtectedResourceRoute: typeof Char91DotwellKnownChar93OauthProtectedResourceRoute
   AccountBlockedRoute: typeof AccountBlockedRoute
@@ -1005,6 +1018,13 @@ declare module '@tanstack/react-router' {
       path: '/terms'
       fullPath: '/terms'
       preLoaderRoute: typeof TermsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/trust-center': {
+      id: '/trust-center'
+      path: '/trust-center'
+      fullPath: '/trust-center'
+      preLoaderRoute: typeof TrustCenterRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/.mcp/list-tools': {
@@ -1420,6 +1440,7 @@ const rootRouteChildren: RootRouteChildren = {
   SitemapDotxmlRoute: SitemapDotxmlRoute,
   SuperadminRoute: SuperadminRoute,
   TermsRoute: TermsRoute,
+  TrustCenterRoute: TrustCenterRoute,
   Char91DotmcpChar93ListToolsRoute: Char91DotmcpChar93ListToolsRoute,
   Char91DotwellKnownChar93OauthProtectedResourceRoute:
     Char91DotwellKnownChar93OauthProtectedResourceRoute,
