@@ -45,7 +45,7 @@ describe("game policy", () => {
     );
     const critical = lines.filter((l) => l.critical).map((l) => l.label);
     expect(critical).toContain("Payment");
-    expect(critical).toContain("Approval");
+    expect(critical).toContain("Joining");
   });
 
   it("covers the eight host acknowledgment topics", () => {
