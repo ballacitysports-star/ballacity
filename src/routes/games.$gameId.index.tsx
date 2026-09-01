@@ -2875,6 +2875,26 @@ function EditGameModal({
     settings?.payment_deadline ? settings.payment_deadline.slice(0, 16) : "",
   );
   const [refundPolicy, setRefundPolicy] = useState<string>(settings?.refund_policy ?? "");
+  // Shared policy editor state. maxPlayers / refundPolicy stay mirrored into
+  // the existing save payload so nothing downstream changes shape.
+  const [editPolicy, setEditPolicy] = useState<GamePolicy>(() =>
+    normalizeGamePolicy({
+      cancellationPolicy: (game.cancellationPolicy ?? undefined) as GamePolicy["cancellationPolicy"],
+      cancellationNotes: game.cancellationNotes ?? "",
+      minPlayers: game.minPlayers ?? 0,
+      maxPlayers: Math.max(2, Math.min(30, Number(game.maxPlayers) || 10)),
+      allowWaitlist: game.allowWaitlist ?? true,
+      entryFee: Number(settings?.entry_fee ?? game.price ?? 0) || 0,
+      requiresApproval: settings ? !!settings.requires_approval : true,
+      refundPolicy: settings?.refund_policy ?? "",
+      gameRules: game.gameRules ?? "",
+    }),
+  );
+  const applyPolicy = (next: GamePolicy) => {
+    setEditPolicy(next);
+    setMaxPlayers(next.maxPlayers);
+    setRefundPolicy(next.refundPolicy);
+  };
   const [paymentInstructions, setPaymentInstructions] = useState<string>(
     settings?.payment_instructions ?? "",
   );
@@ -2951,6 +2971,12 @@ function EditGameModal({
     if (saving) return;
     setSaving(true);
     try {
+      const policyCheck = validateGamePolicy({ ...editPolicy, entryFee: Math.max(0, Number(price) || 0), requiresApproval });
+      if (!policyCheck.ok) {
+        toast.error(policyCheck.error);
+        setSaving(false);
+        return;
+      }
       const mp = Math.max(2, Math.min(30, Number(maxPlayers) || game.maxPlayers));
       const pr = Math.max(0, Number(price) || 0);
       const iso = new Date(dateLocal).toISOString();
@@ -2994,6 +3020,11 @@ function EditGameModal({
         endsAt: allDay ? null : Number.isFinite(endMs) ? new Date(endMs).toISOString() : null,
         allDay,
         maxPlayers: mp,
+        minPlayers: Math.min(editPolicy.minPlayers, mp),
+        allowWaitlist: editPolicy.allowWaitlist,
+        cancellationPolicy: editPolicy.cancellationPolicy,
+        cancellationNotes: editPolicy.cancellationNotes || null,
+        gameRules: editPolicy.gameRules || null,
         price: pr,
         indoor,
         isPrivate,
@@ -3365,22 +3396,18 @@ function EditGameModal({
               ))}
           </div>
 
-          {/* Max players slider */}
-          <Field label="Max players">
-            <div className="rounded-2xl border border-border bg-background p-3">
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-xs text-muted-foreground">Total spots</span>
-                <span className="font-display text-xl font-bold text-lime">{maxPlayers}</span>
-              </div>
-              <input
-                type="range"
-                min={2}
-                max={30}
-                value={maxPlayers}
-                onChange={(e) => setMaxPlayers(+e.target.value)}
-                className="w-full accent-lime"
-              />
-            </div>
+          {/* Game policy: limits, waitlist, cancellation, refunds, rules */}
+          <Field label="Game policy">
+            <GamePolicyFields
+              value={{
+                ...editPolicy,
+                entryFee: Math.max(0, Number(price) || 0),
+                requiresApproval,
+                refundPolicy,
+              }}
+              onChange={applyPolicy}
+              idPrefix="edit-policy"
+            />
           </Field>
 
           {/* Paid game toggle */}
@@ -3522,18 +3549,6 @@ function EditGameModal({
                 value={paymentDeadline}
                 onChange={(e) => setPaymentDeadline(e.target.value)}
                 className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm [color-scheme:dark]"
-              />
-            </Field>
-          )}
-
-          {price > 0 && (
-            <Field label="Refund policy (optional)">
-              <textarea
-                value={refundPolicy}
-                onChange={(e) => setRefundPolicy(e.target.value)}
-                rows={2}
-                placeholder="e.g. Full refund up to 24h before tip-off."
-                className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm resize-none"
               />
             </Field>
           )}
