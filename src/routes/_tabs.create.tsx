@@ -60,6 +60,10 @@ import {
   type WhenRange,
 } from "@/lib/game-schedule";
 import { AgeRequirementFields } from "@/components/games/AgeRequirementFields";
+import { HostResponsibilityNotice } from "@/components/safety/HostResponsibilityNotice";
+import { recordSafetyAck } from "@/lib/safety-acks";
+import { ShieldAlert } from "lucide-react";
+
 
 export const Route = createFileRoute("/_tabs/create")({
   head: () =>
@@ -159,6 +163,10 @@ function Create() {
   const [maxAge, setMaxAge] = useState<number | null>(null);
   const [signupCutoffMin, setSignupCutoffMin] = useState(0);
   const [publishing, setPublishing] = useState(false);
+  // Host responsibility acknowledgment (never pre-checked, recorded per game).
+  const [hostAck, setHostAck] = useState(false);
+  const hostAckRef = useRef<HTMLDivElement | null>(null);
+
   // Nudge hosts to keep their own player availability up to date.
   const hostAvailGate = useAvailabilityGate();
   const [coverUrl, setCoverUrl] = useState<string | null>(null);
@@ -339,7 +347,13 @@ function Create() {
             hostAsRef.current?.querySelector<HTMLButtonElement>("button")?.focus();
             return;
           }
+          if (!hostAck) {
+            toast.error("Acknowledge your host responsibilities to publish");
+            hostAckRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+            return;
+          }
           setPublishing(true);
+
 
           try {
             // Compute one or many start times, each with its own length.
@@ -438,6 +452,12 @@ function Create() {
               });
 
               if (!firstGameId) firstGameId = game.id;
+
+              // Record the host's responsibility acknowledgment for this game.
+              void recordSafetyAck({ gameId: game.id, kind: "host_responsibility" }).catch(
+                () => {},
+              );
+
 
               // Persist host ownership + approval/fee preferences so the host & players see them on the detail page
               try {
@@ -823,17 +843,27 @@ function Create() {
             />
           </Section>
 
+          {/* Host responsibility */}
+          <div ref={hostAckRef}>
+            <Section title="Host responsibility" icon={<ShieldAlert className="h-4 w-4" />}>
+              <HostResponsibilityNotice accepted={hostAck} onChange={setHostAck} />
+            </Section>
+          </div>
+
           <motion.button
             whileTap={{ scale: 0.98 }}
             type="submit"
-            disabled={publishing || !selectedAffiliation}
+            disabled={publishing || !selectedAffiliation || !hostAck}
             className="w-full rounded-2xl bg-lime-gradient py-4 font-bold text-primary-foreground glow-lime disabled:opacity-60"
           >
             {publishing
               ? "Publishing…"
               : !selectedAffiliation
                 ? "Choose a team profile to continue"
-                : "Publish game"}
+                : !hostAck
+                  ? "Acknowledge host responsibilities"
+                  : "Publish game"}
+
           </motion.button>
           <p className="text-center text-xs text-muted-foreground pb-6">
             Hosting is free. Pro hosts get unlimited games + analytics.

@@ -20,7 +20,10 @@ export type ReportReason =
   | "illegal"
   | "payment_scam"
   | "payment_not_received"
-  | "payment_pressure";
+  | "payment_pressure"
+  | "unsafe_conditions"
+  | "injury_risk";
+
 
 export type ReportSubjectType = "user" | "game" | "message" | "reel" | "payment";
 
@@ -43,11 +46,15 @@ export const GAME_REPORT_REASONS: ReasonOption[] = [
   { value: "fake_game", label: "Fake game" },
   { value: "scam", label: "Scam" },
   { value: "unsafe_location", label: "Unsafe location" },
+  { value: "unsafe_conditions", label: "Unsafe venue or playing conditions" },
+  { value: "injury_risk", label: "Injury risk or unsafe play" },
+  { value: "unsafe_behavior", label: "Unsafe behavior by players or host" },
   { value: "misleading", label: "Misleading information" },
   { value: "inappropriate", label: "Inappropriate content" },
   { value: "illegal", label: "Illegal activity" },
   { value: "other", label: "Other" },
 ];
+
 
 export const MESSAGE_REPORT_REASONS: ReasonOption[] = [
   { value: "harassment", label: "Harassment" },

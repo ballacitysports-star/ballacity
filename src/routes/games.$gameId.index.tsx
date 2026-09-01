@@ -29,6 +29,12 @@ import {
   Flag,
 } from "lucide-react";
 import { ReportDialog } from "@/components/ReportDialog";
+import { RiskAcknowledgmentDialog } from "@/components/safety/RiskAcknowledgmentDialog";
+import { needsRiskAcknowledgment, RISK_ACKNOWLEDGMENT } from "@/lib/safety";
+import { recordSafetyAck, useSafetyAck } from "@/lib/safety-acks";
+import { ShieldAlert } from "lucide-react";
+
+
 import { GAMES, SPORTS, imageFor } from "@/lib/sample-data";
 import { TierChips } from "@/components/sports/TierChips";
 import {
@@ -379,6 +385,14 @@ function GameDetail() {
   const capReached = joinResubmitCapReached(myReq);
   const [, setNowTick] = useState(0);
   const [reportGameOpen, setReportGameOpen] = useState(false);
+  // Risk-acknowledgment gate state (physical activity safety).
+  const [riskAckOpen, setRiskAckOpen] = useState(false);
+  const pendingJoinPositionRef = useRef<string | null>(null);
+  const { data: riskAckVersion, refetch: refetchRiskAck } = useSafetyAck(
+    gameId,
+    "participant_risk",
+  );
+
   useEffect(() => {
     if (cooldownMs <= 0) return;
     const t = setInterval(() => setNowTick((n) => n + 1), 1000);
@@ -972,8 +986,7 @@ function GameDetail() {
     }
   };
 
-  const handleJoin = async (preselectedPosition?: string) => {
-
+  const runJoin = async (preselectedPosition?: string) => {
     setProcessing(true);
     try {
       await executeJoinAction(preselectedPosition);
@@ -981,6 +994,40 @@ function GameDetail() {
       setProcessing(false);
     }
   };
+
+  // Physical-activity risk acknowledgment gate. Players see it once per
+  // acknowledgment version per game; hosts and confirmed players skip it.
+  const handleJoin = async (preselectedPosition?: string) => {
+    const gate = needsRiskAcknowledgment({
+      signedIn: !!user,
+      isHost,
+      alreadyJoined: viewerCountsAsJoined,
+      acknowledgedVersion: riskAckVersion ?? null,
+    });
+    if (gate) {
+      pendingJoinPositionRef.current = preselectedPosition ?? null;
+      setRiskAckOpen(true);
+      return;
+    }
+    await runJoin(preselectedPosition);
+  };
+
+  const confirmRiskAck = async () => {
+    setProcessing(true);
+    try {
+      await recordSafetyAck({ gameId: game.id, kind: "participant_risk" });
+      await refetchRiskAck();
+      setRiskAckOpen(false);
+      const pos = pendingJoinPositionRef.current ?? undefined;
+      pendingJoinPositionRef.current = null;
+      await executeJoinAction(pos);
+    } catch (e: any) {
+      toast.error(e?.message ?? "Couldn't record your acknowledgment");
+    } finally {
+      setProcessing(false);
+    }
+  };
+
 
   const viewerPending =
     !isHost && requiresApproval && myReq?.status === "pending" && !viewerCountsAsJoined;
@@ -1061,6 +1108,17 @@ function GameDetail() {
 
   return (
     <div className="pb-32">
+      <RiskAcknowledgmentDialog
+        open={riskAckOpen}
+        onOpenChange={(v) => {
+          setRiskAckOpen(v);
+          if (!v) pendingJoinPositionRef.current = null;
+        }}
+        gameTitle={game.title}
+        submitting={processing}
+        onConfirm={() => void confirmRiskAck()}
+      />
+
       {reportedHostId && (
         <ReportDialog
           open={reportGameOpen}
@@ -1638,6 +1696,34 @@ function GameDetail() {
             About the run
           </h2>
           <p className="text-sm leading-relaxed">{game.description}</p>
+          {/* Safety: risk notice + safety reporting entry point */}
+          <div className="mt-3 rounded-2xl border border-border bg-surface px-4 py-3">
+            <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-muted-foreground">
+              <ShieldAlert className="h-4 w-4 text-lime" aria-hidden /> Safety
+            </div>
+            <p className="mt-2 text-[12px] leading-relaxed text-muted-foreground">
+              {RISK_ACKNOWLEDGMENT.text} Games are organized by the host — OpenRun does not
+              supervise play or inspect venues.
+            </p>
+            <div className="mt-3 flex flex-wrap gap-2">
+              <Link
+                to="/safety"
+                className="rounded-full border border-border px-3 py-1.5 text-xs font-semibold"
+              >
+                Safety Center
+              </Link>
+              {!isHost && reportedHostId && (
+                <button
+                  type="button"
+                  onClick={() => setReportGameOpen(true)}
+                  className="rounded-full border border-border px-3 py-1.5 text-xs font-semibold text-destructive"
+                >
+                  Report a safety issue
+                </button>
+              )}
+            </div>
+          </div>
+
           {game.equipment.length > 0 && (
             <div className="mt-3 flex flex-wrap gap-2">
               {game.equipment.map((e: string) => (
