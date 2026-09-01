@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { ArrowLeft, Eye, MapPin, MessageSquare, Sparkles, Trash2 } from "lucide-react";
+import { ArrowLeft, Download, Eye, MapPin, MessageSquare, Sparkles, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { useMyAgeCategory } from "@/lib/youth-features";
 import { isMinorCategory } from "@/lib/age-policy";
@@ -7,6 +7,7 @@ import { pageHead } from "@/lib/seo";
 import { Switch } from "@/components/ui/switch";
 import {
   SettingsGroup,
+  SettingsLinkRow,
   SettingsStaticRow,
 } from "@/components/settings/SettingsRow";
 import {
@@ -270,7 +271,14 @@ function PrivacySettingsPage() {
         </SettingsGroup>
 
         <SettingsGroup title="Your data">
+          <SettingsLinkRow
+            icon={Download}
+            label="Download my data"
+            description="Get a copy of your profile, games, availability and activity, and see how long we keep each kind of data."
+            to="/account/data"
+          />
           <SettingsStaticRow>
+
             <div className="space-y-2 text-xs text-muted-foreground">
               <p>
                 <span className="font-semibold text-foreground">Deleted:</span> your profile, photos,

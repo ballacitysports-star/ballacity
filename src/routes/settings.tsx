@@ -7,7 +7,9 @@ import {
   Building2,
   ChevronRight,
   CreditCard,
+  Download,
   FileText,
+
 
   IdCard,
   LifeBuoy,
@@ -198,6 +200,12 @@ const SECTIONS: Section[] = [
         label: "AI & Video Privacy",
         description: "How AI analyzes your clips, and delete AI results or videos",
         icon: Sparkles,
+      },
+      {
+        to: "/account/data",
+        label: "Your data & retention",
+        description: "Download a copy of your data and see how long we keep it",
+        icon: Download,
       },
       {
         to: "/account/legal",
