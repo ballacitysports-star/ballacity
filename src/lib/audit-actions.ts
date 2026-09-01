@@ -70,6 +70,8 @@ export const AUDIT_ACTIONS = {
   "legal.draft_delete": { label: "Legal draft deleted", category: "legal" },
   "legal.publish": { label: "Legal document published", category: "legal" },
   "legal.unpublish": { label: "Legal document unpublished", category: "legal" },
+  "compliance.review": { label: "Compliance controls reviewed", category: "legal" },
+
 
   // Feature flags & settings
   "setting.update": { label: "Setting changed", category: "settings" },
