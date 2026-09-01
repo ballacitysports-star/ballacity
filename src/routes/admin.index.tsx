@@ -112,6 +112,10 @@ function AdminPage() {
             <Link to="/admin/legal">Legal &amp; Compliance</Link>
           </Button>
           <Button variant="outline" asChild>
+            <Link to="/admin/compliance">Compliance readiness</Link>
+          </Button>
+
+          <Button variant="outline" asChild>
             <Link to="/admin/audit">Audit logs</Link>
           </Button>
           <Button variant="outline" asChild>
