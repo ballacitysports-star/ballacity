@@ -352,6 +352,9 @@ const PUBLIC_ROUTES = [
   "/auth",
   "/reset-password",
   "/.lovable/oauth/consent",
+  // Legal documents must be readable before/without signing in.
+  "/terms",
+  "/privacy",
   // Shareable, sign-in-free surface.
   "/highlights",
   "/player-card",
