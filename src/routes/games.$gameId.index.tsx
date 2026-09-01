@@ -1106,6 +1106,17 @@ function GameDetail() {
 
   return (
     <div className="pb-32">
+      <RiskAcknowledgmentDialog
+        open={riskAckOpen}
+        onOpenChange={(v) => {
+          setRiskAckOpen(v);
+          if (!v) pendingJoinPositionRef.current = null;
+        }}
+        gameTitle={game.title}
+        submitting={processing}
+        onConfirm={() => void confirmRiskAck()}
+      />
+
       {reportedHostId && (
         <ReportDialog
           open={reportGameOpen}
