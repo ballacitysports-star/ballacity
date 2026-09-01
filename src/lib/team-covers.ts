@@ -1,8 +1,9 @@
 import { supabase } from "@/integrations/supabase/client";
+import { isAllowedImageMime } from "@/lib/image-validation";
+
+const ALLOWED_IMAGE_EXTENSIONS = ["jpg", "jpeg", "png", "webp"];
 
 const BUCKET = "team-covers";
-// 10 years — effectively permanent for display in <img src>.
-const SIGNED_URL_TTL_SECONDS = 60 * 60 * 24 * 365 * 10;
 const MAX_BYTES = 4 * 1024 * 1024;
 
 export type UploadProgress = {
@@ -27,15 +28,18 @@ function extFromFile(file: File): string {
 
 /**
  * Upload a team cover image to Supabase Storage using a signed upload URL,
- * with real byte-level progress via XHR. Returns a long-lived signed URL
- * suitable for use in <img src>.
+ * with real byte-level progress via XHR. `team-covers` is a public branding
+ * bucket, so the stable public URL is returned — no bearer token is minted.
  */
 export async function uploadTeamCover(
   file: File,
   onProgress?: (p: UploadProgress) => void,
 ): Promise<UploadTeamCoverResult> {
-  if (!file.type.startsWith("image/")) {
-    throw new TeamCoverUploadError("Please choose an image file.");
+  if (!ALLOWED_IMAGE_EXTENSIONS.includes(extFromFile(file))) {
+    throw new TeamCoverUploadError("Please choose a JPG, PNG or WEBP image.");
+  }
+  if (file.type && !isAllowedImageMime(file.type)) {
+    throw new TeamCoverUploadError("Please choose a JPG, PNG or WEBP image.");
   }
   if (file.size > MAX_BYTES) {
     throw new TeamCoverUploadError("Image is too large — max 4 MB.");
@@ -85,14 +89,10 @@ export async function uploadTeamCover(
     xhr.send(file);
   });
 
-  const { data: signedGet, error: signedGetErr } = await supabase.storage
-    .from(BUCKET)
-    .createSignedUrl(path, SIGNED_URL_TTL_SECONDS);
-  if (signedGetErr || !signedGet?.signedUrl) {
-    throw new TeamCoverUploadError(
-      signedGetErr?.message || "Uploaded, but could not build a display URL.",
-    );
+  const { data: publicUrl } = supabase.storage.from(BUCKET).getPublicUrl(path);
+  if (!publicUrl?.publicUrl) {
+    throw new TeamCoverUploadError("Uploaded, but could not build a display URL.");
   }
 
-  return { path, url: signedGet.signedUrl };
+  return { path, url: publicUrl.publicUrl };
 }
