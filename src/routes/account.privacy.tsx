@@ -270,7 +270,14 @@ function PrivacySettingsPage() {
         </SettingsGroup>
 
         <SettingsGroup title="Your data">
+          <SettingsLinkRow
+            icon={Download}
+            label="Download my data"
+            description="Get a copy of your profile, games, availability and activity, and see how long we keep each kind of data."
+            to="/account/data"
+          />
           <SettingsStaticRow>
+
             <div className="space-y-2 text-xs text-muted-foreground">
               <p>
                 <span className="font-semibold text-foreground">Deleted:</span> your profile, photos,
