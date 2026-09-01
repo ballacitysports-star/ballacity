@@ -58,6 +58,10 @@ import { ReviewsSection } from "@/components/ReviewsSection";
 import { SpotsPill } from "@/components/SpotsPill";
 import { UserAvatar, UserAvatarById } from "@/components/UserAvatar";
 import { computeReputation, useReviewsFor } from "@/lib/reviews";
+import { GamePolicySummary } from "@/components/games/GamePolicySummary";
+import { GamePolicyFields } from "@/components/games/GamePolicyFields";
+import { HostTrustPanel } from "@/components/games/HostTrustPanel";
+import { normalizeGamePolicy, validateGamePolicy, type GamePolicy, type HostTrust } from "@/lib/game-policy";
 import { ReputationBadge } from "@/components/ReputationBadge";
 import { joinGame, leaveGame, useIsJoined } from "@/lib/games-store";
 import { useLiveParticipantCount } from "@/lib/game-participants-store";
@@ -417,6 +421,63 @@ function GameDetail() {
   const hostReviews = useReviewsFor(hostIdFor(game?.host.username ?? ""));
   const hostRep = useMemo(() => computeReputation(hostReviews, "host"), [hostReviews]);
   const canReviewHost = useCanReview(hostIdFor(game?.host.username ?? ""));
+
+  // Policy players must be able to read before joining.
+  const viewerPolicy = useMemo<GamePolicy>(
+    () =>
+      normalizeGamePolicy({
+        cancellationPolicy: (game?.cancellationPolicy ?? undefined) as GamePolicy["cancellationPolicy"],
+        cancellationNotes: game?.cancellationNotes ?? "",
+        minPlayers: game?.minPlayers ?? 0,
+        maxPlayers: game?.maxPlayers ?? 10,
+        allowWaitlist: game?.allowWaitlist ?? true,
+        entryFee: Number(settings?.entry_fee ?? game?.price ?? 0) || 0,
+        requiresApproval: settings ? !!settings.requires_approval : true,
+        refundPolicy: settings?.refund_policy ?? "",
+        gameRules: game?.gameRules ?? "",
+      }),
+    [game, settings],
+  );
+
+  // Host trust: only real signals. Verification comes from the hosting team
+  // profile's verified flag — never invented.
+  const [hostTeamVerified, setHostTeamVerified] = useState<boolean | null>(null);
+  useEffect(() => {
+    const teamId = game?.teamId;
+    if (!teamId) {
+      setHostTeamVerified(null);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      const { data } = await supabase
+        .from("teams")
+        .select("verified")
+        .eq("id", teamId)
+        .maybeSingle();
+      if (!cancelled) setHostTeamVerified(!!(data as { verified?: boolean } | null)?.verified);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [game?.teamId]);
+
+  const hostTrust = useMemo<HostTrust>(() => {
+    const hostUserId = game?.hostUserId ?? settings?.host_id ?? null;
+    const gamesHosted = hostUserId
+      ? hosted.filter((g) => g.hostUserId === hostUserId).length
+      : 0;
+    return {
+      gamesHosted,
+      rating: hostRep.count > 0 ? hostRep.avg : null,
+      reviewCount: hostRep.count,
+      // No attendance signal is tracked yet — report it honestly instead of
+      // inventing a percentage.
+      attendanceRate: null,
+      verified: hostTeamVerified === true,
+      verifiedLabel: hostTeamVerified === true ? "Verified team profile" : null,
+    };
+  }, [game?.hostUserId, settings?.host_id, hosted, hostRep, hostTeamVerified]);
 
   // Guards refreshStatus while a leave flow is tearing down local + server
   // state. Realtime DELETE events for join_requests / payment_submissions
@@ -1507,6 +1568,10 @@ function GameDetail() {
               </div>
             );
           })()}
+
+        {/* Policies + host trust — visible before any join action */}
+        {!isHost && <GamePolicySummary policy={viewerPolicy} defaultOpen />}
+        <HostTrustPanel trust={hostTrust} hostName={game.host.name} />
 
         {/* Meta */}
         <div className="grid grid-cols-2 gap-2">
