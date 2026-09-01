@@ -12,7 +12,9 @@ import {
   Reply,
   Trash2,
   Check,
+  Flag,
 } from "lucide-react";
+import { ReportDialog } from "@/components/ReportDialog";
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/use-auth";
 import {
@@ -69,6 +71,7 @@ function Thread() {
   const [replyTo, setReplyTo] = useState<Message | null>(null);
   const [reactPickerFor, setReactPickerFor] = useState<string | null>(null);
   const [menuFor, setMenuFor] = useState<string | null>(null);
+  const [reportMsg, setReportMsg] = useState<Message | null>(null);
   const [otherTyping, setOtherTyping] = useState(false);
   const [otherPresent, setOtherPresent] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
@@ -450,6 +453,18 @@ function Thread() {
         </div>
       )}
 
+      {reportMsg && (
+        <ReportDialog
+          open={!!reportMsg}
+          onOpenChange={(v) => !v && setReportMsg(null)}
+          subjectType="message"
+          reportedId={reportMsg.sender_id}
+          subjectLabel={other?.display_name ?? "this message"}
+          conversationId={conversationId}
+          messageId={reportMsg.id}
+        />
+      )}
+
       <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 py-4 space-y-3">
         {msgs.length === 0 ? (
           <div className="text-center text-xs text-muted-foreground mt-10">
@@ -578,6 +593,13 @@ function Thread() {
                           aria-label="Reply"
                         >
                           <Reply className="h-3.5 w-3.5" />
+                        </button>
+                        <button
+                          onClick={() => setReportMsg(m)}
+                          className="grid h-7 w-7 place-items-center rounded-full hover:bg-surface"
+                          aria-label="Report message"
+                        >
+                          <Flag className="h-3.5 w-3.5" />
                         </button>
                       </div>
                     )}

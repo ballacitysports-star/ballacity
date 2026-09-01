@@ -105,6 +105,9 @@ function AdminPage() {
         </div>
         <div className="flex gap-2">
           <Button variant="outline" asChild>
+            <Link to="/admin/moderation">Moderation</Link>
+          </Button>
+          <Button variant="outline" asChild>
             <Link to="/admin/location-analytics">Location analytics</Link>
           </Button>
           <Button variant="outline" asChild>

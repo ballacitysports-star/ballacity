@@ -24,7 +24,9 @@ import {
   Home,
   ShieldCheck,
   History,
+  Flag,
 } from "lucide-react";
+import { ReportDialog } from "@/components/ReportDialog";
 import { GAMES, SPORTS, imageFor } from "@/lib/sample-data";
 import { TierChips } from "@/components/sports/TierChips";
 import {
@@ -374,6 +376,7 @@ function GameDetail() {
   const cooldownMs = joinResubmitCooldownRemainingMs(myReq);
   const capReached = joinResubmitCapReached(myReq);
   const [, setNowTick] = useState(0);
+  const [reportGameOpen, setReportGameOpen] = useState(false);
   useEffect(() => {
     if (cooldownMs <= 0) return;
     const t = setInterval(() => setNowTick((n) => n + 1), 1000);
@@ -1052,8 +1055,20 @@ function GameDetail() {
     })),
   ];
 
+  const reportedHostId = settings?.host_id ?? game.hostUserId ?? null;
+
   return (
     <div className="pb-32">
+      {reportedHostId && (
+        <ReportDialog
+          open={reportGameOpen}
+          onOpenChange={setReportGameOpen}
+          subjectType="game"
+          reportedId={reportedHostId}
+          subjectLabel={game.title}
+          gameId={game.id}
+        />
+      )}
       {/* Hero */}
       <div className="relative h-72">
         <img src={game.image} alt={game.title} className="h-full w-full object-cover" />
@@ -1072,6 +1087,15 @@ function GameDetail() {
             <button className="grid h-10 w-10 place-items-center rounded-full border border-border bg-background/70 backdrop-blur">
               <Share2 className="h-4 w-4" />
             </button>
+            {!isHost && (
+              <button
+                onClick={() => setReportGameOpen(true)}
+                aria-label="Report game"
+                className="grid h-10 w-10 place-items-center rounded-full border border-border bg-background/70 backdrop-blur"
+              >
+                <Flag className="h-4 w-4" />
+              </button>
+            )}
           </div>
         </div>
         <div className="absolute bottom-4 left-4 right-4">
