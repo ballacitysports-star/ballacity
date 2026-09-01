@@ -13,6 +13,7 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as TabsRouteImport } from './routes/_tabs'
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as CommunityGuidelinesRouteImport } from './routes/community-guidelines'
+import { Route as ContactRouteImport } from './routes/contact'
 import { Route as HighlightsRouteImport } from './routes/highlights'
 import { Route as McpRouteImport } from './routes/mcp'
 import { Route as PaymentsRouteImport } from './routes/payments'
@@ -96,6 +97,11 @@ const AuthRoute = AuthRouteImport.update({
 const CommunityGuidelinesRoute = CommunityGuidelinesRouteImport.update({
   id: '/community-guidelines',
   path: '/community-guidelines',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ContactRoute = ContactRouteImport.update({
+  id: '/contact',
+  path: '/contact',
   getParentRoute: () => rootRouteImport,
 } as any)
 const HighlightsRoute = HighlightsRouteImport.update({
@@ -432,6 +438,7 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
   '/community-guidelines': typeof CommunityGuidelinesRoute
+  '/contact': typeof ContactRoute
   '/highlights': typeof HighlightsRoute
   '/mcp': typeof McpRoute
   '/payments': typeof PaymentsRoute
@@ -502,6 +509,7 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
   '/community-guidelines': typeof CommunityGuidelinesRoute
+  '/contact': typeof ContactRoute
   '/highlights': typeof HighlightsRoute
   '/mcp': typeof McpRoute
   '/payments': typeof PaymentsRoute
@@ -573,6 +581,7 @@ export interface FileRoutesById {
   '/_tabs': typeof TabsRouteWithChildren
   '/auth': typeof AuthRoute
   '/community-guidelines': typeof CommunityGuidelinesRoute
+  '/contact': typeof ContactRoute
   '/highlights': typeof HighlightsRoute
   '/mcp': typeof McpRoute
   '/payments': typeof PaymentsRoute
@@ -645,6 +654,7 @@ export interface FileRouteTypes {
     | '/'
     | '/auth'
     | '/community-guidelines'
+    | '/contact'
     | '/highlights'
     | '/mcp'
     | '/payments'
@@ -715,6 +725,7 @@ export interface FileRouteTypes {
     | '/'
     | '/auth'
     | '/community-guidelines'
+    | '/contact'
     | '/highlights'
     | '/mcp'
     | '/payments'
@@ -785,6 +796,7 @@ export interface FileRouteTypes {
     | '/_tabs'
     | '/auth'
     | '/community-guidelines'
+    | '/contact'
     | '/highlights'
     | '/mcp'
     | '/payments'
@@ -857,6 +869,7 @@ export interface RootRouteChildren {
   TabsRoute: typeof TabsRouteWithChildren
   AuthRoute: typeof AuthRoute
   CommunityGuidelinesRoute: typeof CommunityGuidelinesRoute
+  ContactRoute: typeof ContactRoute
   HighlightsRoute: typeof HighlightsRoute
   McpRoute: typeof McpRoute
   PaymentsRoute: typeof PaymentsRoute
@@ -940,6 +953,13 @@ declare module '@tanstack/react-router' {
       path: '/community-guidelines'
       fullPath: '/community-guidelines'
       preLoaderRoute: typeof CommunityGuidelinesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/contact': {
+      id: '/contact'
+      path: '/contact'
+      fullPath: '/contact'
+      preLoaderRoute: typeof ContactRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/highlights': {
@@ -1447,6 +1467,7 @@ const rootRouteChildren: RootRouteChildren = {
   TabsRoute: TabsRouteWithChildren,
   AuthRoute: AuthRoute,
   CommunityGuidelinesRoute: CommunityGuidelinesRoute,
+  ContactRoute: ContactRoute,
   HighlightsRoute: HighlightsRoute,
   McpRoute: McpRoute,
   PaymentsRoute: PaymentsRoute,
