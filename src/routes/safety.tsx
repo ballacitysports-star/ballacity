@@ -72,6 +72,35 @@ function SafetyCenter() {
           </p>
         </section>
 
+        {/* Stay safe */}
+        <section className="mt-5 rounded-2xl border border-border bg-surface px-4 py-4">
+          <h2 className="flex items-center gap-2 text-sm font-bold">
+            <Heart className="h-4 w-4 text-lime" aria-hidden />
+            Stay safe
+          </h2>
+          <ul className="mt-2 space-y-1.5">
+            {STAY_SAFE_POINTS.map((p) => (
+              <li key={p} className="flex gap-2 text-[13px] leading-relaxed text-muted-foreground">
+                <span aria-hidden className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-lime" />
+                {p}
+              </li>
+            ))}
+          </ul>
+        </section>
+
+        {/* Section nav */}
+        <nav aria-label="Safety Center sections" className="mt-5 flex flex-wrap gap-2">
+          {SAFETY_TOPICS.map((t) => (
+            <a
+              key={t.id}
+              href={`#${t.id}`}
+              className="rounded-full bg-surface px-3 py-1.5 text-xs font-semibold text-muted-foreground hover:text-foreground"
+            >
+              {t.title}
+            </a>
+          ))}
+        </nav>
+
         {/* Topics */}
         <div className="mt-6 space-y-4">
           {SAFETY_TOPICS.map((t) => (
