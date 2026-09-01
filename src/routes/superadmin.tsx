@@ -17,6 +17,7 @@ import { ImagesTab } from "@/components/superadmin/ImagesTab";
 import { PaymentsTab } from "@/components/superadmin/PaymentsTab";
 import { OpsTab } from "@/components/superadmin/OpsTab";
 import { AuditTab } from "@/components/superadmin/AuditTab";
+import { YouthTab } from "@/components/superadmin/YouthTab";
 
 export const Route = createFileRoute("/superadmin")({
   head: () =>
@@ -100,6 +101,7 @@ function SuperadminPage() {
           <TabsTrigger value="images">Images</TabsTrigger>
           <TabsTrigger value="payments">Payments</TabsTrigger>
           <TabsTrigger value="ops">Ops &amp; config</TabsTrigger>
+          <TabsTrigger value="youth">Youth &amp; age</TabsTrigger>
           <TabsTrigger value="audit">Audit log</TabsTrigger>
         </TabsList>
         <TabsContent value="overview" className="pt-3">
@@ -120,6 +122,9 @@ function SuperadminPage() {
         </TabsContent>
         <TabsContent value="ops" className="pt-3">
           <OpsTab />
+        </TabsContent>
+        <TabsContent value="youth" className="pt-3">
+          <YouthTab />
         </TabsContent>
         <TabsContent value="audit" className="pt-3">
           <AuditTab />
