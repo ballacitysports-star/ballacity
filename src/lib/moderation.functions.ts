@@ -1,6 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { z } from "zod";
+import type { AuditAction } from "@/lib/audit-actions";
 
 /** Moderator = admin, moderator, or superadmin role. */
 async function assertModerator(ctx: { supabase: any; userId: string }) {
@@ -11,27 +12,38 @@ async function assertModerator(ctx: { supabase: any; userId: string }) {
   if (!data) throw new Error("Forbidden");
 }
 
+/** Canonical audit action for each moderation outcome. */
+const MODERATION_AUDIT_ACTION = {
+  warn: "user.warn",
+  remove_content: "content.remove",
+  suspend: "user.suspend",
+  ban: "user.ban",
+  restore: "user.restore",
+} as const;
+
+const REPORT_STATUS_AUDIT_ACTION: Record<string, AuditAction> = {
+  resolved: "report.resolve",
+  dismissed: "report.dismiss",
+  new: "report.status",
+  investigating: "report.status",
+  escalated: "report.status",
+};
+
 async function audit(
   admin: any,
   actorId: string,
   entry: {
-    action: string;
+    action: AuditAction;
     targetType: string;
     targetId?: string | null;
     reason?: string | null;
     before?: unknown;
     after?: unknown;
+    metadata?: Record<string, unknown>;
   },
 ) {
-  await admin.from("admin_audit_log").insert({
-    actor_id: actorId,
-    action: entry.action,
-    target_type: entry.targetType,
-    target_id: entry.targetId ?? null,
-    reason: entry.reason ?? null,
-    before: (entry.before ?? null) as any,
-    after: (entry.after ?? null) as any,
-  });
+  const { logAdminAction } = await import("@/lib/audit-log.server");
+  await logAdminAction(admin, actorId, entry);
 }
 
 export const moderationCheck = createServerFn({ method: "GET" })
@@ -215,8 +227,9 @@ export const setReportStatus = createServerFn({ method: "POST" })
       .eq("id", data.reportId);
     if (error) throw new Error(error.message);
     await audit(supabaseAdmin, context.userId, {
-      action: `report_status_${data.status}`,
-      targetType: "user_report",
+      action: REPORT_STATUS_AUDIT_ACTION[data.status] ?? "report.status",
+      targetType: "report",
+      metadata: { status: data.status },
       targetId: data.reportId,
       reason: data.notes?.trim() || null,
       before: before ? { status: before.status } : null,
@@ -336,7 +349,7 @@ export const applyModerationAction = createServerFn({ method: "POST" })
       .eq("id", data.reportId);
 
     await audit(supabaseAdmin, context.userId, {
-      action: `moderation_${data.action}`,
+      action: MODERATION_AUDIT_ACTION[data.action],
       targetType: report.subject_type,
       targetId:
         report.subject_type === "game"

@@ -753,14 +753,27 @@ export const superadminSetSetting = createServerFn({ method: "POST" })
     const { error } = await admin.from("app_settings").upsert(row as any, { onConflict: "key" });
     if (error) throw new Error(error.message);
     await writeAudit(admin, context.userId, {
-      action: "setting.update",
+      action: settingAuditAction(data.key, data.value),
       targetType: "app_setting",
       targetId: data.key,
       before,
       after: { value: data.value },
+      metadata: { key: data.key, isPublic: data.isPublic ?? before?.is_public ?? false },
     });
     return { ok: true };
   });
+
+/**
+ * Settings split three ways in the audit trail so security- and flag-related
+ * changes are easy to filter apart from ordinary config edits.
+ */
+function settingAuditAction(key: string, value: unknown) {
+  if (/(security|auth|verification|rate_limit|moderation)/i.test(key))
+    return "security.setting_update" as const;
+  if (typeof value === "boolean" || /(enabled|flag|youth|feature)/i.test(key))
+    return "feature_flag.update" as const;
+  return "setting.update" as const;
+}
 
 export const superadminBroadcast = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
