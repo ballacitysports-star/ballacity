@@ -379,6 +379,14 @@ function GameDetail() {
   const capReached = joinResubmitCapReached(myReq);
   const [, setNowTick] = useState(0);
   const [reportGameOpen, setReportGameOpen] = useState(false);
+  // Risk-acknowledgment gate state (physical activity safety).
+  const [riskAckOpen, setRiskAckOpen] = useState(false);
+  const pendingJoinPositionRef = useRef<string | null>(null);
+  const { data: riskAckVersion, refetch: refetchRiskAck } = useSafetyAck(
+    gameId,
+    "participant_risk",
+  );
+
   useEffect(() => {
     if (cooldownMs <= 0) return;
     const t = setInterval(() => setNowTick((n) => n + 1), 1000);
