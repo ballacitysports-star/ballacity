@@ -376,6 +376,7 @@ function GameDetail() {
   const cooldownMs = joinResubmitCooldownRemainingMs(myReq);
   const capReached = joinResubmitCapReached(myReq);
   const [, setNowTick] = useState(0);
+  const [reportGameOpen, setReportGameOpen] = useState(false);
   useEffect(() => {
     if (cooldownMs <= 0) return;
     const t = setInterval(() => setNowTick((n) => n + 1), 1000);
