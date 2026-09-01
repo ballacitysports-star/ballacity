@@ -21,6 +21,8 @@ export type PrivacyPreferences = {
   show_games_played: boolean;
   allow_messages: ContactScope;
   allow_invites: ContactScope;
+  /** Whether other members may see when you were last active. */
+  show_online_status: boolean;
   marketing_emails: boolean;
   ai_processing: boolean;
   /**
@@ -39,6 +41,7 @@ export const DEFAULT_PRIVACY: PrivacyPreferences = {
   show_games_played: true,
   allow_messages: "everyone",
   allow_invites: "everyone",
+  show_online_status: true,
   marketing_emails: false,
   ai_processing: true,
   ai_training_opt_in: false,
