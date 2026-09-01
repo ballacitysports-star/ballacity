@@ -20,7 +20,7 @@ import {
   Pencil,
   Shield,
   ShieldOff,
-
+  Sparkles,
   Sun,
   Trash2,
   UserCog,
