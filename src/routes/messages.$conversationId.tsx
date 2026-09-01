@@ -580,6 +580,13 @@ function Thread() {
                         >
                           <Reply className="h-3.5 w-3.5" />
                         </button>
+                        <button
+                          onClick={() => setReportMsg(m)}
+                          className="grid h-7 w-7 place-items-center rounded-full hover:bg-surface"
+                          aria-label="Report message"
+                        >
+                          <Flag className="h-3.5 w-3.5" />
+                        </button>
                       </div>
                     )}
                   </div>
