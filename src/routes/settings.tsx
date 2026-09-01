@@ -10,8 +10,11 @@ import {
   FileText,
 
   IdCard,
+  LifeBuoy,
   LogOut,
   Lock,
+  Scale,
+  ShieldCheck,
   Monitor,
   Moon,
   Pencil,
