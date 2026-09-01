@@ -1,3 +1,4 @@
+import { MediaImage } from "@/components/MediaImage";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 
@@ -215,7 +216,7 @@ function DefaultGameCard({ game }: { game: ActiveGame }) {
       params={{ gameId: game.id }}
       className="flex gap-3 rounded-3xl border border-border bg-surface/90 backdrop-blur-xl p-3 shadow-2xl"
     >
-      <img
+      <MediaImage
         src={game.image}
         alt=""
         loading="lazy"

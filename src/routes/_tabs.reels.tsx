@@ -43,6 +43,8 @@ import {
 import { ReelCoach } from "@/components/reels/ReelCoach";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
+import { validateVideoMeta } from "@/lib/video-validation";
+import { finalizeVideoUpload } from "@/lib/media-uploads.functions";
 import { useAuth } from "@/hooks/use-auth";
 import { useSubscription } from "@/hooks/useSubscription";
 import { useStripeCheckout } from "@/hooks/useStripeCheckout";
@@ -757,11 +759,17 @@ function ReelsPage() {
     setBusy(true);
     try {
       const env = getStripeEnvironment();
+      // Client-side gate (type, extension, size). The server re-checks the
+      // stored bytes below, so nothing here is trusted on its own.
+      const invalid = validateVideoMeta({ name: file.name, mime: file.type, bytes: file.size });
+      if (invalid) throw new Error(invalid);
       const base = `${user.id}/${Date.now()}-${file.name.replace(/[^a-zA-Z0-9.-]/g, "_")}`;
       const { error: upErr } = await supabase.storage
         .from("highlight-videos")
         .upload(base, file, { upsert: false });
       if (upErr) throw upErr;
+      // Deletes the object and throws when the bytes aren't a real video.
+      await finalizeVideoUpload({ data: { path: base, kind: "video" } });
 
       // Every upload lands playable: unless the clip is provably H.264 in an
       // MP4 container, we build the iPhone/Safari-safe H.264 copy right here

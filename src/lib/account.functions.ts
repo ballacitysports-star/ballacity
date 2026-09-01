@@ -1,7 +1,20 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
-const MEDIA_BUCKETS = ["avatars", "covers", "reels", "game-covers", "chat-attachments"];
+// Every bucket that stores user-uploaded media under a `<user id>/` prefix.
+const MEDIA_BUCKETS = [
+  "avatars",
+  "covers",
+  "game-covers",
+  "highlight-videos",
+  "message-attachments",
+  "payment-proofs",
+  "team-covers",
+  "team-avatars",
+  "org-covers",
+  "org-avatars",
+  "trainer-avatars",
+];
 
 /**
  * Permanently delete the currently authenticated user's account.

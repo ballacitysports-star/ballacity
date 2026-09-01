@@ -1,4 +1,5 @@
 import { supabase } from "@/integrations/supabase/client";
+import { buildMediaRef } from "@/lib/media-refs";
 import { warmImageVariants } from "@/lib/image-variants";
 import { finalizeImageUpload } from "@/lib/image-uploads.functions";
 import { refreshBlockedImages } from "@/lib/blocked-images";
@@ -26,9 +27,6 @@ const PRIVATE_BUCKETS: Record<PrivateImageBucket, true> = {
   "game-covers": true,
 };
 
-// 10 years — effectively permanent for <img src> in private buckets.
-const SIGNED_URL_TTL = 60 * 60 * 24 * 365 * 10;
-
 function decodeDataUrl(dataUrl: string): { blob: Blob; mime: string; ext: string } {
   const match = dataUrl.match(/^data:(image\/[a-zA-Z0-9+.-]+);base64,(.+)$/);
   if (!match) throw new Error("Not a valid image data URL");
@@ -53,8 +51,8 @@ function decodeDataUrl(dataUrl: string): { blob: Blob; mime: string; ext: string
  * Upload a data URL (jpeg/png/webp) to a Supabase Storage bucket under
  * `{ownerId}/{uuid}.{ext}` and return a URL suitable for use in `<img src>`.
  *
- * Public buckets get a stable `getPublicUrl`; private buckets get a long-lived
- * signed URL. `ownerId` MUST match the first path segment enforced by storage
+ * Public buckets get a stable `getPublicUrl`; private buckets get a
+ * `storage://bucket/path` reference that display code signs per viewer. `ownerId` MUST match the first path segment enforced by storage
  * RLS — `auth.uid()` for user buckets or the entity id for team/org buckets.
  */
 export async function uploadDataUrlToBucket(
@@ -83,16 +81,10 @@ export async function uploadDataUrlToBucket(
   }
 
   if ((PRIVATE_BUCKETS as Record<string, true>)[bucket]) {
-    const { data, error: sErr } = await supabase.storage
-      .from(bucket)
-      .createSignedUrl(path, SIGNED_URL_TTL);
-    if (sErr || !data?.signedUrl) {
-      throw new Error(sErr?.message ?? "Could not build a signed URL");
-    }
-    // Pre-render thumbnails / responsive sizes on the server so the first view
-    // is already cached.
-    warmImageVariants(data.signedUrl);
-    return data.signedUrl;
+    // Private media is persisted as a bucket+path reference, never as a signed
+    // URL: display code mints a fresh one-hour URL per viewer so Storage RLS is
+    // re-checked on every view instead of a token outliving permissions.
+    return buildMediaRef(bucket, path);
   }
 
   const { data } = supabase.storage.from(bucket).getPublicUrl(path);

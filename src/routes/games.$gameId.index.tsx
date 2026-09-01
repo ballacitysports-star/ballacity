@@ -143,6 +143,10 @@ import { useMyProfile } from "@/lib/user-prefs-store";
 import { getOrCreateDirectConversation } from "@/lib/messages";
 import { createNotification } from "@/lib/notifications";
 import { supabase } from "@/integrations/supabase/client";
+import { MediaImage } from "@/components/MediaImage";
+import { buildMediaRef } from "@/lib/media-refs";
+import { isAllowedImageMime, MAX_IMAGE_BYTES } from "@/lib/image-validation";
+import { finalizeImageUpload } from "@/lib/image-uploads.functions";
 import { useCanReview } from "@/lib/transactions";
 import { blockUser, unblockUser, isUserBlocked, useBlockedUsers } from "@/lib/blocked-users-store";
 import {
@@ -1131,7 +1135,7 @@ function GameDetail() {
       )}
       {/* Hero */}
       <div className="relative h-72">
-        <img src={game.image} alt={game.title} className="h-full w-full object-cover" />
+        <MediaImage src={game.image} alt={game.title} className="h-full w-full object-cover" />
         <div className="absolute inset-0 bg-gradient-to-t from-background via-background/40 to-background/40" />
         <div className="absolute top-4 left-4 right-4 flex items-center justify-between">
           <Link
@@ -3145,13 +3149,21 @@ function EditGameModal({
                   const file = e.target.files?.[0];
                   e.target.value = "";
                   if (!file || !user) return;
-                  if (file.size > 5 * 1024 * 1024) {
-                    toast.error("Image too large (max 5MB).");
+                  const ext = (file.name.split(".").pop() || "").toLowerCase();
+                  if (!["jpg", "jpeg", "png", "webp"].includes(ext)) {
+                    toast.error("Please choose a JPG, PNG or WEBP image.");
+                    return;
+                  }
+                  if (file.type && !isAllowedImageMime(file.type)) {
+                    toast.error("Please choose a JPG, PNG or WEBP image.");
+                    return;
+                  }
+                  if (file.size > MAX_IMAGE_BYTES) {
+                    toast.error("Image too large (max 8MB).");
                     return;
                   }
                   setCoverUploading(true);
                   try {
-                    const ext = file.name.split(".").pop() || "jpg";
                     const path = `${user.id}/${Date.now()}-${Math.random()
                       .toString(36)
                       .slice(2, 8)}.${ext}`;
@@ -3159,11 +3171,17 @@ function EditGameModal({
                       .from("game-covers")
                       .upload(path, file, { cacheControl: "3600", upsert: false });
                     if (upErr) throw upErr;
-                    const { data, error: urlErr } = await supabase.storage
-                      .from("game-covers")
-                      .createSignedUrl(path, 60 * 60 * 24 * 365 * 10);
-                    if (urlErr || !data?.signedUrl) throw urlErr ?? new Error("Signed URL failed");
-                    setImage(data.signedUrl);
+                    // Server re-validates the stored bytes and safety-scans them.
+                    const check = await finalizeImageUpload({
+                      data: { bucket: "game-covers", path },
+                    });
+                    if (check?.quarantined) {
+                      throw new Error(
+                        "This image was flagged by our automated safety check and is pending review.",
+                      );
+                    }
+                    // Persist a reference, not a long-lived signed URL.
+                    setImage(buildMediaRef("game-covers", path));
                   } catch (err: any) {
                     toast.error(err?.message ?? "Upload failed");
                   } finally {
