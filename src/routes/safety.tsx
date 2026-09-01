@@ -1,5 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { AlertTriangle, ArrowLeft, Flag, ShieldAlert, ShieldCheck } from "lucide-react";
+import { AlertTriangle, ArrowLeft, Flag, Heart, ShieldAlert, ShieldCheck } from "lucide-react";
+import { PolicyLinks } from "@/components/PolicyLinks";
 import { pageHead } from "@/lib/seo";
 import {
   EMERGENCY_NOTICE,
@@ -7,6 +8,7 @@ import {
   LEGAL_REVIEW_LABEL,
   RISK_ACKNOWLEDGMENT,
   SAFETY_TOPICS,
+  STAY_SAFE_POINTS,
 } from "@/lib/safety";
 
 export const Route = createFileRoute("/safety")({
@@ -70,10 +72,43 @@ function SafetyCenter() {
           </p>
         </section>
 
+        {/* Stay safe */}
+        <section className="mt-5 rounded-2xl border border-border bg-surface px-4 py-4">
+          <h2 className="flex items-center gap-2 text-sm font-bold">
+            <Heart className="h-4 w-4 text-lime" aria-hidden />
+            Stay safe
+          </h2>
+          <ul className="mt-2 space-y-1.5">
+            {STAY_SAFE_POINTS.map((p) => (
+              <li key={p} className="flex gap-2 text-[13px] leading-relaxed text-muted-foreground">
+                <span aria-hidden className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-lime" />
+                {p}
+              </li>
+            ))}
+          </ul>
+        </section>
+
+        {/* Section nav */}
+        <nav aria-label="Safety Center sections" className="mt-5 flex flex-wrap gap-2">
+          {SAFETY_TOPICS.map((t) => (
+            <a
+              key={t.id}
+              href={`#${t.id}`}
+              className="rounded-full bg-surface px-3 py-1.5 text-xs font-semibold text-muted-foreground hover:text-foreground"
+            >
+              {t.title}
+            </a>
+          ))}
+        </nav>
+
         {/* Topics */}
         <div className="mt-6 space-y-4">
           {SAFETY_TOPICS.map((t) => (
-            <section key={t.id} className="rounded-2xl border border-border bg-surface px-4 py-4">
+            <section
+              key={t.id}
+              id={t.id}
+              className="scroll-mt-16 rounded-2xl border border-border bg-surface px-4 py-4"
+            >
               <h2 className="text-sm font-bold">{t.title}</h2>
               <ul className="mt-2 space-y-1.5">
                 {t.points.map((p) => (
@@ -103,23 +138,22 @@ function SafetyCenter() {
           <div className="mt-3 flex flex-wrap gap-2">
             <Link
               to="/account/blocked"
-              className="rounded-full border border-border px-3 py-2 text-xs font-semibold"
+              className="rounded-full border border-border px-3 py-2 text-xs font-semibold hover:bg-background"
             >
               Blocked accounts
             </Link>
             <Link
               to="/account/privacy"
-              className="rounded-full border border-border px-3 py-2 text-xs font-semibold"
+              className="rounded-full border border-border px-3 py-2 text-xs font-semibold hover:bg-background"
             >
               Privacy settings
             </Link>
-            <Link
-              to="/terms"
-              className="rounded-full border border-border px-3 py-2 text-xs font-semibold"
-            >
-              Terms
-            </Link>
           </div>
+        </section>
+
+        <section className="mt-4 rounded-2xl border border-border bg-surface px-4 py-4">
+          <h2 className="text-sm font-bold">More</h2>
+          <PolicyLinks className="mt-3" />
         </section>
       </main>
     </div>

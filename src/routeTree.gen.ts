@@ -12,6 +12,8 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as TabsRouteImport } from './routes/_tabs'
 import { Route as AuthRouteImport } from './routes/auth'
+import { Route as CommunityGuidelinesRouteImport } from './routes/community-guidelines'
+import { Route as ContactRouteImport } from './routes/contact'
 import { Route as HighlightsRouteImport } from './routes/highlights'
 import { Route as McpRouteImport } from './routes/mcp'
 import { Route as PaymentsRouteImport } from './routes/payments'
@@ -26,6 +28,7 @@ import { Route as ShopRouteImport } from './routes/shop'
 import { Route as SitemapDotxmlRouteImport } from './routes/sitemap[.]xml'
 import { Route as SuperadminRouteImport } from './routes/superadmin'
 import { Route as TermsRouteImport } from './routes/terms'
+import { Route as TrustCenterRouteImport } from './routes/trust-center'
 import { Route as Char91DotmcpChar93ListToolsRouteImport } from './routes/[.mcp]/list-tools'
 import { Route as Char91DotwellKnownChar93OauthProtectedResourceRouteImport } from './routes/[.well-known]/oauth-protected-resource'
 import { Route as TabsCreateRouteImport } from './routes/_tabs.create'
@@ -89,6 +92,16 @@ const TabsRoute = TabsRouteImport.update({
 const AuthRoute = AuthRouteImport.update({
   id: '/auth',
   path: '/auth',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CommunityGuidelinesRoute = CommunityGuidelinesRouteImport.update({
+  id: '/community-guidelines',
+  path: '/community-guidelines',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ContactRoute = ContactRouteImport.update({
+  id: '/contact',
+  path: '/contact',
   getParentRoute: () => rootRouteImport,
 } as any)
 const HighlightsRoute = HighlightsRouteImport.update({
@@ -159,6 +172,11 @@ const SuperadminRoute = SuperadminRouteImport.update({
 const TermsRoute = TermsRouteImport.update({
   id: '/terms',
   path: '/terms',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const TrustCenterRoute = TrustCenterRouteImport.update({
+  id: '/trust-center',
+  path: '/trust-center',
   getParentRoute: () => rootRouteImport,
 } as any)
 const Char91DotmcpChar93ListToolsRoute =
@@ -419,6 +437,8 @@ const ApiPublicReelsProcessRoute = ApiPublicReelsProcessRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
+  '/community-guidelines': typeof CommunityGuidelinesRoute
+  '/contact': typeof ContactRoute
   '/highlights': typeof HighlightsRoute
   '/mcp': typeof McpRoute
   '/payments': typeof PaymentsRoute
@@ -433,6 +453,7 @@ export interface FileRoutesByFullPath {
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/superadmin': typeof SuperadminRoute
   '/terms': typeof TermsRoute
+  '/trust-center': typeof TrustCenterRoute
   '/.mcp/list-tools': typeof Char91DotmcpChar93ListToolsRoute
   '/.well-known/oauth-protected-resource': typeof Char91DotwellKnownChar93OauthProtectedResourceRoute
   '/create': typeof TabsCreateRoute
@@ -487,6 +508,8 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
+  '/community-guidelines': typeof CommunityGuidelinesRoute
+  '/contact': typeof ContactRoute
   '/highlights': typeof HighlightsRoute
   '/mcp': typeof McpRoute
   '/payments': typeof PaymentsRoute
@@ -501,6 +524,7 @@ export interface FileRoutesByTo {
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/superadmin': typeof SuperadminRoute
   '/terms': typeof TermsRoute
+  '/trust-center': typeof TrustCenterRoute
   '/.mcp/list-tools': typeof Char91DotmcpChar93ListToolsRoute
   '/.well-known/oauth-protected-resource': typeof Char91DotwellKnownChar93OauthProtectedResourceRoute
   '/create': typeof TabsCreateRoute
@@ -556,6 +580,8 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/_tabs': typeof TabsRouteWithChildren
   '/auth': typeof AuthRoute
+  '/community-guidelines': typeof CommunityGuidelinesRoute
+  '/contact': typeof ContactRoute
   '/highlights': typeof HighlightsRoute
   '/mcp': typeof McpRoute
   '/payments': typeof PaymentsRoute
@@ -570,6 +596,7 @@ export interface FileRoutesById {
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/superadmin': typeof SuperadminRoute
   '/terms': typeof TermsRoute
+  '/trust-center': typeof TrustCenterRoute
   '/.mcp/list-tools': typeof Char91DotmcpChar93ListToolsRoute
   '/.well-known/oauth-protected-resource': typeof Char91DotwellKnownChar93OauthProtectedResourceRoute
   '/_tabs/create': typeof TabsCreateRoute
@@ -626,6 +653,8 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/auth'
+    | '/community-guidelines'
+    | '/contact'
     | '/highlights'
     | '/mcp'
     | '/payments'
@@ -640,6 +669,7 @@ export interface FileRouteTypes {
     | '/sitemap.xml'
     | '/superadmin'
     | '/terms'
+    | '/trust-center'
     | '/.mcp/list-tools'
     | '/.well-known/oauth-protected-resource'
     | '/create'
@@ -694,6 +724,8 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/auth'
+    | '/community-guidelines'
+    | '/contact'
     | '/highlights'
     | '/mcp'
     | '/payments'
@@ -708,6 +740,7 @@ export interface FileRouteTypes {
     | '/sitemap.xml'
     | '/superadmin'
     | '/terms'
+    | '/trust-center'
     | '/.mcp/list-tools'
     | '/.well-known/oauth-protected-resource'
     | '/create'
@@ -762,6 +795,8 @@ export interface FileRouteTypes {
     | '/'
     | '/_tabs'
     | '/auth'
+    | '/community-guidelines'
+    | '/contact'
     | '/highlights'
     | '/mcp'
     | '/payments'
@@ -776,6 +811,7 @@ export interface FileRouteTypes {
     | '/sitemap.xml'
     | '/superadmin'
     | '/terms'
+    | '/trust-center'
     | '/.mcp/list-tools'
     | '/.well-known/oauth-protected-resource'
     | '/_tabs/create'
@@ -832,6 +868,8 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   TabsRoute: typeof TabsRouteWithChildren
   AuthRoute: typeof AuthRoute
+  CommunityGuidelinesRoute: typeof CommunityGuidelinesRoute
+  ContactRoute: typeof ContactRoute
   HighlightsRoute: typeof HighlightsRoute
   McpRoute: typeof McpRoute
   PaymentsRoute: typeof PaymentsRoute
@@ -846,6 +884,7 @@ export interface RootRouteChildren {
   SitemapDotxmlRoute: typeof SitemapDotxmlRoute
   SuperadminRoute: typeof SuperadminRoute
   TermsRoute: typeof TermsRoute
+  TrustCenterRoute: typeof TrustCenterRoute
   Char91DotmcpChar93ListToolsRoute: typeof Char91DotmcpChar93ListToolsRoute
   Char91DotwellKnownChar93OauthProtectedResourceRoute: typeof Char91DotwellKnownChar93OauthProtectedResourceRoute
   AccountBlockedRoute: typeof AccountBlockedRoute
@@ -907,6 +946,20 @@ declare module '@tanstack/react-router' {
       path: '/auth'
       fullPath: '/auth'
       preLoaderRoute: typeof AuthRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/community-guidelines': {
+      id: '/community-guidelines'
+      path: '/community-guidelines'
+      fullPath: '/community-guidelines'
+      preLoaderRoute: typeof CommunityGuidelinesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/contact': {
+      id: '/contact'
+      path: '/contact'
+      fullPath: '/contact'
+      preLoaderRoute: typeof ContactRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/highlights': {
@@ -1005,6 +1058,13 @@ declare module '@tanstack/react-router' {
       path: '/terms'
       fullPath: '/terms'
       preLoaderRoute: typeof TermsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/trust-center': {
+      id: '/trust-center'
+      path: '/trust-center'
+      fullPath: '/trust-center'
+      preLoaderRoute: typeof TrustCenterRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/.mcp/list-tools': {
@@ -1406,6 +1466,8 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   TabsRoute: TabsRouteWithChildren,
   AuthRoute: AuthRoute,
+  CommunityGuidelinesRoute: CommunityGuidelinesRoute,
+  ContactRoute: ContactRoute,
   HighlightsRoute: HighlightsRoute,
   McpRoute: McpRoute,
   PaymentsRoute: PaymentsRoute,
@@ -1420,6 +1482,7 @@ const rootRouteChildren: RootRouteChildren = {
   SitemapDotxmlRoute: SitemapDotxmlRoute,
   SuperadminRoute: SuperadminRoute,
   TermsRoute: TermsRoute,
+  TrustCenterRoute: TrustCenterRoute,
   Char91DotmcpChar93ListToolsRoute: Char91DotmcpChar93ListToolsRoute,
   Char91DotwellKnownChar93OauthProtectedResourceRoute:
     Char91DotwellKnownChar93OauthProtectedResourceRoute,

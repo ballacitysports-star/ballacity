@@ -355,8 +355,12 @@ const PUBLIC_ROUTES = [
   // Legal documents must be readable before/without signing in.
   "/terms",
   "/privacy",
-  // Safety Center must be readable without signing in.
+  // Safety Center, Trust Center, and policy pages must be readable without
+  // signing in.
   "/safety",
+  "/trust-center",
+  "/community-guidelines",
+  "/contact",
 
   // Shareable, sign-in-free surface.
   "/highlights",

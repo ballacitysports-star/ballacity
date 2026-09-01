@@ -103,6 +103,16 @@ export const ADDRESS_PRIVACY_NOTE =
 export const EMERGENCY_NOTICE =
   "OpenRun is not an emergency service. If someone is in danger or seriously injured, contact your local emergency number (911 in the US) immediately. Report the incident in OpenRun afterwards so moderators can act.";
 
+/** Plain-language intro for the Safety Center "Stay safe" section. */
+export const STAY_SAFE_POINTS: string[] = [
+  "Read the whole game post before you commit — venue, court, time, skill level, and cost.",
+  "Play at public sporting facilities and arrive a few minutes early to look the space over.",
+  "Keep conversations in OpenRun so moderators can review them if something goes wrong.",
+  "Share only what a game needs — you never have to give out your address, ID, or financial details.",
+  "Trust your instincts. You can leave any game, decline any request, and block anyone.",
+  "Report unsafe behavior with the flag icon so moderators can act on it.",
+];
+
 export const SAFETY_TOPICS: { id: string; title: string; points: string[] }[] = [
   {
     id: "sports",
@@ -122,7 +132,9 @@ export const SAFETY_TOPICS: { id: string; title: string; points: string[] }[] = 
       "Tell a friend where you're going and when you expect to be back.",
       "Check the player's profile and reviews before agreeing to anything off-app.",
       "Trust your instincts — you can leave any game at any time.",
-    ],
+          "Communicate through OpenRun instead of moving to personal channels early.",
+      "Avoid sharing unnecessary personal information such as your home address or workplace.",
+],
   },
   {
     id: "game",
@@ -132,7 +144,13 @@ export const SAFETY_TOPICS: { id: string; title: string; points: string[] }[] = 
       "Arrive a few minutes early so you can look the space over.",
       "Ask the host about facility rules, entry, and parking before you commit.",
       "If the game looks nothing like it was described, don't play — report it.",
-    ],
+          "Follow the facility's rules and any staff instructions while you're there.",
+      "Respect other participants — no aggressive play, harassment, or trash talk that crosses the line.",
+      "Never participate while impaired by alcohol or drugs.",
+      "Bring appropriate equipment for the sport and surface.",
+      "Know your physical limitations and sit out when you need to.",
+      "Report unsafe behavior to the host and to OpenRun.",
+],
   },
   {
     id: "payments",
@@ -142,7 +160,11 @@ export const SAFETY_TOPICS: { id: string; title: string; points: string[] }[] = 
       "Never send money before the game is confirmed, and never pay more than the posted fee.",
       "Keep a receipt or screenshot of what you sent.",
       "Report anyone who pressures you to pay off-app or refuses to confirm payment.",
-    ],
+          "OpenRun never requests banking passwords, card PINs, or one-time codes.",
+      "Never share payment credentials, logins, or account recovery codes with anyone.",
+      "Confirm the host and the game before sending money.",
+      "Be cautious of payment scams: pressure to pay fast, changed handles, or refund overpayment requests.",
+],
   },
   {
     id: "messaging",
@@ -151,7 +173,10 @@ export const SAFETY_TOPICS: { id: string; title: string; points: string[] }[] = 
       "Keep conversations in OpenRun so moderators can review them if something goes wrong.",
       "Don't share your home address, financial details, or ID documents.",
       "Block anyone who makes you uncomfortable — they can't message or follow you afterwards.",
-    ],
+          "Block users who bother you — blocking is private and stops messages, follows, and join requests.",
+      "Report inappropriate messages with the flag icon in the conversation.",
+      "Avoid sharing sensitive personal information in chat.",
+],
   },
   {
     id: "reporting",
