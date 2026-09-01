@@ -438,6 +438,39 @@ export type Database = {
         }
         Relationships: []
       }
+      game_safety_acknowledgments: {
+        Row: {
+          accepted_at: string
+          created_at: string
+          game_id: string
+          id: string
+          kind: string
+          user_agent: string | null
+          user_id: string
+          version: string
+        }
+        Insert: {
+          accepted_at?: string
+          created_at?: string
+          game_id: string
+          id?: string
+          kind: string
+          user_agent?: string | null
+          user_id: string
+          version: string
+        }
+        Update: {
+          accepted_at?: string
+          created_at?: string
+          game_id?: string
+          id?: string
+          kind?: string
+          user_agent?: string | null
+          user_id?: string
+          version?: string
+        }
+        Relationships: []
+      }
       highlight_reels: {
         Row: {
           ai_analysis: Json | null
