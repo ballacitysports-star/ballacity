@@ -1,13 +1,15 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { pageHead } from "@/lib/seo";
-import { ArrowLeft, Bell, BellOff, Check } from "lucide-react";
+import { ArrowLeft, Bell, BellOff, Check, Lock } from "lucide-react";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
+import { Switch } from "@/components/ui/switch";
 import { supabase } from "@/integrations/supabase/client";
 import {
   CATEGORY_META,
   DEFAULT_NOTIF_PREFS,
-  getNotifPrefs,
+  NOTIF_CATEGORIES,
+  isLockedChannel,
   setNotifPref,
   useHydrateNotifPrefs,
   useNotifPrefs,
@@ -21,13 +23,40 @@ export const Route = createFileRoute("/account/notifications")({
     pageHead({
       path: "/account/notifications",
       title: "Notification settings — OpenRun",
-      description: "Choose which OpenRun notifications you get by push, email, and in-app.",
+      description: "Choose which OpenRun notifications you get in-app and as push alerts.",
       noindex: true,
     }),
   component: NotificationSettingsPage,
 });
 
-const ORDER: NotifCategory[] = ["messages", "approvals", "joinRequests", "follows", "general"];
+const SECTIONS: Array<{ title: string; note?: string; categories: NotifCategory[] }> = [
+  {
+    title: "Games",
+    categories: ["gameReminders", "gameUpdates", "nearbyGames"],
+  },
+  {
+    title: "People",
+    categories: ["messages", "invitations", "social"],
+  },
+  {
+    title: "Payments",
+    note: "OpenRun never moves money for you — these alerts are about payments you or a host mark as sent or confirmed.",
+    categories: ["payments"],
+  },
+  {
+    title: "Safety & security",
+    categories: ["safety"],
+  },
+  {
+    title: "Other",
+    categories: ["general"],
+  },
+  {
+    title: "Marketing",
+    note: "Kept completely separate from game, message, payment, and safety alerts.",
+    categories: ["marketing"],
+  },
+];
 
 function NotificationSettingsPage() {
   const [userId, setUserId] = useState<string | null>(null);
@@ -37,6 +66,11 @@ function NotificationSettingsPage() {
   useHydrateNotifPrefs(userId);
   const prefs = useNotifPrefs();
   const [saved, setSaved] = useState(false);
+
+  const flash = () => {
+    setSaved(true);
+    setTimeout(() => setSaved(false), 1500);
+  };
 
   const onToggle = async (cat: NotifCategory, ch: NotifChannel, val: boolean) => {
     if (ch === "push" && val && typeof window !== "undefined" && "Notification" in window) {
@@ -54,82 +88,93 @@ function NotificationSettingsPage() {
       }
     }
     setNotifPref(cat, ch, val);
-    setSaved(true);
-    setTimeout(() => setSaved(false), 1500);
+    flash();
+  };
+
+  const setAll = (value: boolean, skipMarketing: boolean) => {
+    NOTIF_CATEGORIES.forEach((c) => {
+      if (skipMarketing && c === "marketing") return;
+      setNotifPref(c, "inApp", value);
+      setNotifPref(c, "push", value);
+    });
+    flash();
   };
 
   const enableAll = () => {
-    (Object.keys(prefs) as NotifCategory[]).forEach((c) => {
-      setNotifPref(c, "inApp", true);
-      setNotifPref(c, "push", true);
-    });
-    toast.success("All notifications enabled");
+    // Marketing is never switched on for you — that would be a dark pattern.
+    setAll(true, true);
+    toast.success("All product notifications enabled");
   };
   const muteAll = () => {
-    (Object.keys(prefs) as NotifCategory[]).forEach((c) => {
-      setNotifPref(c, "inApp", false);
-      setNotifPref(c, "push", false);
-    });
-    toast.success("All notifications muted");
+    setAll(false, false);
+    toast.success("Notifications muted, except in-app safety alerts");
   };
   const reset = () => {
-    (Object.keys(DEFAULT_NOTIF_PREFS) as NotifCategory[]).forEach((c) => {
+    NOTIF_CATEGORIES.forEach((c) => {
       setNotifPref(c, "inApp", DEFAULT_NOTIF_PREFS[c].inApp);
       setNotifPref(c, "push", DEFAULT_NOTIF_PREFS[c].push);
     });
+    flash();
     toast.success("Defaults restored");
   };
 
   return (
-    <div className="mx-auto max-w-2xl px-4 pb-24 pt-6">
-      <div className="flex items-center gap-3 mb-6">
-        <Link
-          to="/profile/edit"
-          className="grid h-10 w-10 place-items-center rounded-full border border-border bg-surface"
-        >
-          <ArrowLeft className="h-4 w-4" />
+    <div className="min-h-dvh bg-background pb-24">
+      <header className="sticky top-0 z-10 flex items-center gap-3 border-b border-border bg-background/95 px-2 py-2.5 backdrop-blur">
+        <Link to="/settings" className="rounded-full p-2 hover:bg-surface" aria-label="Back">
+          <ArrowLeft className="h-5 w-5" />
         </Link>
-        <div className="flex-1">
-          <h1 className="font-display text-2xl font-bold">Notifications</h1>
-          <p className="text-xs text-muted-foreground">
-            Choose what you want to be alerted about, and where.
-          </p>
-        </div>
+        <h1 className="flex-1 text-lg font-medium">Notifications</h1>
         {saved && (
-          <span className="inline-flex items-center gap-1 rounded-full bg-lime/15 px-2.5 py-1 text-[11px] font-bold text-lime">
+          <span className="mr-2 inline-flex items-center gap-1 rounded-full bg-lime/15 px-2.5 py-1 text-[11px] font-bold text-lime">
             <Check className="h-3 w-3" /> Saved
           </span>
         )}
-      </div>
+      </header>
 
-      <div className="flex gap-2 mb-4">
-        <button
-          onClick={enableAll}
-          className="inline-flex items-center gap-1.5 rounded-full bg-lime px-3 py-1.5 text-xs font-bold text-primary-foreground"
-        >
-          <Bell className="h-3.5 w-3.5" /> Enable all
-        </button>
-        <button
-          onClick={muteAll}
-          className="inline-flex items-center gap-1.5 rounded-full border border-border bg-surface px-3 py-1.5 text-xs font-bold"
-        >
-          <BellOff className="h-3.5 w-3.5" /> Mute all
-        </button>
-        <button onClick={reset} className="ml-auto text-xs font-bold text-coral">
-          Reset defaults
-        </button>
-      </div>
+      <main className="mx-auto max-w-xl px-4">
+        <p className="pt-4 text-xs text-muted-foreground">
+          Every switch below turns notifications <span className="font-semibold">on</span>. In-app
+          alerts appear on your Alerts tab; push alerts go to this device even when OpenRun is
+          closed. Changes save as soon as you flip a switch.
+        </p>
 
-      <div className="space-y-3">
-        {ORDER.map((cat) => (
-          <CategoryCard key={cat} cat={cat} prefs={prefs} onToggle={onToggle} />
-        ))}
-      </div>
+        <div className="mt-4 flex flex-wrap gap-2">
+          <button
+            onClick={enableAll}
+            className="inline-flex items-center gap-1.5 rounded-full bg-lime px-3 py-1.5 text-xs font-bold text-primary-foreground"
+          >
+            <Bell className="h-3.5 w-3.5" /> Turn on product alerts
+          </button>
+          <button
+            onClick={muteAll}
+            className="inline-flex items-center gap-1.5 rounded-full border border-border bg-surface px-3 py-1.5 text-xs font-bold"
+          >
+            <BellOff className="h-3.5 w-3.5" /> Mute everything else
+          </button>
+          <button onClick={reset} className="ml-auto text-xs font-bold text-coral">
+            Reset defaults
+          </button>
+        </div>
 
-      <p className="mt-6 text-[11px] text-muted-foreground">
-        Push alerts are delivered to this device when the app is in the background or closed. In-app
-        alerts show on the Alerts tab and as toasts.
-      </p>
+        <div className="mt-4 space-y-5">
+          {SECTIONS.map((section) => (
+            <section key={section.title}>
+              <h2 className="px-1 pb-2 text-[11px] font-bold uppercase tracking-wide text-muted-foreground">
+                {section.title}
+              </h2>
+              <div className="space-y-3">
+                {section.categories.map((cat) => (
+                  <CategoryCard key={cat} cat={cat} prefs={prefs} onToggle={onToggle} />
+                ))}
+              </div>
+              {section.note && (
+                <p className="px-1 pt-2 text-[11px] text-muted-foreground">{section.note}</p>
+              )}
+            </section>
+          ))}
+        </div>
+      </main>
     </div>
   );
 }
@@ -147,45 +192,61 @@ function CategoryCard({
   const row = prefs[cat];
   return (
     <div className="rounded-2xl border border-border bg-surface p-4">
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <div className="font-semibold text-sm">{meta.label}</div>
-          <div className="text-xs text-muted-foreground mt-0.5">{meta.description}</div>
-        </div>
+      <div className="min-w-0">
+        <div className="text-sm font-semibold">{meta.label}</div>
+        <div className="mt-0.5 text-xs text-muted-foreground">{meta.description}</div>
       </div>
-      <div className="mt-3 grid grid-cols-2 gap-2">
-        <ToggleBtn label="In-app" on={row.inApp} onChange={(v) => onToggle(cat, "inApp", v)} />
-        <ToggleBtn label="Push" on={row.push} onChange={(v) => onToggle(cat, "push", v)} />
+      <div className="mt-3 space-y-2">
+        <ChannelRow
+          label="In-app alerts"
+          checked={row.inApp}
+          locked={isLockedChannel(cat, "inApp")}
+          ariaLabel={`${meta.label} in-app`}
+          onChange={(v) => onToggle(cat, "inApp", v)}
+        />
+        <ChannelRow
+          label="Push alerts"
+          checked={row.push}
+          locked={isLockedChannel(cat, "push")}
+          ariaLabel={`${meta.label} push`}
+          onChange={(v) => onToggle(cat, "push", v)}
+        />
       </div>
+      {meta.lockedNote && (
+        <p className="mt-3 flex items-start gap-1.5 rounded-xl bg-background/60 p-2.5 text-[11px] text-muted-foreground">
+          <Lock className="mt-0.5 h-3 w-3 shrink-0" aria-hidden />
+          {meta.lockedNote}
+        </p>
+      )}
     </div>
   );
 }
 
-function ToggleBtn({
+function ChannelRow({
   label,
-  on,
+  checked,
+  locked,
+  ariaLabel,
   onChange,
 }: {
   label: string;
-  on: boolean;
+  checked: boolean;
+  locked?: boolean;
+  ariaLabel: string;
   onChange: (v: boolean) => void;
 }) {
   return (
-    <button
-      onClick={() => onChange(!on)}
-      className={`flex items-center justify-between rounded-xl border px-3 py-2.5 text-xs font-semibold transition-colors ${on ? "border-lime bg-lime/10 text-foreground" : "border-border bg-background text-muted-foreground"}`}
-    >
-      <span>{label}</span>
-      <span
-        className={`relative h-5 w-9 rounded-full transition-colors ${on ? "bg-lime" : "bg-border"}`}
-      >
-        <span
-          className={`absolute top-0.5 h-4 w-4 rounded-full bg-white shadow transition-all ${on ? "left-[18px]" : "left-0.5"}`}
-        />
+    <div className="flex min-h-11 items-center justify-between gap-3 rounded-xl bg-background px-3 py-2">
+      <span className="text-xs font-semibold">
+        {label}
+        {locked && <span className="ml-1.5 text-[11px] font-normal text-muted-foreground">Always on</span>}
       </span>
-    </button>
+      <Switch
+        checked={checked}
+        disabled={locked}
+        onCheckedChange={onChange}
+        aria-label={ariaLabel}
+      />
+    </div>
   );
 }
-
-// Ensure getNotifPrefs is referenced to keep type import happy in some bundlers.
-void getNotifPrefs;
