@@ -41,7 +41,8 @@ import {
 import type { PlanEntry, MigrationResult } from "@/lib/legacy-host-migration";
 import { toast } from "sonner";
 import { getLegalConsentStats } from "@/lib/legal-consent.functions";
-import { LEGAL_DOCUMENT_LIST, currentVersion } from "@/lib/legal-documents";
+import { LEGAL_DOCUMENT_LIST, effectiveVersion } from "@/lib/legal-documents";
+import { usePublishedLegalDocuments } from "@/lib/legal-consent";
 
 import { supabase } from "@/integrations/supabase/client";
 
@@ -159,6 +160,7 @@ function LegalConsentPanel() {
     queryKey: ["legal-consent-stats"],
     queryFn: () => load(),
   });
+  const { published } = usePublishedLegalDocuments();
 
   return (
     <Card>
@@ -168,9 +170,9 @@ function LegalConsentPanel() {
       <CardContent className="space-y-3 text-sm">
         <p className="text-xs text-muted-foreground">
           Current versions:{" "}
-          {LEGAL_DOCUMENT_LIST.map((d) => `${d.shortTitle} v${currentVersion(d.type).version}`).join(
-            " · ",
-          )}
+          {LEGAL_DOCUMENT_LIST.map(
+            (d) => `${d.shortTitle} v${effectiveVersion(d.type, published).version}`,
+          ).join(" · ")}
         </p>
         {isLoading ? <p className="text-muted-foreground">Loading…</p> : null}
         {error ? (

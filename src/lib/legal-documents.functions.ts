@@ -137,7 +137,7 @@ export const adminUnpublishLegalDocument = createServerFn({ method: "POST" })
     await assertAdmin(context.supabase as never, context.userId);
     const { error } = await context.supabase.rpc("unpublish_legal_document", {
       _id: data.id,
-      _reason: data.reason ?? null,
+      _reason: data.reason ?? undefined,
     });
     if (error) throw new Error(error.message);
     return { ok: true };
