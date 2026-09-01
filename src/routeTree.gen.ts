@@ -11,7 +11,6 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as TabsRouteImport } from './routes/_tabs'
-import { Route as AdminRouteImport } from './routes/admin'
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as HighlightsRouteImport } from './routes/highlights'
 import { Route as McpRouteImport } from './routes/mcp'
@@ -42,6 +41,7 @@ import { Route as AccountLegalRouteImport } from './routes/account.legal'
 import { Route as AccountNotificationsRouteImport } from './routes/account.notifications'
 import { Route as AccountPrivacyRouteImport } from './routes/account.privacy'
 import { Route as AccountSecurityRouteImport } from './routes/account.security'
+import { Route as AdminIndexRouteImport } from './routes/admin.index'
 import { Route as AdminLocationAnalyticsRouteImport } from './routes/admin.location-analytics'
 import { Route as AdminModerationRouteImport } from './routes/admin.moderation'
 import { Route as CheckoutReturnRouteImport } from './routes/checkout.return'
@@ -83,11 +83,6 @@ const IndexRoute = IndexRouteImport.update({
 } as any)
 const TabsRoute = TabsRouteImport.update({
   id: '/_tabs',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const AdminRoute = AdminRouteImport.update({
-  id: '/admin',
-  path: '/admin',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AuthRoute = AuthRouteImport.update({
@@ -242,15 +237,20 @@ const AccountSecurityRoute = AccountSecurityRouteImport.update({
   path: '/account/security',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AdminIndexRoute = AdminIndexRouteImport.update({
+  id: '/admin/',
+  path: '/admin/',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AdminLocationAnalyticsRoute = AdminLocationAnalyticsRouteImport.update({
-  id: '/location-analytics',
-  path: '/location-analytics',
-  getParentRoute: () => AdminRoute,
+  id: '/admin/location-analytics',
+  path: '/admin/location-analytics',
+  getParentRoute: () => rootRouteImport,
 } as any)
 const AdminModerationRoute = AdminModerationRouteImport.update({
-  id: '/moderation',
-  path: '/moderation',
-  getParentRoute: () => AdminRoute,
+  id: '/admin/moderation',
+  path: '/admin/moderation',
+  getParentRoute: () => rootRouteImport,
 } as any)
 const CheckoutReturnRoute = CheckoutReturnRouteImport.update({
   id: '/checkout/return',
@@ -412,7 +412,6 @@ const ApiPublicReelsProcessRoute = ApiPublicReelsProcessRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
-  '/admin': typeof AdminRouteWithChildren
   '/auth': typeof AuthRoute
   '/highlights': typeof HighlightsRoute
   '/mcp': typeof McpRoute
@@ -459,6 +458,7 @@ export interface FileRoutesByFullPath {
   '/review/new': typeof ReviewNewRoute
   '/teams/create': typeof TeamsCreateRoute
   '/trainers/create': typeof TrainersCreateRoute
+  '/admin/': typeof AdminIndexRoute
   '/messages/': typeof MessagesIndexRoute
   '/orgs/': typeof OrgsIndexRoute
   '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
@@ -479,7 +479,6 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
-  '/admin': typeof AdminRouteWithChildren
   '/auth': typeof AuthRoute
   '/highlights': typeof HighlightsRoute
   '/mcp': typeof McpRoute
@@ -525,6 +524,7 @@ export interface FileRoutesByTo {
   '/review/new': typeof ReviewNewRoute
   '/teams/create': typeof TeamsCreateRoute
   '/trainers/create': typeof TrainersCreateRoute
+  '/admin': typeof AdminIndexRoute
   '/messages': typeof MessagesIndexRoute
   '/orgs': typeof OrgsIndexRoute
   '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
@@ -547,7 +547,6 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/_tabs': typeof TabsRouteWithChildren
-  '/admin': typeof AdminRouteWithChildren
   '/auth': typeof AuthRoute
   '/highlights': typeof HighlightsRoute
   '/mcp': typeof McpRoute
@@ -594,6 +593,7 @@ export interface FileRoutesById {
   '/review/new': typeof ReviewNewRoute
   '/teams/create': typeof TeamsCreateRoute
   '/trainers/create': typeof TrainersCreateRoute
+  '/admin/': typeof AdminIndexRoute
   '/messages/': typeof MessagesIndexRoute
   '/orgs/': typeof OrgsIndexRoute
   '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
@@ -616,7 +616,6 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
-    | '/admin'
     | '/auth'
     | '/highlights'
     | '/mcp'
@@ -663,6 +662,7 @@ export interface FileRouteTypes {
     | '/review/new'
     | '/teams/create'
     | '/trainers/create'
+    | '/admin/'
     | '/messages/'
     | '/orgs/'
     | '/.lovable/oauth/consent'
@@ -683,7 +683,6 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
-    | '/admin'
     | '/auth'
     | '/highlights'
     | '/mcp'
@@ -729,6 +728,7 @@ export interface FileRouteTypes {
     | '/review/new'
     | '/teams/create'
     | '/trainers/create'
+    | '/admin'
     | '/messages'
     | '/orgs'
     | '/.lovable/oauth/consent'
@@ -750,7 +750,6 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/_tabs'
-    | '/admin'
     | '/auth'
     | '/highlights'
     | '/mcp'
@@ -797,6 +796,7 @@ export interface FileRouteTypes {
     | '/review/new'
     | '/teams/create'
     | '/trainers/create'
+    | '/admin/'
     | '/messages/'
     | '/orgs/'
     | '/.lovable/oauth/consent'
@@ -819,7 +819,6 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   TabsRoute: typeof TabsRouteWithChildren
-  AdminRoute: typeof AdminRouteWithChildren
   AuthRoute: typeof AuthRoute
   HighlightsRoute: typeof HighlightsRoute
   McpRoute: typeof McpRoute
@@ -841,6 +840,8 @@ export interface RootRouteChildren {
   AccountNotificationsRoute: typeof AccountNotificationsRoute
   AccountPrivacyRoute: typeof AccountPrivacyRoute
   AccountSecurityRoute: typeof AccountSecurityRoute
+  AdminLocationAnalyticsRoute: typeof AdminLocationAnalyticsRoute
+  AdminModerationRoute: typeof AdminModerationRoute
   CheckoutReturnRoute: typeof CheckoutReturnRoute
   DevOgPreviewRoute: typeof DevOgPreviewRoute
   DevRouteDoctorRoute: typeof DevRouteDoctorRoute
@@ -855,6 +856,7 @@ export interface RootRouteChildren {
   ReviewNewRoute: typeof ReviewNewRoute
   TeamsCreateRoute: typeof TeamsCreateRoute
   TrainersCreateRoute: typeof TrainersCreateRoute
+  AdminIndexRoute: typeof AdminIndexRoute
   MessagesIndexRoute: typeof MessagesIndexRoute
   OrgsIndexRoute: typeof OrgsIndexRoute
   DotlovableOauthConsentRoute: typeof DotlovableOauthConsentRoute
@@ -885,13 +887,6 @@ declare module '@tanstack/react-router' {
       path: ''
       fullPath: '/'
       preLoaderRoute: typeof TabsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/admin': {
-      id: '/admin'
-      path: '/admin'
-      fullPath: '/admin'
-      preLoaderRoute: typeof AdminRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/auth': {
@@ -1104,19 +1099,26 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AccountSecurityRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/admin/': {
+      id: '/admin/'
+      path: '/admin'
+      fullPath: '/admin/'
+      preLoaderRoute: typeof AdminIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/admin/location-analytics': {
       id: '/admin/location-analytics'
-      path: '/location-analytics'
+      path: '/admin/location-analytics'
       fullPath: '/admin/location-analytics'
       preLoaderRoute: typeof AdminLocationAnalyticsRouteImport
-      parentRoute: typeof AdminRoute
+      parentRoute: typeof rootRouteImport
     }
     '/admin/moderation': {
       id: '/admin/moderation'
-      path: '/moderation'
+      path: '/admin/moderation'
       fullPath: '/admin/moderation'
       preLoaderRoute: typeof AdminModerationRouteImport
-      parentRoute: typeof AdminRoute
+      parentRoute: typeof rootRouteImport
     }
     '/checkout/return': {
       id: '/checkout/return'
@@ -1364,18 +1366,6 @@ const TabsRouteChildren: TabsRouteChildren = {
 
 const TabsRouteWithChildren = TabsRoute._addFileChildren(TabsRouteChildren)
 
-interface AdminRouteChildren {
-  AdminLocationAnalyticsRoute: typeof AdminLocationAnalyticsRoute
-  AdminModerationRoute: typeof AdminModerationRoute
-}
-
-const AdminRouteChildren: AdminRouteChildren = {
-  AdminLocationAnalyticsRoute: AdminLocationAnalyticsRoute,
-  AdminModerationRoute: AdminModerationRoute,
-}
-
-const AdminRouteWithChildren = AdminRoute._addFileChildren(AdminRouteChildren)
-
 interface GamesGameIdRouteChildren {
   GamesGameIdPayRoute: typeof GamesGameIdPayRoute
   GamesGameIdPaymentSetupRoute: typeof GamesGameIdPaymentSetupRoute
@@ -1395,7 +1385,6 @@ const GamesGameIdRouteWithChildren = GamesGameIdRoute._addFileChildren(
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   TabsRoute: TabsRouteWithChildren,
-  AdminRoute: AdminRouteWithChildren,
   AuthRoute: AuthRoute,
   HighlightsRoute: HighlightsRoute,
   McpRoute: McpRoute,
@@ -1418,6 +1407,8 @@ const rootRouteChildren: RootRouteChildren = {
   AccountNotificationsRoute: AccountNotificationsRoute,
   AccountPrivacyRoute: AccountPrivacyRoute,
   AccountSecurityRoute: AccountSecurityRoute,
+  AdminLocationAnalyticsRoute: AdminLocationAnalyticsRoute,
+  AdminModerationRoute: AdminModerationRoute,
   CheckoutReturnRoute: CheckoutReturnRoute,
   DevOgPreviewRoute: DevOgPreviewRoute,
   DevRouteDoctorRoute: DevRouteDoctorRoute,
@@ -1432,6 +1423,7 @@ const rootRouteChildren: RootRouteChildren = {
   ReviewNewRoute: ReviewNewRoute,
   TeamsCreateRoute: TeamsCreateRoute,
   TrainersCreateRoute: TrainersCreateRoute,
+  AdminIndexRoute: AdminIndexRoute,
   MessagesIndexRoute: MessagesIndexRoute,
   OrgsIndexRoute: OrgsIndexRoute,
   DotlovableOauthConsentRoute: DotlovableOauthConsentRoute,

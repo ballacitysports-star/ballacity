@@ -1087,7 +1087,7 @@ function GameDetail() {
             <button className="grid h-10 w-10 place-items-center rounded-full border border-border bg-background/70 backdrop-blur">
               <Share2 className="h-4 w-4" />
             </button>
-            {!isHost && (
+            {!isHost && reportedHostId && (
               <button
                 onClick={() => setReportGameOpen(true)}
                 aria-label="Report game"
