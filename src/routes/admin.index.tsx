@@ -45,7 +45,7 @@ import { LEGAL_DOCUMENT_LIST, currentVersion } from "@/lib/legal-documents";
 
 import { supabase } from "@/integrations/supabase/client";
 
-export const Route = createFileRoute("/admin")({
+export const Route = createFileRoute("/admin/")({
   head: () =>
     pageHead({
       path: "/admin",
