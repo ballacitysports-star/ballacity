@@ -41,6 +41,8 @@ export const DEFAULT_PRIVACY: PrivacyPreferences = {
   allow_invites: "everyone",
   marketing_emails: false,
   ai_processing: true,
+  ai_training_opt_in: false,
+  ai_disclosure_ack_at: null,
 };
 
 export const PROFILE_VISIBILITY_OPTIONS: Array<{
