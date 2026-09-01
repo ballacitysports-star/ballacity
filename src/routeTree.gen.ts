@@ -46,6 +46,7 @@ import { Route as AccountNotificationsRouteImport } from './routes/account.notif
 import { Route as AccountPrivacyRouteImport } from './routes/account.privacy'
 import { Route as AccountSecurityRouteImport } from './routes/account.security'
 import { Route as AdminIndexRouteImport } from './routes/admin.index'
+import { Route as AdminLegalRouteImport } from './routes/admin.legal'
 import { Route as AdminLocationAnalyticsRouteImport } from './routes/admin.location-analytics'
 import { Route as AdminModerationRouteImport } from './routes/admin.moderation'
 import { Route as CheckoutReturnRouteImport } from './routes/checkout.return'
@@ -266,6 +267,11 @@ const AdminIndexRoute = AdminIndexRouteImport.update({
   path: '/admin/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AdminLegalRoute = AdminLegalRouteImport.update({
+  id: '/admin/legal',
+  path: '/admin/legal',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AdminLocationAnalyticsRoute = AdminLocationAnalyticsRouteImport.update({
   id: '/admin/location-analytics',
   path: '/admin/location-analytics',
@@ -470,6 +476,7 @@ export interface FileRoutesByFullPath {
   '/account/notifications': typeof AccountNotificationsRoute
   '/account/privacy': typeof AccountPrivacyRoute
   '/account/security': typeof AccountSecurityRoute
+  '/admin/legal': typeof AdminLegalRoute
   '/admin/location-analytics': typeof AdminLocationAnalyticsRoute
   '/admin/moderation': typeof AdminModerationRoute
   '/checkout/return': typeof CheckoutReturnRoute
@@ -541,6 +548,7 @@ export interface FileRoutesByTo {
   '/account/notifications': typeof AccountNotificationsRoute
   '/account/privacy': typeof AccountPrivacyRoute
   '/account/security': typeof AccountSecurityRoute
+  '/admin/legal': typeof AdminLegalRoute
   '/admin/location-analytics': typeof AdminLocationAnalyticsRoute
   '/admin/moderation': typeof AdminModerationRoute
   '/checkout/return': typeof CheckoutReturnRoute
@@ -613,6 +621,7 @@ export interface FileRoutesById {
   '/account/notifications': typeof AccountNotificationsRoute
   '/account/privacy': typeof AccountPrivacyRoute
   '/account/security': typeof AccountSecurityRoute
+  '/admin/legal': typeof AdminLegalRoute
   '/admin/location-analytics': typeof AdminLocationAnalyticsRoute
   '/admin/moderation': typeof AdminModerationRoute
   '/checkout/return': typeof CheckoutReturnRoute
@@ -686,6 +695,7 @@ export interface FileRouteTypes {
     | '/account/notifications'
     | '/account/privacy'
     | '/account/security'
+    | '/admin/legal'
     | '/admin/location-analytics'
     | '/admin/moderation'
     | '/checkout/return'
@@ -757,6 +767,7 @@ export interface FileRouteTypes {
     | '/account/notifications'
     | '/account/privacy'
     | '/account/security'
+    | '/admin/legal'
     | '/admin/location-analytics'
     | '/admin/moderation'
     | '/checkout/return'
@@ -828,6 +839,7 @@ export interface FileRouteTypes {
     | '/account/notifications'
     | '/account/privacy'
     | '/account/security'
+    | '/admin/legal'
     | '/admin/location-analytics'
     | '/admin/moderation'
     | '/checkout/return'
@@ -892,6 +904,7 @@ export interface RootRouteChildren {
   AccountNotificationsRoute: typeof AccountNotificationsRoute
   AccountPrivacyRoute: typeof AccountPrivacyRoute
   AccountSecurityRoute: typeof AccountSecurityRoute
+  AdminLegalRoute: typeof AdminLegalRoute
   AdminLocationAnalyticsRoute: typeof AdminLocationAnalyticsRoute
   AdminModerationRoute: typeof AdminModerationRoute
   CheckoutReturnRoute: typeof CheckoutReturnRoute
@@ -1184,6 +1197,13 @@ declare module '@tanstack/react-router' {
       path: '/admin'
       fullPath: '/admin/'
       preLoaderRoute: typeof AdminIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/admin/legal': {
+      id: '/admin/legal'
+      path: '/admin/legal'
+      fullPath: '/admin/legal'
+      preLoaderRoute: typeof AdminLegalRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/admin/location-analytics': {
@@ -1491,6 +1511,7 @@ const rootRouteChildren: RootRouteChildren = {
   AccountNotificationsRoute: AccountNotificationsRoute,
   AccountPrivacyRoute: AccountPrivacyRoute,
   AccountSecurityRoute: AccountSecurityRoute,
+  AdminLegalRoute: AdminLegalRoute,
   AdminLocationAnalyticsRoute: AdminLocationAnalyticsRoute,
   AdminModerationRoute: AdminModerationRoute,
   CheckoutReturnRoute: CheckoutReturnRoute,
