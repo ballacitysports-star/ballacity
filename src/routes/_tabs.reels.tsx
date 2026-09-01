@@ -460,9 +460,12 @@ function ReelCard({ reel, onRetry }: { reel: Reel; onRetry: (id: string) => Prom
             <Eye className="h-3.5 w-3.5" />
             {showInsights ? "Hide what the AI saw" : "What the AI saw"}
           </button>
-          {showInsights && (
-            <div className="mt-2 rounded-xl border border-border bg-background/60 p-3">
-              {reel.ai_sport && (
+           {showInsights && (
+             <div className="mt-2 rounded-xl border border-border bg-background/60 p-3">
+               <p className="mb-2 text-[10px] italic text-muted-foreground">
+                 {AI_RESULTS_CAVEAT}
+               </p>
+               {reel.ai_sport && (
                 <p className="text-[10px] font-bold uppercase tracking-wider text-lime">
                   {reel.ai_sport}
                 </p>
