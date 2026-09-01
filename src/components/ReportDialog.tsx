@@ -38,6 +38,7 @@ const TITLES: Record<ReportSubjectType, string> = {
   game: "Report game",
   message: "Report message",
   reel: "Report highlight",
+  payment: "Report a payment problem",
 };
 
 export function ReportDialog({

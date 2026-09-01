@@ -17,9 +17,12 @@ export type ReportReason =
   | "fake_game"
   | "unsafe_location"
   | "misleading"
-  | "illegal";
+  | "illegal"
+  | "payment_scam"
+  | "payment_not_received"
+  | "payment_pressure";
 
-export type ReportSubjectType = "user" | "game" | "message" | "reel";
+export type ReportSubjectType = "user" | "game" | "message" | "reel" | "payment";
 
 type ReasonOption = { value: ReportReason; label: string };
 
@@ -56,12 +59,21 @@ export const MESSAGE_REPORT_REASONS: ReasonOption[] = [
   { value: "other", label: "Other" },
 ];
 
+export const PAYMENT_REPORT_REASONS: ReasonOption[] = [
+  { value: "payment_scam", label: "Payment scam or fraud" },
+  { value: "payment_not_received", label: "Host says they never received my payment" },
+  { value: "payment_pressure", label: "Pressured to pay off-app or more than the fee" },
+  { value: "impersonation", label: "Someone impersonating the host" },
+  { value: "other", label: "Other" },
+];
+
 /** Back-compat alias used by older call sites. */
 export const REPORT_REASONS = USER_REPORT_REASONS;
 
 export function reasonsFor(subject: ReportSubjectType): ReasonOption[] {
   if (subject === "game") return GAME_REPORT_REASONS;
   if (subject === "message") return MESSAGE_REPORT_REASONS;
+  if (subject === "payment") return PAYMENT_REPORT_REASONS;
   return USER_REPORT_REASONS;
 }
 
@@ -69,6 +81,7 @@ const ALL_REASONS: ReasonOption[] = [
   ...USER_REPORT_REASONS,
   ...GAME_REPORT_REASONS,
   ...MESSAGE_REPORT_REASONS,
+  ...PAYMENT_REPORT_REASONS,
 ];
 
 export function reportReasonLabel(reason: string): string {
