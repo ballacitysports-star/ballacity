@@ -12,7 +12,9 @@ import {
   Reply,
   Trash2,
   Check,
+  Flag,
 } from "lucide-react";
+import { ReportDialog } from "@/components/ReportDialog";
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/use-auth";
 import {
