@@ -3588,7 +3588,7 @@ function RosterPlayerRow({
     }>
   >([]);
   const [historyLoading, setHistoryLoading] = useState(false);
-  const paymentStatus: "verified" | "pending" | "rejected" | "none" = latestSub?.status ?? "none";
+  const paymentStatus: PaymentSubmissionStatus | "none" = latestSub?.status ?? "none";
   const reviews = useReviewsFor(req.player_id);
   const rep = useMemo(() => computeReputation(reviews, "player"), [reviews]);
   const reliability = rep.criteriaAverages.find((c) => c.key === "reliability")?.avg ?? 0;
