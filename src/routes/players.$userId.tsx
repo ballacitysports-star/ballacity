@@ -18,6 +18,7 @@ import {
   Share2,
   Clapperboard,
 } from "lucide-react";
+import { usePublicPrivacyFlags } from "@/lib/privacy";
 import { useFollow } from "@/lib/follows";
 import { toast } from "sonner";
 import { formatAvailabilityWindow } from "@/lib/availability-timeslots";
@@ -213,6 +214,9 @@ function PlayerProfilePage() {
   const reviews = useReviewsFor(userId);
   const rep = useMemo(() => computeReputation(reviews, "player"), [reviews]);
   const follow = useFollow(userId);
+  const privacyFlags = usePublicPrivacyFlags(userId);
+  const showSports = privacyFlags.data?.show_sports ?? true;
+  const showGamesPlayed = privacyFlags.data?.show_games_played ?? true;
 
   useEffect(() => {
     let cancelled = false;
@@ -316,10 +320,12 @@ function PlayerProfilePage() {
         : profile.sport
           ? [{ name: profile.sport as any }]
           : [];
-  const sportsList = sportsBase.map((s) => ({
-    ...s,
-    level: (s as any).level ?? sportLevels[s.name] ?? null,
-  }));
+  const sportsList = showSports
+    ? sportsBase.map((s) => ({
+        ...s,
+        level: (s as any).level ?? sportLevels[s.name] ?? null,
+      }))
+    : [];
 
   const badges = overrides.badges ?? [];
   const dbLinks = Array.isArray(profile.links) ? (profile.links as any[]) : [];
@@ -369,7 +375,9 @@ function PlayerProfilePage() {
           >
             {follow.following} following
           </button>,
-          `${stats.played} game${stats.played === 1 ? "" : "s"}`,
+          ...(showGamesPlayed
+            ? [`${stats.played} game${stats.played === 1 ? "" : "s"}`]
+            : []),
         ].filter(Boolean)}
         description={bio}
         onOpenAbout={() => setAboutOpen(true)}

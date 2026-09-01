@@ -1428,6 +1428,48 @@ export type Database = {
         }
         Relationships: []
       }
+      privacy_preferences: {
+        Row: {
+          ai_processing: boolean
+          allow_invites: string
+          allow_messages: string
+          created_at: string
+          location_precision: string
+          marketing_emails: boolean
+          profile_visibility: string
+          show_games_played: boolean
+          show_sports: boolean
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          ai_processing?: boolean
+          allow_invites?: string
+          allow_messages?: string
+          created_at?: string
+          location_precision?: string
+          marketing_emails?: boolean
+          profile_visibility?: string
+          show_games_played?: boolean
+          show_sports?: boolean
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          ai_processing?: boolean
+          allow_invites?: string
+          allow_messages?: string
+          created_at?: string
+          location_precision?: string
+          marketing_emails?: boolean
+          profile_visibility?: string
+          show_games_played?: boolean
+          show_sports?: boolean
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           account_type: string | null
@@ -2449,11 +2491,20 @@ export type Database = {
         Args: { _hidden: boolean; _review_id: string }
         Returns: undefined
       }
+      privacy_text: { Args: { _key: string; _user: string }; Returns: string }
       profile_ages: {
         Args: { _ids: string[] }
         Returns: {
           age: number
           id: string
+        }[]
+      }
+      public_privacy_flags: {
+        Args: { _ids: string[] }
+        Returns: {
+          show_games_played: boolean
+          show_sports: boolean
+          user_id: string
         }[]
       }
       shares_game_or_chat: {

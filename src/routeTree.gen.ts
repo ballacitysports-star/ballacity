@@ -39,6 +39,7 @@ import { Route as TabsTeamsRouteImport } from './routes/_tabs.teams'
 import { Route as TabsTrainersRouteImport } from './routes/_tabs.trainers'
 import { Route as AccountLegalRouteImport } from './routes/account.legal'
 import { Route as AccountNotificationsRouteImport } from './routes/account.notifications'
+import { Route as AccountPrivacyRouteImport } from './routes/account.privacy'
 import { Route as AccountSecurityRouteImport } from './routes/account.security'
 import { Route as AdminLocationAnalyticsRouteImport } from './routes/admin.location-analytics'
 import { Route as CheckoutReturnRouteImport } from './routes/checkout.return'
@@ -222,6 +223,11 @@ const AccountLegalRoute = AccountLegalRouteImport.update({
 const AccountNotificationsRoute = AccountNotificationsRouteImport.update({
   id: '/account/notifications',
   path: '/account/notifications',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AccountPrivacyRoute = AccountPrivacyRouteImport.update({
+  id: '/account/privacy',
+  path: '/account/privacy',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AccountSecurityRoute = AccountSecurityRouteImport.update({
@@ -422,6 +428,7 @@ export interface FileRoutesByFullPath {
   '/trainers': typeof TabsTrainersRoute
   '/account/legal': typeof AccountLegalRoute
   '/account/notifications': typeof AccountNotificationsRoute
+  '/account/privacy': typeof AccountPrivacyRoute
   '/account/security': typeof AccountSecurityRoute
   '/admin/location-analytics': typeof AdminLocationAnalyticsRoute
   '/checkout/return': typeof CheckoutReturnRoute
@@ -486,6 +493,7 @@ export interface FileRoutesByTo {
   '/trainers': typeof TabsTrainersRoute
   '/account/legal': typeof AccountLegalRoute
   '/account/notifications': typeof AccountNotificationsRoute
+  '/account/privacy': typeof AccountPrivacyRoute
   '/account/security': typeof AccountSecurityRoute
   '/admin/location-analytics': typeof AdminLocationAnalyticsRoute
   '/checkout/return': typeof CheckoutReturnRoute
@@ -551,6 +559,7 @@ export interface FileRoutesById {
   '/_tabs/trainers': typeof TabsTrainersRoute
   '/account/legal': typeof AccountLegalRoute
   '/account/notifications': typeof AccountNotificationsRoute
+  '/account/privacy': typeof AccountPrivacyRoute
   '/account/security': typeof AccountSecurityRoute
   '/admin/location-analytics': typeof AdminLocationAnalyticsRoute
   '/checkout/return': typeof CheckoutReturnRoute
@@ -617,6 +626,7 @@ export interface FileRouteTypes {
     | '/trainers'
     | '/account/legal'
     | '/account/notifications'
+    | '/account/privacy'
     | '/account/security'
     | '/admin/location-analytics'
     | '/checkout/return'
@@ -681,6 +691,7 @@ export interface FileRouteTypes {
     | '/trainers'
     | '/account/legal'
     | '/account/notifications'
+    | '/account/privacy'
     | '/account/security'
     | '/admin/location-analytics'
     | '/checkout/return'
@@ -745,6 +756,7 @@ export interface FileRouteTypes {
     | '/_tabs/trainers'
     | '/account/legal'
     | '/account/notifications'
+    | '/account/privacy'
     | '/account/security'
     | '/admin/location-analytics'
     | '/checkout/return'
@@ -802,6 +814,7 @@ export interface RootRouteChildren {
   Char91DotwellKnownChar93OauthProtectedResourceRoute: typeof Char91DotwellKnownChar93OauthProtectedResourceRoute
   AccountLegalRoute: typeof AccountLegalRoute
   AccountNotificationsRoute: typeof AccountNotificationsRoute
+  AccountPrivacyRoute: typeof AccountPrivacyRoute
   AccountSecurityRoute: typeof AccountSecurityRoute
   CheckoutReturnRoute: typeof CheckoutReturnRoute
   DevOgPreviewRoute: typeof DevOgPreviewRoute
@@ -1043,6 +1056,13 @@ declare module '@tanstack/react-router' {
       path: '/account/notifications'
       fullPath: '/account/notifications'
       preLoaderRoute: typeof AccountNotificationsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/account/privacy': {
+      id: '/account/privacy'
+      path: '/account/privacy'
+      fullPath: '/account/privacy'
+      preLoaderRoute: typeof AccountPrivacyRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/account/security': {
@@ -1354,6 +1374,7 @@ const rootRouteChildren: RootRouteChildren = {
     Char91DotwellKnownChar93OauthProtectedResourceRoute,
   AccountLegalRoute: AccountLegalRoute,
   AccountNotificationsRoute: AccountNotificationsRoute,
+  AccountPrivacyRoute: AccountPrivacyRoute,
   AccountSecurityRoute: AccountSecurityRoute,
   CheckoutReturnRoute: CheckoutReturnRoute,
   DevOgPreviewRoute: DevOgPreviewRoute,

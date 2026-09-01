@@ -148,6 +148,12 @@ const SECTIONS: Section[] = [
     title: "Legal & Privacy",
     items: [
       {
+        to: "/account/privacy",
+        label: "Privacy",
+        description: "Profile & location visibility, messages, AI, delete account",
+        icon: Shield,
+      },
+      {
         to: "/account/legal",
         label: "Legal & Privacy",
         description: "Terms, Privacy Policy, and your consent status",
@@ -493,7 +499,7 @@ function MyOrgsSection() {
   );
 }
 
-function DeleteAccountButton() {
+export function DeleteAccountButton() {
   const navigate = useNavigate();
   const del = useServerFn(deleteMyAccount);
   const { user } = useAuth();
