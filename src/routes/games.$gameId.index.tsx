@@ -29,6 +29,10 @@ import {
   Flag,
 } from "lucide-react";
 import { ReportDialog } from "@/components/ReportDialog";
+import { RiskAcknowledgmentDialog } from "@/components/safety/RiskAcknowledgmentDialog";
+import { needsRiskAcknowledgment } from "@/lib/safety";
+import { recordSafetyAck, useSafetyAck } from "@/lib/safety-acks";
+
 import { GAMES, SPORTS, imageFor } from "@/lib/sample-data";
 import { TierChips } from "@/components/sports/TierChips";
 import {
