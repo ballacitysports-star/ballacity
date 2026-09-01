@@ -3,6 +3,24 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { normalizeReelStyle } from "@/lib/reel-style";
 
 /**
+ * AI/video processing is opt-out (Settings → Privacy). Every AI entry point
+ * checks the caller's own preference row before any clip is analyzed.
+ */
+async function assertAiProcessingAllowed(context: { supabase: any; userId: string }) {
+  const { data } = await context.supabase
+    .from("privacy_preferences")
+    .select("ai_processing")
+    .eq("user_id", context.userId)
+    .maybeSingle();
+  if (data && data.ai_processing === false) {
+    throw new Error(
+      "AI video processing is turned off. Enable it in Settings → Privacy to use this feature.",
+    );
+  }
+}
+
+
+/**
  * Runs the highlight-reel pipeline for the signed-in user's queued reels.
  *
  * Called right after an upload (so nothing sits in the queue) and from the
@@ -14,6 +32,7 @@ export const processMyReels = createServerFn({ method: "POST" })
     reelId: typeof input?.reelId === "string" ? input.reelId : undefined,
   }))
   .handler(async ({ data, context }) => {
+    await assertAiProcessingAllowed(context as any);
     const apiKey = process.env.LOVABLE_API_KEY;
     if (!apiKey) throw new Error("AI is not configured yet — please try again later");
 
@@ -65,6 +84,7 @@ export const askReelCoach = createServerFn({ method: "POST" })
     },
   )
   .handler(async ({ data, context }) => {
+    await assertAiProcessingAllowed(context as any);
     const apiKey = process.env.LOVABLE_API_KEY;
     if (!apiKey) throw new Error("AI is not configured yet — please try again later");
 
@@ -93,6 +113,7 @@ export const buildReelPackage = createServerFn({ method: "POST" })
     };
   })
   .handler(async ({ data, context }) => {
+    await assertAiProcessingAllowed(context as any);
     const apiKey = process.env.LOVABLE_API_KEY;
     if (!apiKey) throw new Error("AI is not configured yet — please try again later");
 
@@ -121,6 +142,7 @@ export const regenerateReelStyle = createServerFn({ method: "POST" })
     return { reelId: input.reelId, style: normalizeReelStyle(input.style) };
   })
   .handler(async ({ data, context }) => {
+    await assertAiProcessingAllowed(context as any);
     const apiKey = process.env.LOVABLE_API_KEY;
     if (!apiKey) throw new Error("AI is not configured yet — please try again later");
 
@@ -263,6 +285,7 @@ export const previewReelStyle = createServerFn({ method: "POST" })
     return { reelId: input.reelId, style: normalizeReelStyle(input.style) };
   })
   .handler(async ({ data, context }) => {
+    await assertAiProcessingAllowed(context as any);
     const apiKey = process.env.LOVABLE_API_KEY;
     if (!apiKey) throw new Error("AI is not configured yet — please try again later");
 
