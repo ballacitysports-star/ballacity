@@ -452,7 +452,7 @@ function NotificationPreferences() {
   const prefs = useNotifPrefs();
   const { user } = useAuth();
   useHydrateNotifPrefs(user?.id);
-  const categories: NotifCategory[] = ["approvals", "messages", "general"];
+  const categories: NotifCategory[] = ["gameReminders", "gameUpdates", "messages", "payments"];
 
   return (
     <details className="mb-4 rounded-2xl border border-border bg-surface/40 group">
