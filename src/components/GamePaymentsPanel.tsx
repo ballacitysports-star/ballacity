@@ -13,6 +13,16 @@ import {
   type GamePaymentSettings,
 } from "@/lib/payments";
 import { reviewPaymentAction } from "@/lib/payments.functions";
+import { hostCancelPaymentSubmission } from "@/lib/payments";
+import {
+  CANCELLATION_REASON_LABELS,
+  PAYMENT_DISCLAIMER,
+  PAYMENT_STATE_META,
+  canHostConfirm,
+  cancellationReasonLabel,
+  type CancellationReason,
+} from "@/lib/payment-states";
+import { PaymentSafetyNotice } from "@/components/PaymentSafetyNotice";
 import { createNotification } from "@/lib/notifications";
 import { UserAvatar } from "@/components/UserAvatar";
 
@@ -42,10 +52,14 @@ function fmtMoney(n: number | null | undefined): string {
 function StatusPill({ status }: { status: PaymentSubmission["status"] }) {
   const cfg =
     status === "verified"
-      ? { text: "Verified", cls: "border-lime/40 bg-lime/15 text-lime" }
+      ? { text: PAYMENT_STATE_META.confirmed.label, cls: "border-lime/40 bg-lime/15 text-lime" }
       : status === "rejected"
         ? { text: "Declined", cls: "border-coral/50 bg-coral/15 text-coral" }
-        : { text: "Pending review", cls: "border-amber-400/40 bg-amber-500/15 text-amber-500" };
+        : status === "disputed"
+          ? { text: PAYMENT_STATE_META.disputed.label, cls: "border-coral/50 bg-coral/15 text-coral" }
+          : status === "cancelled"
+            ? { text: PAYMENT_STATE_META.cancelled.label, cls: "border-border bg-background text-muted-foreground" }
+            : { text: PAYMENT_STATE_META.host_confirmation_pending.label, cls: "border-amber-400/40 bg-amber-500/15 text-amber-500" };
   return (
     <span
       className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-semibold ${cfg.cls}`}
@@ -316,8 +330,8 @@ export function HostPaymentsPanel({
   }, [gameId]);
 
   const counts = useMemo(() => {
-    const c = { pending: 0, verified: 0, rejected: 0 };
-    for (const r of rows) c[r.status]++;
+    const c = { pending: 0, verified: 0, rejected: 0, disputed: 0, cancelled: 0 };
+    for (const r of rows) if (r.status in c) c[r.status as keyof typeof c]++;
     return c;
   }, [rows]);
 
@@ -371,6 +385,31 @@ export function HostPaymentsPanel({
     }
   };
 
+  const hostCancel = async (row: HostRow) => {
+    if (busyId) return;
+    const options = Object.entries(CANCELLATION_REASON_LABELS)
+      .map(([k, v], i) => `${i + 1}. ${v}`)
+      .join("\n");
+    const keys = Object.keys(CANCELLATION_REASON_LABELS) as CancellationReason[];
+    const pick = window.prompt(`Why is this payment claim cancelled?\n${options}`, "1");
+    if (pick === null) return;
+    const reason = keys[Number(pick) - 1];
+    if (!reason) {
+      toast.error("Pick one of the listed reasons.");
+      return;
+    }
+    setBusyId(row.id);
+    try {
+      await hostCancelPaymentSubmission(row.id, reason);
+      toast.success("Payment claim cancelled.");
+      await load();
+    } catch (e: any) {
+      toast.error(e?.message ?? "Could not cancel this claim.");
+    } finally {
+      setBusyId(null);
+    }
+  };
+
   return (
     <div className="space-y-4">
       <PaymentPoliciesCard gameId={gameId} settings={settings} isHost />
@@ -383,7 +422,7 @@ export function HostPaymentsPanel({
               <ShieldCheck className="h-4 w-4 text-lime" /> Payment approvals
             </div>
             <p className="text-xs text-muted-foreground mt-0.5">
-              Review each player's proof, then approve or decline.
+              Check your payment app, then confirm or decline each player's proof.
             </p>
           </div>
           <button
@@ -409,6 +448,10 @@ export function HostPaymentsPanel({
             <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Declined</div>
           </div>
         </div>
+        <p className="mt-3 rounded-xl border border-border bg-background p-2 text-[11px] text-muted-foreground">
+          {PAYMENT_DISCLAIMER} Confirming here only marks the player paid in OpenRun — it does not
+          move money.
+        </p>
         {settings?.entry_fee != null && (
           <div className="mt-3 text-xs text-muted-foreground">
             Entry fee: <span className="font-semibold text-foreground">{fmtMoney(settings.entry_fee)}</span>
@@ -418,7 +461,7 @@ export function HostPaymentsPanel({
 
       {/* Filter tabs */}
       <div className="flex gap-1 rounded-full border border-border bg-surface p-1 text-xs">
-        {(["pending", "verified", "rejected", "all"] as Filter[]).map((f) => (
+        {(["pending", "verified", "rejected", "disputed", "all"] as Filter[]).map((f) => (
           <button
             key={f}
             type="button"
@@ -481,6 +524,17 @@ export function HostPaymentsPanel({
                       "{row.notes}"
                     </p>
                   )}
+                  {row.status === "disputed" && (
+                    <p className="mt-1 text-[11px] font-semibold text-coral">
+                      Disputed: {row.dispute_reason || "no reason given"} — resolve this directly
+                      with the player in your payment app.
+                    </p>
+                  )}
+                  {row.status === "cancelled" && (
+                    <p className="mt-1 text-[11px] text-muted-foreground">
+                      {cancellationReasonLabel(row.cancellation_reason)}
+                    </p>
+                  )}
                   {row.reviewer_notes && (
                     <p className="mt-1 text-[11px] text-coral">
                       Note to player: {row.reviewer_notes}
@@ -504,14 +558,22 @@ export function HostPaymentsPanel({
                   {row.screenshot_path && <ExternalLink className="h-3 w-3" />}
                 </button>
                 <div className="ml-auto flex gap-2">
-                  {row.status !== "verified" && (
+                  {canHostConfirm(
+                    row.status === "verified"
+                      ? "confirmed"
+                      : row.status === "cancelled"
+                        ? "cancelled"
+                        : row.status === "disputed"
+                          ? "disputed"
+                          : "host_confirmation_pending",
+                  ) && (
                     <button
                       type="button"
                       disabled={busyId === row.id}
                       onClick={() => act(row, "verified")}
                       className="inline-flex items-center gap-1 rounded-full bg-lime px-3 py-1.5 text-xs font-bold text-primary-foreground disabled:opacity-60"
                     >
-                      <Check className="h-3.5 w-3.5" /> Approve
+                      <Check className="h-3.5 w-3.5" /> Confirm received
                     </button>
                   )}
                   {row.status !== "rejected" && (
@@ -522,6 +584,16 @@ export function HostPaymentsPanel({
                       className="inline-flex items-center gap-1 rounded-full border border-coral/60 bg-coral/10 px-3 py-1.5 text-xs font-bold text-coral disabled:opacity-60"
                     >
                       <XIcon className="h-3.5 w-3.5" /> Decline
+                    </button>
+                  )}
+                  {row.status !== "cancelled" && row.status !== "verified" && (
+                    <button
+                      type="button"
+                      disabled={busyId === row.id}
+                      onClick={() => void hostCancel(row)}
+                      className="inline-flex items-center gap-1 rounded-full border border-border px-3 py-1.5 text-xs font-semibold text-muted-foreground disabled:opacity-60"
+                    >
+                      Cancel claim
                     </button>
                   )}
                 </div>
@@ -625,10 +697,14 @@ export function PlayerPaymentsPanel({
             </div>
             <div className="mt-2 font-display text-lg font-bold">
               {latest.status === "verified"
-                ? "Payment verified — you're locked in."
+                ? "Payment confirmed — you're locked in."
                 : latest.status === "rejected"
                   ? "Payment declined"
-                  : "Waiting on host review"}
+                  : latest.status === "disputed"
+                    ? PAYMENT_STATE_META.disputed.label
+                    : latest.status === "cancelled"
+                      ? cancellationReasonLabel(latest.cancellation_reason)
+                      : PAYMENT_STATE_META.host_confirmation_pending.label}
             </div>
             <p className="text-xs text-muted-foreground mt-1">
               {latest.status === "verified"
@@ -636,7 +712,11 @@ export function PlayerPaymentsPanel({
                 : latest.status === "rejected"
                   ? latest.reviewer_notes ||
                     "The host couldn't verify your last payment. Send new proof to lock your spot."
-                  : "Your proof is with the host. You'll be notified when they respond."}
+                  : latest.status === "disputed"
+                    ? latest.dispute_reason || PAYMENT_STATE_META.disputed.playerHint
+                    : latest.status === "cancelled"
+                      ? PAYMENT_STATE_META.cancelled.playerHint
+                      : PAYMENT_STATE_META.host_confirmation_pending.playerHint}
             </p>
             <div className="mt-3 flex flex-wrap items-center gap-2">
               {latest.screenshot_path && (
@@ -661,6 +741,12 @@ export function PlayerPaymentsPanel({
           </>
         )}
       </div>
+
+      <PaymentSafetyNotice
+        counterpartyId={hostId ?? null}
+        counterpartyLabel="this host"
+        gameId={gameId}
+      />
 
       {/* History */}
       {subs.length > 0 && (
