@@ -117,6 +117,7 @@ function AdminPage() {
           <TabsTrigger value="payments">Payments</TabsTrigger>
           <TabsTrigger value="reviews">Reviews</TabsTrigger>
           <TabsTrigger value="games">Games</TabsTrigger>
+          <TabsTrigger value="legal">Legal</TabsTrigger>
         </TabsList>
         <TabsContent value="reels">
           <ReelsPanel />
@@ -133,6 +134,10 @@ function AdminPage() {
         <TabsContent value="games">
           <GamesPanel />
         </TabsContent>
+        <TabsContent value="legal">
+          <LegalConsentPanel />
+        </TabsContent>
+
       </Tabs>
     </div>
   );
