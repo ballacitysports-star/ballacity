@@ -803,6 +803,7 @@ function PaymentStatusTimeline({
       aria-atomic="true"
       data-testid="payment-status-timeline"
       data-status={latest.status}
+      data-payment-state={state}
     >
       <div className="flex items-center justify-between mb-3">
         <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
@@ -810,16 +811,17 @@ function PaymentStatusTimeline({
         </h3>
         <span
           className={`text-[10px] font-bold uppercase rounded-full px-2 py-0.5 border ${
-            isVerified
+            meta.tone === "success"
               ? "border-lime/40 bg-lime/10 text-lime"
-              : isRejected
+              : meta.tone === "danger"
                 ? "border-coral/40 bg-coral/10 text-coral"
                 : "border-border bg-background text-muted-foreground"
           }`}
         >
-          {isVerified ? "Verified" : isRejected ? "Rejected" : "Pending"}
+          {meta.label}
         </span>
       </div>
+
 
       <ol className="space-y-3">
         {steps.map((s, i) => {
