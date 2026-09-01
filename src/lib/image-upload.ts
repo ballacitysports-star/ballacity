@@ -83,16 +83,10 @@ export async function uploadDataUrlToBucket(
   }
 
   if ((PRIVATE_BUCKETS as Record<string, true>)[bucket]) {
-    const { data, error: sErr } = await supabase.storage
-      .from(bucket)
-      .createSignedUrl(path, SIGNED_URL_TTL);
-    if (sErr || !data?.signedUrl) {
-      throw new Error(sErr?.message ?? "Could not build a signed URL");
-    }
-    // Pre-render thumbnails / responsive sizes on the server so the first view
-    // is already cached.
-    warmImageVariants(data.signedUrl);
-    return data.signedUrl;
+    // Private media is persisted as a bucket+path reference, never as a signed
+    // URL: display code mints a fresh one-hour URL per viewer so Storage RLS is
+    // re-checked on every view instead of a token outliving permissions.
+    return buildMediaRef(bucket, path);
   }
 
   const { data } = supabase.storage.from(bucket).getPublicUrl(path);
