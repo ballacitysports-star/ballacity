@@ -1694,6 +1694,34 @@ function GameDetail() {
             About the run
           </h2>
           <p className="text-sm leading-relaxed">{game.description}</p>
+          {/* Safety: risk notice + safety reporting entry point */}
+          <div className="mt-3 rounded-2xl border border-border bg-surface px-4 py-3">
+            <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-muted-foreground">
+              <ShieldAlert className="h-4 w-4 text-lime" aria-hidden /> Safety
+            </div>
+            <p className="mt-2 text-[12px] leading-relaxed text-muted-foreground">
+              {RISK_ACKNOWLEDGMENT.text} Games are organized by the host — OpenRun does not
+              supervise play or inspect venues.
+            </p>
+            <div className="mt-3 flex flex-wrap gap-2">
+              <Link
+                to="/safety"
+                className="rounded-full border border-border px-3 py-1.5 text-xs font-semibold"
+              >
+                Safety Center
+              </Link>
+              {!isHost && reportedHostId && (
+                <button
+                  type="button"
+                  onClick={() => setReportGameOpen(true)}
+                  className="rounded-full border border-border px-3 py-1.5 text-xs font-semibold text-destructive"
+                >
+                  Report a safety issue
+                </button>
+              )}
+            </div>
+          </div>
+
           {game.equipment.length > 0 && (
             <div className="mt-3 flex flex-wrap gap-2">
               {game.equipment.map((e: string) => (
