@@ -3569,7 +3569,7 @@ function RosterPlayerRow({
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [latestSub, setLatestSub] = useState<{
     id: string;
-    status: "verified" | "pending" | "rejected";
+    status: PaymentSubmissionStatus;
     screenshot_path: string | null;
   } | null>(null);
   const [historyOpen, setHistoryOpen] = useState(false);
