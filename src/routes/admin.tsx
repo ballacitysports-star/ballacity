@@ -143,6 +143,63 @@ function AdminPage() {
   );
 }
 
+/** Acceptance counts per legal document version (admins/superadmins only). */
+function LegalConsentPanel() {
+  const load = useServerFn(getLegalConsentStats);
+  const { data, isLoading, error } = useQuery({
+    queryKey: ["legal-consent-stats"],
+    queryFn: () => load(),
+  });
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-base">Legal consent statistics</CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-3 text-sm">
+        <p className="text-xs text-muted-foreground">
+          Current versions:{" "}
+          {LEGAL_DOCUMENT_LIST.map((d) => `${d.shortTitle} v${currentVersion(d.type).version}`).join(
+            " · ",
+          )}
+        </p>
+        {isLoading ? <p className="text-muted-foreground">Loading…</p> : null}
+        {error ? (
+          <p className="text-destructive">
+            {error instanceof Error ? error.message : "Failed to load"}
+          </p>
+        ) : null}
+        {data && data.length > 0 ? (
+          <ul className="divide-y divide-border rounded-lg border border-border">
+            {data.map((row) => (
+              <li
+                key={`${row.document_type}-${row.document_version}`}
+                className="flex items-center justify-between gap-3 px-3 py-2"
+              >
+                <span>
+                  <span className="font-medium">
+                    {row.document_type === "terms" ? "Terms of Service" : "Privacy Policy"}
+                  </span>{" "}
+                  <span className="text-muted-foreground">v{row.document_version}</span>
+                </span>
+                <span className="text-right text-xs text-muted-foreground">
+                  {row.accepted_count} accepted
+                  {row.latest_accepted_at
+                    ? ` · latest ${new Date(row.latest_accepted_at).toLocaleString()}`
+                    : ""}
+                </span>
+              </li>
+            ))}
+          </ul>
+        ) : !isLoading && !error ? (
+          <p className="text-muted-foreground">No consent records yet.</p>
+        ) : null}
+      </CardContent>
+    </Card>
+  );
+}
+
+
 function ReelsPanel() {
   const list = useServerFn(adminListReels);
   const retry = useServerFn(adminRetryReel);
