@@ -124,13 +124,9 @@ function DataExportPage() {
       void qc.invalidateQueries({ queryKey: ["my-data-exports"] });
     },
     onError: (e: unknown) =>
-      toast.error(
-        e instanceof Error
-          ? e.message.includes("rate")
-            ? `You can request ${EXPORT_DAILY_LIMIT} exports per day. Try again later.`
-            : e.message
-          : "Couldn't request your export",
-      ),
+      // The daily cap is enforced by a database trigger and already returns a
+      // member-friendly sentence, so pass it through unchanged.
+      toast.error(e instanceof Error ? e.message : "Couldn't request your export"),
   });
 
   const rows = exports.data ?? [];
