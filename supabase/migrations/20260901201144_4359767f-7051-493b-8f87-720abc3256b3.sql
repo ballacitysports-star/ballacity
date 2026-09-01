@@ -1,0 +1,1 @@
+GRANT SELECT ON public.game_participants TO anon;
