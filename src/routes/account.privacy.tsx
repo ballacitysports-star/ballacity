@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { ArrowLeft, Eye, MapPin, MessageSquare, Sparkles, Trash2 } from "lucide-react";
+import { ArrowLeft, Download, Eye, MapPin, MessageSquare, Sparkles, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { useMyAgeCategory } from "@/lib/youth-features";
 import { isMinorCategory } from "@/lib/age-policy";
@@ -7,6 +7,7 @@ import { pageHead } from "@/lib/seo";
 import { Switch } from "@/components/ui/switch";
 import {
   SettingsGroup,
+  SettingsLinkRow,
   SettingsStaticRow,
 } from "@/components/settings/SettingsRow";
 import {

@@ -200,6 +200,12 @@ const SECTIONS: Section[] = [
         icon: Sparkles,
       },
       {
+        to: "/account/data",
+        label: "Your data & retention",
+        description: "Download a copy of your data and see how long we keep it",
+        icon: Download,
+      },
+      {
         to: "/account/legal",
         label: "Legal & Privacy",
         description: "Terms, Privacy Policy, and your consent status",
