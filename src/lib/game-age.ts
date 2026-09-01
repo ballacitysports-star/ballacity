@@ -11,7 +11,8 @@ export type AgeRequirement = {
   maxAge?: number | null;
 };
 
-export const AGE_MIN = 5;
+// Age policy floor: OpenRun is configured for members 13+ (src/lib/age-policy).
+export const AGE_MIN = 13;
 export const AGE_MAX = 99;
 
 export function hasAgeRequirement(req: AgeRequirement | null | undefined): boolean {

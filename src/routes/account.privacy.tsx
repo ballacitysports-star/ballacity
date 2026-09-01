@@ -1,6 +1,8 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { ArrowLeft, Eye, MapPin, MessageSquare, Sparkles, Trash2 } from "lucide-react";
 import { toast } from "sonner";
+import { useMyAgeCategory } from "@/lib/youth-features";
+import { isMinorCategory } from "@/lib/age-policy";
 import { pageHead } from "@/lib/seo";
 import { Switch } from "@/components/ui/switch";
 import {
@@ -90,6 +92,8 @@ function OptionList<T extends string>({
 function PrivacySettingsPage() {
   const { prefs, isLoading, saving, update } = useMyPrivacy();
   const avatar = useAvatarVisibility();
+  const { category } = useMyAgeCategory();
+  const isMinor = isMinorCategory(category);
 
   const save = async (patch: Partial<PrivacyPreferences>) => {
     try {
@@ -114,6 +118,17 @@ function PrivacySettingsPage() {
           OpenRun never shares your live position or a street address. Availability locations are
           stored as an approximate area only.
         </p>
+
+        {isMinor ? (
+          <div className="mx-4 mt-3 rounded-xl border border-primary/40 bg-primary/10 p-3">
+            <p className="text-xs font-medium">Extra protections are on for your account</p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Because you&apos;re under 18, your profile stays visible to members only, your
+              location is never shared more precisely than your city, and your birthday and
+              contact details are never public.
+            </p>
+          </div>
+        ) : null}
 
         <SettingsGroup title="Profile visibility">
           <SettingsStaticRow icon={Eye} label="Who can see your profile" />
