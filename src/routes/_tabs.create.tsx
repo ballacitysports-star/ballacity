@@ -839,17 +839,27 @@ function Create() {
             />
           </Section>
 
+          {/* Host responsibility */}
+          <div ref={hostAckRef}>
+            <Section title="Host responsibility" icon={<ShieldAlert className="h-4 w-4" />}>
+              <HostResponsibilityNotice accepted={hostAck} onChange={setHostAck} />
+            </Section>
+          </div>
+
           <motion.button
             whileTap={{ scale: 0.98 }}
             type="submit"
-            disabled={publishing || !selectedAffiliation}
+            disabled={publishing || !selectedAffiliation || !hostAck}
             className="w-full rounded-2xl bg-lime-gradient py-4 font-bold text-primary-foreground glow-lime disabled:opacity-60"
           >
             {publishing
               ? "Publishing…"
               : !selectedAffiliation
                 ? "Choose a team profile to continue"
-                : "Publish game"}
+                : !hostAck
+                  ? "Acknowledge host responsibilities"
+                  : "Publish game"}
+
           </motion.button>
           <p className="text-center text-xs text-muted-foreground pb-6">
             Hosting is free. Pro hosts get unlimited games + analytics.
