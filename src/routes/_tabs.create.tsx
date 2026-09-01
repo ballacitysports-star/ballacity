@@ -60,6 +60,10 @@ import {
   type WhenRange,
 } from "@/lib/game-schedule";
 import { AgeRequirementFields } from "@/components/games/AgeRequirementFields";
+import { HostResponsibilityNotice } from "@/components/safety/HostResponsibilityNotice";
+import { recordSafetyAck } from "@/lib/safety-acks";
+import { ShieldAlert } from "lucide-react";
+
 
 export const Route = createFileRoute("/_tabs/create")({
   head: () =>
