@@ -61,6 +61,9 @@ import {
 } from "@/lib/game-schedule";
 import { AgeRequirementFields } from "@/components/games/AgeRequirementFields";
 import { HostResponsibilityNotice } from "@/components/safety/HostResponsibilityNotice";
+import { GamePolicyFields } from "@/components/games/GamePolicyFields";
+import { GamePolicySummary } from "@/components/games/GamePolicySummary";
+import { defaultGamePolicy, validateGamePolicy, type GamePolicy } from "@/lib/game-policy";
 import { recordSafetyAck } from "@/lib/safety-acks";
 import { ShieldAlert } from "lucide-react";
 
@@ -153,12 +156,18 @@ function Create() {
     const kept = serializeSkillTiers(sport, parseSkillTiers(sport, skill));
     if (kept !== skill) setSkill(kept);
   }, [sport, skill]);
-  const [size, setSize] = useState(10);
   const [price, setPrice] = useState(0);
   const [indoor, setIndoor] = useState(false);
   const [priv, setPriv] = useState(false);
   const [description, setDescription] = useState("");
   const [requiresApproval, setRequiresApproval] = useState(true);
+  // Host-configurable game policy (limits, waitlist, cancellation, rules).
+  const [policy, setPolicy] = useState<GamePolicy>(() => defaultGamePolicy(10));
+  const size = policy.maxPlayers;
+  const policyRef = useRef<HTMLDivElement | null>(null);
+  // Payment requirement + approval live in their own controls; mirror them in
+  // the policy object so the preview players see matches reality.
+  const effectivePolicy: GamePolicy = { ...policy, entryFee: price, requiresApproval };
   const [minAge, setMinAge] = useState<number | null>(null);
   const [maxAge, setMaxAge] = useState<number | null>(null);
   const [signupCutoffMin, setSignupCutoffMin] = useState(0);
@@ -347,6 +356,12 @@ function Create() {
             hostAsRef.current?.querySelector<HTMLButtonElement>("button")?.focus();
             return;
           }
+          const policyCheck = validateGamePolicy(effectivePolicy);
+          if (!policyCheck.ok) {
+            toast.error(policyCheck.error);
+            policyRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+            return;
+          }
           if (!hostAck) {
             toast.error("Acknowledge your host responsibilities to publish");
             hostAckRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
@@ -449,6 +464,11 @@ function Create() {
                 timezone: plan.timezone,
                 lat: venue?.lat ?? null,
                 lng: venue?.lng ?? null,
+                minPlayers: effectivePolicy.minPlayers,
+                allowWaitlist: effectivePolicy.allowWaitlist,
+                cancellationPolicy: effectivePolicy.cancellationPolicy,
+                cancellationNotes: effectivePolicy.cancellationNotes || null,
+                gameRules: effectivePolicy.gameRules || null,
               });
 
               if (!firstGameId) firstGameId = game.id;
@@ -466,6 +486,7 @@ function Create() {
                   entry_fee: price,
                   accepted_method_ids: [],
                   requires_approval: requiresApproval,
+                  refund_policy: effectivePolicy.refundPolicy || null,
                 });
               } catch (err: any) {
                 toast.error(err?.message ?? "Saved game, but couldn't lock host ownership.");
@@ -708,24 +729,6 @@ function Create() {
             <PositionsPicker sport={sport} value={positionsNeeded} onChange={setPositionsNeeded} />
           </Section>
 
-          {/* Players */}
-          <Section title="Max players" icon={<Users className="h-4 w-4" />}>
-            <div className="rounded-2xl border border-border bg-surface p-4">
-              <div className="flex items-center justify-between mb-3">
-                <span className="text-sm text-muted-foreground">Total spots</span>
-                <span className="font-display text-2xl font-bold text-lime">{size}</span>
-              </div>
-              <input
-                type="range"
-                min={2}
-                max={30}
-                value={size}
-                onChange={(e) => setSize(+e.target.value)}
-                className="w-full accent-lime"
-              />
-            </div>
-          </Section>
-
           {/* Toggles */}
           <Section title="Details">
             <div className="rounded-2xl border border-border bg-surface px-4 py-3">
@@ -830,6 +833,18 @@ function Create() {
                 closed", and "In progress" once it starts.
               </p>
             </div>
+          </Section>
+
+          {/* Game policy */}
+          <div ref={policyRef}>
+            <Section title="Game policy" icon={<Users className="h-4 w-4" />}>
+              <GamePolicyFields value={effectivePolicy} onChange={setPolicy} idPrefix="create-policy" />
+            </Section>
+          </div>
+
+          {/* What players will see */}
+          <Section title="What players see before joining">
+            <GamePolicySummary policy={effectivePolicy} defaultOpen />
           </Section>
 
           {/* Description */}

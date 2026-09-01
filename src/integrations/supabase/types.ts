@@ -690,7 +690,10 @@ export type Database = {
       hosted_games: {
         Row: {
           all_day: boolean
+          allow_waitlist: boolean
           arrive_early_min: number
+          cancellation_notes: string | null
+          cancellation_policy: string
           created_at: string
           date: string
           description: string
@@ -698,6 +701,7 @@ export type Database = {
           duration: string
           ends_at: string | null
           equipment: string[]
+          game_rules: string | null
           hidden_at: string | null
           host_id: string
           host_snapshot: Json
@@ -713,6 +717,7 @@ export type Database = {
           max_age: number | null
           max_players: number
           min_age: number | null
+          min_players: number
           neighborhood: string
           org_id: string | null
           positions_needed: Json
@@ -733,7 +738,10 @@ export type Database = {
         }
         Insert: {
           all_day?: boolean
+          allow_waitlist?: boolean
           arrive_early_min?: number
+          cancellation_notes?: string | null
+          cancellation_policy?: string
           created_at?: string
           date: string
           description?: string
@@ -741,6 +749,7 @@ export type Database = {
           duration?: string
           ends_at?: string | null
           equipment?: string[]
+          game_rules?: string | null
           hidden_at?: string | null
           host_id: string
           host_snapshot?: Json
@@ -756,6 +765,7 @@ export type Database = {
           max_age?: number | null
           max_players?: number
           min_age?: number | null
+          min_players?: number
           neighborhood?: string
           org_id?: string | null
           positions_needed?: Json
@@ -776,7 +786,10 @@ export type Database = {
         }
         Update: {
           all_day?: boolean
+          allow_waitlist?: boolean
           arrive_early_min?: number
+          cancellation_notes?: string | null
+          cancellation_policy?: string
           created_at?: string
           date?: string
           description?: string
@@ -784,6 +797,7 @@ export type Database = {
           duration?: string
           ends_at?: string | null
           equipment?: string[]
+          game_rules?: string | null
           hidden_at?: string | null
           host_id?: string
           host_snapshot?: Json
@@ -799,6 +813,7 @@ export type Database = {
           max_age?: number | null
           max_players?: number
           min_age?: number | null
+          min_players?: number
           neighborhood?: string
           org_id?: string | null
           positions_needed?: Json
