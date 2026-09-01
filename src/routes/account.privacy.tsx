@@ -185,6 +185,18 @@ function PrivacySettingsPage() {
               />
             }
           />
+          <SettingsStaticRow
+            label="Show online status"
+            description="Let other members see when you were last active. Turn this off and your activity stays private — you can still message and join games."
+            trailing={
+              <Switch
+                checked={prefs.show_online_status}
+                disabled={isLoading || saving}
+                onCheckedChange={(v) => save({ show_online_status: v })}
+                aria-label="Show online status"
+              />
+            }
+          />
         </SettingsGroup>
 
         <SettingsGroup title="Location">
