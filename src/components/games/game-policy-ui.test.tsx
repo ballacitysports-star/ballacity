@@ -1,6 +1,10 @@
 // @vitest-environment jsdom
 import { describe, expect, it, vi } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
+vi.mock("@tanstack/react-router", () => ({
+  Link: ({ children, ...rest }: any) => <a {...rest}>{children}</a>,
+}));
+
 import { GamePolicyFields } from "./GamePolicyFields";
 import { GamePolicySummary } from "./GamePolicySummary";
 import { HostTrustPanel } from "./HostTrustPanel";
