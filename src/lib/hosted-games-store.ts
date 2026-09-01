@@ -96,6 +96,11 @@ type DbRow = {
   team_id?: string | null;
   org_id?: string | null;
   series_id?: string | null;
+  min_players?: number | null;
+  allow_waitlist?: boolean | null;
+  cancellation_policy?: string | null;
+  cancellation_notes?: string | null;
+  game_rules?: string | null;
 
 };
 
@@ -143,6 +148,11 @@ function rowToGame(r: DbRow): Game {
     endsAt: r.ends_at ?? null,
     allDay: !!r.all_day,
     timezone: r.timezone ?? null,
+    minPlayers: Number(r.min_players ?? 0) || 0,
+    allowWaitlist: r.allow_waitlist ?? true,
+    cancellationPolicy: r.cancellation_policy ?? "flexible",
+    cancellationNotes: r.cancellation_notes ?? null,
+    gameRules: r.game_rules ?? null,
 
   } as Game;
 }
@@ -184,6 +194,11 @@ function gameToInsertRow(g: Game): TablesInsert<"hosted_games"> {
     ...(g.endsAt ? { ends_at: g.endsAt } : {}),
     all_day: !!g.allDay,
     ...(g.timezone ? { timezone: g.timezone } : {}),
+    min_players: Number(g.minPlayers ?? 0) || 0,
+    allow_waitlist: g.allowWaitlist ?? true,
+    cancellation_policy: g.cancellationPolicy || "flexible",
+    cancellation_notes: g.cancellationNotes ?? null,
+    game_rules: g.gameRules ?? null,
   } as TablesInsert<"hosted_games">;
 
 }
@@ -295,6 +310,12 @@ export type HostedGameInput = {
   /** Real venue coordinates from the address autocomplete / geocoder. */
   lat?: number | null;
   lng?: number | null;
+  /** Game policy: minimum turnout, waitlist, cancellation terms, house rules. */
+  minPlayers?: number;
+  allowWaitlist?: boolean;
+  cancellationPolicy?: string | null;
+  cancellationNotes?: string | null;
+  gameRules?: string | null;
 
 };
 
@@ -341,6 +362,11 @@ export async function addHostedGame(input: HostedGameInput): Promise<Game> {
     endsAt: input.endsAt ?? null,
     allDay: !!input.allDay,
     timezone: input.timezone ?? null,
+    minPlayers: Math.max(0, Number(input.minPlayers ?? 0) || 0),
+    allowWaitlist: input.allowWaitlist ?? true,
+    cancellationPolicy: input.cancellationPolicy || "flexible",
+    cancellationNotes: input.cancellationNotes ?? null,
+    gameRules: input.gameRules ?? null,
   };
 
 
@@ -444,6 +470,23 @@ export async function updateHostedGame(
   }
   if ((patch as { maxAge?: number | null }).maxAge !== undefined) {
     dbPatch.max_age = (patch as { maxAge?: number | null }).maxAge ?? null;
+  }
+  if ((patch as { minPlayers?: number }).minPlayers !== undefined) {
+    dbPatch.min_players = Math.max(0, Number((patch as { minPlayers?: number }).minPlayers) || 0);
+  }
+  if ((patch as { allowWaitlist?: boolean }).allowWaitlist !== undefined) {
+    dbPatch.allow_waitlist = !!(patch as { allowWaitlist?: boolean }).allowWaitlist;
+  }
+  if ((patch as { cancellationPolicy?: string | null }).cancellationPolicy !== undefined) {
+    dbPatch.cancellation_policy =
+      (patch as { cancellationPolicy?: string | null }).cancellationPolicy || "flexible";
+  }
+  if ((patch as { cancellationNotes?: string | null }).cancellationNotes !== undefined) {
+    dbPatch.cancellation_notes =
+      (patch as { cancellationNotes?: string | null }).cancellationNotes ?? null;
+  }
+  if ((patch as { gameRules?: string | null }).gameRules !== undefined) {
+    dbPatch.game_rules = (patch as { gameRules?: string | null }).gameRules ?? null;
   }
   if (patch.positionsNeeded !== undefined) {
     dbPatch.positions_needed = patch.positionsNeeded as TablesUpdate<"hosted_games">["positions_needed"];

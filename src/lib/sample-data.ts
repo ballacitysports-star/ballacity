@@ -102,6 +102,16 @@ export type Game = {
   allDay?: boolean;
   /** IANA zone the host scheduled in, e.g. "America/Chicago". */
   timezone?: string | null;
+  /** Minimum players the host needs for the game to go ahead. 0 = no minimum. */
+  minPlayers?: number;
+  /** Whether players can queue for a spot once the game is full. */
+  allowWaitlist?: boolean;
+  /** Cancellation policy id: flexible | standard | strict | custom. */
+  cancellationPolicy?: string | null;
+  /** Host's own cancellation wording. */
+  cancellationNotes?: string | null;
+  /** Format, scoring, and house rules players must follow. */
+  gameRules?: string | null;
 
 };
 
