@@ -1522,6 +1522,7 @@ export type Database = {
         Row: {
           account_type: string | null
           active_profile_id: string | null
+          age_category: string
           avatar_initials: string | null
           avatar_url: string | null
           avatar_url_private: string | null
@@ -1548,6 +1549,7 @@ export type Database = {
         Insert: {
           account_type?: string | null
           active_profile_id?: string | null
+          age_category?: string
           avatar_initials?: string | null
           avatar_url?: string | null
           avatar_url_private?: string | null
@@ -1574,6 +1576,7 @@ export type Database = {
         Update: {
           account_type?: string | null
           active_profile_id?: string | null
+          age_category?: string
           avatar_initials?: string | null
           avatar_url?: string | null
           avatar_url_private?: string | null
@@ -2427,6 +2430,7 @@ export type Database = {
           total: number
         }[]
       }
+      age_category_from_birthday: { Args: { _bd: string }; Returns: string }
       approve_org_member_request: { Args: { _req: string }; Returns: string }
       approve_trainer_org_join: { Args: { _req: string }; Returns: string }
       blocked_image_paths: {
@@ -2542,6 +2546,7 @@ export type Database = {
         Args: { _reviewee_id: string; _user: string }
         Returns: boolean
       }
+      is_minor: { Args: { _user: string }; Returns: boolean }
       is_moderator: { Args: { _user_id: string }; Returns: boolean }
       is_org_member: { Args: { _org: string; _user: string }; Returns: boolean }
       is_superadmin: { Args: { _user_id: string }; Returns: boolean }
@@ -2570,10 +2575,15 @@ export type Database = {
           status: string
         }[]
       }
+      minor_messaging_allowed: {
+        Args: { _a: string; _b: string }
+        Returns: boolean
+      }
       moderate_gym_review: {
         Args: { _hidden: boolean; _review_id: string }
         Returns: undefined
       }
+      my_age_category: { Args: never; Returns: string }
       privacy_text: { Args: { _key: string; _user: string }; Returns: string }
       profile_ages: {
         Args: { _ids: string[] }
@@ -2608,6 +2618,7 @@ export type Database = {
           id: string
         }[]
       }
+      youth_flag: { Args: { _flag: string }; Returns: boolean }
     }
     Enums: {
       app_role: "admin" | "moderator" | "superadmin"
