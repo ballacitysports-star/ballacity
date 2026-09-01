@@ -1532,7 +1532,9 @@ export type Database = {
       }
       privacy_preferences: {
         Row: {
+          ai_disclosure_ack_at: string | null
           ai_processing: boolean
+          ai_training_opt_in: boolean
           allow_invites: string
           allow_messages: string
           created_at: string
@@ -1545,7 +1547,9 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          ai_disclosure_ack_at?: string | null
           ai_processing?: boolean
+          ai_training_opt_in?: boolean
           allow_invites?: string
           allow_messages?: string
           created_at?: string
@@ -1558,7 +1562,9 @@ export type Database = {
           user_id: string
         }
         Update: {
+          ai_disclosure_ack_at?: string | null
           ai_processing?: boolean
+          ai_training_opt_in?: boolean
           allow_invites?: string
           allow_messages?: string
           created_at?: string
