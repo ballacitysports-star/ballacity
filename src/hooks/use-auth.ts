@@ -108,6 +108,14 @@ export async function signOut() {
   } catch {
     /* ignore */
   }
+  // Signed media URLs are per-viewer credentials: drop them so a shared device
+  // can't keep rendering the previous account's private media.
+  try {
+    const { clearMediaUrlCache } = await import("@/hooks/use-media-url");
+    clearMediaUrlCache();
+  } catch {
+    /* ignore */
+  }
   await supabase.auth.signOut();
 }
 
