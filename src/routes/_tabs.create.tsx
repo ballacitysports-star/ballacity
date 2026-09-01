@@ -159,6 +159,10 @@ function Create() {
   const [maxAge, setMaxAge] = useState<number | null>(null);
   const [signupCutoffMin, setSignupCutoffMin] = useState(0);
   const [publishing, setPublishing] = useState(false);
+  // Host responsibility acknowledgment (never pre-checked, recorded per game).
+  const [hostAck, setHostAck] = useState(false);
+  const hostAckRef = useRef<HTMLDivElement | null>(null);
+
   // Nudge hosts to keep their own player availability up to date.
   const hostAvailGate = useAvailabilityGate();
   const [coverUrl, setCoverUrl] = useState<string | null>(null);
