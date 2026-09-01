@@ -355,6 +355,9 @@ const PUBLIC_ROUTES = [
   // Legal documents must be readable before/without signing in.
   "/terms",
   "/privacy",
+  // Safety Center must be readable without signing in.
+  "/safety",
+
   // Shareable, sign-in-free surface.
   "/highlights",
   "/player-card",
