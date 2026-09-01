@@ -716,13 +716,23 @@ function StepDot({ active, done, n }: { active: boolean; done: boolean; n: numbe
 function PaymentStatusTimeline({
   latest,
   history,
+  hostId,
+  gameId,
+  onChanged,
 }: {
   latest: PaymentSubmission;
   history: PaymentSubmission[];
+  hostId?: string | null;
+  gameId?: string;
+  onChanged?: () => void | Promise<void>;
 }) {
   const isRejected = latest.status === "rejected";
   const isVerified = latest.status === "verified";
   const isPending = latest.status === "pending";
+  const isDisputed = latest.status === "disputed";
+  const isCancelled = latest.status === "cancelled";
+  const state = paymentStateFor({ feeRequired: true, submission: latest });
+  const meta = PAYMENT_STATE_META[state];
 
   // Three canonical steps; the third splits into verified vs rejected.
   type StepState = "done" | "current" | "upcoming" | "failed";
@@ -735,38 +745,55 @@ function PaymentStatusTimeline({
   }[] = [
     {
       key: "submitted",
-      label: "Proof submitted",
-      hint: "You sent payment details to the host.",
+      label: PAYMENT_STATE_META.payment_sent.label,
+      hint: PAYMENT_STATE_META.payment_sent.playerHint,
       state: "done",
       at: latest.submitted_at,
     },
     {
       key: "review",
-      label: "Host reviewing",
+      label: PAYMENT_STATE_META.host_confirmation_pending.label,
       hint: isPending
-        ? "Waiting on the host to confirm your payment."
+        ? PAYMENT_STATE_META.host_confirmation_pending.playerHint
         : "Host reviewed your submission.",
       state: isPending ? "current" : "done",
       at: isPending ? null : latest.reviewed_at,
     },
-    isRejected
+    isDisputed
       ? {
-          key: "rejected",
-          label: "Rejected — try again",
-          hint: latest.reviewer_notes || "Host couldn't verify this payment.",
+          key: "disputed",
+          label: PAYMENT_STATE_META.disputed.label,
+          hint: latest.dispute_reason || PAYMENT_STATE_META.disputed.playerHint,
           state: "failed",
-          at: latest.reviewed_at,
+          at: latest.disputed_at ?? null,
         }
-      : {
-          key: "verified",
-          label: "Payment verified",
-          hint: isVerified
-            ? latest.reviewer_notes || "You're all set — see you at the game."
-            : "You'll be confirmed once the host verifies.",
-          state: isVerified ? "done" : "upcoming",
-          at: isVerified ? latest.reviewed_at : null,
-        },
+      : isCancelled
+        ? {
+            key: "cancelled",
+            label: cancellationReasonLabel(latest.cancellation_reason),
+            hint: PAYMENT_STATE_META.cancelled.playerHint,
+            state: "failed",
+            at: latest.cancelled_at ?? null,
+          }
+        : isRejected
+          ? {
+              key: "rejected",
+              label: "Declined — try again",
+              hint: latest.reviewer_notes || "Host couldn't verify this payment.",
+              state: "failed",
+              at: latest.reviewed_at,
+            }
+          : {
+              key: "verified",
+              label: PAYMENT_STATE_META.confirmed.label,
+              hint: isVerified
+                ? latest.reviewer_notes || PAYMENT_STATE_META.confirmed.playerHint
+                : "Only the host can confirm this payment.",
+              state: isVerified ? "done" : "upcoming",
+              at: isVerified ? latest.reviewed_at : null,
+            },
   ];
+
 
   return (
     <div
