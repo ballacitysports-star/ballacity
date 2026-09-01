@@ -451,6 +451,18 @@ function Thread() {
         </div>
       )}
 
+      {reportMsg && (
+        <ReportDialog
+          open={!!reportMsg}
+          onOpenChange={(v) => !v && setReportMsg(null)}
+          subjectType="message"
+          reportedId={reportMsg.sender_id}
+          subjectLabel={other?.display_name ?? "this message"}
+          conversationId={conversationId}
+          messageId={reportMsg.id}
+        />
+      )}
+
       <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 py-4 space-y-3">
         {msgs.length === 0 ? (
           <div className="text-center text-xs text-muted-foreground mt-10">
