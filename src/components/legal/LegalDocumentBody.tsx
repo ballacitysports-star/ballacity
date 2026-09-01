@@ -21,10 +21,14 @@ export function LegalReviewBanner() {
 export function LegalDocumentBody({
   doc,
   version,
+  history,
 }: {
   doc: LegalDocument;
   version: LegalDocumentVersion;
+  /** Previous versions to list (defaults to the bundled registry history). */
+  history?: LegalDocumentVersion[];
 }) {
+  const versions = history ?? doc.versions;
   return (
     <article className="space-y-5">
       <LegalReviewBanner />
@@ -46,11 +50,11 @@ export function LegalDocumentBody({
           ))}
         </section>
       ))}
-      {doc.versions.length > 1 ? (
+      {versions.length > 1 ? (
         <section className="space-y-2 border-t border-border pt-4">
           <h2 className="text-sm font-semibold">Version history</h2>
           <ul className="space-y-1 text-xs text-muted-foreground">
-            {doc.versions.map((v) => (
+            {versions.map((v) => (
               <li key={v.version}>
                 <span className="font-semibold text-foreground">{v.version}</span> — effective{" "}
                 {v.effectiveDate}

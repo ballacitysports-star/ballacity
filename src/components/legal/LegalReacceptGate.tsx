@@ -8,7 +8,7 @@ import {
   useAcceptLegal,
   useMyLegalConsents,
 } from "@/lib/legal-consent";
-import { LEGAL_DOCUMENTS, currentVersion } from "@/lib/legal-documents";
+import { LEGAL_DOCUMENTS, effectiveVersion } from "@/lib/legal-documents";
 import { LegalConsent, allAccepted, emptyConsentValue } from "@/components/legal/LegalConsent";
 
 /**
@@ -18,7 +18,7 @@ import { LegalConsent, allAccepted, emptyConsentValue } from "@/components/legal
  */
 export function LegalReacceptGate() {
   const { user, loading } = useAuth();
-  const { pendingRequired, isLoading, refetch } = useMyLegalConsents();
+  const { pendingRequired, isLoading, refetch, published } = useMyLegalConsents();
   const accept = useAcceptLegal();
   const [value, setValue] = useState(emptyConsentValue);
   const [replayed, setReplayed] = useState(false);
@@ -29,7 +29,7 @@ export function LegalReacceptGate() {
     const pending = readPendingConsent();
     if (pending.length === 0) return;
     setReplayed(true);
-    const valid = pending.filter((p) => p.version === currentVersion(p.type).version);
+    const valid = pending.filter((p) => p.version === effectiveVersion(p.type, published).version);
     if (valid.length === 0) {
       clearPendingConsent();
       return;
@@ -50,7 +50,7 @@ export function LegalReacceptGate() {
     if (!allAccepted(value, pendingRequired)) return;
     try {
       await accept.mutateAsync(
-        pendingRequired.map((type) => ({ type, version: currentVersion(type).version })),
+        pendingRequired.map((type) => ({ type, version: effectiveVersion(type, published).version })),
       );
       toast.success("Thanks — your agreement is recorded.");
     } catch (e) {

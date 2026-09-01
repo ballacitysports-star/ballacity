@@ -5,7 +5,7 @@ import { useState } from "react";
 import { pageHead } from "@/lib/seo";
 import { useAuth } from "@/hooks/use-auth";
 import { useAcceptLegal, useMyLegalConsents } from "@/lib/legal-consent";
-import { LEGAL_DOCUMENT_LIST, currentVersion } from "@/lib/legal-documents";
+import { LEGAL_DOCUMENT_LIST, effectiveVersion } from "@/lib/legal-documents";
 import { LegalConsent, allAccepted, emptyConsentValue } from "@/components/legal/LegalConsent";
 import { LegalReviewBanner } from "@/components/legal/LegalDocumentBody";
 
@@ -23,7 +23,7 @@ export const Route = createFileRoute("/account/legal")({
 
 function LegalSettingsPage() {
   const { user } = useAuth();
-  const { statuses, records, isLoading } = useMyLegalConsents();
+  const { statuses, records, isLoading, published } = useMyLegalConsents();
   const accept = useAcceptLegal();
   const [value, setValue] = useState(emptyConsentValue);
 
@@ -33,7 +33,7 @@ function LegalSettingsPage() {
     if (!allAccepted(value, outstanding)) return;
     try {
       await accept.mutateAsync(
-        outstanding.map((type) => ({ type, version: currentVersion(type).version })),
+        outstanding.map((type) => ({ type, version: effectiveVersion(type, published).version })),
       );
       setValue(emptyConsentValue);
       toast.success("Agreement recorded");
@@ -59,7 +59,7 @@ function LegalSettingsPage() {
             Documents
           </h2>
           {LEGAL_DOCUMENT_LIST.map((doc) => {
-            const v = currentVersion(doc.type);
+            const v = effectiveVersion(doc.type, published);
             return (
               <Link
                 key={doc.type}
