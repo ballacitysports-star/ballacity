@@ -1186,6 +1186,11 @@ export type Database = {
       }
       payment_submissions: {
         Row: {
+          cancellation_reason: string | null
+          cancelled_at: string | null
+          dispute_reason: string | null
+          disputed_at: string | null
+          disputed_by: string | null
           game_id: string
           host_id: string
           id: string
@@ -1203,6 +1208,11 @@ export type Database = {
           transaction_reference: string | null
         }
         Insert: {
+          cancellation_reason?: string | null
+          cancelled_at?: string | null
+          dispute_reason?: string | null
+          disputed_at?: string | null
+          disputed_by?: string | null
           game_id: string
           host_id: string
           id?: string
@@ -1220,6 +1230,11 @@ export type Database = {
           transaction_reference?: string | null
         }
         Update: {
+          cancellation_reason?: string | null
+          cancelled_at?: string | null
+          dispute_reason?: string | null
+          disputed_at?: string | null
+          disputed_by?: string | null
           game_id?: string
           host_id?: string
           id?: string
