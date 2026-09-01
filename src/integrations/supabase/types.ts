@@ -46,6 +46,7 @@ export type Database = {
           before: Json | null
           created_at: string
           id: string
+          metadata: Json
           reason: string | null
           target_id: string | null
           target_type: string
@@ -57,6 +58,7 @@ export type Database = {
           before?: Json | null
           created_at?: string
           id?: string
+          metadata?: Json
           reason?: string | null
           target_id?: string | null
           target_type: string
@@ -68,6 +70,7 @@ export type Database = {
           before?: Json | null
           created_at?: string
           id?: string
+          metadata?: Json
           reason?: string | null
           target_id?: string | null
           target_type?: string
@@ -2460,6 +2463,15 @@ export type Database = {
     Functions: {
       accept_conversation: { Args: { _conv: string }; Returns: undefined }
       accept_trainer_org_invite: { Args: { _invite: string }; Returns: string }
+      admin_audit_log_facets: {
+        Args: never
+        Returns: {
+          kind: string
+          label: string
+          uses: number
+          value: string
+        }[]
+      }
       admin_list_storage_objects: {
         Args: {
           _buckets: string[]

@@ -28,17 +28,11 @@ export async function writeAudit(
     reason?: string | null;
     before?: unknown;
     after?: unknown;
+    metadata?: Record<string, unknown>;
   },
 ) {
-  await admin.from("admin_audit_log").insert({
-    actor_id: actorId,
-    action: entry.action,
-    target_type: entry.targetType,
-    target_id: entry.targetId ?? null,
-    reason: entry.reason ?? null,
-    before: (entry.before ?? null) as any,
-    after: (entry.after ?? null) as any,
-  });
+  const { logAdminAction } = await import("@/lib/audit-log.server");
+  await logAdminAction(admin, actorId, entry as never);
 }
 
 /** Content kinds the moderation tab can act on. */
