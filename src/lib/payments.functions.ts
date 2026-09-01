@@ -2,13 +2,15 @@ import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
 type Next = "verified" | "rejected" | "pending";
+/** Any status a submission may currently hold (host actions only set `Next`). */
+type From = Next | "disputed" | "cancelled";
 
 export type ReviewPaymentResult = {
   ok: true;
   changed: boolean;
   submission: {
     id: string;
-    status: Next;
+    status: From;
     screenshot_path: string | null;
     game_id: string;
     player_id: string;
@@ -41,7 +43,7 @@ export const reviewPaymentAction = createServerFn({ method: "POST" })
       gameId: string;
       playerId: string;
       next: Next;
-      expectedFrom?: Next | "none";
+      expectedFrom?: From | "none";
     }) => {
       if (!input?.gameId || typeof input.gameId !== "string") {
         throw new Error("gameId is required.");
