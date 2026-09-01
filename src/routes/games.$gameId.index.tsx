@@ -1,5 +1,7 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { pageHead, ogImageUrl } from "@/lib/seo";
+import type { PaymentSubmissionStatus } from "@/lib/payment-states";
+
 import { motion, AnimatePresence } from "framer-motion";
 import {
   ArrowLeft,
