@@ -339,7 +339,13 @@ function Create() {
             hostAsRef.current?.querySelector<HTMLButtonElement>("button")?.focus();
             return;
           }
+          if (!hostAck) {
+            toast.error("Acknowledge your host responsibilities to publish");
+            hostAckRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+            return;
+          }
           setPublishing(true);
+
 
           try {
             // Compute one or many start times, each with its own length.
