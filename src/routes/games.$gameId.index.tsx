@@ -972,8 +972,7 @@ function GameDetail() {
     }
   };
 
-  const handleJoin = async (preselectedPosition?: string) => {
-
+  const runJoin = async (preselectedPosition?: string) => {
     setProcessing(true);
     try {
       await executeJoinAction(preselectedPosition);
@@ -981,6 +980,40 @@ function GameDetail() {
       setProcessing(false);
     }
   };
+
+  // Physical-activity risk acknowledgment gate. Players see it once per
+  // acknowledgment version per game; hosts and confirmed players skip it.
+  const handleJoin = async (preselectedPosition?: string) => {
+    const gate = needsRiskAcknowledgment({
+      signedIn: !!user,
+      isHost,
+      alreadyJoined: viewerCountsAsJoined,
+      acknowledgedVersion: riskAckVersion ?? null,
+    });
+    if (gate) {
+      pendingJoinPositionRef.current = preselectedPosition ?? null;
+      setRiskAckOpen(true);
+      return;
+    }
+    await runJoin(preselectedPosition);
+  };
+
+  const confirmRiskAck = async () => {
+    setProcessing(true);
+    try {
+      await recordSafetyAck({ gameId: game.id, kind: "participant_risk" });
+      await refetchRiskAck();
+      setRiskAckOpen(false);
+      const pos = pendingJoinPositionRef.current ?? undefined;
+      pendingJoinPositionRef.current = null;
+      await executeJoinAction(pos);
+    } catch (e: any) {
+      toast.error(e?.message ?? "Couldn't record your acknowledgment");
+    } finally {
+      setProcessing(false);
+    }
+  };
+
 
   const viewerPending =
     !isHost && requiresApproval && myReq?.status === "pending" && !viewerCountsAsJoined;
