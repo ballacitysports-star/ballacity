@@ -270,6 +270,57 @@ export type Database = {
         }
         Relationships: []
       }
+      data_export_requests: {
+        Row: {
+          categories: string[]
+          created_at: string
+          error_message: string | null
+          expires_at: string | null
+          file_bytes: number | null
+          id: string
+          ready_at: string | null
+          requested_at: string
+          row_counts: Json
+          started_at: string | null
+          status: string
+          storage_path: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          categories?: string[]
+          created_at?: string
+          error_message?: string | null
+          expires_at?: string | null
+          file_bytes?: number | null
+          id?: string
+          ready_at?: string | null
+          requested_at?: string
+          row_counts?: Json
+          started_at?: string | null
+          status?: string
+          storage_path?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          categories?: string[]
+          created_at?: string
+          error_message?: string | null
+          expires_at?: string | null
+          file_bytes?: number | null
+          id?: string
+          ready_at?: string | null
+          requested_at?: string
+          row_counts?: Json
+          started_at?: string | null
+          status?: string
+          storage_path?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       feed_preferences: {
         Row: {
           created_at: string
@@ -2554,6 +2605,7 @@ export type Database = {
         Args: { _reason: string; _req: string }
         Returns: undefined
       }
+      expire_stale_data_exports: { Args: never; Returns: number }
       free_reels_used: {
         Args: { check_env?: string; user_uuid: string }
         Returns: number
