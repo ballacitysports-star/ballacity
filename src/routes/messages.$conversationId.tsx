@@ -69,6 +69,7 @@ function Thread() {
   const [replyTo, setReplyTo] = useState<Message | null>(null);
   const [reactPickerFor, setReactPickerFor] = useState<string | null>(null);
   const [menuFor, setMenuFor] = useState<string | null>(null);
+  const [reportMsg, setReportMsg] = useState<Message | null>(null);
   const [otherTyping, setOtherTyping] = useState(false);
   const [otherPresent, setOtherPresent] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
