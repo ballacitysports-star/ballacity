@@ -558,6 +558,8 @@ function ReelsPage() {
   const fileRef = useRef<HTMLInputElement>(null);
   const [reels, setReels] = useState<Reel[]>([]);
   const [busy, setBusy] = useState(false);
+  const [disclosureOpen, setDisclosureOpen] = useState(false);
+  const { prefs: privacyPrefs, update: updatePrivacy } = useMyPrivacy();
   const [style, setStyle] = useState<ReelStylePrefs>(DEFAULT_REEL_STYLE);
   /** Athlete-chosen name for the next upload (e.g. "Sunday soccer hat trick"). */
   const [titleDraft, setTitleDraft] = useState("");
