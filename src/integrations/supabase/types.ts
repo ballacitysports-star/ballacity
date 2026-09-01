@@ -912,6 +912,57 @@ export type Database = {
         }
         Relationships: []
       }
+      legal_documents: {
+        Row: {
+          archived_at: string | null
+          content: string
+          created_at: string
+          created_by: string | null
+          document_type: string
+          effective_date: string
+          id: string
+          published: boolean
+          published_at: string | null
+          requires_reacceptance: boolean
+          summary: string
+          title: string
+          updated_at: string
+          version: string
+        }
+        Insert: {
+          archived_at?: string | null
+          content?: string
+          created_at?: string
+          created_by?: string | null
+          document_type: string
+          effective_date?: string
+          id?: string
+          published?: boolean
+          published_at?: string | null
+          requires_reacceptance?: boolean
+          summary?: string
+          title: string
+          updated_at?: string
+          version: string
+        }
+        Update: {
+          archived_at?: string | null
+          content?: string
+          created_at?: string
+          created_by?: string | null
+          document_type?: string
+          effective_date?: string
+          id?: string
+          published?: boolean
+          published_at?: string | null
+          requires_reacceptance?: boolean
+          summary?: string
+          title?: string
+          updated_at?: string
+          version?: string
+        }
+        Relationships: []
+      }
       location_denial_events: {
         Row: {
           code: number | null
@@ -2567,6 +2618,10 @@ export type Database = {
           latest_accepted_at: string
         }[]
       }
+      legal_reacceptance_pending: {
+        Args: { _document_type: string; _version: string }
+        Returns: number
+      }
       list_trainer_booked_slots: {
         Args: { _date: string; _trainer_id: string }
         Returns: {
@@ -2601,11 +2656,16 @@ export type Database = {
           user_id: string
         }[]
       }
+      publish_legal_document: { Args: { _id: string }; Returns: string }
       shares_game_or_chat: {
         Args: { _a: string; _b: string }
         Returns: boolean
       }
       try_uuid: { Args: { _v: string }; Returns: string }
+      unpublish_legal_document: {
+        Args: { _id: string; _reason?: string }
+        Returns: string
+      }
       unsend_message: { Args: { _id: string }; Returns: undefined }
       visible_avatars: {
         Args: { _ids: string[] }

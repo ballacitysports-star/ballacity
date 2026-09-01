@@ -3,12 +3,34 @@ import { useServerFn } from "@tanstack/react-start";
 import { useAuth } from "@/hooks/use-auth";
 import {
   buildConsentStatus,
-  currentVersion,
+  effectiveVersion,
   pendingRequiredTypes,
   type ConsentRecord,
   type LegalDocumentType,
+  type PublishedLegalDocument,
 } from "@/lib/legal-documents";
 import { getMyLegalConsents, recordLegalConsent } from "@/lib/legal-consent.functions";
+import { getPublishedLegalDocuments } from "@/lib/legal-documents.functions";
+
+/**
+ * Published document versions come from the admin-managed `legal_documents`
+ * table; the bundled registry is only a fallback when nothing is published.
+ */
+export function usePublishedLegalDocuments() {
+  const fetchDocs = useServerFn(getPublishedLegalDocuments);
+  const query = useQuery({
+    queryKey: ["legal-documents", "published"],
+    queryFn: () => fetchDocs() as Promise<PublishedLegalDocument[]>,
+    staleTime: 5 * 60_000,
+  });
+  return { ...query, published: query.data ?? null };
+}
+
+/** The version of a consent document users are currently shown. */
+export function useEffectiveLegalVersion(type: LegalDocumentType) {
+  const { published } = usePublishedLegalDocuments();
+  return effectiveVersion(type, published);
+}
 
 const PENDING_KEY = "openrun:pending-legal-consent";
 
@@ -49,15 +71,16 @@ export function clearPendingConsent() {
 }
 
 /** Acceptances for every currently published document version. */
-export function currentAcceptances() {
+export function currentAcceptances(published?: PublishedLegalDocument[] | null) {
   return (["terms", "privacy"] as LegalDocumentType[]).map((type) => ({
     type,
-    version: currentVersion(type).version,
+    version: effectiveVersion(type, published).version,
   }));
 }
 
 export function useMyLegalConsents() {
   const { user } = useAuth();
+  const { published, isLoading: docsLoading } = usePublishedLegalDocuments();
   const fetchConsents = useServerFn(getMyLegalConsents);
   const query = useQuery({
     queryKey: ["legal-consents", user?.id ?? "anon"],
@@ -68,9 +91,11 @@ export function useMyLegalConsents() {
   const records = query.data ?? [];
   return {
     ...query,
+    isLoading: query.isLoading || docsLoading,
+    published,
     records,
-    statuses: buildConsentStatus(records),
-    pendingRequired: query.data ? pendingRequiredTypes(records) : [],
+    statuses: buildConsentStatus(records, published),
+    pendingRequired: query.data && !docsLoading ? pendingRequiredTypes(records, published) : [],
   };
 }
 

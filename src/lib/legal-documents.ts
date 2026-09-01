@@ -186,13 +186,82 @@ export type ConsentStatus = {
 };
 
 /**
+ * A published row from the `legal_documents` table. When present it takes
+ * precedence over the bundled registry above, which is only a fallback for the
+ * (unlikely) case that nothing is published yet.
+ */
+export type PublishedLegalDocument = {
+  id: string;
+  document_type: string;
+  title: string;
+  version: string;
+  content: string;
+  summary: string;
+  requires_reacceptance: boolean;
+  effective_date: string;
+  published: boolean;
+  published_at: string | null;
+  archived_at: string | null;
+};
+
+/** The version users are currently shown for a consent document. */
+export function effectiveVersion(
+  type: LegalDocumentType,
+  published?: PublishedLegalDocument[] | null,
+): LegalDocumentVersion & { content?: string } {
+  const row = published?.find((p) => p.document_type === type && p.published);
+  if (!row) return currentVersion(type);
+  return {
+    version: row.version,
+    effectiveDate: row.effective_date,
+    material: row.requires_reacceptance,
+    summary: row.summary,
+    sections: parseLegalContent(row.content),
+    content: row.content,
+  };
+}
+
+/** Splits stored markdown-lite content ("## Heading" + paragraphs) into sections. */
+export function parseLegalContent(content: string): LegalSection[] {
+  const sections: LegalSection[] = [];
+  let current: LegalSection | null = null;
+  for (const rawBlock of content.split(/\n{2,}/)) {
+    const block = rawBlock.trim();
+    if (!block) continue;
+    const lines = block.split("\n");
+    const first = lines[0].trim();
+    if (first.startsWith("#")) {
+      current = { heading: first.replace(/^#+\s*/, ""), body: [] };
+      sections.push(current);
+      const rest = lines.slice(1).join(" ").trim();
+      if (rest) current.body.push(rest);
+      continue;
+    }
+    if (!current) {
+      current = { heading: "", body: [] };
+      sections.push(current);
+    }
+    current.body.push(lines.join(" ").trim());
+  }
+  return sections;
+}
+
+/** Turns sections back into stored content (used to seed a draft from the registry). */
+export function sectionsToContent(sections: LegalSection[]): string {
+  return sections.map((s) => `## ${s.heading}\n${s.body.join("\n\n")}`).join("\n\n");
+}
+
+/**
  * Compares what the user accepted against the current published versions.
  * A newer version always shows as "update available"; acceptance is only
  * required (blocking) when that version is flagged material.
  */
-export function buildConsentStatus(records: ConsentRecord[]): ConsentStatus[] {
+export function buildConsentStatus(
+  records: ConsentRecord[],
+  published?: PublishedLegalDocument[] | null,
+): ConsentStatus[] {
   return LEGAL_DOCUMENT_LIST.map((doc) => {
-    const current = doc.versions[0];
+    const current = effectiveVersion(doc.type, published);
     const mine = records
       .filter((r) => r.document_type === doc.type)
       .sort((a, b) => (a.accepted_at < b.accepted_at ? 1 : -1));
@@ -212,8 +281,12 @@ export function buildConsentStatus(records: ConsentRecord[]): ConsentStatus[] {
 }
 
 /** Document types the user must accept before continuing (material versions only). */
-export function pendingRequiredTypes(records: ConsentRecord[]): LegalDocumentType[] {
-  return buildConsentStatus(records)
-    .filter((s) => s.needsAcceptance && currentVersion(s.type).material)
+export function pendingRequiredTypes(
+  records: ConsentRecord[],
+  published?: PublishedLegalDocument[] | null,
+): LegalDocumentType[] {
+  return buildConsentStatus(records, published)
+    .filter((s) => s.needsAcceptance && effectiveVersion(s.type, published).material)
     .map((s) => s.type);
 }
+

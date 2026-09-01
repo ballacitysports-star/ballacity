@@ -1,6 +1,7 @@
 import { Link } from "@tanstack/react-router";
 import { Check } from "lucide-react";
-import { LEGAL_DOCUMENT_LIST, currentVersion, type LegalDocumentType } from "@/lib/legal-documents";
+import { LEGAL_DOCUMENT_LIST, effectiveVersion, type LegalDocumentType } from "@/lib/legal-documents";
+import { usePublishedLegalDocuments } from "@/lib/legal-consent";
 
 export type LegalConsentValue = Record<LegalDocumentType, boolean>;
 
@@ -29,12 +30,13 @@ export function LegalConsent({
   disabled?: boolean;
   className?: string;
 }) {
+  const { published } = usePublishedLegalDocuments();
   const docs = LEGAL_DOCUMENT_LIST.filter((d) => !types || types.includes(d.type));
 
   return (
     <div className={`space-y-2 ${className ?? ""}`}>
       {docs.map((doc) => {
-        const v = currentVersion(doc.type);
+        const v = effectiveVersion(doc.type, published);
         const checked = !!value[doc.type];
         const id = `legal-consent-${doc.type}`;
         return (
