@@ -155,6 +155,30 @@ const SECTIONS: Section[] = [
         description: "See who you've blocked and unblock accounts",
         icon: ShieldOff,
       },
+      {
+        to: "/safety",
+        label: "Safety Center",
+        description: "Game, meeting, payment, and messaging safety",
+        icon: ShieldCheck,
+      },
+      {
+        to: "/trust-center",
+        label: "Trust Center",
+        description: "Privacy, security, payments, AI, and moderation",
+        icon: BadgeCheck,
+      },
+      {
+        to: "/community-guidelines",
+        label: "Community Guidelines",
+        description: "What's expected of every player and host",
+        icon: Scale,
+      },
+      {
+        to: "/contact",
+        label: "Contact & report a problem",
+        description: "Reach support or report something you saw",
+        icon: LifeBuoy,
+      },
     ],
   },
   {

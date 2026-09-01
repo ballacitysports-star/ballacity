@@ -104,7 +104,11 @@ function SafetyCenter() {
         {/* Topics */}
         <div className="mt-6 space-y-4">
           {SAFETY_TOPICS.map((t) => (
-            <section key={t.id} className="rounded-2xl border border-border bg-surface px-4 py-4">
+            <section
+              key={t.id}
+              id={t.id}
+              className="scroll-mt-16 rounded-2xl border border-border bg-surface px-4 py-4"
+            >
               <h2 className="text-sm font-bold">{t.title}</h2>
               <ul className="mt-2 space-y-1.5">
                 {t.points.map((p) => (
@@ -134,23 +138,22 @@ function SafetyCenter() {
           <div className="mt-3 flex flex-wrap gap-2">
             <Link
               to="/account/blocked"
-              className="rounded-full border border-border px-3 py-2 text-xs font-semibold"
+              className="rounded-full border border-border px-3 py-2 text-xs font-semibold hover:bg-background"
             >
               Blocked accounts
             </Link>
             <Link
               to="/account/privacy"
-              className="rounded-full border border-border px-3 py-2 text-xs font-semibold"
+              className="rounded-full border border-border px-3 py-2 text-xs font-semibold hover:bg-background"
             >
               Privacy settings
             </Link>
-            <Link
-              to="/terms"
-              className="rounded-full border border-border px-3 py-2 text-xs font-semibold"
-            >
-              Terms
-            </Link>
           </div>
+        </section>
+
+        <section className="mt-4 rounded-2xl border border-border bg-surface px-4 py-4">
+          <h2 className="text-sm font-bold">More</h2>
+          <PolicyLinks className="mt-3" />
         </section>
       </main>
     </div>

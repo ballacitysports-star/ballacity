@@ -335,12 +335,24 @@ function Landing() {
       <footer className="border-t border-border">
         <div className="mx-auto max-w-6xl px-5 py-8 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-muted-foreground">
           <Logo size={22} />
-          <nav className="flex items-center gap-4">
+          <nav className="flex flex-wrap items-center justify-center gap-x-4 gap-y-2">
             <Link to="/terms" className="hover:text-foreground">
               Terms of Service
             </Link>
             <Link to="/privacy" className="hover:text-foreground">
               Privacy Policy
+            </Link>
+            <Link to="/safety" className="hover:text-foreground">
+              Safety
+            </Link>
+            <Link to="/trust-center" className="hover:text-foreground">
+              Trust
+            </Link>
+            <Link to="/community-guidelines" className="hover:text-foreground">
+              Guidelines
+            </Link>
+            <Link to="/contact" className="hover:text-foreground">
+              Contact
             </Link>
           </nav>
           <span>© {new Date().getFullYear()} OpenRun. Built for the players.</span>
