@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as TabsRouteImport } from './routes/_tabs'
 import { Route as AuthRouteImport } from './routes/auth'
+import { Route as CommunityGuidelinesRouteImport } from './routes/community-guidelines'
 import { Route as HighlightsRouteImport } from './routes/highlights'
 import { Route as McpRouteImport } from './routes/mcp'
 import { Route as PaymentsRouteImport } from './routes/payments'
@@ -90,6 +91,11 @@ const TabsRoute = TabsRouteImport.update({
 const AuthRoute = AuthRouteImport.update({
   id: '/auth',
   path: '/auth',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CommunityGuidelinesRoute = CommunityGuidelinesRouteImport.update({
+  id: '/community-guidelines',
+  path: '/community-guidelines',
   getParentRoute: () => rootRouteImport,
 } as any)
 const HighlightsRoute = HighlightsRouteImport.update({
@@ -425,6 +431,7 @@ const ApiPublicReelsProcessRoute = ApiPublicReelsProcessRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
+  '/community-guidelines': typeof CommunityGuidelinesRoute
   '/highlights': typeof HighlightsRoute
   '/mcp': typeof McpRoute
   '/payments': typeof PaymentsRoute
@@ -494,6 +501,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
+  '/community-guidelines': typeof CommunityGuidelinesRoute
   '/highlights': typeof HighlightsRoute
   '/mcp': typeof McpRoute
   '/payments': typeof PaymentsRoute
@@ -564,6 +572,7 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/_tabs': typeof TabsRouteWithChildren
   '/auth': typeof AuthRoute
+  '/community-guidelines': typeof CommunityGuidelinesRoute
   '/highlights': typeof HighlightsRoute
   '/mcp': typeof McpRoute
   '/payments': typeof PaymentsRoute
@@ -635,6 +644,7 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/auth'
+    | '/community-guidelines'
     | '/highlights'
     | '/mcp'
     | '/payments'
@@ -704,6 +714,7 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/auth'
+    | '/community-guidelines'
     | '/highlights'
     | '/mcp'
     | '/payments'
@@ -773,6 +784,7 @@ export interface FileRouteTypes {
     | '/'
     | '/_tabs'
     | '/auth'
+    | '/community-guidelines'
     | '/highlights'
     | '/mcp'
     | '/payments'
@@ -844,6 +856,7 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   TabsRoute: typeof TabsRouteWithChildren
   AuthRoute: typeof AuthRoute
+  CommunityGuidelinesRoute: typeof CommunityGuidelinesRoute
   HighlightsRoute: typeof HighlightsRoute
   McpRoute: typeof McpRoute
   PaymentsRoute: typeof PaymentsRoute
@@ -920,6 +933,13 @@ declare module '@tanstack/react-router' {
       path: '/auth'
       fullPath: '/auth'
       preLoaderRoute: typeof AuthRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/community-guidelines': {
+      id: '/community-guidelines'
+      path: '/community-guidelines'
+      fullPath: '/community-guidelines'
+      preLoaderRoute: typeof CommunityGuidelinesRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/highlights': {
@@ -1426,6 +1446,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   TabsRoute: TabsRouteWithChildren,
   AuthRoute: AuthRoute,
+  CommunityGuidelinesRoute: CommunityGuidelinesRoute,
   HighlightsRoute: HighlightsRoute,
   McpRoute: McpRoute,
   PaymentsRoute: PaymentsRoute,
