@@ -453,6 +453,9 @@ function PlayerProfile() {
             <Link to="/settings" className={channelPillClass()}>
               Settings
             </Link>
+            <Link to="/account/ai-privacy" className={channelPillClass()}>
+              AI &amp; Video Privacy
+            </Link>
           </>
         }
       />
