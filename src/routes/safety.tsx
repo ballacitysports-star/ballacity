@@ -1,5 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { AlertTriangle, ArrowLeft, Flag, ShieldAlert, ShieldCheck } from "lucide-react";
+import { AlertTriangle, ArrowLeft, Flag, Heart, ShieldAlert, ShieldCheck } from "lucide-react";
+import { PolicyLinks } from "@/components/PolicyLinks";
 import { pageHead } from "@/lib/seo";
 import {
   EMERGENCY_NOTICE,
@@ -7,6 +8,7 @@ import {
   LEGAL_REVIEW_LABEL,
   RISK_ACKNOWLEDGMENT,
   SAFETY_TOPICS,
+  STAY_SAFE_POINTS,
 } from "@/lib/safety";
 
 export const Route = createFileRoute("/safety")({
