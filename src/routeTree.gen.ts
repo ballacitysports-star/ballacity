@@ -18,12 +18,14 @@ import { Route as McpRouteImport } from './routes/mcp'
 import { Route as PaymentsRouteImport } from './routes/payments'
 import { Route as PickupRouteImport } from './routes/pickup'
 import { Route as PlansRouteImport } from './routes/plans'
+import { Route as PrivacyRouteImport } from './routes/privacy'
 import { Route as ResetPasswordRouteImport } from './routes/reset-password'
 import { Route as ReviewsRouteImport } from './routes/reviews'
 import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as ShopRouteImport } from './routes/shop'
 import { Route as SitemapDotxmlRouteImport } from './routes/sitemap[.]xml'
 import { Route as SuperadminRouteImport } from './routes/superadmin'
+import { Route as TermsRouteImport } from './routes/terms'
 import { Route as Char91DotmcpChar93ListToolsRouteImport } from './routes/[.mcp]/list-tools'
 import { Route as Char91DotwellKnownChar93OauthProtectedResourceRouteImport } from './routes/[.well-known]/oauth-protected-resource'
 import { Route as TabsCreateRouteImport } from './routes/_tabs.create'
@@ -35,6 +37,7 @@ import { Route as TabsProfileRouteImport } from './routes/_tabs.profile'
 import { Route as TabsReelsRouteImport } from './routes/_tabs.reels'
 import { Route as TabsTeamsRouteImport } from './routes/_tabs.teams'
 import { Route as TabsTrainersRouteImport } from './routes/_tabs.trainers'
+import { Route as AccountLegalRouteImport } from './routes/account.legal'
 import { Route as AccountNotificationsRouteImport } from './routes/account.notifications'
 import { Route as AccountSecurityRouteImport } from './routes/account.security'
 import { Route as AdminLocationAnalyticsRouteImport } from './routes/admin.location-analytics'
@@ -114,6 +117,11 @@ const PlansRoute = PlansRouteImport.update({
   path: '/plans',
   getParentRoute: () => rootRouteImport,
 } as any)
+const PrivacyRoute = PrivacyRouteImport.update({
+  id: '/privacy',
+  path: '/privacy',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ResetPasswordRoute = ResetPasswordRouteImport.update({
   id: '/reset-password',
   path: '/reset-password',
@@ -142,6 +150,11 @@ const SitemapDotxmlRoute = SitemapDotxmlRouteImport.update({
 const SuperadminRoute = SuperadminRouteImport.update({
   id: '/superadmin',
   path: '/superadmin',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const TermsRoute = TermsRouteImport.update({
+  id: '/terms',
+  path: '/terms',
   getParentRoute: () => rootRouteImport,
 } as any)
 const Char91DotmcpChar93ListToolsRoute =
@@ -200,6 +213,11 @@ const TabsTrainersRoute = TabsTrainersRouteImport.update({
   id: '/trainers',
   path: '/trainers',
   getParentRoute: () => TabsRoute,
+} as any)
+const AccountLegalRoute = AccountLegalRouteImport.update({
+  id: '/account/legal',
+  path: '/account/legal',
+  getParentRoute: () => rootRouteImport,
 } as any)
 const AccountNotificationsRoute = AccountNotificationsRouteImport.update({
   id: '/account/notifications',
@@ -383,12 +401,14 @@ export interface FileRoutesByFullPath {
   '/payments': typeof PaymentsRoute
   '/pickup': typeof PickupRoute
   '/plans': typeof PlansRoute
+  '/privacy': typeof PrivacyRoute
   '/reset-password': typeof ResetPasswordRoute
   '/reviews': typeof ReviewsRoute
   '/settings': typeof SettingsRoute
   '/shop': typeof ShopRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/superadmin': typeof SuperadminRoute
+  '/terms': typeof TermsRoute
   '/.mcp/list-tools': typeof Char91DotmcpChar93ListToolsRoute
   '/.well-known/oauth-protected-resource': typeof Char91DotwellKnownChar93OauthProtectedResourceRoute
   '/create': typeof TabsCreateRoute
@@ -400,6 +420,7 @@ export interface FileRoutesByFullPath {
   '/reels': typeof TabsReelsRoute
   '/teams': typeof TabsTeamsRoute
   '/trainers': typeof TabsTrainersRoute
+  '/account/legal': typeof AccountLegalRoute
   '/account/notifications': typeof AccountNotificationsRoute
   '/account/security': typeof AccountSecurityRoute
   '/admin/location-analytics': typeof AdminLocationAnalyticsRoute
@@ -444,12 +465,14 @@ export interface FileRoutesByTo {
   '/payments': typeof PaymentsRoute
   '/pickup': typeof PickupRoute
   '/plans': typeof PlansRoute
+  '/privacy': typeof PrivacyRoute
   '/reset-password': typeof ResetPasswordRoute
   '/reviews': typeof ReviewsRoute
   '/settings': typeof SettingsRoute
   '/shop': typeof ShopRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/superadmin': typeof SuperadminRoute
+  '/terms': typeof TermsRoute
   '/.mcp/list-tools': typeof Char91DotmcpChar93ListToolsRoute
   '/.well-known/oauth-protected-resource': typeof Char91DotwellKnownChar93OauthProtectedResourceRoute
   '/create': typeof TabsCreateRoute
@@ -461,6 +484,7 @@ export interface FileRoutesByTo {
   '/reels': typeof TabsReelsRoute
   '/teams': typeof TabsTeamsRoute
   '/trainers': typeof TabsTrainersRoute
+  '/account/legal': typeof AccountLegalRoute
   '/account/notifications': typeof AccountNotificationsRoute
   '/account/security': typeof AccountSecurityRoute
   '/admin/location-analytics': typeof AdminLocationAnalyticsRoute
@@ -506,12 +530,14 @@ export interface FileRoutesById {
   '/payments': typeof PaymentsRoute
   '/pickup': typeof PickupRoute
   '/plans': typeof PlansRoute
+  '/privacy': typeof PrivacyRoute
   '/reset-password': typeof ResetPasswordRoute
   '/reviews': typeof ReviewsRoute
   '/settings': typeof SettingsRoute
   '/shop': typeof ShopRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/superadmin': typeof SuperadminRoute
+  '/terms': typeof TermsRoute
   '/.mcp/list-tools': typeof Char91DotmcpChar93ListToolsRoute
   '/.well-known/oauth-protected-resource': typeof Char91DotwellKnownChar93OauthProtectedResourceRoute
   '/_tabs/create': typeof TabsCreateRoute
@@ -523,6 +549,7 @@ export interface FileRoutesById {
   '/_tabs/reels': typeof TabsReelsRoute
   '/_tabs/teams': typeof TabsTeamsRoute
   '/_tabs/trainers': typeof TabsTrainersRoute
+  '/account/legal': typeof AccountLegalRoute
   '/account/notifications': typeof AccountNotificationsRoute
   '/account/security': typeof AccountSecurityRoute
   '/admin/location-analytics': typeof AdminLocationAnalyticsRoute
@@ -569,12 +596,14 @@ export interface FileRouteTypes {
     | '/payments'
     | '/pickup'
     | '/plans'
+    | '/privacy'
     | '/reset-password'
     | '/reviews'
     | '/settings'
     | '/shop'
     | '/sitemap.xml'
     | '/superadmin'
+    | '/terms'
     | '/.mcp/list-tools'
     | '/.well-known/oauth-protected-resource'
     | '/create'
@@ -586,6 +615,7 @@ export interface FileRouteTypes {
     | '/reels'
     | '/teams'
     | '/trainers'
+    | '/account/legal'
     | '/account/notifications'
     | '/account/security'
     | '/admin/location-analytics'
@@ -630,12 +660,14 @@ export interface FileRouteTypes {
     | '/payments'
     | '/pickup'
     | '/plans'
+    | '/privacy'
     | '/reset-password'
     | '/reviews'
     | '/settings'
     | '/shop'
     | '/sitemap.xml'
     | '/superadmin'
+    | '/terms'
     | '/.mcp/list-tools'
     | '/.well-known/oauth-protected-resource'
     | '/create'
@@ -647,6 +679,7 @@ export interface FileRouteTypes {
     | '/reels'
     | '/teams'
     | '/trainers'
+    | '/account/legal'
     | '/account/notifications'
     | '/account/security'
     | '/admin/location-analytics'
@@ -691,12 +724,14 @@ export interface FileRouteTypes {
     | '/payments'
     | '/pickup'
     | '/plans'
+    | '/privacy'
     | '/reset-password'
     | '/reviews'
     | '/settings'
     | '/shop'
     | '/sitemap.xml'
     | '/superadmin'
+    | '/terms'
     | '/.mcp/list-tools'
     | '/.well-known/oauth-protected-resource'
     | '/_tabs/create'
@@ -708,6 +743,7 @@ export interface FileRouteTypes {
     | '/_tabs/reels'
     | '/_tabs/teams'
     | '/_tabs/trainers'
+    | '/account/legal'
     | '/account/notifications'
     | '/account/security'
     | '/admin/location-analytics'
@@ -754,14 +790,17 @@ export interface RootRouteChildren {
   PaymentsRoute: typeof PaymentsRoute
   PickupRoute: typeof PickupRoute
   PlansRoute: typeof PlansRoute
+  PrivacyRoute: typeof PrivacyRoute
   ResetPasswordRoute: typeof ResetPasswordRoute
   ReviewsRoute: typeof ReviewsRoute
   SettingsRoute: typeof SettingsRoute
   ShopRoute: typeof ShopRoute
   SitemapDotxmlRoute: typeof SitemapDotxmlRoute
   SuperadminRoute: typeof SuperadminRoute
+  TermsRoute: typeof TermsRoute
   Char91DotmcpChar93ListToolsRoute: typeof Char91DotmcpChar93ListToolsRoute
   Char91DotwellKnownChar93OauthProtectedResourceRoute: typeof Char91DotwellKnownChar93OauthProtectedResourceRoute
+  AccountLegalRoute: typeof AccountLegalRoute
   AccountNotificationsRoute: typeof AccountNotificationsRoute
   AccountSecurityRoute: typeof AccountSecurityRoute
   CheckoutReturnRoute: typeof CheckoutReturnRoute
@@ -859,6 +898,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof PlansRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/privacy': {
+      id: '/privacy'
+      path: '/privacy'
+      fullPath: '/privacy'
+      preLoaderRoute: typeof PrivacyRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/reset-password': {
       id: '/reset-password'
       path: '/reset-password'
@@ -899,6 +945,13 @@ declare module '@tanstack/react-router' {
       path: '/superadmin'
       fullPath: '/superadmin'
       preLoaderRoute: typeof SuperadminRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/terms': {
+      id: '/terms'
+      path: '/terms'
+      fullPath: '/terms'
+      preLoaderRoute: typeof TermsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/.mcp/list-tools': {
@@ -977,6 +1030,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/trainers'
       preLoaderRoute: typeof TabsTrainersRouteImport
       parentRoute: typeof TabsRoute
+    }
+    '/account/legal': {
+      id: '/account/legal'
+      path: '/account/legal'
+      fullPath: '/account/legal'
+      preLoaderRoute: typeof AccountLegalRouteImport
+      parentRoute: typeof rootRouteImport
     }
     '/account/notifications': {
       id: '/account/notifications'
@@ -1281,15 +1341,18 @@ const rootRouteChildren: RootRouteChildren = {
   PaymentsRoute: PaymentsRoute,
   PickupRoute: PickupRoute,
   PlansRoute: PlansRoute,
+  PrivacyRoute: PrivacyRoute,
   ResetPasswordRoute: ResetPasswordRoute,
   ReviewsRoute: ReviewsRoute,
   SettingsRoute: SettingsRoute,
   ShopRoute: ShopRoute,
   SitemapDotxmlRoute: SitemapDotxmlRoute,
   SuperadminRoute: SuperadminRoute,
+  TermsRoute: TermsRoute,
   Char91DotmcpChar93ListToolsRoute: Char91DotmcpChar93ListToolsRoute,
   Char91DotwellKnownChar93OauthProtectedResourceRoute:
     Char91DotwellKnownChar93OauthProtectedResourceRoute,
+  AccountLegalRoute: AccountLegalRoute,
   AccountNotificationsRoute: AccountNotificationsRoute,
   AccountSecurityRoute: AccountSecurityRoute,
   CheckoutReturnRoute: CheckoutReturnRoute,

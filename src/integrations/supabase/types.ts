@@ -849,6 +849,36 @@ export type Database = {
         }
         Relationships: []
       }
+      legal_consents: {
+        Row: {
+          accepted_at: string
+          created_at: string
+          document_type: string
+          document_version: string
+          id: string
+          user_agent: string | null
+          user_id: string
+        }
+        Insert: {
+          accepted_at?: string
+          created_at?: string
+          document_type: string
+          document_version: string
+          id?: string
+          user_agent?: string | null
+          user_id: string
+        }
+        Update: {
+          accepted_at?: string
+          created_at?: string
+          document_type?: string
+          document_version?: string
+          id?: string
+          user_agent?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       location_denial_events: {
         Row: {
           code: number | null
@@ -2397,6 +2427,15 @@ export type Database = {
       is_trainer_org_member: {
         Args: { _org: string; _user: string }
         Returns: boolean
+      }
+      legal_consent_stats: {
+        Args: never
+        Returns: {
+          accepted_count: number
+          document_type: string
+          document_version: string
+          latest_accepted_at: string
+        }[]
       }
       list_trainer_booked_slots: {
         Args: { _date: string; _trainer_id: string }

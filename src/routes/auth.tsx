@@ -18,6 +18,10 @@ import {
   isAccountType,
   setPendingAccountType,
 } from "@/lib/account-type";
+import { LegalConsent, allAccepted, emptyConsentValue } from "@/components/legal/LegalConsent";
+import { currentAcceptances, stashPendingConsent } from "@/lib/legal-consent";
+
+
 
 export const Route = createFileRoute("/auth")({
   head: () =>
@@ -44,6 +48,10 @@ function AuthPage() {
   const [password, setPassword] = useState("");
   const [displayName, setDisplayName] = useState("");
   const [busy, setBusy] = useState(false);
+  // Never pre-checked: the user must tick each document themselves.
+  const [consent, setConsent] = useState(emptyConsentValue);
+  const consentOk = allAccepted(consent);
+
   // Non-null while we're inside the post-provider grace window (see oauth()).
   const [waitingProvider, setWaitingProvider] = useState<string | null>(null);
   // Monotonic token: bumping it cancels any in-flight session poll.
@@ -137,7 +145,15 @@ function AuthPage() {
           setSignupStep("type");
           return;
         }
+        if (!consentOk) {
+          toast.error("Please agree to the Terms of Service and Privacy Policy to continue.");
+          return;
+        }
+        // Signup may finish without a session (email confirmation), so the exact
+        // accepted versions are parked and written on first authenticated load.
+        stashPendingConsent(currentAcceptances());
         setPendingAccountType(accountType);
+
         const { data, error } = await supabase.auth.signUp({
           email,
           password,
@@ -208,6 +224,11 @@ function AuthPage() {
   };
 
   const oauth = (provider: "google" | "apple", opts: { isRetry?: boolean } = {}) => {
+    // Cheap synchronous consent guard before the tap gesture is consumed.
+    if (mode === "signup" && !consentOk) {
+      toast.error("Please agree to the Terms of Service and Privacy Policy to continue.");
+      return;
+    }
     // CRITICAL: start the OAuth helper before storage writes, state updates,
     // telemetry, or toasts. Mobile Safari/Chrome can reject the vendor popup if
     // anything meaningful runs before the helper consumes the tap gesture.
@@ -215,6 +236,9 @@ function AuthPage() {
       redirect_uri: window.location.origin,
       ...(provider === "google" ? { extraParams: { prompt: "select_account" } } : {}),
     });
+
+    if (mode === "signup") stashPendingConsent(currentAcceptances());
+
 
     const providerLabel = provider === "apple" ? "Apple" : "Google";
     if (mode === "signup" && accountType) {
@@ -450,6 +474,12 @@ function AuthPage() {
               </div>
             ) : null}
 
+            {mode === "signup" ? (
+              <LegalConsent value={consent} onChange={setConsent} disabled={busy} />
+            ) : null}
+
+
+
             <button
               onClick={() => oauth("google")}
               disabled={busy}
@@ -567,8 +597,19 @@ function AuthPage() {
                 ? "New to OpenRun? Create an account"
                 : "Already have an account? Sign in"}
             </button>
+
+            <p className="text-center text-[11px] text-muted-foreground">
+              <Link to="/terms" className="underline">
+                Terms of Service
+              </Link>{" "}
+              ·{" "}
+              <Link to="/privacy" className="underline">
+                Privacy Policy
+              </Link>
+            </p>
           </>
         )}
+
       </div>
     </div>
   );

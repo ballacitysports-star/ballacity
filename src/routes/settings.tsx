@@ -7,6 +7,8 @@ import {
   Building2,
   ChevronRight,
   CreditCard,
+  FileText,
+
   IdCard,
   LogOut,
   Lock,
@@ -142,7 +144,19 @@ const SECTIONS: Section[] = [
       },
     ],
   },
+  {
+    title: "Legal & Privacy",
+    items: [
+      {
+        to: "/account/legal",
+        label: "Legal & Privacy",
+        description: "Terms, Privacy Policy, and your consent status",
+        icon: FileText,
+      },
+    ],
+  },
 ];
+
 
 function SettingsHubPage() {
   const [theme, setTheme, , resolved] = useTheme();
