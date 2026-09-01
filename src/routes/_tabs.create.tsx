@@ -449,6 +449,12 @@ function Create() {
 
               if (!firstGameId) firstGameId = game.id;
 
+              // Record the host's responsibility acknowledgment for this game.
+              void recordSafetyAck({ gameId: game.id, kind: "host_responsibility" }).catch(
+                () => {},
+              );
+
+
               // Persist host ownership + approval/fee preferences so the host & players see them on the detail page
               try {
                 await upsertGamePaymentSettings({
