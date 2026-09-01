@@ -40,7 +40,11 @@ export function ResponsiveImage({
   ...rest
 }: Props) {
   const blocked = useBlockedImage(src);
-  if (!src || blocked) return null;
+  // Private media is stored as a reference; swap it for a short-lived signed URL
+  // before building variants (and render nothing when unauthorised).
+  const resolved = useMediaUrl(src);
+  if (!resolved || blocked) return null;
+  src = resolved;
   const fallbackWidth = baseWidth ?? widths[Math.max(0, widths.length - 2)] ?? 960;
   const base = imageVariant(src, {
     width: fallbackWidth,
