@@ -886,6 +886,16 @@ function PaymentStatusTimeline({
         })}
       </ol>
 
+      <PaymentClaimActions
+        submission={latest}
+        state={state}
+        hostId={hostId ?? latest.host_id}
+        gameId={gameId ?? latest.game_id}
+        onChanged={onChanged}
+      />
+
+
+
       {history.length > 0 && (
         <details className="mt-3 rounded-xl border border-border/70 bg-background/60 p-2 text-xs">
           <summary className="cursor-pointer font-semibold text-muted-foreground">
