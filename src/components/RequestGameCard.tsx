@@ -1,3 +1,4 @@
+import { MediaImage } from "@/components/MediaImage";
 import { ageRequirementLabel } from "@/lib/game-age";
 import { useState } from "react";
 import { Link } from "@tanstack/react-router";
@@ -141,7 +142,7 @@ function RequestGameCardInner({
           className="group block"
         >
           <div className="relative h-28 overflow-hidden">
-            <img
+            <MediaImage
               src={game.image}
               alt={game.title}
               loading="lazy"
