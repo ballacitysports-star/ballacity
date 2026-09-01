@@ -32,8 +32,22 @@ import {
   createPaymentSubmission,
   listMySubmissionsForGame,
   getMyJoinRequest,
+  cancelMyPaymentSubmission,
+  disputeMyPaymentSubmission,
 } from "@/lib/payments";
+import {
+  PAYMENT_DISCLAIMER,
+  PAYMENT_STATE_META,
+  canPlayerCancel,
+  canPlayerDispute,
+  cancellationReasonLabel,
+  paymentStateFor,
+  type PaymentState,
+} from "@/lib/payment-states";
+import { PaymentSafetyNotice } from "@/components/PaymentSafetyNotice";
+import { ReportDialog } from "@/components/ReportDialog";
 import { LegalNotice } from "@/components/LegalNotice";
+
 import { PrimaryCTA } from "@/components/PrimaryCTA";
 import { SpotsPill } from "@/components/SpotsPill";
 import { LeaveFlowButton } from "@/components/LeaveFlowButton";
@@ -516,7 +530,24 @@ function PayPage() {
       </div>
 
       {/* Status card replaces the stepper once a submission exists */}
-      {hasSubmission && <PaymentStatusTimeline latest={mySubs[0]} history={mySubs.slice(1)} />}
+      {hasSubmission && (
+        <PaymentStatusTimeline
+          latest={mySubs[0]}
+          history={mySubs.slice(1)}
+          hostId={settings?.host_id ?? null}
+          gameId={gameId}
+          onChanged={async () => setMySubs(await listMySubmissionsForGame(gameId))}
+        />
+      )}
+
+      <PaymentSafetyNotice
+        counterpartyId={settings?.host_id ?? null}
+        counterpartyLabel="this host"
+        gameId={gameId}
+        showPressureWarning={Number(fee) >= 100}
+        className="mb-1"
+      />
+
 
       {/* Approval / payment stage badge — driven by shared flow status so
           paid games show "Payment due" (etc.) rather than "Approved — you
@@ -716,13 +747,23 @@ function StepDot({ active, done, n }: { active: boolean; done: boolean; n: numbe
 function PaymentStatusTimeline({
   latest,
   history,
+  hostId,
+  gameId,
+  onChanged,
 }: {
   latest: PaymentSubmission;
   history: PaymentSubmission[];
+  hostId?: string | null;
+  gameId?: string;
+  onChanged?: () => void | Promise<void>;
 }) {
   const isRejected = latest.status === "rejected";
   const isVerified = latest.status === "verified";
   const isPending = latest.status === "pending";
+  const isDisputed = latest.status === "disputed";
+  const isCancelled = latest.status === "cancelled";
+  const state = paymentStateFor({ feeRequired: true, submission: latest });
+  const meta = PAYMENT_STATE_META[state];
 
   // Three canonical steps; the third splits into verified vs rejected.
   type StepState = "done" | "current" | "upcoming" | "failed";
@@ -735,38 +776,55 @@ function PaymentStatusTimeline({
   }[] = [
     {
       key: "submitted",
-      label: "Proof submitted",
-      hint: "You sent payment details to the host.",
+      label: PAYMENT_STATE_META.payment_sent.label,
+      hint: PAYMENT_STATE_META.payment_sent.playerHint,
       state: "done",
       at: latest.submitted_at,
     },
     {
       key: "review",
-      label: "Host reviewing",
+      label: PAYMENT_STATE_META.host_confirmation_pending.label,
       hint: isPending
-        ? "Waiting on the host to confirm your payment."
+        ? PAYMENT_STATE_META.host_confirmation_pending.playerHint
         : "Host reviewed your submission.",
       state: isPending ? "current" : "done",
       at: isPending ? null : latest.reviewed_at,
     },
-    isRejected
+    isDisputed
       ? {
-          key: "rejected",
-          label: "Rejected — try again",
-          hint: latest.reviewer_notes || "Host couldn't verify this payment.",
+          key: "disputed",
+          label: PAYMENT_STATE_META.disputed.label,
+          hint: latest.dispute_reason || PAYMENT_STATE_META.disputed.playerHint,
           state: "failed",
-          at: latest.reviewed_at,
+          at: latest.disputed_at ?? null,
         }
-      : {
-          key: "verified",
-          label: "Payment verified",
-          hint: isVerified
-            ? latest.reviewer_notes || "You're all set — see you at the game."
-            : "You'll be confirmed once the host verifies.",
-          state: isVerified ? "done" : "upcoming",
-          at: isVerified ? latest.reviewed_at : null,
-        },
+      : isCancelled
+        ? {
+            key: "cancelled",
+            label: cancellationReasonLabel(latest.cancellation_reason),
+            hint: PAYMENT_STATE_META.cancelled.playerHint,
+            state: "failed",
+            at: latest.cancelled_at ?? null,
+          }
+        : isRejected
+          ? {
+              key: "rejected",
+              label: "Declined — try again",
+              hint: latest.reviewer_notes || "Host couldn't verify this payment.",
+              state: "failed",
+              at: latest.reviewed_at,
+            }
+          : {
+              key: "verified",
+              label: PAYMENT_STATE_META.confirmed.label,
+              hint: isVerified
+                ? latest.reviewer_notes || PAYMENT_STATE_META.confirmed.playerHint
+                : "Only the host can confirm this payment.",
+              state: isVerified ? "done" : "upcoming",
+              at: isVerified ? latest.reviewed_at : null,
+            },
   ];
+
 
   return (
     <div
@@ -776,6 +834,7 @@ function PaymentStatusTimeline({
       aria-atomic="true"
       data-testid="payment-status-timeline"
       data-status={latest.status}
+      data-payment-state={state}
     >
       <div className="flex items-center justify-between mb-3">
         <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
@@ -783,16 +842,17 @@ function PaymentStatusTimeline({
         </h3>
         <span
           className={`text-[10px] font-bold uppercase rounded-full px-2 py-0.5 border ${
-            isVerified
+            meta.tone === "success"
               ? "border-lime/40 bg-lime/10 text-lime"
-              : isRejected
+              : meta.tone === "danger"
                 ? "border-coral/40 bg-coral/10 text-coral"
                 : "border-border bg-background text-muted-foreground"
           }`}
         >
-          {isVerified ? "Verified" : isRejected ? "Rejected" : "Pending"}
+          {meta.label}
         </span>
       </div>
+
 
       <ol className="space-y-3">
         {steps.map((s, i) => {
@@ -857,6 +917,16 @@ function PaymentStatusTimeline({
         })}
       </ol>
 
+      <PaymentClaimActions
+        submission={latest}
+        state={state}
+        hostId={hostId ?? latest.host_id}
+        gameId={gameId ?? latest.game_id}
+        onChanged={onChanged}
+      />
+
+
+
       {history.length > 0 && (
         <details className="mt-3 rounded-xl border border-border/70 bg-background/60 p-2 text-xs">
           <summary className="cursor-pointer font-semibold text-muted-foreground">
@@ -875,11 +945,16 @@ function PaymentStatusTimeline({
                   }`}
                 >
                   {h.status === "verified"
-                    ? "✓ Verified"
+                    ? "✓ Confirmed"
                     : h.status === "rejected"
-                      ? "✗ Rejected"
-                      : "⏳ Pending"}
+                      ? "✗ Declined"
+                      : h.status === "disputed"
+                        ? "! Disputed"
+                        : h.status === "cancelled"
+                          ? "– Cancelled"
+                          : "⏳ Awaiting host"}
                 </span>
+
                 <span className="text-muted-foreground">
                   {new Date(h.submitted_at).toLocaleString()}
                 </span>
@@ -891,6 +966,147 @@ function PaymentStatusTimeline({
     </div>
   );
 }
+
+/**
+ * Player-side controls on an open payment claim.
+ *
+ * A player can withdraw their own claim or open a dispute; they can never
+ * mark a payment confirmed — that is host-only, enforced in the database.
+ */
+function PaymentClaimActions({
+  submission,
+  state,
+  hostId,
+  gameId,
+  onChanged,
+}: {
+  submission: PaymentSubmission;
+  state: PaymentState;
+  hostId: string | null;
+  gameId: string;
+  onChanged?: () => void | Promise<void>;
+}) {
+  const [mode, setMode] = useState<null | "cancel" | "dispute">(null);
+  const [reason, setReason] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  const showCancel = canPlayerCancel(state);
+  const showDispute = canPlayerDispute(state);
+  if (!showCancel && !showDispute && state !== "disputed") return null;
+
+  async function run() {
+    setBusy(true);
+    try {
+      if (mode === "cancel") {
+        await cancelMyPaymentSubmission(submission.id, "player_cancelled");
+        toast.success("Payment claim withdrawn.");
+      } else {
+        await disputeMyPaymentSubmission(submission.id, reason);
+        toast.success("Dispute opened — the host has been notified.");
+      }
+      setMode(null);
+      setReason("");
+      await onChanged?.();
+    } catch (e: any) {
+      toast.error(e?.message ?? "Couldn't update this payment");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="mt-3 space-y-2 border-t border-border/70 pt-3" data-testid="payment-claim-actions">
+      <p className="text-[11px] text-muted-foreground">{PAYMENT_DISCLAIMER}</p>
+      {mode === null ? (
+        <div className="flex flex-wrap gap-2">
+          {showCancel && (
+            <button
+              type="button"
+              onClick={() => setMode("cancel")}
+              data-testid="cancel-payment-claim"
+              className="rounded-full border border-border px-3 py-1.5 text-xs font-semibold text-muted-foreground hover:bg-secondary/60"
+            >
+              Withdraw payment claim
+            </button>
+          )}
+          {showDispute && (
+            <button
+              type="button"
+              onClick={() => setMode("dispute")}
+              data-testid="dispute-payment"
+              className="rounded-full border border-coral/50 px-3 py-1.5 text-xs font-bold text-coral hover:bg-coral/10"
+            >
+              Open a dispute
+            </button>
+          )}
+          {hostId && (
+            <PaymentReportLink hostId={hostId} gameId={gameId} />
+          )}
+        </div>
+      ) : (
+        <div className="space-y-2 rounded-xl border border-border bg-background p-3">
+          <p className="text-xs font-semibold">
+            {mode === "cancel"
+              ? "Withdraw this claim? You can submit new proof afterwards."
+              : "What went wrong with this payment?"}
+          </p>
+          {mode === "dispute" && (
+            <textarea
+              value={reason}
+              onChange={(e) => setReason(e.target.value.slice(0, 500))}
+              rows={3}
+              placeholder="E.g. the host says they never got it, or I was charged twice."
+              className="w-full resize-none rounded-xl border border-border bg-surface px-3 py-2 text-sm outline-none focus:border-lime"
+            />
+          )}
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={() => void run()}
+              disabled={busy || (mode === "dispute" && !reason.trim())}
+              className="rounded-full bg-coral px-3 py-1.5 text-xs font-bold text-primary-foreground disabled:opacity-50"
+            >
+              {busy ? "Saving…" : mode === "cancel" ? "Yes, withdraw" : "Open dispute"}
+            </button>
+            <button
+              type="button"
+              onClick={() => setMode(null)}
+              disabled={busy}
+              className="rounded-full border border-border px-3 py-1.5 text-xs font-semibold"
+            >
+              Never mind
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function PaymentReportLink({ hostId, gameId }: { hostId: string; gameId: string }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <>
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        className="rounded-full border border-coral/50 px-3 py-1.5 text-xs font-bold text-coral hover:bg-coral/10"
+      >
+        Report a payment scam
+      </button>
+      <ReportDialog
+        open={open}
+        onOpenChange={setOpen}
+        subjectType="payment"
+        reportedId={hostId}
+        subjectLabel="this payment"
+        gameId={gameId}
+      />
+    </>
+  );
+}
+
+
 
 function PaymentInstructionsAndProof({
   game_id,

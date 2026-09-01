@@ -1,4 +1,5 @@
 import { supabase } from "@/integrations/supabase/client";
+import type { CancellationReason, PaymentSubmissionStatus } from "@/lib/payment-states";
 
 export type PaymentType =
   | "venmo"
@@ -79,10 +80,15 @@ export type PaymentSubmission = {
   paid_amount: number | null;
   paid_at: string | null;
   notes: string | null;
-  status: "pending" | "verified" | "rejected";
+  status: PaymentSubmissionStatus;
   reviewer_notes: string | null;
   submitted_at: string;
   reviewed_at: string | null;
+  dispute_reason?: string | null;
+  disputed_at?: string | null;
+  disputed_by?: string | null;
+  cancelled_at?: string | null;
+  cancellation_reason?: string | null;
 };
 
 export const PAYMENT_TYPES: {
@@ -274,7 +280,7 @@ export async function listMySubmissionsForGame(gameId: string): Promise<PaymentS
 }
 
 export async function listHostSubmissions(
-  status?: "pending" | "verified" | "rejected",
+  status?: PaymentSubmissionStatus,
 ): Promise<PaymentSubmission[]> {
   const { data: u } = await supabase.auth.getUser();
   if (!u.user) return [];
@@ -301,6 +307,60 @@ export async function reviewSubmission(
       reviewer_notes: notes ?? null,
       reviewed_at: status === "pending" ? null : new Date().toISOString(),
     })
+    .eq("id", id);
+  if (error) throw error;
+}
+
+/**
+ * Player-side cancel. A player may only ever move their own claim to
+ * `cancelled` — the database guard blocks any attempt to self-confirm.
+ */
+export async function cancelMyPaymentSubmission(
+  id: string,
+  reason: CancellationReason = "player_cancelled",
+  notes?: string,
+) {
+  const { error } = await supabase
+    .from("payment_submissions")
+    .update({
+      status: "cancelled",
+      cancellation_reason: reason,
+      cancelled_at: new Date().toISOString(),
+      notes: notes?.trim().slice(0, 500) ?? undefined,
+    } as never)
+    .eq("id", id);
+  if (error) throw error;
+}
+
+/** Either party can flag a payment as disputed; OpenRun never moves money. */
+export async function disputeMyPaymentSubmission(id: string, reason: string) {
+  const trimmed = reason.trim().slice(0, 500);
+  if (!trimmed) throw new Error("Tell us what went wrong with this payment.");
+  const { error } = await supabase
+    .from("payment_submissions")
+    .update({
+      status: "disputed",
+      dispute_reason: trimmed,
+      disputed_at: new Date().toISOString(),
+    } as never)
+    .eq("id", id);
+  if (error) throw error;
+}
+
+/** Host-side cancel, e.g. the game itself is off. */
+export async function hostCancelPaymentSubmission(
+  id: string,
+  reason: CancellationReason,
+  notes?: string,
+) {
+  const { error } = await supabase
+    .from("payment_submissions")
+    .update({
+      status: "cancelled",
+      cancellation_reason: reason,
+      cancelled_at: new Date().toISOString(),
+      reviewer_notes: notes?.trim().slice(0, 500) ?? null,
+    } as never)
     .eq("id", id);
   if (error) throw error;
 }

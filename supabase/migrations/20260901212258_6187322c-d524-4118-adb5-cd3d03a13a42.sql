@@ -1,0 +1,1 @@
+REVOKE ALL ON FUNCTION public.payment_submissions_state_guard() FROM anon, authenticated, PUBLIC;

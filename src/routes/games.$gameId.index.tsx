@@ -1,5 +1,7 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { pageHead, ogImageUrl } from "@/lib/seo";
+import type { PaymentSubmissionStatus } from "@/lib/payment-states";
+
 import { motion, AnimatePresence } from "framer-motion";
 import {
   ArrowLeft,
@@ -3569,7 +3571,7 @@ function RosterPlayerRow({
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [latestSub, setLatestSub] = useState<{
     id: string;
-    status: "verified" | "pending" | "rejected";
+    status: PaymentSubmissionStatus;
     screenshot_path: string | null;
   } | null>(null);
   const [historyOpen, setHistoryOpen] = useState(false);
@@ -3586,7 +3588,7 @@ function RosterPlayerRow({
     }>
   >([]);
   const [historyLoading, setHistoryLoading] = useState(false);
-  const paymentStatus: "verified" | "pending" | "rejected" | "none" = latestSub?.status ?? "none";
+  const paymentStatus: PaymentSubmissionStatus | "none" = latestSub?.status ?? "none";
   const reviews = useReviewsFor(req.player_id);
   const rep = useMemo(() => computeReputation(reviews, "player"), [reviews]);
   const reliability = rep.criteriaAverages.find((c) => c.key === "reliability")?.avg ?? 0;
