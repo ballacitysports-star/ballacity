@@ -10,7 +10,10 @@ const MEDIA_BUCKETS = [
   "message-attachments",
   "payment-proofs",
   "team-covers",
-  "org-logos",
+  "team-avatars",
+  "org-covers",
+  "org-avatars",
+  "trainer-avatars",
 ];
 
 /**
