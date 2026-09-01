@@ -1593,6 +1593,7 @@ export type Database = {
           marketing_emails: boolean
           profile_visibility: string
           show_games_played: boolean
+          show_online_status: boolean
           show_sports: boolean
           updated_at: string
           user_id: string
@@ -1608,6 +1609,7 @@ export type Database = {
           marketing_emails?: boolean
           profile_visibility?: string
           show_games_played?: boolean
+          show_online_status?: boolean
           show_sports?: boolean
           updated_at?: string
           user_id: string
@@ -1623,6 +1625,7 @@ export type Database = {
           marketing_emails?: boolean
           profile_visibility?: string
           show_games_played?: boolean
+          show_online_status?: boolean
           show_sports?: boolean
           updated_at?: string
           user_id?: string
