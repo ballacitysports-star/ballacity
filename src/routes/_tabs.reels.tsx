@@ -1056,6 +1056,8 @@ function ReelsPage() {
           </label>
         )}
 
+        <AiDisclosureNotice />
+
         <input
           ref={fileRef}
           type="file"
@@ -1067,8 +1069,20 @@ function ReelsPage() {
             e.target.value = "";
           }}
         />
+        <AiDisclosureDialog
+          open={disclosureOpen}
+          onOpenChange={setDisclosureOpen}
+          busy={busy}
+          onContinue={() => {
+            setDisclosureOpen(false);
+            // Acknowledgement is remembered so the full disclosure is shown once,
+            // while the short notice above stays on the page for every upload.
+            void ackDisclosure();
+            fileRef.current?.click();
+          }}
+        />
         <button
-          onClick={() => (canGenerate ? fileRef.current?.click() : handleSubscribe())}
+          onClick={() => (canGenerate ? startUpload() : handleSubscribe())}
           disabled={busy || !user}
           className="flex w-full items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-border bg-surface/50 py-8 text-sm font-medium disabled:opacity-50"
         >
