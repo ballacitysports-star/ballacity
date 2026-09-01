@@ -936,6 +936,147 @@ function PaymentStatusTimeline({
   );
 }
 
+/**
+ * Player-side controls on an open payment claim.
+ *
+ * A player can withdraw their own claim or open a dispute; they can never
+ * mark a payment confirmed — that is host-only, enforced in the database.
+ */
+function PaymentClaimActions({
+  submission,
+  state,
+  hostId,
+  gameId,
+  onChanged,
+}: {
+  submission: PaymentSubmission;
+  state: PaymentState;
+  hostId: string | null;
+  gameId: string;
+  onChanged?: () => void | Promise<void>;
+}) {
+  const [mode, setMode] = useState<null | "cancel" | "dispute">(null);
+  const [reason, setReason] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  const showCancel = canPlayerCancel(state);
+  const showDispute = canPlayerDispute(state);
+  if (!showCancel && !showDispute && state !== "disputed") return null;
+
+  async function run() {
+    setBusy(true);
+    try {
+      if (mode === "cancel") {
+        await cancelMyPaymentSubmission(submission.id, "player_cancelled");
+        toast.success("Payment claim withdrawn.");
+      } else {
+        await disputeMyPaymentSubmission(submission.id, reason);
+        toast.success("Dispute opened — the host has been notified.");
+      }
+      setMode(null);
+      setReason("");
+      await onChanged?.();
+    } catch (e: any) {
+      toast.error(e?.message ?? "Couldn't update this payment");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="mt-3 space-y-2 border-t border-border/70 pt-3" data-testid="payment-claim-actions">
+      <p className="text-[11px] text-muted-foreground">{PAYMENT_DISCLAIMER}</p>
+      {mode === null ? (
+        <div className="flex flex-wrap gap-2">
+          {showCancel && (
+            <button
+              type="button"
+              onClick={() => setMode("cancel")}
+              data-testid="cancel-payment-claim"
+              className="rounded-full border border-border px-3 py-1.5 text-xs font-semibold text-muted-foreground hover:bg-secondary/60"
+            >
+              Withdraw payment claim
+            </button>
+          )}
+          {showDispute && (
+            <button
+              type="button"
+              onClick={() => setMode("dispute")}
+              data-testid="dispute-payment"
+              className="rounded-full border border-coral/50 px-3 py-1.5 text-xs font-bold text-coral hover:bg-coral/10"
+            >
+              Open a dispute
+            </button>
+          )}
+          {hostId && (
+            <PaymentReportLink hostId={hostId} gameId={gameId} />
+          )}
+        </div>
+      ) : (
+        <div className="space-y-2 rounded-xl border border-border bg-background p-3">
+          <p className="text-xs font-semibold">
+            {mode === "cancel"
+              ? "Withdraw this claim? You can submit new proof afterwards."
+              : "What went wrong with this payment?"}
+          </p>
+          {mode === "dispute" && (
+            <textarea
+              value={reason}
+              onChange={(e) => setReason(e.target.value.slice(0, 500))}
+              rows={3}
+              placeholder="E.g. the host says they never got it, or I was charged twice."
+              className="w-full resize-none rounded-xl border border-border bg-surface px-3 py-2 text-sm outline-none focus:border-lime"
+            />
+          )}
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={() => void run()}
+              disabled={busy || (mode === "dispute" && !reason.trim())}
+              className="rounded-full bg-coral px-3 py-1.5 text-xs font-bold text-primary-foreground disabled:opacity-50"
+            >
+              {busy ? "Saving…" : mode === "cancel" ? "Yes, withdraw" : "Open dispute"}
+            </button>
+            <button
+              type="button"
+              onClick={() => setMode(null)}
+              disabled={busy}
+              className="rounded-full border border-border px-3 py-1.5 text-xs font-semibold"
+            >
+              Never mind
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function PaymentReportLink({ hostId, gameId }: { hostId: string; gameId: string }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <>
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        className="rounded-full border border-coral/50 px-3 py-1.5 text-xs font-bold text-coral hover:bg-coral/10"
+      >
+        Report a payment scam
+      </button>
+      <ReportDialog
+        open={open}
+        onOpenChange={setOpen}
+        subjectType="payment"
+        reportedId={hostId}
+        subjectLabel="this payment"
+        gameId={gameId}
+      />
+    </>
+  );
+}
+
+
+
 function PaymentInstructionsAndProof({
   game_id,
   game_title,
