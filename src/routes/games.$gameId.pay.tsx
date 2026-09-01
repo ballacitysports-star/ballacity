@@ -530,7 +530,24 @@ function PayPage() {
       </div>
 
       {/* Status card replaces the stepper once a submission exists */}
-      {hasSubmission && <PaymentStatusTimeline latest={mySubs[0]} history={mySubs.slice(1)} />}
+      {hasSubmission && (
+        <PaymentStatusTimeline
+          latest={mySubs[0]}
+          history={mySubs.slice(1)}
+          hostId={settings?.host_id ?? null}
+          gameId={gameId}
+          onChanged={async () => setMySubs(await listMySubmissionsForGame(gameId))}
+        />
+      )}
+
+      <PaymentSafetyNotice
+        counterpartyId={settings?.host_id ?? null}
+        counterpartyLabel="this host"
+        gameId={gameId}
+        showPressureWarning={Number(fee) >= 100}
+        className="mb-1"
+      />
+
 
       {/* Approval / payment stage badge — driven by shared flow status so
           paid games show "Payment due" (etc.) rather than "Approved — you
