@@ -914,11 +914,16 @@ function PaymentStatusTimeline({
                   }`}
                 >
                   {h.status === "verified"
-                    ? "✓ Verified"
+                    ? "✓ Confirmed"
                     : h.status === "rejected"
-                      ? "✗ Rejected"
-                      : "⏳ Pending"}
+                      ? "✗ Declined"
+                      : h.status === "disputed"
+                        ? "! Disputed"
+                        : h.status === "cancelled"
+                          ? "– Cancelled"
+                          : "⏳ Awaiting host"}
                 </span>
+
                 <span className="text-muted-foreground">
                   {new Date(h.submitted_at).toLocaleString()}
                 </span>
