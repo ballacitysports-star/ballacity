@@ -1,4 +1,5 @@
 import * as React from "react";
+import { validateAgeMinimum } from "@/lib/age-policy";
 
 export function Section({
   title,
