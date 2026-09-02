@@ -27,6 +27,9 @@ import {
   ShieldCheck,
   History,
   Flag,
+  Ban,
+  UserCheck,
+  UserX,
 } from "lucide-react";
 import { ReportDialog } from "@/components/ReportDialog";
 import { RiskAcknowledgmentDialog } from "@/components/safety/RiskAcknowledgmentDialog";
@@ -539,6 +542,14 @@ function GameDetail() {
   // a double-tap can't fire two requests.
   const [removeTarget, setRemoveTarget] = useState<{ userId: string; name: string } | null>(null);
   const [removingId, setRemovingId] = useState<string | null>(null);
+
+  // Host "Cancel game" flow: a reason is required so every player on the
+  // roster gets a notification that explains what happened.
+  const [cancelOpen, setCancelOpen] = useState(false);
+  const [cancelReason, setCancelReason] = useState("");
+  const [cancelling, setCancelling] = useState(false);
+  // Attendance marking (host only, opens once the game has started).
+  const [attendanceBusy, setAttendanceBusy] = useState<string | null>(null);
 
   const handleRemoveParticipant = async (playerId: string, displayName: string) => {
     if (!game || !isHost) return;
