@@ -9,6 +9,8 @@ import {
   formatBirthdayInput,
   parseBirthdayInput,
 } from "@/components/profile/ProfileFormPrimitives";
+import { birthdayConsentNotice } from "@/lib/age-policy";
+import { checkChildUsername, cohortFromBirthday } from "@/lib/child-policy";
 
 export type ProfileBasicsValue = {
   name: string;
@@ -37,6 +39,12 @@ export function ProfileBasicsFields({
   onChange: (patch: Partial<ProfileBasicsValue>) => void;
   birthdayError?: string | null;
 }) {
+  // Minor-safety checks derived from the entered birthday, so onboarding and
+  // Edit profile enforce identical rules (the database re-checks on write).
+  const cohort = cohortFromBirthday(value.birthday);
+  const usernameCheck = checkChildUsername(value.username, { cohort, fullName: value.name });
+  const consentNotice = birthdayConsentNotice(value.birthday);
+
   return (
     <>
       <Field label="Cover photo">
@@ -69,6 +77,13 @@ export function ProfileBasicsFields({
           maxLength={30}
           placeholder="@you"
         />
+        {usernameCheck.message ? (
+          <div
+            className={`mt-1 text-[11px] ${usernameCheck.ok ? "text-muted-foreground" : "text-destructive"}`}
+          >
+            {usernameCheck.message}
+          </div>
+        ) : null}
       </Field>
       <Field label="Avatar initials (fallback)">
         <Input value={value.avatar} onChange={(v) => onChange({ avatar: v })} maxLength={3} />
@@ -99,6 +114,11 @@ export function ProfileBasicsFields({
           onChange={(v) => onChange({ birthday: v })}
           error={birthdayError}
         />
+        {consentNotice ? (
+          <div className="mt-2 rounded-xl border border-lime/40 bg-lime/10 p-2 text-[11px] leading-snug">
+            {consentNotice}
+          </div>
+        ) : null}
       </Field>
       <Field label="Graduating class">
         <Input

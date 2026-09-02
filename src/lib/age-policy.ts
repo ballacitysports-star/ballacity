@@ -1,209 +1,178 @@
 /**
- * Age gating & minor-safety foundation.
+ * Coarse age categories — a thin compatibility layer over the authoritative
+ * policy engine in `src/lib/child-policy.ts`.
  *
- * OpenRun is configured for members who are at least 13 years old. Youth
- * (under-13) functionality is gated behind administrator-controlled feature
- * flags that default to OFF.
+ * OpenRun intentionally supports members under 13. There is no blanket 13+
+ * minimum: an under-13 account is a legitimate account state that stays
+ * feature-locked until a parent or guardian approves it (see
+ * `PERMISSION_MATRIX` and `policyState` in child-policy).
  *
- * LEGAL REVIEW REQUIRED — age gating alone is NOT a claim of COPPA
- * compliance. Supporting members under 13 requires a dedicated legal/privacy
- * review and a parental-consent implementation before any flag is enabled.
+ * Every rule below delegates to child-policy so age rules exist in exactly
+ * one place. Do not add new age logic here — extend child-policy instead.
+ *
+ * LEGAL REVIEW REQUIRED — technical controls are not a compliance claim. The
+ * verifiable-consent method in particular needs qualified legal sign-off.
  */
+
+import {
+  DEFAULT_AGE_POLICY,
+  ageFromBirthday as cohortAgeFromBirthday,
+  cohortFromAge,
+  cohortFromBirthday,
+  isMinorCohort,
+  isPubliclyVisibleForMinor,
+  messagingAllowed,
+  privacyFloor,
+  requiresParentalConsent,
+  type AgeCohort,
+  type AgePolicyConfig,
+  type MessagingContext,
+} from "@/lib/child-policy";
 
 export const LEGAL_REVIEW_REQUIRED = "LEGAL REVIEW REQUIRED";
 
-/** Minimum age to hold an OpenRun account while youth features are OFF. */
-export const MINIMUM_AGE = 13;
+/**
+ * There is no minimum account age. Under-13 members are supported through the
+ * parental-consent architecture rather than refused at the door.
+ */
+export const MINIMUM_ACCOUNT_AGE = 0;
 
-/** Age at which an account is treated as an adult. */
-export const ADULT_AGE = 18;
+/** Oldest age that requires verifiable parental consent (configurable). */
+export const PARENTAL_CONSENT_MAX_AGE = DEFAULT_AGE_POLICY.parentalConsentMaxAge;
 
-export const AGE_MINIMUM_MESSAGE = `You must be at least ${MINIMUM_AGE} years old to use OpenRun.`;
+/** Age at which an account is treated as an adult (configurable). */
+export const ADULT_AGE = DEFAULT_AGE_POLICY.adultAge;
 
-export const COPPA_DISCLAIMER =
-  "OpenRun does not claim COPPA compliance. Age gating limits accounts to 13+; supporting younger members requires a separate legal and privacy review plus verifiable parental consent.";
+/** Implausible birthdays are still rejected, purely as data validation. */
+export const MAX_PLAUSIBLE_AGE = 120;
+
+export const CONSENT_REQUIRED_MESSAGE =
+  "Because you're under 13, a parent or guardian has to approve this account before games, messages and videos turn on.";
+
+export const CHILD_SUPPORT_NOTE =
+  "OpenRun supports members under 13 through verifiable parental consent. Consent, privacy floors and feature permissions are enforced server-side; OpenRun does not claim COPPA compliance without legal review of the consent method.";
 
 /**
- * Coarse age bucket. This is the only age information the product needs to
- * enforce policy — a full date of birth is never required to be shared
- * publicly, and the category itself is private to the member and moderators.
+ * Coarse age bucket. This is the only age information most of the product
+ * needs; the full date of birth is private (stored in `profile_birthdays`).
  */
 export type AgeCategory = "adult" | "teen" | "child" | "unknown";
 
 export const AGE_CATEGORY_LABELS: Record<AgeCategory, string> = {
-  adult: "Adult (18+)",
-  teen: `Teen (${MINIMUM_AGE}–17)`,
-  child: `Child (under ${MINIMUM_AGE})`,
+  adult: `Adult (${ADULT_AGE}+)`,
+  teen: `Teen (${PARENTAL_CONSENT_MAX_AGE + 1}–${ADULT_AGE - 1})`,
+  child: `Child (under ${PARENTAL_CONSENT_MAX_AGE + 1})`,
   unknown: "Not shared",
 };
 
 export function ageFromBirthday(iso: string | null | undefined): number | null {
-  if (!iso) return null;
-  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso);
-  const d = m ? new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3])) : new Date(iso);
-  if (Number.isNaN(d.getTime())) return null;
-  const now = new Date();
-  let age = now.getFullYear() - d.getFullYear();
-  const md = now.getMonth() - d.getMonth();
-  if (md < 0 || (md === 0 && now.getDate() < d.getDate())) age -= 1;
-  return age >= 0 && age < 130 ? age : null;
+  return cohortAgeFromBirthday(iso);
 }
 
-export function ageCategoryFromAge(age: number | null | undefined): AgeCategory {
-  if (age == null || !Number.isFinite(age)) return "unknown";
-  if (age >= ADULT_AGE) return "adult";
-  if (age >= MINIMUM_AGE) return "teen";
-  return "child";
+/** Map a fine-grained cohort onto the coarse category. */
+export function categoryFromCohort(cohort: AgeCohort): AgeCategory {
+  if (cohort === "adult") return "adult";
+  if (cohort === "child_under_13") return "child";
+  if (cohort === "unknown") return "unknown";
+  return "teen";
 }
 
-export function ageCategoryFromBirthday(iso: string | null | undefined): AgeCategory {
-  return ageCategoryFromAge(ageFromBirthday(iso));
+/** Map a coarse category onto the most protective matching cohort. */
+export function cohortFromCategory(cat: AgeCategory): AgeCohort {
+  if (cat === "adult") return "adult";
+  if (cat === "child") return "child_under_13";
+  if (cat === "teen") return "teen_13_15";
+  return "unknown";
+}
+
+export function ageCategoryFromAge(
+  age: number | null | undefined,
+  config: AgePolicyConfig = DEFAULT_AGE_POLICY,
+): AgeCategory {
+  return categoryFromCohort(cohortFromAge(age, config));
+}
+
+export function ageCategoryFromBirthday(
+  iso: string | null | undefined,
+  config: AgePolicyConfig = DEFAULT_AGE_POLICY,
+): AgeCategory {
+  return categoryFromCohort(cohortFromBirthday(iso, config));
 }
 
 export function isMinorCategory(cat: AgeCategory): boolean {
-  return cat === "teen" || cat === "child";
+  return isMinorCohort(cohortFromCategory(cat));
 }
 
 /**
- * Whether a birthday satisfies the age policy. Returns an error string for
- * the UI, or null when the value is acceptable. `youthEnabled` reflects the
- * administrator flag — when OFF, under-13 accounts are refused (the database
- * enforces the same rule, so the gate cannot be bypassed client-side).
+ * Birthday validation. Under-13 is VALID — it routes the member into the
+ * parental-consent flow instead of being refused. Only impossible values are
+ * rejected here; the database applies the same cohort rules on write.
  */
-export function validateAgeMinimum(
-  iso: string | null | undefined,
-  youthEnabled = false,
-): string | null {
+export function validateAgeMinimum(iso: string | null | undefined): string | null {
   if (!iso) return null;
-  const cat = ageCategoryFromBirthday(iso);
-  if (cat === "child" && !youthEnabled) return AGE_MINIMUM_MESSAGE;
+  const age = ageFromBirthday(iso);
+  if (age == null) return "Enter a valid date of birth";
+  if (age > MAX_PLAUSIBLE_AGE) return "Enter a valid date of birth";
   return null;
 }
 
-/* ------------------------------------------------------------------ */
-/* Youth feature flags                                                */
-/* ------------------------------------------------------------------ */
-
-export const YOUTH_FLAG_KEYS = [
-  "enabled",
-  "parent_guardian_accounts",
-  "parental_consent",
-  "parent_controlled_profile",
-  "minor_messaging_restrictions",
-  "minor_location_restrictions",
-  "minor_media_restrictions",
-  "minor_reporting",
-  "parent_notifications",
-] as const;
-
-export type YouthFlagKey = (typeof YOUTH_FLAG_KEYS)[number];
-
-export type YouthFlags = Record<YouthFlagKey, boolean>;
-
-/** Every youth capability is OFF until an authorized administrator enables it. */
-export const DEFAULT_YOUTH_FLAGS: YouthFlags = YOUTH_FLAG_KEYS.reduce((acc, k) => {
-  acc[k] = false;
-  return acc;
-}, {} as YouthFlags);
-
-export const YOUTH_FLAG_META: Record<YouthFlagKey, { label: string; description: string }> = {
-  enabled: {
-    label: "Youth features",
-    description:
-      "Master switch for all under-13 functionality. LEGAL REVIEW REQUIRED before enabling — parental consent must be implemented first.",
-  },
-  parent_guardian_accounts: {
-    label: "Parent/guardian accounts",
-    description: "Allow an adult to hold a linked guardian account for a minor.",
-  },
-  parental_consent: {
-    label: "Parental consent",
-    description: "Require verifiable guardian consent before a minor account becomes active.",
-  },
-  parent_controlled_profile: {
-    label: "Parent-controlled profile",
-    description: "Guardian approves profile details, photos and visibility for the minor.",
-  },
-  minor_messaging_restrictions: {
-    label: "Messaging restrictions",
-    description:
-      "Safety controls for who may message a minor. Until this is on, adult↔minor direct messages are blocked whenever youth features are enabled.",
-  },
-  minor_location_restrictions: {
-    label: "Location restrictions",
-    description: "Never expose a minor's precise location; city-level only.",
-  },
-  minor_media_restrictions: {
-    label: "Media restrictions",
-    description: "Limit publishing and sharing of a minor's photos and highlight reels.",
-  },
-  minor_reporting: {
-    label: "Reporting",
-    description: "Youth-specific reporting paths routed to moderation with priority handling.",
-  },
-  parent_notifications: {
-    label: "Parent notifications",
-    description: "Notify the linked guardian about activity, requests and reports.",
-  },
-};
-
-export function parseYouthFlags(value: unknown): YouthFlags {
-  const out = { ...DEFAULT_YOUTH_FLAGS };
-  if (!value || typeof value !== "object") return out;
-  for (const key of YOUTH_FLAG_KEYS) {
-    const raw = (value as Record<string, unknown>)[key];
-    out[key] = raw === true;
-  }
-  return out;
+/**
+ * Whether this birthday puts the member into a cohort that needs a parent or
+ * guardian to approve the account. Drives the child-registration hand-off.
+ */
+export function birthdayRequiresParentalConsent(
+  iso: string | null | undefined,
+  config: AgePolicyConfig = DEFAULT_AGE_POLICY,
+): boolean {
+  if (!iso) return false;
+  return requiresParentalConsent(cohortFromBirthday(iso, config), config);
 }
 
-/** Youth sub-controls only take effect while the master switch is on. */
-export function youthFlagActive(flags: YouthFlags, key: YouthFlagKey): boolean {
-  if (key === "enabled") return flags.enabled;
-  return flags.enabled && flags[key];
+/** UI notice shown next to the birthday field, or null when none applies. */
+export function birthdayConsentNotice(
+  iso: string | null | undefined,
+  config: AgePolicyConfig = DEFAULT_AGE_POLICY,
+): string | null {
+  return birthdayRequiresParentalConsent(iso, config) ? CONSENT_REQUIRED_MESSAGE : null;
 }
 
 /* ------------------------------------------------------------------ */
-/* Messaging + privacy policy (mirrors the database guards)           */
+/* Delegated policy helpers (mirror the database guards)              */
 /* ------------------------------------------------------------------ */
 
 /**
- * Adult↔minor direct messaging. With youth features OFF the platform is 13+
- * and messaging is unchanged. With youth features ON, adult↔minor messaging
- * requires the messaging-restriction control to be in place.
+ * Adult↔minor direct messaging, resolved by the child-policy engine.
+ * Unknown adult → child/young-teen is blocked unless a legitimate
+ * relationship exists (guardian link, or shared game/chat for older teens).
  */
 export function minorMessagingAllowed(
   a: AgeCategory,
   b: AgeCategory,
-  flags: YouthFlags,
+  ctx: MessagingContext = {},
+  config: AgePolicyConfig = DEFAULT_AGE_POLICY,
 ): boolean {
-  if (!flags.enabled) return true;
-  if (flags.minor_messaging_restrictions) return true;
-  const mixed =
-    (isMinorCategory(a) && b === "adult") || (isMinorCategory(b) && a === "adult");
-  return !mixed;
+  return messagingAllowed(
+    { cohort: cohortFromCategory(a) },
+    { cohort: cohortFromCategory(b) },
+    ctx,
+    config,
+  );
 }
 
-/** Privacy floor applied to minors: no precise location, no public web profile. */
+/** Privacy floor applied to minors: no precise location, no public profile. */
 export function minorPrivacyFloor(
   cat: AgeCategory,
   prefs: { locationPrecision: string; profileVisibility: string },
 ): { locationPrecision: string; profileVisibility: string } {
-  if (!isMinorCategory(cat)) return prefs;
+  const floored = privacyFloor(cohortFromCategory(cat), prefs as never);
   return {
-    locationPrecision: prefs.locationPrecision === "exact" ? "city" : prefs.locationPrecision,
-    profileVisibility: prefs.profileVisibility === "public" ? "members" : prefs.profileVisibility,
+    locationPrecision: floored.locationPrecision,
+    profileVisibility: floored.profileVisibility,
   };
 }
 
-/** Fields never shown publicly for a minor's profile. */
-export const MINOR_HIDDEN_PUBLIC_FIELDS = [
-  "precise_location",
-  "contact_info",
-  "birthday",
-  "graduating_class",
-] as const;
-
 export function isFieldPubliclyVisibleForMinor(field: string): boolean {
-  return !(MINOR_HIDDEN_PUBLIC_FIELDS as readonly string[]).includes(field);
+  return isPubliclyVisibleForMinor(field);
 }
+
+export { MINOR_NEVER_PUBLIC_FIELDS as MINOR_HIDDEN_PUBLIC_FIELDS } from "@/lib/child-policy";

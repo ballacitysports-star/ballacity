@@ -1,3 +1,4 @@
+import { checkChildUsername, cohortFromBirthday } from "@/lib/child-policy";
 import type { SportEntry } from "@/components/profile/ProfileSportsFields";
 import { serializeSportLevels } from "@/lib/sport-levels";
 import { clampDistanceMi } from "@/lib/distance";
@@ -26,6 +27,24 @@ export type ProfilePayloadInput = {
  * Canonical `profiles` row written by BOTH onboarding and Edit profile so the
  * two flows can never save a different schema.
  */
+/**
+ * Minor-safety validation shared by onboarding and Edit profile. Returns an
+ * error message when the username carries identifying information for a minor,
+ * mirroring the `minor_handle_unsafe` database trigger so the user sees the
+ * problem before the write is refused.
+ */
+export function validateProfileSafety(input: {
+  username: string;
+  name?: string | null;
+  birthday?: string | null;
+}): string | null {
+  const check = checkChildUsername(input.username ?? "", {
+    cohort: cohortFromBirthday(input.birthday ?? null),
+    fullName: input.name ?? null,
+  });
+  return check.ok ? null : (check.message ?? "Pick a different username");
+}
+
 export function buildProfileRow(input: ProfilePayloadInput) {
   const primary = input.sports[0]?.name;
   return {
