@@ -682,7 +682,7 @@ function AuthGate({ children }: { children: React.ReactNode }) {
     return () => {
       cancelled = true;
     };
-  }, [user, loading, skipAgeCheck, router, retryTick]);
+  }, [user, loading, skipAgeCheck, router]);
 
   // Onboarding completion guard: block rendering of protected routes until we
   // confirm the user has picked an account type. Fresh Google sign-ins would
