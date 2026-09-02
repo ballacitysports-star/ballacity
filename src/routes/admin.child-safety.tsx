@@ -13,6 +13,7 @@ import {
 import { CHILD_POLICY_DISCLAIMER, COHORT_META, parseCohort } from "@/lib/child-policy";
 import { Button } from "@/components/ui/button";
 import { BirthdayCorrectionQueue } from "@/components/child/BirthdayCorrectionQueue";
+import { AdminFamilyPanel } from "@/components/child/AdminFamilyPanel";
 
 export const Route = createFileRoute("/admin/child-safety")({
   head: () =>
@@ -88,6 +89,8 @@ function AdminChildSafetyPage() {
               ))}
             </div>
           </section>
+
+          <AdminFamilyPanel />
 
           <BirthdayCorrectionQueue />
 
