@@ -145,6 +145,14 @@ function AuthPage() {
           setSignupStep("type");
           return;
         }
+        // Age is determined BEFORE the account exists. The date itself is only
+        // parked locally; the server derives the age and cohort from it on the
+        // first authenticated load (see /onboarding/age).
+        const dobCheck = checkDobParts(dob);
+        if (!dobCheck.ok) {
+          toast.error(dobCheck.message);
+          return;
+        }
         if (!consentOk) {
           toast.error("Please agree to the Terms of Service and Privacy Policy to continue.");
           return;
@@ -153,6 +161,8 @@ function AuthPage() {
         // accepted versions are parked and written on first authenticated load.
         stashPendingConsent(currentAcceptances());
         setPendingAccountType(accountType);
+        stashPendingDob(dobCheck.iso);
+
 
         const { data, error } = await supabase.auth.signUp({
           email,
