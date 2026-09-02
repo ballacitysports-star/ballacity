@@ -45,12 +45,32 @@ export const getPlayerCard = createServerFn({ method: "GET" })
   })
   .handler(async ({ data }): Promise<PlayerCardData> => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const cols = "id,title,sport,date,location,host_id,hidden_at";
+    const cols = "id,title,sport,date,location,host_id,hidden_at,is_private";
+
+    const empty: PlayerCardData = {
+      profile: null,
+      games: [],
+      stats: { gamesPlayed: 0, gamesHosted: 0, reels: 0, sports: [], upcoming: 0 },
+    };
+
+    // Privacy gate: this endpoint is public, so only surface players whose
+    // profile visibility is "public" and who are not suspended/hidden.
+    const [{ data: visibility }, { data: flagRows }, { data: avatarRows }] = await Promise.all([
+      supabaseAdmin.rpc("profile_visibility_of" as never, { _user: data.userId } as never),
+      supabaseAdmin.rpc("public_privacy_flags" as never, { _ids: [data.userId] } as never),
+      supabaseAdmin.rpc("visible_avatars" as never, { _ids: [data.userId] } as never),
+    ]);
+    if ((visibility as unknown as string) !== "public") return empty;
+
+    const flags = ((flagRows ?? []) as any[])[0] ?? {};
+    const avatar = ((avatarRows ?? []) as any[])[0] ?? {};
+    const showGames = flags.show_games_played !== false;
+    const showSports = flags.show_sports !== false;
 
     const [profRes, hostedRes, joinsRes, reelsRes] = await Promise.all([
       supabaseAdmin
         .from("profiles")
-        .select("id, display_name, username, avatar_initials, avatar_url, cover_url, bio, city, sport")
+        .select("id, display_name, username, avatar_initials, cover_url, bio, city, sport, suspended_at, moderation_state")
         .eq("id", data.userId)
         .maybeSingle(),
       supabaseAdmin
@@ -73,11 +93,20 @@ export const getPlayerCard = createServerFn({ method: "GET" })
         .is("hidden_at", null),
     ]);
 
-    const hosted = ((hostedRes.data ?? []) as any[]).map((g) => ({ ...g, role: "host" as const }));
+    const prof = profRes.data as any | null;
+    if (!prof || prof.suspended_at) return empty;
+
+    const hosted = showGames
+      ? ((hostedRes.data ?? []) as any[])
+          .filter((g) => g.is_private !== true)
+          .map((g) => ({ ...g, role: "host" as const }))
+      : [];
     const hostedIds = new Set(hosted.map((g) => g.id));
-    const joinedIds = ((joinsRes.data ?? []) as any[])
-      .map((r) => r.game_id as string)
-      .filter((id) => id && !hostedIds.has(id));
+    const joinedIds = showGames
+      ? ((joinsRes.data ?? []) as any[])
+          .map((r) => r.game_id as string)
+          .filter((id) => id && !hostedIds.has(id))
+      : [];
 
     let joined: any[] = [];
     if (joinedIds.length > 0) {
@@ -88,7 +117,9 @@ export const getPlayerCard = createServerFn({ method: "GET" })
         .is("hidden_at", null)
         .order("date", { ascending: false })
         .limit(40);
-      joined = ((rows ?? []) as any[]).map((g) => ({ ...g, role: "player" as const }));
+      joined = ((rows ?? []) as any[])
+        .filter((g) => g.is_private !== true)
+        .map((g) => ({ ...g, role: "player" as const }));
     }
 
     const now = Date.now();
@@ -104,34 +135,35 @@ export const getPlayerCard = createServerFn({ method: "GET" })
       .sort((a, b) => new Date(b.date ?? 0).getTime() - new Date(a.date ?? 0).getTime())
       .slice(0, 30);
 
-    const prof = profRes.data as any | null;
-    const sports = Array.from(
-      new Set(games.map((g) => g.sport).filter((s): s is string => Boolean(s))),
-    ).slice(0, 6);
+    const sports = showSports
+      ? Array.from(
+          new Set(games.map((g) => g.sport).filter((s): s is string => Boolean(s))),
+        ).slice(0, 6)
+      : [];
 
     return {
-      profile: prof
-        ? {
-            id: prof.id as string,
-            displayName: (prof.display_name as string) ?? "Player",
-            username: (prof.username as string) ?? null,
-            initials:
-              (prof.avatar_initials as string) ??
-              ((prof.display_name as string) ?? "PL").slice(0, 2).toUpperCase(),
-            avatarUrl: (prof.avatar_url as string) ?? null,
-            coverUrl: (prof.cover_url as string) ?? null,
-            bio: (prof.bio as string) ?? null,
-            city: (prof.city as string) ?? null,
-            sport: (prof.sport as string) ?? null,
-          }
-        : null,
+      profile: {
+        id: prof.id as string,
+        displayName: (avatar.display_name as string) ?? (prof.display_name as string) ?? "Player",
+        username: (prof.username as string) ?? null,
+        initials:
+          (avatar.avatar_initials as string) ??
+          (prof.avatar_initials as string) ??
+          ((prof.display_name as string) ?? "PL").slice(0, 2).toUpperCase(),
+        avatarUrl: (avatar.avatar_url as string) ?? null,
+        coverUrl: (prof.cover_url as string) ?? null,
+        bio: (prof.bio as string) ?? null,
+        city: (prof.city as string) ?? null,
+        sport: showSports ? ((prof.sport as string) ?? null) : null,
+      },
       games,
       stats: {
-        gamesPlayed: games.filter((g) => new Date(g.date ?? 0).getTime() <= now).length,
-        gamesHosted: hosted.length,
+        gamesPlayed: showGames ? games.filter((g) => new Date(g.date ?? 0).getTime() <= now).length : 0,
+        gamesHosted: showGames ? hosted.length : 0,
         reels: reelsRes.count ?? 0,
         sports,
-        upcoming: games.filter((g) => new Date(g.date ?? 0).getTime() > now).length,
+        upcoming: showGames ? games.filter((g) => new Date(g.date ?? 0).getTime() > now).length : 0,
       },
     };
   });
+

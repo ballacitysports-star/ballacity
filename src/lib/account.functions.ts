@@ -52,6 +52,10 @@ export const deleteMyAccount = createServerFn({ method: "POST" })
       } as never)
       .eq("id", userId);
 
+    // Birthdays live in a private table; scrub it too.
+    await supabaseAdmin.from("profile_birthdays").delete().eq("user_id", userId);
+
+
     // Message bodies and attachments are stripped even though rows cascade,
     // so no personal content survives in another participant's cached thread.
     await supabaseAdmin

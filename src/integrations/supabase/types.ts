@@ -1647,6 +1647,27 @@ export type Database = {
         }
         Relationships: []
       }
+      profile_birthdays: {
+        Row: {
+          birthday: string | null
+          created_at: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          birthday?: string | null
+          created_at?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          birthday?: string | null
+          created_at?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           account_type: string | null
