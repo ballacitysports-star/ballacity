@@ -3037,6 +3037,7 @@ export type Database = {
         Args: { _fallback: number; _key: string }
         Returns: number
       }
+      age_verified: { Args: { _user: string }; Returns: boolean }
       approve_org_member_request: { Args: { _req: string }; Returns: string }
       approve_parental_consent: {
         Args: {
@@ -3059,6 +3060,7 @@ export type Database = {
         Args: { _a: string; _b: string }
         Returns: boolean
       }
+      calculate_age: { Args: { _dob: string; _now?: string }; Returns: number }
       can_notify: {
         Args: { _caller: string; _target: string }
         Returns: boolean
@@ -3252,6 +3254,16 @@ export type Database = {
       }
       my_age_category: { Args: never; Returns: string }
       my_age_cohort: { Args: never; Returns: string }
+      my_platform_status: {
+        Args: never
+        Returns: {
+          age_category: string
+          birthday_set: boolean
+          cohort: string
+          review_required: boolean
+          status: string
+        }[]
+      }
       notify_guardians: {
         Args: {
           _body: string
@@ -3263,6 +3275,7 @@ export type Database = {
         Returns: undefined
       }
       parental_consent_state: { Args: { _child: string }; Returns: string }
+      platform_status: { Args: { _user: string }; Returns: string }
       player_activity_stats: {
         Args: { _user: string }
         Returns: {
@@ -3317,6 +3330,15 @@ export type Database = {
       set_child_controls: {
         Args: { _child: string; _controls: Json }
         Returns: undefined
+      }
+      set_my_birthday: {
+        Args: { _dob: string }
+        Returns: {
+          cohort: string
+          member_age: number
+          review_required: boolean
+          status: string
+        }[]
       }
       shares_game_or_chat: {
         Args: { _a: string; _b: string }
