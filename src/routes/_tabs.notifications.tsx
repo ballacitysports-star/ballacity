@@ -3,6 +3,7 @@ import { pageHead } from "@/lib/seo";
 import { ArrowLeft, Bell, MessageCircle } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import { NotificationsPanel } from "@/components/NotificationsPanel";
+import { TeamInvitesInbox } from "@/components/team/TeamInvitesInbox";
 
 export const Route = createFileRoute("/_tabs/notifications")({
   head: () =>
@@ -55,7 +56,11 @@ function NotificationsPage() {
           </Link>
         </div>
       ) : (
-        <NotificationsPanel />
+        <>
+          {/* Invitations need an answer, so they sit above the passive feed. */}
+          <TeamInvitesInbox className="mb-5" />
+          <NotificationsPanel />
+        </>
       )}
     </div>
   );

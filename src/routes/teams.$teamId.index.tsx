@@ -27,6 +27,7 @@ import {
   type OrgPost,
 } from "@/lib/sample-data";
 import { isMyOrg, ensureOrgById } from "@/lib/org-store";
+import { TeamRosterPanel } from "@/components/team/TeamRosterPanel";
 import { ProfileShareCard } from "@/components/ProfileShareCard";
 import { PostCard } from "@/components/PostCard";
 import { PostDetailsDialog } from "@/components/PostDetailsDialog";
@@ -134,11 +135,13 @@ function TeamPage() {
   const org = Route.useLoaderData() as Org;
   const search = Route.useSearch();
   const navigate = Route.useNavigate();
-  const tab: "posts" | "about" | "games" =
-    search.tab === "about" || search.tab === "games" ? search.tab : "posts";
+  const tab: "posts" | "roster" | "about" | "games" =
+    search.tab === "about" || search.tab === "games" || search.tab === "roster"
+      ? search.tab
+      : "posts";
   const filter: PostKind | "all" = (search.filter || "all") as PostKind | "all";
   const reviewsOpen = search.modal === "reviews";
-  const setTab = (v: "posts" | "about" | "games") =>
+  const setTab = (v: "posts" | "roster" | "about" | "games") =>
     navigate({ to: ".", search: { ...search, tab: v === "posts" ? "" : v }, replace: true });
   const setFilter = (v: PostKind | "all") =>
     navigate({ to: ".", search: { ...search, filter: v === "all" ? "" : v }, replace: true });
@@ -383,7 +386,7 @@ function TeamPage() {
 
         {/* Tabs */}
         <div className="mt-6 flex gap-1 rounded-full border border-border bg-surface p-1">
-          {(["posts", "about", "games"] as const).map((t) => (
+          {(["posts", "roster", "about", "games"] as const).map((t) => (
             <button
               key={t}
               onClick={() => setTab(t)}
@@ -395,7 +398,9 @@ function TeamPage() {
                 ? `Games · ${upcomingGames.length}`
                 : t === "posts"
                   ? `Posts · ${allPosts.length}`
-                  : "About"}
+                  : t === "roster"
+                    ? "Roster"
+                    : "About"}
             </button>
           ))}
         </div>
@@ -462,6 +467,9 @@ function TeamPage() {
             </div>
           </>
         )}
+
+        {/* Roster tab */}
+        {tab === "roster" && <TeamRosterPanel teamId={org.id} teamName={org.name} />}
 
         {/* About tab */}
         {tab === "about" && (

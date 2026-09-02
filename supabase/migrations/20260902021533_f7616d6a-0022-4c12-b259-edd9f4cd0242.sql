@@ -1,0 +1,21 @@
+REVOKE EXECUTE ON FUNCTION public.team_owner_of(text) FROM PUBLIC, anon, authenticated;
+REVOKE EXECUTE ON FUNCTION public.team_owner_membership() FROM PUBLIC, anon, authenticated;
+REVOKE EXECUTE ON FUNCTION public.team_role_of(text, uuid) FROM PUBLIC, anon;
+REVOKE EXECUTE ON FUNCTION public.is_team_member(text, uuid) FROM PUBLIC, anon;
+REVOKE EXECUTE ON FUNCTION public.is_team_manager(text, uuid) FROM PUBLIC, anon;
+REVOKE EXECUTE ON FUNCTION public.team_invite_player(text, uuid, public.team_role, text) FROM PUBLIC, anon;
+REVOKE EXECUTE ON FUNCTION public.team_respond_invite(uuid, boolean) FROM PUBLIC, anon;
+REVOKE EXECUTE ON FUNCTION public.team_cancel_invite(uuid) FROM PUBLIC, anon;
+REVOKE EXECUTE ON FUNCTION public.team_remove_member(text, uuid) FROM PUBLIC, anon;
+REVOKE EXECUTE ON FUNCTION public.team_set_member_role(text, uuid, public.team_role) FROM PUBLIC, anon;
+REVOKE EXECUTE ON FUNCTION public.player_activity_stats(uuid) FROM PUBLIC, anon;
+
+GRANT EXECUTE ON FUNCTION public.team_role_of(text, uuid) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.is_team_member(text, uuid) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.is_team_manager(text, uuid) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.team_invite_player(text, uuid, public.team_role, text) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.team_respond_invite(uuid, boolean) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.team_cancel_invite(uuid) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.team_remove_member(text, uuid) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.team_set_member_role(text, uuid, public.team_role) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.player_activity_stats(uuid) TO authenticated;

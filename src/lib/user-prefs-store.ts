@@ -1,11 +1,17 @@
 import { useEffect, useState, useSyncExternalStore } from "react";
 import type { User } from "@supabase/supabase-js";
 import { ME, type Sport } from "@/lib/sample-data";
-import { earnedBadgeIds, makeBadgeStats } from "@/lib/badges";
+import { earnedBadgeIds } from "@/lib/badges";
 import { getDetectedDistanceUnit, type DistanceUnit } from "@/lib/measurement-system";
 import { clampDistanceMi } from "@/lib/distance";
 
 import { parseSportLevels, type SportLevel } from "@/lib/sport-levels";
+import {
+  reliabilityPercent,
+  toBadgeStats,
+  usePlayerActivityStats,
+  EMPTY_PLAYER_STATS,
+} from "@/lib/player-stats";
 
 
 /** Engine-earned badges first, stored override extras appended (deduped). */
@@ -313,6 +319,8 @@ export function useMyProfileState(currentUser?: User | null): {
 } {
   const { user: authUser } = useAuth();
   const user = currentUser === undefined ? authUser : currentUser;
+  // Reputation numbers come from the database aggregate, never sample data.
+  const activityQuery = usePlayerActivityStats(user?.id);
   const [tick, setTick] = useState(0);
   const [loaded, setLoaded] = useState(false);
   const [dbProfile, setDbProfile] = useState<{
@@ -369,6 +377,7 @@ export function useMyProfileState(currentUser?: User | null): {
   if (!user) return { profile: null, loaded: false };
 
   const overrides = readOverrides(user.id);
+  const activity = activityQuery.data ?? EMPTY_PLAYER_STATS;
   const base = defaultsFromUser(user);
   void tick;
   const dbLinks: ProfileLink[] = Array.isArray(dbProfile?.links)
@@ -400,23 +409,19 @@ export function useMyProfileState(currentUser?: User | null): {
     searchRadiusMi:
       clampDistanceMi(overrides.searchRadiusMi ?? dbProfile?.search_radius_mi ?? undefined) ??
       undefined,
-    stats: base.stats,
+    stats: {
+      ...base.stats,
+      played: activity.gamesAttended,
+      hosted: activity.hostedCompleted,
+      reliability: reliabilityPercent(activity),
+      sportsmanship: activity.reviewAvg,
+      endorsements: activity.reviewCount,
+    },
     // Per-sport levels resolved above (local overrides first, then the saved row).
     sports,
     // Earned badges come from the badge engine (reliability + sportsmanship);
     // stored overrides are merged on top as extras.
-    badges: mergeBadges(
-      earnedBadgeIds(
-        makeBadgeStats({
-          gamesPlayed: base.stats.played,
-          hosted: base.stats.hosted ?? 0,
-          showUpRate: (base.stats.reliability ?? 0) / 100,
-          onTimeRate: (base.stats.reliability ?? 0) / 100,
-          sportsmanshipRating: base.stats.sportsmanship ?? 0,
-        }),
-      ),
-      overrides.badges,
-    ),
+    badges: mergeBadges(earnedBadgeIds(toBadgeStats(activity)), overrides.badges),
 
     links: overrides.links?.length ? overrides.links : dbLinks,
   };

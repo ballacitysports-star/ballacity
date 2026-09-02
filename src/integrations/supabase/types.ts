@@ -2293,6 +2293,97 @@ export type Database = {
         }
         Relationships: []
       }
+      team_invites: {
+        Row: {
+          created_at: string
+          expires_at: string
+          id: string
+          invited_by: string
+          invitee_id: string
+          message: string | null
+          responded_at: string | null
+          role: Database["public"]["Enums"]["team_role"]
+          status: string
+          team_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          expires_at?: string
+          id?: string
+          invited_by: string
+          invitee_id: string
+          message?: string | null
+          responded_at?: string | null
+          role?: Database["public"]["Enums"]["team_role"]
+          status?: string
+          team_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          expires_at?: string
+          id?: string
+          invited_by?: string
+          invitee_id?: string
+          message?: string | null
+          responded_at?: string | null
+          role?: Database["public"]["Enums"]["team_role"]
+          status?: string
+          team_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "team_invites_team_id_fkey"
+            columns: ["team_id"]
+            isOneToOne: false
+            referencedRelation: "teams"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      team_members: {
+        Row: {
+          created_at: string
+          id: string
+          jersey_number: string | null
+          position: string | null
+          role: Database["public"]["Enums"]["team_role"]
+          team_id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          jersey_number?: string | null
+          position?: string | null
+          role?: Database["public"]["Enums"]["team_role"]
+          team_id: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          jersey_number?: string | null
+          position?: string | null
+          role?: Database["public"]["Enums"]["team_role"]
+          team_id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "team_members_team_id_fkey"
+            columns: ["team_id"]
+            isOneToOne: false
+            referencedRelation: "teams"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       team_posts: {
         Row: {
           author_id: string
@@ -3110,6 +3201,14 @@ export type Database = {
       is_moderator: { Args: { _user_id: string }; Returns: boolean }
       is_org_member: { Args: { _org: string; _user: string }; Returns: boolean }
       is_superadmin: { Args: { _user_id: string }; Returns: boolean }
+      is_team_manager: {
+        Args: { _team: string; _user: string }
+        Returns: boolean
+      }
+      is_team_member: {
+        Args: { _team: string; _user: string }
+        Returns: boolean
+      }
       is_trainer_org_admin: {
         Args: { _org: string; _user: string }
         Returns: boolean
@@ -3164,6 +3263,23 @@ export type Database = {
         Returns: undefined
       }
       parental_consent_state: { Args: { _child: string }; Returns: string }
+      player_activity_stats: {
+        Args: { _user: string }
+        Returns: {
+          first_activity_at: string
+          games_attended: number
+          games_completed: number
+          games_joined: number
+          hosted_cancelled: number
+          hosted_completed: number
+          hosted_total: number
+          no_shows: number
+          review_avg: number
+          review_count: number
+          teams_count: number
+          verified_review_count: number
+        }[]
+      }
       privacy_text: { Args: { _key: string; _user: string }; Returns: string }
       profile_ages: {
         Args: { _ids: string[] }
@@ -3206,6 +3322,37 @@ export type Database = {
         Args: { _a: string; _b: string }
         Returns: boolean
       }
+      team_cancel_invite: { Args: { _invite: string }; Returns: undefined }
+      team_invite_player: {
+        Args: {
+          _message?: string
+          _role?: Database["public"]["Enums"]["team_role"]
+          _team: string
+          _user: string
+        }
+        Returns: string
+      }
+      team_owner_of: { Args: { _team: string }; Returns: string }
+      team_remove_member: {
+        Args: { _team: string; _user: string }
+        Returns: undefined
+      }
+      team_respond_invite: {
+        Args: { _accept: boolean; _invite: string }
+        Returns: string
+      }
+      team_role_of: {
+        Args: { _team: string; _user: string }
+        Returns: Database["public"]["Enums"]["team_role"]
+      }
+      team_set_member_role: {
+        Args: {
+          _role: Database["public"]["Enums"]["team_role"]
+          _team: string
+          _user: string
+        }
+        Returns: undefined
+      }
       try_uuid: { Args: { _v: string }; Returns: string }
       unpublish_legal_document: {
         Args: { _id: string; _reason?: string }
@@ -3227,6 +3374,7 @@ export type Database = {
     }
     Enums: {
       app_role: "admin" | "moderator" | "superadmin"
+      team_role: "owner" | "manager" | "coach" | "captain" | "player"
       trainer_org_role: "owner" | "admin" | "member"
     }
     CompositeTypes: {
@@ -3356,6 +3504,7 @@ export const Constants = {
   public: {
     Enums: {
       app_role: ["admin", "moderator", "superadmin"],
+      team_role: ["owner", "manager", "coach", "captain", "player"],
       trainer_org_role: ["owner", "admin", "member"],
     },
   },
