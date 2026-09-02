@@ -93,7 +93,8 @@ export function validateBirthday(value: string): string | null {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   if (d > today) return "Birthday cannot be in the future";
-  // Age policy: OpenRun is configured for members 13+ (see src/lib/age-policy).
+  // Every age is supported. Under-13 birthdays are valid and route into the
+  // parental-consent flow (see src/lib/age-policy + src/lib/child-policy).
   return validateAgeMinimum(value);
 }
 

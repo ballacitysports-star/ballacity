@@ -6,7 +6,7 @@ import { motion } from "framer-motion";
 import type { User } from "@supabase/supabase-js";
 import { toast } from "sonner";
 import { SPORTS, type Sport } from "@/lib/sample-data";
-import { buildProfileRow } from "@/lib/profile-payload";
+import { buildProfileRow, validateProfileSafety } from "@/lib/profile-payload";
 
 import {
   useMyProfile,
@@ -211,6 +211,17 @@ function EditProfile() {
     });
     // Keep the feed's distance filter aligned with the profile preference.
     setFeedPrefs({ ...prefs, preferredSports, maxDistanceMi: searchRadiusMi });
+
+    // Minor-safety: refuse identifying usernames before hitting the database.
+    const safetyErr = validateProfileSafety({
+      username,
+      name: trimmedName,
+      birthday: birthdayClean,
+    });
+    if (safetyErr) {
+      toast.error(safetyErr);
+      throw new Error(safetyErr);
+    }
 
     // Persist publicly visible fields so other users can see them.
     const { supabase } = await import("@/integrations/supabase/client");

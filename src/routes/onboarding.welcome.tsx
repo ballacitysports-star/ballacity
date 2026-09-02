@@ -17,6 +17,7 @@ import {
 import { clampDistanceMi, kmToMi, miToKm } from "@/lib/distance";
 import { ProfileLocationFields } from "@/components/profile/ProfileLocationFields";
 import { Section, validateBirthday } from "@/components/profile/ProfileFormPrimitives";
+import { birthdayRequiresParentalConsent } from "@/lib/age-policy";
 import {
   ProfileBasicsFields,
   type ProfileBasicsValue,
@@ -293,6 +294,17 @@ function OnboardingWizard({ type }: { type: AccountType }) {
       setStep(0);
       return false;
     }
+    const { validateProfileSafety } = await import("@/lib/profile-payload");
+    const safetyErr = validateProfileSafety({
+      username: basics.username,
+      name: trimmedName,
+      birthday: birthdayClean,
+    });
+    if (safetyErr) {
+      toast.error(safetyErr);
+      setStep(0);
+      return false;
+    }
     const trimmedCity = basics.city.trim().slice(0, 80);
     const initials = (basics.avatar.trim() || trimmedName.slice(0, 2)).toUpperCase().slice(0, 3);
     if (links.some((l) => validateProfileUrl(l.url) !== null)) {
@@ -445,6 +457,11 @@ function OnboardingWizard({ type }: { type: AccountType }) {
     }
 
     if (isLast) {
+      // Under-13 members finish in the parental-consent flow, not the feed.
+      if (birthdayRequiresParentalConsent(basics.birthday)) {
+        nav({ to: "/onboarding/child" });
+        return;
+      }
       if (nextCfg) nav({ to: nextCfg.goto, search: { finish: 1 } as never });
       else nav({ to: "/feed" });
       return;

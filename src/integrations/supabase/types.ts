@@ -2955,6 +2955,10 @@ export type Database = {
         Returns: boolean
       }
       child_features_locked: { Args: { _user: string }; Returns: boolean }
+      child_game_participation_allowed: {
+        Args: { _user: string }
+        Returns: boolean
+      }
       clear_age_review: {
         Args: { _approve: boolean; _user: string }
         Returns: undefined
@@ -3099,6 +3103,10 @@ export type Database = {
           status: string
         }[]
       }
+      minor_handle_unsafe: {
+        Args: { _cohort: string; _handle: string }
+        Returns: boolean
+      }
       minor_messaging_allowed: {
         Args: { _a: string; _b: string }
         Returns: boolean
@@ -3109,6 +3117,16 @@ export type Database = {
       }
       my_age_category: { Args: never; Returns: string }
       my_age_cohort: { Args: never; Returns: string }
+      notify_guardians: {
+        Args: {
+          _body: string
+          _child: string
+          _link: string
+          _title: string
+          _type: string
+        }
+        Returns: undefined
+      }
       parental_consent_state: { Args: { _child: string }; Returns: string }
       privacy_text: { Args: { _key: string; _user: string }; Returns: string }
       profile_ages: {
