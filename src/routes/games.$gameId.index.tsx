@@ -2578,9 +2578,62 @@ function GameDetail() {
                 approvedReqs.length + Math.max(rosterFromLive.length, fallbackPlaceholderCount);
               return (
                 <>
-                  <h2 className="font-display text-sm font-bold uppercase tracking-wider text-muted-foreground mb-2">
+                   <h2 className="font-display text-sm font-bold uppercase tracking-wider text-muted-foreground mb-2">
                     Roster · {totalConfirmed} / {game.maxPlayers}
                   </h2>
+
+                  {/* Attendance: host-only, opens at start time. Feeds the
+                      host's real attendance rate on the trust panel. */}
+                  {isHost &&
+                  !game.cancelledAt &&
+                  liveRoster.length > 0 &&
+                  Date.now() >= new Date(game.date).getTime() ? (
+                    <div className="mb-3 rounded-2xl border border-border bg-surface p-3">
+                      <div className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                        Attendance
+                      </div>
+                      <p className="mt-0.5 text-[11px] text-muted-foreground">
+                        Mark who showed up. This builds your host reliability score.
+                      </p>
+                      <div className="mt-2 space-y-1.5">
+                        {liveRoster.map((p) => (
+                          <div key={`att-${p.userId}`} className="flex items-center gap-2">
+                            <span className="min-w-0 flex-1 truncate text-xs font-semibold">
+                              {p.displayName}
+                            </span>
+                            <button
+                              type="button"
+                              aria-label={`Mark ${p.displayName} present`}
+                              aria-pressed={p.attended === true}
+                              disabled={attendanceBusy === p.userId}
+                              onClick={() => void handleAttendance(p.userId, true)}
+                              className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-[11px] font-bold disabled:opacity-50 ${
+                                p.attended === true
+                                  ? "border-lime/40 bg-lime/10 text-lime"
+                                  : "border-border bg-background text-muted-foreground"
+                              }`}
+                            >
+                              <UserCheck className="h-3.5 w-3.5" /> Present
+                            </button>
+                            <button
+                              type="button"
+                              aria-label={`Mark ${p.displayName} as a no-show`}
+                              aria-pressed={p.attended === false}
+                              disabled={attendanceBusy === p.userId}
+                              onClick={() => void handleAttendance(p.userId, false)}
+                              className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-[11px] font-bold disabled:opacity-50 ${
+                                p.attended === false
+                                  ? "border-coral/40 bg-coral/10 text-coral"
+                                  : "border-border bg-background text-muted-foreground"
+                              }`}
+                            >
+                              <UserX className="h-3.5 w-3.5" /> No-show
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ) : null}
                   <div className="space-y-2">
                     {totalConfirmed === 0 ? (
                       <div className="rounded-2xl border border-dashed border-border bg-surface/40 p-3 text-xs text-muted-foreground">
