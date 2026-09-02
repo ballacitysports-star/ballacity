@@ -13,6 +13,13 @@ import { sanitizeNextPath } from "@/routes/__root";
 import { readLastVisited } from "@/lib/last-visited";
 import { AccountTypePicker } from "@/components/AccountTypePicker";
 import {
+  EMPTY_DOB,
+  MONTHS,
+  checkDobParts,
+  stashPendingDob,
+  type DobParts,
+} from "@/lib/age-verification";
+import {
   ACCOUNT_TYPE_META,
   type AccountType,
   isAccountType,
@@ -44,6 +51,8 @@ function AuthPage() {
   const [mode, setMode] = useState<"signin" | "signup">("signin");
   const [signupStep, setSignupStep] = useState<"type" | "form">("type");
   const [accountType, setAccountType] = useState<AccountType | null>(null);
+  // Mandatory at signup: no account is activated without a date of birth.
+  const [dob, setDob] = useState<DobParts>(EMPTY_DOB);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [displayName, setDisplayName] = useState("");
