@@ -13,7 +13,7 @@ export default defineTool({
   name: "list_upcoming_games",
   title: "List upcoming games",
   description:
-    "List upcoming pickup games visible to the signed-in OpenRun user, ordered by date.",
+    "List upcoming pickup games visible to the signed-in ballaCity user, ordered by date.",
   inputSchema: {
     limit: z
       .number()

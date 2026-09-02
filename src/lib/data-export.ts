@@ -1,6 +1,6 @@
 /**
  * Data export + retention — the app's single source of truth for what a member
- * can download about themselves, and how long OpenRun keeps each kind of data.
+ * can download about themselves, and how long ballaCity keeps each kind of data.
  *
  * Nothing here is a legal compliance guarantee; retention periods still need
  * legal sign-off (see docs/data-retention.md, LEGAL REVIEW REQUIRED).
@@ -137,7 +137,7 @@ export const EXPORT_EXCLUSIONS: string[] = [
   "Other members' private information, including their contact details and messages they sent you",
   "Internal moderation notes, reviewer identities and admin audit entries",
   "System credentials, service keys and infrastructure configuration",
-  "Payment credentials such as card numbers or bank details (OpenRun never stores them)",
+  "Payment credentials such as card numbers or bank details (ballaCity never stores them)",
 ];
 
 export function exportCategoryLabel(id: string): string {

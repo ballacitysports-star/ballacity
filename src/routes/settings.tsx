@@ -77,7 +77,7 @@ export const Route = createFileRoute("/settings")({
   head: () =>
     pageHead({
       path: "/settings",
-      title: "Settings — OpenRun",
+      title: "Settings — ballaCity",
       description: "Manage your account, profiles, notifications, privacy, and security settings.",
       noindex: true,
     }),

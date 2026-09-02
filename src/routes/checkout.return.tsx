@@ -6,8 +6,8 @@ export const Route = createFileRoute("/checkout/return")({
   head: () =>
     pageHead({
       path: "/checkout/return",
-      title: "Checkout complete — OpenRun",
-      description: "Your OpenRun purchase confirmation and next steps.",
+      title: "Checkout complete — ballaCity",
+      description: "Your ballaCity purchase confirmation and next steps.",
       noindex: true,
     }),
   validateSearch: (search: Record<string, unknown>): { session_id?: string } => ({
@@ -26,7 +26,7 @@ function CheckoutReturn() {
           {session_id ? "Payment complete" : "Checkout complete"}
         </h1>
         <p className="mt-2 text-sm text-muted-foreground">
-          Thanks for supporting OpenRun! Subscriptions activate immediately. For merch orders,
+          Thanks for supporting ballaCity! Subscriptions activate immediately. For merch orders,
           you'll receive a confirmation email with shipping details.
         </p>
         <p className="mt-3 text-xs text-muted-foreground">

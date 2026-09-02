@@ -7,7 +7,7 @@
  * writing meta arrays.
  */
 export const SITE_URL = "https://open-run-connect.lovable.app";
-export const SITE_NAME = "OpenRun";
+export const SITE_NAME = "ballaCity";
 
 type MetaTag = Record<string, string>;
 

@@ -228,7 +228,7 @@ export const BADGES: BadgeDef[] = [
     id: "verified",
     label: "Verified",
     emoji: "🔷",
-    description: "Identity verified on OpenRun.",
+    description: "Identity verified on ballaCity.",
     category: "community",
     tier: "bronze",
     earned: (s) => s.verified,

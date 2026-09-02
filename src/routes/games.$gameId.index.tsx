@@ -216,15 +216,15 @@ export const Route = createFileRoute("/games/$gameId/")({
     const name = game?.title ?? "Pickup game";
     return pageHead({
       path: `/games/${params.gameId}`,
-      title: `${name} — OpenRun`,
+      title: `${name} — ballaCity`,
       description: (
-        game?.description ?? "See the details for this pickup game and request to join on OpenRun."
+        game?.description ?? "See the details for this pickup game and request to join on ballaCity."
       ).slice(0, 155),
       ogType: "article",
       image: ogImageUrl({
         kind: "game",
         title: name,
-        subtitle: game ? [game.sport, game.neighborhood ?? game.location].filter(Boolean).join(" • ") : "Pickup game on OpenRun",
+        subtitle: game ? [game.sport, game.neighborhood ?? game.location].filter(Boolean).join(" • ") : "Pickup game on ballaCity",
         meta: game ? [formatGameWhen(game), game.location, game.price ? `$${game.price}` : "Free"] : [],
       }),
       jsonLd: game
@@ -1885,7 +1885,7 @@ function GameDetail() {
               <ShieldAlert className="h-4 w-4 text-lime" aria-hidden /> Safety
             </div>
             <p className="mt-2 text-[12px] leading-relaxed text-muted-foreground">
-              {RISK_ACKNOWLEDGMENT.text} Games are organized by the host — OpenRun does not
+              {RISK_ACKNOWLEDGMENT.text} Games are organized by the host — ballaCity does not
               supervise play or inspect venues.
             </p>
             <div className="mt-3 flex flex-wrap gap-2">

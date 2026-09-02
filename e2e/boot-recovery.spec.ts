@@ -67,7 +67,7 @@ test("slow client boot is not interrupted by an automatic reload", async ({ page
   });
 
   await page.goto("/", { waitUntil: "domcontentloaded" });
-  await expect(page.getByRole("heading", { name: /OpenRun/i }).first()).toBeVisible({
+  await expect(page.getByRole("heading", { name: /ballaCity/i }).first()).toBeVisible({
     timeout: 18_000,
   });
   expect(documentRequests, "a slow but healthy startup must not be reloaded").toBe(1);

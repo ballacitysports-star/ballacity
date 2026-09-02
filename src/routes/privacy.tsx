@@ -9,9 +9,9 @@ export const Route = createFileRoute("/privacy")({
   head: () =>
     pageHead({
       path: "/privacy",
-      title: "Privacy Policy — OpenRun",
+      title: "Privacy Policy — ballaCity",
       description:
-        "OpenRun's Privacy Policy: what personal data we collect, how it's used and shared, and the privacy controls you have.",
+        "ballaCity's Privacy Policy: what personal data we collect, how it's used and shared, and the privacy controls you have.",
     }),
   loader: async () => ({ published: await getPublishedLegalDocuments() }),
   errorComponent: () => (

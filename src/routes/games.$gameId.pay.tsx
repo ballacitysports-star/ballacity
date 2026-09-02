@@ -115,7 +115,7 @@ function launchExternalPayment(url: string) {
 export const Route = createFileRoute("/games/$gameId/pay")({
   head: () =>
     pageHead({
-      title: "Pay for your spot — OpenRun",
+      title: "Pay for your spot — ballaCity",
       description: "Submit payment for your approved spot in this game.",
       noindex: true,
     }),

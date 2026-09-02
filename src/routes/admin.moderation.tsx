@@ -25,8 +25,8 @@ export const Route = createFileRoute("/admin/moderation")({
   head: () =>
     pageHead({
       path: "/admin/moderation",
-      title: "Moderation — OpenRun Admin",
-      description: "Review OpenRun safety reports, take action, and audit moderation history.",
+      title: "Moderation — ballaCity Admin",
+      description: "Review ballaCity safety reports, take action, and audit moderation history.",
       noindex: true,
     }),
   ssr: false,

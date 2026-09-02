@@ -23,8 +23,8 @@ export const Route = createFileRoute("/superadmin")({
   head: () =>
     pageHead({
       path: "/superadmin",
-      title: "Superadmin — OpenRun",
-      description: "Internal OpenRun control center.",
+      title: "Superadmin — ballaCity",
+      description: "Internal ballaCity control center.",
       noindex: true,
     }),
   ssr: false,

@@ -25,7 +25,7 @@ export const Route = createFileRoute("/admin/compliance")({
   head: () =>
     pageHead({
       path: "/admin/compliance",
-      title: "Compliance readiness — OpenRun Admin",
+      title: "Compliance readiness — ballaCity Admin",
       description: "Track legal, consent, safety, security and data-rights readiness.",
       noindex: true,
     }),

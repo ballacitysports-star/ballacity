@@ -209,7 +209,7 @@ export const sendTestPushToSelf = createServerFn({ method: "POST" })
     }
 
     // 2. Send the sample push.
-    const title = data.title ?? "Test alert from OpenRun";
+    const title = data.title ?? "Test alert from ballaCity";
     const body = data.body ?? "If you can see this, push notifications are working.";
     let sendStatus: number | null = null;
     let recipients: number | null = null;

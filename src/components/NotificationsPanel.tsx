@@ -550,7 +550,7 @@ function PushPrompt() {
         <p className="text-xs text-muted-foreground mt-0.5">
           {perm === "denied"
             ? "Re-enable notifications for this site in your browser settings to get instant approval alerts."
-            : "Know the moment a host approves or declines your join request — even when OpenRun isn't open."}
+            : "Know the moment a host approves or declines your join request — even when ballaCity isn't open."}
         </p>
         {perm !== "denied" && (
           <button

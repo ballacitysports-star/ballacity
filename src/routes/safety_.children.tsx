@@ -14,9 +14,9 @@ export const Route = createFileRoute("/safety_/children")({
   head: () =>
     pageHead({
       path: "/safety/children",
-      title: "Child & teen safety — OpenRun",
+      title: "Child & teen safety — ballaCity",
       description:
-        "How OpenRun protects members under 13 and teens: parental consent, generalized location, messaging limits, private videos, reporting and data deletion.",
+        "How ballaCity protects members under 13 and teens: parental consent, generalized location, messaging limits, private videos, reporting and data deletion.",
     }),
   component: ChildSafetyCenter,
 });
@@ -33,7 +33,7 @@ const LEVEL_LABEL: Record<PermissionLevel, string> = {
 const SECTIONS = [
   {
     title: "Parent or guardian approval",
-    body: "Members under 13 can use OpenRun, but only after a parent or guardian approves the account. Before approval we collect only a name or nickname, a private date of birth, and the guardian's email — nothing else. Games, messaging, videos and profiles stay switched off, enforced on our servers rather than only in the app.",
+    body: "Members under 13 can use ballaCity, but only after a parent or guardian approves the account. Before approval we collect only a name or nickname, a private date of birth, and the guardian's email — nothing else. Games, messaging, videos and profiles stay switched off, enforced on our servers rather than only in the app.",
   },
   {
     title: "Location safety",
@@ -49,7 +49,7 @@ const SECTIONS = [
   },
   {
     title: "No advertising to children",
-    body: "OpenRun does not use children's or teens' information for targeted or behavioural advertising, and does not run session-replay tracking on minor accounts.",
+    body: "ballaCity does not use children's or teens' information for targeted or behavioural advertising, and does not run session-replay tracking on minor accounts.",
   },
   {
     title: "Reporting and blocking",
@@ -61,7 +61,7 @@ const SECTIONS = [
   },
   {
     title: "Not an emergency service",
-    body: "OpenRun is not an emergency service and does not supervise games. In an emergency contact local emergency services. Hosts are responsible for venue safety and participants are responsible for their own readiness to play.",
+    body: "ballaCity is not an emergency service and does not supervise games. In an emergency contact local emergency services. Hosts are responsible for venue safety and participants are responsible for their own readiness to play.",
   },
 ];
 
@@ -75,7 +75,7 @@ function ChildSafetyCenter() {
       </div>
       <h1 className="mt-2 font-display text-3xl font-bold">Child &amp; teen safety</h1>
       <p className="mt-2 text-sm text-muted-foreground">
-        OpenRun supports players under 13, teens and adults — with a different, age-appropriate
+        ballaCity supports players under 13, teens and adults — with a different, age-appropriate
         experience for each. Here is exactly how that works and what parents and guardians control.
       </p>
 

@@ -919,7 +919,7 @@ export function EditOrgScreen({ org }: { org: Org }) {
                           orgResults.data.length === 0 &&
                           !orgResults.isLoading && (
                             <div className="text-[11px] text-muted-foreground">
-                              No match on OpenRun.
+                              No match on ballaCity.
                             </div>
                           )}
                         {placesResults.data?.suggestions &&

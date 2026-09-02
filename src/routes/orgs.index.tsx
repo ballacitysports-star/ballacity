@@ -9,9 +9,9 @@ export const Route = createFileRoute("/orgs/")({
   head: () =>
     pageHead({
       path: "/orgs",
-      title: "Gyms & training organizations — OpenRun",
+      title: "Gyms & training organizations — ballaCity",
       description:
-        "Browse gyms, courts, and training organizations on OpenRun. See hours, amenities, and member reviews.",
+        "Browse gyms, courts, and training organizations on ballaCity. See hours, amenities, and member reviews.",
     }),
   component: OrgsIndex,
 });

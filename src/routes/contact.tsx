@@ -9,9 +9,9 @@ export const Route = createFileRoute("/contact")({
   head: () =>
     pageHead({
       path: "/contact",
-      title: "Contact & Report a Problem — OpenRun",
+      title: "Contact & Report a Problem — ballaCity",
       description:
-        "Reach OpenRun support, report a player, game, message, or highlight, and find out what happens after you send a report.",
+        "Reach ballaCity support, report a player, game, message, or highlight, and find out what happens after you send a report.",
     }),
   component: ContactPage,
 });
@@ -29,7 +29,7 @@ function ContactPage() {
       <main className="mx-auto max-w-2xl px-4 py-6 pb-28">
         <h1 className="font-display text-2xl font-bold">Contact</h1>
         <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
-          Questions about your account, a game, a payment, or something you saw on OpenRun? Start
+          Questions about your account, a game, a payment, or something you saw on ballaCity? Start
           here.
         </p>
 

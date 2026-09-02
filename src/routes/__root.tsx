@@ -105,13 +105,13 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1, viewport-fit=cover" },
-      { title: "OpenRun" },
+      { title: "ballaCity" },
       {
         name: "description",
-        content: "OpenRun — pickup sports games, teams, trainers, and gyms near you.",
+        content: "ballaCity — pickup sports games, teams, trainers, and gyms near you.",
       },
-      { name: "author", content: "OpenRun" },
-      { property: "og:site_name", content: "OpenRun" },
+      { name: "author", content: "ballaCity" },
+      { property: "og:site_name", content: "ballaCity" },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
       { name: "twitter:site", content: "@Lovable" },
@@ -122,7 +122,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
         children: JSON.stringify({
           "@context": "https://schema.org",
           "@type": "WebSite",
-          name: "OpenRun",
+          name: "ballaCity",
           url: "https://open-run-connect.lovable.app",
         }),
       },

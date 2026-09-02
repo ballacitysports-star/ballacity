@@ -19,7 +19,7 @@ export const Route = createFileRoute("/admin/child-safety")({
   head: () =>
     pageHead({
       path: "/admin/child-safety",
-      title: "Child safety — OpenRun Admin",
+      title: "Child safety — ballaCity Admin",
       description: "Review parental consent, age-change reviews and guardian requests.",
       noindex: true,
     }),

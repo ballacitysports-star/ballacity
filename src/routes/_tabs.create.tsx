@@ -72,7 +72,7 @@ export const Route = createFileRoute("/_tabs/create")({
   head: () =>
     pageHead({
       path: "/create",
-      title: "Host a game — OpenRun",
+      title: "Host a game — ballaCity",
       description: "Set up a pickup game: sport, venue, time, spots, and entry fee.",
       noindex: true,
     }),

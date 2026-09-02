@@ -41,7 +41,7 @@ export function ChildConsentGate() {
             ? "A parent or guardian turned this account off"
             : pending
               ? "Waiting for your parent or guardian"
-              : "OpenRun needs a parent or guardian to approve this account"}
+              : "ballaCity needs a parent or guardian to approve this account"}
         </h1>
         <p className="mt-2 text-sm text-muted-foreground">
           {revoked

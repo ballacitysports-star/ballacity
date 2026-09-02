@@ -1,4 +1,4 @@
-# OpenRun data export & retention
+# ballaCity data export & retention
 
 **LEGAL REVIEW REQUIRED** — durations below are engineering defaults, not vetted legal policy.
 
@@ -27,7 +27,7 @@ availability, reviews written, uploaded-media metadata, AI analysis metadata, sa
 
 Passwords and password hashes, session tokens and API keys, other members' private data,
 internal moderation notes and reviewer identities, admin audit entries, system credentials,
-and payment credentials (OpenRun never stores card or bank details).
+and payment credentials (ballaCity never stores card or bank details).
 
 Every read in `src/lib/data-export.functions.ts` runs through the caller's RLS-scoped Supabase
 client filtered on the caller's own id, so an export cannot contain another member's rows even

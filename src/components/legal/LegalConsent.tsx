@@ -77,7 +77,7 @@ export function LegalConsent({
         );
       })}
       <p className="text-[11px] leading-relaxed text-muted-foreground">
-        These documents are placeholder drafts pending legal review. OpenRun does not process
+        These documents are placeholder drafts pending legal review. ballaCity does not process
         payments or supervise games.
       </p>
     </div>

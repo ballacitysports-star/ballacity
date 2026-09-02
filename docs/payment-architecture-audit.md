@@ -1,9 +1,9 @@
-# OpenRun payment architecture audit (P2P safety)
+# ballaCity payment architecture audit (P2P safety)
 
-## 1. What OpenRun is (and is not)
+## 1. What ballaCity is (and is not)
 
-OpenRun is **not a payment processor** for game fees. Players pay hosts
-directly inside Venmo, Zelle, Cash App, PayPal, or with cash. OpenRun stores
+ballaCity is **not a payment processor** for game fees. Players pay hosts
+directly inside Venmo, Zelle, Cash App, PayPal, or with cash. ballaCity stores
 only:
 
 - the host's **public payment handle** (username, payment link, or contact),
@@ -11,7 +11,7 @@ only:
   optional screenshot),
 - the host's **manual confirmation**.
 
-OpenRun never holds funds and cannot move, refund, or reverse a payment. This
+ballaCity never holds funds and cannot move, refund, or reverse a payment. This
 is stated in `PAYMENT_DISCLAIMER` (`src/lib/payment-states.ts`) and rendered by
 `PaymentSafetyNotice` on both the player pay flow and the player payments panel,
 and in the host approvals header.
@@ -61,11 +61,11 @@ weather, dispute, other.
   `payment_not_received`, `payment_pressure`, feeding the existing
   `/admin/moderation` queue and audit log.
 - Disputes are recorded on the claim itself with a reason, visible to both
-  sides, and route resolution back to the payment app (OpenRun cannot refund).
+  sides, and route resolution back to the payment app (ballaCity cannot refund).
 
 ## 6. Stripe audit — scope separation
 
-Stripe in this project is used **only** for OpenRun's own platform
+Stripe in this project is used **only** for ballaCity's own platform
 subscriptions (`/plans`): `src/hooks/useStripeCheckout.tsx`,
 `src/components/StripeEmbeddedCheckout.tsx`, and the webhook at
 `src/routes/api/public/payments/webhook.ts`.
@@ -77,6 +77,6 @@ subscriptions (`/plans`): `src/hooks/useStripeCheckout.tsx`,
 - The webhook verifies its signature before processing and only touches
   subscription state.
 
-Keeping these separate is deliberate: platform subscriptions are OpenRun
+Keeping these separate is deliberate: platform subscriptions are ballaCity
 selling to a user (Stripe is appropriate), while game fees are two users
-transacting with each other (OpenRun stays out of the money flow).
+transacting with each other (ballaCity stays out of the money flow).

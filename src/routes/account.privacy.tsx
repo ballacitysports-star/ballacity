@@ -32,9 +32,9 @@ export const Route = createFileRoute("/account/privacy")({
   head: () =>
     pageHead({
       path: "/account/privacy",
-      title: "Privacy — OpenRun",
+      title: "Privacy — ballaCity",
       description:
-        "Control who can see your OpenRun profile, how precisely your location is shared, who can message or invite you, and delete your account.",
+        "Control who can see your ballaCity profile, how precisely your location is shared, who can message or invite you, and delete your account.",
       noindex: true,
     }),
   component: PrivacySettingsPage,
@@ -116,7 +116,7 @@ function PrivacySettingsPage() {
 
       <main className="mx-auto max-w-xl pb-4">
         <p className="px-4 pt-4 text-xs text-muted-foreground">
-          OpenRun never shares your live position or a street address. Availability locations are
+          ballaCity never shares your live position or a street address. Availability locations are
           stored as an approximate area only.
         </p>
 
@@ -260,7 +260,7 @@ function PrivacySettingsPage() {
           <SettingsStaticRow
             icon={Sparkles}
             label="AI video & highlight processing"
-            description="Allow OpenRun to analyze your uploaded clips to generate titles, captions and coaching notes."
+            description="Allow ballaCity to analyze your uploaded clips to generate titles, captions and coaching notes."
             trailing={
               <Switch
                 checked={prefs.ai_processing}

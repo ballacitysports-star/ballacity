@@ -43,7 +43,7 @@ export const Route = createFileRoute("/payments")({
   head: () =>
     pageHead({
       path: "/payments",
-      title: "Payments — OpenRun",
+      title: "Payments — ballaCity",
       description: "Manage payment methods, verify player payments, and review requests.",
       noindex: true,
     }),
@@ -91,7 +91,7 @@ function PaymentsHub() {
         <div>
           <h1 className="font-display text-2xl font-bold">Payments</h1>
           <p className="text-xs text-muted-foreground">
-            Direct, peer-to-peer. No fees through OpenRun.
+            Direct, peer-to-peer. No fees through ballaCity.
           </p>
         </div>
       </div>

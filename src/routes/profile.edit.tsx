@@ -48,7 +48,7 @@ export const Route = createFileRoute("/profile/edit")({
   head: () =>
     pageHead({
       path: "/profile/edit",
-      title: "Edit your profile — OpenRun",
+      title: "Edit your profile — ballaCity",
       description: "Update your sports, skill levels, photos, location, and links.",
       noindex: true,
     }),
@@ -540,7 +540,7 @@ function EditProfile() {
           <div className="min-w-0 flex-1">
             <div className="font-semibold text-sm">Reviews Hub</div>
             <div className="text-xs text-muted-foreground">
-              Trust scores and AI insights across OpenRun
+              Trust scores and AI insights across ballaCity
             </div>
           </div>
           <div className="text-lime text-xs font-bold">→</div>
@@ -582,13 +582,13 @@ function EditProfile() {
         </Link>
       </Section>
 
-      <Section title="OpenRun Pro">
+      <Section title="ballaCity Pro">
         <motion.div
           whileHover={{ scale: 1.01 }}
           className="rounded-3xl border border-coral/40 bg-coral-gradient p-5 text-white relative overflow-hidden"
         >
           <Video className="absolute right-4 top-4 h-16 w-16 opacity-10" />
-          <div className="text-xs font-bold uppercase tracking-wider opacity-80">OpenRun Pro</div>
+          <div className="text-xs font-bold uppercase tracking-wider opacity-80">ballaCity Pro</div>
           <h3 className="font-display text-xl font-bold mt-1">
             AI highlight reels, unlimited hosting.
           </h3>

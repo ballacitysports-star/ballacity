@@ -1,7 +1,7 @@
 /**
  * Canonical peer-to-peer payment lifecycle.
  *
- * OpenRun never touches money: players pay hosts directly inside Venmo / Zelle /
+ * ballaCity never touches money: players pay hosts directly inside Venmo / Zelle /
  * Cash App / PayPal / cash, and the host manually confirms. Every payment UI in
  * the app derives its wording from this module so there is exactly one vocabulary.
  */
@@ -95,13 +95,13 @@ export const PAYMENT_STATE_META: Record<PaymentState, StateMeta> = {
   disputed: {
     label: "Disputed",
     playerHint:
-      "This payment is disputed. Sort it out with the host in your payment app — OpenRun can't move or refund money.",
+      "This payment is disputed. Sort it out with the host in your payment app — ballaCity can't move or refund money.",
     hostHint: "This payment is disputed. Resolve it directly with the player.",
     tone: "danger",
   },
   cancelled: {
     label: "Cancelled",
-    playerHint: "This payment claim was cancelled. No money was moved by OpenRun.",
+    playerHint: "This payment claim was cancelled. No money was moved by ballaCity.",
     hostHint: "This payment claim was cancelled.",
     tone: "danger",
   },
@@ -169,11 +169,11 @@ export function canHostConfirm(state: PaymentState): boolean {
 
 /** Shown wherever a player is about to send money. */
 export const PAYMENT_DISCLAIMER =
-  "OpenRun is not a payment processor. You pay the host directly in their app, and OpenRun cannot hold, move, refund, or reverse that money.";
+  "ballaCity is not a payment processor. You pay the host directly in their app, and ballaCity cannot hold, move, refund, or reverse that money.";
 
 export const PAYMENT_SAFETY_TIPS: string[] = [
   "Only send the exact game fee — never a deposit, gift card, or crypto transfer.",
-  "Never share your card number, CVV, bank login, or one-time codes. No host or OpenRun staff will ever ask.",
+  "Never share your card number, CVV, bank login, or one-time codes. No host or ballaCity staff will ever ask.",
   "Keep the payment inside your payment app so it has its own record. Screenshot the confirmation.",
   "If someone pressures you to pay fast, pay off-app, or pay more than the listed fee, stop and report it.",
 ];
@@ -184,4 +184,4 @@ export const PAYMENT_PRESSURE_WARNING =
 
 /** Credential-shaped inputs are never allowed anywhere in the payment flow. */
 export const FORBIDDEN_CREDENTIAL_HINT =
-  "OpenRun only stores a host's public payment handle (like a Venmo username or a payment link). It never asks for card numbers, bank accounts, routing numbers, or login details.";
+  "ballaCity only stores a host's public payment handle (like a Venmo username or a payment link). It never asks for card numbers, bank accounts, routing numbers, or login details.";

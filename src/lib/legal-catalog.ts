@@ -33,14 +33,14 @@ export const MANAGED_LEGAL_META: Record<ManagedLegalType, ManagedLegalMeta> = {
     label: "Terms of Service",
     path: "/terms",
     requiresConsent: true,
-    description: "Rules for using OpenRun to find, host, and join games.",
+    description: "Rules for using ballaCity to find, host, and join games.",
   },
   privacy: {
     type: "privacy",
     label: "Privacy Policy",
     path: "/privacy",
     requiresConsent: true,
-    description: "What personal data OpenRun collects and the controls users have.",
+    description: "What personal data ballaCity collects and the controls users have.",
   },
   community_guidelines: {
     type: "community_guidelines",
@@ -61,7 +61,7 @@ export const MANAGED_LEGAL_META: Record<ManagedLegalType, ManagedLegalMeta> = {
     label: "Payment Policy",
     path: null,
     requiresConsent: false,
-    description: "How direct player-to-host payments work on OpenRun.",
+    description: "How direct player-to-host payments work on ballaCity.",
   },
   ai_disclosure: {
     type: "ai_disclosure",

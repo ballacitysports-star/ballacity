@@ -49,7 +49,7 @@ export function HostTrustPanel({
 
       {!verifiedLabel && (
         <p className="mt-2 text-[11px] leading-relaxed text-muted-foreground">
-          OpenRun hasn't verified this host. Read the game policies and message the host with any
+          ballaCity hasn't verified this host. Read the game policies and message the host with any
           questions before you commit.
         </p>
       )}

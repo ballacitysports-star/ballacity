@@ -98,7 +98,7 @@ export const Route = createFileRoute("/_tabs/trainers")({
   head: () =>
     pageHead({
       path: "/trainers",
-      title: "Trainers & coaches — OpenRun",
+      title: "Trainers & coaches — ballaCity",
       description:
         "Find and book trainers and coaches near you by sport, availability, and distance.",
       noindex: true,

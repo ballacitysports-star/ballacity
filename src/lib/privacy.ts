@@ -61,7 +61,7 @@ export const PROFILE_VISIBILITY_OPTIONS: Array<{
   {
     value: "members",
     label: "Signed-in members",
-    description: "Only people signed in to OpenRun can open your profile.",
+    description: "Only people signed in to ballaCity can open your profile.",
   },
   {
     value: "private",

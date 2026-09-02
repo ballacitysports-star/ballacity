@@ -61,14 +61,14 @@ export const Route = createFileRoute("/orgs/$orgId/")({
     const name = org?.name ?? "Gym";
     return pageHead({
       path: `/orgs/${params.orgId}`,
-      title: `${name} — Gym on OpenRun`,
+      title: `${name} — Gym on ballaCity`,
       description: (
-        org?.bio || `${name} on OpenRun: hours, amenities, trainers, and member reviews.`
+        org?.bio || `${name} on ballaCity: hours, amenities, trainers, and member reviews.`
       ).slice(0, 155),
       image: ogImageUrl({
         kind: "venue",
         title: name,
-        subtitle: org?.city ?? org?.address ?? "Gym on OpenRun",
+        subtitle: org?.city ?? org?.address ?? "Gym on ballaCity",
         meta: [org?.city, "Hours & amenities", "Member reviews"],
       }),
       noindex: !org,

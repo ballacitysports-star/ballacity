@@ -39,9 +39,9 @@ export const Route = createFileRoute("/onboarding/welcome")({
   head: () =>
     pageHead({
       path: "/onboarding/welcome",
-      title: "Set up your profile — OpenRun",
+      title: "Set up your profile — ballaCity",
       description:
-        "Add your sports, skill levels, location, and availability to finish setting up OpenRun.",
+        "Add your sports, skill levels, location, and availability to finish setting up ballaCity.",
       noindex: true,
     }),
   validateSearch: searchSchema,
@@ -226,7 +226,7 @@ function OnboardingWizard({ type }: { type: AccountType }) {
           setGeo({
             kind: "denied",
             message:
-              "Location is blocked. Open your browser's site settings for OpenRun, allow Location, then try again — or skip and set a radius manually below.",
+              "Location is blocked. Open your browser's site settings for ballaCity, allow Location, then try again — or skip and set a radius manually below.",
             canRetry: true,
           });
         } else if (err.code === 2) {

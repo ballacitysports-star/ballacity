@@ -166,7 +166,7 @@ export function GamePolicyFields({
           </div>
           <p className="mt-2 text-[11px] text-muted-foreground">
             {value.entryFee > 0
-              ? `Players owe $${value.entryFee} and pay you directly — OpenRun doesn't process payments or issue refunds.`
+              ? `Players owe $${value.entryFee} and pay you directly — ballaCity doesn't process payments or issue refunds.`
               : "This game is free. Set an entry fee in the fee field to require payment."}
           </p>
           {value.entryFee > 0 && (

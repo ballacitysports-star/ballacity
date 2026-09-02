@@ -10,7 +10,7 @@ export const Route = createFileRoute("/account/security")({
   head: () =>
     pageHead({
       path: "/account/security",
-      title: "Security — OpenRun",
+      title: "Security — ballaCity",
       description: "Manage sign-in methods, password, and connected accounts.",
       noindex: true,
     }),

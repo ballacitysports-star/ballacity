@@ -1,14 +1,14 @@
 /**
  * Canonical Trust Center copy.
  *
- * Plain-language explanations of how OpenRun handles privacy, security, user
+ * Plain-language explanations of how ballaCity handles privacy, security, user
  * safety, payments, AI, account deletion, and moderation. These describe how
  * the product currently behaves — they intentionally make no certification,
  * audit, or regulatory-compliance claims. Anything legal-facing lives in
  * `legal-documents.ts` and is labeled for review by counsel.
  */
 
-export const SUPPORT_EMAIL = "support@openrun.app";
+export const SUPPORT_EMAIL = "support@ballacity.app";
 
 export type TrustTopic = {
   id: string;
@@ -35,7 +35,7 @@ export const TRUST_TOPICS: TrustTopic[] = [
     title: "Security",
     summary: "Accounts and data are protected in transit and by per-user database rules.",
     points: [
-      "Traffic to OpenRun uses HTTPS.",
+      "Traffic to ballaCity uses HTTPS.",
       "Sign-in is handled by our authentication provider with email/password or Google sign-in.",
       "Database access is enforced per row and per user, so a request can only read the data that account is allowed to see.",
       "Uploads (avatars, game covers, highlight reels) are checked for ownership before they can be written or replaced.",
@@ -48,7 +48,7 @@ export const TRUST_TOPICS: TrustTopic[] = [
     summary: "Reporting and blocking are available everywhere people interact.",
     points: [
       "Use the flag icon on a profile, game, message, or highlight to report it. Reports include what you saw and when.",
-      "Reports go to OpenRun moderators with an audit trail.",
+      "Reports go to ballaCity moderators with an audit trail.",
       "Blocking stops messages, follows, and join requests both ways, and is not disclosed to the other person.",
       "Manage everyone you've blocked from Account → Blocked users.",
     ],
@@ -56,13 +56,13 @@ export const TRUST_TOPICS: TrustTopic[] = [
   {
     id: "payments",
     title: "Payments",
-    summary: "Game fees are paid person-to-person. OpenRun is not a payment processor.",
+    summary: "Game fees are paid person-to-person. ballaCity is not a payment processor.",
     points: [
       "Hosts publish the fee and their own payment handle (for example Venmo, Zelle, or cash).",
-      "You pay the host directly through that service. Money never moves through OpenRun.",
-      "OpenRun records that you marked a payment as sent and lets the host confirm, reject, or dispute it.",
-      "Because payments are direct, OpenRun cannot reverse a transfer or issue a refund — ask the host, then the payment service.",
-      "Subscriptions for OpenRun plans are separate and handled by our billing provider.",
+      "You pay the host directly through that service. Money never moves through ballaCity.",
+      "ballaCity records that you marked a payment as sent and lets the host confirm, reject, or dispute it.",
+      "Because payments are direct, ballaCity cannot reverse a transfer or issue a refund — ask the host, then the payment service.",
+      "Subscriptions for ballaCity plans are separate and handled by our billing provider.",
     ],
   },
   {

@@ -9,9 +9,9 @@ export const Route = createFileRoute("/terms")({
   head: () =>
     pageHead({
       path: "/terms",
-      title: "Terms of Service — OpenRun",
+      title: "Terms of Service — ballaCity",
       description:
-        "OpenRun's Terms of Service: account rules, game participation, peer-to-peer payments, content, and conduct.",
+        "ballaCity's Terms of Service: account rules, game participation, peer-to-peer payments, content, and conduct.",
     }),
   loader: async () => ({ published: await getPublishedLegalDocuments() }),
   errorComponent: () => (

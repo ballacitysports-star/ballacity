@@ -9,10 +9,10 @@ const projectRef = import.meta.env.VITE_SUPABASE_PROJECT_ID ?? "project-ref-unse
 
 export default defineMcp({
   name: "openrun-mcp",
-  title: "OpenRun",
+  title: "ballaCity",
   version: "0.1.0",
   instructions:
-    "Tools for OpenRun, a pickup-sports app. Use `whoami` to verify the signed-in user, and `list_upcoming_games` to see upcoming games. Callers act as the authenticated OpenRun user; row-level security applies.",
+    "Tools for ballaCity, a pickup-sports app. Use `whoami` to verify the signed-in user, and `list_upcoming_games` to see upcoming games. Callers act as the authenticated ballaCity user; row-level security applies.",
   auth: auth.oauth.issuer({
     issuer: `https://${projectRef}.supabase.co/auth/v1`,
     acceptedAudiences: "authenticated",

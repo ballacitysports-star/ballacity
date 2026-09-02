@@ -6,7 +6,7 @@
  * before launch.
  *
  * IMPORTANT (legal):
- * - OpenRun does NOT organize, supervise, or guarantee the safety of any game.
+ * - ballaCity does NOT organize, supervise, or guarantee the safety of any game.
  * - Host acknowledgments are a plain-language notice of responsibility. They are
  *   NOT a waiver or release of liability and are not universally enforceable.
  */
@@ -69,7 +69,7 @@ export const HOST_ACK_ITEMS: HostAckItem[] = [
   {
     id: "payment",
     label: "Payment info",
-    text: "Any fee, deadline, and refund terms I post are accurate — I collect payment directly, not OpenRun.",
+    text: "Any fee, deadline, and refund terms I post are accurate — I collect payment directly, not ballaCity.",
   },
 ];
 
@@ -79,7 +79,7 @@ export const HOST_ACK_CHECKBOX_LABEL =
 
 /** Configurable legal copy — pending review. */
 export const HOST_ACK_DISCLAIMER =
-  "OpenRun does not organize, supervise, or guarantee the safety of any game. This acknowledgment is a statement of host responsibility, not a waiver or release of liability, and may not be enforceable everywhere.";
+  "ballaCity does not organize, supervise, or guarantee the safety of any game. This acknowledgment is a statement of host responsibility, not a waiver or release of liability, and may not be enforceable everywhere.";
 
 // ---------------------------------------------------------------------------
 // Cancellation policy
@@ -245,7 +245,7 @@ export function gamePolicyLines(policy: GamePolicy): PolicyLine[] {
     critical: true,
     value:
       policy.entryFee > 0
-        ? `$${formatMoney(policy.entryFee)} per player, paid directly to the host. OpenRun doesn't process payments.`
+        ? `$${formatMoney(policy.entryFee)} per player, paid directly to the host. ballaCity doesn't process payments.`
         : "Free to join — the host isn't collecting an entry fee here.",
   });
 
@@ -275,7 +275,7 @@ export function gamePolicyLines(policy: GamePolicy): PolicyLine[] {
       critical: true,
       value:
         policy.refundPolicy ||
-        "The host hasn't posted refund terms — ask before you pay, since OpenRun can't issue refunds.",
+        "The host hasn't posted refund terms — ask before you pay, since ballaCity can't issue refunds.",
     });
   }
 

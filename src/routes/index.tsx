@@ -18,13 +18,13 @@ export const Route = createFileRoute("/")({
   head: () =>
     pageHead({
       path: "/",
-      title: "OpenRun — Pickup sports games near you",
+      title: "ballaCity — Pickup sports games near you",
       description:
         "Find and host pickup sports games near you. Basketball, soccer, pickleball, tennis and more — join a game in seconds.",
       jsonLd: {
         "@context": "https://schema.org",
         "@type": "WebSite",
-        name: "OpenRun",
+        name: "ballaCity",
         url: "https://open-run-connect.lovable.app",
       },
     }),
@@ -116,7 +116,7 @@ function Landing() {
               className="enter-up mt-5 max-w-md text-lg text-muted-foreground"
             >
               Find a game in 15 seconds. Host your court. Build a crew. From hoops to pickleball —
-              OpenRun connects the players around you.
+              ballaCity connects the players around you.
             </p>
             <div
               style={{ "--enter-delay": "180ms" } as CSSProperties}
@@ -160,7 +160,7 @@ function Landing() {
             <div className="relative rounded-[2.5rem] border-[10px] border-surface-2 bg-background shadow-2xl glow-coral overflow-hidden">
               <img
                 src={HERO_IMAGE}
-                alt="OpenRun app preview"
+                alt="ballaCity app preview"
                 className="h-[560px] w-full object-cover"
               />
               <div className="absolute inset-0 bg-gradient-to-t from-background via-background/20 to-transparent" />
@@ -347,7 +347,7 @@ function Landing() {
               to="/feed"
               className="inline-flex items-center gap-2 mt-7 rounded-full bg-lime-gradient px-7 py-4 font-bold text-primary-foreground glow-lime hover:scale-[1.02] transition-transform"
             >
-              Open OpenRun <ArrowRight className="h-4 w-4" />
+              Open ballaCity <ArrowRight className="h-4 w-4" />
             </Link>
           </div>
         </div>
@@ -376,7 +376,7 @@ function Landing() {
               Contact
             </Link>
           </nav>
-          <span>© {new Date().getFullYear()} OpenRun. Built for the players.</span>
+          <span>© {new Date().getFullYear()} ballaCity. Built for the players.</span>
         </div>
       </footer>
 

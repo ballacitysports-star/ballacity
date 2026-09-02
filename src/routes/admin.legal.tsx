@@ -39,8 +39,8 @@ export const Route = createFileRoute("/admin/legal")({
   head: () =>
     pageHead({
       path: "/admin/legal",
-      title: "Legal & Compliance — OpenRun Admin",
-      description: "Manage versions of OpenRun's legal and policy documents.",
+      title: "Legal & Compliance — ballaCity Admin",
+      description: "Manage versions of ballaCity's legal and policy documents.",
       noindex: true,
     }),
   ssr: false,
@@ -220,7 +220,7 @@ function LegalManager() {
         <div className="min-w-0 flex-1">
           <h1 className="text-2xl font-semibold">Legal &amp; Compliance</h1>
           <p className="text-sm text-muted-foreground">
-            Draft, review, and publish versions of OpenRun's policy documents. Published versions are
+            Draft, review, and publish versions of ballaCity's policy documents. Published versions are
             what users see and are never edited afterwards.
           </p>
         </div>

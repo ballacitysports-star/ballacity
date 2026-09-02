@@ -8,7 +8,7 @@ export const Route = createFileRoute("/trainers/create")({
   head: () =>
     pageHead({
       path: "/trainers/create",
-      title: "Create a trainer profile — OpenRun",
+      title: "Create a trainer profile — ballaCity",
       description: "Set up your trainer profile to offer sessions and manage availability.",
       noindex: true,
     }),
