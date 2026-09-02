@@ -1243,6 +1243,71 @@ function GameDetail() {
           gameId={game.id}
         />
       )}
+      {/* Cancel game dialog (host) */}
+      <Dialog
+        open={cancelOpen}
+        onOpenChange={(v) => {
+          if (!cancelling) setCancelOpen(v);
+        }}
+      >
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Cancel {game.title}?</DialogTitle>
+            <DialogDescription>
+              Everyone on the roster is notified right away and no one else can join. This can't be
+              undone — you'd need to create a new game.
+            </DialogDescription>
+          </DialogHeader>
+          <label className="block text-xs font-semibold text-muted-foreground" htmlFor="cancel-reason">
+            Reason players will see
+          </label>
+          <textarea
+            id="cancel-reason"
+            value={cancelReason}
+            onChange={(e) => setCancelReason(e.target.value)}
+            rows={3}
+            placeholder="Field flooded, not enough players, moved to next week…"
+            className="w-full rounded-xl border border-border bg-background p-3 text-sm"
+          />
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={() => setCancelOpen(false)}
+              disabled={cancelling}
+              className="flex-1 rounded-xl border border-border bg-background py-2.5 text-xs font-semibold disabled:opacity-50"
+            >
+              Keep game
+            </button>
+            <button
+              type="button"
+              onClick={() => void handleCancelGame()}
+              disabled={cancelling}
+              className="flex-1 rounded-xl border border-coral/40 bg-coral/10 py-2.5 text-xs font-bold text-coral disabled:opacity-50"
+            >
+              {cancelling ? "Cancelling…" : "Cancel game"}
+            </button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Canonical lifecycle banner: cancelled or ended games say so first. */}
+      {(() => {
+        const resolved = resolveGameStatus(game);
+        if (!resolved.terminal) return null;
+        return (
+          <div
+            role="status"
+            className={`mx-4 mt-4 flex items-start gap-2 rounded-2xl border p-3 text-xs font-semibold ${GAME_STATUS_TONE_CLASS[resolved.tone]}`}
+          >
+            <Ban className="mt-0.5 h-4 w-4 shrink-0" />
+            <div>
+              <div className="text-sm font-bold">{resolved.label}</div>
+              <p className="mt-0.5 font-medium opacity-90">{resolved.detail}</p>
+            </div>
+          </div>
+        );
+      })()}
+
       {/* Hero */}
       <div className="relative h-72">
         <MediaImage src={game.image} alt={game.title} className="h-full w-full object-cover" />
