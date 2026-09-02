@@ -343,6 +343,7 @@ export type Database = {
           location_precision: string
           media_visibility: string
           messaging: string
+          notification_curfew_lifted: boolean
           notifications: boolean
           social_discovery: boolean
           updated_at: string
@@ -356,6 +357,7 @@ export type Database = {
           location_precision?: string
           media_visibility?: string
           messaging?: string
+          notification_curfew_lifted?: boolean
           notifications?: boolean
           social_discovery?: boolean
           updated_at?: string
@@ -369,6 +371,7 @@ export type Database = {
           location_precision?: string
           media_visibility?: string
           messaging?: string
+          notification_curfew_lifted?: boolean
           notifications?: boolean
           social_discovery?: boolean
           updated_at?: string
@@ -2163,6 +2166,7 @@ export type Database = {
           sport_levels: Json
           suspended_at: string | null
           suspended_reason: string | null
+          timezone: string | null
           updated_at: string
           username: string | null
         }
@@ -2192,6 +2196,7 @@ export type Database = {
           sport_levels?: Json
           suspended_at?: string | null
           suspended_reason?: string | null
+          timezone?: string | null
           updated_at?: string
           username?: string | null
         }
@@ -2221,6 +2226,7 @@ export type Database = {
           sport_levels?: Json
           suspended_at?: string | null
           suspended_reason?: string | null
+          timezone?: string | null
           updated_at?: string
           username?: string | null
         }
@@ -2371,6 +2377,87 @@ export type Database = {
           scores?: Json
           title?: string | null
           verified?: boolean
+        }
+        Relationships: []
+      }
+      scheduled_notifications: {
+        Row: {
+          attempts: number
+          body: string | null
+          channel: string
+          created_at: string
+          deliver_after: string
+          id: string
+          last_error: string | null
+          reason: string
+          sent_at: string | null
+          status: string
+          title: string
+          updated_at: string
+          url: string | null
+          user_id: string
+        }
+        Insert: {
+          attempts?: number
+          body?: string | null
+          channel?: string
+          created_at?: string
+          deliver_after: string
+          id?: string
+          last_error?: string | null
+          reason?: string
+          sent_at?: string | null
+          status?: string
+          title: string
+          updated_at?: string
+          url?: string | null
+          user_id: string
+        }
+        Update: {
+          attempts?: number
+          body?: string | null
+          channel?: string
+          created_at?: string
+          deliver_after?: string
+          id?: string
+          last_error?: string | null
+          reason?: string
+          sent_at?: string | null
+          status?: string
+          title?: string
+          updated_at?: string
+          url?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
+      session_activity: {
+        Row: {
+          created_at: string
+          id: string
+          last_heartbeat_at: string
+          started_at: string
+          timezone: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          last_heartbeat_at?: string
+          started_at?: string
+          timezone?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          last_heartbeat_at?: string
+          started_at?: string
+          timezone?: string | null
+          updated_at?: string
+          user_id?: string
         }
         Relationships: []
       }
@@ -3413,6 +3500,15 @@ export type Database = {
         Args: { _a: string; _b: string }
         Returns: boolean
       }
+      minor_time_on_platform: {
+        Args: { _days?: number }
+        Returns: {
+          avg_daily_minutes: number
+          cohort: string
+          day_part: string
+          members: number
+        }[]
+      }
       moderate_gym_review: {
         Args: { _hidden: boolean; _review_id: string }
         Returns: undefined
@@ -3451,6 +3547,7 @@ export type Database = {
         }
         Returns: undefined
       }
+      parental_consent_required: { Args: { _cohort: string }; Returns: boolean }
       parental_consent_state: { Args: { _child: string }; Returns: string }
       platform_status: { Args: { _user: string }; Returns: string }
       player_activity_stats: {
@@ -3488,6 +3585,10 @@ export type Database = {
         }[]
       }
       publish_legal_document: { Args: { _id: string }; Returns: string }
+      record_session_heartbeat: {
+        Args: { _timezone?: string }
+        Returns: string
+      }
       redeem_minor_invite: {
         Args: { _token_hash: string }
         Returns: {
