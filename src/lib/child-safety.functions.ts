@@ -701,3 +701,92 @@ export const getChildConsentTrail = createServerFn({ method: "POST" })
       };
     });
   });
+
+/* ------------------------------------------------------------------ */
+/* Admin family management: guardian links, consent state, invites     */
+/* ------------------------------------------------------------------ */
+
+export type AdminFamilyRow = {
+  linkId: string;
+  parentUserId: string;
+  parentName: string;
+  childUserId: string;
+  childName: string;
+  childCohort: AgeCohort;
+  relationship: string;
+  linkStatus: string;
+  verified: boolean;
+  consentStatus: string | null;
+  createdAt: string;
+};
+
+export type AdminFamilyOverview = {
+  families: AdminFamilyRow[];
+  inviteCounts: Record<string, number>;
+};
+
+export const adminFamilyOverview = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }): Promise<AdminFamilyOverview> => {
+    await assertModerator(context.supabase, context.userId);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    const [{ data: links }, { data: invites }] = await Promise.all([
+      supabaseAdmin
+        .from("guardian_links")
+        .select("id, parent_user_id, child_user_id, relationship, status, verified_at, created_at")
+        .order("created_at", { ascending: false })
+        .limit(200),
+      supabaseAdmin.from("minor_invites").select("status"),
+    ]);
+
+    const rows = links ?? [];
+    const ids = Array.from(
+      new Set(rows.flatMap((r) => [r.parent_user_id, r.child_user_id])),
+    );
+    const [{ data: people }, { data: consents }] = await Promise.all([
+      ids.length
+        ? supabaseAdmin.from("profiles").select("id, display_name, age_cohort").in("id", ids)
+        : Promise.resolve({ data: [] as never[] }),
+      rows.length
+        ? supabaseAdmin
+            .from("parental_consents")
+            .select("child_user_id, status")
+            .in("child_user_id", rows.map((r) => r.child_user_id))
+        : Promise.resolve({ data: [] as never[] }),
+    ]);
+
+    const nameOf = new Map<string, { name: string; cohort: string }>();
+    for (const p of people ?? []) {
+      const row = p as { id: string; display_name: string | null; age_cohort: string | null };
+      nameOf.set(row.id, { name: row.display_name ?? "Member", cohort: row.age_cohort ?? "unknown" });
+    }
+    const consentOf = new Map<string, string>();
+    for (const c of consents ?? []) {
+      const row = c as { child_user_id: string; status: string };
+      consentOf.set(row.child_user_id, row.status);
+    }
+
+    const inviteCounts: Record<string, number> = {};
+    for (const i of invites ?? []) {
+      const s = String((i as { status: string }).status ?? "unknown");
+      inviteCounts[s] = (inviteCounts[s] ?? 0) + 1;
+    }
+
+    return {
+      families: rows.map((r) => ({
+        linkId: r.id,
+        parentUserId: r.parent_user_id,
+        parentName: nameOf.get(r.parent_user_id)?.name ?? "Member",
+        childUserId: r.child_user_id,
+        childName: nameOf.get(r.child_user_id)?.name ?? "Member",
+        childCohort: parseCohort(nameOf.get(r.child_user_id)?.cohort ?? "unknown"),
+        relationship: r.relationship,
+        linkStatus: r.status,
+        verified: !!r.verified_at,
+        consentStatus: consentOf.get(r.child_user_id) ?? null,
+        createdAt: r.created_at,
+      })),
+      inviteCounts,
+    };
+  });
