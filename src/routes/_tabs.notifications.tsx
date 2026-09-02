@@ -55,7 +55,11 @@ function NotificationsPage() {
           </Link>
         </div>
       ) : (
-        <NotificationsPanel />
+        <>
+          {/* Invitations need an answer, so they sit above the passive feed. */}
+          <TeamInvitesInbox className="mb-5" />
+          <NotificationsPanel />
+        </>
       )}
     </div>
   );
