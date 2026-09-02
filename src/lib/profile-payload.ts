@@ -50,10 +50,10 @@ export function buildProfileRow(input: ProfilePayloadInput) {
 /**
  * Persists a canonical profile row.
  *
- * `birthday` is private: signed-in users can read every other profile column
- * but not that one, and Postgres needs read access to a column to resolve an
- * upsert that writes it. So the upsert omits birthday and it is written with a
- * separate self-scoped update.
+ * Birthdays are never stored on `profiles` — that column no longer exists, so
+ * no profile read can leak an exact birthdate. The birthday is written to the
+ * private, self-scoped `profile_birthdays` table instead, which also refreshes
+ * the derived age category.
  */
 export async function saveProfileRow(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -64,14 +64,14 @@ export async function saveProfileRow(
   const { error } = await client.from("profiles").upsert(rest, { onConflict: "id" });
   if (error) throw error;
 
-  if (birthday !== undefined) {
+  if (birthday !== undefined && birthday !== null) {
     const { error: bErr } = await client
-      .from("profiles")
-      .update({ birthday })
-      .eq("id", row.id as string);
+      .from("profile_birthdays")
+      .upsert({ user_id: row.id as string, birthday }, { onConflict: "user_id" });
     if (bErr) throw bErr;
   }
 }
+
 
 /**
  * Stable fingerprint of a profile row, used as an idempotency key so repeated
