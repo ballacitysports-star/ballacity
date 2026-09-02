@@ -14,6 +14,7 @@ import {
 import { CHILD_POLICY_DISCLAIMER, COHORT_META, type ChildControls } from "@/lib/child-policy";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
+import { ConsentTrail } from "@/components/child/ConsentTrail";
 
 export const Route = createFileRoute("/parent/")({
   head: () =>

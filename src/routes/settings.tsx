@@ -1,5 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { pageHead } from "@/lib/seo";
+import { AgeReviewNotice } from "@/components/child/AgeReviewNotice";
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
 import {
   ArrowLeft,
@@ -253,6 +254,8 @@ function SettingsHubPage() {
 
       <main className="mx-auto max-w-xl pb-4">
         <AccountIdentityRow />
+
+        <AgeReviewNotice />
 
         <SettingsGroup title="Appearance">
           <SettingsStaticRow>
