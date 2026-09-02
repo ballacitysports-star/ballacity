@@ -52,49 +52,64 @@ async function hydrate(gameId: string) {
   }
 }
 
-async function attachChannel(gameId: string) {
-  if (channels.has(gameId) || typeof window === "undefined") return;
-  if (!(await hasSession())) return;
+const attaching = new Set<string>();
+let channelSeq = 0;
 
-  const channel = supabase
-    .channel(`game_participants:game:${gameId}`)
-    .on(
-      "postgres_changes",
-      {
-        event: "INSERT",
-        schema: "public",
-        table: "game_participants",
-        filter: `game_id=eq.${gameId}`,
-      },
-      () => {
-        counts.set(gameId, (counts.get(gameId) ?? 0) + 1);
-        emit(gameId);
-      },
-    )
-    .on(
-      "postgres_changes",
-      {
-        event: "DELETE",
-        schema: "public",
-        table: "game_participants",
-        filter: `game_id=eq.${gameId}`,
-      },
-      () => {
-        counts.set(gameId, Math.max((counts.get(gameId) ?? 1) - 1, 0));
-        emit(gameId);
-      },
-    )
-    .subscribe((status) => {
-      if (status === "SUBSCRIBED") {
-        // Re-hydrate on initial connect AND every reconnect. Optimistic +/- 1
-        // deltas can drift if events are missed during a network flap; an
-        // authoritative HEAD count on every SUBSCRIBED transition keeps
-        // "spots left" badges consistent across devices.
-        void hydrate(gameId);
-      }
-    });
-  channels.set(gameId, channel);
+async function attachChannel(gameId: string) {
+  // The session check below is async, so two overlapping mounts could both
+  // pass the `channels.has` test and build two channels on the same topic —
+  // the second one then throws "cannot add postgres_changes callbacks ...
+  // after subscribe()". A synchronous in-progress guard plus a unique topic
+  // per attach keeps every channel fresh and single-owner.
+  if (channels.has(gameId) || attaching.has(gameId) || typeof window === "undefined") return;
+  attaching.add(gameId);
+  try {
+    if (!(await hasSession())) return;
+    if (channels.has(gameId)) return;
+
+    const channel = supabase
+      .channel(`game_participants:game:${gameId}:${++channelSeq}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "game_participants",
+          filter: `game_id=eq.${gameId}`,
+        },
+        () => {
+          counts.set(gameId, (counts.get(gameId) ?? 0) + 1);
+          emit(gameId);
+        },
+      )
+      .on(
+        "postgres_changes",
+        {
+          event: "DELETE",
+          schema: "public",
+          table: "game_participants",
+          filter: `game_id=eq.${gameId}`,
+        },
+        () => {
+          counts.set(gameId, Math.max((counts.get(gameId) ?? 1) - 1, 0));
+          emit(gameId);
+        },
+      )
+      .subscribe((status) => {
+        if (status === "SUBSCRIBED") {
+          // Re-hydrate on initial connect AND every reconnect. Optimistic +/- 1
+          // deltas can drift if events are missed during a network flap; an
+          // authoritative HEAD count on every SUBSCRIBED transition keeps
+          // "spots left" badges consistent across devices.
+          void hydrate(gameId);
+        }
+      });
+    channels.set(gameId, channel);
+  } finally {
+    attaching.delete(gameId);
+  }
 }
+
 
 
 function detachIfIdle(gameId: string) {
