@@ -841,13 +841,6 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "hosted_games_org_id_fkey"
-            columns: ["org_id"]
-            isOneToOne: false
-            referencedRelation: "trainer_orgs_public"
-            referencedColumns: ["id"]
-          },
-          {
             foreignKeyName: "hosted_games_team_id_fkey"
             columns: ["team_id"]
             isOneToOne: false
@@ -1310,13 +1303,6 @@ export type Database = {
             referencedRelation: "trainer_orgs"
             referencedColumns: ["id"]
           },
-          {
-            foreignKeyName: "org_member_requests_org_id_fkey"
-            columns: ["org_id"]
-            isOneToOne: false
-            referencedRelation: "trainer_orgs_public"
-            referencedColumns: ["id"]
-          },
         ]
       }
       org_members: {
@@ -1347,13 +1333,6 @@ export type Database = {
             columns: ["org_id"]
             isOneToOne: false
             referencedRelation: "trainer_orgs"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "org_members_org_id_fkey"
-            columns: ["org_id"]
-            isOneToOne: false
-            referencedRelation: "trainer_orgs_public"
             referencedColumns: ["id"]
           },
         ]
@@ -2242,13 +2221,6 @@ export type Database = {
             referencedRelation: "trainer_orgs"
             referencedColumns: ["id"]
           },
-          {
-            foreignKeyName: "trainer_org_invites_org_id_fkey"
-            columns: ["org_id"]
-            isOneToOne: false
-            referencedRelation: "trainer_orgs_public"
-            referencedColumns: ["id"]
-          },
         ]
       }
       trainer_org_join_requests: {
@@ -2294,13 +2266,6 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "trainer_org_join_requests_org_id_fkey"
-            columns: ["org_id"]
-            isOneToOne: false
-            referencedRelation: "trainer_orgs_public"
-            referencedColumns: ["id"]
-          },
-          {
             foreignKeyName: "trainer_org_join_requests_trainer_id_fkey"
             columns: ["trainer_id"]
             isOneToOne: false
@@ -2340,13 +2305,6 @@ export type Database = {
             columns: ["org_id"]
             isOneToOne: false
             referencedRelation: "trainer_orgs"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "trainer_org_members_org_id_fkey"
-            columns: ["org_id"]
-            isOneToOne: false
-            referencedRelation: "trainer_orgs_public"
             referencedColumns: ["id"]
           },
           {
@@ -2596,81 +2554,7 @@ export type Database = {
       }
     }
     Views: {
-      trainer_orgs_public: {
-        Row: {
-          address: string | null
-          amenities: string[] | null
-          avatar: string | null
-          avatar_url: string | null
-          bio: string | null
-          category: string | null
-          city: string | null
-          cover_url: string | null
-          created_at: string | null
-          geo: Json | null
-          handle: string | null
-          hidden_at: string | null
-          hours: Json | null
-          id: string | null
-          name: string | null
-          owner_id: string | null
-          photos: string[] | null
-          place_id: string | null
-          timezone: string | null
-          updated_at: string | null
-          verified: boolean | null
-          website: string | null
-        }
-        Insert: {
-          address?: string | null
-          amenities?: string[] | null
-          avatar?: string | null
-          avatar_url?: string | null
-          bio?: string | null
-          category?: string | null
-          city?: string | null
-          cover_url?: string | null
-          created_at?: string | null
-          geo?: Json | null
-          handle?: string | null
-          hidden_at?: string | null
-          hours?: Json | null
-          id?: string | null
-          name?: string | null
-          owner_id?: string | null
-          photos?: string[] | null
-          place_id?: string | null
-          timezone?: string | null
-          updated_at?: string | null
-          verified?: boolean | null
-          website?: string | null
-        }
-        Update: {
-          address?: string | null
-          amenities?: string[] | null
-          avatar?: string | null
-          avatar_url?: string | null
-          bio?: string | null
-          category?: string | null
-          city?: string | null
-          cover_url?: string | null
-          created_at?: string | null
-          geo?: Json | null
-          handle?: string | null
-          hidden_at?: string | null
-          hours?: Json | null
-          id?: string | null
-          name?: string | null
-          owner_id?: string | null
-          photos?: string[] | null
-          place_id?: string | null
-          timezone?: string | null
-          updated_at?: string | null
-          verified?: boolean | null
-          website?: string | null
-        }
-        Relationships: []
-      }
+      [_ in never]: never
     }
     Functions: {
       accept_conversation: { Args: { _conv: string }; Returns: undefined }
