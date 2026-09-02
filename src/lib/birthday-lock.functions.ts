@@ -70,7 +70,7 @@ export const requestBirthdayCorrection = createServerFn({ method: "POST" })
     const { data: id, error } = await context.supabase.rpc("request_birthday_correction", {
       _requested: data.requestedBirthday,
       _reason: data.reason,
-      _evidence: data.evidence || null,
+      _evidence: data.evidence || undefined,
     });
     if (error) throw new Error(friendly(error.message));
     return { id: String(id) };
@@ -88,7 +88,7 @@ export type AdminBirthdayCorrection = BirthdayCorrection & {
 export const listBirthdayCorrections = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: { status?: string } | undefined) => ({
-    status: input?.status === "all" ? null : (input?.status ?? "pending"),
+    status: input?.status === "all" ? undefined : (input?.status ?? "pending"),
   }))
   .handler(async ({ data, context }): Promise<AdminBirthdayCorrection[]> => {
     const { data: rows, error } = await context.supabase.rpc("list_birthday_corrections", {
@@ -117,7 +117,7 @@ export const reviewBirthdayCorrection = createServerFn({ method: "POST" })
     const { error } = await context.supabase.rpc("review_birthday_correction", {
       _id: data.id,
       _approve: data.approve,
-      _notes: data.notes || null,
+      _notes: data.notes || undefined,
     });
     if (error) throw new Error(friendly(error.message));
     return { ok: true };
