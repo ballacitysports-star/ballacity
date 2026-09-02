@@ -12,6 +12,7 @@ import {
 } from "@/lib/child-safety.functions";
 import { CHILD_POLICY_DISCLAIMER, COHORT_META, parseCohort } from "@/lib/child-policy";
 import { Button } from "@/components/ui/button";
+import { BirthdayCorrectionQueue } from "@/components/child/BirthdayCorrectionQueue";
 
 export const Route = createFileRoute("/admin/child-safety")({
   head: () =>
@@ -87,6 +88,8 @@ function AdminChildSafetyPage() {
               ))}
             </div>
           </section>
+
+          <BirthdayCorrectionQueue />
 
           <section className="mt-5">
             <h2 className="text-sm font-bold">Parental consent</h2>

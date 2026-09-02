@@ -247,6 +247,93 @@ export type Database = {
           },
         ]
       }
+      birthday_change_audit: {
+        Row: {
+          approved_birthday: string | null
+          created_at: string
+          id: string
+          outcome: string
+          previous_birthday: string | null
+          reason: string | null
+          request_id: string | null
+          requested_birthday: string | null
+          requester_id: string | null
+          reviewer_id: string | null
+          user_id: string
+        }
+        Insert: {
+          approved_birthday?: string | null
+          created_at?: string
+          id?: string
+          outcome: string
+          previous_birthday?: string | null
+          reason?: string | null
+          request_id?: string | null
+          requested_birthday?: string | null
+          requester_id?: string | null
+          reviewer_id?: string | null
+          user_id: string
+        }
+        Update: {
+          approved_birthday?: string | null
+          created_at?: string
+          id?: string
+          outcome?: string
+          previous_birthday?: string | null
+          reason?: string | null
+          request_id?: string | null
+          requested_birthday?: string | null
+          requester_id?: string | null
+          reviewer_id?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
+      birthday_correction_requests: {
+        Row: {
+          created_at: string
+          current_birthday: string | null
+          evidence: string | null
+          id: string
+          reason: string
+          requested_birthday: string
+          review_notes: string | null
+          reviewed_at: string | null
+          reviewed_by: string | null
+          status: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          current_birthday?: string | null
+          evidence?: string | null
+          id?: string
+          reason: string
+          requested_birthday: string
+          review_notes?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          current_birthday?: string | null
+          evidence?: string | null
+          id?: string
+          reason?: string
+          requested_birthday?: string
+          review_notes?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       child_controls: {
         Row: {
           ai_analysis: boolean
@@ -3232,6 +3319,23 @@ export type Database = {
         Args: { _document_type: string; _version: string }
         Returns: number
       }
+      list_birthday_corrections: {
+        Args: { _status?: string }
+        Returns: {
+          created_at: string
+          current_birthday: string
+          display_name: string
+          evidence: string
+          handle: string
+          id: string
+          reason: string
+          requested_birthday: string
+          review_notes: string
+          reviewed_at: string
+          status: string
+          user_id: string
+        }[]
+      }
       list_trainer_booked_slots: {
         Args: { _date: string; _trainer_id: string }
         Returns: {
@@ -3254,6 +3358,18 @@ export type Database = {
       }
       my_age_category: { Args: never; Returns: string }
       my_age_cohort: { Args: never; Returns: string }
+      my_birthday_corrections: {
+        Args: never
+        Returns: {
+          created_at: string
+          id: string
+          reason: string
+          requested_birthday: string
+          review_notes: string
+          reviewed_at: string
+          status: string
+        }[]
+      }
       my_platform_status: {
         Args: never
         Returns: {
@@ -3311,6 +3427,10 @@ export type Database = {
         }[]
       }
       publish_legal_document: { Args: { _id: string }; Returns: string }
+      request_birthday_correction: {
+        Args: { _evidence?: string; _reason: string; _requested: string }
+        Returns: string
+      }
       request_parental_consent: {
         Args: {
           _jurisdiction: string
@@ -3322,6 +3442,10 @@ export type Database = {
           _versions: Json
         }
         Returns: string
+      }
+      review_birthday_correction: {
+        Args: { _approve: boolean; _id: string; _notes?: string }
+        Returns: undefined
       }
       revoke_parental_consent: {
         Args: { _child: string; _reason: string }

@@ -86,7 +86,9 @@ export async function saveProfileRow(
 
   if (typeof birthday === "string" && /^\d{4}-\d{2}-\d{2}$/.test(birthday)) {
     const { error: bErr } = await client.rpc("set_my_birthday", { _dob: birthday });
-    if (bErr) throw bErr;
+    // A locked birthday is expected on every later save: the UI shows it
+    // read-only and corrections go through support review instead.
+    if (bErr && !String(bErr.message ?? "").includes("BIRTHDAY_LOCKED")) throw bErr;
   }
 }
 

@@ -33,11 +33,14 @@ export function ProfileBasicsFields({
   value,
   onChange,
   birthdayError,
+  birthdayLocked = false,
 }: {
   userId?: string;
   value: ProfileBasicsValue;
   onChange: (patch: Partial<ProfileBasicsValue>) => void;
   birthdayError?: string | null;
+  /** True once a date of birth is on file: it can only change via a support-reviewed correction. */
+  birthdayLocked?: boolean;
 }) {
   // Minor-safety checks derived from the entered birthday, so onboarding and
   // Edit profile enforce identical rules (the database re-checks on write).
@@ -109,11 +112,20 @@ export function ProfileBasicsFields({
         </div>
       </Field>
       <Field label="Birthday">
-        <BirthdayInput
-          value={value.birthday}
-          onChange={(v) => onChange({ birthday: v })}
-          error={birthdayError}
-        />
+        {birthdayLocked ? (
+          <div className="rounded-2xl border border-border bg-background px-3 py-2 text-sm">
+            {birthdayToDisplay(value.birthday) || "Not set"}
+            <div className="mt-1 text-[11px] leading-snug text-muted-foreground">
+              Locked after signup because it sets your age group. Ask us to correct it from Settings.
+            </div>
+          </div>
+        ) : (
+          <BirthdayInput
+            value={value.birthday}
+            onChange={(v) => onChange({ birthday: v })}
+            error={birthdayError}
+          />
+        )}
         {consentNotice ? (
           <div className="mt-2 rounded-xl border border-lime/40 bg-lime/10 p-2 text-[11px] leading-snug">
             {consentNotice}
