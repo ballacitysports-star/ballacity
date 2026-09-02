@@ -366,6 +366,7 @@ export const updateChildControls = createServerFn({ method: "POST" })
           location_precision: z.enum(["city", "region"]).optional(),
           game_participation: z.boolean().optional(),
           notifications: z.boolean().optional(),
+          notification_curfew_lifted: z.boolean().optional(),
         }),
       })
       .parse(d),
