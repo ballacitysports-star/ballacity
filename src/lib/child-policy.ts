@@ -565,6 +565,7 @@ export const FEATURE_KEYS = [
   "comments",
   "targeted_advertising",
   "parent_controls",
+  "night_notifications",
 ] as const;
 export type FeatureKey = (typeof FEATURE_KEYS)[number];
 
@@ -601,6 +602,7 @@ export const FEATURE_META: Record<FeatureKey, { label: string; group: string }> 
   comments: { label: "Comments", group: "Social" },
   targeted_advertising: { label: "Targeted advertising", group: "Privacy" },
   parent_controls: { label: "Parent/guardian controls", group: "Identity" },
+  night_notifications: { label: "Overnight notifications", group: "Communication" },
 };
 
 type MatrixCohort = Exclude<AgeCohort, "unknown">;
@@ -728,6 +730,11 @@ export type ChildControls = {
   locationPrecision: "city" | "region";
   gameParticipation: boolean;
   notifications: boolean;
+  /**
+   * Guardian has explicitly consented to lifting the overnight notification
+   * curfew for this minor. Off by default — the curfew is the safe state.
+   */
+  notificationCurfewLifted: boolean;
 };
 
 export const DEFAULT_CHILD_CONTROLS: ChildControls = {
@@ -738,6 +745,7 @@ export const DEFAULT_CHILD_CONTROLS: ChildControls = {
   locationPrecision: "city",
   gameParticipation: true,
   notifications: true,
+  notificationCurfewLifted: false,
 };
 
 export function parseChildControls(row: unknown): ChildControls {
@@ -757,6 +765,10 @@ export function parseChildControls(row: unknown): ChildControls {
     locationPrecision: pick(r["location_precision"], ["city", "region"], d.locationPrecision),
     gameParticipation: bool(r["game_participation"], d.gameParticipation),
     notifications: bool(r["notifications"], d.notifications),
+    notificationCurfewLifted: bool(
+      r["notification_curfew_lifted"],
+      d.notificationCurfewLifted,
+    ),
   };
 }
 
