@@ -112,13 +112,34 @@ export type AgePolicyConfig = {
   biometricAgeEstimationEnabled: boolean;
   /** 0 = consent does not expire. */
   consentReverificationDays: number;
+  /**
+   * Hours (local time of the RECIPIENT) during which minors get no push
+   * notifications. `null` disables the curfew entirely.
+   *
+   * LEGAL REVIEW REQUIRED — the default models NY's SAFE for Kids Act window
+   * (12am–6am) because it is the more protective of the windows we know about;
+   * Connecticut's is 9pm–8am. Neither is asserted to be satisfied by this
+   * implementation.
+   */
+  notificationCurfew: { startHour: number; endHour: number } | null;
 };
 
 export const DEFAULT_AGE_POLICY: AgePolicyConfig = {
   childMaxAge: 12,
   teenMidMaxAge: 15,
   adultAge: 18,
-  parentalConsentMaxAge: 12,
+  /**
+   * Conservative GLOBAL default: verifiable parental consent through age 15.
+   *
+   * LEGAL REVIEW REQUIRED. Federal COPPA reaches under-13, but Georgia's
+   * Protecting Georgia's Children on Social Media Act (O.C.G.A. §§ 39-6-1
+   * to -5) reaches under-16. There is no reliable per-request jurisdiction
+   * signal yet, so the platform applies the more protective threshold to
+   * everyone rather than leaving the stricter rule unwired. Once jurisdiction
+   * detection exists, resolve the config through `policyForJurisdiction()`
+   * per session instead of relying on this global default.
+   */
+  parentalConsentMaxAge: 15,
   jurisdiction: "US_FEDERAL",
   childAdultDmRequiresGuardianLink: true,
   teenAdultDmRequiresSharedContext: true,
@@ -129,7 +150,27 @@ export const DEFAULT_AGE_POLICY: AgePolicyConfig = {
   ageAssuranceRequired: false,
   biometricAgeEstimationEnabled: false,
   consentReverificationDays: 0,
+  notificationCurfew: { startHour: 0, endHour: 6 },
 };
+
+/**
+ * Jurisdiction-specific threshold overrides. Values are engineering defaults
+ * modeled on published statutes — LEGAL REVIEW REQUIRED before relying on any
+ * of them as a compliance position.
+ */
+export const JURISDICTION_POLICY_OVERRIDES: Partial<
+  Record<Jurisdiction, Partial<AgePolicyConfig>>
+> = {
+  // O.C.G.A. §§ 39-6-1 to -5 — verifiable parental consent for under-16.
+  GEORGIA: { parentalConsentMaxAge: 15 },
+  // Federal COPPA floor only (under-13). Kept explicit so the difference is
+  // visible in the admin UI rather than implied.
+  US_FEDERAL: { parentalConsentMaxAge: 12 },
+};
+
+/** The jurisdiction whose thresholds the current defaults are modeled on. */
+export const MODELED_CONSENT_JURISDICTION: Jurisdiction = "GEORGIA";
+
 
 const num = (v: unknown, fallback: number) => {
   const n = typeof v === "string" ? Number(v) : v;
