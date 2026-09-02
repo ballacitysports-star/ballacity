@@ -385,7 +385,15 @@ export type Database = {
           position?: string | null
           user_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "game_participants_game_id_fkey"
+            columns: ["game_id"]
+            isOneToOne: false
+            referencedRelation: "hosted_games"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       game_payment_settings: {
         Row: {
@@ -427,7 +435,15 @@ export type Database = {
           requires_approval?: boolean
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "game_payment_settings_game_id_fkey"
+            columns: ["game_id"]
+            isOneToOne: false
+            referencedRelation: "hosted_games"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       game_position_waitlist: {
         Row: {
@@ -460,7 +476,15 @@ export type Database = {
           status?: string
           user_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "game_position_waitlist_game_id_fkey"
+            columns: ["game_id"]
+            isOneToOne: false
+            referencedRelation: "hosted_games"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       game_reminders: {
         Row: {
@@ -490,7 +514,15 @@ export type Database = {
           updated_at?: string
           user_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "game_reminders_game_id_fkey"
+            columns: ["game_id"]
+            isOneToOne: false
+            referencedRelation: "hosted_games"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       game_safety_acknowledgments: {
         Row: {
@@ -523,7 +555,15 @@ export type Database = {
           user_id?: string
           version?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "game_safety_acknowledgments_game_id_fkey"
+            columns: ["game_id"]
+            isOneToOne: false
+            referencedRelation: "hosted_games"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       highlight_reels: {
         Row: {
@@ -949,7 +989,15 @@ export type Database = {
           reviewer_notes?: string | null
           status?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "join_requests_game_id_fkey"
+            columns: ["game_id"]
+            isOneToOne: false
+            referencedRelation: "hosted_games"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       legal_consents: {
         Row: {
@@ -1405,6 +1453,13 @@ export type Database = {
           transaction_reference?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "payment_submissions_game_id_fkey"
+            columns: ["game_id"]
+            isOneToOne: false
+            referencedRelation: "hosted_games"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "payment_submissions_payment_method_id_fkey"
             columns: ["payment_method_id"]
