@@ -89,6 +89,7 @@ import { Route as TeamsTeamIdIndexRouteImport } from './routes/teams.$teamId.ind
 import { Route as TeamsTeamIdEditRouteImport } from './routes/teams.$teamId.edit'
 import { Route as TrainersTrainerIdIndexRouteImport } from './routes/trainers.$trainerId.index'
 import { Route as TrainersTrainerIdEditRouteImport } from './routes/trainers.$trainerId.edit'
+import { Route as ApiPublicNotificationsFlushRouteImport } from './routes/api/public/notifications/flush'
 import { Route as ApiPublicPaymentsWebhookRouteImport } from './routes/api/public/payments/webhook'
 import { Route as ApiPublicReelsProcessRouteImport } from './routes/api/public/reels/process'
 
@@ -494,6 +495,12 @@ const TrainersTrainerIdEditRoute = TrainersTrainerIdEditRouteImport.update({
   path: '/trainers/$trainerId/edit',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPublicNotificationsFlushRoute =
+  ApiPublicNotificationsFlushRouteImport.update({
+    id: '/api/public/notifications/flush',
+    path: '/api/public/notifications/flush',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiPublicPaymentsWebhookRoute =
   ApiPublicPaymentsWebhookRouteImport.update({
     id: '/api/public/payments/webhook',
@@ -586,6 +593,7 @@ export interface FileRoutesByFullPath {
   '/orgs/$orgId/': typeof OrgsOrgIdIndexRoute
   '/teams/$teamId/': typeof TeamsTeamIdIndexRoute
   '/trainers/$trainerId/': typeof TrainersTrainerIdIndexRoute
+  '/api/public/notifications/flush': typeof ApiPublicNotificationsFlushRoute
   '/api/public/payments/webhook': typeof ApiPublicPaymentsWebhookRoute
   '/api/public/reels/process': typeof ApiPublicReelsProcessRoute
 }
@@ -668,6 +676,7 @@ export interface FileRoutesByTo {
   '/orgs/$orgId': typeof OrgsOrgIdIndexRoute
   '/teams/$teamId': typeof TeamsTeamIdIndexRoute
   '/trainers/$trainerId': typeof TrainersTrainerIdIndexRoute
+  '/api/public/notifications/flush': typeof ApiPublicNotificationsFlushRoute
   '/api/public/payments/webhook': typeof ApiPublicPaymentsWebhookRoute
   '/api/public/reels/process': typeof ApiPublicReelsProcessRoute
 }
@@ -753,6 +762,7 @@ export interface FileRoutesById {
   '/orgs/$orgId/': typeof OrgsOrgIdIndexRoute
   '/teams/$teamId/': typeof TeamsTeamIdIndexRoute
   '/trainers/$trainerId/': typeof TrainersTrainerIdIndexRoute
+  '/api/public/notifications/flush': typeof ApiPublicNotificationsFlushRoute
   '/api/public/payments/webhook': typeof ApiPublicPaymentsWebhookRoute
   '/api/public/reels/process': typeof ApiPublicReelsProcessRoute
 }
@@ -838,6 +848,7 @@ export interface FileRouteTypes {
     | '/orgs/$orgId/'
     | '/teams/$teamId/'
     | '/trainers/$trainerId/'
+    | '/api/public/notifications/flush'
     | '/api/public/payments/webhook'
     | '/api/public/reels/process'
   fileRoutesByTo: FileRoutesByTo
@@ -920,6 +931,7 @@ export interface FileRouteTypes {
     | '/orgs/$orgId'
     | '/teams/$teamId'
     | '/trainers/$trainerId'
+    | '/api/public/notifications/flush'
     | '/api/public/payments/webhook'
     | '/api/public/reels/process'
   id:
@@ -1004,6 +1016,7 @@ export interface FileRouteTypes {
     | '/orgs/$orgId/'
     | '/teams/$teamId/'
     | '/trainers/$trainerId/'
+    | '/api/public/notifications/flush'
     | '/api/public/payments/webhook'
     | '/api/public/reels/process'
   fileRoutesById: FileRoutesById
@@ -1077,6 +1090,7 @@ export interface RootRouteChildren {
   OrgsOrgIdIndexRoute: typeof OrgsOrgIdIndexRoute
   TeamsTeamIdIndexRoute: typeof TeamsTeamIdIndexRoute
   TrainersTrainerIdIndexRoute: typeof TrainersTrainerIdIndexRoute
+  ApiPublicNotificationsFlushRoute: typeof ApiPublicNotificationsFlushRoute
   ApiPublicPaymentsWebhookRoute: typeof ApiPublicPaymentsWebhookRoute
   ApiPublicReelsProcessRoute: typeof ApiPublicReelsProcessRoute
 }
@@ -1643,6 +1657,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof TrainersTrainerIdEditRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/notifications/flush': {
+      id: '/api/public/notifications/flush'
+      path: '/api/public/notifications/flush'
+      fullPath: '/api/public/notifications/flush'
+      preLoaderRoute: typeof ApiPublicNotificationsFlushRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/payments/webhook': {
       id: '/api/public/payments/webhook'
       path: '/api/public/payments/webhook'
@@ -1772,6 +1793,7 @@ const rootRouteChildren: RootRouteChildren = {
   OrgsOrgIdIndexRoute: OrgsOrgIdIndexRoute,
   TeamsTeamIdIndexRoute: TeamsTeamIdIndexRoute,
   TrainersTrainerIdIndexRoute: TrainersTrainerIdIndexRoute,
+  ApiPublicNotificationsFlushRoute: ApiPublicNotificationsFlushRoute,
   ApiPublicPaymentsWebhookRoute: ApiPublicPaymentsWebhookRoute,
   ApiPublicReelsProcessRoute: ApiPublicReelsProcessRoute,
 }
