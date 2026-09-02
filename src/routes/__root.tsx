@@ -24,6 +24,8 @@ import { logAuthGateDecision, readStoredSupabaseSession } from "@/lib/authgate-l
 import { clearLastVisited, rememberLastVisited } from "@/lib/last-visited";
 import { clearPendingAccountType, isAccountType, readPendingAccountType } from "@/lib/account-type";
 import { getOnboardingStatus } from "@/lib/onboarding.functions";
+import { getMyAgeStatus } from "@/lib/age-verification.functions";
+import { AGE_GATE_ROUTE, CHILD_CONSENT_ROUTE, needsAgeGate } from "@/lib/age-verification";
 import { logNotFound } from "@/lib/route-doctor";
 import { ErrorFallback, GlobalErrorBoundary } from "@/components/GlobalErrorBoundary";
 import { setDeepLinkNavigator } from "@/lib/deep-links";
@@ -451,6 +453,9 @@ function AuthLoadingFallback({ pending }: { pending: boolean }) {
  */
 const onboardedUsers = new Set<string>();
 
+/** User ids whose age has already been determined server-side in this tab. */
+const ageVerifiedUsers = new Set<string>();
+
 function AuthGate({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const pathname = router.state.location.pathname;
@@ -706,7 +711,7 @@ function AuthGate({ children }: { children: React.ReactNode }) {
       if (retryTimer !== undefined) window.clearTimeout(retryTimer);
     };
     // Intentionally NOT keyed on `pathname`: the check is per user, not per route.
-  }, [user, loading, skipTypeCheck, router, retryTick]);
+  }, [user, loading, skipTypeCheck, skipAgeCheck, ageStatus, router, retryTick]);
 
   // Age-verification gate: no authenticated member reaches ordinary
   // onboarding, the feed, or any protected route until the SERVER has
