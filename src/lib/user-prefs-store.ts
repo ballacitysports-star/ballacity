@@ -1,7 +1,7 @@
 import { useEffect, useState, useSyncExternalStore } from "react";
 import type { User } from "@supabase/supabase-js";
 import { ME, type Sport } from "@/lib/sample-data";
-import { earnedBadgeIds, makeBadgeStats } from "@/lib/badges";
+import { earnedBadgeIds } from "@/lib/badges";
 import { getDetectedDistanceUnit, type DistanceUnit } from "@/lib/measurement-system";
 import { clampDistanceMi } from "@/lib/distance";
 
@@ -377,6 +377,7 @@ export function useMyProfileState(currentUser?: User | null): {
   if (!user) return { profile: null, loaded: false };
 
   const overrides = readOverrides(user.id);
+  const activity = activityQuery.data ?? EMPTY_PLAYER_STATS;
   const base = defaultsFromUser(user);
   void tick;
   const dbLinks: ProfileLink[] = Array.isArray(dbProfile?.links)
