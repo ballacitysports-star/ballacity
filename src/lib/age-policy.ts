@@ -40,17 +40,19 @@ export const MINIMUM_ACCOUNT_AGE = 0;
 /** Oldest age that requires verifiable parental consent (configurable). */
 export const PARENTAL_CONSENT_MAX_AGE = DEFAULT_AGE_POLICY.parentalConsentMaxAge;
 
+/** Oldest age still in the child cohort. Distinct from the consent age. */
+export const CHILD_MAX_AGE = DEFAULT_AGE_POLICY.childMaxAge;
+
 /** Age at which an account is treated as an adult (configurable). */
 export const ADULT_AGE = DEFAULT_AGE_POLICY.adultAge;
 
 /** Implausible birthdays are still rejected, purely as data validation. */
 export const MAX_PLAUSIBLE_AGE = 120;
 
-export const CONSENT_REQUIRED_MESSAGE =
-  "Because you're under 13, a parent or guardian has to approve this account before games, messages and videos turn on.";
+export const CONSENT_REQUIRED_MESSAGE = `Because you're under ${PARENTAL_CONSENT_MAX_AGE + 1}, a parent or guardian has to approve this account before games, messages and videos turn on.`;
 
 export const CHILD_SUPPORT_NOTE =
-  "ballaCity supports members under 13 through verifiable parental consent. Consent, privacy floors and feature permissions are enforced server-side; ballaCity does not claim COPPA compliance without legal review of the consent method.";
+  "ballaCity supports members under the consent age through verifiable parental consent. Consent, privacy floors and feature permissions are enforced server-side; ballaCity does not claim COPPA compliance without legal review of the consent method.";
 
 /**
  * Coarse age bucket. This is the only age information most of the product
@@ -60,8 +62,8 @@ export type AgeCategory = "adult" | "teen" | "child" | "unknown";
 
 export const AGE_CATEGORY_LABELS: Record<AgeCategory, string> = {
   adult: `Adult (${ADULT_AGE}+)`,
-  teen: `Teen (${PARENTAL_CONSENT_MAX_AGE + 1}–${ADULT_AGE - 1})`,
-  child: `Child (under ${PARENTAL_CONSENT_MAX_AGE + 1})`,
+  teen: `Teen (${CHILD_MAX_AGE + 1}–${ADULT_AGE - 1})`,
+  child: `Child (under ${CHILD_MAX_AGE + 1})`,
   unknown: "Not shared",
 };
 
