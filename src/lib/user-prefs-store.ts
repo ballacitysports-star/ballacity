@@ -319,6 +319,8 @@ export function useMyProfileState(currentUser?: User | null): {
 } {
   const { user: authUser } = useAuth();
   const user = currentUser === undefined ? authUser : currentUser;
+  // Reputation numbers come from the database aggregate, never sample data.
+  const activityQuery = usePlayerActivityStats(user?.id);
   const [tick, setTick] = useState(0);
   const [loaded, setLoaded] = useState(false);
   const [dbProfile, setDbProfile] = useState<{
