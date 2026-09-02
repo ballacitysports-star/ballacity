@@ -189,17 +189,67 @@ export function policyForJurisdiction(
   return { ...config, jurisdiction };
 }
 
-export function ageFromBirthday(iso: string | null | undefined): number | null {
-  if (!iso) return null;
-  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso);
-  const d = m ? new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3])) : new Date(iso);
-  if (Number.isNaN(d.getTime())) return null;
-  const now = new Date();
-  let age = now.getFullYear() - d.getFullYear();
-  const md = now.getMonth() - d.getMonth();
-  if (md < 0 || (md === 0 && now.getDate() < d.getDate())) age -= 1;
-  return age >= 0 && age < 130 ? age : null;
+/**
+ * THE age calculation for OpenRun. Calendar-based (never 365-day math) and
+ * date-only, so a member's age never shifts with timezone or clock time.
+ *
+ * `dateOfBirth` accepts `YYYY-MM-DD` (canonical) or a Date. `currentDate`
+ * defaults to today in the viewer's local calendar and exists so tests can
+ * pin an exact day. Returns null for missing, malformed, future or
+ * implausible dates — callers must treat null as "age unknown", never as 0.
+ *
+ * The database mirrors this in public.calculate_age(dob, now) and is the
+ * authoritative source; this copy exists for UX only.
+ */
+export const MAX_PLAUSIBLE_AGE_YEARS = 120;
+
+function toDateParts(
+  value: string | Date | null | undefined,
+): { y: number; m: number; d: number } | null {
+  if (!value) return null;
+  if (value instanceof Date) {
+    if (Number.isNaN(value.getTime())) return null;
+    return { y: value.getFullYear(), m: value.getMonth() + 1, d: value.getDate() };
+  }
+  const iso = /^(\d{4})-(\d{1,2})-(\d{1,2})$/.exec(value.trim());
+  if (iso) {
+    const y = Number(iso[1]);
+    const m = Number(iso[2]);
+    const d = Number(iso[3]);
+    // Reject impossible calendar dates (2013-02-30, 2013-13-01, …).
+    const probe = new Date(y, m - 1, d);
+    if (probe.getFullYear() !== y || probe.getMonth() !== m - 1 || probe.getDate() !== d) {
+      return null;
+    }
+    return { y, m, d };
+  }
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return null;
+  return { y: parsed.getFullYear(), m: parsed.getMonth() + 1, d: parsed.getDate() };
 }
+
+export function calculateAge(
+  dateOfBirth: string | Date | null | undefined,
+  currentDate: string | Date = new Date(),
+): number | null {
+  const b = toDateParts(dateOfBirth);
+  const n = toDateParts(currentDate);
+  if (!b || !n) return null;
+  let age = n.y - b.y;
+  // The birthday has not happened yet this calendar year.
+  if (n.m < b.m || (n.m === b.m && n.d < b.d)) age -= 1;
+  if (age < 0) return null; // future date of birth
+  if (age > MAX_PLAUSIBLE_AGE_YEARS) return null;
+  return age;
+}
+
+export function ageFromBirthday(
+  iso: string | null | undefined,
+  currentDate: string | Date = new Date(),
+): number | null {
+  return calculateAge(iso, currentDate);
+}
+
 
 export function cohortFromAge(
   age: number | null | undefined,
