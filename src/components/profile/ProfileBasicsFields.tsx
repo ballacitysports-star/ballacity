@@ -33,11 +33,14 @@ export function ProfileBasicsFields({
   value,
   onChange,
   birthdayError,
+  birthdayLocked = false,
 }: {
   userId?: string;
   value: ProfileBasicsValue;
   onChange: (patch: Partial<ProfileBasicsValue>) => void;
   birthdayError?: string | null;
+  /** True once a date of birth is on file: it can only change via a support-reviewed correction. */
+  birthdayLocked?: boolean;
 }) {
   // Minor-safety checks derived from the entered birthday, so onboarding and
   // Edit profile enforce identical rules (the database re-checks on write).
