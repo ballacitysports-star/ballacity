@@ -42,6 +42,7 @@ import {
 import { useAutosave } from "@/hooks/use-autosave";
 import { useMyProfiles } from "@/lib/account-profiles";
 import { SaveStatus } from "@/components/SaveStatus";
+import { useMyBirthdayLock } from "@/lib/birthday-lock";
 
 export const Route = createFileRoute("/profile/edit")({
   head: () =>
@@ -69,6 +70,8 @@ function EditProfile() {
   const profile = useMyProfile(profileUser);
   const prefs = useFeedPrefs();
   const { active: activeProfile, loading: accountTypeLoading } = useMyProfiles();
+  // Date of birth is locked once saved; corrections go through support review.
+  const { data: birthdayLock } = useMyBirthdayLock(Boolean(profileUser));
   const showOrgs = !accountTypeLoading && !!activeProfile && activeProfile.kind !== "player";
   const nav = useNavigate();
 
@@ -349,6 +352,7 @@ function EditProfile() {
             graduatingClass,
           }}
           birthdayError={birthdayError}
+          birthdayLocked={birthdayLock?.locked === true}
           onChange={(patch) => {
             markDirty();
             if ("name" in patch) setName(patch.name!);

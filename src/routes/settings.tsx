@@ -1,6 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { pageHead } from "@/lib/seo";
 import { AgeReviewNotice } from "@/components/child/AgeReviewNotice";
+import { BirthdayLockCard } from "@/components/child/BirthdayLockCard";
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
 import {
   ArrowLeft,
@@ -256,6 +257,10 @@ function SettingsHubPage() {
         <AccountIdentityRow />
 
         <AgeReviewNotice />
+
+        <div className="px-4 pt-2">
+          <BirthdayLockCard />
+        </div>
 
         <SettingsGroup title="Appearance">
           <SettingsStaticRow>
