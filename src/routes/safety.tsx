@@ -39,6 +39,22 @@ function SafetyCenter() {
           inspect venues, referee play, or guarantee anyone's safety. These are the habits that keep
           pickup sports safe.
         </p>
+        <div className="mt-3 flex flex-wrap gap-2 text-xs">
+          <Link
+            to="/safety/children"
+            className="rounded-full border border-border px-3 py-1.5 font-semibold"
+          >
+            Child &amp; teen safety
+          </Link>
+          <Link
+            to="/parent"
+            className="rounded-full border border-border px-3 py-1.5 font-semibold"
+          >
+            Parent Center
+          </Link>
+        </div>
+
+
 
         {/* Emergency */}
         <section className="mt-5 rounded-2xl border border-destructive/50 bg-destructive/5 px-4 py-4">
