@@ -49,6 +49,24 @@ export const AGE_GATE_ROUTE = "/onboarding/age";
 export const CHILD_CONSENT_ROUTE = "/onboarding/child";
 export const ACCOUNT_TYPE_ROUTE = "/onboarding/account-type";
 
+/**
+ * Screens that belong to the age / guardian-consent step. Both root gates (age
+ * determination AND the profile-type picker) must stand down on these paths —
+ * if only one does, the two guards redirect against each other forever.
+ */
+export const ACCOUNT_SETUP_ESCAPES = [
+  AGE_GATE_ROUTE,
+  CHILD_CONSENT_ROUTE,
+  "/parent",
+  "/safety",
+  "/account/legal",
+];
+
+export function isAccountSetupEscape(pathname: string): boolean {
+  return ACCOUNT_SETUP_ESCAPES.some((p) => pathname === p || pathname.startsWith(`${p}/`));
+}
+
+
 export function isPlatformActive(status: PlatformStatus): boolean {
   return status === "active";
 }
