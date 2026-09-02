@@ -15,6 +15,7 @@ import { CHILD_POLICY_DISCLAIMER, COHORT_META, type ChildControls } from "@/lib/
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { ConsentTrail } from "@/components/child/ConsentTrail";
+import { AddMinorPanel } from "@/components/child/AddMinorPanel";
 
 export const Route = createFileRoute("/parent/")({
   head: () =>
@@ -248,7 +249,8 @@ function ParentCenterPage() {
           </div>
           <p className="mt-1 text-xs text-muted-foreground">
             When your child asks for approval, open the link they send you and approve it while
-            signed in here. Their account then appears in this Parent Center.
+            signed in here. Their account then appears in this Parent Center. You can also invite a
+            minor yourself with the form below.
           </p>
         </div>
       ) : (
@@ -272,6 +274,8 @@ function ParentCenterPage() {
           {selected ? <ChildPanel childUserId={selected} /> : null}
         </>
       )}
+
+      <AddMinorPanel />
 
       {requests.length > 0 ? (
         <section className="mt-6 rounded-2xl border border-border bg-surface p-4">
