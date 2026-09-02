@@ -25,7 +25,7 @@ import { clearLastVisited, rememberLastVisited } from "@/lib/last-visited";
 import { clearPendingAccountType, isAccountType, readPendingAccountType } from "@/lib/account-type";
 import { getOnboardingStatus } from "@/lib/onboarding.functions";
 import { getMyAgeStatus } from "@/lib/age-verification.functions";
-import { AGE_GATE_ROUTE, CHILD_CONSENT_ROUTE, needsAgeGate } from "@/lib/age-verification";
+import { AGE_GATE_ROUTE, isAccountSetupEscape, needsAgeGate } from "@/lib/age-verification";
 import { logNotFound } from "@/lib/route-doctor";
 import { ErrorFallback, GlobalErrorBoundary } from "@/components/GlobalErrorBoundary";
 import { setDeepLinkNavigator } from "@/lib/deep-links";
