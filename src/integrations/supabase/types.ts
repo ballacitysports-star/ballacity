@@ -1733,7 +1733,6 @@ export type Database = {
           avatar_url_private: string | null
           avatar_visibility: string
           bio: string | null
-          birthday: string | null
           city: string | null
           cover_url: string | null
           created_at: string
@@ -1760,7 +1759,6 @@ export type Database = {
           avatar_url_private?: string | null
           avatar_visibility?: string
           bio?: string | null
-          birthday?: string | null
           city?: string | null
           cover_url?: string | null
           created_at?: string
@@ -1787,7 +1785,6 @@ export type Database = {
           avatar_url_private?: string | null
           avatar_visibility?: string
           bio?: string | null
-          birthday?: string | null
           city?: string | null
           cover_url?: string | null
           created_at?: string
