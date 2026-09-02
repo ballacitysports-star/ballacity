@@ -6,6 +6,12 @@ import { getDetectedDistanceUnit, type DistanceUnit } from "@/lib/measurement-sy
 import { clampDistanceMi } from "@/lib/distance";
 
 import { parseSportLevels, type SportLevel } from "@/lib/sport-levels";
+import {
+  reliabilityPercent,
+  toBadgeStats,
+  usePlayerActivityStats,
+  EMPTY_PLAYER_STATS,
+} from "@/lib/player-stats";
 
 
 /** Engine-earned badges first, stored override extras appended (deduped). */
