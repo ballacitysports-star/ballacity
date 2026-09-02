@@ -69,44 +69,47 @@ async function attachChannel(gameId: string) {
 
     const channel = supabase
       .channel(`game_participants:game:${gameId}:${++channelSeq}`)
-
-    .on(
-      "postgres_changes",
-      {
-        event: "INSERT",
-        schema: "public",
-        table: "game_participants",
-        filter: `game_id=eq.${gameId}`,
-      },
-      () => {
-        counts.set(gameId, (counts.get(gameId) ?? 0) + 1);
-        emit(gameId);
-      },
-    )
-    .on(
-      "postgres_changes",
-      {
-        event: "DELETE",
-        schema: "public",
-        table: "game_participants",
-        filter: `game_id=eq.${gameId}`,
-      },
-      () => {
-        counts.set(gameId, Math.max((counts.get(gameId) ?? 1) - 1, 0));
-        emit(gameId);
-      },
-    )
-    .subscribe((status) => {
-      if (status === "SUBSCRIBED") {
-        // Re-hydrate on initial connect AND every reconnect. Optimistic +/- 1
-        // deltas can drift if events are missed during a network flap; an
-        // authoritative HEAD count on every SUBSCRIBED transition keeps
-        // "spots left" badges consistent across devices.
-        void hydrate(gameId);
-      }
-    });
-  channels.set(gameId, channel);
+      .on(
+        "postgres_changes",
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "game_participants",
+          filter: `game_id=eq.${gameId}`,
+        },
+        () => {
+          counts.set(gameId, (counts.get(gameId) ?? 0) + 1);
+          emit(gameId);
+        },
+      )
+      .on(
+        "postgres_changes",
+        {
+          event: "DELETE",
+          schema: "public",
+          table: "game_participants",
+          filter: `game_id=eq.${gameId}`,
+        },
+        () => {
+          counts.set(gameId, Math.max((counts.get(gameId) ?? 1) - 1, 0));
+          emit(gameId);
+        },
+      )
+      .subscribe((status) => {
+        if (status === "SUBSCRIBED") {
+          // Re-hydrate on initial connect AND every reconnect. Optimistic +/- 1
+          // deltas can drift if events are missed during a network flap; an
+          // authoritative HEAD count on every SUBSCRIBED transition keeps
+          // "spots left" badges consistent across devices.
+          void hydrate(gameId);
+        }
+      });
+    channels.set(gameId, channel);
+  } finally {
+    attaching.delete(gameId);
+  }
 }
+
 
 
 function detachIfIdle(gameId: string) {
