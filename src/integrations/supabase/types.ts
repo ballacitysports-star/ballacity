@@ -77,6 +77,36 @@ export type Database = {
         }
         Relationships: []
       }
+      age_change_events: {
+        Row: {
+          actor_id: string | null
+          created_at: string
+          from_cohort: string | null
+          id: string
+          outcome: string
+          to_cohort: string | null
+          user_id: string
+        }
+        Insert: {
+          actor_id?: string | null
+          created_at?: string
+          from_cohort?: string | null
+          id?: string
+          outcome: string
+          to_cohort?: string | null
+          user_id: string
+        }
+        Update: {
+          actor_id?: string | null
+          created_at?: string
+          from_cohort?: string | null
+          id?: string
+          outcome?: string
+          to_cohort?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       app_settings: {
         Row: {
           created_at: string
@@ -216,6 +246,48 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      child_controls: {
+        Row: {
+          ai_analysis: boolean
+          child_user_id: string
+          created_at: string
+          game_participation: boolean
+          location_precision: string
+          media_visibility: string
+          messaging: string
+          notifications: boolean
+          social_discovery: boolean
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          ai_analysis?: boolean
+          child_user_id: string
+          created_at?: string
+          game_participation?: boolean
+          location_precision?: string
+          media_visibility?: string
+          messaging?: string
+          notifications?: boolean
+          social_discovery?: boolean
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          ai_analysis?: boolean
+          child_user_id?: string
+          created_at?: string
+          game_participation?: boolean
+          location_precision?: string
+          media_visibility?: string
+          messaging?: string
+          notifications?: boolean
+          social_discovery?: boolean
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: []
       }
       conversation_participants: {
         Row: {
@@ -564,6 +636,36 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      guardian_links: {
+        Row: {
+          child_user_id: string
+          created_at: string
+          id: string
+          parent_user_id: string
+          relationship: string
+          status: string
+          verified_at: string | null
+        }
+        Insert: {
+          child_user_id: string
+          created_at?: string
+          id?: string
+          parent_user_id: string
+          relationship?: string
+          status?: string
+          verified_at?: string | null
+        }
+        Update: {
+          child_user_id?: string
+          created_at?: string
+          id?: string
+          parent_user_id?: string
+          relationship?: string
+          status?: string
+          verified_at?: string | null
+        }
+        Relationships: []
       }
       highlight_reels: {
         Row: {
@@ -1385,6 +1487,170 @@ export type Database = {
           },
         ]
       }
+      parent_requests: {
+        Row: {
+          child_user_id: string
+          created_at: string
+          details: string | null
+          handled_at: string | null
+          handled_by: string | null
+          id: string
+          kind: string
+          parent_user_id: string
+          resolution_notes: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          child_user_id: string
+          created_at?: string
+          details?: string | null
+          handled_at?: string | null
+          handled_by?: string | null
+          id?: string
+          kind: string
+          parent_user_id: string
+          resolution_notes?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          child_user_id?: string
+          created_at?: string
+          details?: string | null
+          handled_at?: string | null
+          handled_by?: string | null
+          id?: string
+          kind?: string
+          parent_user_id?: string
+          resolution_notes?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      parental_consent_events: {
+        Row: {
+          action: string
+          actor_id: string | null
+          child_user_id: string
+          consent_id: string
+          created_at: string
+          detail: Json
+          from_status: string | null
+          id: string
+          method: string | null
+          to_status: string | null
+        }
+        Insert: {
+          action: string
+          actor_id?: string | null
+          child_user_id: string
+          consent_id: string
+          created_at?: string
+          detail?: Json
+          from_status?: string | null
+          id?: string
+          method?: string | null
+          to_status?: string | null
+        }
+        Update: {
+          action?: string
+          actor_id?: string | null
+          child_user_id?: string
+          consent_id?: string
+          created_at?: string
+          detail?: Json
+          from_status?: string | null
+          id?: string
+          method?: string | null
+          to_status?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "parental_consent_events_consent_id_fkey"
+            columns: ["consent_id"]
+            isOneToOne: false
+            referencedRelation: "parental_consents"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      parental_consents: {
+        Row: {
+          approved_at: string | null
+          child_policy_version: string | null
+          child_user_id: string
+          created_at: string
+          id: string
+          jurisdiction: string
+          method: string
+          parent_email: string | null
+          parent_name: string | null
+          parent_user_id: string | null
+          privacy_version: string | null
+          relationship: string
+          requested_at: string | null
+          reverify_at: string | null
+          revoked_at: string | null
+          revoked_reason: string | null
+          scope: Json
+          status: string
+          terms_version: string | null
+          token_expires_at: string | null
+          updated_at: string
+          verification_token_hash: string | null
+        }
+        Insert: {
+          approved_at?: string | null
+          child_policy_version?: string | null
+          child_user_id: string
+          created_at?: string
+          id?: string
+          jurisdiction?: string
+          method?: string
+          parent_email?: string | null
+          parent_name?: string | null
+          parent_user_id?: string | null
+          privacy_version?: string | null
+          relationship?: string
+          requested_at?: string | null
+          reverify_at?: string | null
+          revoked_at?: string | null
+          revoked_reason?: string | null
+          scope?: Json
+          status?: string
+          terms_version?: string | null
+          token_expires_at?: string | null
+          updated_at?: string
+          verification_token_hash?: string | null
+        }
+        Update: {
+          approved_at?: string | null
+          child_policy_version?: string | null
+          child_user_id?: string
+          created_at?: string
+          id?: string
+          jurisdiction?: string
+          method?: string
+          parent_email?: string | null
+          parent_name?: string | null
+          parent_user_id?: string | null
+          privacy_version?: string | null
+          relationship?: string
+          requested_at?: string | null
+          reverify_at?: string | null
+          revoked_at?: string | null
+          revoked_reason?: string | null
+          scope?: Json
+          status?: string
+          terms_version?: string | null
+          token_expires_at?: string | null
+          updated_at?: string
+          verification_token_hash?: string | null
+        }
+        Relationships: []
+      }
       payment_submissions: {
         Row: {
           cancellation_reason: string | null
@@ -1728,6 +1994,8 @@ export type Database = {
           account_type: string | null
           active_profile_id: string | null
           age_category: string
+          age_cohort: string
+          age_review_required: boolean
           avatar_initials: string | null
           avatar_url: string | null
           avatar_url_private: string | null
@@ -1740,6 +2008,7 @@ export type Database = {
           display_name: string
           graduating_class: number | null
           id: string
+          jurisdiction: string
           links: Json
           moderation_state: string
           search_radius_mi: number | null
@@ -1754,6 +2023,8 @@ export type Database = {
           account_type?: string | null
           active_profile_id?: string | null
           age_category?: string
+          age_cohort?: string
+          age_review_required?: boolean
           avatar_initials?: string | null
           avatar_url?: string | null
           avatar_url_private?: string | null
@@ -1766,6 +2037,7 @@ export type Database = {
           display_name?: string
           graduating_class?: number | null
           id: string
+          jurisdiction?: string
           links?: Json
           moderation_state?: string
           search_radius_mi?: number | null
@@ -1780,6 +2052,8 @@ export type Database = {
           account_type?: string | null
           active_profile_id?: string | null
           age_category?: string
+          age_cohort?: string
+          age_review_required?: boolean
           avatar_initials?: string | null
           avatar_url?: string | null
           avatar_url_private?: string | null
@@ -1792,6 +2066,7 @@ export type Database = {
           display_name?: string
           graduating_class?: number | null
           id?: string
+          jurisdiction?: string
           links?: Json
           moderation_state?: string
           search_radius_mi?: number | null
@@ -2642,7 +2917,27 @@ export type Database = {
         }[]
       }
       age_category_from_birthday: { Args: { _bd: string }; Returns: string }
+      age_cohort_from_birthday: { Args: { _bd: string }; Returns: string }
+      age_cohort_of: { Args: { _user: string }; Returns: string }
+      age_cohort_rank: { Args: { _cohort: string }; Returns: number }
+      age_policy_flag: {
+        Args: { _fallback: boolean; _key: string }
+        Returns: boolean
+      }
+      age_policy_number: {
+        Args: { _fallback: number; _key: string }
+        Returns: number
+      }
       approve_org_member_request: { Args: { _req: string }; Returns: string }
+      approve_parental_consent: {
+        Args: {
+          _method: string
+          _parent_user: string
+          _token_hash: string
+          _versions: Json
+        }
+        Returns: string
+      }
       approve_trainer_org_join: { Args: { _req: string }; Returns: string }
       blocked_image_paths: {
         Args: never
@@ -2659,8 +2954,17 @@ export type Database = {
         Args: { _caller: string; _target: string }
         Returns: boolean
       }
+      child_features_locked: { Args: { _user: string }; Returns: boolean }
+      clear_age_review: {
+        Args: { _approve: boolean; _user: string }
+        Returns: undefined
+      }
       create_direct_conversation: {
         Args: { _game_id?: string; _other_user: string }
+        Returns: string
+      }
+      create_parent_request: {
+        Args: { _child: string; _details: string; _kind: string }
         Returns: string
       }
       create_trainer_org_with_owner:
@@ -2754,6 +3058,10 @@ export type Database = {
         Args: { _game_id: string; _user_id: string }
         Returns: boolean
       }
+      is_guardian_of: {
+        Args: { _child: string; _parent: string }
+        Returns: boolean
+      }
       is_gym_admin_text: {
         Args: { _reviewee_id: string; _user: string }
         Returns: boolean
@@ -2800,6 +3108,8 @@ export type Database = {
         Returns: undefined
       }
       my_age_category: { Args: never; Returns: string }
+      my_age_cohort: { Args: never; Returns: string }
+      parental_consent_state: { Args: { _child: string }; Returns: string }
       privacy_text: { Args: { _key: string; _user: string }; Returns: string }
       profile_ages: {
         Args: { _ids: string[] }
@@ -2818,6 +3128,26 @@ export type Database = {
         }[]
       }
       publish_legal_document: { Args: { _id: string }; Returns: string }
+      request_parental_consent: {
+        Args: {
+          _jurisdiction: string
+          _parent_email: string
+          _parent_name: string
+          _relationship: string
+          _token_expires_at: string
+          _token_hash: string
+          _versions: Json
+        }
+        Returns: string
+      }
+      revoke_parental_consent: {
+        Args: { _child: string; _reason: string }
+        Returns: undefined
+      }
+      set_child_controls: {
+        Args: { _child: string; _controls: Json }
+        Returns: undefined
+      }
       shares_game_or_chat: {
         Args: { _a: string; _b: string }
         Returns: boolean

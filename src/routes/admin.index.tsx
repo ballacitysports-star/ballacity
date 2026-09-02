@@ -114,6 +114,10 @@ function AdminPage() {
           <Button variant="outline" asChild>
             <Link to="/admin/compliance">Compliance readiness</Link>
           </Button>
+          <Button variant="outline" asChild>
+            <Link to="/admin/child-safety">Child safety</Link>
+          </Button>
+
 
           <Button variant="outline" asChild>
             <Link to="/admin/audit">Audit logs</Link>
