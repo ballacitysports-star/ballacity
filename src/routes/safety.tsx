@@ -15,9 +15,9 @@ export const Route = createFileRoute("/safety")({
   head: () =>
     pageHead({
       path: "/safety",
-      title: "Safety Center — OpenRun",
+      title: "Safety Center — ballaCity",
       description:
-        "How to stay safe on OpenRun: sports safety, meeting new players, game and payment safety, messaging, reporting, blocking, and emergency information.",
+        "How to stay safe on ballaCity: sports safety, meeting new players, game and payment safety, messaging, reporting, blocking, and emergency information.",
     }),
   component: SafetyCenter,
 });
@@ -35,7 +35,7 @@ function SafetyCenter() {
       <main className="mx-auto max-w-2xl px-4 py-6 pb-28">
         <h1 className="font-display text-2xl font-bold">Safety Center</h1>
         <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
-          OpenRun helps players find games — hosts organize them. OpenRun does not supervise games,
+          ballaCity helps players find games — hosts organize them. ballaCity does not supervise games,
           inspect venues, referee play, or guarantee anyone's safety. These are the habits that keep
           pickup sports safe.
         </p>
@@ -149,7 +149,7 @@ function SafetyCenter() {
           </div>
           <p className="mt-2 text-[13px] leading-relaxed text-muted-foreground">
             Use the flag icon on any profile, game, message, or highlight. Safety reports go to
-            OpenRun moderators.
+            ballaCity moderators.
           </p>
           <div className="mt-3 flex flex-wrap gap-2">
             <Link

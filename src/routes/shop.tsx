@@ -11,8 +11,8 @@ export const Route = createFileRoute("/shop")({
   head: () =>
     pageHead({
       path: "/shop",
-      title: "Shop — OpenRun",
-      description: "OpenRun gear and merch for players, teams, and trainers.",
+      title: "Shop — ballaCity",
+      description: "ballaCity gear and merch for players, teams, and trainers.",
     }),
   component: ShopPage,
 });
@@ -59,7 +59,7 @@ function ShopPage() {
         </Link>
         <h1 className="mt-4 font-display text-3xl font-bold">Shop</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          OpenRun gear, shipped to your door.{" "}
+          ballaCity gear, shipped to your door.{" "}
           <span className="font-semibold text-foreground">All sales final — no refunds.</span>
         </p>
 

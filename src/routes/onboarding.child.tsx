@@ -13,9 +13,9 @@ export const Route = createFileRoute("/onboarding/child")({
   head: () =>
     pageHead({
       path: "/onboarding/child",
-      title: "Parent or guardian approval — OpenRun",
+      title: "Parent or guardian approval — ballaCity",
       description:
-        "Under-13 OpenRun accounts need a parent or guardian to approve them before games, messages and videos turn on.",
+        "Under-13 ballaCity accounts need a parent or guardian to approve them before games, messages and videos turn on.",
       noindex: true,
     }),
   ssr: false,
@@ -75,7 +75,7 @@ function ChildOnboardingPage() {
         A parent or guardian approves this account
       </h1>
       <p className="mt-2 text-sm text-muted-foreground">
-        OpenRun requires a parent or guardian to approve accounts for members under 13. Until they
+        ballaCity requires a parent or guardian to approve accounts for members under 13. Until they
         do, we keep things switched off — no messages, no videos, no public profile.
       </p>
 
@@ -94,7 +94,7 @@ function ChildOnboardingPage() {
             to="/feed"
             className="mt-3 inline-block rounded-full bg-primary px-4 py-2 text-sm font-bold text-primary-foreground"
           >
-            Go to OpenRun
+            Go to ballaCity
           </Link>
         </div>
       ) : (
@@ -125,7 +125,7 @@ function ChildOnboardingPage() {
               </div>
               <p className="mt-1 text-sm text-muted-foreground">
                 We're waiting for {status.consent.parentEmail} to approve. They need to open the
-                approval link and sign in with their own adult OpenRun account.
+                approval link and sign in with their own adult ballaCity account.
               </p>
             </div>
           ) : null}

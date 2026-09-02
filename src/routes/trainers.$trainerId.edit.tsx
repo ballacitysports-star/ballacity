@@ -7,7 +7,7 @@ import { EditOrgScreen } from "@/components/EditOrgScreen";
 export const Route = createFileRoute("/trainers/$trainerId/edit")({
   head: () =>
     pageHead({
-      title: "Edit trainer profile — OpenRun",
+      title: "Edit trainer profile — ballaCity",
       description: "Update your trainer details, session types, and availability.",
       noindex: true,
     }),

@@ -22,8 +22,8 @@ export const Route = createFileRoute("/account/notifications")({
   head: () =>
     pageHead({
       path: "/account/notifications",
-      title: "Notification settings — OpenRun",
-      description: "Choose which OpenRun notifications you get in-app and as push alerts.",
+      title: "Notification settings — ballaCity",
+      description: "Choose which ballaCity notifications you get in-app and as push alerts.",
       noindex: true,
     }),
   component: NotificationSettingsPage,
@@ -40,7 +40,7 @@ const SECTIONS: Array<{ title: string; note?: string; categories: NotifCategory[
   },
   {
     title: "Payments",
-    note: "OpenRun never moves money for you — these alerts are about payments you or a host mark as sent or confirmed.",
+    note: "ballaCity never moves money for you — these alerts are about payments you or a host mark as sent or confirmed.",
     categories: ["payments"],
   },
   {
@@ -135,7 +135,7 @@ function NotificationSettingsPage() {
       <main className="mx-auto max-w-xl px-4">
         <p className="pt-4 text-xs text-muted-foreground">
           Every switch below turns notifications <span className="font-semibold">on</span>. In-app
-          alerts appear on your Alerts tab; push alerts go to this device even when OpenRun is
+          alerts appear on your Alerts tab; push alerts go to this device even when ballaCity is
           closed. Changes save as soon as you flip a switch.
         </p>
 

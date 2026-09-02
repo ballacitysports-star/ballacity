@@ -77,7 +77,7 @@ export const Route = createFileRoute("/_tabs/reels")({
   head: () =>
     pageHead({
       path: "/reels",
-      title: "Highlight reels — OpenRun",
+      title: "Highlight reels — ballaCity",
       description: "Turn your game footage into AI-edited highlight reels you can share.",
       noindex: true,
     }),

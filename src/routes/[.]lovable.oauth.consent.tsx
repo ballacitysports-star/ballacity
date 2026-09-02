@@ -30,7 +30,7 @@ function oauth(): OAuthNs {
 export const Route = createFileRoute("/.lovable/oauth/consent")({
   head: () =>
     pageHead({
-      title: "Authorize access — OpenRun",
+      title: "Authorize access — ballaCity",
       description: "Review and approve access for a connected application.",
       noindex: true,
     }),
@@ -96,10 +96,10 @@ function Consent() {
   return (
     <main className="mx-auto max-w-md p-6">
       <h1 className="font-display text-2xl font-bold">
-        Connect {clientName} to your OpenRun account
+        Connect {clientName} to your ballaCity account
       </h1>
       <p className="mt-3 text-sm text-muted-foreground">
-        This lets {clientName} use OpenRun as you. It does not bypass OpenRun's permissions or
+        This lets {clientName} use ballaCity as you. It does not bypass ballaCity's permissions or
         backend policies.
       </p>
       {redirectUri && (

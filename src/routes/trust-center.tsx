@@ -29,16 +29,16 @@ export const Route = createFileRoute("/trust-center")({
   head: () =>
     pageHead({
       path: "/trust-center",
-      title: "Trust Center — OpenRun",
+      title: "Trust Center — ballaCity",
       description:
-        "How OpenRun handles privacy, account security, reporting and blocking, direct player-to-player payments, AI highlight analysis, account deletion, and moderation.",
+        "How ballaCity handles privacy, account security, reporting and blocking, direct player-to-player payments, AI highlight analysis, account deletion, and moderation.",
       jsonLd: {
         "@context": "https://schema.org",
         "@type": "WebPage",
-        name: "OpenRun Trust Center",
+        name: "ballaCity Trust Center",
         url: `${SITE_URL}/trust-center`,
         description:
-          "Plain-language explanations of privacy, security, safety, payments, AI, account deletion, and moderation on OpenRun.",
+          "Plain-language explanations of privacy, security, safety, payments, AI, account deletion, and moderation on ballaCity.",
       },
     }),
   component: TrustCenter,
@@ -57,7 +57,7 @@ function TrustCenter() {
       <main className="mx-auto max-w-2xl px-4 py-6 pb-28">
         <h1 className="font-display text-2xl font-bold">Trust Center</h1>
         <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
-          Straight answers about how OpenRun works: what we do with your information, how accounts
+          Straight answers about how ballaCity works: what we do with your information, how accounts
           are protected, what happens when you report someone, and where money actually goes. This
           page describes how the product behaves today — it isn't a certification or an audit
           result.

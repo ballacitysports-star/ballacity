@@ -57,16 +57,16 @@ export const Route = createFileRoute("/teams/$teamId/")({
     const name = o?.name ?? "Team";
     return pageHead({
       path: `/teams/${params.teamId}`,
-      title: `${name} — Team on OpenRun`,
+      title: `${name} — Team on ballaCity`,
       description: (
         o?.bio ||
         o?.tagline ||
-        `Follow ${name} on OpenRun: roster, games, tryouts, and reviews.`
+        `Follow ${name} on ballaCity: roster, games, tryouts, and reviews.`
       ).slice(0, 155),
       image: ogImageUrl({
         kind: "team",
         title: name,
-        subtitle: o?.tagline ?? o?.city ?? "Team on OpenRun",
+        subtitle: o?.tagline ?? o?.city ?? "Team on ballaCity",
         meta: [o?.sports?.[0], o?.city, "Roster & games"],
       }),
       jsonLd: o
@@ -561,7 +561,7 @@ function TeamPage() {
               }
             >
               <p className="text-sm text-muted-foreground">
-                Active on OpenRun since {org.founded}.
+                Active on ballaCity since {org.founded}.
               </p>
             </Section>
           </div>

@@ -15,10 +15,10 @@ import { ogImageUrl } from "@/lib/seo";
 export type ProfileShareKind = "player" | "team" | "trainer" | "gym";
 
 const KIND_LABEL: Record<ProfileShareKind, string> = {
-  player: "OpenRun player",
-  team: "OpenRun team",
-  trainer: "OpenRun trainer",
-  gym: "OpenRun gym",
+  player: "ballaCity player",
+  team: "ballaCity team",
+  trainer: "ballaCity trainer",
+  gym: "ballaCity gym",
 };
 
 const KIND_TITLE: Record<ProfileShareKind, string> = {
@@ -109,7 +109,7 @@ async function copyText(text: string) {
 }
 
 /**
- * Share dialog showing a clean OpenRun preview card built from a profile's
+ * Share dialog showing a clean ballaCity preview card built from a profile's
  * About-section highlights, with native share / copy-link actions. Works for
  * every profile type (player, team, trainer, gym).
  */
@@ -150,7 +150,7 @@ export function ProfileShareCard({
   const handleShare = async () => {
     try {
       if (typeof navigator !== "undefined" && navigator.share) {
-        await navigator.share({ title: `${data.displayName} on OpenRun`, text: shareText, url });
+        await navigator.share({ title: `${data.displayName} on ballaCity`, text: shareText, url });
         return;
       }
     } catch (e: any) {
@@ -177,7 +177,7 @@ export function ProfileShareCard({
         <DialogHeader>
           <DialogTitle>{KIND_TITLE[data.kind]}</DialogTitle>
           <DialogDescription>
-            A clean OpenRun preview card with the About highlights.
+            A clean ballaCity preview card with the About highlights.
           </DialogDescription>
         </DialogHeader>
 

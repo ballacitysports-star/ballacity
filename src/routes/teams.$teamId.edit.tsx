@@ -7,7 +7,7 @@ import { EditOrgScreen } from "@/components/EditOrgScreen";
 export const Route = createFileRoute("/teams/$teamId/edit")({
   head: () =>
     pageHead({
-      title: "Edit team — OpenRun",
+      title: "Edit team — ballaCity",
       description: "Update your team's details, roster, venues, and availability.",
       noindex: true,
     }),

@@ -44,8 +44,8 @@ export const Route = createFileRoute("/admin/audit")({
   head: () =>
     pageHead({
       path: "/admin/audit",
-      title: "Audit logs — OpenRun Admin",
-      description: "Append-only history of administrative and security actions on OpenRun.",
+      title: "Audit logs — ballaCity Admin",
+      description: "Append-only history of administrative and security actions on ballaCity.",
       noindex: true,
     }),
   ssr: false,

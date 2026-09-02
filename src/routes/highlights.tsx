@@ -28,14 +28,14 @@ export const Route = createFileRoute("/highlights")({
   head: () =>
     pageHead({
       path: "/highlights",
-      title: "Highlight feed — OpenRun",
+      title: "Highlight feed — ballaCity",
       description:
-        "Scroll the latest player highlight reels on OpenRun: basketball, soccer, and every other pickup sport, linked to the games they came from.",
+        "Scroll the latest player highlight reels on ballaCity: basketball, soccer, and every other pickup sport, linked to the games they came from.",
       ogType: "website",
       jsonLd: {
         "@context": "https://schema.org",
         "@type": "CollectionPage",
-        name: "OpenRun highlight feed",
+        name: "ballaCity highlight feed",
       },
     }),
   component: HighlightFeedPage,

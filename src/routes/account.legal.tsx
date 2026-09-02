@@ -13,9 +13,9 @@ export const Route = createFileRoute("/account/legal")({
   head: () =>
     pageHead({
       path: "/account/legal",
-      title: "Legal & Privacy — OpenRun",
+      title: "Legal & Privacy — ballaCity",
       description:
-        "Review the OpenRun Terms of Service and Privacy Policy and see your consent history.",
+        "Review the ballaCity Terms of Service and Privacy Policy and see your consent history.",
       noindex: true,
     }),
   component: LegalSettingsPage,

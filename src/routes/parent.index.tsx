@@ -22,9 +22,9 @@ export const Route = createFileRoute("/parent/")({
   head: () =>
     pageHead({
       path: "/parent",
-      title: "Parent Center — OpenRun",
+      title: "Parent Center — ballaCity",
       description:
-        "Manage your child's OpenRun account: messaging, video visibility, discoverability, data requests and consent.",
+        "Manage your child's ballaCity account: messaging, video visibility, discoverability, data requests and consent.",
       noindex: true,
     }),
   ssr: false,
@@ -217,7 +217,7 @@ function ParentCenterPage() {
       <main className="mx-auto w-full max-w-lg px-4 py-10">
         <h1 className="font-display text-2xl font-bold">Parent Center</h1>
         <p className="mt-2 text-sm text-muted-foreground">
-          Sign in with your adult account to manage a child&rsquo;s OpenRun account.
+          Sign in with your adult account to manage a child&rsquo;s ballaCity account.
         </p>
         <Link
           to="/auth"

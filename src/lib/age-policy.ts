@@ -2,7 +2,7 @@
  * Coarse age categories — a thin compatibility layer over the authoritative
  * policy engine in `src/lib/child-policy.ts`.
  *
- * OpenRun intentionally supports members under 13. There is no blanket 13+
+ * ballaCity intentionally supports members under 13. There is no blanket 13+
  * minimum: an under-13 account is a legitimate account state that stays
  * feature-locked until a parent or guardian approves it (see
  * `PERMISSION_MATRIX` and `policyState` in child-policy).
@@ -50,7 +50,7 @@ export const CONSENT_REQUIRED_MESSAGE =
   "Because you're under 13, a parent or guardian has to approve this account before games, messages and videos turn on.";
 
 export const CHILD_SUPPORT_NOTE =
-  "OpenRun supports members under 13 through verifiable parental consent. Consent, privacy floors and feature permissions are enforced server-side; OpenRun does not claim COPPA compliance without legal review of the consent method.";
+  "ballaCity supports members under 13 through verifiable parental consent. Consent, privacy floors and feature permissions are enforced server-side; ballaCity does not claim COPPA compliance without legal review of the consent method.";
 
 /**
  * Coarse age bucket. This is the only age information most of the product

@@ -1,4 +1,4 @@
-# OpenRun — Child / Teen Privacy & Safety Implementation Audit
+# ballaCity — Child / Teen Privacy & Safety Implementation Audit
 
 **Not a legal compliance certification.** This documents the technical controls now in the
 codebase and flags every item that requires review by qualified legal counsel or a business

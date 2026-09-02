@@ -1,5 +1,5 @@
 /**
- * Single source of truth for OpenRun's legal documents.
+ * Single source of truth for ballaCity's legal documents.
  *
  * Nothing in the app should hard-code legal copy: routes, consent checkboxes,
  * and the settings screen all read from this registry. Publishing a new version
@@ -43,7 +43,7 @@ const TERMS: LegalDocument = {
   title: "Terms of Service",
   shortTitle: "Terms",
   path: "/terms",
-  description: "The rules for using OpenRun to find, host, and join pickup games.",
+  description: "The rules for using ballaCity to find, host, and join pickup games.",
   versions: [
     {
       version: "2026-09-01",
@@ -54,21 +54,21 @@ const TERMS: LegalDocument = {
         {
           heading: "1. Your account",
           body: [
-            "You need an OpenRun account to join or host games. Keep your sign-in details secure and provide accurate information about yourself.",
+            "You need an ballaCity account to join or host games. Keep your sign-in details secure and provide accurate information about yourself.",
             "You must meet the minimum age set for any game you join, and hosts may require approval before you participate.",
           ],
         },
         {
           heading: "2. Games and participation",
           body: [
-            "OpenRun connects players, teams, trainers, and gyms. We do not organize, supervise, coach, or insure any activity listed on the platform.",
+            "ballaCity connects players, teams, trainers, and gyms. We do not organize, supervise, coach, or insure any activity listed on the platform.",
             "You take part in physical activity at your own risk and are responsible for your own health, equipment, and safety decisions.",
           ],
         },
         {
           heading: "3. Payments between players and hosts",
           body: [
-            "OpenRun does not process payments, hold funds, or act as an escrow or payment processor. Any entry fee is paid directly between you and the host.",
+            "ballaCity does not process payments, hold funds, or act as an escrow or payment processor. Any entry fee is paid directly between you and the host.",
             "Verify recipient details before sending money. Refunds and disputes are handled between you and the host.",
           ],
         },
@@ -96,7 +96,7 @@ const PRIVACY: LegalDocument = {
   title: "Privacy Policy",
   shortTitle: "Privacy",
   path: "/privacy",
-  description: "What personal data OpenRun collects, why, and the controls you have.",
+  description: "What personal data ballaCity collects, why, and the controls you have.",
   versions: [
     {
       version: "2026-09-01",
@@ -138,7 +138,7 @@ const PRIVACY: LegalDocument = {
           heading: "5. Retention and contact",
           body: [
             "We keep data while your account is active and for as long as needed to meet legal or safety obligations.",
-            "For privacy questions, contact the OpenRun team through the app.",
+            "For privacy questions, contact the ballaCity team through the app.",
           ],
         },
       ],

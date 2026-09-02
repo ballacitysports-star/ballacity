@@ -21,9 +21,9 @@ export const Route = createFileRoute("/onboarding/age")({
   head: () =>
     pageHead({
       path: "/onboarding/age",
-      title: "Add your date of birth — OpenRun",
+      title: "Add your date of birth — ballaCity",
       description:
-        "OpenRun asks for your date of birth so we can set the right safety, privacy and account experience.",
+        "ballaCity asks for your date of birth so we can set the right safety, privacy and account experience.",
       noindex: true,
     }),
   ssr: false,
@@ -120,7 +120,7 @@ function AgeGatePage() {
         <h1 className="mt-2 font-display text-2xl font-bold">Create your account</h1>
         <p className="mt-2 text-sm text-muted-foreground">
           Your age helps us provide the right safety, privacy and account experience. Everyone is
-          welcome on OpenRun — we just set things up differently depending on your age.
+          welcome on ballaCity — we just set things up differently depending on your age.
         </p>
 
         <form onSubmit={onSubmit} className="mt-6 space-y-4" noValidate>

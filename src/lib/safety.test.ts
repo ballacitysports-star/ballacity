@@ -21,7 +21,7 @@ describe("safety copy", () => {
     );
   });
 
-  it("never claims OpenRun guarantees safety", () => {
+  it("never claims ballaCity guarantees safety", () => {
     const all = [
       RISK_ACKNOWLEDGMENT.text,
       HOST_RESPONSIBILITY.text,
@@ -32,8 +32,8 @@ describe("safety copy", () => {
       ...SAFETY_TOPICS.flatMap((t) => t.points),
     ].join(" ");
     // Only affirmative claims are forbidden; explicit disclaimers ("does not
-    // guarantee", "never claim OpenRun guarantees…") are exactly what we want.
-    expect(all).not.toMatch(/(?<!(?:not|never claim) )OpenRun (guarantees|ensures) safety/i);
+    // guarantee", "never claim ballaCity guarantees…") are exactly what we want.
+    expect(all).not.toMatch(/(?<!(?:not|never claim) )ballaCity (guarantees|ensures) safety/i);
     expect(HOST_RESPONSIBILITY.text).toMatch(/does not organize, supervise, or guarantee/i);
 
     expect(EMERGENCY_NOTICE).toMatch(/not an emergency service/i);

@@ -60,16 +60,16 @@ export const Route = createFileRoute("/trainers/$trainerId/")({
     const name = o?.name ?? "Trainer";
     return pageHead({
       path: `/trainers/${params.trainerId}`,
-      title: `${name} — Trainer on OpenRun`,
+      title: `${name} — Trainer on ballaCity`,
       description: (
         o?.bio ||
         o?.tagline ||
-        `Book sessions with ${name} on OpenRun: session types, venues, and availability.`
+        `Book sessions with ${name} on ballaCity: session types, venues, and availability.`
       ).slice(0, 155),
       image: ogImageUrl({
         kind: "trainer",
         title: name,
-        subtitle: o?.tagline ?? o?.city ?? "Trainer on OpenRun",
+        subtitle: o?.tagline ?? o?.city ?? "Trainer on ballaCity",
         meta: [o?.sports?.[0], o?.city, "Book a session"],
       }),
       noindex: !o,

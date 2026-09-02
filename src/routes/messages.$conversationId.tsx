@@ -41,8 +41,8 @@ import { supabase } from "@/integrations/supabase/client";
 export const Route = createFileRoute("/messages/$conversationId")({
   head: () =>
     pageHead({
-      title: "Chat — OpenRun",
-      description: "A private OpenRun conversation.",
+      title: "Chat — ballaCity",
+      description: "A private ballaCity conversation.",
       noindex: true,
     }),
   component: Thread,

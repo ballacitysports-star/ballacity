@@ -28,7 +28,7 @@ export const RISK_ACKNOWLEDGMENT = {
     "facility, host, and safety rules.",
   checkboxLabel: "I acknowledge the risks of this activity and agree to follow facility, host, and safety rules.",
   points: [
-    "Games are organized by the host, not by OpenRun. OpenRun does not supervise, referee, or inspect venues.",
+    "Games are organized by the host, not by ballaCity. ballaCity does not supervise, referee, or inspect venues.",
     "Play within your ability, warm up, and stop if you're injured or unwell.",
     "Follow the venue's rules and any staff instructions while you're there.",
     "You are responsible for your own health, insurance, and equipment.",
@@ -45,7 +45,7 @@ export const HOST_RESPONSIBILITY = {
   text:
     "You are organizing this individual game. You are responsible for the accuracy of the " +
     "game information you publish, the venue and its access rules, communicating cancellations " +
-    "or changes, and the conduct expected of players you invite. OpenRun does not organize, " +
+    "or changes, and the conduct expected of players you invite. ballaCity does not organize, " +
     "supervise, or guarantee the safety of any game.",
   checkboxLabel: "I understand I'm responsible for organizing this game and the accuracy of its details.",
   points: [
@@ -53,7 +53,7 @@ export const HOST_RESPONSIBILITY = {
     "Confirm you're allowed to use the court, field, or facility, and share its rules with players.",
     "Tell players promptly if you cancel, move, or reschedule.",
     "Set the conduct you expect, and report players who behave unsafely.",
-    "Never claim OpenRun guarantees safety, supervision, or insurance for your game.",
+    "Never claim ballaCity guarantees safety, supervision, or insurance for your game.",
   ],
   disclaimer:
     "This acknowledgment is not a waiver or release of liability and is pending legal review.",
@@ -101,13 +101,13 @@ export const ADDRESS_PRIVACY_NOTE =
   "Use a public court, park, gym, or facility whenever you can. Avoid publishing a private residential address — share exact access details in chat with confirmed players instead.";
 
 export const EMERGENCY_NOTICE =
-  "OpenRun is not an emergency service. If someone is in danger or seriously injured, contact your local emergency number (911 in the US) immediately. Report the incident in OpenRun afterwards so moderators can act.";
+  "ballaCity is not an emergency service. If someone is in danger or seriously injured, contact your local emergency number (911 in the US) immediately. Report the incident in ballaCity afterwards so moderators can act.";
 
 /** Plain-language intro for the Safety Center "Stay safe" section. */
 export const STAY_SAFE_POINTS: string[] = [
   "Read the whole game post before you commit — venue, court, time, skill level, and cost.",
   "Play at public sporting facilities and arrive a few minutes early to look the space over.",
-  "Keep conversations in OpenRun so moderators can review them if something goes wrong.",
+  "Keep conversations in ballaCity so moderators can review them if something goes wrong.",
   "Share only what a game needs — you never have to give out your address, ID, or financial details.",
   "Trust your instincts. You can leave any game, decline any request, and block anyone.",
   "Report unsafe behavior with the flag icon so moderators can act on it.",
@@ -132,7 +132,7 @@ export const SAFETY_TOPICS: { id: string; title: string; points: string[] }[] = 
       "Tell a friend where you're going and when you expect to be back.",
       "Check the player's profile and reviews before agreeing to anything off-app.",
       "Trust your instincts — you can leave any game at any time.",
-          "Communicate through OpenRun instead of moving to personal channels early.",
+          "Communicate through ballaCity instead of moving to personal channels early.",
       "Avoid sharing unnecessary personal information such as your home address or workplace.",
 ],
   },
@@ -149,18 +149,18 @@ export const SAFETY_TOPICS: { id: string; title: string; points: string[] }[] = 
       "Never participate while impaired by alcohol or drugs.",
       "Bring appropriate equipment for the sport and surface.",
       "Know your physical limitations and sit out when you need to.",
-      "Report unsafe behavior to the host and to OpenRun.",
+      "Report unsafe behavior to the host and to ballaCity.",
 ],
   },
   {
     id: "payments",
     title: "Payment safety",
     points: [
-      "OpenRun is not a payment processor. Entry fees are paid directly to the host.",
+      "ballaCity is not a payment processor. Entry fees are paid directly to the host.",
       "Never send money before the game is confirmed, and never pay more than the posted fee.",
       "Keep a receipt or screenshot of what you sent.",
       "Report anyone who pressures you to pay off-app or refuses to confirm payment.",
-          "OpenRun never requests banking passwords, card PINs, or one-time codes.",
+          "ballaCity never requests banking passwords, card PINs, or one-time codes.",
       "Never share payment credentials, logins, or account recovery codes with anyone.",
       "Confirm the host and the game before sending money.",
       "Be cautious of payment scams: pressure to pay fast, changed handles, or refund overpayment requests.",
@@ -170,7 +170,7 @@ export const SAFETY_TOPICS: { id: string; title: string; points: string[] }[] = 
     id: "messaging",
     title: "Messaging safety",
     points: [
-      "Keep conversations in OpenRun so moderators can review them if something goes wrong.",
+      "Keep conversations in ballaCity so moderators can review them if something goes wrong.",
       "Don't share your home address, financial details, or ID documents.",
       "Block anyone who makes you uncomfortable — they can't message or follow you afterwards.",
           "Block users who bother you — blocking is private and stops messages, follows, and join requests.",
@@ -183,7 +183,7 @@ export const SAFETY_TOPICS: { id: string; title: string; points: string[] }[] = 
     title: "Reporting",
     points: [
       "Use the flag icon on a profile, game, message, or highlight to report it.",
-      "Safety reports go straight to OpenRun moderators with an audit trail.",
+      "Safety reports go straight to ballaCity moderators with an audit trail.",
       "Include details: what happened, when, and where.",
     ],
   },

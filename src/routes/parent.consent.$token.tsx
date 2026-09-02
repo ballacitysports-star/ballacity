@@ -17,9 +17,9 @@ import { Button } from "@/components/ui/button";
 export const Route = createFileRoute("/parent/consent/$token")({
   head: () =>
     pageHead({
-      title: "Approve a child's OpenRun account",
+      title: "Approve a child's ballaCity account",
       description:
-        "Review what OpenRun collects and what your child can do, then approve or decline the account.",
+        "Review what ballaCity collects and what your child can do, then approve or decline the account.",
       noindex: true,
     }),
   ssr: false,
@@ -84,7 +84,7 @@ function ConsentApprovalPage() {
         <span className="text-xs font-bold uppercase tracking-wide">Parent / guardian approval</span>
       </div>
       <h1 className="mt-2 font-display text-2xl font-bold">
-        Approve {info?.childDisplayName ?? "a child"}&rsquo;s OpenRun account
+        Approve {info?.childDisplayName ?? "a child"}&rsquo;s ballaCity account
       </h1>
 
       {query.isLoading ? (
@@ -143,7 +143,7 @@ function ConsentApprovalPage() {
               <Link to="/safety/children" className="font-semibold text-primary underline">
                 Children&rsquo;s privacy information
               </Link>
-              , and I consent to OpenRun collecting and using my child&rsquo;s information as
+              , and I consent to ballaCity collecting and using my child&rsquo;s information as
               described.
             </span>
           </label>
@@ -151,7 +151,7 @@ function ConsentApprovalPage() {
           {loading ? null : !user ? (
             <div className="mt-4 rounded-2xl border border-border bg-surface p-4 text-xs">
               <p className="text-muted-foreground">
-                Sign in with your own adult OpenRun account to approve. This confirms your email and
+                Sign in with your own adult ballaCity account to approve. This confirms your email and
                 gives you the Parent Center.
               </p>
               <Link

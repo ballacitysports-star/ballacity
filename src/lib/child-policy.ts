@@ -1,5 +1,5 @@
 /**
- * OpenRun child & teen policy engine.
+ * ballaCity child & teen policy engine.
  *
  * ONE place decides every age-dependent rule: cohorts, jurisdiction, parental
  * consent requirements, feature permissions, privacy/messaging/media floors.
@@ -10,12 +10,12 @@
  * so a client that lies about its cohort gains nothing.
  *
  * LEGAL REVIEW REQUIRED — this module implements technical controls. It is not
- * a claim that OpenRun is "COPPA compliant" or "Georgia compliant". Thresholds,
+ * a claim that ballaCity is "COPPA compliant" or "Georgia compliant". Thresholds,
  * consent methods and jurisdiction rules must be confirmed by qualified counsel.
  */
 
 export const CHILD_POLICY_DISCLAIMER =
-  "OpenRun implements technical child-safety and parental-consent controls. This is not a legal compliance claim; applicable requirements must be confirmed by qualified legal counsel.";
+  "ballaCity implements technical child-safety and parental-consent controls. This is not a legal compliance claim; applicable requirements must be confirmed by qualified legal counsel.";
 
 /* ------------------------------------------------------------------ */
 /* Cohorts                                                             */
@@ -190,7 +190,7 @@ export function policyForJurisdiction(
 }
 
 /**
- * THE age calculation for OpenRun. Calendar-based (never 365-day math) and
+ * THE age calculation for ballaCity. Calendar-based (never 365-day math) and
  * date-only, so a member's age never shifts with timezone or clock time.
  *
  * `dateOfBirth` accepts `YYYY-MM-DD` (canonical) or a Date. `currentDate`
@@ -309,7 +309,7 @@ export const CONSENT_METHOD_META: Record<ConsentMethod, { label: string; note: s
     note: "Consent verified by a configured third-party parental-consent provider. No provider is enabled until one is selected and contracted.",
   },
   manual_review: {
-    label: "OpenRun manual review",
+    label: "ballaCity manual review",
     note: "Consent recorded by trained staff after reviewing guardian evidence.",
   },
 };

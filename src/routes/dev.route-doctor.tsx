@@ -15,7 +15,7 @@ export const Route = createFileRoute("/dev/route-doctor")({
   head: () =>
     pageHead({
       path: "/dev/route-doctor",
-      title: "Route Doctor — OpenRun",
+      title: "Route Doctor — ballaCity",
       description:
         "Reproduce broken links, test any path against the app's routes, and see recent 404s.",
       noindex: true,

@@ -34,8 +34,8 @@ export const Route = createFileRoute("/auth")({
   head: () =>
     pageHead({
       path: "/auth",
-      title: "Sign in — OpenRun",
-      description: "Sign in or create an OpenRun account to join and host pickup games.",
+      title: "Sign in — ballaCity",
+      description: "Sign in or create an ballaCity account to join and host pickup games.",
       noindex: true,
     }),
   validateSearch: (s: Record<string, unknown>) => {
@@ -441,7 +441,7 @@ function AuthPage() {
 
       <div className="px-4 mt-6 space-y-5">
         <div className="text-center">
-          <div className="font-display text-3xl font-bold">OpenRun</div>
+          <div className="font-display text-3xl font-bold">ballaCity</div>
           <p className="text-sm text-muted-foreground mt-1">
             Save games, write reviews, and build your reputation.
           </p>
@@ -668,7 +668,7 @@ function AuthPage() {
               className="w-full text-center text-xs text-muted-foreground py-2"
             >
               {mode === "signin"
-                ? "New to OpenRun? Create an account"
+                ? "New to ballaCity? Create an account"
                 : "Already have an account? Sign in"}
             </button>
 

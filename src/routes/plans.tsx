@@ -15,9 +15,9 @@ export const Route = createFileRoute("/plans")({
   head: () =>
     pageHead({
       path: "/plans",
-      title: "Plans & subscriptions — OpenRun",
+      title: "Plans & subscriptions — ballaCity",
       description:
-        "Compare OpenRun plans: host games, run a team, and generate unlimited AI highlight reels.",
+        "Compare ballaCity plans: host games, run a team, and generate unlimited AI highlight reels.",
     }),
   component: PlansPage,
 });

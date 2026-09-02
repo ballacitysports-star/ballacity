@@ -8,9 +8,9 @@ export const Route = createFileRoute("/community-guidelines")({
   head: () =>
     pageHead({
       path: "/community-guidelines",
-      title: "Community Guidelines — OpenRun",
+      title: "Community Guidelines — ballaCity",
       description:
-        "The rules for playing on OpenRun: respect other players, post accurate games, play safely, keep payments clean, and upload only clips you own.",
+        "The rules for playing on ballaCity: respect other players, post accurate games, play safely, keep payments clean, and upload only clips you own.",
     }),
   component: GuidelinesPage,
 });
@@ -28,7 +28,7 @@ function GuidelinesPage() {
       <main className="mx-auto max-w-2xl px-4 py-6 pb-28">
         <h1 className="font-display text-2xl font-bold">Community Guidelines</h1>
         <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
-          OpenRun works when runs are honest, safe, and worth showing up for. These are the
+          ballaCity works when runs are honest, safe, and worth showing up for. These are the
           expectations for every player, host, team, gym, and trainer on the app.
         </p>
 

@@ -340,7 +340,7 @@ export async function cancelMyPaymentSubmission(
   if (error) throw error;
 }
 
-/** Either party can flag a payment as disputed; OpenRun never moves money. */
+/** Either party can flag a payment as disputed; ballaCity never moves money. */
 export async function disputeMyPaymentSubmission(id: string, reason: string) {
   const trimmed = reason.trim().slice(0, 500);
   if (!trimmed) throw new Error("Tell us what went wrong with this payment.");

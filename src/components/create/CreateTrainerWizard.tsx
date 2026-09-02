@@ -711,7 +711,7 @@ export function CreateTrainerWizard() {
                           </button>
                         ))}
                         {orgResults.data && orgResults.data.length === 0 && !orgResults.isLoading && (
-                          <div className="text-[11px] text-muted-foreground">No match on OpenRun.</div>
+                          <div className="text-[11px] text-muted-foreground">No match on ballaCity.</div>
                         )}
                         {placesResults.data?.suggestions && placesResults.data.suggestions.length > 0 && (
                           <>

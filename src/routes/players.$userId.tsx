@@ -58,15 +58,15 @@ export const Route = createFileRoute("/players/$userId")({
   head: ({ params }) => ({
     ...pageHead({
       path: `/players/${params.userId}`,
-      title: "Player profile — OpenRun",
+      title: "Player profile — ballaCity",
       description:
-        "See this player's sports, skill levels, availability, badges, and reviews on OpenRun.",
+        "See this player's sports, skill levels, availability, badges, and reviews on ballaCity.",
       ogType: "profile",
       image: ogImageUrl({
         kind: "player",
         title: "Player profile",
         subtitle: "Sports, availability, badges, and reviews",
-        meta: ["OpenRun player"],
+        meta: ["ballaCity player"],
       }),
       jsonLd: {
         "@context": "https://schema.org",

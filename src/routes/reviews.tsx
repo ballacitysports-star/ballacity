@@ -18,8 +18,8 @@ import { useMemo } from "react";
 export const Route = createFileRoute("/reviews")({
   head: () =>
     pageHead({
-      title: "Reviews & reputation — OpenRun",
-      description: "Read and manage reviews for players, teams, trainers, and gyms across OpenRun.",
+      title: "Reviews & reputation — ballaCity",
+      description: "Read and manage reviews for players, teams, trainers, and gyms across ballaCity.",
       noindex: true,
     }),
   // URL-persisted filter + sort so refresh/share preserves the view.
@@ -131,7 +131,7 @@ function ReviewsDashboard() {
         <h1 className="font-display text-xl font-bold">Reviews Hub</h1>
       </div>
       <p className="text-sm text-muted-foreground mb-5">
-        Trust scores, top strengths, and AI insights for everyone on OpenRun.
+        Trust scores, top strengths, and AI insights for everyone on ballaCity.
       </p>
 
       {/* Kind filter */}

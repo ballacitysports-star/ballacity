@@ -8,7 +8,7 @@ export const Route = createFileRoute("/dev/og-preview")({
   head: () =>
     pageHead({
       path: "/dev/og-preview",
-      title: "OG Card Preview — OpenRun",
+      title: "OG Card Preview — ballaCity",
       description:
         "Paste any game, profile, or venue URL and preview its share card in every supported size.",
       noindex: true,
