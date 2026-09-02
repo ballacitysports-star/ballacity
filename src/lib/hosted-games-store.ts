@@ -63,6 +63,8 @@ function getSnapshot() {
 type DbRow = {
   id: string;
   host_id: string;
+  hidden_at?: string | null;
+
   sport: string;
   title: string;
   date: string;
@@ -209,6 +211,8 @@ async function fetchAll(): Promise<void> {
   const { data, error } = await supabase
     .from("hosted_games")
     .select("*")
+    // Moderator-hidden games must never surface in the feed or on the map.
+    .is("hidden_at", null)
     .order("date", { ascending: true });
   if (error) throw error;
   const games = (data as DbRow[] | null)?.map(rowToGame) ?? [];
@@ -242,6 +246,12 @@ function ensureRealtime() {
       const oldRow = payload.old as DbRow | null;
       if (payload.eventType === "DELETE" && oldRow) {
         cache = cache.filter((g) => g.id !== oldRow.id);
+        emit();
+        return;
+      }
+      if (newRow?.hidden_at) {
+        // Just hidden by a moderator: drop it from the live cache.
+        cache = cache.filter((g) => g.id !== newRow.id);
         emit();
         return;
       }
@@ -401,7 +411,12 @@ export async function fetchHostedGame(id: string): Promise<Game | null> {
   const local = cache.find((g) => g.id === id);
   if (local) return local;
 
-  const { data, error } = await supabase.from("hosted_games").select("*").eq("id", id).maybeSingle();
+  const { data, error } = await supabase
+    .from("hosted_games")
+    .select("*")
+    .eq("id", id)
+    .is("hidden_at", null)
+    .maybeSingle();
   if (error) throw error;
   if (!data) return null;
 

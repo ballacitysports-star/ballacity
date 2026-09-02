@@ -3,7 +3,8 @@ import { pageHead } from "@/lib/seo";
 import { ArrowRight, MapPin, Sparkles, Trophy, Users, Video, Zap } from "lucide-react";
 import { useEffect, type CSSProperties } from "react";
 import { Logo } from "@/components/Logo";
-import { HERO_IMAGE, SPORTS, GAMES } from "@/lib/sample-data";
+import { HERO_IMAGE, SPORTS } from "@/lib/sample-data";
+import { useHostedGames } from "@/lib/hosted-games-store";
 import { GameCard } from "@/components/GameCard";
 import { AuthRedirectSkeleton } from "@/components/AuthRedirectSkeleton";
 import { useAuth } from "@/hooks/use-auth";
@@ -33,6 +34,7 @@ export const Route = createFileRoute("/")({
 function Landing() {
   const router = useRouter();
   const { user, loading } = useAuth();
+  const hosted = useHostedGames();
   const hasStoredSession = typeof window !== "undefined" ? !!readStoredSupabaseSession() : false;
 
   useEffect(() => {
@@ -58,7 +60,11 @@ function Landing() {
   // see a skeleton instead of the marketing hero while we redirect.
   if (user || (loading && hasStoredSession)) return <AuthRedirectSkeleton />;
 
-  const trending = hideFinishedGames(GAMES.filter((g) => g.trending)).slice(0, 4);
+  // Real hosted games only — soonest first, public games (RLS already hides
+  // private and moderator-hidden ones from anonymous visitors).
+  const trending = hideFinishedGames(hosted.filter((g) => !g.isPrivate))
+    .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
+    .slice(0, 4);
 
   return (
     <div className="min-h-dvh">
@@ -303,11 +309,26 @@ function Landing() {
             See all <ArrowRight className="h-4 w-4" />
           </Link>
         </div>
-        <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-4">
-          {trending.map((g, i) => (
-            <GameCard key={g.id} game={g} index={i} />
-          ))}
-        </div>
+        {trending.length === 0 ? (
+          <div className="rounded-2xl border border-border bg-surface p-8 text-center">
+            <p className="font-semibold">No games posted near you yet.</p>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Be the first to put one on the board — hosting takes about a minute.
+            </p>
+            <Link
+              to="/create"
+              className="mt-5 inline-flex items-center gap-2 rounded-full bg-lime-gradient px-5 py-3 text-sm font-bold text-primary-foreground"
+            >
+              Host a game <ArrowRight className="h-4 w-4" />
+            </Link>
+          </div>
+        ) : (
+          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-4">
+            {trending.map((g, i) => (
+              <GameCard key={g.id} game={g} index={i} />
+            ))}
+          </div>
+        )}
       </section>
 
       {/* CTA */}
