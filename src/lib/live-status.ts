@@ -86,6 +86,7 @@ export function cutoffAmountLabel(min: number | undefined): string {
 }
 
 export type JoinState =
+  | "cancelled"
   | "open"
   | "roster_full"
   | "closed_cutoff"
@@ -121,6 +122,18 @@ export function resolveJoinGate(
   opts: JoinGateOptions = {},
 ): JoinGate {
   const liveStatus = computeLiveStatus(game, now);
+  const cancelled =
+    !!(game as { cancelledAt?: string | null }).cancelledAt || game.status === "cancelled";
+  if (cancelled) {
+    return {
+      liveStatus,
+      joinState: "cancelled",
+      label: "Cancelled",
+      reason: "The host cancelled this game.",
+      locked: true,
+      waitlistOpen: false,
+    };
+  }
   const cutoffMin = Number((game as { signupCutoffMin?: number }).signupCutoffMin ?? 0);
 
   if (liveStatus === "completed") {
@@ -213,6 +226,7 @@ export function useJoinGate(game: Game, opts: JoinGateOptions = {}): JoinGate {
     game.date,
     game.duration,
     game.status ?? "",
+    (game as { cancelledAt?: string | null }).cancelledAt ?? "",
     game.joinsClosed ? 1 : 0,
     (game as { signupCutoffMin?: number }).signupCutoffMin ?? 0,
     spotsLeft ?? "",
