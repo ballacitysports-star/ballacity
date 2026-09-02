@@ -632,18 +632,11 @@ function AuthGate({ children }: { children: React.ReactNode }) {
 
   // Age-verification gate: no authenticated member reaches ordinary
   // onboarding, the feed, or any protected route until the SERVER has
-  // determined their age from a stored date of birth. The routes below are the
-  // only escapes (the age form itself, the guardian-consent flow, and legal /
-  // safety reading), so the gate can never trap anyone in a loop.
-  const AGE_ESCAPE_PREFIXES = [
-    AGE_GATE_ROUTE,
-    CHILD_CONSENT_ROUTE,
-    "/parent",
-    "/safety",
-    "/account/legal",
-  ];
-  const skipAgeCheck =
-    isPublic || AGE_ESCAPE_PREFIXES.some((p) => pathname === p || pathname.startsWith(`${p}/`));
+  // determined their age from a stored date of birth. `isAccountSetupEscape`
+  // lists the only exits (the age form itself, the guardian-consent flow, and
+  // legal / safety reading), so the gate can never trap anyone in a loop.
+  const skipAgeCheck = isPublic || isAccountSetupEscape(pathname);
+
   const [ageStatus, setAgeStatus] = useState<"unknown" | "ok" | "missing">(
     !!user && ageVerifiedUsers.has(user.id) ? "ok" : "unknown",
   );
