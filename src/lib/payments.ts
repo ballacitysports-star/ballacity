@@ -1,5 +1,7 @@
 import { supabase } from "@/integrations/supabase/client";
+import { validateImageMeta } from "@/lib/image-validation";
 import type { CancellationReason, PaymentSubmissionStatus } from "@/lib/payment-states";
+
 
 export type PaymentType =
   | "venmo"
