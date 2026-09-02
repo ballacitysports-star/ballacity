@@ -42,8 +42,15 @@ const CATEGORY_QUERIES: Record<
       table: "profiles",
       column: "id",
       columns:
-        "id, username, display_name, avatar_initials, bio, sport, sport_levels, city, birthday, graduating_class, account_type, search_radius_mi, links, avatar_url, cover_url, age_category, created_at, updated_at",
+        "id, username, display_name, avatar_initials, bio, sport, sport_levels, city, graduating_class, account_type, search_radius_mi, links, avatar_url, cover_url, age_category, created_at, updated_at",
     },
+    {
+      key: "birthday",
+      table: "profile_birthdays",
+      column: "user_id",
+      columns: "birthday, updated_at",
+    },
+
     {
       key: "profile_types",
       table: "account_profiles",
