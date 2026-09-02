@@ -61,6 +61,8 @@ import { computeReputation, useReviewsFor } from "@/lib/reviews";
 import { GamePolicySummary } from "@/components/games/GamePolicySummary";
 import { GamePolicyFields } from "@/components/games/GamePolicyFields";
 import { HostTrustPanel } from "@/components/games/HostTrustPanel";
+import { cancelGame, completeGame, markAttendance, useHostAttendanceStats } from "@/lib/game-lifecycle";
+import { resolveGameStatus, GAME_STATUS_TONE_CLASS } from "@/lib/game-status";
 import { normalizeGamePolicy, validateGamePolicy, type GamePolicy, type HostTrust } from "@/lib/game-policy";
 import { ReputationBadge } from "@/components/ReputationBadge";
 import { joinGame, leaveGame, useIsJoined } from "@/lib/games-store";
@@ -462,6 +464,8 @@ function GameDetail() {
     };
   }, [game?.teamId]);
 
+  const hostAttendance = useHostAttendanceStats(game?.hostUserId ?? settings?.host_id ?? undefined);
+
   const hostTrust = useMemo<HostTrust>(() => {
     const hostUserId = game?.hostUserId ?? settings?.host_id ?? null;
     const gamesHosted = hostUserId
@@ -471,13 +475,13 @@ function GameDetail() {
       gamesHosted,
       rating: hostRep.count > 0 ? hostRep.avg : null,
       reviewCount: hostRep.count,
-      // No attendance signal is tracked yet — report it honestly instead of
-      // inventing a percentage.
-      attendanceRate: null,
+      // Real signal only: the share of host-marked roster spots that showed
+      // up. Null until this host has marked attendance at least once.
+      attendanceRate: hostAttendance?.attendanceRate ?? null,
       verified: hostTeamVerified === true,
       verifiedLabel: hostTeamVerified === true ? "Verified team profile" : null,
     };
-  }, [game?.hostUserId, settings?.host_id, hosted, hostRep, hostTeamVerified]);
+  }, [game?.hostUserId, settings?.host_id, hosted, hostRep, hostTeamVerified, hostAttendance]);
 
   // Guards refreshStatus while a leave flow is tearing down local + server
   // state. Realtime DELETE events for join_requests / payment_submissions
@@ -2335,8 +2339,23 @@ function GameDetail() {
                 type="button"
                 onClick={() => {
                   if (game.status === "in_progress") {
-                    void updateHostedGame(game.id, { status: "completed" }).catch(() => {});
-                    toast.success("Game marked as ended.");
+                    // Completion goes through the RPC so the database stamps
+                    // completed_at, locks joins and opens attendance marking.
+                    void (async () => {
+                      try {
+                        await completeGame(game.id);
+                        await updateHostedGame(game.id, {
+                          status: "completed",
+                          completedAt: new Date().toISOString(),
+                          joinsClosed: true,
+                        });
+                        toast.success("Game marked as ended. You can now mark attendance.");
+                      } catch (err) {
+                        toast.error(
+                          (err as { message?: string })?.message ?? "Couldn't end this game.",
+                        );
+                      }
+                    })();
                   } else {
                     void updateHostedGame(game.id, {
                       status: "in_progress",
@@ -2372,6 +2391,16 @@ function GameDetail() {
                 )}
               </button>
             </div>
+            {!game.cancelledAt && game.status !== "cancelled" ? (
+              <button
+                type="button"
+                onClick={() => setCancelOpen(true)}
+                disabled={game.status === "completed" || !!game.completedAt}
+                className="mt-2 w-full inline-flex items-center justify-center gap-2 rounded-xl border border-amber-500/40 bg-amber-500/10 text-amber-600 dark:text-amber-400 py-2.5 text-xs font-bold disabled:opacity-50"
+              >
+                <Ban className="h-4 w-4" /> Cancel game
+              </button>
+            ) : null}
             <button
               type="button"
               onClick={async () => {
