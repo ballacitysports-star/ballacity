@@ -52,12 +52,24 @@ async function hydrate(gameId: string) {
   }
 }
 
-async function attachChannel(gameId: string) {
-  if (channels.has(gameId) || typeof window === "undefined") return;
-  if (!(await hasSession())) return;
+const attaching = new Set<string>();
+let channelSeq = 0;
 
-  const channel = supabase
-    .channel(`game_participants:game:${gameId}`)
+async function attachChannel(gameId: string) {
+  // The session check below is async, so two overlapping mounts could both
+  // pass the `channels.has` test and build two channels on the same topic —
+  // the second one then throws "cannot add postgres_changes callbacks ...
+  // after subscribe()". A synchronous in-progress guard plus a unique topic
+  // per attach keeps every channel fresh and single-owner.
+  if (channels.has(gameId) || attaching.has(gameId) || typeof window === "undefined") return;
+  attaching.add(gameId);
+  try {
+    if (!(await hasSession())) return;
+    if (channels.has(gameId)) return;
+
+    const channel = supabase
+      .channel(`game_participants:game:${gameId}:${++channelSeq}`)
+
     .on(
       "postgres_changes",
       {
