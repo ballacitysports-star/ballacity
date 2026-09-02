@@ -540,6 +540,61 @@ function AuthPage() {
                   className="w-full rounded-2xl border border-border bg-surface px-4 py-3 text-sm outline-none focus:border-lime"
                 />
               )}
+              {mode === "signup" && (
+                <fieldset>
+                  <legend className="mb-1 text-xs font-semibold text-muted-foreground">
+                    Date of birth
+                  </legend>
+                  <div className="grid grid-cols-3 gap-2">
+                    <select
+                      aria-label="Birth month"
+                      value={dob.month}
+                      onChange={(e) => setDob((p) => ({ ...p, month: e.target.value }))}
+                      className="rounded-2xl border border-border bg-surface px-3 py-3 text-sm outline-none focus:border-lime"
+                    >
+                      <option value="">Month</option>
+                      {MONTHS.map((m, i) => (
+                        <option key={m} value={String(i + 1)}>
+                          {m}
+                        </option>
+                      ))}
+                    </select>
+                    <select
+                      aria-label="Birth day"
+                      value={dob.day}
+                      onChange={(e) => setDob((p) => ({ ...p, day: e.target.value }))}
+                      className="rounded-2xl border border-border bg-surface px-3 py-3 text-sm outline-none focus:border-lime"
+                    >
+                      <option value="">Day</option>
+                      {Array.from({ length: 31 }, (_, i) => i + 1).map((d) => (
+                        <option key={d} value={String(d)}>
+                          {d}
+                        </option>
+                      ))}
+                    </select>
+                    <input
+                      aria-label="Birth year"
+                      inputMode="numeric"
+                      autoComplete="bday-year"
+                      placeholder="Year"
+                      maxLength={4}
+                      value={dob.year}
+                      onChange={(e) =>
+                        setDob((p) => ({
+                          ...p,
+                          year: e.target.value.replace(/[^0-9]/g, "").slice(0, 4),
+                        }))
+                      }
+                      className="rounded-2xl border border-border bg-surface px-3 py-3 text-sm outline-none focus:border-lime"
+                    />
+                  </div>
+                  <p className="mt-1 text-[11px] text-muted-foreground">
+                    Your age helps us provide the right safety and privacy settings. Your birth date
+                    stays private.
+                  </p>
+                </fieldset>
+              )}
+
               <input
                 type="email"
                 value={email}
