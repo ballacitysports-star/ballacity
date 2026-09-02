@@ -43,7 +43,7 @@ export const deleteMyAccount = createServerFn({ method: "POST" })
         avatar_initials: "??",
         bio: null,
         city: null,
-        birthday: null,
+        
         avatar_url: null,
         avatar_url_private: null,
         cover_url: null,
