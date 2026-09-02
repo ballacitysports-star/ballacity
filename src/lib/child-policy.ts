@@ -218,17 +218,131 @@ export function parseAgePolicy(value: unknown): AgePolicyConfig {
       raw["consent_reverification_days"],
       d.consentReverificationDays,
     ),
+    notificationCurfew: bool(
+      raw["notification_curfew_enabled"],
+      d.notificationCurfew !== null,
+    )
+      ? {
+          startHour: clampHour(
+            num(raw["notification_curfew_start_hour"], d.notificationCurfew?.startHour ?? 0),
+          ),
+          endHour: clampHour(
+            num(raw["notification_curfew_end_hour"], d.notificationCurfew?.endHour ?? 6),
+          ),
+        }
+      : null,
   };
 }
 
-/** Jurisdiction overrides layered on top of the base config. */
+const clampHour = (h: number) => Math.min(23, Math.max(0, Math.round(h)));
+
+/**
+ * Jurisdiction overrides layered on top of the base config.
+ *
+ * Call this once jurisdiction is known for a session; until then the platform
+ * runs on the conservative global defaults in DEFAULT_AGE_POLICY.
+ */
 export function policyForJurisdiction(
   config: AgePolicyConfig,
   jurisdiction: Jurisdiction | null | undefined,
 ): AgePolicyConfig {
-  if (!jurisdiction || jurisdiction === config.jurisdiction) return config;
-  return { ...config, jurisdiction };
+  if (!jurisdiction) return config;
+  const overrides = JURISDICTION_POLICY_OVERRIDES[jurisdiction] ?? {};
+  // Never loosen the platform default — a jurisdiction override may only make
+  // the consent threshold stricter. LEGAL REVIEW REQUIRED before changing this
+  // to allow a lower per-jurisdiction threshold.
+  const parentalConsentMaxAge = Math.max(
+    config.parentalConsentMaxAge,
+    overrides.parentalConsentMaxAge ?? 0,
+  );
+  return { ...config, ...overrides, parentalConsentMaxAge, jurisdiction };
 }
+
+/* ------------------------------------------------------------------ */
+/* Notification curfew for minors                                      */
+/* ------------------------------------------------------------------ */
+
+/** True when `hour` (0–23, recipient local time) falls inside the curfew. */
+export function hourInCurfew(
+  hour: number,
+  curfew: AgePolicyConfig["notificationCurfew"],
+): boolean {
+  if (!curfew) return false;
+  const h = ((Math.floor(hour) % 24) + 24) % 24;
+  const { startHour, endHour } = curfew;
+  if (startHour === endHour) return false;
+  return startHour < endHour
+    ? h >= startHour && h < endHour
+    : h >= startHour || h < endHour;
+}
+
+/** The recipient's local hour for an instant, in an IANA timezone. */
+export function localHourIn(date: Date, timezone: string | null | undefined): number {
+  if (!timezone) return date.getUTCHours();
+  try {
+    const parts = new Intl.DateTimeFormat("en-US", {
+      timeZone: timezone,
+      hour: "numeric",
+      hour12: false,
+    }).format(date);
+    const h = Number(parts.replace(/[^\d]/g, ""));
+    return Number.isFinite(h) ? h % 24 : date.getUTCHours();
+  } catch {
+    return date.getUTCHours();
+  }
+}
+
+export type CurfewDecision = {
+  /** Send the push immediately. */
+  send: boolean;
+  /** When suppressed, the earliest instant the push may be delivered. */
+  deliverAfter: Date | null;
+  reason:
+    | "not_a_minor"
+    | "curfew_disabled"
+    | "outside_curfew"
+    | "curfew_lifted_by_guardian"
+    | "in_curfew";
+};
+
+/**
+ * Should a push go out now? Minors inside the curfew window are queued, not
+ * dropped — the in-app notification row is always written by the caller, so
+ * nothing is silently lost.
+ *
+ * A guardian may explicitly lift the curfew for their child (mirrors the other
+ * parent-controlled features). The separate `notifications` control is an
+ * independent, more restrictive layer handled by the caller.
+ */
+export function notificationCurfewDecision(input: {
+  cohort: AgeCohort;
+  curfewLifted?: boolean;
+  timezone?: string | null;
+  now?: Date;
+  config?: AgePolicyConfig;
+}): CurfewDecision {
+  const config = input.config ?? DEFAULT_AGE_POLICY;
+  const now = input.now ?? new Date();
+  if (!isMinorCohort(input.cohort)) {
+    return { send: true, deliverAfter: null, reason: "not_a_minor" };
+  }
+  const curfew = config.notificationCurfew;
+  if (!curfew) return { send: true, deliverAfter: null, reason: "curfew_disabled" };
+  const hour = localHourIn(now, input.timezone ?? null);
+  if (!hourInCurfew(hour, curfew)) {
+    return { send: true, deliverAfter: null, reason: "outside_curfew" };
+  }
+  if (input.curfewLifted) {
+    return { send: true, deliverAfter: null, reason: "curfew_lifted_by_guardian" };
+  }
+  // Hours remaining until the window closes, in the recipient's local time.
+  const hoursLeft = (curfew.endHour - hour + 24) % 24 || 24;
+  const deliverAfter = new Date(now.getTime());
+  deliverAfter.setUTCMinutes(0, 0, 0);
+  deliverAfter.setUTCHours(deliverAfter.getUTCHours() + hoursLeft);
+  return { send: false, deliverAfter, reason: "in_curfew" };
+}
+
 
 /**
  * THE age calculation for ballaCity. Calendar-based (never 365-day math) and
