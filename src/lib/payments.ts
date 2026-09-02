@@ -1,5 +1,7 @@
 import { supabase } from "@/integrations/supabase/client";
+import { validateImageMeta } from "@/lib/image-validation";
 import type { CancellationReason, PaymentSubmissionStatus } from "@/lib/payment-states";
+
 
 export type PaymentType =
   | "venmo"
@@ -228,15 +230,21 @@ export async function upsertGamePaymentSettings(input: {
 export async function uploadProofScreenshot(file: File): Promise<string> {
   const { data: u } = await supabase.auth.getUser();
   if (!u.user) throw new Error("Sign in to upload proof.");
-  const ext = file.name.split(".").pop()?.toLowerCase() || "jpg";
+  // Proof screenshots are images only — reject anything else before it lands in
+  // storage, and pin the stored content type so it can never be served as HTML.
+  const invalid = validateImageMeta({ mime: file.type, bytes: file.size });
+  if (invalid) throw new Error(invalid);
+  const ext = file.type === "image/png" ? "png" : file.type === "image/webp" ? "webp" : "jpg";
   const path = `${u.user.id}/${crypto.randomUUID()}.${ext}`;
   const { error } = await supabase.storage.from("payment-proofs").upload(path, file, {
     cacheControl: "3600",
     upsert: false,
+    contentType: file.type,
   });
   if (error) throw error;
   return path;
 }
+
 
 export async function getSignedProofUrl(path: string): Promise<string | null> {
   const { data, error } = await supabase.storage

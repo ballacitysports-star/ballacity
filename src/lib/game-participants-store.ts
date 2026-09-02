@@ -23,10 +23,21 @@ function emit(gameId: string) {
   listeners.get(gameId)?.forEach((l) => l());
 }
 
+/**
+ * `game_participants` is readable only by signed-in users (RLS + grants), so
+ * counting rows as a visitor would return a 401 for every card on the page.
+ * Signed-out viewers fall back to the static `game.joined` count instead.
+ */
+async function hasSession() {
+  const { data } = await supabase.auth.getSession();
+  return !!data.session;
+}
+
 async function hydrate(gameId: string) {
   if (inFlight.has(gameId)) return;
   inFlight.add(gameId);
   try {
+    if (!(await hasSession())) return;
     const { count, error } = await supabase
       .from("game_participants")
       .select("*", { count: "exact", head: true })
@@ -41,8 +52,10 @@ async function hydrate(gameId: string) {
   }
 }
 
-function attachChannel(gameId: string) {
+async function attachChannel(gameId: string) {
   if (channels.has(gameId) || typeof window === "undefined") return;
+  if (!(await hasSession())) return;
+
   const channel = supabase
     .channel(`game_participants:game:${gameId}`)
     .on(
@@ -107,7 +120,7 @@ function detachIfIdle(gameId: string) {
 export function useLiveParticipantCount(gameId: string | undefined): number | undefined {
   useEffect(() => {
     if (!gameId) return;
-    attachChannel(gameId);
+    void attachChannel(gameId);
     void hydrate(gameId);
   }, [gameId]);
 
