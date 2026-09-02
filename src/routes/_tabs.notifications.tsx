@@ -3,6 +3,7 @@ import { pageHead } from "@/lib/seo";
 import { ArrowLeft, Bell, MessageCircle } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import { NotificationsPanel } from "@/components/NotificationsPanel";
+import { TeamInvitesInbox } from "@/components/team/TeamInvitesInbox";
 
 export const Route = createFileRoute("/_tabs/notifications")({
   head: () =>
