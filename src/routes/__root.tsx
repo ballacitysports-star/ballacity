@@ -691,7 +691,13 @@ function AuthGate({ children }: { children: React.ReactNode }) {
   // The result is cached per user id for the lifetime of the tab, so ordinary
   // navigations never re-run the check (which used to blank the screen with
   // the full-page loader on every route change).
-  const skipTypeCheck = isPublic || pathname === "/onboarding/account-type";
+  // The account-setup escapes (date-of-birth form, guardian consent, parent
+  // center, legal/safety reading) belong to the age step. The type check must
+  // be skipped on ALL of them, not only on the picker itself — otherwise it
+  // redirects away from the date-of-birth screen while the age gate redirects
+  // back, and the two guards ping-pong forever.
+  const skipTypeCheck = isPublic || pathname === "/onboarding/account-type" || skipAgeCheck;
+
   const alreadyConfirmed = !!user && onboardedUsers.has(user.id);
   const [typeStatus, setTypeStatus] = useState<"unknown" | "ok" | "missing">(
     alreadyConfirmed ? "ok" : "unknown",
