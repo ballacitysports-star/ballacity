@@ -17,6 +17,7 @@ import {
 import { clampDistanceMi, kmToMi, miToKm } from "@/lib/distance";
 import { ProfileLocationFields } from "@/components/profile/ProfileLocationFields";
 import { Section, validateBirthday } from "@/components/profile/ProfileFormPrimitives";
+import { birthdayRequiresParentalConsent } from "@/lib/age-policy";
 import {
   ProfileBasicsFields,
   type ProfileBasicsValue,
@@ -456,6 +457,11 @@ function OnboardingWizard({ type }: { type: AccountType }) {
     }
 
     if (isLast) {
+      // Under-13 members finish in the parental-consent flow, not the feed.
+      if (birthdayRequiresParentalConsent(basics.birthday)) {
+        nav({ to: "/onboarding/child" });
+        return;
+      }
       if (nextCfg) nav({ to: nextCfg.goto, search: { finish: 1 } as never });
       else nav({ to: "/feed" });
       return;
