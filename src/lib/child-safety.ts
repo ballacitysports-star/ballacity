@@ -12,14 +12,18 @@ import {
 } from "@/lib/child-policy";
 import {
   createParentRequest,
+  getChildConsentTrail,
   getChildFootprint,
   getMyChildStatus,
+  listMyAgeChangeEvents,
   listMyChildren,
   listMyParentRequests,
   requestParentalConsent,
   revokeChildConsent,
   updateChildControls,
+  type AgeChangeEvent,
   type ChildStatus,
+  type ConsentTrailEntry,
   type GuardianChild,
   type ParentRequestRow,
 } from "@/lib/child-safety.functions";
@@ -142,4 +146,30 @@ export function useChildFootprint(childUserId: string | null) {
     enabled: !!childUserId,
     staleTime: 60_000,
   });
+}
+
+/** Why a date-of-birth change was applied or held for safety review. */
+export function useMyAgeChangeEvents() {
+  const { user } = useAuth();
+  const fetch = useServerFn(listMyAgeChangeEvents);
+  const query = useQuery({
+    queryKey: ["age-change-events", user?.id ?? "anon"],
+    queryFn: () => fetch() as Promise<AgeChangeEvent[]>,
+    enabled: !!user,
+    staleTime: 60_000,
+  });
+  return { ...query, events: query.data ?? [] };
+}
+
+/** Consent audit trail for one linked child (guardian only). */
+export function useChildConsentTrail(childUserId: string | null) {
+  const fetch = useServerFn(getChildConsentTrail);
+  const query = useQuery({
+    queryKey: ["child-consent-trail", childUserId],
+    queryFn: () =>
+      fetch({ data: { childUserId: childUserId! } }) as Promise<ConsentTrailEntry[]>,
+    enabled: !!childUserId,
+    staleTime: 30_000,
+  });
+  return { ...query, entries: query.data ?? [] };
 }
