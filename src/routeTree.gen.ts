@@ -70,7 +70,7 @@ import { Route as PlayerCardUserIdRouteImport } from './routes/player-card.$user
 import { Route as PlayersUserIdRouteImport } from './routes/players.$userId'
 import { Route as ProfileEditRouteImport } from './routes/profile.edit'
 import { Route as ReviewNewRouteImport } from './routes/review.new'
-import { Route as SafetyChildrenRouteImport } from './routes/safety.children'
+import { Route as SafetyChildrenRouteImport } from './routes/safety_.children'
 import { Route as TeamsCreateRouteImport } from './routes/teams.create'
 import { Route as TrainersCreateRouteImport } from './routes/trainers.create'
 import { Route as DotlovableOauthConsentRouteImport } from './routes/[.]lovable.oauth.consent'
@@ -397,9 +397,9 @@ const ReviewNewRoute = ReviewNewRouteImport.update({
   getParentRoute: () => rootRouteImport,
 } as any)
 const SafetyChildrenRoute = SafetyChildrenRouteImport.update({
-  id: '/children',
-  path: '/children',
-  getParentRoute: () => SafetyRoute,
+  id: '/safety_/children',
+  path: '/safety/children',
+  getParentRoute: () => rootRouteImport,
 } as any)
 const TeamsCreateRoute = TeamsCreateRouteImport.update({
   id: '/teams/create',
@@ -507,7 +507,7 @@ export interface FileRoutesByFullPath {
   '/privacy': typeof PrivacyRoute
   '/reset-password': typeof ResetPasswordRoute
   '/reviews': typeof ReviewsRoute
-  '/safety': typeof SafetyRouteWithChildren
+  '/safety': typeof SafetyRoute
   '/settings': typeof SettingsRoute
   '/shop': typeof ShopRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
@@ -588,7 +588,7 @@ export interface FileRoutesByTo {
   '/privacy': typeof PrivacyRoute
   '/reset-password': typeof ResetPasswordRoute
   '/reviews': typeof ReviewsRoute
-  '/safety': typeof SafetyRouteWithChildren
+  '/safety': typeof SafetyRoute
   '/settings': typeof SettingsRoute
   '/shop': typeof ShopRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
@@ -670,7 +670,7 @@ export interface FileRoutesById {
   '/privacy': typeof PrivacyRoute
   '/reset-password': typeof ResetPasswordRoute
   '/reviews': typeof ReviewsRoute
-  '/safety': typeof SafetyRouteWithChildren
+  '/safety': typeof SafetyRoute
   '/settings': typeof SettingsRoute
   '/shop': typeof ShopRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
@@ -714,7 +714,7 @@ export interface FileRoutesById {
   '/players/$userId': typeof PlayersUserIdRoute
   '/profile/edit': typeof ProfileEditRoute
   '/review/new': typeof ReviewNewRoute
-  '/safety/children': typeof SafetyChildrenRoute
+  '/safety_/children': typeof SafetyChildrenRoute
   '/teams/create': typeof TeamsCreateRoute
   '/trainers/create': typeof TrainersCreateRoute
   '/admin/': typeof AdminIndexRoute
@@ -959,7 +959,7 @@ export interface FileRouteTypes {
     | '/players/$userId'
     | '/profile/edit'
     | '/review/new'
-    | '/safety/children'
+    | '/safety_/children'
     | '/teams/create'
     | '/trainers/create'
     | '/admin/'
@@ -998,7 +998,7 @@ export interface RootRouteChildren {
   PrivacyRoute: typeof PrivacyRoute
   ResetPasswordRoute: typeof ResetPasswordRoute
   ReviewsRoute: typeof ReviewsRoute
-  SafetyRoute: typeof SafetyRouteWithChildren
+  SafetyRoute: typeof SafetyRoute
   SettingsRoute: typeof SettingsRoute
   ShopRoute: typeof ShopRoute
   SitemapDotxmlRoute: typeof SitemapDotxmlRoute
@@ -1033,6 +1033,7 @@ export interface RootRouteChildren {
   PlayersUserIdRoute: typeof PlayersUserIdRoute
   ProfileEditRoute: typeof ProfileEditRoute
   ReviewNewRoute: typeof ReviewNewRoute
+  SafetyChildrenRoute: typeof SafetyChildrenRoute
   TeamsCreateRoute: typeof TeamsCreateRoute
   TrainersCreateRoute: typeof TrainersCreateRoute
   AdminIndexRoute: typeof AdminIndexRoute
@@ -1483,12 +1484,12 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ReviewNewRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/safety/children': {
-      id: '/safety/children'
-      path: '/children'
+    '/safety_/children': {
+      id: '/safety_/children'
+      path: '/safety/children'
       fullPath: '/safety/children'
       preLoaderRoute: typeof SafetyChildrenRouteImport
-      parentRoute: typeof SafetyRoute
+      parentRoute: typeof rootRouteImport
     }
     '/teams/create': {
       id: '/teams/create'
@@ -1645,17 +1646,6 @@ const TabsRouteChildren: TabsRouteChildren = {
 
 const TabsRouteWithChildren = TabsRoute._addFileChildren(TabsRouteChildren)
 
-interface SafetyRouteChildren {
-  SafetyChildrenRoute: typeof SafetyChildrenRoute
-}
-
-const SafetyRouteChildren: SafetyRouteChildren = {
-  SafetyChildrenRoute: SafetyChildrenRoute,
-}
-
-const SafetyRouteWithChildren =
-  SafetyRoute._addFileChildren(SafetyRouteChildren)
-
 interface GamesGameIdRouteChildren {
   GamesGameIdPayRoute: typeof GamesGameIdPayRoute
   GamesGameIdPaymentSetupRoute: typeof GamesGameIdPaymentSetupRoute
@@ -1686,7 +1676,7 @@ const rootRouteChildren: RootRouteChildren = {
   PrivacyRoute: PrivacyRoute,
   ResetPasswordRoute: ResetPasswordRoute,
   ReviewsRoute: ReviewsRoute,
-  SafetyRoute: SafetyRouteWithChildren,
+  SafetyRoute: SafetyRoute,
   SettingsRoute: SettingsRoute,
   ShopRoute: ShopRoute,
   SitemapDotxmlRoute: SitemapDotxmlRoute,
@@ -1722,6 +1712,7 @@ const rootRouteChildren: RootRouteChildren = {
   PlayersUserIdRoute: PlayersUserIdRoute,
   ProfileEditRoute: ProfileEditRoute,
   ReviewNewRoute: ReviewNewRoute,
+  SafetyChildrenRoute: SafetyChildrenRoute,
   TeamsCreateRoute: TeamsCreateRoute,
   TrainersCreateRoute: TrainersCreateRoute,
   AdminIndexRoute: AdminIndexRoute,

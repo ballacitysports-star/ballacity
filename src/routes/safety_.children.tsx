@@ -10,7 +10,7 @@ import {
   type PermissionLevel,
 } from "@/lib/child-policy";
 
-export const Route = createFileRoute("/safety/children")({
+export const Route = createFileRoute("/safety_/children")({
   head: () =>
     pageHead({
       path: "/safety/children",
