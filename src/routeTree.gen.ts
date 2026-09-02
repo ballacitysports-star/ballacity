@@ -61,6 +61,7 @@ import { Route as GamesGameIdRouteImport } from './routes/games.$gameId'
 import { Route as MessagesIndexRouteImport } from './routes/messages.index'
 import { Route as MessagesConversationIdRouteImport } from './routes/messages.$conversationId'
 import { Route as OnboardingAccountTypeRouteImport } from './routes/onboarding.account-type'
+import { Route as OnboardingAgeRouteImport } from './routes/onboarding.age'
 import { Route as OnboardingChildRouteImport } from './routes/onboarding.child'
 import { Route as OnboardingWelcomeRouteImport } from './routes/onboarding.welcome'
 import { Route as OrgsIndexRouteImport } from './routes/orgs.index'
@@ -351,6 +352,11 @@ const OnboardingAccountTypeRoute = OnboardingAccountTypeRouteImport.update({
   path: '/onboarding/account-type',
   getParentRoute: () => rootRouteImport,
 } as any)
+const OnboardingAgeRoute = OnboardingAgeRouteImport.update({
+  id: '/onboarding/age',
+  path: '/onboarding/age',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const OnboardingChildRoute = OnboardingChildRouteImport.update({
   id: '/onboarding/child',
   path: '/onboarding/child',
@@ -544,6 +550,7 @@ export interface FileRoutesByFullPath {
   '/games/$gameId': typeof GamesGameIdRouteWithChildren
   '/messages/$conversationId': typeof MessagesConversationIdRoute
   '/onboarding/account-type': typeof OnboardingAccountTypeRoute
+  '/onboarding/age': typeof OnboardingAgeRoute
   '/onboarding/child': typeof OnboardingChildRoute
   '/onboarding/welcome': typeof OnboardingWelcomeRoute
   '/orgs/create': typeof OrgsCreateRoute
@@ -624,6 +631,7 @@ export interface FileRoutesByTo {
   '/dev/route-doctor': typeof DevRouteDoctorRoute
   '/messages/$conversationId': typeof MessagesConversationIdRoute
   '/onboarding/account-type': typeof OnboardingAccountTypeRoute
+  '/onboarding/age': typeof OnboardingAgeRoute
   '/onboarding/child': typeof OnboardingChildRoute
   '/onboarding/welcome': typeof OnboardingWelcomeRoute
   '/orgs/create': typeof OrgsCreateRoute
@@ -707,6 +715,7 @@ export interface FileRoutesById {
   '/games/$gameId': typeof GamesGameIdRouteWithChildren
   '/messages/$conversationId': typeof MessagesConversationIdRoute
   '/onboarding/account-type': typeof OnboardingAccountTypeRoute
+  '/onboarding/age': typeof OnboardingAgeRoute
   '/onboarding/child': typeof OnboardingChildRoute
   '/onboarding/welcome': typeof OnboardingWelcomeRoute
   '/orgs/create': typeof OrgsCreateRoute
@@ -790,6 +799,7 @@ export interface FileRouteTypes {
     | '/games/$gameId'
     | '/messages/$conversationId'
     | '/onboarding/account-type'
+    | '/onboarding/age'
     | '/onboarding/child'
     | '/onboarding/welcome'
     | '/orgs/create'
@@ -870,6 +880,7 @@ export interface FileRouteTypes {
     | '/dev/route-doctor'
     | '/messages/$conversationId'
     | '/onboarding/account-type'
+    | '/onboarding/age'
     | '/onboarding/child'
     | '/onboarding/welcome'
     | '/orgs/create'
@@ -952,6 +963,7 @@ export interface FileRouteTypes {
     | '/games/$gameId'
     | '/messages/$conversationId'
     | '/onboarding/account-type'
+    | '/onboarding/age'
     | '/onboarding/child'
     | '/onboarding/welcome'
     | '/orgs/create'
@@ -1026,6 +1038,7 @@ export interface RootRouteChildren {
   GamesGameIdRoute: typeof GamesGameIdRouteWithChildren
   MessagesConversationIdRoute: typeof MessagesConversationIdRoute
   OnboardingAccountTypeRoute: typeof OnboardingAccountTypeRoute
+  OnboardingAgeRoute: typeof OnboardingAgeRoute
   OnboardingChildRoute: typeof OnboardingChildRoute
   OnboardingWelcomeRoute: typeof OnboardingWelcomeRoute
   OrgsCreateRoute: typeof OrgsCreateRoute
@@ -1421,6 +1434,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof OnboardingAccountTypeRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/onboarding/age': {
+      id: '/onboarding/age'
+      path: '/onboarding/age'
+      fullPath: '/onboarding/age'
+      preLoaderRoute: typeof OnboardingAgeRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/onboarding/child': {
       id: '/onboarding/child'
       path: '/onboarding/child'
@@ -1705,6 +1725,7 @@ const rootRouteChildren: RootRouteChildren = {
   GamesGameIdRoute: GamesGameIdRouteWithChildren,
   MessagesConversationIdRoute: MessagesConversationIdRoute,
   OnboardingAccountTypeRoute: OnboardingAccountTypeRoute,
+  OnboardingAgeRoute: OnboardingAgeRoute,
   OnboardingChildRoute: OnboardingChildRoute,
   OnboardingWelcomeRoute: OnboardingWelcomeRoute,
   OrgsCreateRoute: OrgsCreateRoute,

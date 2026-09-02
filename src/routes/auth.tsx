@@ -13,6 +13,13 @@ import { sanitizeNextPath } from "@/routes/__root";
 import { readLastVisited } from "@/lib/last-visited";
 import { AccountTypePicker } from "@/components/AccountTypePicker";
 import {
+  EMPTY_DOB,
+  MONTHS,
+  checkDobParts,
+  stashPendingDob,
+  type DobParts,
+} from "@/lib/age-verification";
+import {
   ACCOUNT_TYPE_META,
   type AccountType,
   isAccountType,
@@ -44,6 +51,8 @@ function AuthPage() {
   const [mode, setMode] = useState<"signin" | "signup">("signin");
   const [signupStep, setSignupStep] = useState<"type" | "form">("type");
   const [accountType, setAccountType] = useState<AccountType | null>(null);
+  // Mandatory at signup: no account is activated without a date of birth.
+  const [dob, setDob] = useState<DobParts>(EMPTY_DOB);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [displayName, setDisplayName] = useState("");
@@ -145,6 +154,14 @@ function AuthPage() {
           setSignupStep("type");
           return;
         }
+        // Age is determined BEFORE the account exists. The date itself is only
+        // parked locally; the server derives the age and cohort from it on the
+        // first authenticated load (see /onboarding/age).
+        const dobCheck = checkDobParts(dob);
+        if (!dobCheck.ok) {
+          toast.error(dobCheck.message);
+          return;
+        }
         if (!consentOk) {
           toast.error("Please agree to the Terms of Service and Privacy Policy to continue.");
           return;
@@ -153,6 +170,8 @@ function AuthPage() {
         // accepted versions are parked and written on first authenticated load.
         stashPendingConsent(currentAcceptances());
         setPendingAccountType(accountType);
+        stashPendingDob(dobCheck.iso);
+
 
         const { data, error } = await supabase.auth.signUp({
           email,
@@ -540,6 +559,61 @@ function AuthPage() {
                   className="w-full rounded-2xl border border-border bg-surface px-4 py-3 text-sm outline-none focus:border-lime"
                 />
               )}
+              {mode === "signup" && (
+                <fieldset>
+                  <legend className="mb-1 text-xs font-semibold text-muted-foreground">
+                    Date of birth
+                  </legend>
+                  <div className="grid grid-cols-3 gap-2">
+                    <select
+                      aria-label="Birth month"
+                      value={dob.month}
+                      onChange={(e) => setDob((p) => ({ ...p, month: e.target.value }))}
+                      className="rounded-2xl border border-border bg-surface px-3 py-3 text-sm outline-none focus:border-lime"
+                    >
+                      <option value="">Month</option>
+                      {MONTHS.map((m, i) => (
+                        <option key={m} value={String(i + 1)}>
+                          {m}
+                        </option>
+                      ))}
+                    </select>
+                    <select
+                      aria-label="Birth day"
+                      value={dob.day}
+                      onChange={(e) => setDob((p) => ({ ...p, day: e.target.value }))}
+                      className="rounded-2xl border border-border bg-surface px-3 py-3 text-sm outline-none focus:border-lime"
+                    >
+                      <option value="">Day</option>
+                      {Array.from({ length: 31 }, (_, i) => i + 1).map((d) => (
+                        <option key={d} value={String(d)}>
+                          {d}
+                        </option>
+                      ))}
+                    </select>
+                    <input
+                      aria-label="Birth year"
+                      inputMode="numeric"
+                      autoComplete="bday-year"
+                      placeholder="Year"
+                      maxLength={4}
+                      value={dob.year}
+                      onChange={(e) =>
+                        setDob((p) => ({
+                          ...p,
+                          year: e.target.value.replace(/[^0-9]/g, "").slice(0, 4),
+                        }))
+                      }
+                      className="rounded-2xl border border-border bg-surface px-3 py-3 text-sm outline-none focus:border-lime"
+                    />
+                  </div>
+                  <p className="mt-1 text-[11px] text-muted-foreground">
+                    Your age helps us provide the right safety and privacy settings. Your birth date
+                    stays private.
+                  </p>
+                </fieldset>
+              )}
+
               <input
                 type="email"
                 value={email}

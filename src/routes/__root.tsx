@@ -24,6 +24,8 @@ import { logAuthGateDecision, readStoredSupabaseSession } from "@/lib/authgate-l
 import { clearLastVisited, rememberLastVisited } from "@/lib/last-visited";
 import { clearPendingAccountType, isAccountType, readPendingAccountType } from "@/lib/account-type";
 import { getOnboardingStatus } from "@/lib/onboarding.functions";
+import { getMyAgeStatus } from "@/lib/age-verification.functions";
+import { AGE_GATE_ROUTE, CHILD_CONSENT_ROUTE, needsAgeGate } from "@/lib/age-verification";
 import { logNotFound } from "@/lib/route-doctor";
 import { ErrorFallback, GlobalErrorBoundary } from "@/components/GlobalErrorBoundary";
 import { setDeepLinkNavigator } from "@/lib/deep-links";
@@ -451,6 +453,9 @@ function AuthLoadingFallback({ pending }: { pending: boolean }) {
  */
 const onboardedUsers = new Set<string>();
 
+/** User ids whose age has already been determined server-side in this tab. */
+const ageVerifiedUsers = new Set<string>();
+
 function AuthGate({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const pathname = router.state.location.pathname;
@@ -625,6 +630,60 @@ function AuthGate({ children }: { children: React.ReactNode }) {
     };
   }, [loading, user, isPublic, router, pathname]);
 
+  // Age-verification gate: no authenticated member reaches ordinary
+  // onboarding, the feed, or any protected route until the SERVER has
+  // determined their age from a stored date of birth. The routes below are the
+  // only escapes (the age form itself, the guardian-consent flow, and legal /
+  // safety reading), so the gate can never trap anyone in a loop.
+  const AGE_ESCAPE_PREFIXES = [
+    AGE_GATE_ROUTE,
+    CHILD_CONSENT_ROUTE,
+    "/parent",
+    "/safety",
+    "/account/legal",
+  ];
+  const skipAgeCheck =
+    isPublic || AGE_ESCAPE_PREFIXES.some((p) => pathname === p || pathname.startsWith(`${p}/`));
+  const [ageStatus, setAgeStatus] = useState<"unknown" | "ok" | "missing">(
+    !!user && ageVerifiedUsers.has(user.id) ? "ok" : "unknown",
+  );
+
+  useEffect(() => {
+    if (loading || !user) return;
+    if (skipAgeCheck || ageVerifiedUsers.has(user.id)) {
+      setAgeStatus("ok");
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        const status = await withDeadline(getMyAgeStatus(), ONBOARDING_CHECK_TIMEOUT_MS);
+        if (cancelled) return;
+        if (needsAgeGate(status.status) || status.cohort === "unknown") {
+          setAgeStatus("missing");
+          router.navigate({ to: AGE_GATE_ROUTE, replace: true } as never);
+          window.setTimeout(() => {
+            if (cancelled || typeof window === "undefined") return;
+            if (window.location.pathname !== AGE_GATE_ROUTE) {
+              window.location.replace(AGE_GATE_ROUTE);
+            }
+          }, 700);
+        } else {
+          ageVerifiedUsers.add(user.id);
+          setAgeStatus("ok");
+        }
+      } catch {
+        // Network/server fault: don't strand the member behind a loader. Every
+        // age-restricted action is refused server-side anyway.
+        if (cancelled) return;
+        setAgeStatus("ok");
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [user, loading, skipAgeCheck, router]);
+
   // Onboarding completion guard: block rendering of protected routes until we
   // confirm the user has picked an account type. Fresh Google sign-ins would
   // otherwise flash the feed for a moment before the redirect fires.
@@ -642,10 +701,14 @@ function AuthGate({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     if (loading || !user) return;
+    // Age determination strictly precedes the account-type picker, so an
+    // unverified member is never routed into ordinary onboarding.
+    if (!skipAgeCheck && ageStatus !== "ok") return;
     if (skipTypeCheck || onboardedUsers.has(user.id)) {
       setTypeStatus("ok");
       return;
     }
+
     let cancelled = false;
     let retryTimer: number | undefined;
     // A background retry must not blank an already-rendered page.
@@ -702,7 +765,7 @@ function AuthGate({ children }: { children: React.ReactNode }) {
       if (retryTimer !== undefined) window.clearTimeout(retryTimer);
     };
     // Intentionally NOT keyed on `pathname`: the check is per user, not per route.
-  }, [user, loading, skipTypeCheck, router, retryTick]);
+  }, [user, loading, skipTypeCheck, skipAgeCheck, ageStatus, router, retryTick]);
 
   useEffect(() => {
     if (user && !isPublic && !isTab) {
@@ -721,11 +784,16 @@ function AuthGate({ children }: { children: React.ReactNode }) {
   if (loading || verifying || !user) {
     return <AuthLoadingFallback pending={oauthPending} />;
   }
+  // Age comes before every other onboarding step.
+  if (!skipAgeCheck && ageStatus !== "ok") {
+    return <AuthLoadingFallback pending={oauthPending} />;
+  }
   // Hold rendering only on a genuine first check for this user; a cached
   // "ok" keeps the page mounted across navigations.
   if (!skipTypeCheck && typeStatus !== "ok") {
     return <AuthLoadingFallback pending={oauthPending} />;
   }
+
   return (
     <>
       {children}
