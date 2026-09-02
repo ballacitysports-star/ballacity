@@ -154,7 +154,7 @@ export const requestParentalConsent = createServerFn({ method: "POST" })
     const expiresAt = new Date(Date.now() + CONSENT_TOKEN_TTL_HOURS * 3600_000).toISOString();
     const { error } = await context.supabase.rpc("request_parental_consent", {
       _parent_email: data.parentEmail,
-      _parent_name: data.parentName ?? null,
+      _parent_name: data.parentName ?? "",
       _relationship: data.relationship ?? "guardian",
       _token_hash: hashToken(token),
       _token_expires_at: expiresAt,
@@ -420,7 +420,7 @@ export const createParentRequest = createServerFn({ method: "POST" })
     const { data: id, error } = await context.supabase.rpc("create_parent_request", {
       _child: data.childUserId,
       _kind: data.kind,
-      _details: data.details ?? null,
+      _details: data.details ?? "",
     });
     if (error) throw new Error(error.message);
     return { id: id as string };
@@ -463,7 +463,7 @@ export const getChildFootprint = createServerFn({ method: "POST" })
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const child = data.childUserId;
     const count = async (table: string, column: string, extra?: (q: any) => any) => {
-      let q = supabaseAdmin.from(table).select("*", { count: "exact", head: true }).eq(column, child);
+      let q = (supabaseAdmin as any).from(table).select("*", { count: "exact", head: true }).eq(column, child);
       if (extra) q = extra(q);
       const { count: c } = await q;
       return c ?? 0;
