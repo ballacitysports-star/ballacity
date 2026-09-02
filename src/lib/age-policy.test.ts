@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   ADULT_AGE,
   CONSENT_REQUIRED_MESSAGE,
+  CHILD_MAX_AGE,
   MINIMUM_ACCOUNT_AGE,
   PARENTAL_CONSENT_MAX_AGE,
   ageCategoryFromAge,
@@ -29,8 +30,9 @@ describe("age categories", () => {
     expect(ageCategoryFromAge(30)).toBe("adult");
     expect(ageCategoryFromAge(ADULT_AGE)).toBe("adult");
     expect(ageCategoryFromAge(ADULT_AGE - 1)).toBe("teen");
-    expect(ageCategoryFromAge(PARENTAL_CONSENT_MAX_AGE + 1)).toBe("teen");
-    expect(ageCategoryFromAge(PARENTAL_CONSENT_MAX_AGE)).toBe("child");
+    // Consent age (15 by default) is broader than the child cohort (12).
+    expect(ageCategoryFromAge(PARENTAL_CONSENT_MAX_AGE)).toBe("teen");
+    expect(ageCategoryFromAge(CHILD_MAX_AGE)).toBe("child");
     expect(ageCategoryFromAge(null)).toBe("unknown");
   });
 
@@ -72,11 +74,14 @@ describe("birthday validation", () => {
     expect(validateAgeMinimum(birthdayForAge(200))).toBeTruthy();
   });
 
-  it("flags under-13 birthdays for parental consent instead of blocking", () => {
+  it("flags minors under the consent threshold instead of blocking them", () => {
     expect(birthdayRequiresParentalConsent(birthdayForAge(10))).toBe(true);
     expect(birthdayConsentNotice(birthdayForAge(10))).toBe(CONSENT_REQUIRED_MESSAGE);
-    expect(birthdayRequiresParentalConsent(birthdayForAge(14))).toBe(false);
-    expect(birthdayConsentNotice(birthdayForAge(14))).toBeNull();
+    // Conservative global default follows Georgia: consent required under 16.
+    expect(birthdayRequiresParentalConsent(birthdayForAge(14))).toBe(true);
+    expect(birthdayConsentNotice(birthdayForAge(14))).toBe(CONSENT_REQUIRED_MESSAGE);
+    expect(birthdayRequiresParentalConsent(birthdayForAge(16))).toBe(false);
+    expect(birthdayConsentNotice(birthdayForAge(16))).toBeNull();
     expect(birthdayRequiresParentalConsent(birthdayForAge(30))).toBe(false);
     expect(birthdayRequiresParentalConsent("")).toBe(false);
   });

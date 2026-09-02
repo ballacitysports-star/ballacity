@@ -102,7 +102,10 @@ describe("age policy config", () => {
 
   it("derives consent requirements from config, not hard-coded ages", () => {
     expect(requiresParentalConsent("child_under_13")).toBe(true);
-    expect(requiresParentalConsent("teen_13_15")).toBe(false);
+    // Conservative global default = Georgia-style (consent under 16).
+    expect(requiresParentalConsent("teen_13_15")).toBe(true);
+    const federalOnly = { ...DEFAULT_AGE_POLICY, parentalConsentMaxAge: 12 };
+    expect(requiresParentalConsent("teen_13_15", federalOnly)).toBe(false);
     const georgiaStyle = { ...DEFAULT_AGE_POLICY, parentalConsentMaxAge: 15 };
     expect(requiresParentalConsent("teen_13_15", georgiaStyle)).toBe(true);
     expect(requiresParentalConsent("teen_16_17", georgiaStyle)).toBe(false);
@@ -126,8 +129,19 @@ describe("policy state machine", () => {
     );
   });
 
+  it("locks a 14-year-old pending guardian approval under the default policy", () => {
+    expect(policyState({ cohort: "teen_13_15" })).toBe("PARENTAL_CONSENT_REQUIRED");
+    expect(policyState({ cohort: "teen_13_15", consent: consent("pending") })).toBe(
+      "PARENTAL_CONSENT_PENDING",
+    );
+    expect(policyState({ cohort: "teen_13_15", consent: consent("approved") })).toBe(
+      "PARENTAL_CONSENT_APPROVED",
+    );
+  });
+
   it("classifies teens and adults without consent states", () => {
-    expect(policyState({ cohort: "teen_13_15" })).toBe("TEEN_13_15");
+    const federalOnly = { ...DEFAULT_AGE_POLICY, parentalConsentMaxAge: 12 };
+    expect(policyState({ cohort: "teen_13_15" }, federalOnly)).toBe("TEEN_13_15");
     expect(policyState({ cohort: "teen_16_17" })).toBe("TEEN_16_17");
     expect(policyState({ cohort: "adult" })).toBe("ADULT_18_PLUS");
     expect(policyState({ cohort: "unknown" })).toBe("AGE_UNKNOWN");
