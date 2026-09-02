@@ -584,6 +584,40 @@ function GameDetail() {
     }
   };
 
+  const handleCancelGame = async () => {
+    if (!game || !isHost) return;
+    setCancelling(true);
+    try {
+      await cancelGame(game.id, cancelReason);
+      await updateHostedGame(game.id, {
+        status: "cancelled",
+        cancelledAt: new Date().toISOString(),
+        cancellationReason: cancelReason.trim() || null,
+        joinsClosed: true,
+      });
+      toast.success("Game cancelled. Everyone on the roster was notified.");
+      setCancelOpen(false);
+      setCancelReason("");
+    } catch (err) {
+      toast.error((err as { message?: string })?.message ?? "Couldn't cancel this game.");
+    } finally {
+      setCancelling(false);
+    }
+  };
+
+  const handleAttendance = async (playerId: string, attended: boolean) => {
+    if (!game || !isHost) return;
+    setAttendanceBusy(playerId);
+    try {
+      await markAttendance(game.id, playerId, attended);
+      await refetchRoster();
+    } catch (err) {
+      toast.error((err as { message?: string })?.message ?? "Couldn't save attendance.");
+    } finally {
+      setAttendanceBusy(null);
+    }
+  };
+
   useEffect(() => {
     if (GAMES.some((g) => g.id === gameId) || hosted.some((g) => g.id === gameId)) {
       setLookupComplete(true);
