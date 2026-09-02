@@ -69,8 +69,18 @@ function AgeGatePage() {
   const [pendingTried, setPendingTried] = useState(false);
   useEffect(() => {
     if (pendingTried || busy || !user || status.isLoading) return;
-    if (status.data && status.data.birthdaySet) {
+    // Leave this screen only once the SERVER has actually determined the
+    // cohort. A stored birthday with an undetermined cohort would otherwise
+    // bounce straight back here from the root age gate.
+    if (status.data && status.data.birthdaySet && status.data.cohort !== "unknown") {
       routeOnward(status.data.cohort);
+      return;
+    }
+    if (status.data && status.data.birthdaySet) {
+      // Birthday saved but age still undetermined — offer a retry instead of
+      // redirecting into a loop.
+      setPendingTried(true);
+      setError("We saved your date of birth but couldn't finish checking your account. Try again.");
       return;
     }
     const pending = readPendingDob();
@@ -78,6 +88,7 @@ function AgeGatePage() {
     if (pending) void save(pending);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user, status.isLoading, status.data, pendingTried, busy]);
+
 
   const onSubmit = (e: React.FormEvent) => {
     e.preventDefault();

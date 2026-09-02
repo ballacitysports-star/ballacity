@@ -25,7 +25,7 @@ import { clearLastVisited, rememberLastVisited } from "@/lib/last-visited";
 import { clearPendingAccountType, isAccountType, readPendingAccountType } from "@/lib/account-type";
 import { getOnboardingStatus } from "@/lib/onboarding.functions";
 import { getMyAgeStatus } from "@/lib/age-verification.functions";
-import { AGE_GATE_ROUTE, CHILD_CONSENT_ROUTE, needsAgeGate } from "@/lib/age-verification";
+import { AGE_GATE_ROUTE, isAccountSetupEscape, needsAgeGate } from "@/lib/age-verification";
 import { logNotFound } from "@/lib/route-doctor";
 import { ErrorFallback, GlobalErrorBoundary } from "@/components/GlobalErrorBoundary";
 import { setDeepLinkNavigator } from "@/lib/deep-links";
@@ -632,18 +632,11 @@ function AuthGate({ children }: { children: React.ReactNode }) {
 
   // Age-verification gate: no authenticated member reaches ordinary
   // onboarding, the feed, or any protected route until the SERVER has
-  // determined their age from a stored date of birth. The routes below are the
-  // only escapes (the age form itself, the guardian-consent flow, and legal /
-  // safety reading), so the gate can never trap anyone in a loop.
-  const AGE_ESCAPE_PREFIXES = [
-    AGE_GATE_ROUTE,
-    CHILD_CONSENT_ROUTE,
-    "/parent",
-    "/safety",
-    "/account/legal",
-  ];
-  const skipAgeCheck =
-    isPublic || AGE_ESCAPE_PREFIXES.some((p) => pathname === p || pathname.startsWith(`${p}/`));
+  // determined their age from a stored date of birth. `isAccountSetupEscape`
+  // lists the only exits (the age form itself, the guardian-consent flow, and
+  // legal / safety reading), so the gate can never trap anyone in a loop.
+  const skipAgeCheck = isPublic || isAccountSetupEscape(pathname);
+
   const [ageStatus, setAgeStatus] = useState<"unknown" | "ok" | "missing">(
     !!user && ageVerifiedUsers.has(user.id) ? "ok" : "unknown",
   );
@@ -691,7 +684,13 @@ function AuthGate({ children }: { children: React.ReactNode }) {
   // The result is cached per user id for the lifetime of the tab, so ordinary
   // navigations never re-run the check (which used to blank the screen with
   // the full-page loader on every route change).
-  const skipTypeCheck = isPublic || pathname === "/onboarding/account-type";
+  // The account-setup escapes (date-of-birth form, guardian consent, parent
+  // center, legal/safety reading) belong to the age step. The type check must
+  // be skipped on ALL of them, not only on the picker itself — otherwise it
+  // redirects away from the date-of-birth screen while the age gate redirects
+  // back, and the two guards ping-pong forever.
+  const skipTypeCheck = isPublic || pathname === "/onboarding/account-type" || skipAgeCheck;
+
   const alreadyConfirmed = !!user && onboardedUsers.has(user.id);
   const [typeStatus, setTypeStatus] = useState<"unknown" | "ok" | "missing">(
     alreadyConfirmed ? "ok" : "unknown",
