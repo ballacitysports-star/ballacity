@@ -708,6 +708,7 @@ export function trackingAllowed(cohort: AgeCohort): {
 
 const IDENTIFYING_PATTERNS: Array<{ re: RegExp; message: string }> = [
   { re: /\b\d{3}[-.\s]?\d{3}[-.\s]?\d{4}\b/, message: "looks like a phone number" },
+  { re: /\d{10,}/, message: "looks like a phone number" },
   { re: /[\w.+-]+@[\w-]+\.[a-z]{2,}/i, message: "looks like an email address" },
   {
     re: /\b\d{1,5}\s+(north|south|east|west|n|s|e|w)?\s*\w+\s+(st|street|ave|avenue|rd|road|dr|drive|ln|lane|blvd|court|ct)\b/i,
