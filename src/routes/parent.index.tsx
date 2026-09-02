@@ -16,6 +16,7 @@ import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { ConsentTrail } from "@/components/child/ConsentTrail";
 import { AddMinorPanel } from "@/components/child/AddMinorPanel";
+import { FamilyApprovalsPanel } from "@/components/child/FamilyApprovalsPanel";
 
 export const Route = createFileRoute("/parent/")({
   head: () =>
@@ -239,6 +240,8 @@ function ParentCenterPage() {
         Manage consent, messaging, videos, discoverability and data requests. You only ever see
         information about your own child.
       </p>
+
+      <FamilyApprovalsPanel />
 
       {isLoading ? (
         <p className="mt-6 text-sm text-muted-foreground">Loading…</p>
