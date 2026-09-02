@@ -604,3 +604,100 @@ export const resolveParentRequest = createServerFn({ method: "POST" })
     if (error) throw new Error(error.message);
     return { ok: true };
   });
+
+/* ------------------------------------------------------------------ */
+/* Transparency: age-change review history and consent audit trail     */
+/* ------------------------------------------------------------------ */
+
+export type AgeChangeEvent = {
+  id: string;
+  fromCohort: string | null;
+  toCohort: string | null;
+  outcome: string;
+  createdAt: string;
+};
+
+/**
+ * A member can always see why a date-of-birth change was held for review.
+ * RLS scopes the rows to the caller, so no extra guard is needed here.
+ */
+export const listMyAgeChangeEvents = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }): Promise<AgeChangeEvent[]> => {
+    const { data, error } = await context.supabase
+      .from("age_change_events")
+      .select("id, from_cohort, to_cohort, outcome, created_at")
+      .eq("user_id", context.userId)
+      .order("created_at", { ascending: false })
+      .limit(50);
+    if (error) throw new Error(error.message);
+    return (data ?? []).map((r) => {
+      const row = r as {
+        id: string;
+        from_cohort: string | null;
+        to_cohort: string | null;
+        outcome: string;
+        created_at: string;
+      };
+      return {
+        id: row.id,
+        fromCohort: row.from_cohort,
+        toCohort: row.to_cohort,
+        outcome: row.outcome,
+        createdAt: row.created_at,
+      };
+    });
+  });
+
+export type ConsentTrailEntry = {
+  id: string;
+  action: string;
+  fromStatus: string | null;
+  toStatus: string | null;
+  method: string | null;
+  createdAt: string;
+};
+
+/**
+ * Consent audit trail for one linked child. Read through the caller's own
+ * client so the guardian RLS policy is the boundary; the explicit
+ * `is_guardian_of` check keeps the failure mode obvious rather than empty.
+ */
+export const getChildConsentTrail = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { childUserId: string }) =>
+    z.object({ childUserId: z.string().uuid() }).parse(d),
+  )
+  .handler(async ({ context, data }): Promise<ConsentTrailEntry[]> => {
+    const { data: isGuardian } = await context.supabase.rpc("is_guardian_of", {
+      _parent: context.userId,
+      _child: data.childUserId,
+    });
+    if (isGuardian !== true) throw new Error("Not authorized for this child account.");
+
+    const { data: rows, error } = await context.supabase
+      .from("parental_consent_events")
+      .select("id, action, from_status, to_status, method, created_at")
+      .eq("child_user_id", data.childUserId)
+      .order("created_at", { ascending: false })
+      .limit(100);
+    if (error) throw new Error(error.message);
+    return (rows ?? []).map((r) => {
+      const row = r as {
+        id: string;
+        action: string;
+        from_status: string | null;
+        to_status: string | null;
+        method: string | null;
+        created_at: string;
+      };
+      return {
+        id: row.id,
+        action: row.action,
+        fromStatus: row.from_status,
+        toStatus: row.to_status,
+        method: row.method,
+        createdAt: row.created_at,
+      };
+    });
+  });

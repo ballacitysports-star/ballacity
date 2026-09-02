@@ -126,3 +126,38 @@ AI-training authorization.
   Edit profile, mirroring the `minor_handle_unsafe` database trigger.
 - Host-selectable game age floor lowered to 5 so youth games are expressible;
   under-13 participation stays gated by parental consent and parent controls.
+
+## Phase 1 closeout (2026-09-02)
+
+Verified end-to-end as already enforced server-side: cohort derivation
+(`sync_age_category_from_birthdays`), consent lifecycle
+(`request_parental_consent` / `approve_parental_consent` /
+`revoke_parental_consent`), guardian controls (`set_child_controls`),
+child game-participation gates, minor handle safety, minor privacy floor,
+and DOB-escalation protection (a change to a higher-privilege cohort keeps
+the previous cohort, flags `age_review_required`, logs `age_change_events`,
+and notifies the member plus guardians).
+
+Closed in this phase:
+- RLS gap: guardians could not read their own child's `parental_consent_events`
+  or `age_change_events`. Added two guardian SELECT policies scoped by
+  `is_guardian_of`.
+- Transparency surfaces: `listMyAgeChangeEvents` + `AgeReviewNotice` (Settings),
+  `getChildConsentTrail` + `ConsentTrail` (Parent Center approval history).
+- E2E coverage: `e2e/child-lifecycle-cohorts.spec.ts` asserts the gate for
+  under-13 required/pending/approved/revoked plus 13-15, 16-17 and adult, and
+  that a blocked child can still reach the consent and safety pages.
+
+Remaining legal/product decisions (not engineering blockers):
+- The verifiable-consent method (`email_confirmation` via a signed-in adult
+  account) requires counsel sign-off; `third_party_verified` is wired for a
+  provider integration.
+- Consent re-verification interval (`consent_reverification_days`) defaults to
+  0 (never) and is a policy choice.
+- Guardian "Request deletion" creates a `parent_requests` row handled by a
+  moderator; a fully automated child-deletion pipeline is intentionally
+  human-reviewed.
+
+Manual QA required: real guardian email delivery of the approval link (the link
+is currently surfaced in-app for the child to hand over), and an authenticated
+direct-API probe per child table with a non-guardian token.

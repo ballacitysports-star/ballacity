@@ -14,6 +14,7 @@ import {
 import { CHILD_POLICY_DISCLAIMER, COHORT_META, type ChildControls } from "@/lib/child-policy";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
+import { ConsentTrail } from "@/components/child/ConsentTrail";
 
 export const Route = createFileRoute("/parent/")({
   head: () =>
@@ -168,8 +169,10 @@ function ChildPanel({ childUserId }: { childUserId: string }) {
           details only with the host and participants of a game they join.
         </div>
       </div>
+      <ConsentTrail childUserId={childUserId} />
 
       <div className="mt-4 flex flex-wrap gap-2">
+
         <Button size="sm" variant="outline" onClick={() => request("access")}>
           Request a copy of their data
         </Button>
