@@ -10,7 +10,7 @@ import { supabase } from "@/integrations/supabase/client";
 export async function cancelGame(gameId: string, reason: string): Promise<void> {
   const { error } = await supabase.rpc("host_cancel_game", {
     _game_id: gameId,
-    _reason: reason.trim() || null,
+    _reason: reason.trim(),
   });
   if (error) throw error;
 }
