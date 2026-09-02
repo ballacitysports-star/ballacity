@@ -408,23 +408,19 @@ export function useMyProfileState(currentUser?: User | null): {
     searchRadiusMi:
       clampDistanceMi(overrides.searchRadiusMi ?? dbProfile?.search_radius_mi ?? undefined) ??
       undefined,
-    stats: base.stats,
+    stats: {
+      ...base.stats,
+      played: activity.gamesAttended,
+      hosted: activity.hostedCompleted,
+      reliability: reliabilityPercent(activity),
+      sportsmanship: activity.reviewAvg,
+      endorsements: activity.reviewCount,
+    },
     // Per-sport levels resolved above (local overrides first, then the saved row).
     sports,
     // Earned badges come from the badge engine (reliability + sportsmanship);
     // stored overrides are merged on top as extras.
-    badges: mergeBadges(
-      earnedBadgeIds(
-        makeBadgeStats({
-          gamesPlayed: base.stats.played,
-          hosted: base.stats.hosted ?? 0,
-          showUpRate: (base.stats.reliability ?? 0) / 100,
-          onTimeRate: (base.stats.reliability ?? 0) / 100,
-          sportsmanshipRating: base.stats.sportsmanship ?? 0,
-        }),
-      ),
-      overrides.badges,
-    ),
+    badges: mergeBadges(earnedBadgeIds(toBadgeStats(activity)), overrides.badges),
 
     links: overrides.links?.length ? overrides.links : dbLinks,
   };
