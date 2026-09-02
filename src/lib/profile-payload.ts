@@ -70,9 +70,10 @@ export function buildProfileRow(input: ProfilePayloadInput) {
  * Persists a canonical profile row.
  *
  * Birthdays are never stored on `profiles` — that column no longer exists, so
- * no profile read can leak an exact birthdate. The birthday is written to the
- * private, self-scoped `profile_birthdays` table instead, which also refreshes
- * the derived age category.
+ * no profile read can leak an exact birthdate. Direct writes to the private
+ * `profile_birthdays` table are revoked as well: the date of birth goes
+ * through the `set_my_birthday` routine, which validates it, derives the age
+ * cohort server-side, and flags an age change for review when needed.
  */
 export async function saveProfileRow(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -83,13 +84,12 @@ export async function saveProfileRow(
   const { error } = await client.from("profiles").upsert(rest, { onConflict: "id" });
   if (error) throw error;
 
-  if (birthday !== undefined && birthday !== null) {
-    const { error: bErr } = await client
-      .from("profile_birthdays")
-      .upsert({ user_id: row.id as string, birthday }, { onConflict: "user_id" });
+  if (typeof birthday === "string" && /^\d{4}-\d{2}-\d{2}$/.test(birthday)) {
+    const { error: bErr } = await client.rpc("set_my_birthday", { _dob: birthday });
     if (bErr) throw bErr;
   }
 }
+
 
 
 /**
