@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { pageHead } from "@/lib/seo";
-import { ArrowLeft, Bell } from "lucide-react";
+import { ArrowLeft, Bell, MessageCircle } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import { NotificationsPanel } from "@/components/NotificationsPanel";
 
@@ -20,15 +20,26 @@ function NotificationsPage() {
 
   return (
     <div className="mx-auto max-w-md px-4 pt-6 pb-32">
-      <div className="flex items-center gap-3 mb-5">
+      <div className="mb-5 flex items-center gap-3">
         <Link
           to="/feed"
           className="grid h-10 w-10 place-items-center rounded-full border border-border bg-surface"
         >
           <ArrowLeft className="h-5 w-5" />
         </Link>
-        <h1 className="font-display text-2xl font-bold">Notifications</h1>
+        <h1 className="flex-1 font-display text-2xl font-bold">Notifications</h1>
+        {/* The inbox has no bottom-nav tab of its own, so Activity is the one
+            reliable entry point into it. */}
+        <Link
+          to="/messages"
+          aria-label="Messages"
+          className="inline-flex min-h-11 items-center gap-1.5 rounded-full border border-border bg-surface px-3 text-sm font-semibold"
+        >
+          <MessageCircle className="h-5 w-5" />
+          Inbox
+        </Link>
       </div>
+
 
       {loading ? (
         <div className="text-sm text-muted-foreground">Loading…</div>
