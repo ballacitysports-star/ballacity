@@ -44,7 +44,7 @@ const NOT_COLLECTED_BEFORE_CONSENT = [
 ];
 
 function ChildOnboardingPage() {
-  const { status, state, isLoading, refetch } = useMyChildStatus();
+  const { status, state, isLoading, refetch, policy } = useMyChildStatus();
   const request = useRequestParentalConsent();
   const [parentEmail, setParentEmail] = useState("");
   const [parentName, setParentName] = useState("");
@@ -69,14 +69,17 @@ function ChildOnboardingPage() {
     <main className="mx-auto w-full max-w-lg px-4 py-6 pb-24">
       <div className="flex items-center gap-2 text-primary">
         <ShieldCheck className="h-5 w-5" aria-hidden />
-        <span className="text-xs font-bold uppercase tracking-wide">Child account setup</span>
+        <span className="text-xs font-bold uppercase tracking-wide">
+          Guardian approval needed
+        </span>
       </div>
       <h1 className="mt-2 font-display text-2xl font-bold">
         A parent or guardian approves this account
       </h1>
       <p className="mt-2 text-sm text-muted-foreground">
-        ballaCity requires a parent or guardian to approve accounts for members under 13. Until they
-        do, we keep things switched off — no messages, no videos, no public profile.
+        ballaCity requires a parent or guardian to approve accounts for members under{" "}
+        {policy.parentalConsentMaxAge + 1}. Until they do, we keep things switched off — no
+        messages, no videos, no public profile.
       </p>
 
       {isLoading ? (

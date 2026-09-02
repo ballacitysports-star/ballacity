@@ -20,7 +20,7 @@ const ALLOWED_PREFIXES = [
  * is the friendly explanation rather than the security boundary.
  */
 export function ChildConsentGate() {
-  const { status, consentBlocked, state, isLoading } = useMyChildStatus();
+  const { status, consentBlocked, state, isLoading, policy } = useMyChildStatus();
   const location = useLocation();
 
   if (isLoading || !status || !consentBlocked) return null;
@@ -48,7 +48,7 @@ export function ChildConsentGate() {
             ? "Your parent or guardian withdrew their approval, so games, messages, videos and your profile are turned off. They can approve again from the Parent Center."
             : pending
               ? "We're waiting for them to open the approval link and confirm. Games, messages and videos stay off until they do."
-              : "Because you're under 13, a parent or guardian has to approve your account before you can join games, message anyone, or share videos."}
+              : `Because you're under ${policy.parentalConsentMaxAge + 1}, a parent or guardian has to approve your account before you can join games, message anyone, or share videos.`}
         </p>
         <div className="mt-4 flex flex-wrap gap-2">
           <Link
