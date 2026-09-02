@@ -210,6 +210,63 @@ export function YouthTab() {
         </div>
       </div>
 
+      <div className="rounded-xl border bg-card p-4">
+        <div className="text-sm font-semibold">Overnight notification curfew (minors)</div>
+        <p className="mt-0.5 text-xs text-muted-foreground">
+          {LEGAL_REVIEW_REQUIRED} — the default window models NY&rsquo;s SAFE for Kids Act
+          (12am&ndash;6am recipient local time), the more protective of the windows we know about;
+          Connecticut&rsquo;s is 9pm&ndash;8am. Held pushes are queued and delivered when the window
+          ends; the in-app alert always appears immediately.
+        </p>
+        <div className="mt-3 flex items-center justify-between gap-3">
+          <span className="text-sm">Curfew enabled</span>
+          <Switch
+            checked={local.notificationCurfew !== null}
+            disabled={loading || saving}
+            aria-label="Overnight notification curfew"
+            onCheckedChange={(v) =>
+              void persist(
+                {
+                  ...local,
+                  notificationCurfew: v ? { startHour: 0, endHour: 6 } : null,
+                },
+                "Notification curfew",
+              )
+            }
+          />
+        </div>
+        {local.notificationCurfew ? (
+          <div className="mt-3 grid gap-3 sm:grid-cols-2">
+            {(["startHour", "endHour"] as const).map((k) => (
+              <label key={k} className="block">
+                <span className="text-xs font-medium">
+                  {k === "startHour" ? "Quiet hours start (local hour)" : "Quiet hours end"}
+                </span>
+                <input
+                  type="number"
+                  min={0}
+                  max={23}
+                  value={local.notificationCurfew?.[k] ?? 0}
+                  disabled={loading || saving}
+                  onChange={(e) =>
+                    setLocal({
+                      ...local,
+                      notificationCurfew: {
+                        startHour: local.notificationCurfew?.startHour ?? 0,
+                        endHour: local.notificationCurfew?.endHour ?? 6,
+                        [k]: Number(e.target.value),
+                      },
+                    })
+                  }
+                  onBlur={() => void persist(local, "Notification curfew")}
+                  className="mt-1 w-full rounded-lg border bg-background px-3 py-2 text-sm"
+                />
+              </label>
+            ))}
+          </div>
+        ) : null}
+      </div>
+
       <div className="rounded-xl border bg-card divide-y">
         {(Object.keys(BOOL_META) as BoolKey[]).map((key) => {
           const meta = BOOL_META[key];
