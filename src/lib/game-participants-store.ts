@@ -120,7 +120,7 @@ function detachIfIdle(gameId: string) {
 export function useLiveParticipantCount(gameId: string | undefined): number | undefined {
   useEffect(() => {
     if (!gameId) return;
-    attachChannel(gameId);
+    void attachChannel(gameId);
     void hydrate(gameId);
   }, [gameId]);
 
