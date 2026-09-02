@@ -833,7 +833,10 @@ export function can(
             ? controls.gameParticipation
             : feature === "team_membership"
               ? controls.gameParticipation
-              : true;
+              : feature === "night_notifications"
+                ? controls.notifications && controls.notificationCurfewLifted
+                : true;
+
     return {
       allowed: on,
       level,
