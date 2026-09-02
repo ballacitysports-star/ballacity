@@ -720,7 +720,15 @@ export const PERMISSION_MATRIX: Record<FeatureKey, Record<MatrixCohort, Permissi
     teen_16_17: "parent_controlled",
     adult: "blocked",
   },
+  // Overnight pushes to minors are off unless a guardian lifts the curfew.
+  night_notifications: {
+    child_under_13: "parent_controlled",
+    teen_13_15: "parent_controlled",
+    teen_16_17: "parent_controlled",
+    adult: "allowed",
+  },
 };
+
 
 export type ChildControls = {
   messaging: "off" | "guardian_only" | "teammates" | "peers";
