@@ -1,18 +1,44 @@
 import { Link } from "@tanstack/react-router";
+import mark from "@/assets/ballacity-mark.png.asset.json";
+import lockup from "@/assets/ballacity-lockup.png.asset.json";
 
-export function Logo({ size = 28 }: { size?: number }) {
+/**
+ * Brand logo. `variant="lockup"` (default) shows the mark + wordmark artwork,
+ * `variant="mark"` shows only the bc monogram (tight spaces, avatars, nav).
+ */
+export function Logo({
+  size = 28,
+  variant = "lockup",
+  linkTo = "/",
+}: {
+  size?: number;
+  variant?: "lockup" | "mark";
+  linkTo?: string | null;
+}) {
+  const content =
+    variant === "mark" ? (
+      <img
+        src={mark.url}
+        alt="ballaCity"
+        width={size}
+        height={size}
+        style={{ height: size, width: "auto" }}
+        className="enter-pop object-contain"
+      />
+    ) : (
+      <img
+        src={lockup.url}
+        alt="ballaCity"
+        style={{ height: size, width: "auto" }}
+        className="enter-pop object-contain"
+      />
+    );
+
+  if (!linkTo) return <span className="inline-flex items-center">{content}</span>;
+
   return (
-    <Link to="/" className="flex items-center gap-2">
-      <div
-        className="enter-pop relative grid place-items-center rounded-xl bg-lime-gradient text-primary-foreground font-display font-bold glow-lime"
-        style={{ width: size, height: size, fontSize: size * 0.55 }}
-      >
-b
-        <span className="absolute -right-1 -top-1 h-2 w-2 rounded-full bg-coral animate-pulse" />
-      </div>
-      <span className="font-display font-bold text-lg tracking-tight">
-        balla<span className="text-lime">City</span>
-      </span>
+    <Link to={linkTo} className="inline-flex items-center">
+      {content}
     </Link>
   );
 }
