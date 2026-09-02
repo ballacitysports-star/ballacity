@@ -642,10 +642,14 @@ function AuthGate({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     if (loading || !user) return;
+    // Age determination strictly precedes the account-type picker, so an
+    // unverified member is never routed into ordinary onboarding.
+    if (!skipAgeCheck && ageStatus !== "ok") return;
     if (skipTypeCheck || onboardedUsers.has(user.id)) {
       setTypeStatus("ok");
       return;
     }
+
     let cancelled = false;
     let retryTimer: number | undefined;
     // A background retry must not blank an already-rendered page.
