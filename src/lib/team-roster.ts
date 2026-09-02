@@ -126,7 +126,7 @@ async function attachProfiles<T extends { userId: string }>(rows: T[]) {
 
 export async function fetchTeamRoster(teamId: string): Promise<RosterMember[]> {
   const { data, error } = await supabase
-    .from("team_members" as any)
+    .from("team_members")
     .select("id, team_id, user_id, role, jersey_number, position, created_at")
     .eq("team_id", teamId);
   if (error) throw error;
@@ -185,7 +185,7 @@ export function useTeamPendingInvites(teamId: string | undefined, enabled = true
     queryKey: ["team-invites", "team", teamId],
     queryFn: async (): Promise<TeamInvite[]> => {
       const { data, error } = await supabase
-        .from("team_invites" as any)
+        .from("team_invites")
         .select("id, team_id, invitee_id, invited_by, role, message, status, expires_at, created_at")
         .eq("team_id", teamId!)
         .eq("status", "pending")
@@ -226,7 +226,7 @@ export function useMyTeamInvites() {
     queryKey: ["team-invites", "mine", user?.id],
     queryFn: async (): Promise<TeamInvite[]> => {
       const { data, error } = await supabase
-        .from("team_invites" as any)
+        .from("team_invites")
         .select("id, team_id, invitee_id, invited_by, role, message, status, expires_at, created_at")
         .eq("invitee_id", user!.id)
         .eq("status", "pending")
@@ -323,7 +323,7 @@ export function useMyTeamMemberships() {
     queryKey: ["my-team-memberships", user?.id],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from("team_members" as any)
+        .from("team_members")
         .select("team_id, role")
         .eq("user_id", user!.id);
       if (error) throw error;
