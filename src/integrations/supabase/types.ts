@@ -1415,6 +1415,48 @@ export type Database = {
           },
         ]
       }
+      minor_invites: {
+        Row: {
+          child_name: string
+          child_user_id: string | null
+          created_at: string
+          expires_at: string
+          id: string
+          parent_user_id: string
+          redeemed_at: string | null
+          relationship: string
+          status: string
+          token_hash: string
+          updated_at: string
+        }
+        Insert: {
+          child_name: string
+          child_user_id?: string | null
+          created_at?: string
+          expires_at: string
+          id?: string
+          parent_user_id: string
+          redeemed_at?: string | null
+          relationship?: string
+          status?: string
+          token_hash: string
+          updated_at?: string
+        }
+        Update: {
+          child_name?: string
+          child_user_id?: string | null
+          created_at?: string
+          expires_at?: string
+          id?: string
+          parent_user_id?: string
+          redeemed_at?: string | null
+          relationship?: string
+          status?: string
+          token_hash?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       notification_delivery_log: {
         Row: {
           channel: string
@@ -3165,6 +3207,15 @@ export type Database = {
         Args: { _game_id?: string; _other_user: string }
         Returns: string
       }
+      create_minor_invite: {
+        Args: {
+          _child_name: string
+          _expires_at: string
+          _relationship: string
+          _token_hash: string
+        }
+        Returns: string
+      }
       create_parent_request: {
         Args: { _child: string; _details: string; _kind: string }
         Returns: string
@@ -3344,6 +3395,16 @@ export type Database = {
           status: string
         }[]
       }
+      lookup_minor_invite: {
+        Args: { _token_hash: string }
+        Returns: {
+          child_name: string
+          expires_at: string
+          parent_name: string
+          relationship: string
+          state: string
+        }[]
+      }
       minor_handle_unsafe: {
         Args: { _cohort: string; _handle: string }
         Returns: boolean
@@ -3427,6 +3488,13 @@ export type Database = {
         }[]
       }
       publish_legal_document: { Args: { _id: string }; Returns: string }
+      redeem_minor_invite: {
+        Args: { _token_hash: string }
+        Returns: {
+          consent_recorded: boolean
+          parent_user_id: string
+        }[]
+      }
       request_birthday_correction: {
         Args: { _evidence?: string; _reason: string; _requested: string }
         Returns: string
@@ -3447,6 +3515,7 @@ export type Database = {
         Args: { _approve: boolean; _id: string; _notes?: string }
         Returns: undefined
       }
+      revoke_minor_invite: { Args: { _id: string }; Returns: undefined }
       revoke_parental_consent: {
         Args: { _child: string; _reason: string }
         Returns: undefined

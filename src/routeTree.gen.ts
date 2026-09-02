@@ -77,6 +77,7 @@ import { Route as TrainersCreateRouteImport } from './routes/trainers.create'
 import { Route as DotlovableOauthConsentRouteImport } from './routes/[.]lovable.oauth.consent'
 import { Route as Char91DotmcpChar93InvokeToolToolRouteImport } from './routes/[.mcp]/invoke-tool/$tool'
 import { Route as ApiPublicOgRouteImport } from './routes/api/public/og'
+import { Route as FamilyJoinTokenRouteImport } from './routes/family.join.$token'
 import { Route as GamesGameIdIndexRouteImport } from './routes/games.$gameId.index'
 import { Route as GamesGameIdPayRouteImport } from './routes/games.$gameId.pay'
 import { Route as GamesGameIdPaymentSetupRouteImport } from './routes/games.$gameId.payment-setup'
@@ -433,6 +434,11 @@ const ApiPublicOgRoute = ApiPublicOgRouteImport.update({
   path: '/api/public/og',
   getParentRoute: () => rootRouteImport,
 } as any)
+const FamilyJoinTokenRoute = FamilyJoinTokenRouteImport.update({
+  id: '/family/join/$token',
+  path: '/family/join/$token',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const GamesGameIdIndexRoute = GamesGameIdIndexRouteImport.update({
   id: '/',
   path: '/',
@@ -568,6 +574,7 @@ export interface FileRoutesByFullPath {
   '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
   '/.mcp/invoke-tool/$tool': typeof Char91DotmcpChar93InvokeToolToolRoute
   '/api/public/og': typeof ApiPublicOgRoute
+  '/family/join/$token': typeof FamilyJoinTokenRoute
   '/games/$gameId/pay': typeof GamesGameIdPayRoute
   '/games/$gameId/payment-setup': typeof GamesGameIdPaymentSetupRoute
   '/orgs/$orgId/edit': typeof OrgsOrgIdEditRoute
@@ -649,6 +656,7 @@ export interface FileRoutesByTo {
   '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
   '/.mcp/invoke-tool/$tool': typeof Char91DotmcpChar93InvokeToolToolRoute
   '/api/public/og': typeof ApiPublicOgRoute
+  '/family/join/$token': typeof FamilyJoinTokenRoute
   '/games/$gameId/pay': typeof GamesGameIdPayRoute
   '/games/$gameId/payment-setup': typeof GamesGameIdPaymentSetupRoute
   '/orgs/$orgId/edit': typeof OrgsOrgIdEditRoute
@@ -733,6 +741,7 @@ export interface FileRoutesById {
   '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
   '/.mcp/invoke-tool/$tool': typeof Char91DotmcpChar93InvokeToolToolRoute
   '/api/public/og': typeof ApiPublicOgRoute
+  '/family/join/$token': typeof FamilyJoinTokenRoute
   '/games/$gameId/pay': typeof GamesGameIdPayRoute
   '/games/$gameId/payment-setup': typeof GamesGameIdPaymentSetupRoute
   '/orgs/$orgId/edit': typeof OrgsOrgIdEditRoute
@@ -817,6 +826,7 @@ export interface FileRouteTypes {
     | '/.lovable/oauth/consent'
     | '/.mcp/invoke-tool/$tool'
     | '/api/public/og'
+    | '/family/join/$token'
     | '/games/$gameId/pay'
     | '/games/$gameId/payment-setup'
     | '/orgs/$orgId/edit'
@@ -898,6 +908,7 @@ export interface FileRouteTypes {
     | '/.lovable/oauth/consent'
     | '/.mcp/invoke-tool/$tool'
     | '/api/public/og'
+    | '/family/join/$token'
     | '/games/$gameId/pay'
     | '/games/$gameId/payment-setup'
     | '/orgs/$orgId/edit'
@@ -981,6 +992,7 @@ export interface FileRouteTypes {
     | '/.lovable/oauth/consent'
     | '/.mcp/invoke-tool/$tool'
     | '/api/public/og'
+    | '/family/join/$token'
     | '/games/$gameId/pay'
     | '/games/$gameId/payment-setup'
     | '/orgs/$orgId/edit'
@@ -1056,6 +1068,7 @@ export interface RootRouteChildren {
   DotlovableOauthConsentRoute: typeof DotlovableOauthConsentRoute
   Char91DotmcpChar93InvokeToolToolRoute: typeof Char91DotmcpChar93InvokeToolToolRoute
   ApiPublicOgRoute: typeof ApiPublicOgRoute
+  FamilyJoinTokenRoute: typeof FamilyJoinTokenRoute
   OrgsOrgIdEditRoute: typeof OrgsOrgIdEditRoute
   OrgsOrgIdMembersRoute: typeof OrgsOrgIdMembersRoute
   ParentConsentTokenRoute: typeof ParentConsentTokenRoute
@@ -1546,6 +1559,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicOgRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/family/join/$token': {
+      id: '/family/join/$token'
+      path: '/family/join/$token'
+      fullPath: '/family/join/$token'
+      preLoaderRoute: typeof FamilyJoinTokenRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/games/$gameId/': {
       id: '/games/$gameId/'
       path: '/'
@@ -1743,6 +1763,7 @@ const rootRouteChildren: RootRouteChildren = {
   DotlovableOauthConsentRoute: DotlovableOauthConsentRoute,
   Char91DotmcpChar93InvokeToolToolRoute: Char91DotmcpChar93InvokeToolToolRoute,
   ApiPublicOgRoute: ApiPublicOgRoute,
+  FamilyJoinTokenRoute: FamilyJoinTokenRoute,
   OrgsOrgIdEditRoute: OrgsOrgIdEditRoute,
   OrgsOrgIdMembersRoute: OrgsOrgIdMembersRoute,
   ParentConsentTokenRoute: ParentConsentTokenRoute,
