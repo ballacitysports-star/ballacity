@@ -92,6 +92,39 @@ export const sendPushToUser = createServerFn({ method: "POST" })
       }
     };
 
+    // Minor-safety curfew. The in-app notification row already exists (the
+    // caller writes it first), so suppressing a push here never hides an alert
+    // from the member — it only delays the interruption.
+    try {
+      const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+      const { curfewGateFor } = await import("@/lib/push-curfew.server");
+      const gate = await curfewGateFor(supabaseAdmin as any, data.userId);
+      if (gate.action === "blocked") {
+        await log("skipped", { error: gate.reason });
+        return { ok: false as const, reason: gate.reason };
+      }
+      if (gate.action === "queue") {
+        await supabaseAdmin.from("scheduled_notifications" as any).insert({
+          user_id: data.userId,
+          title: data.title,
+          body: data.body ?? null,
+          url: data.url ?? null,
+          channel: "push",
+          reason: "minor_notification_curfew",
+          deliver_after: gate.deliverAfter,
+        } as any);
+        await log("skipped", {
+          error: "minor_notification_curfew",
+          detail: { deliver_after: gate.deliverAfter },
+        });
+        return { ok: true as const, queued: true as const, deliverAfter: gate.deliverAfter };
+      }
+    } catch (e) {
+      // A curfew lookup failure must not turn into a silent drop; log and send.
+      console.warn("[push] curfew check failed", e);
+    }
+
+
     const restKey = process.env.ONESIGNAL_REST_API_KEY;
     if (!restKey) {
       console.warn("[push] ONESIGNAL_REST_API_KEY not configured");
