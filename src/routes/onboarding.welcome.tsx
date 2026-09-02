@@ -293,6 +293,17 @@ function OnboardingWizard({ type }: { type: AccountType }) {
       setStep(0);
       return false;
     }
+    const { validateProfileSafety } = await import("@/lib/profile-payload");
+    const safetyErr = validateProfileSafety({
+      username: basics.username,
+      name: trimmedName,
+      birthday: birthdayClean,
+    });
+    if (safetyErr) {
+      toast.error(safetyErr);
+      setStep(0);
+      return false;
+    }
     const trimmedCity = basics.city.trim().slice(0, 80);
     const initials = (basics.avatar.trim() || trimmedName.slice(0, 2)).toUpperCase().slice(0, 3);
     if (links.some((l) => validateProfileUrl(l.url) !== null)) {
