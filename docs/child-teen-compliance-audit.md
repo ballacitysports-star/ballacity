@@ -109,3 +109,20 @@ Parent Center, safety center, moderator dashboard, deletion workflow, versioned 
 **Requires legal counsel / business policy:** consent verification mechanism, notice wording,
 which cohorts need consent in which jurisdictions, retention periods, third-party DPAs, and any
 AI-training authorization.
+
+## Age-policy refactor (all cohorts supported)
+
+- `src/lib/age-policy.ts` is now a thin compatibility layer over
+  `src/lib/child-policy.ts`. There is no 13+ signup block: `MINIMUM_ACCOUNT_AGE`
+  is 0 and `validateAgeMinimum` only rejects impossible dates.
+- Under-13 birthdays are valid and surface `CONSENT_REQUIRED_MESSAGE` inline;
+  finishing onboarding routes the member to `/onboarding/child` for the
+  DOB → parent info → consent → activation flow.
+- Cohort thresholds, jurisdiction and minor protections are configured in
+  Superadmin → Youth (age policy) and stored in `app_settings.age_policy`,
+  the same row the SQL helpers `age_policy_flag()` / `age_policy_number()` read.
+- Username PII detection (`checkChildUsername`) runs in the shared basics
+  fields and in `validateProfileSafety`, used by both onboarding and
+  Edit profile, mirroring the `minor_handle_unsafe` database trigger.
+- Host-selectable game age floor lowered to 5 so youth games are expressible;
+  under-13 participation stays gated by parental consent and parent controls.
