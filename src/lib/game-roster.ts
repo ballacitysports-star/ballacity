@@ -9,12 +9,15 @@ export type LiveParticipant = {
   avatarUrl: string | null;
   username: string | null;
   position: string | null;
+  /** Host-marked attendance: true = showed up, false = no-show, null = unmarked. */
+  attended: boolean | null;
 };
 
 type Row = {
   user_id: string;
   created_at: string;
   position: string | null;
+  attended?: boolean | null;
 };
 
 
@@ -55,6 +58,7 @@ function toParticipant(row: Row, profile: ProfileRow | undefined): LiveParticipa
     avatarUrl: profile?.avatar_url ?? null,
     username: profile?.username ?? null,
     position: row.position ?? null,
+    attended: row.attended ?? null,
   };
 }
 
@@ -86,7 +90,7 @@ export function useLiveParticipants(gameId: string | undefined): {
     const load = async () => {
       const { data, error } = await supabase
         .from("game_participants")
-        .select("user_id, created_at, position")
+        .select("user_id, created_at, position, attended")
         .eq("game_id", gameId)
         .order("created_at", { ascending: true });
 

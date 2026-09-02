@@ -437,6 +437,9 @@ export type Database = {
       }
       game_participants: {
         Row: {
+          attendance_marked_at: string | null
+          attendance_marked_by: string | null
+          attended: boolean | null
           created_at: string
           game_id: string
           id: string
@@ -444,6 +447,9 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          attendance_marked_at?: string | null
+          attendance_marked_by?: string | null
+          attended?: boolean | null
           created_at?: string
           game_id: string
           id?: string
@@ -451,6 +457,9 @@ export type Database = {
           user_id: string
         }
         Update: {
+          attendance_marked_at?: string | null
+          attendance_marked_by?: string | null
+          attended?: boolean | null
           created_at?: string
           game_id?: string
           id?: string
@@ -836,6 +845,9 @@ export type Database = {
           arrive_early_min: number
           cancellation_notes: string | null
           cancellation_policy: string
+          cancellation_reason: string | null
+          cancelled_at: string | null
+          completed_at: string | null
           created_at: string
           date: string
           description: string
@@ -884,6 +896,9 @@ export type Database = {
           arrive_early_min?: number
           cancellation_notes?: string | null
           cancellation_policy?: string
+          cancellation_reason?: string | null
+          cancelled_at?: string | null
+          completed_at?: string | null
           created_at?: string
           date: string
           description?: string
@@ -932,6 +947,9 @@ export type Database = {
           arrive_early_min?: number
           cancellation_notes?: string | null
           cancellation_policy?: string
+          cancellation_reason?: string | null
+          cancelled_at?: string | null
+          completed_at?: string | null
           created_at?: string
           date?: string
           description?: string
@@ -3053,6 +3071,24 @@ export type Database = {
       has_verified_gym_visit: {
         Args: { _org: string; _user: string }
         Returns: boolean
+      }
+      host_attendance_stats: {
+        Args: { _host: string }
+        Returns: {
+          attended: number
+          cancelled_games: number
+          completed_games: number
+          marked: number
+        }[]
+      }
+      host_cancel_game: {
+        Args: { _game_id: string; _reason: string }
+        Returns: undefined
+      }
+      host_complete_game: { Args: { _game_id: string }; Returns: undefined }
+      host_mark_attendance: {
+        Args: { _attended: boolean; _game_id: string; _user_id: string }
+        Returns: undefined
       }
       is_conversation_participant: {
         Args: { _conv: string; _user: string }

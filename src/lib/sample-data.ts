@@ -82,7 +82,12 @@ export type Game = {
   image: string;
   description: string;
   equipment: string[];
-  status?: "scheduled" | "in_progress" | "completed";
+  status?: "scheduled" | "in_progress" | "completed" | "cancelled";
+  /** Set when the host called the game off. Blocks joins everywhere. */
+  cancelledAt?: string | null;
+  cancellationReason?: string | null;
+  /** Set when the host closed the game out (attendance can be marked). */
+  completedAt?: string | null;
   joinsClosed?: boolean;
   /** Minutes before start when signups close automatically. 0 = off. */
   signupCutoffMin?: number;

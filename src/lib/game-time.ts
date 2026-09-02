@@ -13,7 +13,13 @@ export function parseDurationMin(duration: string | null | undefined): number {
 }
 
 /** A game shape that carries just enough to compute its end. */
-export type GameTiming = Pick<Game, "date" | "duration"> & { endsAt?: string | null };
+export type GameTiming = Pick<Game, "date" | "duration"> & {
+  endsAt?: string | null;
+  /** Host lifecycle state; a cancelled game counts as finished for lists. */
+  status?: string | null;
+  cancelledAt?: string | null;
+  completedAt?: string | null;
+};
 
 /** Timestamp (ms) when a game is expected to end (explicit end wins). */
 export function gameEndsAt(game: GameTiming): number {
@@ -31,6 +37,10 @@ export function isGameFinished(
   game: GameTiming,
   now: number = Date.now(),
 ): boolean {
+  // A host decision outranks the clock: cancelled or closed-out games drop
+  // out of discovery immediately instead of lingering until their end time.
+  if (game.cancelledAt || game.status === "cancelled") return true;
+  if (game.completedAt || game.status === "completed") return true;
   return gameEndsAt(game) + GRACE_MS < now;
 }
 

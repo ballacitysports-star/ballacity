@@ -89,6 +89,9 @@ type DbRow = {
   description: string;
   equipment: string[] | null;
   status: string | null;
+  cancelled_at?: string | null;
+  cancellation_reason?: string | null;
+  completed_at?: string | null;
   joins_closed: boolean;
   signup_cutoff_min?: number | null;
   min_age?: number | null;
@@ -139,6 +142,9 @@ function rowToGame(r: DbRow): Game {
     description: r.description,
     equipment: r.equipment ?? [],
     status: (r.status as Game["status"]) ?? undefined,
+    cancelledAt: r.cancelled_at ?? null,
+    cancellationReason: r.cancellation_reason ?? null,
+    completedAt: r.completed_at ?? null,
     joinsClosed: !!r.joins_closed,
     signupCutoffMin: Number(r.signup_cutoff_min ?? 0) || 0,
     minAge: r.min_age ?? null,

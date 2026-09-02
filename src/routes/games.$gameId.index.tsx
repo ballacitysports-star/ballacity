@@ -27,6 +27,9 @@ import {
   ShieldCheck,
   History,
   Flag,
+  Ban,
+  UserCheck,
+  UserX,
 } from "lucide-react";
 import { ReportDialog } from "@/components/ReportDialog";
 import { RiskAcknowledgmentDialog } from "@/components/safety/RiskAcknowledgmentDialog";
@@ -61,6 +64,8 @@ import { computeReputation, useReviewsFor } from "@/lib/reviews";
 import { GamePolicySummary } from "@/components/games/GamePolicySummary";
 import { GamePolicyFields } from "@/components/games/GamePolicyFields";
 import { HostTrustPanel } from "@/components/games/HostTrustPanel";
+import { cancelGame, completeGame, markAttendance, useHostAttendanceStats } from "@/lib/game-lifecycle";
+import { resolveGameStatus, GAME_STATUS_TONE_CLASS } from "@/lib/game-status";
 import { normalizeGamePolicy, validateGamePolicy, type GamePolicy, type HostTrust } from "@/lib/game-policy";
 import { ReputationBadge } from "@/components/ReputationBadge";
 import { joinGame, leaveGame, useIsJoined } from "@/lib/games-store";
@@ -462,6 +467,8 @@ function GameDetail() {
     };
   }, [game?.teamId]);
 
+  const hostAttendance = useHostAttendanceStats(game?.hostUserId ?? settings?.host_id ?? undefined);
+
   const hostTrust = useMemo<HostTrust>(() => {
     const hostUserId = game?.hostUserId ?? settings?.host_id ?? null;
     const gamesHosted = hostUserId
@@ -471,13 +478,13 @@ function GameDetail() {
       gamesHosted,
       rating: hostRep.count > 0 ? hostRep.avg : null,
       reviewCount: hostRep.count,
-      // No attendance signal is tracked yet — report it honestly instead of
-      // inventing a percentage.
-      attendanceRate: null,
+      // Real signal only: the share of host-marked roster spots that showed
+      // up. Null until this host has marked attendance at least once.
+      attendanceRate: hostAttendance?.attendanceRate ?? null,
       verified: hostTeamVerified === true,
       verifiedLabel: hostTeamVerified === true ? "Verified team profile" : null,
     };
-  }, [game?.hostUserId, settings?.host_id, hosted, hostRep, hostTeamVerified]);
+  }, [game?.hostUserId, settings?.host_id, hosted, hostRep, hostTeamVerified, hostAttendance]);
 
   // Guards refreshStatus while a leave flow is tearing down local + server
   // state. Realtime DELETE events for join_requests / payment_submissions
@@ -536,6 +543,14 @@ function GameDetail() {
   const [removeTarget, setRemoveTarget] = useState<{ userId: string; name: string } | null>(null);
   const [removingId, setRemovingId] = useState<string | null>(null);
 
+  // Host "Cancel game" flow: a reason is required so every player on the
+  // roster gets a notification that explains what happened.
+  const [cancelOpen, setCancelOpen] = useState(false);
+  const [cancelReason, setCancelReason] = useState("");
+  const [cancelling, setCancelling] = useState(false);
+  // Attendance marking (host only, opens once the game has started).
+  const [attendanceBusy, setAttendanceBusy] = useState<string | null>(null);
+
   const handleRemoveParticipant = async (playerId: string, displayName: string) => {
     if (!game || !isHost) return;
     setRemovingId(playerId);
@@ -566,6 +581,40 @@ function GameDetail() {
       setRemoveTarget(null);
       void refetchRoster();
       refreshHostRequests();
+    }
+  };
+
+  const handleCancelGame = async () => {
+    if (!game || !isHost) return;
+    setCancelling(true);
+    try {
+      await cancelGame(game.id, cancelReason);
+      await updateHostedGame(game.id, {
+        status: "cancelled",
+        cancelledAt: new Date().toISOString(),
+        cancellationReason: cancelReason.trim() || null,
+        joinsClosed: true,
+      });
+      toast.success("Game cancelled. Everyone on the roster was notified.");
+      setCancelOpen(false);
+      setCancelReason("");
+    } catch (err) {
+      toast.error((err as { message?: string })?.message ?? "Couldn't cancel this game.");
+    } finally {
+      setCancelling(false);
+    }
+  };
+
+  const handleAttendance = async (playerId: string, attended: boolean) => {
+    if (!game || !isHost) return;
+    setAttendanceBusy(playerId);
+    try {
+      await markAttendance(game.id, playerId, attended);
+      await refetchRoster();
+    } catch (err) {
+      toast.error((err as { message?: string })?.message ?? "Couldn't save attendance.");
+    } finally {
+      setAttendanceBusy(null);
     }
   };
 
@@ -1194,6 +1243,71 @@ function GameDetail() {
           gameId={game.id}
         />
       )}
+      {/* Cancel game dialog (host) */}
+      <Dialog
+        open={cancelOpen}
+        onOpenChange={(v) => {
+          if (!cancelling) setCancelOpen(v);
+        }}
+      >
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Cancel {game.title}?</DialogTitle>
+            <DialogDescription>
+              Everyone on the roster is notified right away and no one else can join. This can't be
+              undone — you'd need to create a new game.
+            </DialogDescription>
+          </DialogHeader>
+          <label className="block text-xs font-semibold text-muted-foreground" htmlFor="cancel-reason">
+            Reason players will see
+          </label>
+          <textarea
+            id="cancel-reason"
+            value={cancelReason}
+            onChange={(e) => setCancelReason(e.target.value)}
+            rows={3}
+            placeholder="Field flooded, not enough players, moved to next week…"
+            className="w-full rounded-xl border border-border bg-background p-3 text-sm"
+          />
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={() => setCancelOpen(false)}
+              disabled={cancelling}
+              className="flex-1 rounded-xl border border-border bg-background py-2.5 text-xs font-semibold disabled:opacity-50"
+            >
+              Keep game
+            </button>
+            <button
+              type="button"
+              onClick={() => void handleCancelGame()}
+              disabled={cancelling}
+              className="flex-1 rounded-xl border border-coral/40 bg-coral/10 py-2.5 text-xs font-bold text-coral disabled:opacity-50"
+            >
+              {cancelling ? "Cancelling…" : "Cancel game"}
+            </button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Canonical lifecycle banner: cancelled or ended games say so first. */}
+      {(() => {
+        const resolved = resolveGameStatus(game);
+        if (!resolved.terminal) return null;
+        return (
+          <div
+            role="status"
+            className={`mx-4 mt-4 flex items-start gap-2 rounded-2xl border p-3 text-xs font-semibold ${GAME_STATUS_TONE_CLASS[resolved.tone]}`}
+          >
+            <Ban className="mt-0.5 h-4 w-4 shrink-0" />
+            <div>
+              <div className="text-sm font-bold">{resolved.label}</div>
+              <p className="mt-0.5 font-medium opacity-90">{resolved.detail}</p>
+            </div>
+          </div>
+        );
+      })()}
+
       {/* Hero */}
       <div className="relative h-72">
         <MediaImage src={game.image} alt={game.title} className="h-full w-full object-cover" />
@@ -2335,8 +2449,23 @@ function GameDetail() {
                 type="button"
                 onClick={() => {
                   if (game.status === "in_progress") {
-                    void updateHostedGame(game.id, { status: "completed" }).catch(() => {});
-                    toast.success("Game marked as ended.");
+                    // Completion goes through the RPC so the database stamps
+                    // completed_at, locks joins and opens attendance marking.
+                    void (async () => {
+                      try {
+                        await completeGame(game.id);
+                        await updateHostedGame(game.id, {
+                          status: "completed",
+                          completedAt: new Date().toISOString(),
+                          joinsClosed: true,
+                        });
+                        toast.success("Game marked as ended. You can now mark attendance.");
+                      } catch (err) {
+                        toast.error(
+                          (err as { message?: string })?.message ?? "Couldn't end this game.",
+                        );
+                      }
+                    })();
                   } else {
                     void updateHostedGame(game.id, {
                       status: "in_progress",
@@ -2372,6 +2501,16 @@ function GameDetail() {
                 )}
               </button>
             </div>
+            {!game.cancelledAt && game.status !== "cancelled" ? (
+              <button
+                type="button"
+                onClick={() => setCancelOpen(true)}
+                disabled={game.status === "completed" || !!game.completedAt}
+                className="mt-2 w-full inline-flex items-center justify-center gap-2 rounded-xl border border-amber-500/40 bg-amber-500/10 text-amber-600 dark:text-amber-400 py-2.5 text-xs font-bold disabled:opacity-50"
+              >
+                <Ban className="h-4 w-4" /> Cancel game
+              </button>
+            ) : null}
             <button
               type="button"
               onClick={async () => {
@@ -2439,9 +2578,62 @@ function GameDetail() {
                 approvedReqs.length + Math.max(rosterFromLive.length, fallbackPlaceholderCount);
               return (
                 <>
-                  <h2 className="font-display text-sm font-bold uppercase tracking-wider text-muted-foreground mb-2">
+                   <h2 className="font-display text-sm font-bold uppercase tracking-wider text-muted-foreground mb-2">
                     Roster · {totalConfirmed} / {game.maxPlayers}
                   </h2>
+
+                  {/* Attendance: host-only, opens at start time. Feeds the
+                      host's real attendance rate on the trust panel. */}
+                  {isHost &&
+                  !game.cancelledAt &&
+                  liveRoster.length > 0 &&
+                  Date.now() >= new Date(game.date).getTime() ? (
+                    <div className="mb-3 rounded-2xl border border-border bg-surface p-3">
+                      <div className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                        Attendance
+                      </div>
+                      <p className="mt-0.5 text-[11px] text-muted-foreground">
+                        Mark who showed up. This builds your host reliability score.
+                      </p>
+                      <div className="mt-2 space-y-1.5">
+                        {liveRoster.map((p) => (
+                          <div key={`att-${p.userId}`} className="flex items-center gap-2">
+                            <span className="min-w-0 flex-1 truncate text-xs font-semibold">
+                              {p.displayName}
+                            </span>
+                            <button
+                              type="button"
+                              aria-label={`Mark ${p.displayName} present`}
+                              aria-pressed={p.attended === true}
+                              disabled={attendanceBusy === p.userId}
+                              onClick={() => void handleAttendance(p.userId, true)}
+                              className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-[11px] font-bold disabled:opacity-50 ${
+                                p.attended === true
+                                  ? "border-lime/40 bg-lime/10 text-lime"
+                                  : "border-border bg-background text-muted-foreground"
+                              }`}
+                            >
+                              <UserCheck className="h-3.5 w-3.5" /> Present
+                            </button>
+                            <button
+                              type="button"
+                              aria-label={`Mark ${p.displayName} as a no-show`}
+                              aria-pressed={p.attended === false}
+                              disabled={attendanceBusy === p.userId}
+                              onClick={() => void handleAttendance(p.userId, false)}
+                              className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-[11px] font-bold disabled:opacity-50 ${
+                                p.attended === false
+                                  ? "border-coral/40 bg-coral/10 text-coral"
+                                  : "border-border bg-background text-muted-foreground"
+                              }`}
+                            >
+                              <UserX className="h-3.5 w-3.5" /> No-show
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ) : null}
                   <div className="space-y-2">
                     {totalConfirmed === 0 ? (
                       <div className="rounded-2xl border border-dashed border-border bg-surface/40 p-3 text-xs text-muted-foreground">

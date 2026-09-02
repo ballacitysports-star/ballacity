@@ -157,6 +157,11 @@ export function joinGame(id: string, position?: string) {
       joined.delete(id);
       saveJoinedGames();
       emit();
+      // The server-side join gate rejects cancelled/ended/closed/full games.
+      // Tell the player why instead of silently un-joining them.
+      const { joinGateErrorMessage } = await import("@/lib/game-status");
+      const { toast } = await import("sonner");
+      toast.error(joinGateErrorMessage(error));
     }
   })();
 }
