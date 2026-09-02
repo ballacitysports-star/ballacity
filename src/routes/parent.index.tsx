@@ -157,6 +157,11 @@ function ChildPanel({ childUserId }: { childUserId: string }) {
           ["AI video analysis", "ai_analysis", c.aiAnalysis],
           ["Can join games", "game_participation", c.gameParticipation],
           ["Notifications", "notifications", c.notifications],
+          [
+            "Allow overnight notifications",
+            "notification_curfew_lifted",
+            c.notificationCurfewLifted,
+          ],
         ].map(([label, key, value]) => (
           <div key={String(key)} className="flex items-center justify-between gap-3">
             <span className="text-sm">{String(label)}</span>
@@ -166,6 +171,10 @@ function ChildPanel({ childUserId }: { childUserId: string }) {
             />
           </div>
         ))}
+        <div className="rounded-xl border border-border bg-background p-3 text-xs text-muted-foreground">
+          Overnight notifications are off by default: between midnight and 6am in their local time
+          we hold push alerts until morning. The alert still appears in the app straight away.
+        </div>
         <div className="rounded-xl border border-border bg-background p-3 text-xs text-muted-foreground">
           Precise location is never shared for a child account — only a general city, and venue
           details only with the host and participants of a game they join.

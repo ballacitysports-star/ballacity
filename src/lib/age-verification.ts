@@ -9,9 +9,12 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import {
+  DEFAULT_AGE_POLICY,
   calculateAge,
   cohortFromAge,
+  requiresParentalConsent,
   type AgeCohort,
+  type AgePolicyConfig,
   MAX_PLAUSIBLE_AGE_YEARS,
 } from "@/lib/child-policy";
 import { getMyAgeStatus, submitMyBirthday, type AgeStatus } from "@/lib/age-verification.functions";
@@ -84,12 +87,16 @@ export function signupStateFor(input: {
   status: PlatformStatus;
   cohort: AgeCohort;
   hasAccountType: boolean;
+  /** Active age policy — the consent age band is configurable, never hardcoded. */
+  policy?: AgePolicyConfig;
 }): SignupState {
   if (!input.authenticated) return "NEW";
   if (input.status === "age_verification_required" || input.cohort === "unknown") {
     return "DOB_REQUIRED";
   }
-  if (input.cohort === "child_under_13") {
+  // "Needs a guardian" is a policy question (currently under-16 by default),
+  // not a synonym for the under-13 cohort.
+  if (requiresParentalConsent(input.cohort, input.policy ?? DEFAULT_AGE_POLICY)) {
     switch (input.status) {
       case "consent_required":
         return "CHILD_CONSENT_REQUIRED";

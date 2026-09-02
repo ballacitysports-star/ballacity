@@ -29,6 +29,7 @@ import { AGE_GATE_ROUTE, isAccountSetupEscape, needsAgeGate } from "@/lib/age-ve
 import { logNotFound } from "@/lib/route-doctor";
 import { ErrorFallback, GlobalErrorBoundary } from "@/components/GlobalErrorBoundary";
 import { setDeepLinkNavigator } from "@/lib/deep-links";
+import { useSessionHeartbeat } from "@/hooks/use-session-heartbeat";
 
 function NotFoundComponent() {
   const router = useRouter();
@@ -801,6 +802,15 @@ function AuthGate({ children }: { children: React.ReactNode }) {
   );
 }
 
+/**
+ * Time-on-platform heartbeat (duration only). Rendered client-only so it never
+ * runs during SSR.
+ */
+function SessionHeartbeat() {
+  useSessionHeartbeat();
+  return null;
+}
+
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
   const router = useRouter();
@@ -943,6 +953,7 @@ function RootComponent() {
       </ClientOnly>
       <Toaster position="top-center" richColors />
       <ClientOnly fallback={null}>
+        <SessionHeartbeat />
         <DebugModeToggle />
       </ClientOnly>
     </QueryClientProvider>

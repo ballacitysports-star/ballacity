@@ -16,6 +16,8 @@ import {
   useSubmitBirthday,
   type DobParts,
 } from "@/lib/age-verification";
+import { parseCohort, requiresParentalConsent } from "@/lib/child-policy";
+import { useAgePolicy } from "@/lib/youth-features";
 
 export const Route = createFileRoute("/onboarding/age")({
   head: () =>
@@ -34,6 +36,7 @@ function AgeGatePage() {
   const { user, loading } = useAuth();
   const navigate = useNavigate();
   const status = useMyAgeStatus(!!user);
+  const { policy } = useAgePolicy();
   const submitBirthday = useSubmitBirthday();
   const [dob, setDob] = useState<DobParts>(EMPTY_DOB);
   const [error, setError] = useState<string | null>(null);
@@ -44,9 +47,11 @@ function AgeGatePage() {
   }, [loading, user, navigate]);
 
   const routeOnward = (cohort: string) => {
-    // Under-13 goes to the guardian flow; nobody reaches ordinary onboarding
-    // before the server has determined their age.
-    window.location.replace(cohort === "child_under_13" ? CHILD_CONSENT_ROUTE : ACCOUNT_TYPE_ROUTE);
+    // Anyone in a cohort that needs a guardian (under-16 by default) goes to the
+    // consent flow; nobody reaches ordinary onboarding before the server has
+    // determined their age.
+    const needsGuardian = requiresParentalConsent(parseCohort(cohort), policy);
+    window.location.replace(needsGuardian ? CHILD_CONSENT_ROUTE : ACCOUNT_TYPE_ROUTE);
   };
 
   const save = async (iso: string) => {

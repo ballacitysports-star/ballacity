@@ -7,6 +7,7 @@ import { superadminSetSetting } from "@/lib/superadmin.functions";
 import { useAgePolicy } from "@/lib/youth-features";
 import {
   CHILD_POLICY_DISCLAIMER,
+  MODELED_CONSENT_JURISDICTION,
   COHORT_META,
   DEFAULT_AGE_POLICY,
   JURISDICTIONS,
@@ -63,7 +64,7 @@ const NUM_META: Record<NumKey, { label: string; hint: string; min: number; max: 
   adultAge: { label: "Adult age", hint: "18+ in most jurisdictions", min: 13, max: 21 },
   parentalConsentMaxAge: {
     label: "Parental consent required through age",
-    hint: "Raise for stricter state laws",
+    hint: `Currently modeled on ${MODELED_CONSENT_JURISDICTION.replace(/_/g, " ")} (verifiable consent under 16). Federal COPPA alone would be 12.`,
     min: 0,
     max: 17,
   },
@@ -94,6 +95,9 @@ function toRow(c: AgePolicyConfig) {
     age_assurance_required: c.ageAssuranceRequired,
     biometric_age_estimation_enabled: c.biometricAgeEstimationEnabled,
     consent_reverification_days: c.consentReverificationDays,
+    notification_curfew_enabled: c.notificationCurfew !== null,
+    notification_curfew_start_hour: c.notificationCurfew?.startHour ?? 0,
+    notification_curfew_end_hour: c.notificationCurfew?.endHour ?? 6,
   };
 }
 
@@ -204,6 +208,63 @@ export function YouthTab() {
             </span>
           </label>
         </div>
+      </div>
+
+      <div className="rounded-xl border bg-card p-4">
+        <div className="text-sm font-semibold">Overnight notification curfew (minors)</div>
+        <p className="mt-0.5 text-xs text-muted-foreground">
+          {LEGAL_REVIEW_REQUIRED} — the default window models NY&rsquo;s SAFE for Kids Act
+          (12am&ndash;6am recipient local time), the more protective of the windows we know about;
+          Connecticut&rsquo;s is 9pm&ndash;8am. Held pushes are queued and delivered when the window
+          ends; the in-app alert always appears immediately.
+        </p>
+        <div className="mt-3 flex items-center justify-between gap-3">
+          <span className="text-sm">Curfew enabled</span>
+          <Switch
+            checked={local.notificationCurfew !== null}
+            disabled={loading || saving}
+            aria-label="Overnight notification curfew"
+            onCheckedChange={(v) =>
+              void persist(
+                {
+                  ...local,
+                  notificationCurfew: v ? { startHour: 0, endHour: 6 } : null,
+                },
+                "Notification curfew",
+              )
+            }
+          />
+        </div>
+        {local.notificationCurfew ? (
+          <div className="mt-3 grid gap-3 sm:grid-cols-2">
+            {(["startHour", "endHour"] as const).map((k) => (
+              <label key={k} className="block">
+                <span className="text-xs font-medium">
+                  {k === "startHour" ? "Quiet hours start (local hour)" : "Quiet hours end"}
+                </span>
+                <input
+                  type="number"
+                  min={0}
+                  max={23}
+                  value={local.notificationCurfew?.[k] ?? 0}
+                  disabled={loading || saving}
+                  onChange={(e) =>
+                    setLocal({
+                      ...local,
+                      notificationCurfew: {
+                        startHour: local.notificationCurfew?.startHour ?? 0,
+                        endHour: local.notificationCurfew?.endHour ?? 6,
+                        [k]: Number(e.target.value),
+                      },
+                    })
+                  }
+                  onBlur={() => void persist(local, "Notification curfew")}
+                  className="mt-1 w-full rounded-lg border bg-background px-3 py-2 text-sm"
+                />
+              </label>
+            ))}
+          </div>
+        ) : null}
       </div>
 
       <div className="rounded-xl border bg-card divide-y">

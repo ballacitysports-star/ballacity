@@ -112,13 +112,34 @@ export type AgePolicyConfig = {
   biometricAgeEstimationEnabled: boolean;
   /** 0 = consent does not expire. */
   consentReverificationDays: number;
+  /**
+   * Hours (local time of the RECIPIENT) during which minors get no push
+   * notifications. `null` disables the curfew entirely.
+   *
+   * LEGAL REVIEW REQUIRED — the default models NY's SAFE for Kids Act window
+   * (12am–6am) because it is the more protective of the windows we know about;
+   * Connecticut's is 9pm–8am. Neither is asserted to be satisfied by this
+   * implementation.
+   */
+  notificationCurfew: { startHour: number; endHour: number } | null;
 };
 
 export const DEFAULT_AGE_POLICY: AgePolicyConfig = {
   childMaxAge: 12,
   teenMidMaxAge: 15,
   adultAge: 18,
-  parentalConsentMaxAge: 12,
+  /**
+   * Conservative GLOBAL default: verifiable parental consent through age 15.
+   *
+   * LEGAL REVIEW REQUIRED. Federal COPPA reaches under-13, but Georgia's
+   * Protecting Georgia's Children on Social Media Act (O.C.G.A. §§ 39-6-1
+   * to -5) reaches under-16. There is no reliable per-request jurisdiction
+   * signal yet, so the platform applies the more protective threshold to
+   * everyone rather than leaving the stricter rule unwired. Once jurisdiction
+   * detection exists, resolve the config through `policyForJurisdiction()`
+   * per session instead of relying on this global default.
+   */
+  parentalConsentMaxAge: 15,
   jurisdiction: "US_FEDERAL",
   childAdultDmRequiresGuardianLink: true,
   teenAdultDmRequiresSharedContext: true,
@@ -129,7 +150,27 @@ export const DEFAULT_AGE_POLICY: AgePolicyConfig = {
   ageAssuranceRequired: false,
   biometricAgeEstimationEnabled: false,
   consentReverificationDays: 0,
+  notificationCurfew: { startHour: 0, endHour: 6 },
 };
+
+/**
+ * Jurisdiction-specific threshold overrides. Values are engineering defaults
+ * modeled on published statutes — LEGAL REVIEW REQUIRED before relying on any
+ * of them as a compliance position.
+ */
+export const JURISDICTION_POLICY_OVERRIDES: Partial<
+  Record<Jurisdiction, Partial<AgePolicyConfig>>
+> = {
+  // O.C.G.A. §§ 39-6-1 to -5 — verifiable parental consent for under-16.
+  GEORGIA: { parentalConsentMaxAge: 15 },
+  // Federal COPPA floor only (under-13). Kept explicit so the difference is
+  // visible in the admin UI rather than implied.
+  US_FEDERAL: { parentalConsentMaxAge: 12 },
+};
+
+/** The jurisdiction whose thresholds the current defaults are modeled on. */
+export const MODELED_CONSENT_JURISDICTION: Jurisdiction = "GEORGIA";
+
 
 const num = (v: unknown, fallback: number) => {
   const n = typeof v === "string" ? Number(v) : v;
@@ -177,17 +218,131 @@ export function parseAgePolicy(value: unknown): AgePolicyConfig {
       raw["consent_reverification_days"],
       d.consentReverificationDays,
     ),
+    notificationCurfew: bool(
+      raw["notification_curfew_enabled"],
+      d.notificationCurfew !== null,
+    )
+      ? {
+          startHour: clampHour(
+            num(raw["notification_curfew_start_hour"], d.notificationCurfew?.startHour ?? 0),
+          ),
+          endHour: clampHour(
+            num(raw["notification_curfew_end_hour"], d.notificationCurfew?.endHour ?? 6),
+          ),
+        }
+      : null,
   };
 }
 
-/** Jurisdiction overrides layered on top of the base config. */
+const clampHour = (h: number) => Math.min(23, Math.max(0, Math.round(h)));
+
+/**
+ * Jurisdiction overrides layered on top of the base config.
+ *
+ * Call this once jurisdiction is known for a session; until then the platform
+ * runs on the conservative global defaults in DEFAULT_AGE_POLICY.
+ */
 export function policyForJurisdiction(
   config: AgePolicyConfig,
   jurisdiction: Jurisdiction | null | undefined,
 ): AgePolicyConfig {
-  if (!jurisdiction || jurisdiction === config.jurisdiction) return config;
-  return { ...config, jurisdiction };
+  if (!jurisdiction) return config;
+  const overrides = JURISDICTION_POLICY_OVERRIDES[jurisdiction] ?? {};
+  // Never loosen the platform default — a jurisdiction override may only make
+  // the consent threshold stricter. LEGAL REVIEW REQUIRED before changing this
+  // to allow a lower per-jurisdiction threshold.
+  const parentalConsentMaxAge = Math.max(
+    config.parentalConsentMaxAge,
+    overrides.parentalConsentMaxAge ?? 0,
+  );
+  return { ...config, ...overrides, parentalConsentMaxAge, jurisdiction };
 }
+
+/* ------------------------------------------------------------------ */
+/* Notification curfew for minors                                      */
+/* ------------------------------------------------------------------ */
+
+/** True when `hour` (0–23, recipient local time) falls inside the curfew. */
+export function hourInCurfew(
+  hour: number,
+  curfew: AgePolicyConfig["notificationCurfew"],
+): boolean {
+  if (!curfew) return false;
+  const h = ((Math.floor(hour) % 24) + 24) % 24;
+  const { startHour, endHour } = curfew;
+  if (startHour === endHour) return false;
+  return startHour < endHour
+    ? h >= startHour && h < endHour
+    : h >= startHour || h < endHour;
+}
+
+/** The recipient's local hour for an instant, in an IANA timezone. */
+export function localHourIn(date: Date, timezone: string | null | undefined): number {
+  if (!timezone) return date.getUTCHours();
+  try {
+    const parts = new Intl.DateTimeFormat("en-US", {
+      timeZone: timezone,
+      hour: "numeric",
+      hour12: false,
+    }).format(date);
+    const h = Number(parts.replace(/[^\d]/g, ""));
+    return Number.isFinite(h) ? h % 24 : date.getUTCHours();
+  } catch {
+    return date.getUTCHours();
+  }
+}
+
+export type CurfewDecision = {
+  /** Send the push immediately. */
+  send: boolean;
+  /** When suppressed, the earliest instant the push may be delivered. */
+  deliverAfter: Date | null;
+  reason:
+    | "not_a_minor"
+    | "curfew_disabled"
+    | "outside_curfew"
+    | "curfew_lifted_by_guardian"
+    | "in_curfew";
+};
+
+/**
+ * Should a push go out now? Minors inside the curfew window are queued, not
+ * dropped — the in-app notification row is always written by the caller, so
+ * nothing is silently lost.
+ *
+ * A guardian may explicitly lift the curfew for their child (mirrors the other
+ * parent-controlled features). The separate `notifications` control is an
+ * independent, more restrictive layer handled by the caller.
+ */
+export function notificationCurfewDecision(input: {
+  cohort: AgeCohort;
+  curfewLifted?: boolean;
+  timezone?: string | null;
+  now?: Date;
+  config?: AgePolicyConfig;
+}): CurfewDecision {
+  const config = input.config ?? DEFAULT_AGE_POLICY;
+  const now = input.now ?? new Date();
+  if (!isMinorCohort(input.cohort)) {
+    return { send: true, deliverAfter: null, reason: "not_a_minor" };
+  }
+  const curfew = config.notificationCurfew;
+  if (!curfew) return { send: true, deliverAfter: null, reason: "curfew_disabled" };
+  const hour = localHourIn(now, input.timezone ?? null);
+  if (!hourInCurfew(hour, curfew)) {
+    return { send: true, deliverAfter: null, reason: "outside_curfew" };
+  }
+  if (input.curfewLifted) {
+    return { send: true, deliverAfter: null, reason: "curfew_lifted_by_guardian" };
+  }
+  // Hours remaining until the window closes, in the recipient's local time.
+  const hoursLeft = (curfew.endHour - hour + 24) % 24 || 24;
+  const deliverAfter = new Date(now.getTime());
+  deliverAfter.setUTCMinutes(0, 0, 0);
+  deliverAfter.setUTCHours(deliverAfter.getUTCHours() + hoursLeft);
+  return { send: false, deliverAfter, reason: "in_curfew" };
+}
+
 
 /**
  * THE age calculation for ballaCity. Calendar-based (never 365-day math) and
@@ -410,6 +565,7 @@ export const FEATURE_KEYS = [
   "comments",
   "targeted_advertising",
   "parent_controls",
+  "night_notifications",
 ] as const;
 export type FeatureKey = (typeof FEATURE_KEYS)[number];
 
@@ -446,6 +602,7 @@ export const FEATURE_META: Record<FeatureKey, { label: string; group: string }> 
   comments: { label: "Comments", group: "Social" },
   targeted_advertising: { label: "Targeted advertising", group: "Privacy" },
   parent_controls: { label: "Parent/guardian controls", group: "Identity" },
+  night_notifications: { label: "Overnight notifications", group: "Communication" },
 };
 
 type MatrixCohort = Exclude<AgeCohort, "unknown">;
@@ -563,7 +720,15 @@ export const PERMISSION_MATRIX: Record<FeatureKey, Record<MatrixCohort, Permissi
     teen_16_17: "parent_controlled",
     adult: "blocked",
   },
+  // Overnight pushes to minors are off unless a guardian lifts the curfew.
+  night_notifications: {
+    child_under_13: "parent_controlled",
+    teen_13_15: "parent_controlled",
+    teen_16_17: "parent_controlled",
+    adult: "allowed",
+  },
 };
+
 
 export type ChildControls = {
   messaging: "off" | "guardian_only" | "teammates" | "peers";
@@ -573,6 +738,11 @@ export type ChildControls = {
   locationPrecision: "city" | "region";
   gameParticipation: boolean;
   notifications: boolean;
+  /**
+   * Guardian has explicitly consented to lifting the overnight notification
+   * curfew for this minor. Off by default — the curfew is the safe state.
+   */
+  notificationCurfewLifted: boolean;
 };
 
 export const DEFAULT_CHILD_CONTROLS: ChildControls = {
@@ -583,6 +753,7 @@ export const DEFAULT_CHILD_CONTROLS: ChildControls = {
   locationPrecision: "city",
   gameParticipation: true,
   notifications: true,
+  notificationCurfewLifted: false,
 };
 
 export function parseChildControls(row: unknown): ChildControls {
@@ -602,6 +773,10 @@ export function parseChildControls(row: unknown): ChildControls {
     locationPrecision: pick(r["location_precision"], ["city", "region"], d.locationPrecision),
     gameParticipation: bool(r["game_participation"], d.gameParticipation),
     notifications: bool(r["notifications"], d.notifications),
+    notificationCurfewLifted: bool(
+      r["notification_curfew_lifted"],
+      d.notificationCurfewLifted,
+    ),
   };
 }
 
@@ -658,7 +833,10 @@ export function can(
             ? controls.gameParticipation
             : feature === "team_membership"
               ? controls.gameParticipation
-              : true;
+              : feature === "night_notifications"
+                ? controls.notifications && controls.notificationCurfewLifted
+                : true;
+
     return {
       allowed: on,
       level,
