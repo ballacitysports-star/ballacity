@@ -4,6 +4,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { ArrowLeft, RefreshCw, ShieldCheck } from "lucide-react";
+import { YouthOversightCard } from "@/components/admin/YouthOversightCard";
 import { pageHead } from "@/lib/seo";
 import { supabase } from "@/integrations/supabase/client";
 import {
@@ -265,6 +266,8 @@ function ComplianceDashboard() {
               </div>
             </CardContent>
           </Card>
+
+          <YouthOversightCard />
 
           <Card>
             <CardHeader>

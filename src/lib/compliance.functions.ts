@@ -17,6 +17,13 @@ import {
   type SafetySummary,
   type SecurityAreaRow,
 } from "@/lib/compliance";
+import {
+  isStalePending,
+  summarizeCohortUsage,
+  type CohortUsage,
+  type ConsentBacklog,
+  type TimeOnPlatformRow,
+} from "@/lib/youth-oversight";
 
 export type ComplianceOverview = {
   generatedAt: string;
@@ -235,4 +242,97 @@ export const adminMarkComplianceReviewed = createServerFn({ method: "POST" })
       metadata: { reviewed_at: now },
     });
     return { reviewedAt: now };
+  });
+
+/* ------------------------------------------------------------------ */
+/* Youth oversight: minor time-on-platform + parental consent backlog  */
+/* ------------------------------------------------------------------ */
+
+export type YouthOversight = {
+  generatedAt: string;
+  windowDays: number;
+  usage: TimeOnPlatformRow[];
+  cohorts: CohortUsage[];
+  backlog: ConsentBacklog;
+  minorsTotal: number;
+  minorsBlocked: number;
+  tracked: number;
+};
+
+/**
+ * Aggregate youth oversight report for the compliance panel.
+ *
+ * Duration-only session data (see session-activity.functions.ts) plus consent
+ * queue counts. No page views, no per-child behavioural profile.
+ * LEGAL REVIEW REQUIRED — retention of the underlying session rows.
+ */
+export const adminYouthOversight = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: { days?: number } | undefined) => ({
+    days: Math.min(Math.max(Math.trunc(Number(input?.days ?? 30)) || 30, 1), 180),
+  }))
+  .handler(async ({ data: input, context }): Promise<YouthOversight> => {
+    await assertComplianceAdmin(context.supabase as never, context.userId);
+    const { supabaseAdmin: admin } = await import("@/integrations/supabase/client.server");
+
+    const MINOR_COHORTS = ["child_under_13", "teen_13_15", "teen_16_17"];
+    // LEGAL REVIEW REQUIRED — cohorts that must hold guardian consent before use.
+    const CONSENT_COHORTS = ["child_under_13", "teen_13_15"];
+
+    const [usageRes, consentRows, minorProfiles, minorsTotal, tracked] = await Promise.all([
+      context.supabase.rpc("minor_time_on_platform", { _days: input.days }),
+      admin
+        .from("parental_consents")
+        .select("child_user_id, status, requested_at")
+        .limit(5000),
+      admin.from("profiles").select("id").in("age_cohort", CONSENT_COHORTS).limit(5000),
+      countRows(admin, "profiles", (q: any) => q.in("age_cohort", MINOR_COHORTS)),
+      countRows(admin, "session_activity"),
+    ]);
+
+    const usage: TimeOnPlatformRow[] = (
+      (usageRes as { data?: Array<Record<string, unknown>> }).data ?? []
+    ).map((r) => ({
+      cohort: String(r.cohort ?? "unknown"),
+      dayPart: String(r.day_part ?? "unknown"),
+      members: Number(r.members ?? 0),
+      avgDailyMinutes: Number(r.avg_daily_minutes ?? 0),
+    }));
+
+    const consents =
+      (consentRows as {
+        data?: Array<{ child_user_id: string; status: string; requested_at: string | null }>;
+      }).data ?? [];
+    const countStatus = (s: string) => consents.filter((c) => c.status === s).length;
+    const pending = consents
+      .filter((c) => c.status === "pending")
+      .map((c) => c.requested_at)
+      .sort((a, b) => (a ?? "").localeCompare(b ?? ""));
+    const settled = new Set(
+      consents.filter((c) => c.status !== "revoked").map((c) => c.child_user_id),
+    );
+    const minorIds = ((minorProfiles as { data?: Array<{ id: string }> }).data ?? []).map(
+      (p) => p.id,
+    );
+    const required = minorIds.filter((id) => !settled.has(id)).length;
+
+    const backlog: ConsentBacklog = {
+      required,
+      pending: countStatus("pending"),
+      revoked: countStatus("revoked"),
+      approved: countStatus("approved"),
+      stalePending: pending.filter((at) => isStalePending(at)).length,
+      oldestPendingAt: pending[0] ?? null,
+    };
+
+    return {
+      generatedAt: new Date().toISOString(),
+      windowDays: input.days,
+      usage,
+      cohorts: summarizeCohortUsage(usage),
+      backlog,
+      minorsTotal,
+      minorsBlocked: required + backlog.pending + backlog.revoked,
+      tracked,
+    };
   });
