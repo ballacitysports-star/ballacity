@@ -3598,7 +3598,7 @@ export type Database = {
         Args: { _token_hash: string }
         Returns: {
           consent_recorded: boolean
-          parent_user_id: string
+          parent_id: string
         }[]
       }
       reel_audience: { Args: { _reel_id: string }; Returns: string }
