@@ -65,6 +65,8 @@ import { GamePolicyFields } from "@/components/games/GamePolicyFields";
 import { GamePolicySummary } from "@/components/games/GamePolicySummary";
 import { defaultGamePolicy, validateGamePolicy, type GamePolicy } from "@/lib/game-policy";
 import { recordSafetyAck } from "@/lib/safety-acks";
+import { useMyChildStatus } from "@/lib/child-safety";
+import { HOSTING_BLOCKED_MESSAGE } from "@/lib/hosting-policy";
 import { ShieldAlert } from "lucide-react";
 
 
@@ -83,6 +85,8 @@ function Create() {
   const nav = useNavigate();
   const { user } = useAuth();
   const profile = useMyProfile(user);
+  const { can: canFeature } = useMyChildStatus();
+  const hostingDecision = canFeature("game_hosting");
   const fetchMyTeams = useServerFn(listMyTeams);
   const myTeamsQuery = useQuery({
     queryKey: ["my-teams", user?.id ?? "anon"],
