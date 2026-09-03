@@ -210,6 +210,34 @@ function ChildOnboardingPage() {
                   <Copy className="mr-1 h-3.5 w-3.5" aria-hidden /> Copy
                 </Button>
               </div>
+              <div className="mt-2 flex flex-wrap gap-2">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => {
+                    const subject = encodeURIComponent("Please approve my ballaCity account");
+                    const body = encodeURIComponent(
+                      `Hi,\n\nPlease approve my ballaCity account by opening this one-time link and signing in with your own adult account:\n\n${link}\n\nIt expires in 72 hours.\n\nThank you!`,
+                    );
+                    window.location.href = `mailto:${encodeURIComponent(parentEmail)}?subject=${subject}&body=${body}`;
+                  }}
+                >
+                  Email this link
+                </Button>
+                {typeof navigator !== "undefined" && "share" in navigator ? (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => {
+                      void navigator
+                        .share({ title: "Approve my ballaCity account", url: link })
+                        .catch(() => undefined);
+                    }}
+                  >
+                    Share
+                  </Button>
+                ) : null}
+              </div>
             </section>
           ) : null}
         </>

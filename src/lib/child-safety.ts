@@ -37,6 +37,12 @@ export function useMyChildStatus() {
     queryFn: () => fetch() as Promise<ChildStatus>,
     enabled: !!user,
     staleTime: 60_000,
+    // While a guardian request is outstanding the child is staring at the
+    // waiting screen; poll so approval unlocks the app without a reload.
+    refetchInterval: (q) => {
+      const data = q.state.data as ChildStatus | undefined;
+      return data?.consent?.status === "pending" ? 15_000 : false;
+    },
   });
   const status = query.data ?? null;
   const subject = status

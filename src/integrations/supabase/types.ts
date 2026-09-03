@@ -3260,7 +3260,7 @@ export type Database = {
           _method: string
           _parent_user: string
           _token_hash: string
-          _versions: Json
+          _versions?: Json
         }
         Returns: string
       }

@@ -2,6 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { pageHead } from "@/lib/seo";
 import { AgeReviewNotice } from "@/components/child/AgeReviewNotice";
 import { BirthdayLockCard } from "@/components/child/BirthdayLockCard";
+import { ParentCenterSection } from "@/components/child/ParentCenterSection";
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
 import {
   ArrowLeft,
@@ -293,6 +294,8 @@ function SettingsHubPage() {
             </p>
           </SettingsStaticRow>
         </SettingsGroup>
+
+        <ParentCenterSection />
 
         <ProfileIdentitySection />
 
