@@ -22,7 +22,11 @@ export function BirthdayCorrectionQueue() {
     }
   };
 
-  if (error) return null;
+  const errorMessage = error
+    ? error instanceof Error
+      ? error.message
+      : "Could not load birthday corrections."
+    : null;
 
   return (
     <section className="mt-5 rounded-2xl border border-border bg-surface p-4">
