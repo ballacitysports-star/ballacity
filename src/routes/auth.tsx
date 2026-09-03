@@ -146,10 +146,12 @@ function AuthPage() {
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (busy) return;
+    setErrors({ type: null, dob: null, consent: null, form: null });
     setBusy(true);
     try {
       if (mode === "signup") {
         if (!accountType) {
+          setErrors((p) => ({ ...p, type: "Pick an account type first." }));
           toast.error("Pick an account type first.");
           setSignupStep("type");
           return;
@@ -159,13 +161,19 @@ function AuthPage() {
         // first authenticated load (see /onboarding/age).
         const dobCheck = checkDobParts(dob);
         if (!dobCheck.ok) {
+          setErrors((p) => ({ ...p, dob: dobCheck.message }));
           toast.error(dobCheck.message);
+          dobRef.current?.focus();
           return;
         }
         if (!consentOk) {
-          toast.error("Please agree to the Terms of Service and Privacy Policy to continue.");
+          const message =
+            "Please agree to the Terms of Service and Privacy Policy to continue.";
+          setErrors((p) => ({ ...p, consent: message }));
+          toast.error(message);
           return;
         }
+
         // Signup may finish without a session (email confirmation), so the exact
         // accepted versions are parked and written on first authenticated load.
         stashPendingConsent(currentAcceptances());
