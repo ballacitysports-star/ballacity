@@ -61,6 +61,29 @@ export const reviewPaymentAction = createServerFn({ method: "POST" })
     const { supabase, userId } = context;
     const { gameId, playerId, next, expectedFrom } = data;
 
+    // Defense in depth: cohorts blocked from `game_payments` (see
+    // PERMISSION_MATRIX in child-policy.ts) may never record or confirm a
+    // payment, even if the client-side gate is bypassed. The database
+    // trigger `enforce_game_payment_cohort` is the final backstop.
+    for (const [party, id] of [
+      ["host", userId],
+      ["player", playerId],
+    ] as const) {
+      const { data: allowed, error: gateErr } = await (supabase.rpc as any)(
+        "game_payments_allowed",
+        { _user: id },
+      );
+      if (gateErr) throw new Error(gateErr.message);
+      if (allowed === false) {
+        throw new Error(
+          party === "host"
+            ? "Payment coordination isn't available for this account yet."
+            : "Payment coordination isn't available for this player's account yet.",
+        );
+      }
+    }
+
+
     // Latest submission for this (game, player) authored under this host.
     // RLS also scopes to the caller, but we filter explicitly so the
     // idempotency check is unambiguous.
