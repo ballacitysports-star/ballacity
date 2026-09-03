@@ -86,13 +86,14 @@ export const getMyChildStatus = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }): Promise<ChildStatus> => {
     const { supabase, userId } = context;
-    const [{ data: profile }, { data: consent }, { data: controls }, policy, { data: bd }] =
+    // The age columns on `profiles` are deliberately NOT readable by the
+    // signed-in role (they are age PII), so the cohort has to come from the
+    // SECURITY DEFINER `my_child_context` RPC. Reading them through a plain
+    // select silently yielded "unknown", which made the consent gate fail
+    // open and let an unapproved child browse the app.
+    const [{ data: ctx, error: ctxError }, { data: consent }, { data: controls }, policy] =
       await Promise.all([
-        supabase
-          .from("profiles")
-          .select("age_cohort, age_review_required, jurisdiction")
-          .eq("id", userId)
-          .maybeSingle(),
+        supabase.rpc("my_child_context"),
         supabase
           .from("parental_consents")
           .select("status, method, parent_email, requested_at, approved_at, revoked_at, reverify_at")
@@ -100,22 +101,27 @@ export const getMyChildStatus = createServerFn({ method: "GET" })
           .maybeSingle(),
         supabase.from("child_controls").select("*").eq("child_user_id", userId).maybeSingle(),
         loadPolicy(supabase),
-        supabase.rpc("get_my_birthday"),
       ]);
+    if (ctxError) throw new Error("Could not check your account status. Please try again.");
 
-    const p = (profile ?? {}) as {
-      age_cohort?: string;
-      age_review_required?: boolean;
-      jurisdiction?: string;
-    };
+    const row = (Array.isArray(ctx) ? ctx[0] : ctx) as
+      | {
+          cohort?: string | null;
+          age_review_required?: boolean | null;
+          jurisdiction?: string | null;
+          has_birthday?: boolean | null;
+        }
+      | null
+      | undefined;
+
     return {
-      cohort: parseCohort(p.age_cohort),
-      ageReviewRequired: p.age_review_required === true,
-      jurisdiction: p.jurisdiction ?? policy.jurisdiction,
+      cohort: parseCohort(row?.cohort),
+      ageReviewRequired: row?.age_review_required === true,
+      jurisdiction: row?.jurisdiction ?? policy.jurisdiction,
       consent: toConsentView((consent ?? null) as ConsentRow | null),
       controls: controls ? parseChildControls(controls) : null,
       policy,
-      hasBirthday: typeof bd === "string" && bd.length > 0,
+      hasBirthday: row?.has_birthday === true,
     };
   });
 
