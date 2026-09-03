@@ -60,6 +60,16 @@ function AuthPage() {
   // Never pre-checked: the user must tick each document themselves.
   const [consent, setConsent] = useState(emptyConsentValue);
   const consentOk = allAccepted(consent);
+  // Inline, field-associated validation messages (toasts alone are invisible to
+  // screen readers and vanish before a user can act on them).
+  const [errors, setErrors] = useState<{
+    type: string | null;
+    dob: string | null;
+    consent: string | null;
+    form: string | null;
+  }>({ type: null, dob: null, consent: null, form: null });
+  const dobRef = useRef<HTMLSelectElement | null>(null);
+  const summaryRef = useRef<HTMLDivElement | null>(null);
 
   // Non-null while we're inside the post-provider grace window (see oauth()).
   const [waitingProvider, setWaitingProvider] = useState<string | null>(null);
@@ -195,6 +205,10 @@ function AuthPage() {
         if (error) throw error;
         // Supabase returns 200 with empty identities for already-registered emails.
         if (data.user && data.user.identities && data.user.identities.length === 0) {
+          setErrors((p) => ({
+            ...p,
+            form: "An account with this email already exists. Try signing in.",
+          }));
           toast.error("An account with this email already exists. Try signing in.");
           setMode("signin");
           return;
@@ -209,6 +223,7 @@ function AuthPage() {
         if (error) {
           const msg = error.message?.toLowerCase() ?? "";
           if (msg.includes("invalid login") || msg.includes("invalid credentials")) {
+            setErrors((p) => ({ ...p, form: "Email or password is incorrect." }));
             toast.error("Email or password is incorrect.", {
               description:
                 "If you signed up with Google, continue with Google and set a password under Profile → Security, or use Forgot password to set one now.",
@@ -221,6 +236,7 @@ function AuthPage() {
             return;
           }
           if (msg.includes("email not confirmed")) {
+            setErrors((p) => ({ ...p, form: "Confirm your email first, then sign in." }));
             toast.error("Confirm your email first, then sign in.");
             return;
           }
@@ -228,7 +244,9 @@ function AuthPage() {
         }
       }
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Auth failed");
+      const message = err instanceof Error ? err.message : "Auth failed";
+      setErrors((p) => ({ ...p, form: message }));
+      toast.error(message);
     } finally {
       setBusy(false);
     }
@@ -250,9 +268,18 @@ function AuthPage() {
     }
   };
 
+  // Move focus to the error summary so it is announced immediately.
+  useEffect(() => {
+    if (errors.form) summaryRef.current?.focus();
+  }, [errors.form]);
+
   const oauth = (provider: "google" | "apple", opts: { isRetry?: boolean } = {}) => {
     // Cheap synchronous consent guard before the tap gesture is consumed.
     if (mode === "signup" && !consentOk) {
+      setErrors((p) => ({
+        ...p,
+        consent: "Please agree to the Terms of Service and Privacy Policy to continue.",
+      }));
       toast.error("Please agree to the Terms of Service and Privacy Policy to continue.");
       return;
     }
