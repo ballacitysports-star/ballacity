@@ -46,6 +46,8 @@ UPDATE public.profiles SET age_cohort = 'teen_13_15' WHERE id = '<TEST_USER>';
 SELECT public.profile_visibility_of('<TEST_USER>');   -- expect 'members'
 UPDATE public.profiles SET age_cohort = 'adult' WHERE id = '<TEST_USER>';
 SELECT public.profile_visibility_of('<TEST_USER>');   -- expect 'public' (unchanged behaviour)
+UPDATE public.profiles SET age_cohort = 'unknown' WHERE id = '<TEST_USER>';
+SELECT public.profile_visibility_of('<TEST_USER>');   -- expect 'private' (unknown cohort, e.g. pre-birthday signup window)
 ```
 
 Layer two: `handle_new_user()` now inserts a `privacy_preferences` row at signup,
