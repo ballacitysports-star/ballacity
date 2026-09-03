@@ -15,18 +15,22 @@ import {
   getChildConsentTrail,
   getChildFootprint,
   getMyChildStatus,
+  listFamilyActivity,
   listMyAgeChangeEvents,
   listMyChildren,
   listMyParentRequests,
   requestParentalConsent,
   revokeChildConsent,
+  revokeGuardianLink,
   updateChildControls,
   type AgeChangeEvent,
   type ChildStatus,
   type ConsentTrailEntry,
+  type FamilyActivityEntry,
   type GuardianChild,
   type ParentRequestRow,
 } from "@/lib/child-safety.functions";
+
 
 /** The signed-in member's cohort, consent state and guardian controls. */
 export function useMyChildStatus() {
@@ -174,6 +178,32 @@ export function useChildConsentTrail(childUserId: string | null) {
     queryKey: ["child-consent-trail", childUserId],
     queryFn: () =>
       fetch({ data: { childUserId: childUserId! } }) as Promise<ConsentTrailEntry[]>,
+    enabled: !!childUserId,
+    staleTime: 30_000,
+  });
+  return { ...query, entries: query.data ?? [] };
+}
+
+/** Guardian ends their link to one minor; consent is withdrawn with it. */
+export function useRevokeGuardianLink() {
+  const qc = useQueryClient();
+  const run = useServerFn(revokeGuardianLink);
+  return useMutation({
+    mutationFn: (input: { childUserId: string; reason?: string }) => run({ data: input }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["guardian-children"] });
+      qc.invalidateQueries({ queryKey: ["child-status"] });
+      qc.invalidateQueries({ queryKey: ["family-activity"] });
+    },
+  });
+}
+
+/** Append-only family activity trail for one linked minor. */
+export function useFamilyActivity(childUserId: string | null) {
+  const fetch = useServerFn(listFamilyActivity);
+  const query = useQuery({
+    queryKey: ["family-activity", childUserId],
+    queryFn: () => fetch({ data: { childUserId: childUserId! } }) as Promise<FamilyActivityEntry[]>,
     enabled: !!childUserId,
     staleTime: 30_000,
   });

@@ -483,6 +483,33 @@ export type Database = {
         }
         Relationships: []
       }
+      family_audit_log: {
+        Row: {
+          action: string
+          actor_user_id: string | null
+          child_user_id: string
+          context: Json
+          created_at: string
+          id: string
+        }
+        Insert: {
+          action: string
+          actor_user_id?: string | null
+          child_user_id: string
+          context?: Json
+          created_at?: string
+          id?: string
+        }
+        Update: {
+          action?: string
+          actor_user_id?: string | null
+          child_user_id?: string
+          context?: Json
+          created_at?: string
+          id?: string
+        }
+        Relationships: []
+      }
       feed_preferences: {
         Row: {
           created_at: string
@@ -3380,6 +3407,30 @@ export type Database = {
         }[]
       }
       get_my_birthday: { Args: never; Returns: string }
+      guardian_children_overview: {
+        Args: never
+        Returns: {
+          age_cohort: string
+          age_review_required: boolean
+          avatar_url: string
+          child_user_id: string
+          consent_approved_at: string
+          consent_method: string
+          consent_parent_email: string
+          consent_requested_at: string
+          consent_reverify_at: string
+          consent_revoked_at: string
+          consent_status: string
+          display_name: string
+          linked_at: string
+          next_game_at: string
+          next_game_title: string
+          relationship: string
+          team_count: number
+          upcoming_games: number
+          username: string
+        }[]
+      }
       has_active_subscription: {
         Args: { check_env?: string; user_uuid: string }
         Returns: boolean
@@ -3630,6 +3681,10 @@ export type Database = {
       }
       review_birthday_correction: {
         Args: { _approve: boolean; _id: string; _notes?: string }
+        Returns: undefined
+      }
+      revoke_guardian_link: {
+        Args: { _child_user_id: string; _reason?: string }
         Returns: undefined
       }
       revoke_minor_invite: { Args: { _id: string }; Returns: undefined }
