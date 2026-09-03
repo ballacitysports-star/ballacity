@@ -267,6 +267,12 @@ export async function createPaymentSubmission(input: {
 }) {
   const { data: u } = await supabase.auth.getUser();
   if (!u.user) throw new Error("Sign in to submit proof.");
+  // Age gate (see PERMISSION_MATRIX.game_payments). Enforced again by the
+  // `enforce_game_payment_cohort` database trigger.
+  const { data: allowed } = await (supabase.rpc as any)("game_payments_allowed", {
+    _user: u.user.id,
+  });
+  if (allowed === false) throw new Error(PAYMENTS_BLOCKED_MESSAGE);
   const { error } = await supabase.from("payment_submissions").insert({
     ...input,
     player_id: u.user.id,
