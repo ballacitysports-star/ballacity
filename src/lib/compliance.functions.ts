@@ -276,23 +276,19 @@ export const adminYouthOversight = createServerFn({ method: "GET" })
     const { supabaseAdmin: admin } = await import("@/integrations/supabase/client.server");
 
     const MINOR_COHORTS = ["child_under_13", "teen_13_15", "teen_16_17"];
+    // LEGAL REVIEW REQUIRED — cohorts that must hold guardian consent before use.
+    const CONSENT_COHORTS = ["child_under_13", "teen_13_15"];
 
-    const [usageRes, pendingRows, consentRows, minorsTotal, minorsBlocked, tracked] =
-      await Promise.all([
-        context.supabase.rpc("minor_time_on_platform", { _days: input.days }),
-        admin
-          .from("parental_consents")
-          .select("requested_at")
-          .eq("status", "pending")
-          .order("requested_at", { ascending: true })
-          .limit(500),
-        admin.from("parental_consents").select("status").limit(5000),
-        countRows(admin, "profiles", (q: any) => q.in("age_cohort", MINOR_COHORTS)),
-        countRows(admin, "profiles", (q: any) =>
-          q.in("age_cohort", MINOR_COHORTS).eq("platform_status", "consent_required"),
-        ),
-        countRows(admin, "session_activity"),
-      ]);
+    const [usageRes, consentRows, minorProfiles, minorsTotal, tracked] = await Promise.all([
+      context.supabase.rpc("minor_time_on_platform", { _days: input.days }),
+      admin
+        .from("parental_consents")
+        .select("child_user_id, status, requested_at")
+        .limit(5000),
+      admin.from("profiles").select("id").in("age_cohort", CONSENT_COHORTS).limit(5000),
+      countRows(admin, "profiles", (q: any) => q.in("age_cohort", MINOR_COHORTS)),
+      countRows(admin, "session_activity"),
+    ]);
 
     const usage: TimeOnPlatformRow[] = (
       (usageRes as { data?: Array<Record<string, unknown>> }).data ?? []
@@ -303,15 +299,25 @@ export const adminYouthOversight = createServerFn({ method: "GET" })
       avgDailyMinutes: Number(r.avg_daily_minutes ?? 0),
     }));
 
-    const statuses = ((consentRows as { data?: Array<{ status: string }> }).data ?? []).map(
-      (r) => r.status,
+    const consents =
+      (consentRows as {
+        data?: Array<{ child_user_id: string; status: string; requested_at: string | null }>;
+      }).data ?? [];
+    const countStatus = (s: string) => consents.filter((c) => c.status === s).length;
+    const pending = consents
+      .filter((c) => c.status === "pending")
+      .map((c) => c.requested_at)
+      .sort((a, b) => (a ?? "").localeCompare(b ?? ""));
+    const settled = new Set(
+      consents.filter((c) => c.status !== "revoked").map((c) => c.child_user_id),
     );
-    const countStatus = (s: string) => statuses.filter((x) => x === s).length;
-    const pending = ((pendingRows as { data?: Array<{ requested_at: string | null }> }).data ?? [])
-      .map((r) => r.requested_at);
+    const minorIds = ((minorProfiles as { data?: Array<{ id: string }> }).data ?? []).map(
+      (p) => p.id,
+    );
+    const required = minorIds.filter((id) => !settled.has(id)).length;
 
     const backlog: ConsentBacklog = {
-      required: minorsBlocked,
+      required,
       pending: countStatus("pending"),
       revoked: countStatus("revoked"),
       approved: countStatus("approved"),
@@ -326,7 +332,7 @@ export const adminYouthOversight = createServerFn({ method: "GET" })
       cohorts: summarizeCohortUsage(usage),
       backlog,
       minorsTotal,
-      minorsBlocked,
+      minorsBlocked: required + backlog.pending + backlog.revoked,
       tracked,
     };
   });
