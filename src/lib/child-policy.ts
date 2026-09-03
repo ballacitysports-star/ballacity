@@ -553,6 +553,7 @@ export const FEATURE_KEYS = [
   "game_discovery",
   "game_participation",
   "game_hosting",
+  "game_payments",
   "direct_messaging",
   "game_chat",
   "team_membership",
@@ -590,6 +591,7 @@ export const FEATURE_META: Record<FeatureKey, { label: string; group: string }> 
   game_discovery: { label: "Game discovery", group: "Games" },
   game_participation: { label: "Game participation", group: "Games" },
   game_hosting: { label: "Hosting games", group: "Games" },
+  game_payments: { label: "Game payment coordination", group: "Games" },
   direct_messaging: { label: "Direct messaging", group: "Communication" },
   game_chat: { label: "Game chat", group: "Communication" },
   team_membership: { label: "Team membership", group: "Social" },
@@ -643,6 +645,13 @@ export const PERMISSION_MATRIX: Record<FeatureKey, Record<MatrixCohort, Permissi
     adult: "allowed",
   },
   game_hosting: {
+    child_under_13: "blocked",
+    teen_13_15: "blocked",
+    teen_16_17: "protected",
+    adult: "allowed",
+  },
+  // Money changing hands is adult territory; 16-17 gets the protective defaults.
+  game_payments: {
     child_under_13: "blocked",
     teen_13_15: "blocked",
     teen_16_17: "protected",
