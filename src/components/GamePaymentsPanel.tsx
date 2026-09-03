@@ -430,6 +430,10 @@ export function HostPaymentsPanel({
     }
   };
 
+  if (!paymentsGate.allowed) {
+    return <PaymentsUnavailableCard reason={paymentsGate.reason} />;
+  }
+
   return (
     <div className="space-y-4">
       <PaymentPoliciesCard gameId={gameId} settings={settings} isHost />
@@ -685,6 +689,10 @@ export function PlayerPaymentsPanel({
 
   const latest = subs[0] ?? null;
   const fee = Number(settings?.entry_fee ?? 0);
+
+  if (!paymentsGate.allowed) {
+    return <PaymentsUnavailableCard reason={paymentsGate.reason} />;
+  }
 
   return (
     <div className="space-y-4">
