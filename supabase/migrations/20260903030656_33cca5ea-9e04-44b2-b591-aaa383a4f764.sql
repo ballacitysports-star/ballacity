@@ -1,0 +1,1 @@
+REVOKE EXECUTE ON FUNCTION public.redeem_minor_invite(text) FROM PUBLIC;
