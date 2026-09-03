@@ -92,3 +92,48 @@ The append-only `family_audit_log` is written only by database triggers on
 `child_controls`, `parental_consents` and `guardian_links`; updates and deletes
 raise `family_audit_log is append-only`, and reads are limited to the child,
 their active guardians and moderators.
+
+## 5. Live end-to-end family verification (parent → two minors)
+
+Executed against the live backend with three throwaway accounts (one adult, a
+10-year-old and a 14-year-old), each acting through the Data API with its own
+user token — not through the UI. The accounts were deleted afterwards.
+
+Observed and passing:
+
+- `set_my_birthday` returned the authoritative cohorts (`adult`,
+  `child_under_13`, `teen_13_15`) and `consent_required` for both minors.
+- Only the adult could call `create_minor_invite` (`ADULT_REQUIRED` for minors);
+  invites are single use (`INVITE_USED` on replay) and hashed-token lookup works.
+- Both minors redeemed their own invite; `guardian_children_overview()` returned
+  both children for the parent and an empty set for a minor caller.
+- Protected `profiles.age_cohort` remains unreadable by `authenticated`
+  (`42501`), so the overview RPC is the only cohort path.
+- `set_child_controls` succeeded only for the linked parent — `NOT_AUTHORIZED`
+  for an unrelated minor and for the child itself. Each child reads only its own
+  `child_controls` row; the parent reads all linked children's rows.
+- `family_audit_log` showed `consent.required`, `link.active`,
+  `consent.approved`, `controls.created`; a child sees only its own rows, and a
+  direct `PATCH` changed nothing (no UPDATE policy).
+- `revoke_guardian_link` was rejected for a non-parent (`NOT_FOUND`) and, for
+  the parent, revoked the link plus that parent's consent; afterwards the child
+  disappeared from the overview, its controls became unreadable to the parent,
+  and its writes failed with `CHILD_CONSENT_REQUIRED`.
+- Minors cannot host (`CHILD_CANNOT_HOST`); anonymous callers cannot execute
+  `guardian_children_overview` (`42501`); minor privacy rows default to
+  `profile_visibility = private`.
+
+Two real defects were found by this run and fixed:
+
+1. `block_locked_child_activity()` resolved the owner column with one SQL `CASE`
+   over `NEW.sender_id`/`NEW.host_id`/`NEW.user_id`. Postgres prepares that whole
+   expression against `NEW`'s rowtype, so every insert into `hosted_games`,
+   `highlight_reels` and `player_availabilities` failed with
+   `record "new" has no field "sender_id"` — for adults too. Now branched with
+   `IF`/`ELSIF`, verified by a successful adult game insert while both minors
+   still hit `CHILD_CANNOT_HOST`.
+2. `minor_messaging_allowed()` honoured only `child_controls.messaging = 'off'`,
+   so a `guardian_only` minor could still DM (and be DM'd by) non-guardians —
+   reproduced between the two test minors. The control is now enforced on both
+   sides for all minor cohorts: after the fix, minor→minor raised
+   `MINOR_MESSAGING_BLOCKED` while minor→linked guardian still succeeded.
