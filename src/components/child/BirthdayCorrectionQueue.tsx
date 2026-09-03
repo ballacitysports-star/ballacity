@@ -39,7 +39,11 @@ export function BirthdayCorrectionQueue() {
         recalculates that member's age group and permissions.
       </p>
 
-      {isLoading ? (
+      {errorMessage ? (
+        <div className="mt-3 rounded-xl border border-destructive/40 bg-destructive/10 p-2 text-xs leading-snug">
+          {errorMessage}
+        </div>
+      ) : isLoading ? (
         <div className="mt-3 text-xs text-muted-foreground">Loading…</div>
       ) : (data?.length ?? 0) === 0 ? (
         <div className="mt-3 text-xs text-muted-foreground">No requests waiting.</div>
