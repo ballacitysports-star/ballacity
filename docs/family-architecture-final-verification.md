@@ -47,6 +47,7 @@ Legend: Evidence is the observed HTTP status + body from the live Data API.
 | --- | --- | --- | --- |
 | C1 | Four `SECURITY DEFINER` trigger routines (`guard_profile_age_fields`, `birthday_audit_append_only`, `enforce_game_payment_cohort`, `reclamp_privacy_on_cohort_change`) were directly callable by `anon`/`authenticated` through the API | `REVOKE EXECUTE ... FROM PUBLIC, anon, authenticated` | linter count 102 → 94; zero `SECURITY DEFINER` trigger functions remain executable by `anon`/`authenticated`; triggers still fire (D1–D6 below) |
 | C2 | The support review queue silently rendered nothing when its RPC failed (including `FORBIDDEN`) | `BirthdayCorrectionQueue` now shows the returned message | queue component renders an error panel instead of `null` |
+| C3 | **Account deletion was impossible.** Deleting a user cascaded into `profile_birthdays`, where the immutability trigger raised `BIRTHDAY_LOCKED`, aborting the whole delete — this blocked admin deletion and any right-to-erasure request | `guard_birthday_immutability()` now permits the DELETE when the owning `auth.users` row no longer exists (cascade), and still refuses every other delete or change | before: `P0001 BIRTHDAY_LOCKED ... DELETE FROM ONLY "public"."profile_birthdays"`; after: 47 fixture accounts deleted successfully, 0 orphaned birthday rows remain; D2–D4 re-verified as still refused |
 
 ## D. Birthday / age integrity (post-hardening smoke)
 
