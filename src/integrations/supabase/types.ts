@@ -3336,6 +3336,10 @@ export type Database = {
             Returns: string
           }
       decline_conversation: { Args: { _conv: string }; Returns: undefined }
+      default_profile_visibility_for: {
+        Args: { _user: string }
+        Returns: string
+      }
       deny_org_member_request: {
         Args: { _reason: string; _req: string }
         Returns: undefined
@@ -3597,6 +3601,8 @@ export type Database = {
           parent_user_id: string
         }[]
       }
+      reel_audience: { Args: { _reel_id: string }; Returns: string }
+      reel_publicly_visible: { Args: { _reel_id: string }; Returns: boolean }
       request_birthday_correction: {
         Args: { _evidence?: string; _reason: string; _requested: string }
         Returns: string
