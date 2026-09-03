@@ -25,6 +25,8 @@ import {
 import { PaymentSafetyNotice } from "@/components/PaymentSafetyNotice";
 import { createNotification } from "@/lib/notifications";
 import { UserAvatar } from "@/components/UserAvatar";
+import { useMyChildStatus } from "@/lib/child-safety";
+import { PAYMENTS_BLOCKED_MESSAGE } from "@/lib/payments-policy";
 
 
 type Filter = "all" | "pending" | "verified" | "rejected" | "disputed";
@@ -255,6 +257,22 @@ type HostRow = PaymentSubmission & {
   playerAvatarUrl: string | null;
 };
 
+/** Shown instead of payment UI when the member's cohort can't coordinate payments. */
+function PaymentsUnavailableCard({ reason }: { reason?: string | null }) {
+  return (
+    <div className="rounded-2xl border border-border bg-surface p-4">
+      <div className="flex items-center gap-2 text-xs uppercase tracking-wider font-bold text-muted-foreground">
+        <ShieldCheck className="h-3.5 w-3.5" /> Payments
+      </div>
+      <div className="mt-1 font-display text-lg font-bold">{PAYMENTS_BLOCKED_MESSAGE}</div>
+      <p className="mt-1 text-xs text-muted-foreground">
+        {reason ||
+          "An adult account handles payment for this game. Ask a parent or guardian to take care of it for you."}
+      </p>
+    </div>
+  );
+}
+
 export function HostPaymentsPanel({
   gameId,
   gameTitle,
@@ -264,6 +282,8 @@ export function HostPaymentsPanel({
   gameTitle: string;
   settings: GamePaymentSettings | null;
 }) {
+  const { can: canFeature } = useMyChildStatus();
+  const paymentsGate = canFeature("game_payments");
   const [rows, setRows] = useState<HostRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<Filter>("pending");
@@ -615,6 +635,8 @@ export function PlayerPaymentsPanel({
   gameId: string;
   settings: GamePaymentSettings | null;
 }) {
+  const { can: canFeature } = useMyChildStatus();
+  const paymentsGate = canFeature("game_payments");
   const [subs, setSubs] = useState<PaymentSubmission[]>([]);
   const [loading, setLoading] = useState(true);
 
