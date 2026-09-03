@@ -308,55 +308,160 @@ export type GuardianChild = {
   childUserId: string;
   displayName: string;
   username: string | null;
+  avatarUrl: string | null;
   cohort: AgeCohort;
+  ageReviewRequired: boolean;
+  relationship: string;
+  linkedAt: string | null;
+  upcomingGames: number;
+  nextGame: { title: string | null; at: string } | null;
+  teamCount: number;
   consent: ConsentRecordView | null;
   controls: ChildControls;
 };
 
+type OverviewRow = {
+  child_user_id: string;
+  display_name: string | null;
+  username: string | null;
+  avatar_url: string | null;
+  age_cohort: string | null;
+  age_review_required: boolean | null;
+  consent_status: string | null;
+  consent_method: string | null;
+  consent_requested_at: string | null;
+  consent_approved_at: string | null;
+  consent_revoked_at: string | null;
+  consent_reverify_at: string | null;
+  consent_parent_email: string | null;
+  relationship: string | null;
+  linked_at: string | null;
+  upcoming_games: number | null;
+  next_game_title: string | null;
+  next_game_at: string | null;
+  team_count: number | null;
+};
+
+/**
+ * Every minor this guardian is authorised for, in one round trip.
+ *
+ * The age columns on `profiles` are not selectable by the signed-in role, so
+ * the cohort has to come from the guardian-scoped SECURITY DEFINER
+ * `guardian_children_overview` RPC — reading them through a plain select
+ * silently produced "unknown" for every child. The RPC also folds in the
+ * consent record plus upcoming-game and team tallies so the Family Dashboard
+ * never fans out one query per child.
+ */
 export const listMyChildren = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }): Promise<GuardianChild[]> => {
-    const { supabase, userId } = context;
-    const { data: links, error } = await supabase
-      .from("guardian_links")
-      .select("child_user_id")
-      .eq("parent_user_id", userId)
-      .eq("status", "active");
+    const { supabase } = context;
+    const { data: rows, error } = await supabase.rpc("guardian_children_overview");
     if (error) throw new Error(error.message);
-    const ids = (links ?? []).map((l) => (l as { child_user_id: string }).child_user_id);
-    if (ids.length === 0) return [];
+    const list = (rows ?? []) as unknown as OverviewRow[];
+    if (list.length === 0) return [];
 
-    const [{ data: profiles }, { data: consents }, { data: controls }] = await Promise.all([
-      supabase.from("profiles").select("id, display_name, username, age_cohort").in("id", ids),
-      supabase
-        .from("parental_consents")
-        .select(
-          "child_user_id, status, method, parent_email, requested_at, approved_at, revoked_at, reverify_at",
-        )
-        .in("child_user_id", ids),
-      supabase.from("child_controls").select("*").in("child_user_id", ids),
-    ]);
+    const ids = list.map((r) => r.child_user_id);
+    const { data: controls } = await supabase
+      .from("child_controls")
+      .select("*")
+      .in("child_user_id", ids);
 
-    return ids.map((id) => {
-      const p = (profiles ?? []).find((x) => (x as { id: string }).id === id) as
-        | { display_name?: string; username?: string | null; age_cohort?: string }
-        | undefined;
-      const c = (consents ?? []).find(
-        (x) => (x as { child_user_id: string }).child_user_id === id,
-      ) as ConsentRow | undefined;
+    return list.map((r) => {
       const ct = (controls ?? []).find(
-        (x) => (x as { child_user_id: string }).child_user_id === id,
+        (x) => (x as { child_user_id: string }).child_user_id === r.child_user_id,
       );
       return {
-        childUserId: id,
-        displayName: p?.display_name ?? "Child account",
-        username: p?.username ?? null,
-        cohort: parseCohort(p?.age_cohort),
-        consent: toConsentView(c ?? null),
+        childUserId: r.child_user_id,
+        displayName: r.display_name ?? "Child account",
+        username: r.username ?? null,
+        avatarUrl: r.avatar_url ?? null,
+        cohort: parseCohort(r.age_cohort ?? undefined),
+        ageReviewRequired: r.age_review_required === true,
+        relationship: r.relationship ?? "parent",
+        linkedAt: r.linked_at,
+        upcomingGames: r.upcoming_games ?? 0,
+        nextGame: r.next_game_at ? { title: r.next_game_title, at: r.next_game_at } : null,
+        teamCount: r.team_count ?? 0,
+        consent: r.consent_status
+          ? toConsentView({
+              status: r.consent_status,
+              method: r.consent_method ?? "email",
+              parent_email: r.consent_parent_email,
+              requested_at: r.consent_requested_at,
+              approved_at: r.consent_approved_at,
+              revoked_at: r.consent_revoked_at,
+              reverify_at: r.consent_reverify_at,
+            })
+          : null,
         controls: parseChildControls(ct ?? null),
       };
     });
   });
+
+/** Guardian ends their own link to a minor. Consent is withdrawn with it. */
+export const revokeGuardianLink = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { childUserId: string; reason?: string }) =>
+    z
+      .object({ childUserId: z.string().uuid(), reason: z.string().trim().max(500).optional() })
+      .parse(d),
+  )
+  .handler(async ({ context, data }) => {
+    const { error } = await context.supabase.rpc("revoke_guardian_link", {
+      _child_user_id: data.childUserId,
+      _reason: data.reason ?? undefined,
+    });
+    if (error) {
+      throw new Error(
+        error.message.includes("NOT_FOUND")
+          ? "That family link is no longer active."
+          : "Could not end that family link.",
+      );
+    }
+    return { ok: true };
+  });
+
+export type FamilyActivityEntry = {
+  id: string;
+  action: string;
+  context: Record<string, string | number | boolean | null>;
+  createdAt: string;
+  actorIsMe: boolean;
+};
+
+/** Immutable family activity trail for one linked minor. */
+export const listFamilyActivity = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { childUserId: string }) =>
+    z.object({ childUserId: z.string().uuid() }).parse(d),
+  )
+  .handler(async ({ context, data }): Promise<FamilyActivityEntry[]> => {
+    const { data: rows, error } = await context.supabase
+      .from("family_audit_log")
+      .select("id, action, context, created_at, actor_user_id")
+      .eq("child_user_id", data.childUserId)
+      .order("created_at", { ascending: false })
+      .limit(40);
+    if (error) throw new Error("Could not load the family activity log.");
+    return (rows ?? []).map((r) => {
+      const row = r as {
+        id: string;
+        action: string;
+        context: Record<string, string | number | boolean | null> | null;
+        created_at: string;
+        actor_user_id: string | null;
+      };
+      return {
+        id: row.id,
+        action: row.action,
+        context: row.context ?? {},
+        createdAt: row.created_at,
+        actorIsMe: row.actor_user_id === context.userId,
+      };
+    });
+  });
+
 
 export const updateChildControls = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])

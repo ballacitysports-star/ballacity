@@ -1,0 +1,58 @@
+import { describe, expect, it } from "vitest";
+import { describeFamilyActivity } from "@/lib/family-activity";
+
+describe("describeFamilyActivity", () => {
+  it("labels control creation", () => {
+    expect(describeFamilyActivity({ action: "controls.created" })).toEqual({
+      title: "Safety settings created",
+      detail: "Default protections applied.",
+    });
+  });
+
+  it("lists each changed control with a friendly value", () => {
+    const d = describeFamilyActivity({
+      action: "controls.changed",
+      context: { messaging: "guardian_only", notifications: false },
+    });
+    expect(d.title).toBe("Safety settings changed");
+    expect(d.detail).toBe("Messaging → guardians only, Notifications → off");
+  });
+
+  it("handles an empty change set", () => {
+    expect(describeFamilyActivity({ action: "controls.changed", context: {} }).detail).toBeNull();
+  });
+
+  it("describes consent transitions", () => {
+    expect(
+      describeFamilyActivity({ action: "consent.approved", context: { method: "email" } }),
+    ).toEqual({ title: "Parental consent approved", detail: "By email confirmation" });
+    expect(describeFamilyActivity({ action: "consent.revoked" }).title).toBe(
+      "Parental consent withdrawn",
+    );
+    expect(
+      describeFamilyActivity({ action: "consent.pending", context: { method: "credit_card" } })
+        .detail,
+    ).toBe("By credit card");
+  });
+
+  it("describes family link transitions", () => {
+    expect(
+      describeFamilyActivity({ action: "link.active", context: { relationship: "parent" } }),
+    ).toEqual({ title: "Family link connected", detail: "Relationship: parent" });
+    expect(describeFamilyActivity({ action: "link.revoked" }).title).toBe("Family link ended");
+  });
+
+  it("falls back readably for unknown keys", () => {
+    expect(describeFamilyActivity({ action: "consent.reverify_due" }).title).toBe(
+      "Consent reverify due",
+    );
+    expect(describeFamilyActivity({ action: "link.paused" }).title).toBe("Family link paused");
+    expect(describeFamilyActivity({ action: "something.else_new" }).title).toBe(
+      "something else new",
+    );
+  });
+
+  it("tolerates a null context", () => {
+    expect(describeFamilyActivity({ action: "controls.changed", context: null }).detail).toBeNull();
+  });
+});

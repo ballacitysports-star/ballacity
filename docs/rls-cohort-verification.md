@@ -67,3 +67,28 @@ ROLLBACK;
 
 The trigger checks `age_cohort_of(host_id) NOT IN ('teen_16_17','adult')`, so a
 renamed or newly added minor cohort stays blocked by default.
+
+## 5. Guardian family overview (protected age columns)
+
+`profiles.age_cohort` is not selectable by the `authenticated` role, so any
+parent-facing read of a child's cohort must go through the guardian-scoped
+`guardian_children_overview()` SECURITY DEFINER RPC. Confirm the column really
+is protected and the RPC is reachable only when signed in:
+
+```sql
+-- expect: false for age_cohort, true for display_name
+select has_column_privilege('authenticated','public.profiles','age_cohort','SELECT') as cohort,
+       has_column_privilege('authenticated','public.profiles','display_name','SELECT') as name;
+
+-- expect: prosecdef true, authenticated true, anon false
+select p.prosecdef,
+       has_function_privilege('authenticated', p.oid, 'EXECUTE') as auth_exec,
+       has_function_privilege('anon', p.oid, 'EXECUTE') as anon_exec
+from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+where n.nspname = 'public' and p.proname = 'guardian_children_overview';
+```
+
+The append-only `family_audit_log` is written only by database triggers on
+`child_controls`, `parental_consents` and `guardian_links`; updates and deletes
+raise `family_audit_log is append-only`, and reads are limited to the child,
+their active guardians and moderators.

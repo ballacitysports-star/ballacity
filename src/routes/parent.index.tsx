@@ -9,14 +9,19 @@ import {
   useMyChildren,
   useParentRequests,
   useRevokeChildConsent,
+  useRevokeGuardianLink,
   useUpdateChildControls,
 } from "@/lib/child-safety";
 import { CHILD_POLICY_DISCLAIMER, COHORT_META, type ChildControls } from "@/lib/child-policy";
+import { formatRelativeDay } from "@/lib/datetime";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { ConsentTrail } from "@/components/child/ConsentTrail";
 import { AddMinorPanel } from "@/components/child/AddMinorPanel";
+import { FamilyActivityLog } from "@/components/child/FamilyActivityLog";
 import { FamilyApprovalsPanel } from "@/components/child/FamilyApprovalsPanel";
+import { FamilyChildSwitcher } from "@/components/child/FamilyChildSwitcher";
+
 
 export const Route = createFileRoute("/parent/")({
   head: () =>
@@ -83,6 +88,7 @@ function ChildPanel({ childUserId }: { childUserId: string }) {
   const child = children.find((c) => c.childUserId === childUserId);
   const update = useUpdateChildControls();
   const revoke = useRevokeChildConsent();
+  const unlink = useRevokeGuardianLink();
   const footprint = useChildFootprint(childUserId);
   const { submit } = useParentRequests();
   if (!child) return null;
@@ -109,7 +115,13 @@ function ChildPanel({ childUserId }: { childUserId: string }) {
   };
 
   return (
-    <section className="mt-4 rounded-2xl border border-border bg-surface p-4">
+    <section
+      className="mt-4 rounded-2xl border border-border bg-surface p-4"
+      id={`child-panel-${childUserId}`}
+      role={children.length > 1 ? "tabpanel" : undefined}
+      aria-labelledby={children.length > 1 ? `child-tab-${childUserId}` : undefined}
+      tabIndex={-1}
+    >
       <header className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <h2 className="truncate font-display text-lg font-bold">{child.displayName}</h2>
@@ -120,9 +132,31 @@ function ChildPanel({ childUserId }: { childUserId: string }) {
               : child.consent?.status === "revoked"
                 ? "Consent withdrawn"
                 : "Consent pending"}
+            {child.ageReviewRequired ? " · Age under review" : ""}
           </p>
         </div>
       </header>
+
+      <div className="mt-3 rounded-xl border border-border bg-background p-3 text-xs">
+        <div className="flex flex-wrap gap-x-4 gap-y-1 text-muted-foreground">
+          <span>
+            Teams: <span className="font-semibold text-foreground">{child.teamCount}</span>
+          </span>
+          <span>
+            Upcoming games:{" "}
+            <span className="font-semibold text-foreground">{child.upcomingGames}</span>
+          </span>
+        </div>
+        {child.nextGame ? (
+          <p className="mt-1">
+            Next up: <span className="font-semibold">{child.nextGame.title ?? "Game"}</span>{" "}
+            {formatRelativeDay(child.nextGame.at)}
+          </p>
+        ) : (
+          <p className="mt-1">No upcoming games scheduled.</p>
+        )}
+      </div>
+
 
       {footprint.data ? (
         <div className="mt-3 grid grid-cols-3 gap-2 text-center text-xs">
@@ -181,9 +215,9 @@ function ChildPanel({ childUserId }: { childUserId: string }) {
         </div>
       </div>
       <ConsentTrail childUserId={childUserId} />
+      <FamilyActivityLog childUserId={childUserId} />
 
       <div className="mt-4 flex flex-wrap gap-2">
-
         <Button size="sm" variant="outline" onClick={() => request("access")}>
           Request a copy of their data
         </Button>
@@ -209,7 +243,29 @@ function ChildPanel({ childUserId }: { childUserId: string }) {
         >
           Withdraw consent
         </Button>
+        <Button
+          size="sm"
+          variant="destructive"
+          disabled={unlink.isPending}
+          onClick={() => {
+            const ok = window.confirm(
+              `End your family link with ${child.displayName}? You will no longer manage their settings, and your consent for their account is withdrawn.`,
+            );
+            if (!ok) return;
+            unlink.mutate(
+              { childUserId, reason: "Guardian ended the link from the Parent Center" },
+              {
+                onSuccess: () => toast.success("Family link ended."),
+                onError: (e) =>
+                  toast.error(e instanceof Error ? e.message : "Could not end that link"),
+              },
+            );
+          }}
+        >
+          End family link
+        </Button>
       </div>
+
     </section>
   );
 }
@@ -267,24 +323,14 @@ function ParentCenterPage() {
         </div>
       ) : (
         <>
-          {children.length > 1 ? (
-            <div className="mt-4 flex flex-wrap gap-2">
-              {children.map((c) => (
-                <button
-                  key={c.childUserId}
-                  type="button"
-                  onClick={() => setOpenChild(c.childUserId)}
-                  className={`rounded-full border px-3 py-1.5 text-xs font-semibold ${
-                    selected === c.childUserId ? "border-primary bg-primary/10 text-primary" : "border-border"
-                  }`}
-                >
-                  {c.displayName}
-                </button>
-              ))}
-            </div>
-          ) : null}
-          {selected ? <ChildPanel childUserId={selected} /> : null}
+          <FamilyChildSwitcher
+            children={children}
+            selected={selected}
+            onSelect={setOpenChild}
+          />
+          {selected ? <ChildPanel key={selected} childUserId={selected} /> : null}
         </>
+
       )}
 
       <AddMinorPanel />
