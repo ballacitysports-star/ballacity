@@ -60,6 +60,16 @@ function AuthPage() {
   // Never pre-checked: the user must tick each document themselves.
   const [consent, setConsent] = useState(emptyConsentValue);
   const consentOk = allAccepted(consent);
+  // Inline, field-associated validation messages (toasts alone are invisible to
+  // screen readers and vanish before a user can act on them).
+  const [errors, setErrors] = useState<{
+    type: string | null;
+    dob: string | null;
+    consent: string | null;
+    form: string | null;
+  }>({ type: null, dob: null, consent: null, form: null });
+  const dobRef = useRef<HTMLSelectElement | null>(null);
+  const summaryRef = useRef<HTMLDivElement | null>(null);
 
   // Non-null while we're inside the post-provider grace window (see oauth()).
   const [waitingProvider, setWaitingProvider] = useState<string | null>(null);
@@ -146,10 +156,12 @@ function AuthPage() {
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (busy) return;
+    setErrors({ type: null, dob: null, consent: null, form: null });
     setBusy(true);
     try {
       if (mode === "signup") {
         if (!accountType) {
+          setErrors((p) => ({ ...p, type: "Pick an account type first." }));
           toast.error("Pick an account type first.");
           setSignupStep("type");
           return;
@@ -159,13 +171,19 @@ function AuthPage() {
         // first authenticated load (see /onboarding/age).
         const dobCheck = checkDobParts(dob);
         if (!dobCheck.ok) {
+          setErrors((p) => ({ ...p, dob: dobCheck.message }));
           toast.error(dobCheck.message);
+          dobRef.current?.focus();
           return;
         }
         if (!consentOk) {
-          toast.error("Please agree to the Terms of Service and Privacy Policy to continue.");
+          const message =
+            "Please agree to the Terms of Service and Privacy Policy to continue.";
+          setErrors((p) => ({ ...p, consent: message }));
+          toast.error(message);
           return;
         }
+
         // Signup may finish without a session (email confirmation), so the exact
         // accepted versions are parked and written on first authenticated load.
         stashPendingConsent(currentAcceptances());
@@ -187,6 +205,10 @@ function AuthPage() {
         if (error) throw error;
         // Supabase returns 200 with empty identities for already-registered emails.
         if (data.user && data.user.identities && data.user.identities.length === 0) {
+          setErrors((p) => ({
+            ...p,
+            form: "An account with this email already exists. Try signing in.",
+          }));
           toast.error("An account with this email already exists. Try signing in.");
           setMode("signin");
           return;
@@ -201,6 +223,7 @@ function AuthPage() {
         if (error) {
           const msg = error.message?.toLowerCase() ?? "";
           if (msg.includes("invalid login") || msg.includes("invalid credentials")) {
+            setErrors((p) => ({ ...p, form: "Email or password is incorrect." }));
             toast.error("Email or password is incorrect.", {
               description:
                 "If you signed up with Google, continue with Google and set a password under Profile → Security, or use Forgot password to set one now.",
@@ -213,6 +236,7 @@ function AuthPage() {
             return;
           }
           if (msg.includes("email not confirmed")) {
+            setErrors((p) => ({ ...p, form: "Confirm your email first, then sign in." }));
             toast.error("Confirm your email first, then sign in.");
             return;
           }
@@ -220,7 +244,9 @@ function AuthPage() {
         }
       }
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Auth failed");
+      const message = err instanceof Error ? err.message : "Auth failed";
+      setErrors((p) => ({ ...p, form: message }));
+      toast.error(message);
     } finally {
       setBusy(false);
     }
@@ -242,9 +268,18 @@ function AuthPage() {
     }
   };
 
+  // Move focus to the error summary so it is announced immediately.
+  useEffect(() => {
+    if (errors.form) summaryRef.current?.focus();
+  }, [errors.form]);
+
   const oauth = (provider: "google" | "apple", opts: { isRetry?: boolean } = {}) => {
     // Cheap synchronous consent guard before the tap gesture is consumed.
     if (mode === "signup" && !consentOk) {
+      setErrors((p) => ({
+        ...p,
+        consent: "Please agree to the Terms of Service and Privacy Policy to continue.",
+      }));
       toast.error("Please agree to the Terms of Service and Privacy Policy to continue.");
       return;
     }
@@ -454,12 +489,20 @@ function AuthPage() {
               You can add team, trainer, and gym profiles later and switch between them anytime.
             </p>
 
+            {errors.type ? (
+              <p role="alert" className="text-center text-xs font-semibold text-destructive">
+                {errors.type}
+              </p>
+            ) : null}
+
             <button
               onClick={() => {
                 if (!accountType) {
+                  setErrors((p) => ({ ...p, type: "Pick an account type to continue." }));
                   toast.error("Pick an account type to continue.");
                   return;
                 }
+                setErrors((p) => ({ ...p, type: null }));
                 setSignupStep("form");
               }}
               className="w-full rounded-full bg-lime-gradient px-4 py-3 text-sm font-bold text-primary-foreground disabled:opacity-50"
@@ -474,6 +517,7 @@ function AuthPage() {
             </button>
           </>
         ) : (
+
           <>
             {mode === "signup" && accountType ? (
               <div className="flex items-center justify-between rounded-2xl border border-border bg-surface px-4 py-3 text-sm">
@@ -550,23 +594,50 @@ function AuthPage() {
               <div className="h-px flex-1 bg-border" /> or <div className="h-px flex-1 bg-border" />
             </div>
 
-            <form onSubmit={submit} className="space-y-3">
+            {errors.form ? (
+              <div
+                role="alert"
+                ref={summaryRef}
+                tabIndex={-1}
+                className="rounded-2xl border border-destructive/40 bg-destructive/10 px-4 py-3 text-sm text-destructive"
+              >
+                {errors.form}
+              </div>
+            ) : null}
+
+            <form onSubmit={submit} noValidate className="space-y-3">
               {mode === "signup" && (
-                <input
-                  value={displayName}
-                  onChange={(e) => setDisplayName(e.target.value)}
-                  placeholder="Display name"
-                  className="w-full rounded-2xl border border-border bg-surface px-4 py-3 text-sm outline-none focus:border-lime"
-                />
+                <div>
+                  <label
+                    htmlFor="signup-display-name"
+                    className="mb-1 block text-xs font-semibold text-muted-foreground"
+                  >
+                    Display name
+                  </label>
+                  <input
+                    id="signup-display-name"
+                    value={displayName}
+                    onChange={(e) => setDisplayName(e.target.value)}
+                    placeholder="Display name"
+                    autoComplete="nickname"
+                    className="w-full rounded-2xl border border-border bg-surface px-4 py-3 text-sm outline-none focus:border-lime"
+                  />
+                </div>
               )}
               {mode === "signup" && (
-                <fieldset>
+                <fieldset
+                  aria-describedby={`dob-hint${errors.dob ? " dob-error" : ""}`}
+                  aria-invalid={errors.dob ? true : undefined}
+                >
                   <legend className="mb-1 text-xs font-semibold text-muted-foreground">
                     Date of birth
                   </legend>
                   <div className="grid grid-cols-3 gap-2">
                     <select
                       aria-label="Birth month"
+                      aria-invalid={errors.dob ? true : undefined}
+                      aria-describedby={`dob-hint${errors.dob ? " dob-error" : ""}`}
+                      ref={dobRef}
                       value={dob.month}
                       onChange={(e) => setDob((p) => ({ ...p, month: e.target.value }))}
                       className="rounded-2xl border border-border bg-surface px-3 py-3 text-sm outline-none focus:border-lime"
@@ -580,6 +651,8 @@ function AuthPage() {
                     </select>
                     <select
                       aria-label="Birth day"
+                      aria-invalid={errors.dob ? true : undefined}
+                      aria-describedby={`dob-hint${errors.dob ? " dob-error" : ""}`}
                       value={dob.day}
                       onChange={(e) => setDob((p) => ({ ...p, day: e.target.value }))}
                       className="rounded-2xl border border-border bg-surface px-3 py-3 text-sm outline-none focus:border-lime"
@@ -593,6 +666,8 @@ function AuthPage() {
                     </select>
                     <input
                       aria-label="Birth year"
+                      aria-invalid={errors.dob ? true : undefined}
+                      aria-describedby={`dob-hint${errors.dob ? " dob-error" : ""}`}
                       inputMode="numeric"
                       autoComplete="bday-year"
                       placeholder="Year"
@@ -607,40 +682,79 @@ function AuthPage() {
                       className="rounded-2xl border border-border bg-surface px-3 py-3 text-sm outline-none focus:border-lime"
                     />
                   </div>
-                  <p className="mt-1 text-[11px] text-muted-foreground">
+                  {errors.dob ? (
+                    <p id="dob-error" role="alert" className="mt-1 text-xs font-semibold text-destructive">
+                      {errors.dob}
+                    </p>
+                  ) : null}
+                  <p id="dob-hint" className="mt-1 text-[11px] text-muted-foreground">
                     Your age helps us provide the right safety and privacy settings. Your birth date
                     stays private.
                   </p>
                 </fieldset>
               )}
 
-              <input
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="Email"
-                required
-                autoComplete="email"
-                className="w-full rounded-2xl border border-border bg-surface px-4 py-3 text-sm outline-none focus:border-lime"
-              />
-              <input
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="Password"
-                required
-                minLength={6}
-                autoComplete={mode === "signin" ? "current-password" : "new-password"}
-                className="w-full rounded-2xl border border-border bg-surface px-4 py-3 text-sm outline-none focus:border-lime"
-              />
+              <div>
+                <label
+                  htmlFor="auth-email"
+                  className="mb-1 block text-xs font-semibold text-muted-foreground"
+                >
+                  Email
+                </label>
+                <input
+                  id="auth-email"
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="Email"
+                  required
+                  autoComplete="email"
+                  className="w-full rounded-2xl border border-border bg-surface px-4 py-3 text-sm outline-none focus:border-lime"
+                />
+              </div>
+              <div>
+                <label
+                  htmlFor="auth-password"
+                  className="mb-1 block text-xs font-semibold text-muted-foreground"
+                >
+                  Password
+                </label>
+                <input
+                  id="auth-password"
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="Password"
+                  required
+                  minLength={6}
+                  autoComplete={mode === "signin" ? "current-password" : "new-password"}
+                  aria-describedby={mode === "signup" ? "password-hint" : undefined}
+                  className="w-full rounded-2xl border border-border bg-surface px-4 py-3 text-sm outline-none focus:border-lime"
+                />
+                {mode === "signup" ? (
+                  <p id="password-hint" className="mt-1 text-[11px] text-muted-foreground">
+                    At least 6 characters.
+                  </p>
+                ) : null}
+              </div>
+              {mode === "signup" && errors.consent ? (
+                <p role="alert" className="text-xs font-semibold text-destructive">
+                  {errors.consent}
+                </p>
+              ) : null}
               <button
                 type="submit"
                 disabled={busy}
+                aria-busy={busy}
                 className="w-full rounded-full bg-lime-gradient px-4 py-3 text-sm font-bold text-primary-foreground disabled:opacity-50"
               >
                 {busy ? "Please wait…" : mode === "signin" ? "Sign in" : "Create account"}
               </button>
+              <p className="sr-only" role="status" aria-live="polite">
+                {busy ? "Submitting, please wait." : ""}
+              </p>
             </form>
+
 
             {mode === "signin" && (
               <button
