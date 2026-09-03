@@ -3532,6 +3532,15 @@ export type Database = {
           status: string
         }[]
       }
+      my_child_context: {
+        Args: never
+        Returns: {
+          age_review_required: boolean
+          cohort: string
+          has_birthday: boolean
+          jurisdiction: string
+        }[]
+      }
       my_platform_status: {
         Args: never
         Returns: {
