@@ -454,12 +454,20 @@ function AuthPage() {
               You can add team, trainer, and gym profiles later and switch between them anytime.
             </p>
 
+            {errors.type ? (
+              <p role="alert" className="text-center text-xs font-semibold text-destructive">
+                {errors.type}
+              </p>
+            ) : null}
+
             <button
               onClick={() => {
                 if (!accountType) {
+                  setErrors((p) => ({ ...p, type: "Pick an account type to continue." }));
                   toast.error("Pick an account type to continue.");
                   return;
                 }
+                setErrors((p) => ({ ...p, type: null }));
                 setSignupStep("form");
               }}
               className="w-full rounded-full bg-lime-gradient px-4 py-3 text-sm font-bold text-primary-foreground disabled:opacity-50"
@@ -474,6 +482,7 @@ function AuthPage() {
             </button>
           </>
         ) : (
+
           <>
             {mode === "signup" && accountType ? (
               <div className="flex items-center justify-between rounded-2xl border border-border bg-surface px-4 py-3 text-sm">
