@@ -20,6 +20,11 @@ import {
   type AgeCohort,
   type ConsentRecordView,
 } from "@/lib/child-policy";
+import {
+  PAYMENTS_BLOCKED_MESSAGE,
+  paymentParticipantsGate,
+  paymentsAllowedForCohort,
+} from "@/lib/payments-policy";
 
 function birthdayForAge(age: number): string {
   const d = new Date();
@@ -332,5 +337,59 @@ describe("guardian controls parsing", () => {
       messaging: "guardian_only",
       locationPrecision: "city",
     });
+  });
+});
+
+describe("game payment coordination gate", () => {
+  it("blocks payment coordination for every under-16 cohort", () => {
+    for (const cohort of ["child_under_13", "teen_13_15"] as const) {
+      expect(PERMISSION_MATRIX.game_payments[cohort]).toBe("blocked");
+      expect(can("game_payments", { cohort, consent: consent("approved") }).allowed).toBe(false);
+    }
+  });
+
+  it("keeps payment coordination protected for 16-17 and open for adults", () => {
+    expect(PERMISSION_MATRIX.game_payments.teen_16_17).toBe("protected");
+    expect(PERMISSION_MATRIX.game_payments.adult).toBe("allowed");
+    expect(can("game_payments", { cohort: "teen_16_17" }).allowed).toBe(true);
+    expect(can("game_payments", { cohort: "adult" }).allowed).toBe(true);
+  });
+
+  it("treats an unknown age protectively for payments", () => {
+    expect(can("game_payments", { cohort: "unknown" }).allowed).toBe(false);
+  });
+});
+
+describe("server-side payment participant gate", () => {
+  it("rejects a blocked cohort's submission even when the client check is bypassed", () => {
+    const gate = paymentParticipantsGate({
+      submitter: { cohort: "teen_13_15", consent: consent("approved") },
+      recipient: { cohort: "adult" },
+    });
+    expect(gate.ok).toBe(false);
+    expect(gate.reason).toBe(PAYMENTS_BLOCKED_MESSAGE);
+  });
+
+  it("rejects a payment whose recipient cannot coordinate payments", () => {
+    const gate = paymentParticipantsGate({
+      submitter: { cohort: "adult" },
+      recipient: { cohort: "child_under_13", consent: consent("approved") },
+    });
+    expect(gate.ok).toBe(false);
+    expect(gate.reason).toMatch(/host account/i);
+  });
+
+  it("allows an adult-to-adult payment", () => {
+    expect(
+      paymentParticipantsGate({
+        submitter: { cohort: "adult" },
+        recipient: { cohort: "adult" },
+      }).ok,
+    ).toBe(true);
+  });
+
+  it("exposes a cohort-only helper for callers that only know the cohort", () => {
+    expect(paymentsAllowedForCohort("adult")).toBe(true);
+    expect(paymentsAllowedForCohort("teen_13_15")).toBe(false);
   });
 });
