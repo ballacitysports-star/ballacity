@@ -3345,6 +3345,7 @@ export type Database = {
         Args: { check_env?: string; user_uuid: string }
         Returns: number
       }
+      game_payments_allowed: { Args: { _user: string }; Returns: boolean }
       get_account_type: { Args: { _user_id: string }; Returns: string }
       get_game_host_payment_methods: {
         Args: { _game_id: string; _host_id: string }
