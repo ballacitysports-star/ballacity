@@ -82,6 +82,15 @@ function ChildOnboardingPage() {
         messages, no videos, no public profile.
       </p>
 
+      {!isLoading && !approved && (
+        <Link
+          to="/feed"
+          className="mt-3 inline-block text-sm font-semibold text-primary underline underline-offset-2"
+        >
+          Not now — let me look around first
+        </Link>
+      )}
+
       {isLoading ? (
         <p className="mt-6 text-sm text-muted-foreground">Checking your account…</p>
       ) : approved ? (
