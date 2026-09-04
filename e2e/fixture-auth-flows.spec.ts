@@ -84,12 +84,13 @@ test("two fixture accounts hold independent sessions side by side", async ({ bro
     await p2.goto("/settings", { waitUntil: "domcontentloaded" });
 
     // Each context keeps its own account: neither leaks into the other.
-    await expect(p1.getByText(account("host").email, { exact: false })).toBeVisible({
+    await expect(p1.getByText(account("host").displayName).first()).toBeVisible({
       timeout: 20_000,
     });
-    await expect(p2.getByText(account("player2").email, { exact: false })).toBeVisible({
+    await expect(p2.getByText(account("player2").displayName).first()).toBeVisible({
       timeout: 20_000,
     });
+    await expect(p1.getByText(account("player2").displayName)).toHaveCount(0);
   } finally {
     await one.close();
     await two.close();
