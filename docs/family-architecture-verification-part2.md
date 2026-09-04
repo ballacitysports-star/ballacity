@@ -108,7 +108,7 @@ just by the writer's own view.
 
 | # | Finding | Evidence | Status |
 | --- | --- | --- | --- |
-| L-1 | **A team roster is world-readable, including its minor members.** `team_members` has a permissive SELECT policy for `public` on any non-hidden team, so an anonymous visitor can enumerate the `user_id`s of every child on a roster. It is a partial leak — the minors' `profiles` rows are not readable (G5c), so no name, city or avatar comes with it — but the roster reveals that a given account is a minor teammate and lets an attacker correlate it with a game roster or a comment author id. | G5a `200` with three minor `user_id`s | **OPEN.** Fixing it means deciding what a public team page shows for minors (hide minors from anonymous readers, or restrict rosters to members) — a product decision, not a mechanical fix, so it is recorded rather than silently changed. |
+| L-1 | **A team roster is world-readable, including its minor members.** `team_members` has a permissive SELECT policy for `public` on any non-hidden team, so an anonymous visitor can enumerate the `user_id`s of every child on a roster. It is a partial leak — the minors' `profiles` rows are not readable (G5c), so no name, city or avatar comes with it — but the roster reveals that a given account is a minor teammate and lets an attacker correlate it with a game roster or a comment author id. | G5a `200` with three minor `user_id`s | **FIXED this run.** Roster rows are now filtered per member by cohort: adults stay public, `teen_16_17` is signed-in-only, and under-16 rows are visible only to the member, a linked guardian or a team manager. See "L-1 fix" below and the live re-verification (L1F1–L1F12), including the all-adult-team regression check. |
 | L-2 | **Comments on minors' content are unrestricted and world-readable.** `post_comments` has a permissive `public` SELECT policy and no cohort check on insert, so any adult, any unrelated minor, and any anonymous reader can write to and read the comment thread on a `child_under_13`'s reel. This is the main adult→child contact channel that is *not* covered by `minor_messaging_allowed`. | I2a/I3b `201`, I4 `200` with bodies + author ids | **FIXED this run.** Comments on a minor's content are now restricted to the owner, a linked guardian and real teammates, on both write and read. See "L-2 fix" below for the rule and the live re-verification (L2F1–L2F25). |
 | L-3 | **`child_controls.messaging = 'teammates'` had no effect.** `minor_messaging_allowed` honoured only `off` and `guardian_only`; with `teammates` set, the teen and an unrelated adult who merely co-participated in a game opened a conversation and exchanged messages. | before: J2a `200 <uuid>`, J2b/J2c `201` | **FIXED this run.** `minor_messaging_allowed` now enforces `teammates` on both sides via a new `shares_team()` helper (guardians always allowed). Re-verified: M2 adult sharing only a game `400 MINOR_MESSAGING_BLOCKED`, M3 reverse direction `400`, M6 unlinked minor `400`, M4 real teammate `200`, M5 guardian `200`. |
 | L-4 | **Guardian control over AI analysis was not enforced anywhere.** `child_controls.ai_analysis = false` was read by no code path: the only gate was the user's own `privacy_preferences.ai_processing`, which defaulted to `true` for minors and was writable by the child; and the worker route (`/api/public/reels/process`) runs with the service role and had no gate at all, so a child's queued reel would be analysed regardless. | K4c `ai_processing true`, K4d child's own write accepted, K4f reel still queued | **FIXED this run.** New `ai_analysis_allowed(user)` resolves guardian control first, then the user's own preference; a BEFORE trigger clamps a minor's `ai_processing`/`ai_training_opt_in` to `false` while the guardian control is off; an AFTER trigger on `child_controls` re-clamps when a guardian revokes; existing rows backfilled. Both entry points now call the gate — the signed-in server functions and the service-role worker, which marks a blocked reel `failed` with an explanatory message instead of processing it. Re-verified by N1–N12. |
@@ -218,4 +218,85 @@ public reel/post/game row) and a boolean. No other function's grants changed.
 
 **Revised GO / NO-GO:** unchanged as a GO, now with **one** open finding (L-1, the
 world-readable roster). The same caveat applies: this records observed behaviour of
-specific controls, not legal compliance certification.
+specific controls, not legal compliance certification. (L-1 was closed later in the
+same run — see the section below and the final verdict at the end of this document.)
+
+## L-1 fix — who appears on a public team roster
+
+L-1 is now closed in the database, using the same shape as `reel_publicly_visible()`
+and `can_comment_on_minor_content()`: a small `SECURITY DEFINER` helper that resolves
+the *subject's* cohort first, then the caller's relationship to them, wired into the
+table's SELECT policy.
+
+**Rule encoded.** `public.roster_row_visible(_team_id text, _member_user_id uuid)`
+returns true when:
+
+- the member's cohort is not a minor cohort — adults stay public, exactly as before;
+- the member is `teen_16_17` **and** the caller is authenticated — the same
+  members-only treatment `reel_audience()` gives that cohort;
+- the caller **is** the member, is a linked guardian (`is_guardian_of`), or is a
+  manager of the team (`is_team_manager`) — i.e. exactly the people who can already
+  write to that roster row.
+
+It returns false otherwise, so every anonymous caller sees nothing for a member under
+16. `_team_id` is `text`, not `uuid`, because `team_members.team_id` is the team's text
+handle and `is_team_manager` takes the same type; a `uuid` signature could not have
+been called from the policy.
+
+The `team_members_read` policy now reads
+`EXISTS (non-hidden team) AND roster_row_visible(team_id, user_id)` for
+`anon, authenticated`, replacing the unconditional "team is not hidden" check.
+EXECUTE is granted to `anon`, `authenticated` and `service_role` — as with
+`can_comment_on_minor_content`, `anon` must be able to evaluate it or the public
+policy cannot run at all. Insert/update/delete policies were not touched.
+
+### Live re-verification
+
+Fixtures: a guardian who owns a **mixed** team with a linked `child_under_13`, a linked
+`teen_13_15` and an unrelated `teen_16_17` on the roster (all three joined by accepting
+a manager's invite), an unrelated signed-in adult, and a separate **all-adult** team
+(adult owner + adult player) as the regression baseline. Ground truth rosters: mixed =
+4 rows (P7 `200`), all-adult = 2 rows (P8 `200`).
+
+| # | Test | Expected | Actual | Result | Evidence |
+| --- | --- | --- | --- | --- | --- |
+| L1F1 | ANONYMOUS reads the mixed roster | adult rows only | 1 row, the adult owner | PASS | `200 [{owner}]` — child, `teen_13_15` and `teen_16_17` absent |
+| L1F2 | Authenticated non-member reads the mixed roster | adults + `teen_16_17` | 2 rows: owner + `teen_16_17` | PASS | `200 [{owner},{player 0405…}]` |
+| L1F3 | Linked guardian (also the manager) reads it | full roster | all 4 rows | PASS | `200` with child, teen, teen17, owner |
+| L1F4 | The child reads it | own row + adults + `teen_16_17` | owner + own row + `teen_16_17`; the unrelated `teen_13_15` hidden | PASS | `200` 3 rows |
+| **L1F5** | **REGRESSION: ANONYMOUS reads the all-adult roster** | full roster, unchanged | both rows | **PASS** | `200 [{owner},{player}]` — identical to P8 |
+| L1F6 | Authenticated non-member reads the all-adult roster | full roster | both rows | PASS | `200` 2 rows |
+| L1F7 | ANONYMOUS evaluates `roster_row_visible(mixed, child)` | false | false | PASS | `200 false` |
+| L1F8 | ANONYMOUS evaluates it for the `teen_16_17` | false | false | PASS | `200 false` |
+| L1F9 | ANONYMOUS evaluates it for the adult owner | true | true | PASS | `200 true` |
+| L1F10 | Signed-in non-member evaluates it for the `teen_16_17` | true | true | PASS | `200 true` |
+| L1F11 | Signed-in non-member evaluates it for the `teen_13_15` | false | false | PASS | `200 false` |
+| L1F12 | Guardian evaluates it for their child | true | true | PASS | `200 true` |
+
+The regression guarded against is the one caught during the L-2 fix, where an
+`authenticated`-only policy silently hid **adult** content from signed-out visitors.
+Here the before-state is on record from the original pass (G5a: anonymous read a full
+four-row roster) and the after-state for an all-adult team is byte-identical to the
+owner's own view (L1F5 vs P8), so the narrowing applies only to rows belonging to
+minors.
+
+Database-linter state after this fix: 102 warnings — 1 extension in `public`, 12
+`SECURITY DEFINER` functions callable by `anon`, 89 callable by `authenticated`. The
+one newly anon-callable function is `roster_row_visible`, for the reason above; it
+returns only a boolean about a roster row the caller is asking about. No other
+function's grants changed.
+
+All fixture accounts, both teams and their rosters were deleted afterwards.
+
+## Final GO / NO-GO
+
+**GO with zero open findings.** All five findings recorded in this document (L-1
+through L-5) are closed and re-verified live, as are the findings in
+[`family-architecture-final-verification.md`](./family-architecture-final-verification.md)
+(part 1). L-1 was the last one open; the two public-read surfaces that motivated it and
+L-2 — team rosters and comment threads — are now both cohort-gated on read as well as
+write, while adult content stays publicly readable.
+
+The standing caveat is unchanged and is not a formality: this document records observed
+behaviour of specific controls at a point in time. It is not a legal compliance
+certification for COPPA, GDPR-K or any other regime.

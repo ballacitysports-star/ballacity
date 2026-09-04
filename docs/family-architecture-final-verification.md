@@ -112,8 +112,8 @@ so this is not an escalation path, but the API response is not self-explanatory.
 
 ## GO / NO-GO
 
-**GO** for the family/minor architecture as verified above, with these caveats
-recorded rather than claimed away:
+**GO with zero open findings** for the family/minor architecture as verified above and
+in part 2, with these caveats recorded rather than claimed away:
 
 - Every check in sections A–F was executed against the live backend by real user
   tokens; no result in this document is inferred.
@@ -126,11 +126,15 @@ recorded rather than claimed away:
   `reel_publicly_visible`, `guardian_children_overview`, …) — policy helpers must
   be executable by the calling role for RLS to evaluate, and each RPC enforces
   its own authorization, as F11–F13 and E12–E13 demonstrate. The four routines
-  that had no business being callable were revoked in C1.
+  that had no business being callable were revoked in C1. Part 2 adds three more
+  policy helpers of the same kind (`can_comment_on_minor_content`,
+  `comment_subject_owner`, `roster_row_visible`).
 - This document reports observed behaviour of specific controls. It is not a
   legal compliance certification for COPPA, GDPR-K or any other regime.
 
 Continued in
 [`family-architecture-verification-part2.md`](./family-architecture-verification-part2.md),
 which covers the remaining feature keys (teams/rosters, comments, game chat, AI
-analysis, precise location) and records two open public-read findings.
+analysis, precise location). The two public-read findings it originally recorded as
+open — comment threads (L-2) and team rosters (L-1) — were both fixed and re-verified
+live in that document, so no finding remains open across the two parts.
