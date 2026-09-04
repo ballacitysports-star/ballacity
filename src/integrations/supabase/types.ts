@@ -3281,6 +3281,7 @@ export type Database = {
         Returns: number
       }
       age_verified: { Args: { _user: string }; Returns: boolean }
+      ai_analysis_allowed: { Args: { _user: string }; Returns: boolean }
       approve_org_member_request: { Args: { _req: string }; Returns: string }
       approve_parental_consent: {
         Args: {
@@ -3709,6 +3710,7 @@ export type Database = {
         Args: { _a: string; _b: string }
         Returns: boolean
       }
+      shares_team: { Args: { _a: string; _b: string }; Returns: boolean }
       team_cancel_invite: { Args: { _invite: string }; Returns: undefined }
       team_invite_player: {
         Args: {
