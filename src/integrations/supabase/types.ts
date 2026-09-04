@@ -3305,6 +3305,10 @@ export type Database = {
         Returns: boolean
       }
       calculate_age: { Args: { _dob: string; _now?: string }; Returns: number }
+      can_comment_on_minor_content: {
+        Args: { _commenter: string; _content_owner: string }
+        Returns: boolean
+      }
       can_notify: {
         Args: { _caller: string; _target: string }
         Returns: boolean
@@ -3317,6 +3321,10 @@ export type Database = {
       clear_age_review: {
         Args: { _approve: boolean; _user: string }
         Returns: undefined
+      }
+      comment_subject_owner: {
+        Args: { _subject_id: string; _subject_type: string }
+        Returns: string
       }
       create_direct_conversation: {
         Args: { _game_id?: string; _other_user: string }
