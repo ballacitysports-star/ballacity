@@ -959,6 +959,7 @@ function RootComponent() {
       unsubRouter();
       window.removeEventListener("error", onError);
       window.removeEventListener("unhandledrejection", onRejection);
+      uninstallStaleServerFnRecovery();
     };
   }, [queryClient, router]);
 
