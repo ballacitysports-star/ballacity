@@ -148,6 +148,7 @@ import type { JoinGate } from "@/lib/live-status";
 import { JoinBlockedReason } from "@/components/JoinBlockedReason";
 
 import { useAuth } from "@/hooks/use-auth";
+import { useMyChildStatus } from "@/lib/child-safety";
 import { useMyProfile } from "@/lib/user-prefs-store";
 import { getOrCreateDirectConversation } from "@/lib/messages";
 import { createNotification } from "@/lib/notifications";
@@ -313,6 +314,9 @@ function GameDetail() {
   const nav = useNavigate();
   const { user } = useAuth();
   const myProfile = useMyProfile(user);
+  const { can: canChildFeature } = useMyChildStatus();
+  const participationDecision = canChildFeature("game_participation");
+  const messagingDecision = canChildFeature("direct_messaging");
   const [settings, setSettings] = useState<GamePaymentSettings | null>(null);
   const [mySubs, setMySubs] = useState<PaymentSubmission[]>([]);
   const [myReq, setMyReq] = useState<JoinRequest | null>(null);
@@ -2742,10 +2746,17 @@ function GameDetail() {
           )}
           <div className="flex items-center gap-2">
             <button
-              disabled={messaging}
+              disabled={messaging || !messagingDecision.allowed}
               onClick={async () => {
                 if (!user) {
                   nav({ to: "/auth" });
+                  return;
+                }
+                if (!messagingDecision.allowed) {
+                  toast.error(
+                    messagingDecision.reason ||
+                      "A parent or guardian must approve this account first.",
+                  );
                   return;
                 }
                 const hostUid = settings?.host_id;
@@ -2777,9 +2788,18 @@ function GameDetail() {
                 // block NEW joins, but keep leave/cancel and payment actions live.
                 const lockedForNewJoin =
                   gate.locked && !joined && !isPending && !isConfirmed && !isApproved;
-                const canJoinAction = joined || isPending || isConfirmed || spotsLeft > 0;
+                const alreadyInFlow = joined || isPending || isConfirmed;
+                // A parent/guardian must approve this account before a NEW
+                // join; leaving/withdrawing a join made before consent was
+                // revoked stays available.
+                const consentBlocksNewJoin = !alreadyInFlow && !participationDecision.allowed;
+                const canJoinAction = alreadyInFlow || spotsLeft > 0;
                 const buttonDisabled =
-                  requesting || processing || !canJoinAction || lockedForNewJoin;
+                  requesting ||
+                  processing ||
+                  !canJoinAction ||
+                  lockedForNewJoin ||
+                  consentBlocksNewJoin;
                 const hasPaymentAttempt =
                   latestSub?.status === "pending" || latestSub?.status === "rejected";
                 const canEnterPaymentFlow =
@@ -2835,6 +2855,13 @@ function GameDetail() {
                   <motion.button
                     whileTap={{ scale: 0.97 }}
                     onClick={() => {
+                      if (consentBlocksNewJoin) {
+                        toast.error(
+                          participationDecision.reason ||
+                            "A parent or guardian must approve this account first.",
+                        );
+                        return;
+                      }
                       const wantsLeave = isConfirmed || (joined && !isPaid);
                       const wantsFreeJoin =
                         !isConfirmed &&
@@ -2863,7 +2890,7 @@ function GameDetail() {
                           ? "bg-surface border border-coral/40 text-coral"
                           : joined
                             ? "bg-surface border border-lime/40 text-lime"
-                            : lockedForNewJoin || spotsLeft <= 0
+                            : lockedForNewJoin || spotsLeft <= 0 || consentBlocksNewJoin
                               ? "bg-surface border border-border text-muted-foreground"
                               : "bg-lime-gradient text-primary-foreground glow-lime"
                     }`}
@@ -2882,6 +2909,10 @@ function GameDetail() {
                     ) : joined && !isPaid ? (
                       <>
                         <Check className="h-4 w-4" /> You're in · Tap to leave
+                      </>
+                    ) : consentBlocksNewJoin ? (
+                      <>
+                        <Lock className="h-4 w-4" /> Parent approval needed
                       </>
                     ) : lockedForNewJoin ? (
                       <>

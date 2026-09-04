@@ -52,6 +52,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { validateVideoMeta } from "@/lib/video-validation";
 import { finalizeVideoUpload } from "@/lib/media-uploads.functions";
 import { useAuth } from "@/hooks/use-auth";
+import { useMyChildStatus } from "@/lib/child-safety";
 import { useSubscription } from "@/hooks/useSubscription";
 import { useStripeCheckout } from "@/hooks/useStripeCheckout";
 import { PaymentTestModeBanner } from "@/components/PaymentTestModeBanner";
@@ -561,6 +562,8 @@ function ReelCard({ reel, onRetry }: { reel: Reel; onRetry: (id: string) => Prom
 
 function ReelsPage() {
   const { user } = useAuth();
+  const { can: canChildFeature } = useMyChildStatus();
+  const uploadDecision = canChildFeature("video_upload");
   const { game: gameId, title: gameTitle, upload: autoUpload } = Route.useSearch();
   const { isActive, isPastDue, freeUsed, freeRemaining, loading: subLoading } = useSubscription();
   const { openCheckout, isOpen, checkoutElement, closeCheckout } = useStripeCheckout();
@@ -738,6 +741,10 @@ function ReelsPage() {
    * least once; after that the short notice on the page carries the reminder.
    */
   function startUpload() {
+    if (!uploadDecision.allowed) {
+      toast.error(uploadDecision.reason || "A parent or guardian must approve this account first.");
+      return;
+    }
     if (!privacyPrefs.ai_disclosure_ack_at) {
       setDisclosureOpen(true);
       return;
@@ -784,6 +791,10 @@ function ReelsPage() {
 
   async function handleUpload(file: File) {
     if (!user) return;
+    if (!uploadDecision.allowed) {
+      toast.error(uploadDecision.reason || "A parent or guardian must approve this account first.");
+      return;
+    }
     if (!canGenerate) {
       handleSubscribe();
       return;

@@ -18,6 +18,7 @@ import {
 } from "@/lib/post-engagement.functions";
 import { UserAvatar } from "@/components/UserAvatar";
 import { useAuth } from "@/hooks/use-auth";
+import { useMyChildStatus } from "@/lib/child-safety";
 import { supabase } from "@/integrations/supabase/client";
 import { formatWhen } from "@/lib/format";
 import {
@@ -34,6 +35,8 @@ type Props = {
 export function PostEngagement({ subjectType, subjectId }: Props) {
   const qc = useQueryClient();
   const { user } = useAuth();
+  const { can: canChildFeature } = useMyChildStatus();
+  const commentsDecision = canChildFeature("comments");
   const [body, setBody] = useState("");
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editBody, setEditBody] = useState("");
@@ -157,6 +160,12 @@ export function PostEngagement({ subjectType, subjectId }: Props) {
       toast.message("Sign in to comment");
       return;
     }
+    if (!commentsDecision.allowed) {
+      toast.error(
+        commentsDecision.reason || "A parent or guardian must approve this account first.",
+      );
+      return;
+    }
     createMut.mutate(trimmed);
   };
 
@@ -218,15 +227,18 @@ export function PostEngagement({ subjectType, subjectId }: Props) {
           <textarea
             value={body}
             onChange={(e) => setBody(e.target.value.slice(0, 1000))}
-            placeholder="Add a comment…"
+            placeholder={
+              commentsDecision.allowed ? "Add a comment…" : "Parent approval needed to comment"
+            }
             rows={2}
-            className="w-full resize-none bg-transparent text-sm outline-none placeholder:text-muted-foreground"
+            disabled={!commentsDecision.allowed}
+            className="w-full resize-none bg-transparent text-sm outline-none placeholder:text-muted-foreground disabled:opacity-50"
           />
           <div className="mt-2 flex items-center justify-between">
             <span className="text-[11px] text-muted-foreground">{body.length}/1000</span>
             <button
               onClick={handlePost}
-              disabled={!body.trim() || createMut.isPending}
+              disabled={!body.trim() || createMut.isPending || !commentsDecision.allowed}
               className="inline-flex items-center gap-1.5 rounded-full bg-lime-gradient px-4 py-1.5 text-xs font-bold text-primary-foreground disabled:opacity-50"
             >
               {createMut.isPending && <Loader2 className="h-3 w-3 animate-spin" />}
