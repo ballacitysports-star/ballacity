@@ -3,18 +3,19 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { normalizeReelStyle } from "@/lib/reel-style";
 
 /**
- * AI/video processing is opt-out (Settings → Privacy). Every AI entry point
- * checks the caller's own preference row before any clip is analyzed.
+ * AI/video processing is opt-out for adults (Settings → Privacy) and
+ * guardian-controlled for minors (child_controls.ai_analysis, which wins over
+ * the minor's own toggle). `ai_analysis_allowed` resolves both in the database
+ * so every entry point — server fn or worker — sees the same answer.
  */
 async function assertAiProcessingAllowed(context: { supabase: any; userId: string }) {
-  const { data } = await context.supabase
-    .from("privacy_preferences")
-    .select("ai_processing")
-    .eq("user_id", context.userId)
-    .maybeSingle();
-  if (data && data.ai_processing === false) {
+  const { data: allowed, error } = await context.supabase.rpc("ai_analysis_allowed", {
+    _user: context.userId,
+  });
+  if (error) throw new Error(error.message);
+  if (allowed !== true) {
     throw new Error(
-      "AI video processing is turned off. Enable it in Settings → Privacy to use this feature.",
+      "AI video processing is turned off. Enable it in Settings → Privacy — for a child account, a parent or guardian controls this.",
     );
   }
 }
