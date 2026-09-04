@@ -2,6 +2,9 @@ import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { TEST_ACCOUNTS } from "./test-fixtures";
 
+/** Every fixture account is a clear adult so onboarding's age step is settled. */
+const FIXTURE_ADULT_BIRTHDAY = "1990-06-15";
+
 /**
  * Idempotently seeds the test fixture accounts in Supabase Auth + profiles
  * and creates a sample player availability for each "player" account plus
