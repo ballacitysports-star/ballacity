@@ -342,7 +342,7 @@ export const superadminSuspendUser = createServerFn({ method: "POST" })
 
     if (data.suspend) {
       try {
-        await admin.auth.admin.signOut(data.userId, "global");
+        await admin.rpc("admin_revoke_user_sessions", { _user_id: data.userId });
       } catch {
         /* best effort */
       }
@@ -408,7 +408,9 @@ export const superadminForceSignOut = createServerFn({ method: "POST" })
   .handler(async ({ context, data }) => {
     await assertSuperadmin(context);
     const admin = await getAdmin();
-    const { error } = await admin.auth.admin.signOut(data.userId, "global");
+    const { error } = await admin.rpc("admin_revoke_user_sessions", {
+      _user_id: data.userId,
+    });
     if (error) throw new Error(error.message);
     await writeAudit(admin, context.userId, {
       action: "user.force_signout",
