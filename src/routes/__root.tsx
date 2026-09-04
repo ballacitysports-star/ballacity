@@ -350,6 +350,38 @@ function maybeReloadForStaleChunk(reason: unknown) {
   window.location.reload();
 }
 
+// After the app is rebuilt, a page left open keeps calling old server-action
+// addresses that no longer exist, which answers with a 500 and a blank panel.
+// Detect that specific answer and refresh the page once.
+function installStaleServerFnRecovery() {
+  if (typeof window === "undefined") return () => {};
+  const originalFetch = window.fetch.bind(window);
+  const patched: typeof window.fetch = async (input, init) => {
+    const response = await originalFetch(input, init);
+    try {
+      const url =
+        typeof input === "string"
+          ? input
+          : input instanceof URL
+            ? input.href
+            : (input as Request).url;
+      if (response.status === 500 && url.includes("/_serverFn/")) {
+        const text = await response.clone().text();
+        if (/Invalid server function ID/i.test(text)) {
+          maybeReloadForStaleChunk("Loading chunk stale-server-fn failed");
+        }
+      }
+    } catch {
+      // never let the check break the request
+    }
+    return response;
+  };
+  window.fetch = patched;
+  return () => {
+    if (window.fetch === patched) window.fetch = originalFetch;
+  };
+}
+
 const PUBLIC_ROUTES = [
   "/",
   "/auth",
