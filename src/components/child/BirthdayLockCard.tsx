@@ -24,9 +24,20 @@ export function BirthdayLockCard() {
   const pending = data?.requests.find((r) => r.status === "pending") ?? null;
   const latest = data?.requests[0] ?? null;
 
+  const trimmedReason = reason.trim();
+  const formError = !/^\d{4}-\d{2}-\d{2}$/.test(dob)
+    ? "Enter the correct date of birth as month, day and year."
+    : trimmedReason.length < 10
+      ? "Tell us in a sentence why the date needs correcting."
+      : null;
+
   const submit = async () => {
+    if (formError) {
+      toast.error(formError);
+      return;
+    }
     try {
-      await request.mutateAsync({ requestedBirthday: dob, reason });
+      await request.mutateAsync({ requestedBirthday: dob, reason: trimmedReason });
       toast.success("Correction sent. Support will review it and let you know.");
       setOpen(false);
       setDob("");
@@ -34,6 +45,7 @@ export function BirthdayLockCard() {
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Could not send that request.");
     }
+
   };
 
   return (
@@ -90,11 +102,15 @@ export function BirthdayLockCard() {
                     className="mt-1 w-full rounded-2xl border border-border bg-background px-3 py-2 text-sm outline-none focus:border-lime"
                   />
                 </label>
+                {formError ? (
+                  <p className="text-[11px] leading-snug text-muted-foreground">{formError}</p>
+                ) : null}
                 <div className="flex gap-2">
                   <button
                     type="button"
-                    disabled={request.isPending}
+                    disabled={request.isPending || !!formError}
                     onClick={() => void submit()}
+
                     className="rounded-full bg-lime px-4 py-2 text-xs font-bold text-primary-foreground disabled:opacity-60"
                   >
                     {request.isPending ? "Sending…" : "Send for review"}
