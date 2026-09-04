@@ -109,7 +109,7 @@ just by the writer's own view.
 | # | Finding | Evidence | Status |
 | --- | --- | --- | --- |
 | L-1 | **A team roster is world-readable, including its minor members.** `team_members` has a permissive SELECT policy for `public` on any non-hidden team, so an anonymous visitor can enumerate the `user_id`s of every child on a roster. It is a partial leak — the minors' `profiles` rows are not readable (G5c), so no name, city or avatar comes with it — but the roster reveals that a given account is a minor teammate and lets an attacker correlate it with a game roster or a comment author id. | G5a `200` with three minor `user_id`s | **OPEN.** Fixing it means deciding what a public team page shows for minors (hide minors from anonymous readers, or restrict rosters to members) — a product decision, not a mechanical fix, so it is recorded rather than silently changed. |
-| L-2 | **Comments on minors' content are unrestricted and world-readable.** `post_comments` has a permissive `public` SELECT policy and no cohort check on insert, so any adult, any unrelated minor, and any anonymous reader can write to and read the comment thread on a `child_under_13`'s reel. This is the main adult→child contact channel that is *not* covered by `minor_messaging_allowed`. | I2a/I3b `201`, I4 `200` with bodies + author ids | **OPEN.** Same reason: the fix (restrict who may comment on a minor's content, and who may read it) needs a product rule per cohort before it is encoded in RLS. |
+| L-2 | **Comments on minors' content are unrestricted and world-readable.** `post_comments` has a permissive `public` SELECT policy and no cohort check on insert, so any adult, any unrelated minor, and any anonymous reader can write to and read the comment thread on a `child_under_13`'s reel. This is the main adult→child contact channel that is *not* covered by `minor_messaging_allowed`. | I2a/I3b `201`, I4 `200` with bodies + author ids | **FIXED this run.** Comments on a minor's content are now restricted to the owner, a linked guardian and real teammates, on both write and read. See "L-2 fix" below for the rule and the live re-verification (L2F1–L2F25). |
 | L-3 | **`child_controls.messaging = 'teammates'` had no effect.** `minor_messaging_allowed` honoured only `off` and `guardian_only`; with `teammates` set, the teen and an unrelated adult who merely co-participated in a game opened a conversation and exchanged messages. | before: J2a `200 <uuid>`, J2b/J2c `201` | **FIXED this run.** `minor_messaging_allowed` now enforces `teammates` on both sides via a new `shares_team()` helper (guardians always allowed). Re-verified: M2 adult sharing only a game `400 MINOR_MESSAGING_BLOCKED`, M3 reverse direction `400`, M6 unlinked minor `400`, M4 real teammate `200`, M5 guardian `200`. |
 | L-4 | **Guardian control over AI analysis was not enforced anywhere.** `child_controls.ai_analysis = false` was read by no code path: the only gate was the user's own `privacy_preferences.ai_processing`, which defaulted to `true` for minors and was writable by the child; and the worker route (`/api/public/reels/process`) runs with the service role and had no gate at all, so a child's queued reel would be analysed regardless. | K4c `ai_processing true`, K4d child's own write accepted, K4f reel still queued | **FIXED this run.** New `ai_analysis_allowed(user)` resolves guardian control first, then the user's own preference; a BEFORE trigger clamps a minor's `ai_processing`/`ai_training_opt_in` to `false` while the guardian control is off; an AFTER trigger on `child_controls` re-clamps when a guardian revokes; existing rows backfilled. Both entry points now call the gate — the signed-in server functions and the service-role worker, which marks a blocked reel `failed` with an explanatory message instead of processing it. Re-verified by N1–N12. |
 | L-5 | `enforce_child_game_participation()` resolved the actor with one SQL `CASE` over `NEW.player_id`/`NEW.user_id`, which Postgres validates against the whole rowtype, so **every** `game_participants` insert failed with `record "new" has no field "player_id"` — for adults too. Same class as the `block_locked_child_activity` defect in part 1. | before: `400 record "new" has no field "player_id"` | **FIXED earlier this run** (branched with `IF`/`ELSIF`). Regression-verified: four joins across cohorts all `201`. |
@@ -141,3 +141,81 @@ The two new trigger routines are executable by neither `anon` nor `authenticated
 
 As in part 1: this records observed behaviour of specific controls. It is not a
 legal compliance certification for COPPA, GDPR-K or any other regime.
+
+## L-2 fix — comments on a minor's content
+
+L-1 is deliberately left as it was (still a product decision). L-2 is now closed in
+the database.
+
+**Rule encoded.** Two helpers were added:
+
+- `comment_subject_owner(subject_type, subject_id)` resolves the owner of the
+  commented-on subject — `highlight_reels.user_id`, `team_posts.author_id` or
+  `hosted_games.host_id` — and returns `NULL` when the subject cannot be resolved.
+- `can_comment_on_minor_content(commenter, content_owner)` returns true when the
+  owner is unknown or **not** in a minor cohort (adult content is unchanged, and
+  stays publicly readable); otherwise only the owner, a linked guardian
+  (`is_guardian_of`) or someone on a shared roster (`shares_team`) passes, and an
+  anonymous caller (`commenter IS NULL`) never does.
+
+Both are wired into `post_comments`: the INSERT policy keeps `auth.uid() = author_id`
+and adds the gate, and the SELECT policy `Comments are readable by permitted viewers`
+applies the gate to reads for `anon, authenticated`. Edit/delete policies were not
+touched — authorship still governs them.
+
+### Live re-verification
+
+Fixtures: guardian + linked `child_under_13`, a `teen_16_17` who accepted a roster
+invite onto the same team as the child, an unrelated adult, and an unrelated
+`child_under_13`. The reel under test is owned by the child; a second reel is owned
+by the unrelated adult as the public baseline.
+
+| # | Test | Expected | Actual | Result | Evidence |
+| --- | --- | --- | --- | --- | --- |
+| L2F1 | Unrelated adult comments on the child's reel | denied | denied | PASS | `403 42501 new row violates row-level security policy for table "post_comments"` |
+| L2F2 | Unrelated minor comments on the child's reel | denied | denied | PASS | `403 42501 new row violates row-level security policy` |
+| L2F3b | Teammate (`teen_16_17`, same accepted roster) comments | allowed | allowed | PASS | `201` row `786b8ee3…` |
+| L2F4 | Linked guardian comments | allowed | allowed | PASS | `201` row `6947a95c…` |
+| L2F5 | Child comments on their own reel | allowed | allowed | PASS | `201` row `068baf2d…` |
+| L2F6 | Anonymous comments on the child's reel | denied | denied | PASS | `401 42501 permission denied for table post_comments` |
+| L2F7/L2F7b | Unrelated adult reads / re-writes the child's thread | empty / denied | empty / denied | PASS | read `200 []`, write `403 42501` |
+| L2F8b | Unrelated minor reads the child's thread | empty | empty | PASS | `200 []` |
+| L2F9b | Teammate reads the child's thread | full thread | 2 comments returned | PASS | `200` with the teammate's and the guardian's comments |
+| L2F10 | Guardian reads the child's thread | full thread | full thread | PASS | `200` with both comments |
+| L2F11 | Child reads their own thread | full thread | full thread | PASS | `200` with both comments |
+| L2F12b | Anonymous reads the child's thread | empty | empty | PASS | `200 []` |
+| L2F13 | Child edits their own comment | allowed | allowed | PASS | `200` body `"my clip (edited)"` |
+| L2F14b | Child edits the teammate's comment | no rows affected | no rows affected | PASS | `200 []` |
+| L2F15 | Child deletes their own comment | allowed | allowed | PASS | `200` deleted row returned |
+| L2F22 | Teammate edits their own comment | allowed | allowed | PASS | `200` body `"great clip!"` |
+| L2F16 | Adult comments on an adult's reel (baseline) | allowed | allowed | PASS | `201` row `a9c7461b…` |
+| L2F17b | Signed-in user reads an adult's thread (baseline) | visible | visible | PASS | `200` with the comment |
+| L2F18b | Anonymous reads an adult's thread (public baseline) | visible | visible | PASS | `200` with the comment |
+| L2F20 | Unrelated adult evaluates `can_comment_on_minor_content(self, child)` | false | false | PASS | `200 false` |
+| L2F21 | Teammate evaluates it before joining the roster | false | false | PASS | `200 false` (pre-acceptance) |
+| Q3 | `shares_team(child, teammate)` after the invite is accepted | true | true | PASS | `200 true` |
+| L2F24 | Anonymous evaluates the gate for a child owner | false | false | PASS | `200 false` |
+| L2F25 | Anonymous evaluates the gate for an adult owner | true | true | PASS | `200 true` |
+
+Two behaviours worth recording rather than glossing:
+
+- A **pending** roster invite is not membership. The first pass granted no teammate
+  access (L2F3 `403`, `shares_team` `false`) because `team_invite_player` only
+  creates an invite; the invitee must call `team_respond_invite`. After acceptance the
+  same request succeeded. The gate follows the real roster, not an intent to invite.
+- An earlier iteration of the SELECT policy was `authenticated`-only, which silently
+  hid **adult** comment threads from signed-out visitors (`200 []` on a public reel).
+  That was a regression, not a hardening, and was fixed by granting the two helpers to
+  `anon` and scoping the policy to `anon, authenticated`; the anonymous public read is
+  restored (L2F18b) while the child's thread stays closed (L2F12b).
+
+Database-linter state after this fix: 100 warnings — 1 extension in `public`, 11
+`SECURITY DEFINER` functions callable by `anon`, 88 callable by `authenticated`. The
+two newly anon-callable ones are `comment_subject_owner` and
+`can_comment_on_minor_content`; `anon` must be able to evaluate them for the public
+SELECT policy to work, and they return only a subject owner id (already exposed on the
+public reel/post/game row) and a boolean. No other function's grants changed.
+
+**Revised GO / NO-GO:** unchanged as a GO, now with **one** open finding (L-1, the
+world-readable roster). The same caveat applies: this records observed behaviour of
+specific controls, not legal compliance certification.
