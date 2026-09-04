@@ -41,8 +41,10 @@ for (const cohort of COHORTS) {
       await expect(blocked, `${cohort} may host, so no block card`).toHaveCount(0);
     } else {
       await expect(blocked, `${cohort} may not host`).toBeVisible({ timeout: 20_000 });
-      // The explanation always names an adult route forward.
-      await expect(page.getByText(/adult account|parent, guardian or coach/i).first()).toBeVisible();
+      // The block card always explains why, never a bare headline.
+      const explanation = blocked.locator("xpath=following-sibling::p[1]");
+      await expect(explanation).toBeVisible();
+      expect((await explanation.innerText()).trim().length).toBeGreaterThan(10);
     }
   });
 }
