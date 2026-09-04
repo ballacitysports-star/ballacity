@@ -83,9 +83,17 @@ export const seedTestAccounts = createServerFn({ method: "POST" })
             .slice(0, 2)
             .toUpperCase(),
           city: acct.city,
+          account_type: "player",
         },
         { onConflict: "id" },
       );
+
+      // Fixture accounts are adults. Without a stored birthday every sign-in
+      // lands on the age step of onboarding instead of the app, so E2E specs
+      // never reach the surface under test.
+      await supabaseAdmin
+        .from("profile_birthdays")
+        .upsert({ user_id: user.id, birthday: FIXTURE_ADULT_BIRTHDAY }, { onConflict: "user_id" });
 
       results.push({ key: acct.key, email: acct.email, userId: user.id, created });
     }
