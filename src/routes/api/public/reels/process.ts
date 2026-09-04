@@ -62,11 +62,30 @@ export const Route = createFileRoute("/api/public/reels/process")({
         }
 
         const results = [];
+        let skipped = 0;
         for (const r of (reels ?? []) as unknown as Reel[]) {
+          // Guardian control + own privacy preference are authoritative for AI
+          // analysis. The worker runs with the service role, so it must ask the
+          // database explicitly — RLS does not gate it.
+          const { data: allowed, error: gateErr } = await supabaseAdmin.rpc("ai_analysis_allowed", {
+            _user: r.user_id,
+          });
+          if (gateErr || allowed !== true) {
+            skipped += 1;
+            await supabaseAdmin
+              .from("highlight_reels")
+              .update({
+                status: "failed",
+                error_message:
+                  "AI analysis is turned off for this account (check Settings → Privacy, or ask your parent/guardian).",
+              })
+              .eq("id", r.id);
+            continue;
+          }
           results.push(await processReel(r, supabaseAdmin, apiKey));
         }
 
-        return new Response(JSON.stringify({ processed: results.length, results }), {
+        return new Response(JSON.stringify({ processed: results.length, skipped, results }), {
           headers: { "Content-Type": "application/json" },
         });
       },
