@@ -854,6 +854,7 @@ function RootComponent() {
     const onRejection = (event: PromiseRejectionEvent) => maybeReloadForStaleChunk(event.reason);
     window.addEventListener("error", onError);
     window.addEventListener("unhandledrejection", onRejection);
+    const uninstallStaleServerFnRecovery = installStaleServerFnRecovery();
 
     // Record initial URL, then every resolved navigation, so a later visit
     // to `/` (refresh, bookmark, OAuth return) can restore the page.
