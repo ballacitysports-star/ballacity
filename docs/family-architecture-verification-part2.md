@@ -141,3 +141,81 @@ The two new trigger routines are executable by neither `anon` nor `authenticated
 
 As in part 1: this records observed behaviour of specific controls. It is not a
 legal compliance certification for COPPA, GDPR-K or any other regime.
+
+## L-2 fix — comments on a minor's content
+
+L-1 is deliberately left as it was (still a product decision). L-2 is now closed in
+the database.
+
+**Rule encoded.** Two helpers were added:
+
+- `comment_subject_owner(subject_type, subject_id)` resolves the owner of the
+  commented-on subject — `highlight_reels.user_id`, `team_posts.author_id` or
+  `hosted_games.host_id` — and returns `NULL` when the subject cannot be resolved.
+- `can_comment_on_minor_content(commenter, content_owner)` returns true when the
+  owner is unknown or **not** in a minor cohort (adult content is unchanged, and
+  stays publicly readable); otherwise only the owner, a linked guardian
+  (`is_guardian_of`) or someone on a shared roster (`shares_team`) passes, and an
+  anonymous caller (`commenter IS NULL`) never does.
+
+Both are wired into `post_comments`: the INSERT policy keeps `auth.uid() = author_id`
+and adds the gate, and the SELECT policy `Comments are readable by permitted viewers`
+applies the gate to reads for `anon, authenticated`. Edit/delete policies were not
+touched — authorship still governs them.
+
+### Live re-verification
+
+Fixtures: guardian + linked `child_under_13`, a `teen_16_17` who accepted a roster
+invite onto the same team as the child, an unrelated adult, and an unrelated
+`child_under_13`. The reel under test is owned by the child; a second reel is owned
+by the unrelated adult as the public baseline.
+
+| # | Test | Expected | Actual | Result | Evidence |
+| --- | --- | --- | --- | --- | --- |
+| L2F1 | Unrelated adult comments on the child's reel | denied | denied | PASS | `403 42501 new row violates row-level security policy for table "post_comments"` |
+| L2F2 | Unrelated minor comments on the child's reel | denied | denied | PASS | `403 42501 new row violates row-level security policy` |
+| L2F3b | Teammate (`teen_16_17`, same accepted roster) comments | allowed | allowed | PASS | `201` row `786b8ee3…` |
+| L2F4 | Linked guardian comments | allowed | allowed | PASS | `201` row `6947a95c…` |
+| L2F5 | Child comments on their own reel | allowed | allowed | PASS | `201` row `068baf2d…` |
+| L2F6 | Anonymous comments on the child's reel | denied | denied | PASS | `401 42501 permission denied for table post_comments` |
+| L2F7/L2F7b | Unrelated adult reads / re-writes the child's thread | empty / denied | empty / denied | PASS | read `200 []`, write `403 42501` |
+| L2F8b | Unrelated minor reads the child's thread | empty | empty | PASS | `200 []` |
+| L2F9b | Teammate reads the child's thread | full thread | 2 comments returned | PASS | `200` with the teammate's and the guardian's comments |
+| L2F10 | Guardian reads the child's thread | full thread | full thread | PASS | `200` with both comments |
+| L2F11 | Child reads their own thread | full thread | full thread | PASS | `200` with both comments |
+| L2F12b | Anonymous reads the child's thread | empty | empty | PASS | `200 []` |
+| L2F13 | Child edits their own comment | allowed | allowed | PASS | `200` body `"my clip (edited)"` |
+| L2F14b | Child edits the teammate's comment | no rows affected | no rows affected | PASS | `200 []` |
+| L2F15 | Child deletes their own comment | allowed | allowed | PASS | `200` deleted row returned |
+| L2F22 | Teammate edits their own comment | allowed | allowed | PASS | `200` body `"great clip!"` |
+| L2F16 | Adult comments on an adult's reel (baseline) | allowed | allowed | PASS | `201` row `a9c7461b…` |
+| L2F17b | Signed-in user reads an adult's thread (baseline) | visible | visible | PASS | `200` with the comment |
+| L2F18b | Anonymous reads an adult's thread (public baseline) | visible | visible | PASS | `200` with the comment |
+| L2F20 | Unrelated adult evaluates `can_comment_on_minor_content(self, child)` | false | false | PASS | `200 false` |
+| L2F21 | Teammate evaluates it before joining the roster | false | false | PASS | `200 false` (pre-acceptance) |
+| Q3 | `shares_team(child, teammate)` after the invite is accepted | true | true | PASS | `200 true` |
+| L2F24 | Anonymous evaluates the gate for a child owner | false | false | PASS | `200 false` |
+| L2F25 | Anonymous evaluates the gate for an adult owner | true | true | PASS | `200 true` |
+
+Two behaviours worth recording rather than glossing:
+
+- A **pending** roster invite is not membership. The first pass granted no teammate
+  access (L2F3 `403`, `shares_team` `false`) because `team_invite_player` only
+  creates an invite; the invitee must call `team_respond_invite`. After acceptance the
+  same request succeeded. The gate follows the real roster, not an intent to invite.
+- An earlier iteration of the SELECT policy was `authenticated`-only, which silently
+  hid **adult** comment threads from signed-out visitors (`200 []` on a public reel).
+  That was a regression, not a hardening, and was fixed by granting the two helpers to
+  `anon` and scoping the policy to `anon, authenticated`; the anonymous public read is
+  restored (L2F18b) while the child's thread stays closed (L2F12b).
+
+Database-linter state after this fix: 100 warnings — 1 extension in `public`, 11
+`SECURITY DEFINER` functions callable by `anon`, 88 callable by `authenticated`. The
+two newly anon-callable ones are `comment_subject_owner` and
+`can_comment_on_minor_content`; `anon` must be able to evaluate them for the public
+SELECT policy to work, and they return only a subject owner id (already exposed on the
+public reel/post/game row) and a boolean. No other function's grants changed.
+
+**Revised GO / NO-GO:** unchanged as a GO, now with **one** open finding (L-1, the
+world-readable roster). The same caveat applies: this records observed behaviour of
+specific controls, not legal compliance certification.
