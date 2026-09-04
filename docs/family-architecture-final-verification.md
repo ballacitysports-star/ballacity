@@ -129,3 +129,8 @@ recorded rather than claimed away:
   that had no business being callable were revoked in C1.
 - This document reports observed behaviour of specific controls. It is not a
   legal compliance certification for COPPA, GDPR-K or any other regime.
+
+Continued in
+[`family-architecture-verification-part2.md`](./family-architecture-verification-part2.md),
+which covers the remaining feature keys (teams/rosters, comments, game chat, AI
+analysis, precise location) and records two open public-read findings.
