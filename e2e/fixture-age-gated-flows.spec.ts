@@ -67,7 +67,7 @@ test("a minor cohort keeps the app browsable rather than locking it out", async 
   await stubChildStatus(page, childStatus("teen_13_15", null));
   await signInAs(page, "player");
 
-  for (const path of ["/feed", "/players", "/discover"]) {
+  for (const path of ["/feed", "/players", "/reels"]) {
     await page.goto(path, { waitUntil: "domcontentloaded" });
     await expect(page).toHaveURL(new RegExp(path));
     await expect(page.getByRole("group", { name: "Primary tabs" })).toBeVisible({
