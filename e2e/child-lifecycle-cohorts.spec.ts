@@ -10,18 +10,22 @@ import { DEFAULT_AGE_POLICY, DEFAULT_CHILD_CONTROLS } from "../src/lib/child-pol
  *
  * The gate is the friendly explanation, not the security boundary — the
  * database enforces the same rules (`child_features_locked`,
- * `enforce_child_game_participation`, `enforce_minor_messaging`). These tests
- * assert the product surface matches the server decision for every cohort:
+ * `enforce_child_game_participation`, `enforce_minor_messaging`). A child
+ * without approved consent gets LIMITED access: the app itself stays
+ * browsable (this is the point — a locked-out child was blocked even from
+ * looking around), while the database rejects every write that matters
+ * regardless of what the client shows. These tests assert the product
+ * surface matches the server decision for every cohort:
  *
- *   under-13, consent required  → app blocked, routed to the consent flow
- *   under-13, consent pending   → app blocked, "waiting for your parent"
- *   under-13, consent approved  → app usable
- *   under-13, consent revoked   → app blocked again, "turned this account off"
+ *   under-13, consent required  → banner + app browsable, routed to the consent flow
+ *   under-13, consent pending   → banner + app browsable, "waiting for your parent"
+ *   under-13, consent approved  → no banner, app usable
+ *   under-13, consent revoked   → banner again, "turned this account off"
  *   13-15 / 16-17 / adult       → app usable, never gated
  *
  * Also covered: the consent flow and safety pages stay reachable while the
- * gate is up (a blocked child must never be trapped), and the guardian-only
- * Parent Center is not reachable from a blocked child account.
+ * banner is up, and the guardian-only Parent Center is not reachable from a
+ * blocked child account.
  *
  * The server-fn response is stubbed the same way as
  * `social-login-identity-cases.spec.ts`: TanStack encodes results with seroval
@@ -119,19 +123,17 @@ async function signIn(page: Page) {
 }
 
 const gate = (page: Page) =>
-  page.getByRole("heading", {
-    name: /parent or guardian|needs a parent or guardian|turned this account off/i,
-  });
+  page.getByText(/parent or guardian|turned this account off/i);
 
 test.describe("child lifecycle: consent gate per cohort", () => {
   const blocked: Array<[string, Consent["status"], RegExp]> = [
-    ["consent required", "required", /needs a parent or guardian to approve/i],
+    ["consent required", "required", /A parent or guardian needs to approve this account/i],
     ["consent pending", "pending", /Waiting for your parent or guardian/i],
-    ["consent revoked", "revoked", /turned this account off/i],
+    ["consent revoked", "revoked", /A parent or guardian turned this account off/i],
   ];
 
-  for (const [label, consentStatus, heading] of blocked) {
-    test(`under-13 with ${label} cannot use the app`, async ({ browser }) => {
+  for (const [label, consentStatus, bannerText] of blocked) {
+    test(`under-13 with ${label} gets limited, browse-only access`, async ({ browser }) => {
       const context = await browser.newContext();
       const page = await context.newPage();
       try {
@@ -139,13 +141,17 @@ test.describe("child lifecycle: consent gate per cohort", () => {
         await signIn(page);
         await page.goto("/feed", { waitUntil: "domcontentloaded" });
 
-        await expect(page.getByRole("heading", { name: heading })).toBeVisible({
-          timeout: 20_000,
-        });
+        // The banner explains the account is limited...
+        await expect(page.getByText(bannerText)).toBeVisible({ timeout: 20_000 });
         // The escape hatch to the consent flow must always be offered.
         await expect(
-          page.getByRole("link", { name: /Start approval|Check approval status/i }),
+          page.getByRole("link", { name: /Start approval|Check status/i }),
         ).toBeVisible();
+        // ...but the feed itself is NOT blocked — the child can still browse,
+        // and the primary tab bar underneath the banner is reachable, not
+        // covered by a full-screen overlay.
+        await expect(page).toHaveURL(/\/feed/);
+        await expect(page.getByRole("group", { name: "Primary tabs" })).toBeVisible();
       } finally {
         await context.close();
       }

@@ -17,6 +17,7 @@ import {
 import { ReportDialog } from "@/components/ReportDialog";
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/use-auth";
+import { useMyChildStatus } from "@/lib/child-safety";
 import {
   getConversationOther,
   listMessages,
@@ -58,6 +59,8 @@ type Other = {
 function Thread() {
   const { conversationId } = Route.useParams();
   const { user, loading } = useAuth();
+  const { can: canChildFeature } = useMyChildStatus();
+  const messagingDecision = canChildFeature("direct_messaging");
   const [msgs, setMsgs] = useState<Message[]>([]);
   const [reactions, setReactions] = useState<MessageReaction[]>([]);
   const [other, setOther] = useState<Other | null>(null);
@@ -300,6 +303,12 @@ function Thread() {
     e.preventDefault();
     if (!text.trim() && !pendingFile) return;
     if (uploading) return;
+    if (!messagingDecision.allowed) {
+      toast.error(
+        messagingDecision.reason || "A parent or guardian must approve this account first.",
+      );
+      return;
+    }
     setSending(true);
     try {
       let attachment = null;
@@ -794,13 +803,25 @@ function Thread() {
               }
             }}
             rows={1}
-            placeholder={isRequest ? "Accept to reply" : "Message…"}
-            disabled={isRequest}
+            placeholder={
+              !messagingDecision.allowed
+                ? "Parent approval needed to message"
+                : isRequest
+                  ? "Accept to reply"
+                  : "Message…"
+            }
+            disabled={isRequest || !messagingDecision.allowed}
             className="flex-1 resize-none rounded-2xl border border-border bg-surface px-4 py-2.5 text-sm focus:outline-none focus:border-lime max-h-32 disabled:opacity-50"
           />
           <button
             type="submit"
-            disabled={sending || uploading || isRequest || (!text.trim() && !pendingFile)}
+            disabled={
+              sending ||
+              uploading ||
+              isRequest ||
+              !messagingDecision.allowed ||
+              (!text.trim() && !pendingFile)
+            }
             aria-label="Send"
             className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-lime-gradient text-primary-foreground disabled:opacity-40"
           >

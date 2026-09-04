@@ -2,7 +2,7 @@ import { Link, useLocation } from "@tanstack/react-router";
 import { ShieldAlert } from "lucide-react";
 import { useMyChildStatus } from "@/lib/child-safety";
 
-const ALLOWED_PREFIXES = [
+const HIDDEN_PREFIXES = [
   "/onboarding",
   "/parent",
   "/safety",
@@ -15,55 +15,48 @@ const ALLOWED_PREFIXES = [
 ];
 
 /**
- * A child account with no approved guardian consent never sees the social app.
- * The database enforces the same rule (child_features_locked), so this overlay
- * is the friendly explanation rather than the security boundary.
+ * A child account without approved guardian consent gets LIMITED, browse-only
+ * access: it can look around the app, but every write the database cares
+ * about (joining/hosting games, messaging, comments, video upload, …) is
+ * refused by the `child_features_locked` triggers regardless of what this
+ * component does. This banner is the friendly explanation, not the security
+ * boundary — the DB enforces the real one, and the individual action buttons
+ * (see `useMyChildStatus().can(...)`) reflect it in the UI too.
  */
 export function ChildConsentGate() {
   const { status, consentBlocked, state, isLoading, policy } = useMyChildStatus();
   const location = useLocation();
 
   if (isLoading || !status || !consentBlocked) return null;
-  if (ALLOWED_PREFIXES.some((p) => location.pathname.startsWith(p))) return null;
+  if (HIDDEN_PREFIXES.some((p) => location.pathname.startsWith(p))) return null;
 
   const revoked = state === "PARENTAL_CONSENT_REVOKED";
   const pending = state === "PARENTAL_CONSENT_PENDING";
 
   return (
-    <div className="fixed inset-0 z-50 grid place-items-center bg-background/95 p-5 backdrop-blur">
-      <div className="w-full max-w-md rounded-2xl border border-border bg-surface p-5">
-        <div className="flex items-center gap-2 text-primary">
-          <ShieldAlert className="h-5 w-5" aria-hidden />
-          <span className="text-xs font-bold uppercase tracking-wide">Account needs approval</span>
-        </div>
-        <h1 className="mt-2 font-display text-xl font-bold">
+    <div className="sticky top-0 z-40 border-b border-border bg-surface/95 px-4 py-2.5 backdrop-blur">
+      <div className="mx-auto flex max-w-2xl items-center gap-2.5 text-sm">
+        <ShieldAlert className="h-4 w-4 shrink-0 text-primary" aria-hidden />
+        <p className="min-w-0 flex-1 text-muted-foreground">
+          <span className="font-semibold text-foreground">
+            {revoked
+              ? "A parent or guardian turned this account off."
+              : pending
+                ? "Waiting for your parent or guardian."
+                : "A parent or guardian needs to approve this account."}
+          </span>{" "}
           {revoked
-            ? "A parent or guardian turned this account off"
+            ? "Games, messages, videos and comments stay off until they approve again."
             : pending
-              ? "Waiting for your parent or guardian"
-              : "ballaCity needs a parent or guardian to approve this account"}
-        </h1>
-        <p className="mt-2 text-sm text-muted-foreground">
-          {revoked
-            ? "Your parent or guardian withdrew their approval, so games, messages, videos and your profile are turned off. They can approve again from the Parent Center."
-            : pending
-              ? "We're waiting for them to open the approval link and confirm. Games, messages and videos stay off until they do."
-              : `Because you're under ${policy.parentalConsentMaxAge + 1}, a parent or guardian has to approve your account before you can join games, message anyone, or share videos.`}
+              ? "Games, messages, videos and comments stay off until they confirm."
+              : `Because you're under ${policy.parentalConsentMaxAge + 1}, games, messages, videos and comments stay off until they do. You can still look around.`}
         </p>
-        <div className="mt-4 flex flex-wrap gap-2">
-          <Link
-            to="/onboarding/child"
-            className="rounded-full bg-primary px-4 py-2 text-sm font-bold text-primary-foreground"
-          >
-            {pending ? "Check approval status" : "Start approval"}
-          </Link>
-          <Link
-            to="/safety/children"
-            className="rounded-full border border-border px-4 py-2 text-sm font-semibold"
-          >
-            Child & teen safety
-          </Link>
-        </div>
+        <Link
+          to="/onboarding/child"
+          className="shrink-0 rounded-full bg-primary px-3 py-1.5 text-xs font-bold text-primary-foreground"
+        >
+          {pending ? "Check status" : "Start approval"}
+        </Link>
       </div>
     </div>
   );
