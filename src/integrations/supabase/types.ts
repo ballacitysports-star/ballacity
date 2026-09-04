@@ -3701,6 +3701,10 @@ export type Database = {
         Args: { _child: string; _reason: string }
         Returns: undefined
       }
+      roster_row_visible: {
+        Args: { _member_user_id: string; _team_id: string }
+        Returns: boolean
+      }
       set_child_controls: {
         Args: { _child: string; _controls: Json }
         Returns: undefined
