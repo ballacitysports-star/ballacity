@@ -3268,6 +3268,10 @@ export type Database = {
           total: number
         }[]
       }
+      admin_revoke_user_sessions: {
+        Args: { _user_id: string }
+        Returns: number
+      }
       age_category_from_birthday: { Args: { _bd: string }; Returns: string }
       age_cohort_from_birthday: { Args: { _bd: string }; Returns: string }
       age_cohort_of: { Args: { _user: string }; Returns: string }
