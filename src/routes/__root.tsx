@@ -410,6 +410,7 @@ const TAB_PATHS = [
   "/profile",
   "/notifications",
   "/reels",
+  "/highlights",
 ];
 
 /**

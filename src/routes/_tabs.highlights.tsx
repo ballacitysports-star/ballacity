@@ -24,7 +24,7 @@ import {
 import { useReelRealtime } from "@/hooks/use-reel-realtime";
 
 
-export const Route = createFileRoute("/highlights")({
+export const Route = createFileRoute("/_tabs/highlights")({
   head: () =>
     pageHead({
       path: "/highlights",
@@ -142,7 +142,7 @@ function HighlightFeedPage() {
   const visible = sortItems(items, sort);
 
   return (
-    <div className="min-h-dvh bg-background pb-24 pt-[env(safe-area-inset-top)]">
+    <div className="min-h-dvh bg-background">
       {/* Instagram-style top bar: wordmark left, actions right. */}
       <header className="sticky top-0 z-10 border-b border-border/70 bg-background/90 backdrop-blur">
         <div className="mx-auto flex w-full max-w-[470px] items-center gap-3 px-4 py-3">
