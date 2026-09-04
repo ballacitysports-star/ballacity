@@ -102,11 +102,15 @@ export function BirthdayLockCard() {
                     className="mt-1 w-full rounded-2xl border border-border bg-background px-3 py-2 text-sm outline-none focus:border-lime"
                   />
                 </label>
+                {formError ? (
+                  <p className="text-[11px] leading-snug text-muted-foreground">{formError}</p>
+                ) : null}
                 <div className="flex gap-2">
                   <button
                     type="button"
-                    disabled={request.isPending}
+                    disabled={request.isPending || !!formError}
                     onClick={() => void submit()}
+
                     className="rounded-full bg-lime px-4 py-2 text-xs font-bold text-primary-foreground disabled:opacity-60"
                   >
                     {request.isPending ? "Sending…" : "Send for review"}
