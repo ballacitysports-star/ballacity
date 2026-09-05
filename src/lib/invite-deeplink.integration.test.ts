@@ -18,7 +18,7 @@
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { TEST_ACCOUNTS } from "./test-fixtures";
-import { Route as GameRoute } from "@/routes/games.$gameId";
+import { Route as GameIndexRoute } from "@/routes/games.$gameId.index";
 
 // The notification row is written by a TanStack server function, which has no
 // Start runtime under vitest. Capture the payload the writer produces so the
@@ -129,7 +129,7 @@ describe.skipIf(skipIfNoBackend)("invite notification deep link", () => {
     // 3. The actual route's validateSearch parses them back into typed state,
     //    so the Game detail page will render the "You're invited" banner.
     const search = Object.fromEntries(params.entries()) as Record<string, unknown>;
-    const validate = GameRoute.options.validateSearch as unknown as (
+    const validate = GameIndexRoute.options.validateSearch as unknown as (
       s: Record<string, unknown>,
     ) => { invite?: true; from?: string };
     const parsed = validate(search);
