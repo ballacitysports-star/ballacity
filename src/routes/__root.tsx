@@ -148,9 +148,9 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
 const THEME_INIT_SCRIPT = `(function(){try{var h=document.documentElement;h.classList.add('dark');h.dataset.theme='dark';h.dataset.themePref='dark';}catch(e){document.documentElement.classList.add('dark');}})();`;
 
 const BOOT_RETRY_KEY = "openrun:boot-retry-at";
-const BOOT_TIMEOUT_MS = 20_000;
-const BOOT_HARD_TIMEOUT_MS = 45_000;
-const BOOT_PROGRESS_GRACE_MS = 8_000;
+const BOOT_TIMEOUT_MS = 12_000;
+const BOOT_HARD_TIMEOUT_MS = 20_000;
+const BOOT_PROGRESS_GRACE_MS = 4_000;
 
 /**
  * Boot watchdog. Runs as a plain inline script (NOT a React effect) because the
@@ -202,7 +202,7 @@ const BOOT_WATCHDOG_SCRIPT = `(function(){
     write(String(Date.now()));
     window.location.reload();
   }
-  function resourceCount(){try{return performance.getEntriesByType('resource').length;}catch(e){return 0;}}
+  function resourceCount(){try{var o=location.origin;var e=performance.getEntriesByType('resource');var n=0;for(var i=0;i<e.length;i++){if(String(e[i].name).indexOf(o)===0)n++;}return n;}catch(e){return 0;}}
   function checkProgress(){
     if(booted())return;
     var now=Date.now();
