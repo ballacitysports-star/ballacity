@@ -772,8 +772,8 @@ function AuthGate({ children }: { children: React.ReactNode }) {
         );
         if (cancelled) return;
         if (status.needsOnboarding) {
+          // Render the picker in place; no redirect.
           setTypeStatus("missing");
-          router.navigate({ to: "/onboarding/account-type", replace: true });
         } else {
           onboardedUsers.add(user.id);
           setTypeStatus("ok");
@@ -795,7 +795,6 @@ function AuthGate({ children }: { children: React.ReactNode }) {
           setTypeStatus("ok");
         } else {
           setTypeStatus("missing");
-          router.navigate({ to: "/onboarding/account-type", replace: true });
         }
       } catch {
         // Both the server guard and the profile read failed (offline, server
