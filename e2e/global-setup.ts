@@ -47,10 +47,11 @@ export default async function globalSetup() {
 
   // (2) Best-effort idempotent seed when a service role key is available.
   if (SUPABASE_SERVICE_ROLE_KEY) {
+    const admin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
+      auth: { persistSession: false, autoRefreshToken: false, storage: undefined },
+    });
+
     try {
-      const admin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
-        auth: { persistSession: false, autoRefreshToken: false, storage: undefined },
-      });
       const { data: list, error: listErr } = await admin.auth.admin.listUsers({
         page: 1,
         perPage: 1000,
@@ -84,6 +85,63 @@ export default async function globalSetup() {
         `[e2e global-setup] Could not upsert fixture account: ${
           err instanceof Error ? err.message : String(err)
         }. Falling through to sign-in attempt.`,
+      );
+    }
+
+    // (2b) Seed the fixed "g1"/"g2" hosted_games rows a large chunk of the
+    // suite hardcodes as a lightweight, DB-free fixture game. These used to
+    // be served from a bundled sample-data fallback; that fallback is now
+    // empty (real users no longer see demo games), so the specs need a real
+    // row instead. host_id has no FK, so any UUID that isn't the signed-in
+    // player's own id keeps isHost false — no second fixture account needed.
+    try {
+      const now = Date.now();
+      const rows = [
+        {
+          id: "g1",
+          host_id: "00000000-0000-4000-8000-000000000001",
+          sport: "Basketball",
+          title: "Friday Night Run · 5v5 Full Court",
+          date: new Date(now + 3 * 3600_000).toISOString(),
+          duration: "120 min",
+          location: "Tompkins Square Courts",
+          neighborhood: "East Village",
+          max_players: 10,
+          joined: 8,
+          skill: "Intermediate",
+          price: 0,
+          indoor: false,
+          is_private: false,
+          description:
+            "Competitive but chill. We rotate teams every game to 11. Bring a light + dark shirt.",
+          host_snapshot: { name: "Marcus Lee", username: "@marcus", avatar: "ML", rating: 4.9 },
+        },
+        {
+          id: "g2",
+          host_id: "00000000-0000-4000-8000-000000000002",
+          sport: "Soccer",
+          title: "Sunday Sunset 7v7",
+          date: new Date(now + 22 * 3600_000).toISOString(),
+          duration: "90 min",
+          location: "Pier 40 Turf",
+          neighborhood: "West Side",
+          max_players: 14,
+          joined: 11,
+          skill: "All Levels",
+          price: 8,
+          indoor: false,
+          is_private: false,
+          description: "Mixed-gender, all levels. $8 covers turf rental. Cleats recommended.",
+          host_snapshot: { name: "Ana García", username: "@anagk", avatar: "AG", rating: 4.8 },
+        },
+      ];
+      const { error } = await admin.from("hosted_games").upsert(rows, { onConflict: "id" });
+      if (error) throw new Error(error.message);
+    } catch (err) {
+      console.warn(
+        `[e2e global-setup] Could not seed fixture games g1/g2: ${
+          err instanceof Error ? err.message : String(err)
+        }. Specs that hardcode these ids will fail.`,
       );
     }
   }
