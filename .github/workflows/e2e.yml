@@ -13,12 +13,33 @@ jobs:
   playwright:
     name: Playwright
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    # Was 20; the suite ran with the fixture accounts genuinely signed in for
+    # the first time and hit this ceiling mid-run (single-worker by design —
+    # see playwright.config.ts — since many specs share the same few fixture
+    # accounts and parallel runs would race on them).
+    timeout-minutes: 40
     env:
       # Force Playwright to use its own managed Chromium rather than the
       # sandbox-only path baked into playwright.config.ts.
       PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH: ""
       E2E_BASE_URL: http://localhost:8080
+      # Vite reads these from the environment at build/dev time (no .env file
+      # is committed — see .env.example). Without them the Supabase client in
+      # src/integrations/supabase/client.ts throws on first use and the app
+      # never boots, let alone runs auth-dependent specs.
+      VITE_SUPABASE_URL: ${{ secrets.E2E_SUPABASE_URL }}
+      VITE_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.E2E_SUPABASE_PUBLISHABLE_KEY }}
+      VITE_SUPABASE_PROJECT_ID: ${{ secrets.E2E_SUPABASE_PROJECT_ID }}
+      # Non-VITE-prefixed copies for Node-side scripts (e2e/global-setup.ts,
+      # SSR) that read process.env directly instead of import.meta.env.
+      SUPABASE_URL: ${{ secrets.E2E_SUPABASE_URL }}
+      SUPABASE_PUBLISHABLE_KEY: ${{ secrets.E2E_SUPABASE_PUBLISHABLE_KEY }}
+      SUPABASE_PROJECT_ID: ${{ secrets.E2E_SUPABASE_PROJECT_ID }}
+      # Optional: lets global-setup.ts idempotently create/reset the seeded
+      # e2e-*@lovable.test fixture accounts via the admin API. Without it,
+      # global-setup falls back to signing in — which only works if those
+      # accounts already exist in the Supabase project.
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.E2E_SUPABASE_SERVICE_ROLE_KEY }}
     steps:
       - uses: actions/checkout@v4
 

@@ -14,7 +14,6 @@ import { Route as TabsRouteImport } from './routes/_tabs'
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as CommunityGuidelinesRouteImport } from './routes/community-guidelines'
 import { Route as ContactRouteImport } from './routes/contact'
-import { Route as HighlightsRouteImport } from './routes/highlights'
 import { Route as McpRouteImport } from './routes/mcp'
 import { Route as PaymentsRouteImport } from './routes/payments'
 import { Route as PickupRouteImport } from './routes/pickup'
@@ -34,6 +33,7 @@ import { Route as Char91DotwellKnownChar93OauthProtectedResourceRouteImport } fr
 import { Route as TabsCreateRouteImport } from './routes/_tabs.create'
 import { Route as TabsDiscoverRouteImport } from './routes/_tabs.discover'
 import { Route as TabsFeedRouteImport } from './routes/_tabs.feed'
+import { Route as TabsHighlightsRouteImport } from './routes/_tabs.highlights'
 import { Route as TabsNotificationsRouteImport } from './routes/_tabs.notifications'
 import { Route as TabsPlayersRouteImport } from './routes/_tabs.players'
 import { Route as TabsProfileRouteImport } from './routes/_tabs.profile'
@@ -115,11 +115,6 @@ const CommunityGuidelinesRoute = CommunityGuidelinesRouteImport.update({
 const ContactRoute = ContactRouteImport.update({
   id: '/contact',
   path: '/contact',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const HighlightsRoute = HighlightsRouteImport.update({
-  id: '/highlights',
-  path: '/highlights',
   getParentRoute: () => rootRouteImport,
 } as any)
 const McpRoute = McpRouteImport.update({
@@ -217,6 +212,11 @@ const TabsDiscoverRoute = TabsDiscoverRouteImport.update({
 const TabsFeedRoute = TabsFeedRouteImport.update({
   id: '/feed',
   path: '/feed',
+  getParentRoute: () => TabsRoute,
+} as any)
+const TabsHighlightsRoute = TabsHighlightsRouteImport.update({
+  id: '/highlights',
+  path: '/highlights',
   getParentRoute: () => TabsRoute,
 } as any)
 const TabsNotificationsRoute = TabsNotificationsRouteImport.update({
@@ -518,7 +518,6 @@ export interface FileRoutesByFullPath {
   '/auth': typeof AuthRoute
   '/community-guidelines': typeof CommunityGuidelinesRoute
   '/contact': typeof ContactRoute
-  '/highlights': typeof HighlightsRoute
   '/mcp': typeof McpRoute
   '/payments': typeof PaymentsRoute
   '/pickup': typeof PickupRoute
@@ -538,6 +537,7 @@ export interface FileRoutesByFullPath {
   '/create': typeof TabsCreateRoute
   '/discover': typeof TabsDiscoverRoute
   '/feed': typeof TabsFeedRoute
+  '/highlights': typeof TabsHighlightsRoute
   '/notifications': typeof TabsNotificationsRoute
   '/players': typeof TabsPlayersRoute
   '/profile': typeof TabsProfileRoute
@@ -602,7 +602,6 @@ export interface FileRoutesByTo {
   '/auth': typeof AuthRoute
   '/community-guidelines': typeof CommunityGuidelinesRoute
   '/contact': typeof ContactRoute
-  '/highlights': typeof HighlightsRoute
   '/mcp': typeof McpRoute
   '/payments': typeof PaymentsRoute
   '/pickup': typeof PickupRoute
@@ -622,6 +621,7 @@ export interface FileRoutesByTo {
   '/create': typeof TabsCreateRoute
   '/discover': typeof TabsDiscoverRoute
   '/feed': typeof TabsFeedRoute
+  '/highlights': typeof TabsHighlightsRoute
   '/notifications': typeof TabsNotificationsRoute
   '/players': typeof TabsPlayersRoute
   '/profile': typeof TabsProfileRoute
@@ -687,7 +687,6 @@ export interface FileRoutesById {
   '/auth': typeof AuthRoute
   '/community-guidelines': typeof CommunityGuidelinesRoute
   '/contact': typeof ContactRoute
-  '/highlights': typeof HighlightsRoute
   '/mcp': typeof McpRoute
   '/payments': typeof PaymentsRoute
   '/pickup': typeof PickupRoute
@@ -707,6 +706,7 @@ export interface FileRoutesById {
   '/_tabs/create': typeof TabsCreateRoute
   '/_tabs/discover': typeof TabsDiscoverRoute
   '/_tabs/feed': typeof TabsFeedRoute
+  '/_tabs/highlights': typeof TabsHighlightsRoute
   '/_tabs/notifications': typeof TabsNotificationsRoute
   '/_tabs/players': typeof TabsPlayersRoute
   '/_tabs/profile': typeof TabsProfileRoute
@@ -773,7 +773,6 @@ export interface FileRouteTypes {
     | '/auth'
     | '/community-guidelines'
     | '/contact'
-    | '/highlights'
     | '/mcp'
     | '/payments'
     | '/pickup'
@@ -793,6 +792,7 @@ export interface FileRouteTypes {
     | '/create'
     | '/discover'
     | '/feed'
+    | '/highlights'
     | '/notifications'
     | '/players'
     | '/profile'
@@ -857,7 +857,6 @@ export interface FileRouteTypes {
     | '/auth'
     | '/community-guidelines'
     | '/contact'
-    | '/highlights'
     | '/mcp'
     | '/payments'
     | '/pickup'
@@ -877,6 +876,7 @@ export interface FileRouteTypes {
     | '/create'
     | '/discover'
     | '/feed'
+    | '/highlights'
     | '/notifications'
     | '/players'
     | '/profile'
@@ -941,7 +941,6 @@ export interface FileRouteTypes {
     | '/auth'
     | '/community-guidelines'
     | '/contact'
-    | '/highlights'
     | '/mcp'
     | '/payments'
     | '/pickup'
@@ -961,6 +960,7 @@ export interface FileRouteTypes {
     | '/_tabs/create'
     | '/_tabs/discover'
     | '/_tabs/feed'
+    | '/_tabs/highlights'
     | '/_tabs/notifications'
     | '/_tabs/players'
     | '/_tabs/profile'
@@ -1027,7 +1027,6 @@ export interface RootRouteChildren {
   AuthRoute: typeof AuthRoute
   CommunityGuidelinesRoute: typeof CommunityGuidelinesRoute
   ContactRoute: typeof ContactRoute
-  HighlightsRoute: typeof HighlightsRoute
   McpRoute: typeof McpRoute
   PaymentsRoute: typeof PaymentsRoute
   PickupRoute: typeof PickupRoute
@@ -1130,13 +1129,6 @@ declare module '@tanstack/react-router' {
       path: '/contact'
       fullPath: '/contact'
       preLoaderRoute: typeof ContactRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/highlights': {
-      id: '/highlights'
-      path: '/highlights'
-      fullPath: '/highlights'
-      preLoaderRoute: typeof HighlightsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/mcp': {
@@ -1270,6 +1262,13 @@ declare module '@tanstack/react-router' {
       path: '/feed'
       fullPath: '/feed'
       preLoaderRoute: typeof TabsFeedRouteImport
+      parentRoute: typeof TabsRoute
+    }
+    '/_tabs/highlights': {
+      id: '/_tabs/highlights'
+      path: '/highlights'
+      fullPath: '/highlights'
+      preLoaderRoute: typeof TabsHighlightsRouteImport
       parentRoute: typeof TabsRoute
     }
     '/_tabs/notifications': {
@@ -1685,6 +1684,7 @@ interface TabsRouteChildren {
   TabsCreateRoute: typeof TabsCreateRoute
   TabsDiscoverRoute: typeof TabsDiscoverRoute
   TabsFeedRoute: typeof TabsFeedRoute
+  TabsHighlightsRoute: typeof TabsHighlightsRoute
   TabsNotificationsRoute: typeof TabsNotificationsRoute
   TabsPlayersRoute: typeof TabsPlayersRoute
   TabsProfileRoute: typeof TabsProfileRoute
@@ -1697,6 +1697,7 @@ const TabsRouteChildren: TabsRouteChildren = {
   TabsCreateRoute: TabsCreateRoute,
   TabsDiscoverRoute: TabsDiscoverRoute,
   TabsFeedRoute: TabsFeedRoute,
+  TabsHighlightsRoute: TabsHighlightsRoute,
   TabsNotificationsRoute: TabsNotificationsRoute,
   TabsPlayersRoute: TabsPlayersRoute,
   TabsProfileRoute: TabsProfileRoute,
@@ -1729,7 +1730,6 @@ const rootRouteChildren: RootRouteChildren = {
   AuthRoute: AuthRoute,
   CommunityGuidelinesRoute: CommunityGuidelinesRoute,
   ContactRoute: ContactRoute,
-  HighlightsRoute: HighlightsRoute,
   McpRoute: McpRoute,
   PaymentsRoute: PaymentsRoute,
   PickupRoute: PickupRoute,

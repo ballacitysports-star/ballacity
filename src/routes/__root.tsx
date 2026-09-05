@@ -410,6 +410,7 @@ const TAB_PATHS = [
   "/profile",
   "/notifications",
   "/reels",
+  "/highlights",
 ];
 
 /**
@@ -810,7 +811,19 @@ function AuthGate({ children }: { children: React.ReactNode }) {
     };
   }, [user, isPublic, isTab]);
 
-  if (isPublic) return <>{children}</>;
+  // Public routes skip the sign-in/age/account-type gates below so an
+  // anonymous visitor (e.g. a shared link) can view them. But a route that's
+  // ALSO a primary tab (currently just /highlights) should still show the
+  // tab bar for a signed-in viewer — otherwise tapping "Highlights" from the
+  // bar makes the bar itself disappear, unlike every other tab.
+  if (isPublic) {
+    return (
+      <>
+        {children}
+        {user && isTab && <BottomNav />}
+      </>
+    );
+  }
   // "Signing you in…" only while an OAuth attempt is actually pending.
   const oauthPending = typeof window !== "undefined" && !!readSavedOAuthProvider();
   if (loading || verifying || !user) {
