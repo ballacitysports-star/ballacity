@@ -17,9 +17,21 @@
  * Run:
  *   bunx vitest run src/lib/invite-contact-request.integration.test.ts
  */
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { TEST_ACCOUNTS } from "./test-fixtures";
+
+// The in-app notification insert runs through a TanStack server function, which
+// has no Start runtime inside vitest. Capture its payload instead so the
+// notification contract stays testable here.
+const notif = vi.hoisted(() => ({ calls: [] as Array<Record<string, unknown>> }));
+vi.mock("@/lib/notifications.functions", () => ({
+  createNotificationForUser: async ({ data }: { data: Record<string, unknown> }) => {
+    notif.calls.push(data);
+  },
+}));
+vi.mock("@/lib/push.functions", () => ({ sendPushToUser: async () => {} }));
+
 
 const URL = process.env.VITE_SUPABASE_URL ?? process.env.SUPABASE_URL;
 const KEY = process.env.VITE_SUPABASE_PUBLISHABLE_KEY ?? process.env.SUPABASE_PUBLISHABLE_KEY;
@@ -220,26 +232,27 @@ describe.skipIf(skipIfNoBackend)("availability invite endpoint", () => {
     if (insErr || !ins) return;
     createdRequestIds.push(ins.id as string);
 
-    // Try to mutate game_id — trigger should reject.
+    // Try to mutate game_id / kind / to_user_id. Either RLS matches zero rows
+    // (sender has no UPDATE grant) or the trigger raises "identity fields are
+    // immutable" — both are acceptable; the row must not change.
+    const identityErr = /immutable|identity/i;
     const { error: gameIdErr } = await hostClient
       .from("availability_contact_requests")
       .update({ game_id: `swapped-${Date.now()}` })
       .eq("id", ins.id);
-    expect(gameIdErr?.message ?? "").toMatch(/immutable|identity/i);
+    if (gameIdErr) expect(gameIdErr.message).toMatch(identityErr);
 
-    // Try to mutate kind.
     const { error: kindErr } = await hostClient
       .from("availability_contact_requests")
       .update({ kind: "contact" })
       .eq("id", ins.id);
-    expect(kindErr?.message ?? "").toMatch(/immutable|identity/i);
+    if (kindErr) expect(kindErr.message).toMatch(identityErr);
 
-    // Try to mutate to_user_id.
     const { error: toErr } = await hostClient
       .from("availability_contact_requests")
       .update({ to_user_id: player2Id })
       .eq("id", ins.id);
-    expect(toErr?.message ?? "").toMatch(/immutable|identity/i);
+    if (toErr) expect(toErr.message).toMatch(identityErr);
 
     // Confirm row is unchanged.
     const { data: after } = await hostClient
@@ -252,7 +265,7 @@ describe.skipIf(skipIfNoBackend)("availability invite endpoint", () => {
     expect(after?.to_user_id).toBe(playerId);
   });
 
-  it("createContactRequest(invite) inserts an in-app notification for the recipient", async () => {
+  it("createContactRequest(invite) notifies the recipient", async () => {
     if (!canRun || !playerAvailabilityId) return;
     // Use the real client-side helper so we exercise the same code path the UI uses.
     const mod = await import("./availability");
@@ -262,7 +275,7 @@ describe.skipIf(skipIfNoBackend)("availability invite endpoint", () => {
     await supabase.auth.signInWithPassword({ email: host.email, password: host.password });
 
     const gameId = `notif-${Date.now()}`;
-    const before = new Date().toISOString();
+    notif.calls.length = 0;
     await mod.createContactRequest(playerAvailabilityId, playerId, "Want in?", {
       gameId,
       title: "Notif verification game",
@@ -271,26 +284,13 @@ describe.skipIf(skipIfNoBackend)("availability invite endpoint", () => {
       startsAt: new Date(Date.now() + 86_400_000).toISOString(),
     });
 
-    // Recipient (player) reads their own notifications row (RLS scoped to auth.uid()).
-    // Poll briefly because the insert is fire-and-forget.
-    let found: any = null;
-    for (let i = 0; i < 6; i++) {
-      const { data } = await playerClient
-        .from("notifications")
-        .select("id, type, title, user_id, created_at")
-        .eq("user_id", playerId)
-        .eq("type", "game_invite")
-        .gte("created_at", before)
-        .order("created_at", { ascending: false })
-        .limit(1);
-      if (data && data.length) {
-        found = data[0];
-        break;
-      }
-      await new Promise((r) => setTimeout(r, 250));
-    }
+    const found = notif.calls.find(
+      (c) => c.type === "game_invite" && c.user_id === playerId,
+    ) as Record<string, string> | undefined;
     expect(found).toBeTruthy();
-    expect(found.title).toMatch(/Notif verification game/);
+    expect(found!.title).toMatch(/Notif verification game/);
+    expect(found!.link).toBe(`/games/${gameId}?invite=1&from=${hostId}`);
+
 
     // Cleanup the request row created via the helper (by recipient/game_id).
     const { data: rows } = await hostClient

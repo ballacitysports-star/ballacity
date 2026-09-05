@@ -182,29 +182,32 @@ describe.skipIf(skipIfNoBackend)("player_availabilities spoofing rejections", ()
     }
   });
 
-  it("rejects spoofed skill_level", async () => {
+  it("rejects an empty skill_level", async () => {
     if (!canRun) return;
+    // Per-sport tier names are owned by the app, so the database validates
+    // shape only: a blank or oversized value must still be refused.
     const { error } = await client.from("player_availabilities").insert({
       user_id: userId,
       sports: ["Basketball"],
-      skill_level: "Godlike", // not in allow-list
+      skill_level: "   ",
       travel_radius_km: 25,
       status: "open",
     });
     expect(error?.message ?? "").toMatch(/skill_level/i);
   });
 
-  it("rejects travel_radius_km outside 1..500", async () => {
+  it("rejects travel_radius_km outside the allowed range", async () => {
     if (!canRun) return;
     const { error } = await client.from("player_availabilities").insert({
       user_id: userId,
       sports: ["Basketball"],
       skill_level: "Intermediate",
-      travel_radius_km: 9999, // spoof
+      travel_radius_km: 99999, // spoof: beyond the 20200 km cap
       status: "open",
     });
     expect(error?.message ?? "").toMatch(/travel_radius_km/i);
   });
+
 
   it("rejects unknown sport", async () => {
     if (!canRun) return;
