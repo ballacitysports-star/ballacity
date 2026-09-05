@@ -706,14 +706,10 @@ function AuthGate({ children }: { children: React.ReactNode }) {
         const status = await withDeadline(getMyAgeStatus(), ONBOARDING_CHECK_TIMEOUT_MS);
         if (cancelled) return;
         if (needsAgeGate(status.status) || status.cohort === "unknown") {
+          // Render the date-of-birth step in place instead of redirecting to a
+          // URL that may never resolve — the member finishes setup right here
+          // and continues on the route they asked for.
           setAgeStatus("missing");
-          router.navigate({ to: AGE_GATE_ROUTE, replace: true } as never);
-          window.setTimeout(() => {
-            if (cancelled || typeof window === "undefined") return;
-            if (window.location.pathname !== AGE_GATE_ROUTE) {
-              window.location.replace(AGE_GATE_ROUTE);
-            }
-          }, 700);
         } else {
           ageVerifiedUsers.add(user.id);
           setAgeStatus("ok");
