@@ -15,10 +15,22 @@
  * Run:
  *   bunx vitest run src/lib/invite-deeplink.integration.test.ts
  */
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { TEST_ACCOUNTS } from "./test-fixtures";
-import { Route as GameRoute } from "@/routes/games.$gameId";
+import { Route as GameIndexRoute } from "@/routes/games.$gameId.index";
+
+// The notification row is written by a TanStack server function, which has no
+// Start runtime under vitest. Capture the payload the writer produces so the
+// link contract is still asserted end-to-end against the route parser.
+const notif = vi.hoisted(() => ({ calls: [] as Array<Record<string, unknown>> }));
+vi.mock("@/lib/notifications.functions", () => ({
+  createNotificationForUser: async ({ data }: { data: Record<string, unknown> }) => {
+    notif.calls.push(data);
+  },
+}));
+vi.mock("@/lib/push.functions", () => ({ sendPushToUser: async () => {} }));
+
 
 const URL = process.env.VITE_SUPABASE_URL ?? process.env.SUPABASE_URL;
 const KEY = process.env.VITE_SUPABASE_PUBLISHABLE_KEY ?? process.env.SUPABASE_PUBLISHABLE_KEY;
@@ -79,7 +91,7 @@ describe.skipIf(skipIfNoBackend)("invite notification deep link", () => {
     await supabase.auth.signInWithPassword({ email: host.email, password: host.password });
 
     const gameId = `deeplink-${Date.now()}`;
-    const before = new Date().toISOString();
+    notif.calls.length = 0;
     const { createContactRequest } = await import("./availability");
     await createContactRequest(playerAvailabilityId, playerId, "join us", {
       gameId,
@@ -89,25 +101,12 @@ describe.skipIf(skipIfNoBackend)("invite notification deep link", () => {
       startsAt: new Date(Date.now() + 86_400_000).toISOString(),
     });
 
-    // Recipient polls for the notification row (RLS scoped to auth.uid()).
-    let found: { link: string | null } | null = null;
-    for (let i = 0; i < 8; i++) {
-      const { data } = await playerClient
-        .from("notifications")
-        .select("link, type, created_at")
-        .eq("user_id", playerId)
-        .eq("type", "game_invite")
-        .gte("created_at", before)
-        .order("created_at", { ascending: false })
-        .limit(1);
-      if (data && data.length) {
-        found = { link: (data[0] as any).link as string | null };
-        break;
-      }
-      await new Promise((r) => setTimeout(r, 250));
-    }
-    expect(found, "game_invite notification row should exist").toBeTruthy();
+    const found = notif.calls.find(
+      (c) => c.type === "game_invite" && c.user_id === playerId,
+    ) as { link: string | null } | undefined;
+    expect(found, "game_invite notification should be written").toBeTruthy();
     expect(found!.link, "notification.link must be set").toBeTruthy();
+
 
     // Track for cleanup.
     const { data: rows } = await hostClient
@@ -130,7 +129,7 @@ describe.skipIf(skipIfNoBackend)("invite notification deep link", () => {
     // 3. The actual route's validateSearch parses them back into typed state,
     //    so the Game detail page will render the "You're invited" banner.
     const search = Object.fromEntries(params.entries()) as Record<string, unknown>;
-    const validate = GameRoute.options.validateSearch as unknown as (
+    const validate = GameIndexRoute.options.validateSearch as unknown as (
       s: Record<string, unknown>,
     ) => { invite?: true; from?: string };
     const parsed = validate(search);
