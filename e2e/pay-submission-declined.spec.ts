@@ -26,7 +26,7 @@ const METHOD_ID = "mock-method-venmo-1";
 const DECLINE_MSG = "Payment declined by processor — please try again.";
 
 function tableUrl(url: string, table: string) {
-  return url.includes(`/rest/v1/${table}`);
+  return String(url).includes(`/rest/v1/${table}`);
 }
 
 async function restoreSession(page: Page) {

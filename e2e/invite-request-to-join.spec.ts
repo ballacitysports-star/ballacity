@@ -44,7 +44,7 @@ function sessionUserId(): string {
 
 /** Match Supabase REST reads/writes against a specific table. */
 function tableUrl(url: string, table: string) {
-  return url.includes(`/rest/v1/${table}`);
+  return String(url).includes(`/rest/v1/${table}`);
 }
 
 test("tapping invite -> Request to join CTA posts correct payload with preserved invite params", async ({

@@ -28,7 +28,7 @@ const HOST_ID = "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee";
 const METHOD_ID = "mock-method-venmo-1";
 
 function tableUrl(url: string, table: string) {
-  return url.includes(`/rest/v1/${table}`);
+  return String(url).includes(`/rest/v1/${table}`);
 }
 
 async function restoreSession(page: Page) {

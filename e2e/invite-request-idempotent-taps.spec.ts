@@ -42,7 +42,7 @@ function sessionUserId(): string {
   return id!;
 }
 
-const isTable = (url: string, table: string) => url.includes(`/rest/v1/${table}`);
+const isTable = (url: string, table: string) => String(url).includes(`/rest/v1/${table}`);
 
 test("rapid taps on Request-to-join create exactly one pending row (server-side idempotency)", async ({
   browser,

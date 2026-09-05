@@ -45,7 +45,7 @@ function sessionUserId(): string {
   return id!;
 }
 
-const isTable = (url: string, table: string) => url.includes(`/rest/v1/${table}`);
+const isTable = (url: string, table: string) => String(url).includes(`/rest/v1/${table}`);
 
 test("join request → host approval arrives via realtime and status flips live", async ({
   browser,

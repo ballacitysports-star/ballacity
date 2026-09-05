@@ -39,7 +39,7 @@ function sessionUserId(): string {
   return id!;
 }
 
-const isTable = (url: string, table: string) => url.includes(`/rest/v1/${table}`);
+const isTable = (url: string, table: string) => String(url).includes(`/rest/v1/${table}`);
 
 test("pay page auto-flips from approval gate to payment picker on approval", async ({
   browser,

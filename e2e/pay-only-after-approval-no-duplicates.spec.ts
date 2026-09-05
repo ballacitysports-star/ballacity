@@ -37,7 +37,7 @@ function sessionUserId(): string {
   return id!;
 }
 
-const isTable = (url: string, table: string) => url.includes(`/rest/v1/${table}`);
+const isTable = (url: string, table: string) => String(url).includes(`/rest/v1/${table}`);
 
 test("pay is blocked while pending; after approval exactly one submission is created", async ({
   browser,

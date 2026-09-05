@@ -36,7 +36,7 @@ function sessionUserId(): string {
   return id!;
 }
 
-const isTable = (url: string, table: string) => url.includes(`/rest/v1/${table}`);
+const isTable = (url: string, table: string) => String(url).includes(`/rest/v1/${table}`);
 
 test("failed first join request can be retried and lands on pending UI with invite params preserved", async ({
   browser,

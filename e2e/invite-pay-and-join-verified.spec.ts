@@ -43,7 +43,7 @@ function sessionUserId(): string {
   return id!;
 }
 
-const isTable = (url: string, table: string) => url.includes(`/rest/v1/${table}`);
+const isTable = (url: string, table: string) => String(url).includes(`/rest/v1/${table}`);
 
 test("invite → Pay & join → host-verified → Confirmed on game page (invite params preserved)", async ({
   browser,
