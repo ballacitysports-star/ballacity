@@ -148,9 +148,9 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
 const THEME_INIT_SCRIPT = `(function(){try{var h=document.documentElement;h.classList.add('dark');h.dataset.theme='dark';h.dataset.themePref='dark';}catch(e){document.documentElement.classList.add('dark');}})();`;
 
 const BOOT_RETRY_KEY = "openrun:boot-retry-at";
-const BOOT_TIMEOUT_MS = 20_000;
-const BOOT_HARD_TIMEOUT_MS = 45_000;
-const BOOT_PROGRESS_GRACE_MS = 8_000;
+const BOOT_TIMEOUT_MS = 12_000;
+const BOOT_HARD_TIMEOUT_MS = 20_000;
+const BOOT_PROGRESS_GRACE_MS = 4_000;
 
 /**
  * Boot watchdog. Runs as a plain inline script (NOT a React effect) because the
