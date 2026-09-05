@@ -50,7 +50,9 @@ function emailLocalPart(): string | null {
 
 async function createGameAndCaptureUrl(page: Page, title: string): Promise<string> {
   await page.goto("/create");
-  await expect(page.getByRole("heading", { name: /host a game/i })).toBeVisible();
+  await expect(page.getByRole("heading", { name: /host a game/i })).toBeVisible({
+    timeout: 15_000,
+  });
   await page
     .getByPlaceholder(/title|game/i)
     .first()

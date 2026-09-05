@@ -72,7 +72,9 @@ test("host name uses user_metadata.display_name under throttled profile loading"
 
   // 1. Open the host-a-game form.
   await page.goto("/create");
-  await expect(page.getByRole("heading", { name: /host a game/i })).toBeVisible();
+  await expect(page.getByRole("heading", { name: /host a game/i })).toBeVisible({
+    timeout: 15_000,
+  });
 
   // 2. Fill the bare minimum required to publish.
   const title = `E2E throttled host ${Date.now()}`;

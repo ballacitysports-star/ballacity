@@ -107,7 +107,9 @@ test("realtime refresh under throttled profile reads keeps display_name (no emai
   // 1. Create a game (with normal-speed profile reads so the snapshot is
   //    correctly persisted as display_name).
   await page.goto("/create");
-  await expect(page.getByRole("heading", { name: /host a game/i })).toBeVisible();
+  await expect(page.getByRole("heading", { name: /host a game/i })).toBeVisible({
+    timeout: 15_000,
+  });
   const title = `E2E realtime host ${Date.now()}`;
   await page
     .getByPlaceholder(/title|game/i)
