@@ -202,7 +202,7 @@ const BOOT_WATCHDOG_SCRIPT = `(function(){
     write(String(Date.now()));
     window.location.reload();
   }
-  function resourceCount(){try{return performance.getEntriesByType('resource').length;}catch(e){return 0;}}
+  function resourceCount(){try{var o=location.origin;var e=performance.getEntriesByType('resource');var n=0;for(var i=0;i<e.length;i++){if(String(e[i].name).indexOf(o)===0)n++;}return n;}catch(e){return 0;}}
   function checkProgress(){
     if(booted())return;
     var now=Date.now();
