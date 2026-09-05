@@ -321,7 +321,6 @@ function AuthPage() {
     // anything meaningful runs before the helper consumes the tap gesture.
     const promise = lovable.auth.signInWithOAuth(provider, {
       redirect_uri: window.location.origin,
-      ...(provider === "google" ? { extraParams: { prompt: "select_account" } } : {}),
     });
 
     if (mode === "signup") stashPendingConsent(currentAcceptances());
