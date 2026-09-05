@@ -134,13 +134,43 @@ export default async function globalSetup() {
   const client = createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
     auth: { persistSession: false, autoRefreshToken: false, storage: undefined },
   });
-  const { data, error } = await client.auth.signInWithPassword({
-    email: sessionAccount.email,
-    password: sessionAccount.password,
-  });
-  if (error || !data.session) {
+  const signIn = async (acct: (typeof TEST_ACCOUNTS)[number]) => {
+    const { data, error } = await client.auth.signInWithPassword({
+      email: acct.email,
+      password: acct.password,
+    });
+    return error || !data.session ? null : data.session;
+  };
+
+  let session = await signIn(sessionAccount);
+  let signedInAs = sessionAccount.email;
+
+  // The reserved account has to exist before it can back the snapshot, and
+  // provisioning it needs the service role key. Rather than skip ~130
+  // auth-required specs when it is missing — silence reads as health — fall
+  // back to the account that has historically been seeded. That reinstates the
+  // mid-run revocation this split was made to fix, so say so loudly; the fix
+  // engages on its own the moment the reserved account exists.
+  if (!session) {
+    const fallback = TEST_ACCOUNTS.find((a) => a.key === "player");
+    if (fallback) {
+      session = await signIn(fallback);
+      if (session) {
+        signedInAs = fallback.email;
+        console.warn(
+          `[e2e global-setup] ${sessionAccount.email} is not provisioned, so the injected ` +
+            `session falls back to ${fallback.email}. Expect the fixture-* specs' global-scope ` +
+            "sign-out to revoke it mid-run, failing every injected-session spec ordered after " +
+            `them. Seed ${sessionAccount.email} (run seedTestAccounts, or set ` +
+            "SUPABASE_SERVICE_ROLE_KEY so this file can provision it) to get the isolation back.",
+        );
+      }
+    }
+  }
+
+  if (!session) {
     console.warn(
-      `[e2e global-setup] Could not sign in ${sessionAccount.email}: ${error?.message ?? "no session"}. ` +
+      `[e2e global-setup] Could not sign in ${sessionAccount.email}: no session. ` +
         "Set SUPABASE_SERVICE_ROLE_KEY (or pre-seed the account) so global-setup can provision it. " +
         "Auth-required specs will skip.",
     );
@@ -149,9 +179,9 @@ export default async function globalSetup() {
 
   const storageKey = `sb-${SUPABASE_PROJECT_ID}-auth-token`;
   process.env.LOVABLE_BROWSER_SUPABASE_STORAGE_KEY = storageKey;
-  process.env.LOVABLE_BROWSER_SUPABASE_SESSION_JSON = JSON.stringify(data.session);
-  process.env.LOVABLE_BROWSER_SUPABASE_ACCESS_TOKEN = data.session.access_token;
+  process.env.LOVABLE_BROWSER_SUPABASE_SESSION_JSON = JSON.stringify(session);
+  process.env.LOVABLE_BROWSER_SUPABASE_ACCESS_TOKEN = session.access_token;
   process.env.LOVABLE_BROWSER_AUTH_STATUS = "injected";
 
-  console.log(`[e2e global-setup] Signed in ${sessionAccount.email} for E2E specs.`);
+  console.log(`[e2e global-setup] Signed in ${signedInAs} for E2E specs.`);
 }
