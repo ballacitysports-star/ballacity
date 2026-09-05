@@ -149,7 +149,14 @@ const THEME_INIT_SCRIPT = `(function(){try{var h=document.documentElement;h.clas
 
 const BOOT_RETRY_KEY = "openrun:boot-retry-at";
 const BOOT_TIMEOUT_MS = 12_000;
-const BOOT_HARD_TIMEOUT_MS = 20_000;
+/**
+ * Absolute backstop, applied even while the page still looks busy. It only has
+ * to bound the pathological "requests stream forever but the app never boots"
+ * case, so it is deliberately generous: a cold mobile boot over a slow network
+ * can legitimately run well past twenty seconds, and reloading such a page just
+ * restarts the download with a *smaller* budget (see TIMEOUT below).
+ */
+const BOOT_HARD_TIMEOUT_MS = 60_000;
 const BOOT_PROGRESS_GRACE_MS = 4_000;
 
 /**
@@ -167,6 +174,7 @@ const BOOT_WATCHDOG_SCRIPT = `(function(){
   var PROGRESS_GRACE=${BOOT_PROGRESS_GRACE_MS};
   var lastResourceCount=0;
   var lastProgressAt=START;
+  var sawComplete=0;
   var RE=/dynamically imported module|Importing a module script failed|Loading chunk|error loading dynamically imported module/i;
   function read(){try{return sessionStorage.getItem(K);}catch(e){return null;}}
   function write(v){try{sessionStorage.setItem(K,v);}catch(e){}}
@@ -203,11 +211,22 @@ const BOOT_WATCHDOG_SCRIPT = `(function(){
     window.location.reload();
   }
   function resourceCount(){try{var o=location.origin;var e=performance.getEntriesByType('resource');var n=0;for(var i=0;i<e.length;i++){if(String(e[i].name).indexOf(o)===0)n++;}return n;}catch(e){return 0;}}
+  function stillFetching(){try{return document.readyState!=='complete';}catch(e){return false;}}
   function checkProgress(){
     if(booted())return;
     var now=Date.now();
     var count=resourceCount();
-    if(count>lastResourceCount){lastResourceCount=count;lastProgressAt=now;}
+    // A resource entry only appears once that request COMPLETES, so a single
+    // slow module in flight looks identical to a dead page. An incomplete
+    // document means the browser is still fetching something: that is progress,
+    // not a stall, and reloading it would just restart the download.
+    var fetching=stillFetching();
+    // Hydration runs after the last request lands and is CPU-bound, so it emits
+    // no resources at all. Give it its own grace window instead of counting the
+    // wait as time already stalled. A page that never loads reaches 'complete'
+    // almost immediately, so this costs a dead page nothing.
+    if(!fetching&&!sawComplete){sawComplete=1;lastProgressAt=now;}
+    if(count>lastResourceCount||fetching){lastResourceCount=count;lastProgressAt=now;}
     if(now-START>=HARD_TIMEOUT){recover(true);return;}
     if(now-START>=TIMEOUT&&now-lastProgressAt>=PROGRESS_GRACE){recover(true);return;}
     setTimeout(checkProgress,1000);
