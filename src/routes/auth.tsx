@@ -83,13 +83,36 @@ function AuthPage() {
     [],
   );
 
+  // Never let a stalled network call trap the user on the sign-in form: every
+  // await between "submit succeeded" and "leave /auth" is bounded, and the
+  // fallback always continues (AuthGate re-runs the same check server-side).
+  const withTimeout = async <T,>(op: PromiseLike<T>, ms: number, fallback: T): Promise<T> => {
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    try {
+      return await Promise.race([
+        Promise.resolve(op),
+        new Promise<T>((resolve) => {
+          timer = setTimeout(() => resolve(fallback), ms);
+        }),
+      ]);
+    } finally {
+      if (timer) clearTimeout(timer);
+    }
+  };
+
   const needsAccountType = async (currentUser: User | null | undefined) => {
     if (!currentUser) return false;
-    const { data, error } = await supabase
+    const query = supabase
       .from("profiles")
       .select("account_type")
       .eq("id", currentUser.id)
       .maybeSingle();
+    const res = await withTimeout(query, 2500, null as unknown as Awaited<typeof query> | null);
+    if (!res) {
+      console.warn("[auth] account type check timed out; continuing");
+      return false;
+    }
+    const { data, error } = res;
     if (error) {
       console.warn("[auth] account type check failed", error.message);
       return false;
@@ -98,9 +121,21 @@ function AuthPage() {
     return !isAccountType(t);
   };
 
+  const leave = (dest: string) => {
+    // Hard reload keeps mobile webviews / OAuth popups in sync with the
+    // freshly-hydrated session; a client-side navigate can race with the
+    // AuthGate's own loading flip.
+    window.location.replace(dest);
+    // If the document load never takes (proxy hiccup, blocked replace), retry
+    // once with an assignment so the user isn't left staring at the form.
+    window.setTimeout(() => {
+      if (window.location.pathname === "/auth") window.location.href = dest;
+    }, 2500);
+  };
+
   const goPostAuth = async (currentUser: User | null | undefined = user) => {
     if (await needsAccountType(currentUser)) {
-      window.location.replace("/onboarding/account-type");
+      leave("/onboarding/account-type");
       return;
     }
     let dest = sanitizeNextPath(next);
@@ -122,11 +157,9 @@ function AuthPage() {
       }
     }
     if (!dest) dest = "/feed";
-    // Hard reload keeps mobile webviews / OAuth popups in sync with the
-    // freshly-hydrated session; a client-side navigate can race with the
-    // AuthGate's own loading flip.
-    window.location.replace(dest);
+    leave(dest);
   };
+
 
   useEffect(() => {
     if (!loading && user) void goPostAuth(user);
