@@ -22,7 +22,12 @@ import { useGameReminderFlush } from "@/lib/game-reminders";
 import { useOneSignal } from "@/lib/onesignal";
 import { logAuthGateDecision, readStoredSupabaseSession } from "@/lib/authgate-log";
 import { clearLastVisited, rememberLastVisited } from "@/lib/last-visited";
-import { clearPendingAccountType, isAccountType, readPendingAccountType } from "@/lib/account-type";
+import {
+  type AccountType,
+  clearPendingAccountType,
+  isAccountType,
+  readPendingAccountType,
+} from "@/lib/account-type";
 import { getOnboardingStatus } from "@/lib/onboarding.functions";
 import { getMyAgeStatus } from "@/lib/age-verification.functions";
 import { CHILD_CONSENT_ROUTE, isAccountSetupEscape, needsAgeGate } from "@/lib/age-verification";
