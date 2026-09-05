@@ -29,7 +29,7 @@ const METHOD_ID = "mock-method-venmo-1";
 const REJECT_NOTE = "Couldn't find your Venmo transfer — please resend.";
 
 function tableUrl(url: string, table: string) {
-  return url.includes(`/rest/v1/${table}`);
+  return String(url).includes(`/rest/v1/${table}`);
 }
 
 async function restoreSession(page: Page) {

@@ -44,7 +44,7 @@ function sessionUserId(): string {
   return id!;
 }
 
-const isTable = (url: string, table: string) => url.includes(`/rest/v1/${table}`);
+const isTable = (url: string, table: string) => String(url).includes(`/rest/v1/${table}`);
 
 test("double-tapping Request to join while the first POST is in flight blocks the second submission", async ({
   browser,

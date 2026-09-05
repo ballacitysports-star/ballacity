@@ -45,7 +45,7 @@ function sessionUserId(): string {
   return id!;
 }
 
-const isTable = (url: string, table: string) => url.includes(`/rest/v1/${table}`);
+const isTable = (url: string, table: string) => String(url).includes(`/rest/v1/${table}`);
 
 async function installMocks(page: Page, onJoinPost: () => void) {
   // Approval-gated settings owned by REAL_HOST_ID.

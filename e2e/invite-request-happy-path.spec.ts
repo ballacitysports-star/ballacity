@@ -43,7 +43,7 @@ function sessionUserId(): string {
   return id!;
 }
 
-const isTable = (url: string, table: string) => url.includes(`/rest/v1/${table}`);
+const isTable = (url: string, table: string) => String(url).includes(`/rest/v1/${table}`);
 
 test("well-formed invite → Request to join succeeds and shows pending UI with params preserved", async ({
   browser,

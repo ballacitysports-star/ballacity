@@ -33,7 +33,7 @@ async function restoreSession(page: Page) {
   );
 }
 
-const isTable = (url: string, table: string) => url.includes(`/rest/v1/${table}`);
+const isTable = (url: string, table: string) => String(url).includes(`/rest/v1/${table}`);
 
 async function installMocks(page: Page, onJoinPost: () => void) {
   await page.route(

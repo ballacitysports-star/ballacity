@@ -43,7 +43,7 @@ function sessionUserId(): string {
   return id!;
 }
 
-const isTable = (url: string, table: string) => url.includes(`/rest/v1/${table}`);
+const isTable = (url: string, table: string) => String(url).includes(`/rest/v1/${table}`);
 
 test("payment submission is blocked while join request is unapproved", async ({ browser }) => {
   const userId = sessionUserId();

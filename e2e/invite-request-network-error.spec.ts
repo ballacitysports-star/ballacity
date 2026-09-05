@@ -38,7 +38,7 @@ function sessionUserId(): string {
   return id!;
 }
 
-const isTable = (url: string, table: string) => url.includes(`/rest/v1/${table}`);
+const isTable = (url: string, table: string) => String(url).includes(`/rest/v1/${table}`);
 
 test("network error on first Request-to-join blocks a mid-flight second tap, then allows a successful retry", async ({
   browser,
