@@ -38,9 +38,11 @@ export function useRequestBirthdayCorrection() {
 /** Support queue (admins only — the database enforces it). */
 export function useBirthdayCorrectionQueue(status: "pending" | "all" = "pending") {
   const fn = useServerFn(listBirthdayCorrections);
+  const { session, loading } = useAuth();
   return useQuery({
     queryKey: ["birthday-corrections", status],
     queryFn: () => fn({ data: { status } }),
+    enabled: !loading && Boolean(session),
     staleTime: 30_000,
     retry: false,
   });
