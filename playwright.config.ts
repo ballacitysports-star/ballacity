@@ -1,4 +1,28 @@
+import { existsSync } from "node:fs";
 import { defineConfig, devices } from "@playwright/test";
+
+/**
+ * Resolve a browser that actually exists on this machine.
+ *
+ * Order:
+ *  1. explicit PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH (empty string = "use
+ *     Playwright's own managed browser", as CI sets it)
+ *  2. known sandbox install locations
+ *  3. undefined → Playwright's managed Chromium
+ */
+function resolveChromium(): string | undefined {
+  const fromEnv = process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH;
+  if (typeof fromEnv === "string") {
+    if (fromEnv.trim() === "") return undefined;
+    return existsSync(fromEnv) ? fromEnv : undefined;
+  }
+  const candidates = [
+    "/opt/ms-playwright/chromium-1194/chrome-linux/chrome",
+    "/chromium-1194/chrome-linux/chrome",
+  ];
+  return candidates.find((p) => existsSync(p));
+}
+
 
 /**
  * Playwright config for E2E tests against the local dev server.
