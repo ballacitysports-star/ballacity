@@ -24,6 +24,20 @@ const PROTECTED_ROUTES = ["/feed", "/profile", "/notifications"] as const;
 const PROVIDERS = ["google", "apple"] as const;
 
 async function stubNullAccountType(page: Page) {
+  // The gate asks the server first (`getOnboardingStatus`) and only falls back
+  // to PostgREST when that call fails, so both layers must report "no type".
+  await page.route(/\/_serverFn\/[^ ]*getOnboardingStatus/, async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        needsOnboarding: true,
+        isSocial: false,
+        provider: "email",
+        accountType: null,
+      }),
+    });
+  });
   // The root gate hits `/rest/v1/profiles?select=account_type&id=eq.<uid>`.
   // Force every read of that column to return NULL so the redirect logic runs
   // even for users who actually have a type in the real DB.
@@ -36,6 +50,7 @@ async function stubNullAccountType(page: Page) {
     });
   });
 }
+
 
 async function restoreSession(page: Page) {
   await page.goto("/", { waitUntil: "domcontentloaded" });
