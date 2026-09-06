@@ -62,7 +62,6 @@ function FamilyJoinPage() {
         </p>
         <Link
           to="/auth"
-          search={{ next: `/family/join/${token}` }}
           className="mt-4 inline-flex rounded-full bg-lime px-4 py-2 text-sm font-bold text-primary-foreground"
         >
           Sign in

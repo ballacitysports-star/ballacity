@@ -1,5 +1,4 @@
 import { test, expect, type Page } from "@playwright/test";
-import { gotoCreateAndExpectHeading } from "./helpers/create-page";
 
 /**
  * E2E: while the game detail page and feed card are mounted, trigger a
@@ -107,7 +106,8 @@ test("realtime refresh under throttled profile reads keeps display_name (no emai
 
   // 1. Create a game (with normal-speed profile reads so the snapshot is
   //    correctly persisted as display_name).
-  await gotoCreateAndExpectHeading(page);
+  await page.goto("/create");
+  await expect(page.getByRole("heading", { name: /host a game/i })).toBeVisible();
   const title = `E2E realtime host ${Date.now()}`;
   await page
     .getByPlaceholder(/title|game/i)

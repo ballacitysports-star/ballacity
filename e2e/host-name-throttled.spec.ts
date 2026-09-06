@@ -1,5 +1,4 @@
 import { test, expect, type Page } from "@playwright/test";
-import { gotoCreateAndExpectHeading } from "./helpers/create-page";
 
 /**
  * E2E: throttle the `profiles` table read and confirm the host name shown on
@@ -72,7 +71,8 @@ test("host name uses user_metadata.display_name under throttled profile loading"
   await throttleProfileReads(page);
 
   // 1. Open the host-a-game form.
-  await gotoCreateAndExpectHeading(page);
+  await page.goto("/create");
+  await expect(page.getByRole("heading", { name: /host a game/i })).toBeVisible();
 
   // 2. Fill the bare minimum required to publish.
   const title = `E2E throttled host ${Date.now()}`;

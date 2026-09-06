@@ -116,11 +116,7 @@ export async function signOut() {
   } catch {
     /* ignore */
   }
-  // `local` scope signs the user out of *this* device only. Supabase defaults
-  // to `global`, which revokes every refresh token on the account — ending the
-  // user's sessions on every other device they own, which is not what a
-  // "Sign out" button on one browser should do.
-  await supabase.auth.signOut({ scope: "local" });
+  await supabase.auth.signOut();
 }
 
 export async function getCurrentUser() {
