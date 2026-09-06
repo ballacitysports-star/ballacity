@@ -22,10 +22,21 @@ import { useGameReminderFlush } from "@/lib/game-reminders";
 import { useOneSignal } from "@/lib/onesignal";
 import { logAuthGateDecision, readStoredSupabaseSession } from "@/lib/authgate-log";
 import { clearLastVisited, rememberLastVisited } from "@/lib/last-visited";
-import { clearPendingAccountType, isAccountType, readPendingAccountType } from "@/lib/account-type";
+import {
+  type AccountType,
+  clearPendingAccountType,
+  isAccountType,
+  readPendingAccountType,
+} from "@/lib/account-type";
 import { getOnboardingStatus } from "@/lib/onboarding.functions";
 import { getMyAgeStatus } from "@/lib/age-verification.functions";
-import { AGE_GATE_ROUTE, isAccountSetupEscape, needsAgeGate } from "@/lib/age-verification";
+import { CHILD_CONSENT_ROUTE, isAccountSetupEscape, needsAgeGate } from "@/lib/age-verification";
+import { parseCohort, requiresParentalConsent } from "@/lib/child-policy";
+import { AgeGateScreen } from "@/components/onboarding/AgeGateScreen";
+import {
+  AccountTypeScreen,
+  destinationForAccountType,
+} from "@/components/onboarding/AccountTypeScreen";
 import { logNotFound } from "@/lib/route-doctor";
 import { ErrorFallback, GlobalErrorBoundary } from "@/components/GlobalErrorBoundary";
 import { setDeepLinkNavigator } from "@/lib/deep-links";
@@ -706,14 +717,10 @@ function AuthGate({ children }: { children: React.ReactNode }) {
         const status = await withDeadline(getMyAgeStatus(), ONBOARDING_CHECK_TIMEOUT_MS);
         if (cancelled) return;
         if (needsAgeGate(status.status) || status.cohort === "unknown") {
+          // Render the date-of-birth step in place instead of redirecting to a
+          // URL that may never resolve — the member finishes setup right here
+          // and continues on the route they asked for.
           setAgeStatus("missing");
-          router.navigate({ to: AGE_GATE_ROUTE, replace: true } as never);
-          window.setTimeout(() => {
-            if (cancelled || typeof window === "undefined") return;
-            if (window.location.pathname !== AGE_GATE_ROUTE) {
-              window.location.replace(AGE_GATE_ROUTE);
-            }
-          }, 700);
         } else {
           ageVerifiedUsers.add(user.id);
           setAgeStatus("ok");
@@ -776,8 +783,8 @@ function AuthGate({ children }: { children: React.ReactNode }) {
         );
         if (cancelled) return;
         if (status.needsOnboarding) {
+          // Render the picker in place; no redirect.
           setTypeStatus("missing");
-          router.navigate({ to: "/onboarding/account-type", replace: true });
         } else {
           onboardedUsers.add(user.id);
           setTypeStatus("ok");
@@ -799,7 +806,6 @@ function AuthGate({ children }: { children: React.ReactNode }) {
           setTypeStatus("ok");
         } else {
           setTypeStatus("missing");
-          router.navigate({ to: "/onboarding/account-type", replace: true });
         }
       } catch {
         // Both the server guard and the profile read failed (offline, server
@@ -848,9 +854,39 @@ function AuthGate({ children }: { children: React.ReactNode }) {
   if (loading || verifying || !user) {
     return <AuthLoadingFallback pending={oauthPending} />;
   }
-  // Age comes before every other onboarding step.
+  // Age comes before every other onboarding step. While the check is still in
+  // flight we show the loader; once we know a date of birth is missing we
+  // render the real setup step right here — no redirect, so the member can
+  // finish and stay on the route they asked for.
+  if (!skipAgeCheck && ageStatus === "missing") {
+    return (
+      <AgeGateScreen
+        onResolved={(cohort) => {
+          if (requiresParentalConsent(parseCohort(cohort))) {
+            router.navigate({ to: CHILD_CONSENT_ROUTE, replace: true } as never);
+            return;
+          }
+          if (user) ageVerifiedUsers.add(user.id);
+          setAgeStatus("ok");
+        }}
+      />
+    );
+  }
   if (!skipAgeCheck && ageStatus !== "ok") {
     return <AuthLoadingFallback pending={oauthPending} />;
+  }
+  // Same for the profile-type step: render the picker in place.
+  if (!skipTypeCheck && typeStatus === "missing") {
+    const finishType = (type?: AccountType) => {
+      if (user) onboardedUsers.add(user.id);
+      setTypeStatus("ok");
+      if (type && type !== "player") {
+        router.navigate({ to: destinationForAccountType(type), replace: true } as never);
+      }
+    };
+    return (
+      <AccountTypeScreen onResolved={finishType} onAlreadySet={() => finishType()} />
+    );
   }
   // Hold rendering only on a genuine first check for this user; a cached
   // "ok" keeps the page mounted across navigations.

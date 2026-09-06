@@ -2,8 +2,8 @@ import { test, expect, type Page } from "@playwright/test";
 
 /**
  * Integration test: any signed-in user whose `profiles.account_type` is NULL
- * must be redirected to `/onboarding/account-type`, regardless of how they
- * signed in (Google, Apple, or email). We simulate this by intercepting the
+ * must see the account-type picker before protected content, regardless of how
+ * they signed in (Google, Apple, or email). We simulate this by intercepting the
  * PostgREST call the root gate makes to read `profiles.account_type` and
  * returning `null`.
  *
@@ -24,6 +24,34 @@ const PROTECTED_ROUTES = ["/feed", "/profile", "/notifications"] as const;
 const PROVIDERS = ["google", "apple"] as const;
 
 async function stubNullAccountType(page: Page) {
+  // The gate asks the server first (`getOnboardingStatus`) and only falls back
+  // to PostgREST when that call fails, so both layers must report "no type".
+  // Server-fn addresses are base64-encoded ({file, export}), so decode the
+  // path segment instead of pattern-matching the raw URL.
+  await page.route("**/_serverFn/**", async (route) => {
+    const segment = new URL(route.request().url()).pathname.split("/_serverFn/")[1] ?? "";
+    let decoded = "";
+    try {
+      decoded = Buffer.from(decodeURIComponent(segment), "base64").toString("utf8");
+    } catch {
+      decoded = "";
+    }
+    if (!decoded.includes("getOnboardingStatus")) {
+      await route.fallback();
+      return;
+    }
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        needsOnboarding: true,
+        isSocial: false,
+        provider: "email",
+        accountType: null,
+      }),
+    });
+  });
+
   // The root gate hits `/rest/v1/profiles?select=account_type&id=eq.<uid>`.
   // Force every read of that column to return NULL so the redirect logic runs
   // even for users who actually have a type in the real DB.
@@ -37,6 +65,7 @@ async function stubNullAccountType(page: Page) {
   });
 }
 
+
 async function restoreSession(page: Page) {
   await page.goto("/", { waitUntil: "domcontentloaded" });
   await page.evaluate(
@@ -49,9 +78,9 @@ async function restoreSession(page: Page) {
   );
 }
 
-test.describe("null account_type → /onboarding/account-type", () => {
+test.describe("null account_type → account-type setup", () => {
   for (const route of PROTECTED_ROUTES) {
-    test(`route gate: visiting ${route} with null account_type redirects to onboarding`, async ({
+    test(`route gate: visiting ${route} with null account_type shows onboarding in place`, async ({
       browser,
     }) => {
       const context = await browser.newContext();
@@ -62,9 +91,11 @@ test.describe("null account_type → /onboarding/account-type", () => {
 
         await page.goto(route, { waitUntil: "domcontentloaded" });
 
-        await expect(page).toHaveURL(/\/onboarding\/account-type(?:[?#/].*)?$/, {
+        await expect(page).toHaveURL(new RegExp(route));
+        await expect(page.getByRole("heading", { name: /Where do you want to start/i })).toBeVisible({
           timeout: 15_000,
         });
+        await expect(page.getByRole("button", { name: /Player/i })).toBeVisible();
       } finally {
         await context.close();
       }
