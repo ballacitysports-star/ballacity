@@ -8,12 +8,9 @@
  * worker processes because they inherit process.env at spawn time.
  *
  * The account is reserved (see SESSION_ACCOUNT_KEY) because this is a single
- * snapshot shared by ~40 specs for the whole run. It used to be `player`,
- * which the fixture-* specs also sign in and out of through the real form —
- * and `supabase.auth.signOut()` defaults to global scope, revoking every
- * refresh token for that user. That silently killed this snapshot mid-run, so
- * every injection spec ordered after those specs got 403s and bounced to
- * /auth. Nothing may sign this account in or out through the form.
+ * snapshot shared by ~40 specs for the whole run, and the fixture-* specs sign
+ * in and out through the real form. Keeping them on separate accounts stops
+ * their profile/onboarding mutations from perturbing the snapshot.
  *
  * Flow:
  *  1. If the sandbox already injected a session, pass it through.
@@ -50,11 +47,8 @@ export default async function globalSetup() {
     return;
   }
 
-  // The reserved session account — NOT `player`. Every spec that injects this
-  // snapshot depends on its refresh token surviving the whole run, and
-  // `supabase.auth.signOut()` defaults to global scope: the fixture-* specs
-  // sign `player` out through the real form, which used to revoke this
-  // snapshot and leave every later injection spec bouncing to /auth with 403s.
+  // The reserved session account — preferred over `player`, which the
+  // fixture-* specs drive through the real form.
   const sessionAccount = TEST_ACCOUNTS.find((a) => a.key === SESSION_ACCOUNT_KEY)!;
 
   // (2) Best-effort idempotent seed when a service role key is available.
@@ -146,11 +140,17 @@ export default async function globalSetup() {
   let signedInAs = sessionAccount.email;
 
   // The reserved account has to exist before it can back the snapshot, and
-  // provisioning it needs the service role key. Rather than skip ~130
-  // auth-required specs when it is missing — silence reads as health — fall
-  // back to the account that has historically been seeded. That reinstates the
-  // mid-run revocation this split was made to fix, so say so loudly; the fix
-  // engages on its own the moment the reserved account exists.
+  // provisioning it needs the service role key — which CI does not have, and
+  // on Lovable Cloud cannot be exported to one (server code reaches it through
+  // the managed backend binding; the raw value is not retrievable). Rather than
+  // skip ~130 auth-required specs — silence reads as health — fall back to the
+  // account that has historically been seeded.
+  //
+  // This fallback is only survivable because the app signs out with
+  // `scope: "local"` (see signOut() in @/hooks/use-auth). Under Supabase's
+  // default global scope, the fixture-* specs' sign-out revoked every refresh
+  // token for this user and every injection spec ordered after them got 403s.
+  // Do not restore the bare `signOut()` without restoring the reserved account.
   if (!session) {
     const fallback = TEST_ACCOUNTS.find((a) => a.key === "player");
     if (fallback) {
@@ -159,10 +159,10 @@ export default async function globalSetup() {
         signedInAs = fallback.email;
         console.warn(
           `[e2e global-setup] ${sessionAccount.email} is not provisioned, so the injected ` +
-            `session falls back to ${fallback.email}. Expect the fixture-* specs' global-scope ` +
-            "sign-out to revoke it mid-run, failing every injected-session spec ordered after " +
-            `them. Seed ${sessionAccount.email} (run seedTestAccounts, or set ` +
-            "SUPABASE_SERVICE_ROLE_KEY so this file can provision it) to get the isolation back.",
+            `session falls back to ${fallback.email}, which the fixture-* specs also drive ` +
+            "through the real form. Seed it (run the admin-gated seedTestAccounts server fn " +
+            "from the deployed app, or set SUPABASE_SERVICE_ROLE_KEY so this file can " +
+            "provision it) to get the isolation back.",
         );
       }
     }

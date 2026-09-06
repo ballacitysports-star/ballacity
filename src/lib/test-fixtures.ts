@@ -7,12 +7,18 @@
  *
  * One account is reserved: `session` backs the single session snapshot
  * `e2e/global-setup.ts` mints and exports as LOVABLE_BROWSER_SUPABASE_*, which
- * ~40 specs inject instead of signing in. Nothing may sign that account in or
- * out through the real form. `supabase.auth.signOut()` defaults to global
- * scope, so one sign-out revokes every refresh token for that user — when the
- * fixture-* specs did that to `player` (which used to back the snapshot), every
- * injection spec ordered after them got 403s and bounced to /auth. Loop
- * REAL_FORM_ACCOUNTS, never TEST_ACCOUNTS, when signing in for real.
+ * ~40 specs inject instead of signing in. Keep the real-form specs off it: loop
+ * REAL_FORM_ACCOUNTS, never TEST_ACCOUNTS, when signing in for real, so their
+ * profile/onboarding mutations can't perturb a snapshot 40 other specs share.
+ *
+ * This split was originally forced by something sharper. The app used to call
+ * `supabase.auth.signOut()` bare, and Supabase defaults that to *global* scope
+ * — one sign-out revokes every refresh token for the user. The fixture-* specs
+ * sign out through the real form, so when `player` backed the snapshot they
+ * silently killed it mid-run and every injection spec ordered after them got
+ * 403s and bounced to /auth. The app now signs out with `scope: "local"` (see
+ * signOut() in @/hooks/use-auth), so that particular hazard is gone and the
+ * `player` fallback in global-setup survives a full run.
  */
 export const TEST_ACCOUNTS = [
   {
@@ -64,8 +70,8 @@ export const SESSION_ACCOUNT_KEY = "session" satisfies TestAccountKey;
 
 /**
  * Accounts that may be signed in (and out) through the real /auth form.
- * Excludes the session-injection account, whose refresh token a global-scope
- * sign-out anywhere would revoke for the rest of the run.
+ * Excludes the session-injection account so real-form state changes stay off
+ * the snapshot the injection specs share.
  */
 export const REAL_FORM_ACCOUNTS = TEST_ACCOUNTS.filter((a) => a.key !== SESSION_ACCOUNT_KEY);
 
