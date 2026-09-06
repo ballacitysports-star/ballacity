@@ -49,9 +49,9 @@ export default defineConfig({
     trace: "retain-on-failure",
     screenshot: "only-on-failure",
     launchOptions: {
-      executablePath:
-        process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH ?? "/chromium-1194/chrome-linux/chrome",
+      executablePath: resolveChromium(),
     },
+
   },
   projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"] } }],
 });
