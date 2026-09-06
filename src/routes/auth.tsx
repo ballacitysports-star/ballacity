@@ -11,11 +11,13 @@ import { trackSigninEvent } from "@/lib/auth-signin-telemetry";
 import { classifyOAuthFailure } from "@/lib/oauth-outcome";
 import { sanitizeNextPath } from "@/routes/__root";
 import { readLastVisited } from "@/lib/last-visited";
+import { postAuthDestination } from "@/lib/post-auth-destination";
 import { AccountTypePicker } from "@/components/AccountTypePicker";
 import {
   EMPTY_DOB,
   MONTHS,
   checkDobParts,
+  isAccountSetupEscape,
   stashPendingDob,
   type DobParts,
 } from "@/lib/age-verification";
@@ -49,8 +51,16 @@ function AuthPage() {
   const { next } = Route.useSearch();
   const { user, loading } = useAuth();
   const [mode, setMode] = useState<"signin" | "signup">("signin");
-  const [signupStep, setSignupStep] = useState<"type" | "form">("type");
-  const [accountType, setAccountType] = useState<AccountType | null>(null);
+  // A `next` that points at an account-setup escape (guardian consent, the
+  // Parent Center, safety/legal reading) has no player/team/trainer/gym
+  // answer to give — AuthGate itself skips the type gate on those routes, so
+  // asking here would only strand a brand-new guardian one step before the
+  // screen they were emailed a link to.
+  const isGuardianEntry = !!next && isAccountSetupEscape(next);
+  const [signupStep, setSignupStep] = useState<"type" | "form">(isGuardianEntry ? "form" : "type");
+  const [accountType, setAccountType] = useState<AccountType | null>(
+    isGuardianEntry ? "player" : null,
+  );
   // Mandatory at signup: no account is activated without a date of birth.
   const [dob, setDob] = useState<DobParts>(EMPTY_DOB);
   const [email, setEmail] = useState("");
@@ -134,29 +144,29 @@ function AuthPage() {
   };
 
   const goPostAuth = async (currentUser: User | null | undefined = user) => {
-    if (await needsAccountType(currentUser)) {
-      leave("/onboarding/account-type");
-      return;
-    }
-    let dest = sanitizeNextPath(next);
-    if (!dest) dest = readLastVisited() ?? undefined;
-    if (!dest) {
-      // Some mobile in-app browsers strip the `next` query on redirects;
-      // fall back to a same-origin referrer, then to the in-app default
-      // surface (/feed) so users never get bounced back to marketing.
-      try {
-        const ref = document.referrer;
-        if (ref) {
-          const u = new URL(ref);
-          if (u.origin === window.location.origin) {
-            dest = sanitizeNextPath(`${u.pathname}${u.search}${u.hash}`);
-          }
+    // Some mobile in-app browsers strip the `next` query on redirects; fall
+    // back to a same-origin referrer so users never get bounced back to
+    // marketing. Read this before the account-type check so a guardian
+    // arriving via `next` still has it available below.
+    let referrer: string | undefined;
+    try {
+      const ref = document.referrer;
+      if (ref) {
+        const u = new URL(ref);
+        if (u.origin === window.location.origin) {
+          referrer = sanitizeNextPath(`${u.pathname}${u.search}${u.hash}`);
         }
-      } catch {
-        /* ignore */
       }
+    } catch {
+      /* ignore */
     }
-    if (!dest) dest = "/feed";
+
+    const dest = postAuthDestination({
+      next: sanitizeNextPath(next),
+      needsAccountType: await needsAccountType(currentUser),
+      lastVisited: readLastVisited() ?? undefined,
+      referrer,
+    });
     leave(dest);
   };
 
@@ -551,7 +561,12 @@ function AuthPage() {
         ) : (
 
           <>
-            {mode === "signup" && accountType ? (
+            {mode === "signup" && isGuardianEntry ? (
+              <div className="rounded-2xl border border-border bg-surface px-4 py-3 text-sm">
+                This account is for supervising your child — you can set up a player profile of your
+                own later.
+              </div>
+            ) : mode === "signup" && accountType ? (
               <div className="flex items-center justify-between rounded-2xl border border-border bg-surface px-4 py-3 text-sm">
                 <span>
                   Signing up as{" "}
