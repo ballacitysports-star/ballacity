@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { TEST_ACCOUNTS } from "../src/lib/test-fixtures";
+import { REAL_FORM_ACCOUNTS } from "../src/lib/test-fixtures";
 import { HAS_BACKEND, account, signInAs } from "./helpers/fixture-auth";
 
 /**
@@ -15,7 +15,10 @@ test.describe.configure({ mode: "serial" });
 
 test.skip(!HAS_BACKEND, "Requires backend env (VITE_SUPABASE_URL / SUPABASE_URL).");
 
-for (const a of TEST_ACCOUNTS) {
+// REAL_FORM_ACCOUNTS, not TEST_ACCOUNTS: the session-injection account must
+// never be signed in or out here — the sign-out test below revokes every
+// refresh token for whichever account it touches.
+for (const a of REAL_FORM_ACCOUNTS) {
   test(`${a.key}: signs in and reaches a protected surface`, async ({ page }) => {
     await signInAs(page, a.key);
 

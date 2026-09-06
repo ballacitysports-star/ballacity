@@ -95,7 +95,9 @@ export function AccountTypeScreen({
   };
 
   const signOut = async () => {
-    await supabase.auth.signOut();
+    // Device-level sign-out — see signOut() in @/hooks/use-auth for why
+    // this is `local` and not Supabase's default `global` scope.
+    await supabase.auth.signOut({ scope: "local" });
     navigate({ to: "/auth", replace: true });
   };
 

@@ -1,15 +1,20 @@
 /**
  * Playwright global setup: guarantee a signed-in Supabase session for the
- * seeded `e2e-player@lovable.test` fixture account and expose it to specs
+ * reserved `e2e-session@lovable.test` fixture account and expose it to specs
  * via the same `LOVABLE_BROWSER_SUPABASE_*` env vars the pay-button specs
  * (and sandbox) already look for.
  *
  * Runs once before any spec. Env mutations here propagate to Playwright
  * worker processes because they inherit process.env at spawn time.
  *
+ * The account is reserved (see SESSION_ACCOUNT_KEY) because this is a single
+ * snapshot shared by ~40 specs for the whole run, and the fixture-* specs sign
+ * in and out through the real form. Keeping them on separate accounts stops
+ * their profile/onboarding mutations from perturbing the snapshot.
+ *
  * Flow:
  *  1. If the sandbox already injected a session, pass it through.
- *  2. Otherwise, if a service role key is available, upsert the player
+ *  2. Otherwise, if a service role key is available, upsert the session
  *     fixture account (idempotent) via the Admin API so CI runs work
  *     without a pre-seeded database.
  *  3. Sign in with the fixture credentials via the publishable key and
@@ -18,13 +23,12 @@
  * Missing env → warn + return; the specs auto-skip as before.
  */
 import { createClient } from "@supabase/supabase-js";
-import { TEST_ACCOUNTS } from "../src/lib/test-fixtures";
+import { SESSION_ACCOUNT_KEY, TEST_ACCOUNTS } from "../src/lib/test-fixtures";
 
 const SUPABASE_URL = process.env.SUPABASE_URL ?? process.env.VITE_SUPABASE_URL;
 const SUPABASE_PUBLISHABLE_KEY =
   process.env.SUPABASE_PUBLISHABLE_KEY ?? process.env.VITE_SUPABASE_PUBLISHABLE_KEY;
-const SUPABASE_PROJECT_ID =
-  process.env.SUPABASE_PROJECT_ID ?? process.env.VITE_SUPABASE_PROJECT_ID;
+const SUPABASE_PROJECT_ID = process.env.SUPABASE_PROJECT_ID ?? process.env.VITE_SUPABASE_PROJECT_ID;
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
 export default async function globalSetup() {
@@ -43,7 +47,9 @@ export default async function globalSetup() {
     return;
   }
 
-  const player = TEST_ACCOUNTS.find((a) => a.key === "player")!;
+  // The reserved session account — preferred over `player`, which the
+  // fixture-* specs drive through the real form.
+  const sessionAccount = TEST_ACCOUNTS.find((a) => a.key === SESSION_ACCOUNT_KEY)!;
 
   // (2) Best-effort idempotent seed when a service role key is available.
   if (SUPABASE_SERVICE_ROLE_KEY) {
@@ -57,27 +63,57 @@ export default async function globalSetup() {
       });
       if (listErr) throw new Error(listErr.message);
       const metadata = {
-        display_name: player.displayName,
-        name: player.displayName,
-        full_name: player.displayName,
+        display_name: sessionAccount.displayName,
+        name: sessionAccount.displayName,
+        full_name: sessionAccount.displayName,
       };
       const existing = list.users.find(
-        (u) => u.email?.toLowerCase() === player.email.toLowerCase(),
+        (u) => u.email?.toLowerCase() === sessionAccount.email.toLowerCase(),
       );
       if (!existing) {
         const { error } = await admin.auth.admin.createUser({
-          email: player.email,
-          password: player.password,
+          email: sessionAccount.email,
+          password: sessionAccount.password,
           email_confirm: true,
           user_metadata: metadata,
         });
         if (error && !/already/i.test(error.message)) throw error;
       } else {
         await admin.auth.admin.updateUserById(existing.id, {
-          password: player.password,
+          password: sessionAccount.password,
           email_confirm: true,
           user_metadata: { ...(existing.user_metadata ?? {}), ...metadata },
         });
+      }
+
+      // Creating the auth user is not enough: AuthGate holds every protected
+      // route until the account has a resolved age and an account_type, so a
+      // fresh account would land on the age/onboarding step instead of the
+      // surface under test. `seedTestAccounts` does this for its own runs;
+      // do the same here, since CI only ever runs this file.
+      const { data: after } = await admin.auth.admin.listUsers({ page: 1, perPage: 1000 });
+      const seeded = after.users.find(
+        (u) => u.email?.toLowerCase() === sessionAccount.email.toLowerCase(),
+      );
+      if (seeded) {
+        await admin.from("profiles").upsert(
+          {
+            id: seeded.id,
+            display_name: sessionAccount.displayName,
+            avatar_initials: sessionAccount.displayName
+              .split(" ")
+              .map((s) => s[0])
+              .join("")
+              .slice(0, 2)
+              .toUpperCase(),
+            city: sessionAccount.city,
+            account_type: "player",
+          },
+          { onConflict: "id" },
+        );
+        await admin
+          .from("profile_birthdays")
+          .upsert({ user_id: seeded.id, birthday: "1990-06-15" }, { onConflict: "user_id" });
       }
     } catch (err) {
       console.warn(
@@ -92,13 +128,49 @@ export default async function globalSetup() {
   const client = createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
     auth: { persistSession: false, autoRefreshToken: false, storage: undefined },
   });
-  const { data, error } = await client.auth.signInWithPassword({
-    email: player.email,
-    password: player.password,
-  });
-  if (error || !data.session) {
+  const signIn = async (acct: (typeof TEST_ACCOUNTS)[number]) => {
+    const { data, error } = await client.auth.signInWithPassword({
+      email: acct.email,
+      password: acct.password,
+    });
+    return error || !data.session ? null : data.session;
+  };
+
+  let session = await signIn(sessionAccount);
+  let signedInAs = sessionAccount.email;
+
+  // The reserved account has to exist before it can back the snapshot, and
+  // provisioning it needs the service role key — which CI does not have, and
+  // on Lovable Cloud cannot be exported to one (server code reaches it through
+  // the managed backend binding; the raw value is not retrievable). Rather than
+  // skip ~130 auth-required specs — silence reads as health — fall back to the
+  // account that has historically been seeded.
+  //
+  // This fallback is only survivable because the app signs out with
+  // `scope: "local"` (see signOut() in @/hooks/use-auth). Under Supabase's
+  // default global scope, the fixture-* specs' sign-out revoked every refresh
+  // token for this user and every injection spec ordered after them got 403s.
+  // Do not restore the bare `signOut()` without restoring the reserved account.
+  if (!session) {
+    const fallback = TEST_ACCOUNTS.find((a) => a.key === "player");
+    if (fallback) {
+      session = await signIn(fallback);
+      if (session) {
+        signedInAs = fallback.email;
+        console.warn(
+          `[e2e global-setup] ${sessionAccount.email} is not provisioned, so the injected ` +
+            `session falls back to ${fallback.email}, which the fixture-* specs also drive ` +
+            "through the real form. Seed it (run the admin-gated seedTestAccounts server fn " +
+            "from the deployed app, or set SUPABASE_SERVICE_ROLE_KEY so this file can " +
+            "provision it) to get the isolation back.",
+        );
+      }
+    }
+  }
+
+  if (!session) {
     console.warn(
-      `[e2e global-setup] Could not sign in ${player.email}: ${error?.message ?? "no session"}. ` +
+      `[e2e global-setup] Could not sign in ${sessionAccount.email}: no session. ` +
         "Set SUPABASE_SERVICE_ROLE_KEY (or pre-seed the account) so global-setup can provision it. " +
         "Auth-required specs will skip.",
     );
@@ -107,9 +179,9 @@ export default async function globalSetup() {
 
   const storageKey = `sb-${SUPABASE_PROJECT_ID}-auth-token`;
   process.env.LOVABLE_BROWSER_SUPABASE_STORAGE_KEY = storageKey;
-  process.env.LOVABLE_BROWSER_SUPABASE_SESSION_JSON = JSON.stringify(data.session);
-  process.env.LOVABLE_BROWSER_SUPABASE_ACCESS_TOKEN = data.session.access_token;
+  process.env.LOVABLE_BROWSER_SUPABASE_SESSION_JSON = JSON.stringify(session);
+  process.env.LOVABLE_BROWSER_SUPABASE_ACCESS_TOKEN = session.access_token;
   process.env.LOVABLE_BROWSER_AUTH_STATUS = "injected";
 
-  console.log(`[e2e global-setup] Signed in ${player.email} for E2E specs.`);
+  console.log(`[e2e global-setup] Signed in ${signedInAs} for E2E specs.`);
 }

@@ -317,7 +317,15 @@ function Create() {
   if (affiliationsLoading) {
     return (
       <div className="mx-auto w-full max-w-md sm:max-w-2xl lg:max-w-4xl px-4 pt-6">
-        <div className="h-8 w-40 bg-surface rounded-lg animate-pulse mb-4" />
+        <div className="flex items-center gap-3 mb-5">
+          <Link
+            to="/feed"
+            className="grid h-10 w-10 place-items-center rounded-full border border-border bg-surface"
+          >
+            <ArrowLeft className="h-5 w-5" />
+          </Link>
+          <h1 className="font-display text-2xl font-bold">Host a game</h1>
+        </div>
         <div className="h-32 bg-surface rounded-2xl animate-pulse" />
       </div>
     );

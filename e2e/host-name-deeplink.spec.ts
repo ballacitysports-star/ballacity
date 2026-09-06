@@ -1,4 +1,5 @@
 import { test, expect, type Page } from "@playwright/test";
+import { gotoCreateAndExpectHeading } from "./helpers/create-page";
 
 /**
  * E2E: after a hard refresh / fresh deep-link open of a game detail page,
@@ -49,8 +50,7 @@ function emailLocalPart(): string | null {
 }
 
 async function createGameAndCaptureUrl(page: Page, title: string): Promise<string> {
-  await page.goto("/create");
-  await expect(page.getByRole("heading", { name: /host a game/i })).toBeVisible();
+  await gotoCreateAndExpectHeading(page);
   await page
     .getByPlaceholder(/title|game/i)
     .first()

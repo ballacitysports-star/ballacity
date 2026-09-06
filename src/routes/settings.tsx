@@ -227,7 +227,9 @@ function SettingsHubPage() {
 
   const handleSignOut = async () => {
     try {
-      await supabase.auth.signOut();
+      // Device-level sign-out — see signOut() in @/hooks/use-auth for why
+      // this is `local` and not Supabase's default `global` scope.
+      await supabase.auth.signOut({ scope: "local" });
       toast.success("Signed out");
       window.location.href = "/auth";
     } catch {
