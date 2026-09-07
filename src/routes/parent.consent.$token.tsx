@@ -156,6 +156,7 @@ function ConsentApprovalPage() {
               </p>
               <Link
                 to="/auth"
+                search={{ next: `/parent/consent/${token}` }}
                 className="mt-3 inline-block rounded-full bg-primary px-4 py-2 text-sm font-bold text-primary-foreground"
               >
                 Sign in to approve
