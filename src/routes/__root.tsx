@@ -12,6 +12,7 @@ import { useEffect, useState } from "react";
 import appCss from "../styles.css?url";
 import { DebugModeToggle } from "@/components/DebugModeToggle";
 import { BottomNav } from "@/components/BottomNav";
+import { SwipeNavigator } from "@/components/navigation/SwipeNavigator";
 import { ClientOnly } from "@tanstack/react-router";
 import { supabase } from "@/integrations/supabase/client";
 import { Toaster } from "@/components/ui/sonner";
@@ -1049,7 +1050,9 @@ function RootComponent() {
       >
         <GlobalErrorBoundary scope="root">
           <AuthGate>
-            <Outlet />
+            <SwipeNavigator>
+              <Outlet />
+            </SwipeNavigator>
           </AuthGate>
         </GlobalErrorBoundary>
       </ClientOnly>
