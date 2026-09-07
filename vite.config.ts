@@ -48,6 +48,22 @@ export default defineConfig({
   },
   vite: {
     plugins: [mcpPlugin()],
+    // Email rendering pulls in `entities`; a nested v7 copy breaks SSR because it
+    // dropped ./lib/decode.js. Pin every import to the hoisted v4.5.0 copy.
+    resolve: {
+      alias: {
+        "entities/lib/decode.js": resolve(
+          dirname(fileURLToPath(import.meta.url)),
+          "node_modules/entities/lib/decode.js",
+        ),
+        "entities/lib/encode.js": resolve(
+          dirname(fileURLToPath(import.meta.url)),
+          "node_modules/entities/lib/encode.js",
+        ),
+        entities: resolve(dirname(fileURLToPath(import.meta.url)), "node_modules/entities"),
+      },
+    },
+
     environments: {
       client: {
         build: {
