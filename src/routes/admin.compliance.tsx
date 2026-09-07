@@ -129,7 +129,7 @@ function ComplianceDashboard() {
   });
 
   return (
-    <div className="page-shell mx-auto max-w-5xl space-y-6 p-4 pb-24">
+    <div className="page-shell space-y-6 py-4 pb-24">
       <div className="flex items-center gap-2">
         <Button asChild variant="ghost" size="sm">
           <Link to="/admin">

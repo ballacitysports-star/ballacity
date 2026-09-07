@@ -266,7 +266,7 @@ function AuditLogPage() {
   const pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
   return (
-    <div className="mx-auto min-h-dvh max-w-5xl space-y-4 p-4 pb-24 sm:p-6">
+    <div className="page-shell min-h-dvh space-y-4 py-4 pb-24 sm:py-6">
       <div className="flex items-center gap-2">
         <Button variant="ghost" size="icon" asChild>
           <Link to="/admin">

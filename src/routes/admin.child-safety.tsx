@@ -52,7 +52,7 @@ function AdminChildSafetyPage() {
 
   if (query.isError) {
     return (
-      <main className="mx-auto w-full max-w-lg px-4 py-10">
+      <main className="page-shell py-10">
         <h1 className="font-display text-xl font-bold">Not authorized</h1>
         <p className="mt-2 text-sm text-muted-foreground">
           This page is restricted to moderators and administrators.
@@ -67,7 +67,7 @@ function AdminChildSafetyPage() {
   const data = query.data;
 
   return (
-    <main className="mx-auto w-full max-w-3xl px-4 py-6 pb-24">
+    <main className="page-shell py-6 pb-24">
       <Link to="/admin" className="inline-flex items-center gap-1 text-xs text-muted-foreground">
         <ArrowLeft className="h-3.5 w-3.5" aria-hidden /> Admin
       </Link>
