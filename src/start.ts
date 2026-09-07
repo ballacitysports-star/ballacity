@@ -3,7 +3,13 @@ import { createStart, createMiddleware } from "@tanstack/react-start";
 import { renderErrorPage } from "./lib/error-page";
 import { attachSupabaseAuth } from "@/integrations/supabase/auth-attacher";
 
-const errorMiddleware = createMiddleware().server(async ({ next }) => {
+// Platform email routes authenticate themselves (signed webhook / API key) and
+// must never pass through app-level guards or error wrapping.
+const isPlatformPath = (request: Request) =>
+  new URL(request.url).pathname.startsWith("/lovable/");
+
+const errorMiddleware = createMiddleware().server(async ({ request, next }) => {
+  if (isPlatformPath(request)) return await next();
   try {
     return await next();
   } catch (error) {
@@ -19,6 +25,7 @@ const errorMiddleware = createMiddleware().server(async ({ next }) => {
 });
 
 const serverFnDirectAccessMiddleware = createMiddleware().server(async ({ request, next }) => {
+  if (isPlatformPath(request)) return await next();
   const pathname = new URL(request.url).pathname;
   const serverFnBase = process.env["TSS_SERVER_FN_BASE"] || "/_serverFn";
   const normalizedBase = serverFnBase.endsWith("/") ? serverFnBase : `${serverFnBase}/`;
@@ -29,6 +36,7 @@ const serverFnDirectAccessMiddleware = createMiddleware().server(async ({ reques
 
   return await next();
 });
+
 
 export const startInstance = createStart(() => ({
   functionMiddleware: [attachSupabaseAuth],
