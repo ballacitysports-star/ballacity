@@ -6,13 +6,20 @@ import { toast } from "sonner";
 import { Check, ShieldCheck } from "lucide-react";
 import { pageHead } from "@/lib/seo";
 import { useAuth } from "@/hooks/use-auth";
-import { CHILD_POLICY_DISCLAIMER, CONSENT_METHOD_META } from "@/lib/child-policy";
+import {
+  CHILD_POLICY_DISCLAIMER,
+  CONSENT_METHOD_META,
+  parseCohort,
+  requiresParentalConsent,
+} from "@/lib/child-policy";
 import {
   approveConsentAsGuardian,
   lookupConsentRequest,
   type ConsentLookup,
 } from "@/lib/child-safety.functions";
 import { Button } from "@/components/ui/button";
+import { CHILD_CONSENT_ROUTE, needsAgeGate, useMyAgeStatus } from "@/lib/age-verification";
+import { AgeGateScreen } from "@/components/onboarding/AgeGateScreen";
 
 export const Route = createFileRoute("/parent/consent/$token")({
   head: () =>
@@ -64,6 +71,46 @@ function ConsentApprovalPage() {
   });
   const info = query.data;
 
+  // `/parent/*` is an account-setup escape (see age-verification.ts) so a
+  // brand-new guardian reaches this page straight after signing up, without
+  // AuthGate's ordinary age gate ever running. That is deliberate — but it
+  // means nothing here has ever asked this account for its date of birth,
+  // while approving requires the server to already know it is an adult
+  // (child_safety.functions.ts checks `profiles.age_cohort === 'adult'`).
+  // Left unhandled, a genuine adult whose birthday was never recorded could
+  // tick the box, press Approve, and hit that check as a dead-end server
+  // error with no way to act on it.
+  //
+  // So run the same check AuthGate runs elsewhere, and when it is missing,
+  // render the exact screen AuthGate would have shown — in place, the way
+  // AuthGate does for every other protected route — before Approve is ever
+  // reachable.
+  const ageStatus = useMyAgeStatus(!!user);
+  const ageMissing =
+    !!ageStatus.data &&
+    (needsAgeGate(ageStatus.data.status) || ageStatus.data.cohort === "unknown");
+
+  // AgeGateScreen is written to be the whole page (own heading, own full-height
+  // background) — every other caller (AuthGate) renders it that way, so this
+  // does too rather than nesting it in a card and ending up with two headers.
+  // It hands back to this route, on this URL, once resolved.
+  if (user && ageMissing) {
+    return (
+      <AgeGateScreen
+        onResolved={(cohort) => {
+          if (requiresParentalConsent(parseCohort(cohort))) {
+            // Turned out to need its own guardian, so it cannot approve
+            // anyone else's — send it through the same step every other
+            // minor account goes through.
+            void navigate({ to: CHILD_CONSENT_ROUTE, replace: true });
+            return;
+          }
+          void ageStatus.refetch();
+        }}
+      />
+    );
+  }
+
   const submit = async () => {
     setSubmitting(true);
     try {
@@ -81,7 +128,9 @@ function ConsentApprovalPage() {
     <main className="mx-auto w-full max-w-lg px-4 py-6 pb-24">
       <div className="flex items-center gap-2 text-primary">
         <ShieldCheck className="h-5 w-5" aria-hidden />
-        <span className="text-xs font-bold uppercase tracking-wide">Parent / guardian approval</span>
+        <span className="text-xs font-bold uppercase tracking-wide">
+          Parent / guardian approval
+        </span>
       </div>
       <h1 className="mt-2 font-display text-2xl font-bold">
         Approve {info?.childDisplayName ?? "a child"}&rsquo;s ballaCity account
@@ -151,8 +200,8 @@ function ConsentApprovalPage() {
           {loading ? null : !user ? (
             <div className="mt-4 rounded-2xl border border-border bg-surface p-4 text-xs">
               <p className="text-muted-foreground">
-                Sign in with your own adult ballaCity account to approve. This confirms your email and
-                gives you the Parent Center.
+                Sign in with your own adult ballaCity account to approve. This confirms your email
+                and gives you the Parent Center.
               </p>
               <Link
                 to="/auth"
@@ -162,12 +211,10 @@ function ConsentApprovalPage() {
                 Sign in to approve
               </Link>
             </div>
+          ) : ageStatus.isLoading ? (
+            <p className="mt-4 text-sm text-muted-foreground">Checking your account…</p>
           ) : (
-            <Button
-              className="mt-4 w-full"
-              disabled={!acknowledged || submitting}
-              onClick={submit}
-            >
+            <Button className="mt-4 w-full" disabled={!acknowledged || submitting} onClick={submit}>
               {submitting ? "Approving…" : "Approve this account"}
             </Button>
           )}
