@@ -240,7 +240,9 @@ function ChannelRow({
     <div className="flex min-h-11 items-center justify-between gap-3 rounded-xl bg-background px-3 py-2">
       <span className="text-xs font-semibold">
         {label}
-        {locked && <span className="ml-1.5 text-[11px] font-normal text-muted-foreground">Always on</span>}
+        {locked && (
+          <span className="ml-1.5 text-[11px] font-normal text-muted-foreground">Always on</span>
+        )}
       </span>
       <Switch
         checked={checked}
