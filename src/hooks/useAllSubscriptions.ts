@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { getStripeEnvironment } from "@/lib/stripe";
+import { getBillingEnvironment } from "@/lib/stripe";
 import { useAuth } from "@/hooks/use-auth";
 
 type SubRow = {
@@ -34,13 +34,9 @@ export function useAllSubscriptions() {
     }
     let cancelled = false;
     async function refetch() {
-      let env: ReturnType<typeof getStripeEnvironment>;
-      try {
-        env = getStripeEnvironment();
-      } catch {
-        if (!cancelled) setLoading(false);
-        return;
-      }
+      // Reading which plans someone is on must work even on a build that
+      // cannot sell anything; see getBillingEnvironment().
+      const env = getBillingEnvironment();
       const { data } = await supabase
         .from("subscriptions")
         .select("id,status,price_id,current_period_end,cancel_at_period_end,stripe_customer_id")

@@ -2,6 +2,11 @@ const clientToken = import.meta.env.VITE_PAYMENTS_CLIENT_TOKEN;
 
 export function PaymentTestModeBanner() {
   if (!clientToken) {
+    // Builder-facing, not athlete-facing: a missing key is a deploy task, and
+    // on a live site it reads to a member as though the app is demanding
+    // payment for something (the free tier) that costs nothing. The features
+    // that don't involve a charge keep working, so say nothing in production.
+    if (!import.meta.env.DEV) return null;
     return (
       <div className="w-full bg-red-100 border-b border-red-300 px-4 py-2 text-center text-sm text-red-800">
         Production checkout is not configured. Complete Stripe go-live in your Lovable project to

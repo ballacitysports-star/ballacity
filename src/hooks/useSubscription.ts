@@ -1,7 +1,10 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { getStripeEnvironment } from "@/lib/stripe";
+import { getBillingEnvironment, isPaymentsConfigured } from "@/lib/stripe";
 import { useAuth } from "@/hooks/use-auth";
+
+/** Reels a member may generate before a subscription is required. */
+export const FREE_REEL_ALLOWANCE = 3;
 
 export type SubscriptionRow = {
   id: string;
@@ -28,13 +31,10 @@ export function useSubscription() {
     let cancelled = false;
 
     async function refetch() {
-      let env: ReturnType<typeof getStripeEnvironment>;
-      try {
-        env = getStripeEnvironment();
-      } catch {
-        if (!cancelled) setLoading(false);
-        return;
-      }
+      // Deliberately not getStripeEnvironment(): the free allowance is not a
+      // Stripe feature, so counting it must not depend on checkout being
+      // configured. A build with no publishable key still has three free reels.
+      const env = getBillingEnvironment();
 
       const [{ data: subRow }, { count }] = await Promise.all([
         supabase
@@ -90,6 +90,8 @@ export function useSubscription() {
     isPastDue,
     loading,
     freeUsed,
-    freeRemaining: Math.max(0, 3 - freeUsed),
+    freeRemaining: Math.max(0, FREE_REEL_ALLOWANCE - freeUsed),
+    /** False when this build has no Stripe key — nothing can be bought. */
+    paymentsConfigured: isPaymentsConfigured(),
   };
 }
