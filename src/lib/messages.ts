@@ -358,7 +358,12 @@ export async function sendMessage(
   } as any);
   if (error) throw error;
 
-  // Skip notification if this thread is still a request for the recipient
+  // A recipient who has not accepted the thread is looking at a message
+  // request. They still have to hear about it once: this used to notify only
+  // people in accepted_by, and a recipient is never in accepted_by before
+  // they reply, so the very first message — the one that starts every
+  // conversation — reached nobody. The thread sat unread until they happened
+  // to open the inbox, which is what "messaging doesn't work" looked like.
   const { data: convRow } = await supabase
     .from("conversations" as any)
     .select("accepted_by")
@@ -378,19 +383,48 @@ export async function sendMessage(
     .maybeSingle();
   const name = (meProf as any)?.display_name ?? "Someone";
   const preview = trimmed ? trimmed.slice(0, 140) : `📎 ${attachment?.name ?? "Attachment"}`;
-  await Promise.all(
-    others
-      .filter((uid) => accepted.includes(uid))
-      .map((uid) =>
-        createNotification({
-          user_id: uid,
-          type: "message",
-          title: `New message from ${name}`,
-          body: preview,
-          link: `/messages/${convId}`,
-        }),
-      ),
-  );
+  const known = others.filter((uid) => accepted.includes(uid));
+  const strangers = others.filter((uid) => !accepted.includes(uid));
+
+  // Only the opening message of a request notifies, so someone who has not
+  // been accepted cannot push a stream of alerts at a person who never
+  // answered. Counted after the insert, so the first message is exactly 1.
+  let firstContact = false;
+  if (strangers.length > 0) {
+    const { count } = await supabase
+      .from("messages")
+      .select("id", { count: "exact", head: true })
+      .eq("conversation_id", convId)
+      .eq("sender_id", me);
+    firstContact = (count ?? 0) <= 1;
+  }
+
+  await Promise.all([
+    ...known.map((uid) =>
+      createNotification({
+        user_id: uid,
+        type: "message",
+        title: `New message from ${name}`,
+        body: preview,
+        link: `/messages/${convId}`,
+      }),
+    ),
+    // Type stays "message" so this counts toward the inbox badge and honours
+    // the member's existing message preferences. The body deliberately omits
+    // the text: an unaccepted sender should not get to put arbitrary words on
+    // someone's lock screen.
+    ...(firstContact
+      ? strangers.map((uid) =>
+          createNotification({
+            user_id: uid,
+            type: "message",
+            title: `Message request from ${name}`,
+            body: "They'd like to start a conversation.",
+            link: `/messages/${convId}`,
+          }),
+        )
+      : []),
+  ]);
 }
 
 /**

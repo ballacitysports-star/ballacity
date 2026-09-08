@@ -1,4 +1,4 @@
-import { Link } from "@tanstack/react-router";
+import { Link, useRouterState } from "@tanstack/react-router";
 import { BellRing, Clock } from "lucide-react";
 import { useFamilyApprovals } from "@/lib/family-approvals";
 
@@ -8,6 +8,10 @@ import { useFamilyApprovals } from "@/lib/family-approvals";
  */
 export function FamilyApprovalsPanel() {
   const { approvals, actionNeeded, isLoading } = useFamilyApprovals();
+  // The panel lives on /parent, and several items point there because that is
+  // where they lead from a notification. Rendering "Review consent" as a link
+  // to the page you are already reading is a dead end, so drop it here.
+  const here = useRouterState({ select: (s) => s.location.pathname });
   if (isLoading || approvals.length === 0) return null;
 
   return (
@@ -35,7 +39,7 @@ export function FamilyApprovalsPanel() {
           >
             <div className="text-sm font-semibold capitalize">{a.title}</div>
             <p className="mt-1 text-muted-foreground">{a.detail}</p>
-            {a.actionLabel && a.actionTo ? (
+            {a.actionLabel && a.actionTo && a.actionTo !== here ? (
               <Link
                 to={a.actionTo}
                 className="mt-2 inline-block font-semibold text-primary underline"

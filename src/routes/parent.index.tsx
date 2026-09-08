@@ -4,6 +4,7 @@ import { toast } from "sonner";
 import { ShieldCheck, Users } from "lucide-react";
 import { pageHead } from "@/lib/seo";
 import { useAuth } from "@/hooks/use-auth";
+import { useFamilyRoster } from "@/lib/family-roster";
 import {
   useChildFootprint,
   useMyChildren,
@@ -20,7 +21,7 @@ import { ConsentTrail } from "@/components/child/ConsentTrail";
 import { AddMinorPanel } from "@/components/child/AddMinorPanel";
 import { FamilyActivityLog } from "@/components/child/FamilyActivityLog";
 import { FamilyApprovalsPanel } from "@/components/child/FamilyApprovalsPanel";
-import { FamilyChildSwitcher } from "@/components/child/FamilyChildSwitcher";
+import { FamilyRoster } from "@/components/child/FamilyRoster";
 
 
 export const Route = createFileRoute("/parent/")({
@@ -273,6 +274,7 @@ function ChildPanel({ childUserId }: { childUserId: string }) {
 function ParentCenterPage() {
   const { user, loading } = useAuth();
   const { children, isLoading } = useMyChildren();
+  const roster = useFamilyRoster();
   const { requests } = useParentRequests();
   const [openChild, setOpenChild] = useState<string | null>(null);
   const selected = openChild ?? children[0]?.childUserId ?? null;
@@ -300,10 +302,11 @@ function ParentCenterPage() {
         <ShieldCheck className="h-5 w-5" aria-hidden />
         <span className="text-xs font-bold uppercase tracking-wide">Parent Center</span>
       </div>
-      <h1 className="mt-2 font-display text-2xl font-bold">Your child&rsquo;s account</h1>
+      <h1 className="mt-2 font-display text-2xl font-bold">Your family</h1>
       <p className="mt-2 text-sm text-muted-foreground">
-        Manage consent, messaging, videos, discoverability and data requests. You only ever see
-        information about your own child.
+        Everyone you manage, who is waiting on you, and their settings — consent, messaging,
+        videos, discoverability and data requests. You only ever see information about your own
+        children.
       </p>
 
       <FamilyApprovalsPanel />
@@ -323,8 +326,9 @@ function ParentCenterPage() {
         </div>
       ) : (
         <>
-          <FamilyChildSwitcher
-            children={children}
+          <FamilyRoster
+            needsAction={roster.needsAction}
+            approved={roster.approved}
             selected={selected}
             onSelect={setOpenChild}
           />
