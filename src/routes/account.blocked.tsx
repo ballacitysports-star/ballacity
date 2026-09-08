@@ -1,5 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { ArrowLeft, Loader2, ShieldOff } from "lucide-react";
+import { BackHeader } from "@/components/layout/BackHeader";
+import { Loader2, ShieldOff } from "lucide-react";
 import { toast } from "sonner";
 import { pageHead } from "@/lib/seo";
 import { Button } from "@/components/ui/button";
@@ -33,12 +34,7 @@ function BlockedUsersPage() {
 
   return (
     <div className="min-h-screen bg-background pb-24">
-      <header className="sticky top-0 z-10 flex items-center gap-3 border-b border-border bg-background/95 px-2 py-2.5 backdrop-blur">
-        <Link to="/settings" className="rounded-full p-2 hover:bg-surface" aria-label="Back">
-          <ArrowLeft className="h-5 w-5" />
-        </Link>
-        <h1 className="text-lg font-medium">Blocked users</h1>
-      </header>
+      <BackHeader title="Blocked users" fallbackTo="/settings" />
 
       <main className="page-shell-narrow space-y-4 py-4">
         <p className="text-sm text-muted-foreground">

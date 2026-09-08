@@ -1,9 +1,10 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { BackHeader } from "@/components/layout/BackHeader";
 import { useEffect, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { ArrowLeft, Loader2, ShieldAlert } from "lucide-react";
+import { Loader2, ShieldAlert } from "lucide-react";
 import { pageHead } from "@/lib/seo";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -92,31 +93,26 @@ function ModerationPage() {
   if (!access?.isModerator) return null;
 
   return (
-    <div className="page-shell min-h-dvh space-y-4 py-4 sm:py-6">
-      <header className="flex items-center gap-3">
-        <Link to="/admin" className="rounded-full p-2 hover:bg-surface" aria-label="Back">
-          <ArrowLeft className="h-5 w-5" />
-        </Link>
-        <div>
-          <h1 className="text-2xl font-semibold">Moderation</h1>
-          <p className="text-sm text-muted-foreground">
-            Reports, actions, and the moderation audit log
-          </p>
-        </div>
-      </header>
+    <div className="min-h-dvh">
+      <BackHeader title="Moderation" fallbackTo="/admin" />
+      <div className="page-shell space-y-4 py-4 sm:py-6">
+        <p className="text-sm text-muted-foreground">
+          Reports, actions, and the moderation audit log
+        </p>
 
-      <Tabs defaultValue="reports">
-        <TabsList>
-          <TabsTrigger value="reports">Reports</TabsTrigger>
-          <TabsTrigger value="audit">Audit log</TabsTrigger>
-        </TabsList>
-        <TabsContent value="reports" className="pt-3">
-          <ReportsTab />
-        </TabsContent>
-        <TabsContent value="audit" className="pt-3">
-          <AuditTab />
-        </TabsContent>
-      </Tabs>
+        <Tabs defaultValue="reports">
+          <TabsList>
+            <TabsTrigger value="reports">Reports</TabsTrigger>
+            <TabsTrigger value="audit">Audit log</TabsTrigger>
+          </TabsList>
+          <TabsContent value="reports" className="pt-3">
+            <ReportsTab />
+          </TabsContent>
+          <TabsContent value="audit" className="pt-3">
+            <AuditTab />
+          </TabsContent>
+        </Tabs>
+      </div>
     </div>
   );
 }
@@ -217,7 +213,9 @@ function ReportCard({ report, onDone }: { report: ModerationReport; onDone: () =
           <Badge variant="outline" className="capitalize">
             {report.subjectType}
           </Badge>
-          <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${statusTone(report.status)}`}>
+          <span
+            className={`rounded-full px-2 py-0.5 text-xs font-medium ${statusTone(report.status)}`}
+          >
             {reportStatusLabel(report.status)}
           </span>
           <span className="text-sm font-medium">{reportReasonLabel(report.reason)}</span>
@@ -256,11 +254,7 @@ function ReportCard({ report, onDone }: { report: ModerationReport; onDone: () =
             <div>
               <dt className="text-muted-foreground">Game</dt>
               <dd>
-                <Link
-                  to="/games/$gameId"
-                  params={{ gameId: report.gameId }}
-                  className="underline"
-                >
+                <Link to="/games/$gameId" params={{ gameId: report.gameId }} className="underline">
                   {report.gameTitle ?? report.gameId}
                 </Link>
               </dd>
@@ -307,10 +301,20 @@ function ReportCard({ report, onDone }: { report: ModerationReport; onDone: () =
         />
 
         <div className="flex flex-wrap gap-1.5">
-          <Button size="sm" variant="outline" disabled={busy} onClick={() => statusMutation.mutate("investigating")}>
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={busy}
+            onClick={() => statusMutation.mutate("investigating")}
+          >
             Investigating
           </Button>
-          <Button size="sm" variant="outline" disabled={busy} onClick={() => actionMutation.mutate("warn")}>
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={busy}
+            onClick={() => actionMutation.mutate("warn")}
+          >
             Warn
           </Button>
           <Button
@@ -321,22 +325,52 @@ function ReportCard({ report, onDone }: { report: ModerationReport; onDone: () =
           >
             Remove content
           </Button>
-          <Button size="sm" variant="destructive" disabled={busy} onClick={() => actionMutation.mutate("suspend")}>
+          <Button
+            size="sm"
+            variant="destructive"
+            disabled={busy}
+            onClick={() => actionMutation.mutate("suspend")}
+          >
             Suspend
           </Button>
-          <Button size="sm" variant="destructive" disabled={busy} onClick={() => actionMutation.mutate("ban")}>
+          <Button
+            size="sm"
+            variant="destructive"
+            disabled={busy}
+            onClick={() => actionMutation.mutate("ban")}
+          >
             Ban
           </Button>
-          <Button size="sm" variant="secondary" disabled={busy} onClick={() => actionMutation.mutate("restore")}>
+          <Button
+            size="sm"
+            variant="secondary"
+            disabled={busy}
+            onClick={() => actionMutation.mutate("restore")}
+          >
             Restore
           </Button>
-          <Button size="sm" variant="outline" disabled={busy} onClick={() => statusMutation.mutate("escalated")}>
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={busy}
+            onClick={() => statusMutation.mutate("escalated")}
+          >
             Escalate
           </Button>
-          <Button size="sm" variant="outline" disabled={busy} onClick={() => statusMutation.mutate("resolved")}>
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={busy}
+            onClick={() => statusMutation.mutate("resolved")}
+          >
             Resolve
           </Button>
-          <Button size="sm" variant="ghost" disabled={busy} onClick={() => statusMutation.mutate("dismissed")}>
+          <Button
+            size="sm"
+            variant="ghost"
+            disabled={busy}
+            onClick={() => statusMutation.mutate("dismissed")}
+          >
             Dismiss
           </Button>
         </div>

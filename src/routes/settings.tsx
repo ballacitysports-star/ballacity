@@ -1,11 +1,11 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { BackHeader } from "@/components/layout/BackHeader";
 import { pageHead } from "@/lib/seo";
 import { AgeReviewNotice } from "@/components/child/AgeReviewNotice";
 import { BirthdayLockCard } from "@/components/child/BirthdayLockCard";
 import { ParentCenterSection } from "@/components/child/ParentCenterSection";
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
 import {
-  ArrowLeft,
   Bell,
   Building2,
   ChevronRight,
@@ -249,12 +249,7 @@ function SettingsHubPage() {
 
   return (
     <div className="min-h-screen bg-background pb-24">
-      <header className="sticky top-0 z-10 flex items-center gap-3 border-b border-border bg-background/95 px-2 py-2.5 backdrop-blur">
-        <Link to="/profile" className="rounded-full p-2 hover:bg-surface" aria-label="Back">
-          <ArrowLeft className="h-5 w-5" />
-        </Link>
-        <h1 className="text-lg font-medium">Settings</h1>
-      </header>
+      <BackHeader title="Settings" fallbackTo="/profile" />
 
       <main className="page-shell-narrow pb-4">
         <AccountIdentityRow />

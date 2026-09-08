@@ -827,7 +827,7 @@ function AuthGate({ children }: { children: React.ReactNode }) {
   }, [user, loading, skipTypeCheck, skipAgeCheck, ageStatus, router, retryTick]);
 
   useEffect(() => {
-    if (user && !isPublic && !isTab) {
+    if (user && !isTab) {
       document.body.style.paddingBottom = "calc(env(safe-area-inset-bottom) + 6rem)";
     } else {
       document.body.style.paddingBottom = "";
@@ -838,15 +838,15 @@ function AuthGate({ children }: { children: React.ReactNode }) {
   }, [user, isPublic, isTab]);
 
   // Public routes skip the sign-in/age/account-type gates below so an
-  // anonymous visitor (e.g. a shared link) can view them. But a route that's
-  // ALSO a primary tab (currently just /highlights) should still show the
-  // tab bar for a signed-in viewer — otherwise tapping "Highlights" from the
-  // bar makes the bar itself disappear, unlike every other tab.
+  // anonymous visitor (e.g. a shared link) can view them. A signed-in viewer
+  // still gets the tab bar there: a page like /safety or /terms otherwise has
+  // no way back into the app except the browser's own back button, which an
+  // installed PWA does not show.
   if (isPublic) {
     return (
       <>
         {children}
-        {user && isTab && <BottomNav />}
+        {user && <BottomNav />}
       </>
     );
   }
