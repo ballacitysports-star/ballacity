@@ -111,6 +111,7 @@ function ModerationPage() {
           <AuditTab />
         </TabsContent>
       </Tabs>
+      </div>
     </div>
   );
 }
