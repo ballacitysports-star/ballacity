@@ -112,6 +112,33 @@ jobs:
       - name: Run Playwright tests
         run: bunx playwright test
 
+      # Runs even when the suite fails, which is the only time it matters.
+      # Reads the JSON reporter's file rather than the job log, so the tally
+      # survives the stdout truncation that lost it in runs 70 and 71.
+      - name: Summarise results
+        if: always()
+        run: |
+          f=playwright-report/results.json
+          if [ ! -f "$f" ]; then echo "no results.json - the run died before writing one"; exit 0; fi
+          node -e '
+            const r = require("./playwright-report/results.json");
+            const out = [];
+            const walk = (s) => (s.suites ?? []).forEach(walk) ||
+              (s.specs ?? []).forEach((sp) => sp.tests.forEach((t) =>
+                out.push([t.status, sp.title, sp.file])));
+            (r.suites ?? []).forEach(walk);
+            const by = (st) => out.filter((o) => o[0] === st).length;
+            const failed = out.filter((o) => o[0] !== "expected" && o[0] !== "skipped");
+            const line = `${failed.length} failed, ${by("expected")} passed, ${by("skipped")} skipped, ${out.length} total`;
+            console.log(line);
+            const files = [...new Set(failed.map((f) => f[2]))].sort();
+            console.log(`${files.length} spec files with failures:`);
+            files.forEach((f) => console.log("  " + f));
+            const sum = process.env.GITHUB_STEP_SUMMARY;
+            if (sum) require("fs").appendFileSync(sum,
+              `### E2E\n\n${line}\n\n` + files.map((f) => `- ${f}`).join("\n") + "\n");
+          '
+
       - name: Stop dev server
         if: always()
         run: |

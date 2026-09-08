@@ -42,7 +42,19 @@ export default defineConfig({
   timeout: 60_000,
   fullyParallel: false,
   retries: 0,
-  reporter: [["list"]],
+  // The list reporter writes its tally to stdout at the very end, and twice now
+  // that tally has not survived: runs 70 and 71 both stop after the last
+  // failure block with no "N failed"/"N passed" line at all, while run 68 —
+  // same config — printed it. Exit code 1 was preserved both times, so the
+  // process knew it had failed; only the summary was lost.
+  //
+  // That makes CI unreadable in exactly the case you need to read it. A JSON
+  // reporter writing to a file does not depend on stdout being flushed at
+  // exit, so the counts survive whatever is truncating the tail, and the
+  // workflow prints them from there.
+  reporter: process.env.CI
+    ? ([["list"], ["json", { outputFile: "playwright-report/results.json" }]] as const)
+    : [["list"]],
   use: {
     baseURL: process.env.E2E_BASE_URL ?? "http://localhost:8080",
     viewport: { width: 1280, height: 1800 },
