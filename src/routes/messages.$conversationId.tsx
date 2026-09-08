@@ -1,4 +1,4 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { pageHead } from "@/lib/seo";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
@@ -58,6 +58,7 @@ type Other = {
 
 function Thread() {
   const { conversationId } = Route.useParams();
+  const navigate = useNavigate();
   const { user, loading } = useAuth();
   const { can: canChildFeature } = useMyChildStatus();
   const messagingDecision = canChildFeature("direct_messaging");
@@ -366,7 +367,11 @@ function Thread() {
   const handleDecline = async () => {
     try {
       await declineConversation(conversationId);
-      window.history.back();
+      // Not history.back(): declining leaves the thread, so this route no
+      // longer loads for you, and arriving here from a notification or a
+      // shared link means there is nothing behind you to go back to. Send
+      // people to the inbox, which always exists.
+      await navigate({ to: "/messages", replace: true });
     } catch (e: any) {
       toast.error(e.message);
     }
