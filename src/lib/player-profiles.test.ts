@@ -114,6 +114,7 @@ describe("minor status is derived, not declared", () => {
     avatarUrl: null,
     bio: null,
     primarySport: "Baseball",
+    location: null,
     legacy: false,
   };
 

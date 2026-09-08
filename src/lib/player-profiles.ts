@@ -30,6 +30,7 @@ export type PlayerProfile = {
   avatarUrl: string | null;
   bio: string | null;
   primarySport: string | null;
+  location: string | null;
   /** True when this row came from the legacy `profiles` table. */
   legacy: boolean;
 };
@@ -65,6 +66,7 @@ type Row = {
   avatar_url: string | null;
   bio: string | null;
   primary_sport: string | null;
+  location: string | null;
 };
 
 function fromRow(r: Row): PlayerProfile {
@@ -82,12 +84,13 @@ function fromRow(r: Row): PlayerProfile {
     avatarUrl: r.avatar_url,
     bio: r.bio,
     primarySport: r.primary_sport,
+    location: r.location,
     legacy: false,
   };
 }
 
 const COLUMNS =
-  "id, account_id, user_id, display_name, slug, date_of_birth, age_cohort, avatar_initials, avatar_url, bio, primary_sport";
+  "id, account_id, user_id, display_name, slug, date_of_birth, age_cohort, avatar_initials, avatar_url, bio, primary_sport, location";
 
 /**
  * Every athlete this account manages, including their own.
@@ -152,7 +155,120 @@ async function legacyPlayerFor(userId: string): Promise<PlayerProfile[]> {
       avatarUrl: p.avatar_url,
       bio: p.bio,
       primarySport: p.sport,
+      location: null,
       legacy: true,
     },
   ];
+}
+
+/** What the Add Player form collects. Everything else is filled in later. */
+export type NewPlayerInput = {
+  firstName: string;
+  lastName: string;
+  /** ISO yyyy-mm-dd. */
+  dateOfBirth: string;
+  sport: string;
+  /**
+   * True when the account owner is adding themselves. Sets user_id so the
+   * profile is linked to their login; a child is left unlinked, which is the
+   * entire point — they never need one.
+   */
+  isSelf: boolean;
+};
+
+export class PlayerProfileError extends Error {}
+
+/**
+ * Turn a database failure into something a parent can act on.
+ *
+ * §23: never show a raw Postgres or PostgREST error. The codes here are the
+ * ones this table can actually produce — the ownership and cohort rules are
+ * enforced as grants and constraints, so a bug in a caller surfaces as 42501
+ * or 23514 rather than as a silent success.
+ */
+function describe(error: { code?: string; message?: string } | null): string {
+  switch (error?.code) {
+    case "23505":
+      return "That profile link is already taken. Try a different name.";
+    case "23514":
+    case "42501":
+      return "You can only add players to your own account.";
+    case "23503":
+      return "Your account isn't ready yet. Reload the page and try again.";
+    default:
+      return "Couldn't create that player. Please try again.";
+  }
+}
+
+/**
+ * Create a player under the signed-in account.
+ *
+ * age_cohort is deliberately absent: it is derived from date_of_birth by a
+ * database trigger and is not in the INSERT grant, so naming it here would
+ * make the statement fail outright.
+ */
+export async function createPlayer(input: NewPlayerInput): Promise<PlayerProfile> {
+  const { data: auth } = await supabase.auth.getUser();
+  const me = auth.user?.id;
+  if (!me) throw new PlayerProfileError("Sign in to add a player.");
+
+  const first = input.firstName.trim();
+  const last = input.lastName.trim();
+  if (!first) throw new PlayerProfileError("Enter the player's first name.");
+  if (!input.dateOfBirth) throw new PlayerProfileError("Enter the player's date of birth.");
+
+  const display = [first, last].filter(Boolean).join(" ");
+  const { data, error } = await supabase
+    .from("player_profiles")
+    .insert({
+      account_id: me,
+      user_id: input.isSelf ? me : null,
+      first_name: first,
+      last_name: last || null,
+      display_name: display,
+      date_of_birth: input.dateOfBirth,
+      primary_sport: input.sport || null,
+      avatar_initials: initialsFor(first, last),
+    })
+    .select(COLUMNS)
+    .single();
+
+  if (error || !data) throw new PlayerProfileError(describe(error));
+  return fromRow(data as Row);
+}
+
+/** "Jake Smith" -> "JS"; a first name alone -> "JA". */
+export function initialsFor(first: string, last: string): string {
+  const f = first.trim();
+  const l = last.trim();
+  if (f && l) return (f[0] + l[0]).toUpperCase();
+  return f.slice(0, 2).toUpperCase() || "PL";
+}
+
+/**
+ * Which sections of a player's profile are still empty (§5).
+ *
+ * Deliberately advisory: nothing here blocks entry to the app, it only tells
+ * the owner what is left. Weighted evenly so no single field dominates the
+ * percentage.
+ */
+export const COMPLETION_AREAS = [
+  "Profile photo",
+  "Sport",
+  "Date of birth",
+  "Bio",
+  "Location",
+] as const;
+
+export function completionFor(p: PlayerProfile): { pct: number; missing: string[] } {
+  const done: Record<(typeof COMPLETION_AREAS)[number], boolean> = {
+    "Profile photo": !!p.avatarUrl,
+    Sport: !!p.primarySport,
+    "Date of birth": !!p.dateOfBirth,
+    Bio: !!p.bio,
+    Location: !!p.location,
+  };
+  const missing = COMPLETION_AREAS.filter((a) => !done[a]);
+  const pct = Math.round(((COMPLETION_AREAS.length - missing.length) / COMPLETION_AREAS.length) * 100);
+  return { pct, missing: [...missing] };
 }

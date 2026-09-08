@@ -63,12 +63,14 @@ import { Route as MessagesConversationIdRouteImport } from './routes/messages.$c
 import { Route as OnboardingAccountTypeRouteImport } from './routes/onboarding.account-type'
 import { Route as OnboardingAgeRouteImport } from './routes/onboarding.age'
 import { Route as OnboardingChildRouteImport } from './routes/onboarding.child'
+import { Route as OnboardingSetupForRouteImport } from './routes/onboarding.setup-for'
 import { Route as OnboardingWelcomeRouteImport } from './routes/onboarding.welcome'
 import { Route as OrgsIndexRouteImport } from './routes/orgs.index'
 import { Route as OrgsCreateRouteImport } from './routes/orgs.create'
 import { Route as ParentIndexRouteImport } from './routes/parent.index'
 import { Route as PlayerCardUserIdRouteImport } from './routes/player-card.$userId'
 import { Route as PlayersUserIdRouteImport } from './routes/players.$userId'
+import { Route as PlayersAddRouteImport } from './routes/players.add'
 import { Route as ProfileEditRouteImport } from './routes/profile.edit'
 import { Route as ReviewNewRouteImport } from './routes/review.new'
 import { Route as SafetyChildrenRouteImport } from './routes/safety_.children'
@@ -366,6 +368,11 @@ const OnboardingChildRoute = OnboardingChildRouteImport.update({
   path: '/onboarding/child',
   getParentRoute: () => rootRouteImport,
 } as any)
+const OnboardingSetupForRoute = OnboardingSetupForRouteImport.update({
+  id: '/onboarding/setup-for',
+  path: '/onboarding/setup-for',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const OnboardingWelcomeRoute = OnboardingWelcomeRouteImport.update({
   id: '/onboarding/welcome',
   path: '/onboarding/welcome',
@@ -394,6 +401,11 @@ const PlayerCardUserIdRoute = PlayerCardUserIdRouteImport.update({
 const PlayersUserIdRoute = PlayersUserIdRouteImport.update({
   id: '/players/$userId',
   path: '/players/$userId',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PlayersAddRoute = PlayersAddRouteImport.update({
+  id: '/players/add',
+  path: '/players/add',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ProfileEditRoute = ProfileEditRouteImport.update({
@@ -577,10 +589,12 @@ export interface FileRoutesByFullPath {
   '/onboarding/account-type': typeof OnboardingAccountTypeRoute
   '/onboarding/age': typeof OnboardingAgeRoute
   '/onboarding/child': typeof OnboardingChildRoute
+  '/onboarding/setup-for': typeof OnboardingSetupForRoute
   '/onboarding/welcome': typeof OnboardingWelcomeRoute
   '/orgs/create': typeof OrgsCreateRoute
   '/player-card/$userId': typeof PlayerCardUserIdRoute
   '/players/$userId': typeof PlayersUserIdRoute
+  '/players/add': typeof PlayersAddRoute
   '/profile/edit': typeof ProfileEditRoute
   '/review/new': typeof ReviewNewRoute
   '/safety/children': typeof SafetyChildrenRoute
@@ -662,10 +676,12 @@ export interface FileRoutesByTo {
   '/onboarding/account-type': typeof OnboardingAccountTypeRoute
   '/onboarding/age': typeof OnboardingAgeRoute
   '/onboarding/child': typeof OnboardingChildRoute
+  '/onboarding/setup-for': typeof OnboardingSetupForRoute
   '/onboarding/welcome': typeof OnboardingWelcomeRoute
   '/orgs/create': typeof OrgsCreateRoute
   '/player-card/$userId': typeof PlayerCardUserIdRoute
   '/players/$userId': typeof PlayersUserIdRoute
+  '/players/add': typeof PlayersAddRoute
   '/profile/edit': typeof ProfileEditRoute
   '/review/new': typeof ReviewNewRoute
   '/safety/children': typeof SafetyChildrenRoute
@@ -750,10 +766,12 @@ export interface FileRoutesById {
   '/onboarding/account-type': typeof OnboardingAccountTypeRoute
   '/onboarding/age': typeof OnboardingAgeRoute
   '/onboarding/child': typeof OnboardingChildRoute
+  '/onboarding/setup-for': typeof OnboardingSetupForRoute
   '/onboarding/welcome': typeof OnboardingWelcomeRoute
   '/orgs/create': typeof OrgsCreateRoute
   '/player-card/$userId': typeof PlayerCardUserIdRoute
   '/players/$userId': typeof PlayersUserIdRoute
+  '/players/add': typeof PlayersAddRoute
   '/profile/edit': typeof ProfileEditRoute
   '/review/new': typeof ReviewNewRoute
   '/safety_/children': typeof SafetyChildrenRoute
@@ -838,10 +856,12 @@ export interface FileRouteTypes {
     | '/onboarding/account-type'
     | '/onboarding/age'
     | '/onboarding/child'
+    | '/onboarding/setup-for'
     | '/onboarding/welcome'
     | '/orgs/create'
     | '/player-card/$userId'
     | '/players/$userId'
+    | '/players/add'
     | '/profile/edit'
     | '/review/new'
     | '/safety/children'
@@ -923,10 +943,12 @@ export interface FileRouteTypes {
     | '/onboarding/account-type'
     | '/onboarding/age'
     | '/onboarding/child'
+    | '/onboarding/setup-for'
     | '/onboarding/welcome'
     | '/orgs/create'
     | '/player-card/$userId'
     | '/players/$userId'
+    | '/players/add'
     | '/profile/edit'
     | '/review/new'
     | '/safety/children'
@@ -1010,10 +1032,12 @@ export interface FileRouteTypes {
     | '/onboarding/account-type'
     | '/onboarding/age'
     | '/onboarding/child'
+    | '/onboarding/setup-for'
     | '/onboarding/welcome'
     | '/orgs/create'
     | '/player-card/$userId'
     | '/players/$userId'
+    | '/players/add'
     | '/profile/edit'
     | '/review/new'
     | '/safety_/children'
@@ -1088,10 +1112,12 @@ export interface RootRouteChildren {
   OnboardingAccountTypeRoute: typeof OnboardingAccountTypeRoute
   OnboardingAgeRoute: typeof OnboardingAgeRoute
   OnboardingChildRoute: typeof OnboardingChildRoute
+  OnboardingSetupForRoute: typeof OnboardingSetupForRoute
   OnboardingWelcomeRoute: typeof OnboardingWelcomeRoute
   OrgsCreateRoute: typeof OrgsCreateRoute
   PlayerCardUserIdRoute: typeof PlayerCardUserIdRoute
   PlayersUserIdRoute: typeof PlayersUserIdRoute
+  PlayersAddRoute: typeof PlayersAddRoute
   ProfileEditRoute: typeof ProfileEditRoute
   ReviewNewRoute: typeof ReviewNewRoute
   SafetyChildrenRoute: typeof SafetyChildrenRoute
@@ -1500,6 +1526,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof OnboardingChildRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/onboarding/setup-for': {
+      id: '/onboarding/setup-for'
+      path: '/onboarding/setup-for'
+      fullPath: '/onboarding/setup-for'
+      preLoaderRoute: typeof OnboardingSetupForRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/onboarding/welcome': {
       id: '/onboarding/welcome'
       path: '/onboarding/welcome'
@@ -1540,6 +1573,13 @@ declare module '@tanstack/react-router' {
       path: '/players/$userId'
       fullPath: '/players/$userId'
       preLoaderRoute: typeof PlayersUserIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/players/add': {
+      id: '/players/add'
+      path: '/players/add'
+      fullPath: '/players/add'
+      preLoaderRoute: typeof PlayersAddRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/profile/edit': {
@@ -1808,10 +1848,12 @@ const rootRouteChildren: RootRouteChildren = {
   OnboardingAccountTypeRoute: OnboardingAccountTypeRoute,
   OnboardingAgeRoute: OnboardingAgeRoute,
   OnboardingChildRoute: OnboardingChildRoute,
+  OnboardingSetupForRoute: OnboardingSetupForRoute,
   OnboardingWelcomeRoute: OnboardingWelcomeRoute,
   OrgsCreateRoute: OrgsCreateRoute,
   PlayerCardUserIdRoute: PlayerCardUserIdRoute,
   PlayersUserIdRoute: PlayersUserIdRoute,
+  PlayersAddRoute: PlayersAddRoute,
   ProfileEditRoute: ProfileEditRoute,
   ReviewNewRoute: ReviewNewRoute,
   SafetyChildrenRoute: SafetyChildrenRoute,
