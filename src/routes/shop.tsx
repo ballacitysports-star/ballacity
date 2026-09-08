@@ -35,7 +35,7 @@ function ShopPage() {
 
   if (isOpen) {
     return (
-      <div className="mx-auto max-w-2xl px-4 py-6">
+      <div className="page-shell-prose py-6">
         <button
           onClick={closeCheckout}
           className="mb-4 inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground"
@@ -50,7 +50,7 @@ function ShopPage() {
   return (
     <div className="min-h-dvh">
       <PaymentTestModeBanner />
-      <div className="mx-auto max-w-2xl px-4 pb-24 pt-6">
+      <div className="page-shell-prose pb-24 pt-6">
         <Link
           to="/profile"
           className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground"

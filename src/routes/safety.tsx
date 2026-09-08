@@ -32,12 +32,12 @@ function SafetyCenter() {
         <span className="text-sm font-medium">Safety Center</span>
       </header>
 
-      <main className="mx-auto max-w-2xl px-4 py-6 pb-28">
+      <main className="page-shell-prose py-6 pb-28">
         <h1 className="font-display text-2xl font-bold">Safety Center</h1>
         <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
-          ballaCity helps players find games — hosts organize them. ballaCity does not supervise games,
-          inspect venues, referee play, or guarantee anyone's safety. These are the habits that keep
-          pickup sports safe.
+          ballaCity helps players find games — hosts organize them. ballaCity does not supervise
+          games, inspect venues, referee play, or guarantee anyone's safety. These are the habits
+          that keep pickup sports safe.
         </p>
         <div className="mt-3 flex flex-wrap gap-2 text-xs">
           <Link
@@ -53,8 +53,6 @@ function SafetyCenter() {
             Parent Center
           </Link>
         </div>
-
-
 
         {/* Emergency */}
         <section className="mt-5 rounded-2xl border border-destructive/50 bg-destructive/5 px-4 py-4">

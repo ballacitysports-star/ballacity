@@ -25,7 +25,7 @@ function GuidelinesPage() {
         <span className="text-sm font-medium">Community Guidelines</span>
       </header>
 
-      <main className="mx-auto max-w-2xl px-4 py-6 pb-28">
+      <main className="page-shell-prose py-6 pb-28">
         <h1 className="font-display text-2xl font-bold">Community Guidelines</h1>
         <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
           ballaCity works when runs are honest, safe, and worth showing up for. These are the
@@ -34,7 +34,10 @@ function GuidelinesPage() {
 
         <div className="mt-6 space-y-4">
           {COMMUNITY_GUIDELINES.map((rule) => (
-            <section key={rule.id} className="rounded-2xl border border-border bg-surface px-4 py-4">
+            <section
+              key={rule.id}
+              className="rounded-2xl border border-border bg-surface px-4 py-4"
+            >
               <h2 className="text-sm font-bold">{rule.title}</h2>
               <ul className="mt-2 space-y-1.5">
                 {rule.points.map((p) => (

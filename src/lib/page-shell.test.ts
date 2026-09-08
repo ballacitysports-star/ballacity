@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { pageContainerClasses, type PageWidth } from "@/lib/page-shell";
 
-const ALL_WIDTHS: PageWidth[] = ["narrow", "content", "default", "full"];
+const ALL_WIDTHS: PageWidth[] = ["narrow", "prose", "content", "default", "full"];
 
 /**
  * The shells' geometry lives in styles.css, so these assertions read it there
@@ -26,7 +26,13 @@ function capRem(name: string): number | null {
   throw new Error(`${name} has a max-width that is not min(100%, …)`);
 }
 
-const SHELLS = ["page-shell-narrow", "page-shell-content", "page-shell", "page-shell-full"];
+const SHELLS = [
+  "page-shell-narrow",
+  "page-shell-prose",
+  "page-shell-content",
+  "page-shell",
+  "page-shell-full",
+];
 
 describe("page shell utilities", () => {
   it("defines every shell the component can render", () => {
@@ -54,12 +60,20 @@ describe("page shell utilities", () => {
     }
   });
 
-  it("orders the tiers narrow < content < default", () => {
+  it("orders the tiers narrow < prose < content < default", () => {
     const narrow = capRem("page-shell-narrow")!;
+    const prose = capRem("page-shell-prose")!;
     const content = capRem("page-shell-content")!;
     const wide = capRem("page-shell")!;
-    expect(narrow).toBeLessThan(content);
+    expect(narrow).toBeLessThan(prose);
+    expect(prose).toBeLessThan(content);
     expect(content).toBeLessThan(wide);
+  });
+
+  it("keeps prose at a readable measure", () => {
+    // Wider than about 45rem and a line of body text runs past the point
+    // where the eye reliably finds the next one.
+    expect(capRem("page-shell-prose")!).toBeLessThanOrEqual(45);
   });
 
   it("leaves the full shell uncapped", () => {
@@ -83,6 +97,7 @@ describe("page shell utilities", () => {
 describe("pageContainerClasses", () => {
   it("maps each width to its shell utility", () => {
     expect(pageContainerClasses("narrow")).toContain("page-shell-narrow");
+    expect(pageContainerClasses("prose")).toContain("page-shell-prose");
     expect(pageContainerClasses("content")).toContain("page-shell-content");
     expect(pageContainerClasses("full")).toContain("page-shell-full");
   });

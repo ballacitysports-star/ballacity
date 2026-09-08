@@ -9,7 +9,7 @@ import { cn } from "@/lib/utils";
  * size, so the choice stays visible in review instead of buried in a class
  * list.
  */
-export type PageWidth = "narrow" | "content" | "default" | "full";
+export type PageWidth = "narrow" | "prose" | "content" | "default" | "full";
 
 /**
  * `default` maps to the original `page-shell` (72rem), so the routes that
@@ -18,6 +18,8 @@ export type PageWidth = "narrow" | "content" | "default" | "full";
 const WIDTH_UTILITY: Record<PageWidth, string> = {
   // Forms, auth, onboarding, consent.
   narrow: "page-shell-narrow",
+  // Long-form reading: legal documents, policies, guidelines.
+  prose: "page-shell-prose",
   // Feeds, profiles, detail pages, settings — the bulk of the app.
   content: "page-shell-content",
   // Dashboards, admin, anything genuinely multi-column.

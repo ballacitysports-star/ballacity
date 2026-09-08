@@ -57,7 +57,7 @@ function PrivacyPage() {
   return (
     <div className="min-h-dvh bg-background">
       <LegalPageHeader title={doc.shortTitle} />
-      <main className="mx-auto max-w-2xl px-4 py-6 pb-24">
+      <main className="page-shell-prose py-6 pb-24">
         <LegalDocumentBody
           doc={doc}
           version={version}

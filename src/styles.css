@@ -188,6 +188,16 @@ html.light {
   padding-inline: clamp(0.75rem, 4vw, 2rem);
 }
 
+/* Long-form reading — legal documents, policies, guidelines. Narrower than
+   `content` on purpose: past roughly 75 characters a line gets hard to track
+   back from, so prose wants a tighter measure than a page of cards does. */
+@utility page-shell-prose {
+  margin-inline: auto;
+  width: 100%;
+  max-width: min(100%, 42rem);
+  padding-inline: clamp(0.75rem, 4vw, 2rem);
+}
+
 /* Forms, auth, onboarding, consent: one column that stays readable rather
    than stretching a lone input across a monitor. */
 @utility page-shell-narrow {
