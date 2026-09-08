@@ -48,7 +48,9 @@ export function buildFamilyApprovals(input: {
         source: "consent",
         title: `Approve consent for ${child.displayName}`,
         detail:
-          "Their account stays limited until you confirm you're their parent or legal guardian.",
+          "Their account stays limited until you confirm you're their parent or legal guardian. " +
+          "Open the approval link they sent you — approving needs that link, so it cannot be done " +
+          "from this page.",
         actionLabel: "Review consent",
         actionTo: "/parent",
         urgency: "action_needed",
