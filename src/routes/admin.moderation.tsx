@@ -94,9 +94,7 @@ function ModerationPage() {
   return (
     <div className="page-shell min-h-dvh space-y-4 py-4 sm:py-6">
       <header className="flex items-center gap-3">
-        <Link to="/admin" className="rounded-full p-2 hover:bg-surface" aria-label="Back">
-          <ArrowLeft className="h-5 w-5" />
-        </Link>
+        <BackHeaderInlineBack />
         <div>
           <h1 className="text-2xl font-semibold">Moderation</h1>
           <p className="text-sm text-muted-foreground">
