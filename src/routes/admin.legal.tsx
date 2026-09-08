@@ -212,7 +212,7 @@ function LegalManager() {
   };
 
   return (
-    <div className="mx-auto min-h-dvh max-w-5xl space-y-4 p-4 sm:p-6">
+    <div className="page-shell min-h-dvh space-y-4 py-4 sm:py-6">
       <header className="flex items-center gap-3">
         <Link to="/admin" className="rounded-full p-2 hover:bg-surface" aria-label="Back to admin">
           <ArrowLeft className="h-5 w-5" />

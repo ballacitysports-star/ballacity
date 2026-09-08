@@ -78,7 +78,7 @@ function MessagesInbox() {
 
   if (!loading && !user) {
     return (
-      <div className="mx-auto max-w-md px-4 pt-10 text-center">
+      <div className="page-shell-narrow pt-10 text-center">
         <MessageCircle className="mx-auto h-10 w-10 text-muted-foreground mb-3" />
         <h1 className="font-display text-2xl font-bold mb-2">Sign in to your inbox</h1>
         <Link
@@ -94,7 +94,9 @@ function MessagesInbox() {
   const list = msgTab === "primary" ? primary : requests;
 
   // Warm photos for every thread in both tabs, not just the visible ones.
-  usePrefetchUserAvatars(useMemo(() => [...primary, ...requests].map((c) => c.other_user_id), [primary, requests]));
+  usePrefetchUserAvatars(
+    useMemo(() => [...primary, ...requests].map((c) => c.other_user_id), [primary, requests]),
+  );
 
   const handleAccept = async (id: string) => {
     try {
@@ -118,7 +120,7 @@ function MessagesInbox() {
   const setTop = (t: TopTab) => nav({ search: (prev: any) => ({ ...prev, tab: t }) });
 
   return (
-    <div className="mx-auto max-w-md px-4 pt-6 pb-32">
+    <div className="page-shell-content pt-6 pb-32">
       <div className="flex items-center gap-3 mb-5">
         <Link
           to="/feed"

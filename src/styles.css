@@ -165,10 +165,74 @@ html.light {
   }
 }
 
+/*
+ * Page shells — the one set of page containers for the whole app.
+ *
+ * An audit of the route files found 102 page containers using nine different
+ * max-widths and a mix of px-4, px-6, p-4 and no padding at all, so pages felt
+ * narrower or roomier than their neighbours for no product reason. These four
+ * tiers replace that: a page picks the tier its content calls for and gets the
+ * same gutters and centring as every other page in the app.
+ *
+ * Padding is a clamp rather than breakpoint steps so gutters grow smoothly
+ * with the viewport instead of jumping at 640px, and `min(100%, …)` means a
+ * shell can never be wider than the screen — the cap only ever narrows it.
+ *
+ * `page-shell` itself keeps the exact geometry it already had, so the pages
+ * already using it are unaffected.
+ */
 @utility page-shell {
   margin-inline: auto;
   width: 100%;
   max-width: min(100%, 72rem);
+  padding-inline: clamp(0.75rem, 4vw, 2rem);
+}
+
+/* Long-form reading — legal documents, policies, guidelines. Narrower than
+   `content` on purpose: past roughly 75 characters a line gets hard to track
+   back from, so prose wants a tighter measure than a page of cards does. */
+@utility page-shell-prose {
+  margin-inline: auto;
+  width: 100%;
+  max-width: min(100%, 42rem);
+  padding-inline: clamp(0.75rem, 4vw, 2rem);
+}
+
+/* Forms, auth, onboarding, consent: one column that stays readable rather
+   than stretching a lone input across a monitor. */
+@utility page-shell-narrow {
+  margin-inline: auto;
+  width: 100%;
+  max-width: min(100%, 32rem);
+  padding-inline: clamp(0.75rem, 4vw, 2rem);
+}
+
+/* Feeds, profiles, detail pages, settings — the bulk of the app. Matches the
+   56rem the most common existing route container already settled on. */
+@utility page-shell-content {
+  margin-inline: auto;
+  width: 100%;
+  max-width: min(100%, 56rem);
+  padding-inline: clamp(0.75rem, 4vw, 2rem);
+}
+
+/* Same column as `content`, but with no gutter of its own, for pages whose
+   children already own their horizontal padding — a settings list with
+   edge-to-edge rows, or a profile that opens on a full-width banner. Adding
+   padding here would inset those and double up on everything else.
+   Distinct from `full` below: this one is capped but unpadded, that one is
+   padded but uncapped. */
+@utility page-shell-flush {
+  margin-inline: auto;
+  width: 100%;
+  max-width: min(100%, 56rem);
+}
+
+/* Maps and other surfaces meant to fill the viewport: still centred and
+   guttered, just uncapped. */
+@utility page-shell-full {
+  margin-inline: auto;
+  width: 100%;
   padding-inline: clamp(0.75rem, 4vw, 2rem);
 }
 

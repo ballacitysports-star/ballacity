@@ -1,4 +1,5 @@
 import { ageRequirementLabel } from "@/lib/game-age";
+import { describeMessagingError } from "@/lib/minor-messaging";
 import type { CSSProperties } from "react";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { MapPin, Users, Clock, Zap, Lock, Flame, MessageCircle, CalendarDays } from "lucide-react";
@@ -25,7 +26,7 @@ const sportEmoji: Record<string, string> = {
   Pickleball: "🏓",
   Volleyball: "🏐",
   Tennis: "🎾",
-  "Football": "🏈",
+  Football: "🏈",
   Baseball: "⚾",
   Softball: "🥎",
   Running: "🏃",
@@ -35,7 +36,10 @@ export function GameCard({ game, index = 0 }: { game: Game; index?: number }) {
   const joinedByMe = useIsJoined(game.id);
   const liveCount = useLiveParticipantCount(game.id);
   const baseJoined = liveCount ?? game.joined;
-  const joinedCount = Math.min(game.maxPlayers, baseJoined + (joinedByMe && liveCount === undefined ? 1 : 0));
+  const joinedCount = Math.min(
+    game.maxPlayers,
+    baseJoined + (joinedByMe && liveCount === undefined ? 1 : 0),
+  );
   const spotsLeft = game.maxPlayers - joinedCount;
   const fillPct = Math.round((joinedCount / game.maxPlayers) * 100);
   const navigate = useNavigate();
@@ -68,12 +72,11 @@ export function GameCard({ game, index = 0 }: { game: Game; index?: number }) {
       const id = await getOrCreateDirectConversation(hostUserId, game.id);
       navigate({ to: "/messages/$conversationId", params: { conversationId: id } });
     } catch (err: any) {
-      toast.error(err?.message ?? "Couldn't open chat");
+      toast.error(describeMessagingError(err));
     } finally {
       setOpening(false);
     }
   };
-
 
   return (
     <div className="enter-up" style={{ "--enter-delay": `${index * 50}ms` } as CSSProperties}>
@@ -173,14 +176,16 @@ export function GameCard({ game, index = 0 }: { game: Game; index?: number }) {
           </div>
           {game.positionsNeeded && Object.keys(game.positionsNeeded).length > 0 && (
             <div className="flex flex-wrap gap-1">
-              {Object.entries(game.positionsNeeded).slice(0, 3).map(([name, count]) => (
-                <span
-                  key={name}
-                  className="inline-flex items-center gap-1 rounded-full border border-lime/40 bg-lime/10 px-1.5 py-0.5 text-[9px] font-semibold text-lime"
-                >
-                  {name} <span className="tabular-nums opacity-80">×{count}</span>
-                </span>
-              ))}
+              {Object.entries(game.positionsNeeded)
+                .slice(0, 3)
+                .map(([name, count]) => (
+                  <span
+                    key={name}
+                    className="inline-flex items-center gap-1 rounded-full border border-lime/40 bg-lime/10 px-1.5 py-0.5 text-[9px] font-semibold text-lime"
+                  >
+                    {name} <span className="tabular-nums opacity-80">×{count}</span>
+                  </span>
+                ))}
               {Object.keys(game.positionsNeeded).length > 3 && (
                 <span className="text-[9px] font-semibold text-muted-foreground">
                   +{Object.keys(game.positionsNeeded).length - 3} more
@@ -245,12 +250,16 @@ export function GameCard({ game, index = 0 }: { game: Game; index?: number }) {
               )}
               <div className="flex items-center gap-1 text-[11px] font-semibold">
                 <Users className="h-3.5 w-3.5 text-lime" />
-                <span key={joinedCount} className="text-foreground inline-block motion-safe:animate-scale-in">
+                <span
+                  key={joinedCount}
+                  className="text-foreground inline-block motion-safe:animate-scale-in"
+                >
                   {joinedCount}/{game.maxPlayers}
                 </span>
-                {spotsLeft < game.maxPlayers && spotsLeft <= Math.max(3, Math.ceil(game.maxPlayers * 0.2)) && (
-                  <SpotsPill spotsLeft={spotsLeft} maxPlayers={game.maxPlayers} />
-                )}
+                {spotsLeft < game.maxPlayers &&
+                  spotsLeft <= Math.max(3, Math.ceil(game.maxPlayers * 0.2)) && (
+                    <SpotsPill spotsLeft={spotsLeft} maxPlayers={game.maxPlayers} />
+                  )}
               </div>
             </div>
           </div>

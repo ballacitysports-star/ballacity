@@ -38,7 +38,6 @@ export type MessageReaction = {
 
 export const REACTION_EMOJIS = ["❤️", "😂", "😮", "😢", "🔥", "👍"] as const;
 
-
 export type Attachment = {
   path: string;
   type: string;
@@ -56,8 +55,6 @@ export type ConversationWithMeta = Conversation & {
   is_request: boolean;
   accepted_by: string[];
 };
-
-
 
 // Find or create a 1:1 conversation between current user and otherUserId
 export async function getOrCreateDirectConversation(
@@ -81,6 +78,56 @@ export async function getOrCreateDirectConversation(
     throw new Error(error.message || "Could not start conversation.");
   }
   return data as unknown as string;
+}
+
+/**
+ * Per-conversation preview and unread count.
+ *
+ * This used to be computed by selecting every message in every conversation
+ * the member belongs to and reducing it client-side — the whole message
+ * history over the wire on each inbox load, and silently truncated by
+ * PostgREST's row cap, which left older threads with no preview and a unread
+ * count of zero. `list_conversation_summaries` does it in one query.
+ *
+ * The old path is kept as a fallback purely so the client and the migration
+ * can ship in either order: without it, deploying this build first would break
+ * the inbox outright. It can go once the migration is out.
+ */
+async function conversationSummaries(
+  ids: string[],
+  me: string,
+): Promise<{ lastByConv: Record<string, any>; unreadByConv: Record<string, number> }> {
+  const lastByConv: Record<string, any> = {};
+  const unreadByConv: Record<string, number> = {};
+
+  const { data, error } = await supabase.rpc("list_conversation_summaries" as any);
+  if (!error && Array.isArray(data)) {
+    for (const row of data as any[]) {
+      if (row.last_created_at) {
+        lastByConv[row.conversation_id] = {
+          body: row.last_body,
+          created_at: row.last_created_at,
+          sender_id: row.last_sender_id,
+        };
+      }
+      if (row.unread) unreadByConv[row.conversation_id] = row.unread;
+    }
+    return { lastByConv, unreadByConv };
+  }
+
+  // Fallback: the function is not deployed yet.
+  const { data: lastMsgs } = await supabase
+    .from("messages" as any)
+    .select("conversation_id, body, created_at, sender_id, read_at")
+    .in("conversation_id", ids)
+    .order("created_at", { ascending: false });
+  for (const m of (lastMsgs ?? []) as any[]) {
+    if (!lastByConv[m.conversation_id]) lastByConv[m.conversation_id] = m;
+    if (m.sender_id !== me && !m.read_at) {
+      unreadByConv[m.conversation_id] = (unreadByConv[m.conversation_id] ?? 0) + 1;
+    }
+  }
+  return { lastByConv, unreadByConv };
 }
 
 export async function listMyConversations(): Promise<ConversationWithMeta[]> {
@@ -121,29 +168,46 @@ export async function listMyConversations(): Promise<ConversationWithMeta[]> {
     profilesById = Object.fromEntries(((profs ?? []) as any[]).map((p) => [p.id, p]));
   }
 
+  const { lastByConv, unreadByConv } = await conversationSummaries(ids, me);
 
-  // Last message per conversation
-  const { data: lastMsgs } = await supabase
-    .from("messages" as any)
-    .select("conversation_id, body, created_at, sender_id, read_at")
-    .in("conversation_id", ids)
-    .order("created_at", { ascending: false });
+  return buildConversationList({
+    me,
+    convs: (convs ?? []) as any[],
+    participants: (allParts ?? []) as any[],
+    profilesById,
+    lastByConv,
+    unreadByConv,
+  });
+}
 
-  const lastByConv: Record<string, any> = {};
-  const unreadByConv: Record<string, number> = {};
-  for (const m of (lastMsgs ?? []) as any[]) {
-    if (!lastByConv[m.conversation_id]) lastByConv[m.conversation_id] = m;
-    if (m.sender_id !== me && !m.read_at) {
-      unreadByConv[m.conversation_id] = (unreadByConv[m.conversation_id] ?? 0) + 1;
-    }
-  }
+export type ConversationListInput = {
+  me: string;
+  convs: any[];
+  participants: { conversation_id: string; user_id: string }[];
+  profilesById: Record<
+    string,
+    { display_name?: string | null; avatar_initials?: string | null; avatar_url?: string | null }
+  >;
+  lastByConv: Record<string, { body?: string | null } | undefined>;
+  unreadByConv: Record<string, number>;
+};
 
-  return ((convs ?? []) as any[]).map((c) => {
-    const others = ((allParts ?? []) as any[]).filter(
-      (p) => p.conversation_id === c.id && p.user_id !== me,
-    );
-    const other = others[0];
+/**
+ * Assemble the inbox rows. Pure, so the parts that have actually gone wrong —
+ * whether a thread counts as a request, and what a thread with a missing
+ * counterpart renders as — can be tested without a database.
+ *
+ * A thread is a "request" until you are listed in `accepted_by`, which a
+ * trigger fills in when you send your first message. That means a thread
+ * created but never written to is a request for everyone, including whoever
+ * opened it.
+ */
+export function buildConversationList(input: ConversationListInput): ConversationWithMeta[] {
+  const { me, convs, participants, profilesById, lastByConv, unreadByConv } = input;
+  return convs.map((c) => {
+    const other = participants.find((p) => p.conversation_id === c.id && p.user_id !== me);
     const prof = other ? profilesById[other.user_id] : null;
+    const accepted = (c.accepted_by ?? []) as string[];
     return {
       ...c,
       other_user_id: other?.user_id ?? null,
@@ -153,13 +217,11 @@ export async function listMyConversations(): Promise<ConversationWithMeta[]> {
       other_avatar_url: prof?.avatar_url ?? null,
       last_message: lastByConv[c.id]?.body ?? null,
       unread: unreadByConv[c.id] ?? 0,
-      accepted_by: (c.accepted_by ?? []) as string[],
-      is_request: !((c.accepted_by ?? []) as string[]).includes(me),
+      accepted_by: accepted,
+      is_request: !accepted.includes(me),
     } as ConversationWithMeta;
   });
 }
-
-
 
 export async function getConversation(convId: string) {
   const { data, error } = await supabase
@@ -171,9 +233,7 @@ export async function getConversation(convId: string) {
   return data as unknown as Conversation | null;
 }
 
-export async function getConversationOther(
-  convId: string,
-): Promise<{
+export async function getConversationOther(convId: string): Promise<{
   user_id: string;
   display_name: string;
   avatar_initials: string | null;
@@ -199,7 +259,6 @@ export async function getConversationOther(
     avatar_url: (prof as any)?.avatar_url ?? null,
   };
 }
-
 
 export async function listMessages(convId: string): Promise<Message[]> {
   const { data, error } = await supabase
@@ -334,15 +393,28 @@ export async function sendMessage(
   );
 }
 
-export async function markConversationRead(convId: string) {
+/**
+ * Mark everything the other person sent as read.
+ *
+ * The result used to be discarded, so a failure here was invisible: the badge
+ * simply never cleared and nothing said why. It stays non-throwing — a failed
+ * read receipt should not break opening a thread — but it reports, so the next
+ * time this breaks there is something to find.
+ */
+export async function markConversationRead(convId: string): Promise<boolean> {
   const { data: u } = await supabase.auth.getUser();
-  if (!u.user) return;
-  await supabase
+  if (!u.user) return false;
+  const { error } = await supabase
     .from("messages" as any)
     .update({ read_at: new Date().toISOString() } as any)
     .eq("conversation_id", convId)
     .neq("sender_id", u.user.id)
     .is("read_at", null);
+  if (error) {
+    console.error("[messages] markConversationRead failed", { convId, error });
+    return false;
+  }
+  return true;
 }
 
 export async function unsendMessage(messageId: string) {
@@ -386,6 +458,5 @@ export async function listReactionsFor(messageIds: string[]): Promise<MessageRea
     .from("message_reactions" as any)
     .select("message_id, user_id, emoji")
     .in("message_id", messageIds);
-  return ((data ?? []) as unknown) as MessageReaction[];
+  return (data ?? []) as unknown as MessageReaction[];
 }
-

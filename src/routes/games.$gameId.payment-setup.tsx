@@ -1,4 +1,5 @@
 import { createFileRoute, Link, notFound, useNavigate } from "@tanstack/react-router";
+import { RouteFallback, FALLBACK_ACTION_CLASS } from "@/components/layout/RouteFallback";
 import { pageHead } from "@/lib/seo";
 import { useEffect, useState } from "react";
 import { ArrowLeft, Check, ShieldAlert } from "lucide-react";
@@ -26,13 +27,27 @@ export const Route = createFileRoute("/games/$gameId/payment-setup")({
     if (!game) throw notFound();
     return { game };
   },
-  notFoundComponent: () => <div className="p-6 text-sm">Game not found.</div>,
+  notFoundComponent: () => (
+    <RouteFallback
+      title="Game not found"
+      message="It may have wrapped up or been cancelled."
+      action={
+        <Link to="/feed" className={FALLBACK_ACTION_CLASS}>
+          Back to feed
+        </Link>
+      }
+    />
+  ),
   errorComponent: ({ reset }) => (
-    <div className="p-6">
-      <button onClick={reset} className="text-lime">
-        Try again
-      </button>
-    </div>
+    <RouteFallback
+      title="Couldn't open payment setup"
+      onRetry={reset}
+      action={
+        <Link to="/feed" className={FALLBACK_ACTION_CLASS}>
+          Back to feed
+        </Link>
+      }
+    />
   ),
   component: SetupPage,
 });

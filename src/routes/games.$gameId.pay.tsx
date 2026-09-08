@@ -1,4 +1,5 @@
 import { createFileRoute, Link, notFound, useNavigate } from "@tanstack/react-router";
+import { RouteFallback, FALLBACK_ACTION_CLASS } from "@/components/layout/RouteFallback";
 import { pageHead } from "@/lib/seo";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
@@ -129,13 +130,28 @@ export const Route = createFileRoute("/games/$gameId/pay")({
     gameId: params.gameId,
     game: GAMES.find((g) => g.id === params.gameId) ?? null,
   }),
-  notFoundComponent: () => <div className="p-6 text-center text-sm">Game not found.</div>,
+  notFoundComponent: () => (
+    <RouteFallback
+      title="Game not found"
+      message="It may have wrapped up or been cancelled."
+      action={
+        <Link to="/feed" className={FALLBACK_ACTION_CLASS}>
+          Back to feed
+        </Link>
+      }
+    />
+  ),
   errorComponent: ({ reset }) => (
-    <div className="p-6 text-center">
-      <button onClick={reset} className="text-lime font-bold">
-        Try again
-      </button>
-    </div>
+    <RouteFallback
+      title="Couldn't load this payment"
+      message="Nothing has been charged."
+      onRetry={reset}
+      action={
+        <Link to="/feed" className={FALLBACK_ACTION_CLASS}>
+          Back to feed
+        </Link>
+      }
+    />
   ),
   component: PayPage,
 });
@@ -548,7 +564,6 @@ function PayPage() {
         className="mb-1"
       />
 
-
       {/* Approval / payment stage badge — driven by shared flow status so
           paid games show "Payment due" (etc.) rather than "Approved — you
           can pay now" until the host actually verifies the payment. */}
@@ -825,7 +840,6 @@ function PaymentStatusTimeline({
             },
   ];
 
-
   return (
     <div
       className="mb-4 rounded-2xl border border-border bg-surface p-4"
@@ -852,7 +866,6 @@ function PaymentStatusTimeline({
           {meta.label}
         </span>
       </div>
-
 
       <ol className="space-y-3">
         {steps.map((s, i) => {
@@ -924,8 +937,6 @@ function PaymentStatusTimeline({
         gameId={gameId ?? latest.game_id}
         onChanged={onChanged}
       />
-
-
 
       {history.length > 0 && (
         <details className="mt-3 rounded-xl border border-border/70 bg-background/60 p-2 text-xs">
@@ -1015,7 +1026,10 @@ function PaymentClaimActions({
   }
 
   return (
-    <div className="mt-3 space-y-2 border-t border-border/70 pt-3" data-testid="payment-claim-actions">
+    <div
+      className="mt-3 space-y-2 border-t border-border/70 pt-3"
+      data-testid="payment-claim-actions"
+    >
       <p className="text-[11px] text-muted-foreground">{PAYMENT_DISCLAIMER}</p>
       {mode === null ? (
         <div className="flex flex-wrap gap-2">
@@ -1039,9 +1053,7 @@ function PaymentClaimActions({
               Open a dispute
             </button>
           )}
-          {hostId && (
-            <PaymentReportLink hostId={hostId} gameId={gameId} />
-          )}
+          {hostId && <PaymentReportLink hostId={hostId} gameId={gameId} />}
         </div>
       ) : (
         <div className="space-y-2 rounded-xl border border-border bg-background p-3">
@@ -1105,8 +1117,6 @@ function PaymentReportLink({ hostId, gameId }: { hostId: string; gameId: string 
     </>
   );
 }
-
-
 
 function PaymentInstructionsAndProof({
   game_id,

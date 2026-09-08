@@ -91,10 +91,7 @@ function Thread() {
   }, [msgs]);
 
   // Sender avatars for the whole loaded thread, warmed before rows scroll in.
-  const senderIds = useMemo(
-    () => Array.from(new Set(msgs.map((m) => m.sender_id))),
-    [msgs],
-  );
+  const senderIds = useMemo(() => Array.from(new Set(msgs.map((m) => m.sender_id))), [msgs]);
   usePrefetchUserAvatars(senderIds);
 
   const reactionsByMsg = useMemo(() => {
@@ -239,7 +236,7 @@ function Thread() {
 
   if (!loading && !user) {
     return (
-      <div className="mx-auto max-w-md px-4 pt-10 text-center text-sm">
+      <div className="page-shell-narrow pt-10 text-center text-sm">
         <Link to="/auth" className="text-lime font-bold">
           Sign in to view this chat
         </Link>

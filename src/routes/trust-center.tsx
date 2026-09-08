@@ -54,7 +54,7 @@ function TrustCenter() {
         <span className="text-sm font-medium">Trust Center</span>
       </header>
 
-      <main className="mx-auto max-w-2xl px-4 py-6 pb-28">
+      <main className="page-shell-prose py-6 pb-28">
         <h1 className="font-display text-2xl font-bold">Trust Center</h1>
         <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
           Straight answers about how ballaCity works: what we do with your information, how accounts

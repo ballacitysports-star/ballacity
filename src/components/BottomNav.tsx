@@ -1,6 +1,7 @@
 import { Link, useLocation } from "@tanstack/react-router";
 import { Home, Users, Shield, Clapperboard, Heart } from "lucide-react";
 import { MyAvatar } from "@/components/UserAvatar";
+import { TABS } from "@/lib/navigation-gestures";
 
 type NavItem = {
   to: string;
@@ -12,47 +13,28 @@ type NavItem = {
 
 /**
  * Instagram-style 6-tab bottom bar: Home, Available Players, Teams, Highlights, Activity, Profile.
+ *
+ * The order and the active-route rules come from TABS, which the swipe
+ * gesture also steps through — so paging sideways always lands on the tab
+ * sitting next to the current one in this bar.
  */
-const items: NavItem[] = [
-  {
-    to: "/feed",
-    icon: Home,
-    label: "Home",
-    match: (p) => p === "/feed" || p === "/" || p === "/pickup",
-  },
-  {
-    to: "/players",
-    icon: Users,
-    label: "Players",
-    match: (p) =>
-      p.startsWith("/players") || p.startsWith("/discover") || p.startsWith("/trainers"),
-  },
-
-  {
-    to: "/teams",
-    icon: Shield,
-    label: "Teams",
-    match: (p) => p.startsWith("/teams"),
-  },
-  {
-    to: "/highlights",
-    icon: Clapperboard,
-    label: "Highlights",
-    match: (p) => p === "/highlights" || p.startsWith("/highlights"),
-  },
-  {
-    to: "/notifications",
-    icon: Heart,
-    label: "Activity",
-    match: (p) => p.startsWith("/notifications") || p.startsWith("/messages"),
-  },
-  {
-    to: "/profile",
-    label: "Profile",
-    match: (p) => p.startsWith("/profile"),
+const presentation: Record<string, Pick<NavItem, "icon" | "render">> = {
+  "/feed": { icon: Home },
+  "/players": { icon: Users },
+  "/teams": { icon: Shield },
+  "/highlights": { icon: Clapperboard },
+  "/notifications": { icon: Heart },
+  "/profile": {
     render: (active) => <MyAvatar ringWhenActive active={active} />,
   },
-];
+};
+
+const items: NavItem[] = TABS.map((tab) => ({
+  to: tab.to,
+  label: tab.label,
+  match: tab.match,
+  ...presentation[tab.to],
+}));
 
 export function BottomNav() {
   const { pathname } = useLocation();

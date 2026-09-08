@@ -1,4 +1,5 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { describeMessagingError } from "@/lib/minor-messaging";
 import { pageHead } from "@/lib/seo";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { zodValidator, fallback } from "@tanstack/zod-adapter";
@@ -1086,7 +1087,7 @@ const navigate = useNavigate();
       const id = await getOrCreateDirectConversation(a.user_id);
       navigate({ to: "/messages/$conversationId", params: { conversationId: id } });
     } catch (e: any) {
-      toast.error(e.message || "Couldn't open chat");
+      toast.error(describeMessagingError(e));
     }
   };
 

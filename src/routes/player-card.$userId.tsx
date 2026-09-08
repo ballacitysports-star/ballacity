@@ -7,7 +7,6 @@ import { listPublicReels } from "@/lib/reels.functions";
 import { getPlayerCard, type PlayerCardData } from "@/lib/player-card.functions";
 import { useReelRealtime } from "@/hooks/use-reel-realtime";
 
-
 export const Route = createFileRoute("/player-card/$userId")({
   head: ({ params }) => ({
     ...pageHead({
@@ -91,7 +90,6 @@ function PlayerCardPage() {
     { userId },
   );
 
-
   // Highlight the tab for whichever section is in view while scrolling.
   useEffect(() => {
     if (loading) return;
@@ -130,7 +128,7 @@ function PlayerCardPage() {
 
   if (loading) {
     return (
-      <div className="mx-auto w-full max-w-md px-4 pt-6 pb-24">
+      <div className="page-shell-content pt-6 pb-24">
         <div className="h-40 animate-pulse rounded-3xl bg-surface/50" />
         <div className="mt-4 h-24 animate-pulse rounded-2xl bg-surface/40" />
         <div className="mt-3 h-52 animate-pulse rounded-2xl bg-surface/40" />
@@ -140,8 +138,11 @@ function PlayerCardPage() {
 
   if (!card?.profile) {
     return (
-      <div className="mx-auto w-full max-w-md px-4 pt-6 pb-24">
-        <Link to="/players" className="inline-flex items-center gap-1 text-sm text-muted-foreground">
+      <div className="page-shell-content pt-6 pb-24">
+        <Link
+          to="/players"
+          className="inline-flex items-center gap-1 text-sm text-muted-foreground"
+        >
           <ArrowLeft className="h-4 w-4" /> Back to players
         </Link>
         <div className="mt-4 rounded-2xl border border-dashed border-border bg-surface/40 p-8 text-center">
@@ -156,7 +157,7 @@ function PlayerCardPage() {
   const stats = card.stats;
 
   return (
-    <div className="mx-auto w-full max-w-md pb-28">
+    <div className="page-shell-flush pb-28">
       {/* Header */}
       <header className="relative">
         <div
@@ -247,7 +248,10 @@ function PlayerCardPage() {
         ) : (
           <div className="space-y-4">
             {reels.map((reel) => (
-              <article key={reel.id} className="overflow-hidden rounded-2xl border border-border bg-surface">
+              <article
+                key={reel.id}
+                className="overflow-hidden rounded-2xl border border-border bg-surface"
+              >
                 <InlineVideoPlayer
                   videoUrl={reel.videoUrl}
                   fallbackVideoUrl={reel.fallbackVideoUrl}
@@ -264,10 +268,14 @@ function PlayerCardPage() {
                     )}
                   </div>
                   {reel.gameTitle && (
-                    <p className="mt-0.5 truncate text-xs text-muted-foreground">{reel.gameTitle}</p>
+                    <p className="mt-0.5 truncate text-xs text-muted-foreground">
+                      {reel.gameTitle}
+                    </p>
                   )}
                   {reel.caption && (
-                    <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">{reel.caption}</p>
+                    <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">
+                      {reel.caption}
+                    </p>
                   )}
                 </div>
               </article>
@@ -291,9 +299,7 @@ function PlayerCardPage() {
           <EmptyBlock text="No games on this player's card yet." />
         ) : (
           <div className="space-y-4">
-            {upcoming.length > 0 && (
-              <GameGroup title="Upcoming" games={upcoming} />
-            )}
+            {upcoming.length > 0 && <GameGroup title="Upcoming" games={upcoming} />}
             {past.length > 0 && <GameGroup title="Recent" games={past.slice(0, 12)} />}
           </div>
         )}
@@ -318,7 +324,9 @@ function PlayerCardPage() {
         </div>
         {stats.sports.length > 0 && (
           <div className="mt-3 rounded-2xl border border-border bg-surface p-3">
-            <p className="text-xs font-bold uppercase tracking-wide text-muted-foreground">Sports</p>
+            <p className="text-xs font-bold uppercase tracking-wide text-muted-foreground">
+              Sports
+            </p>
             <div className="mt-2 flex flex-wrap gap-1.5">
               {stats.sports.map((s) => (
                 <span
@@ -343,13 +351,7 @@ function PlayerCardPage() {
   );
 }
 
-function GameGroup({
-  title,
-  games,
-}: {
-  title: string;
-  games: PlayerCardData["games"];
-}) {
+function GameGroup({ title, games }: { title: string; games: PlayerCardData["games"] }) {
   return (
     <div>
       <p className="mb-1.5 text-xs font-bold uppercase tracking-wide text-muted-foreground">

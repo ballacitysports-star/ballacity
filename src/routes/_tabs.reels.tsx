@@ -53,10 +53,10 @@ import { validateVideoMeta } from "@/lib/video-validation";
 import { finalizeVideoUpload } from "@/lib/media-uploads.functions";
 import { useAuth } from "@/hooks/use-auth";
 import { useMyChildStatus } from "@/lib/child-safety";
-import { useSubscription } from "@/hooks/useSubscription";
+import { FREE_REEL_ALLOWANCE, useSubscription } from "@/hooks/useSubscription";
 import { useStripeCheckout } from "@/hooks/useStripeCheckout";
 import { PaymentTestModeBanner } from "@/components/PaymentTestModeBanner";
-import { getStripeEnvironment } from "@/lib/stripe";
+import { getBillingEnvironment, getStripeEnvironment } from "@/lib/stripe";
 import { createPortalSession } from "@/utils/payments.functions";
 import { FREE_TIER } from "@/lib/catalog";
 import {
@@ -565,7 +565,14 @@ function ReelsPage() {
   const { can: canChildFeature } = useMyChildStatus();
   const uploadDecision = canChildFeature("video_upload");
   const { game: gameId, title: gameTitle, upload: autoUpload } = Route.useSearch();
-  const { isActive, isPastDue, freeUsed, freeRemaining, loading: subLoading } = useSubscription();
+  const {
+    isActive,
+    isPastDue,
+    freeUsed,
+    freeRemaining,
+    paymentsConfigured,
+    loading: subLoading,
+  } = useSubscription();
   const { openCheckout, isOpen, checkoutElement, closeCheckout } = useStripeCheckout();
   const fileRef = useRef<HTMLInputElement>(null);
   const [reels, setReels] = useState<Reel[]>([]);
@@ -646,17 +653,14 @@ function ReelsPage() {
   const lockedReason = !user
     ? "Sign in to create reels"
     : !canGenerate
-      ? "You've used all 3 free reels. Subscribe to keep going."
+      ? paymentsConfigured
+        ? `You've used all ${FREE_REEL_ALLOWANCE} free reels. Subscribe to keep going.`
+        : `You've used all ${FREE_REEL_ALLOWANCE} free reels. Subscriptions aren't available yet — check back soon.`
       : null;
 
   useEffect(() => {
     if (!user) return;
-    let env: string;
-    try {
-      env = getStripeEnvironment();
-    } catch {
-      return;
-    }
+    const env = getBillingEnvironment();
     let cancelled = false;
     const load = () =>
       supabase
@@ -715,12 +719,7 @@ function ReelsPage() {
   const hasWorkInFlight = reels.some((r) => r.status === "processing");
   useEffect(() => {
     if (!user || (!hasWorkInFlight && !busy)) return;
-    let env: string;
-    try {
-      env = getStripeEnvironment();
-    } catch {
-      return;
-    }
+    const env = getBillingEnvironment();
     const id = setInterval(() => {
       void supabase
         .from("highlight_reels")
@@ -801,7 +800,9 @@ function ReelsPage() {
     }
     setBusy(true);
     try {
-      const env = getStripeEnvironment();
+      // Not getStripeEnvironment(): a free reel involves no charge, so an
+      // unconfigured Stripe key must not turn an upload into a payment error.
+      const env = getBillingEnvironment();
       // Client-side gate (type, extension, size). The server re-checks the
       // stored bytes below, so nothing here is trusted on its own.
       const invalid = validateVideoMeta({ name: file.name, mime: file.type, bytes: file.size });
@@ -920,6 +921,12 @@ function ReelsPage() {
       toast.error("Please sign in first");
       return;
     }
+    if (!paymentsConfigured) {
+      // Opening checkout here would throw inside StripeEmbeddedCheckout and
+      // surface as a raw build-configuration error to an athlete.
+      toast.error("Subscriptions aren't available yet — your free reels still work.");
+      return;
+    }
     openCheckout({
       priceId: "ai_highlight_reel_monthly",
       returnUrl: `${window.location.origin}/checkout/return?session_id={CHECKOUT_SESSION_ID}`,
@@ -1014,17 +1021,23 @@ function ReelsPage() {
               <div>
                 <p className="text-sm font-semibold">Free trial</p>
                 <p className="text-xs text-muted-foreground">
-                  {freeRemaining} of 3 free reels left
+                  {freeRemaining} of {FREE_REEL_ALLOWANCE} free reels left
                 </p>
               </div>
-              <span className="text-xs text-muted-foreground">{freeUsed}/3 used</span>
+              <span className="text-xs text-muted-foreground">
+                {freeUsed}/{FREE_REEL_ALLOWANCE} used
+              </span>
             </div>
-            <button
-              onClick={handleSubscribe}
-              className="w-full rounded-xl bg-lime py-2.5 font-semibold text-black"
-            >
-              {freeRemaining > 0 ? "Upgrade to unlimited · $15/mo" : "Subscribe · $15/mo"}
-            </button>
+            {/* No upgrade button on a build that cannot take a payment — it
+                would only lead to a checkout that immediately fails. */}
+            {paymentsConfigured && (
+              <button
+                onClick={handleSubscribe}
+                className="w-full rounded-xl bg-lime py-2.5 font-semibold text-black"
+              >
+                {freeRemaining > 0 ? "Upgrade to unlimited · $15/mo" : "Subscribe · $15/mo"}
+              </button>
+            )}
           </div>
         )}
       </section>

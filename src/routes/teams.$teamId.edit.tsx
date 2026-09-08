@@ -14,12 +14,10 @@ export const Route = createFileRoute("/teams/$teamId/edit")({
   ssr: false,
   component: EditOrg,
   pendingComponent: () => (
-    <div className="mx-auto max-w-md px-6 pt-24 text-center text-muted-foreground">
-      Loading editor…
-    </div>
+    <div className="page-shell-narrow pt-24 text-center text-muted-foreground">Loading editor…</div>
   ),
   errorComponent: ({ error }) => (
-    <div className="mx-auto max-w-md px-6 pt-24 text-center">
+    <div className="page-shell-narrow pt-24 text-center">
       <p className="text-muted-foreground">
         {error instanceof Error ? error.message : "Couldn't open editor."}
       </p>
@@ -32,7 +30,7 @@ export const Route = createFileRoute("/teams/$teamId/edit")({
     </div>
   ),
   notFoundComponent: () => (
-    <div className="mx-auto max-w-md px-6 pt-24 text-center">
+    <div className="page-shell-narrow pt-24 text-center">
       <p className="text-muted-foreground">Gym not found.</p>
       <Link
         to="/teams"
