@@ -1,5 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { ArrowLeft, CheckCircle2, AlertCircle, FileText } from "lucide-react";
+import { BackHeader } from "@/components/layout/BackHeader";
+import { CheckCircle2, AlertCircle, FileText } from "lucide-react";
 import { toast } from "sonner";
 import { useState } from "react";
 import { pageHead } from "@/lib/seo";

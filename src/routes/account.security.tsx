@@ -1,7 +1,8 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { BackHeader } from "@/components/layout/BackHeader";
 import { pageHead } from "@/lib/seo";
 import { useEffect, useState } from "react";
-import { ArrowLeft, ShieldCheck } from "lucide-react";
+import { ShieldCheck } from "lucide-react";
 import { toast } from "sonner";
 import type { User } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";

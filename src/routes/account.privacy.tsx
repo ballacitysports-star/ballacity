@@ -1,5 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { ArrowLeft, Download, Eye, MapPin, MessageSquare, Sparkles, Trash2 } from "lucide-react";
+import { BackHeader } from "@/components/layout/BackHeader";
+import { Download, Eye, MapPin, MessageSquare, Sparkles, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { useMyAgeCategory } from "@/lib/youth-features";
 import { isMinorCategory } from "@/lib/age-policy";

@@ -1,5 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { ArrowLeft, Loader2, ShieldOff } from "lucide-react";
+import { BackHeader } from "@/components/layout/BackHeader";
+import { Loader2, ShieldOff } from "lucide-react";
 import { toast } from "sonner";
 import { pageHead } from "@/lib/seo";
 import { Button } from "@/components/ui/button";

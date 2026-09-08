@@ -1,7 +1,8 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { BackHeader } from "@/components/layout/BackHeader";
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ArrowLeft, Film, Loader2, Sparkles, Trash2 } from "lucide-react";
+import { Film, Loader2, Sparkles, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { pageHead } from "@/lib/seo";
 import { Switch } from "@/components/ui/switch";

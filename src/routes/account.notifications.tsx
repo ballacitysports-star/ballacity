@@ -1,6 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { BackHeader } from "@/components/layout/BackHeader";
 import { pageHead } from "@/lib/seo";
-import { ArrowLeft, Bell, BellOff, Check, Lock } from "lucide-react";
+import { Bell, BellOff, Check, Lock } from "lucide-react";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { Switch } from "@/components/ui/switch";

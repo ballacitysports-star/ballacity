@@ -1,11 +1,11 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { BackHeader } from "@/components/layout/BackHeader";
 import { pageHead } from "@/lib/seo";
 import { AgeReviewNotice } from "@/components/child/AgeReviewNotice";
 import { BirthdayLockCard } from "@/components/child/BirthdayLockCard";
 import { ParentCenterSection } from "@/components/child/ParentCenterSection";
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
 import {
-  ArrowLeft,
   Bell,
   Building2,
   ChevronRight,
