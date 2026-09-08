@@ -165,6 +165,29 @@ html.light {
   }
 }
 
+/* A visible keyboard focus indicator, everywhere.
+   
+   The app had none. There is no :focus-visible rule in this file, only 14 of
+   230 components set a focus style, and all 625 raw <button> elements rely on
+   the browser default — which `outline-none` then removes. That utility
+   appears 181 times, and several of the places using it set no replacement
+   ring at all (TimezoneSelect, ReelCoach, InvitePlayerDialog, HoursEditor).
+   The result is a keyboard user tabbing through the app with nothing showing
+   where they are.
+
+   :focus-visible, not :focus, so this never appears for a mouse click — only
+   for keyboard and assistive tech. Unlayered so it outranks the `outline-none`
+   utilities in @layer utilities that removed the indicator in the first place.
+   The colour is the theme's own --ring, so it matches in light and dark and
+   changes with the palette rather than being a hardcoded blue.
+
+   Components that provide their own focus treatment still do; this is the
+   floor, not a replacement. */
+:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+
 /* Buttons: behaviour the app should never have to restate, and never does
    consistently. 624 of the app's buttons are written as raw <button> rather
    than the Button primitive, and they are not wrong to be — 348 of them are

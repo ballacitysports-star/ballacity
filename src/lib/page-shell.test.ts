@@ -262,3 +262,46 @@ describe("shared title and button rules", () => {
     expect(CSS).toMatch(/touch-action:\s*manipulation/);
   });
 });
+
+/**
+ * Keyboard focus has to be visible.
+ *
+ * The app shipped with no focus indicator of its own: no :focus-visible rule
+ * in styles.css, 14 of 230 components setting a focus style, and all 625 raw
+ * <button> elements relying on the browser default — which the `outline-none`
+ * utility, used 181 times, removes. Several of those places set no replacement
+ * ring, so a keyboard user had nothing showing where they were.
+ */
+describe("keyboard focus is visible", () => {
+  const rule = CSS.match(/\n:focus-visible \{([\s\S]*?)\n\}/)?.[1];
+
+  it("defines a global focus indicator", () => {
+    expect(rule, ":focus-visible rule missing from styles.css").toBeTruthy();
+    expect(rule!).toMatch(/outline:[^;]*solid/);
+  });
+
+  it("uses :focus-visible so a mouse click does not draw a ring", () => {
+    // :focus would fire on pointer clicks too, which is why designs strip it.
+    expect(CSS).toMatch(/\n:focus-visible \{/);
+    expect(CSS, "a bare :focus rule would bring back the problem").not.toMatch(
+      /\n:focus \{[^}]*outline:/,
+    );
+  });
+
+  it("takes its colour from the theme rather than hardcoding one", () => {
+    // --ring is defined for both light and dark, so the indicator follows.
+    expect(rule!).toMatch(/var\(--ring\)/);
+    expect(CSS).toMatch(/--ring:/);
+  });
+
+  it("sits outside @layer so it outranks the outline-none utilities", () => {
+    // Tailwind puts utilities in @layer utilities; unlayered rules win.
+    const at = CSS.indexOf("\n:focus-visible {");
+    const layerBefore = CSS.lastIndexOf("@layer", at);
+    if (layerBefore !== -1) {
+      // If a @layer block opened before it, that block must have closed first.
+      const between = CSS.slice(layerBefore, at);
+      expect(between.split("{").length - 1).toBeLessThanOrEqual(between.split("}").length - 1);
+    }
+  });
+});
