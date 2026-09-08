@@ -120,17 +120,17 @@ function NotificationSettingsPage() {
 
   return (
     <div className="min-h-dvh bg-background pb-24">
-      <header className="sticky top-0 z-10 flex items-center gap-3 border-b border-border bg-background/95 px-2 py-2.5 backdrop-blur">
-        <Link to="/settings" className="rounded-full p-2 hover:bg-surface" aria-label="Back">
-          <ArrowLeft className="h-5 w-5" />
-        </Link>
-        <h1 className="flex-1 text-lg font-medium">Notifications</h1>
-        {saved && (
-          <span className="mr-2 inline-flex items-center gap-1 rounded-full bg-lime/15 px-2.5 py-1 text-[11px] font-bold text-lime">
-            <Check className="h-3 w-3" /> Saved
-          </span>
-        )}
-      </header>
+      <BackHeader
+        title="Notifications"
+        fallbackTo="/settings"
+        actions={
+          saved ? (
+            <span className="mr-1 inline-flex items-center gap-1 rounded-full bg-lime/15 px-2.5 py-1 text-[11px] font-bold text-lime">
+              <Check className="h-3 w-3" /> Saved
+            </span>
+          ) : null
+        }
+      />
 
       <main className="mx-auto max-w-xl px-4">
         <p className="pt-4 text-xs text-muted-foreground">
