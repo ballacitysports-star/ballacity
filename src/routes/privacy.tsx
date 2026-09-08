@@ -1,9 +1,11 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { ArrowLeft } from "lucide-react";
 import { pageHead } from "@/lib/seo";
 import { LEGAL_DOCUMENTS, effectiveVersion, parseLegalContent } from "@/lib/legal-documents";
 import { getPublishedLegalDocuments } from "@/lib/legal-documents.functions";
 import { LegalDocumentBody } from "@/components/legal/LegalDocumentBody";
+import { LegalPageFallback, LegalPageHeader } from "@/components/legal/LegalPageChrome";
+
+const SHORT_TITLE = LEGAL_DOCUMENTS.privacy.shortTitle;
 
 export const Route = createFileRoute("/privacy")({
   head: () =>
@@ -13,11 +15,28 @@ export const Route = createFileRoute("/privacy")({
       description:
         "ballaCity's Privacy Policy: what personal data we collect, how it's used and shared, and the privacy controls you have.",
     }),
-  loader: async () => ({ published: await getPublishedLegalDocuments() }),
-  errorComponent: () => (
-    <div className="p-6 text-sm text-muted-foreground">Couldn't load the Privacy Policy.</div>
+  // The published rows only supply the version history and any newer text; the
+  // policy itself is bundled, and `effectiveVersion` already falls back to that
+  // when there is nothing published. So a failed fetch must not fail the route
+  // — this policy has to stay readable, which is the whole reason /privacy is
+  // public in the first place.
+  loader: async () => {
+    try {
+      return { published: await getPublishedLegalDocuments() };
+    } catch {
+      return { published: [] };
+    }
+  },
+  errorComponent: ({ reset }) => (
+    <LegalPageFallback
+      title={SHORT_TITLE}
+      message="Couldn't load the Privacy Policy."
+      onRetry={reset}
+    />
   ),
-  notFoundComponent: () => <div className="p-6 text-sm text-muted-foreground">Not found.</div>,
+  notFoundComponent: () => (
+    <LegalPageFallback title={SHORT_TITLE} message="This page could not be found." />
+  ),
   component: PrivacyPage,
 });
 
@@ -37,12 +56,7 @@ function PrivacyPage() {
 
   return (
     <div className="min-h-dvh bg-background">
-      <header className="sticky top-0 z-10 flex items-center gap-3 border-b border-border bg-background/95 px-2 py-2.5 backdrop-blur">
-        <Link to="/" className="rounded-full p-2 hover:bg-surface" aria-label="Back">
-          <ArrowLeft className="h-5 w-5" />
-        </Link>
-        <span className="text-sm font-medium">{doc.shortTitle}</span>
-      </header>
+      <LegalPageHeader title={doc.shortTitle} />
       <main className="mx-auto max-w-2xl px-4 py-6 pb-24">
         <LegalDocumentBody
           doc={doc}
