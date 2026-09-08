@@ -5,6 +5,10 @@ on:
   push:
     branches: [main]
 
+# Two levels, because they solve different problems.
+#
+# Workflow level, keyed on the ref: a new push to the same branch cancels the
+# run it superseded. That is the usual "don't test stale code" saving.
 concurrency:
   group: e2e-${{ github.ref }}
   cancel-in-progress: true
@@ -12,6 +16,28 @@ concurrency:
 jobs:
   playwright:
     name: Playwright
+    # Job level, keyed on nothing: only one E2E job in the repository executes
+    # at a time, whatever ref it is on.
+    #
+    # The ref-keyed group above cannot do this. A PR's run and main's run sit
+    # in different groups, so they never serialise against each other — and
+    # merging a PR fires both at once, seconds apart. Runs 58/59 started 5s
+    # apart, 56/57 53s apart, and 68/69 overlapped for 23 minutes.
+    #
+    # They share one Supabase project and the same handful of fixture
+    # accounts, so an overlap is two suites signing the same users in and out,
+    # writing the same rows and cancelling each other's sessions. That is why
+    # the suite has looked non-deterministic: run 68 failed 79 tests during a
+    # 23-minute overlap, while run 70 — essentially alone — failed far fewer,
+    # with the code between them differing by one CSS rule.
+    #
+    # cancel-in-progress is false here on purpose: a queued run must wait for
+    # the database, not kill whoever holds it. GitHub keeps at most one run
+    # pending per group and drops the older pending one, so this serialises
+    # without building a backlog.
+    concurrency:
+      group: e2e-shared-supabase-fixtures
+      cancel-in-progress: false
     runs-on: ubuntu-latest
     # Was 20; the suite ran with the fixture accounts genuinely signed in for
     # the first time and hit this ceiling mid-run (single-worker by design —
