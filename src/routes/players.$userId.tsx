@@ -133,7 +133,6 @@ function PublicReelsSection({ userId }: { userId: string }) {
 
   if (!loaded || reels.length === 0) return null;
 
-
   return (
     <div className="mt-6">
       <h2 className="mb-2 flex items-center gap-1.5 font-display text-sm font-bold uppercase tracking-wider text-muted-foreground">
@@ -277,7 +276,7 @@ function PlayerProfilePage() {
 
   if (loading) {
     return (
-      <div className="mx-auto max-w-md px-4 pt-6 pb-24">
+      <div className="page-shell-content pt-6 pb-24">
         <div className="h-44 animate-pulse rounded-2xl bg-surface/40" />
         <div className="mt-4 h-40 animate-pulse rounded-2xl border border-border bg-surface/40" />
       </div>
@@ -286,7 +285,7 @@ function PlayerProfilePage() {
 
   if (!profile) {
     return (
-      <div className="mx-auto max-w-md px-4 pt-6 pb-24">
+      <div className="page-shell-content pt-6 pb-24">
         <Link
           to="/players"
           className="inline-flex items-center gap-1 text-sm text-muted-foreground mb-4"
@@ -335,7 +334,7 @@ function PlayerProfilePage() {
   const stats = { played: 0, reliability: 100, sportsmanship: 5, friends: 0 };
 
   return (
-    <div className="mx-auto max-w-md pb-28">
+    <div className="page-shell-flush pb-28">
       <ProfileChannelHeader
         bannerUrl={coverUrl ?? HERO_IMAGE}
         bannerOverlay={
@@ -375,9 +374,7 @@ function PlayerProfilePage() {
           >
             {follow.following} following
           </button>,
-          ...(showGamesPlayed
-            ? [`${stats.played} game${stats.played === 1 ? "" : "s"}`]
-            : []),
+          ...(showGamesPlayed ? [`${stats.played} game${stats.played === 1 ? "" : "s"}`] : []),
         ].filter(Boolean)}
         description={bio}
         onOpenAbout={() => setAboutOpen(true)}
@@ -456,8 +453,7 @@ function PlayerProfilePage() {
           avatarUrl,
           bio,
           city: city || undefined,
-          travelRadius:
-            searchRadiusMi != null ? formatDistance(searchRadiusMi, unit) : undefined,
+          travelRadius: searchRadiusMi != null ? formatDistance(searchRadiusMi, unit) : undefined,
           sports: sportsList.map((s) => ({
             name: s.name,
             level: s.level ? formatSportLevel(s.level as any) : null,
@@ -510,7 +506,7 @@ function PlayerProfilePage() {
         </AboutBlock>
       </ProfileAboutSheet>
 
-<div className="px-4">
+      <div className="px-4">
         {/* About — shown directly on the card */}
         {(bio || links.length > 0 || searchRadiusMi != null || city) && (
           <div className="mt-4 rounded-2xl border border-border bg-surface p-4">
@@ -519,7 +515,9 @@ function PlayerProfilePage() {
                 <h2 className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                   About
                 </h2>
-                <p className="text-sm leading-relaxed text-foreground/90 whitespace-pre-wrap">{bio}</p>
+                <p className="text-sm leading-relaxed text-foreground/90 whitespace-pre-wrap">
+                  {bio}
+                </p>
               </section>
             )}
             <section className={bio ? "mt-4" : ""}>
@@ -538,7 +536,7 @@ function PlayerProfilePage() {
                 {profile.graduating_class && <li>Class of {profile.graduating_class}</li>}
               </ul>
             </section>
-<div className="mt-2 border-t border-border/60 pt-1">
+            <div className="mt-2 border-t border-border/60 pt-1">
               <ExpandableAboutSection label="Stats">
                 <AboutStats
                   items={[

@@ -216,6 +216,18 @@ html.light {
   padding-inline: clamp(0.75rem, 4vw, 2rem);
 }
 
+/* Same column as `content`, but with no gutter of its own, for pages whose
+   children already own their horizontal padding — a settings list with
+   edge-to-edge rows, or a profile that opens on a full-width banner. Adding
+   padding here would inset those and double up on everything else.
+   Distinct from `full` below: this one is capped but unpadded, that one is
+   padded but uncapped. */
+@utility page-shell-flush {
+  margin-inline: auto;
+  width: 100%;
+  max-width: min(100%, 56rem);
+}
+
 /* Maps and other surfaces meant to fill the viewport: still centred and
    guttered, just uncapped. */
 @utility page-shell-full {

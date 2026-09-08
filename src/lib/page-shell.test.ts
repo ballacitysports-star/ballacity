@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { pageContainerClasses, type PageWidth } from "@/lib/page-shell";
 
-const ALL_WIDTHS: PageWidth[] = ["narrow", "prose", "content", "default", "full"];
+const ALL_WIDTHS: PageWidth[] = ["narrow", "prose", "content", "flush", "default", "full"];
 
 /**
  * The shells' geometry lives in styles.css, so these assertions read it there
@@ -30,6 +30,7 @@ const SHELLS = [
   "page-shell-narrow",
   "page-shell-prose",
   "page-shell-content",
+  "page-shell-flush",
   "page-shell",
   "page-shell-full",
 ];
@@ -46,10 +47,20 @@ describe("page shell utilities", () => {
     }
   });
 
-  it("always gutters content away from the screen edge", () => {
+  it("gutters content away from the screen edge", () => {
     for (const name of SHELLS) {
+      // `flush` is the deliberate exception: its children own the padding.
+      if (name === "page-shell-flush") continue;
       expect(shell(name), name).toMatch(/padding-inline:\s*clamp\(/);
     }
+  });
+
+  it("leaves the flush shell unpadded, since its children pad themselves", () => {
+    expect(shell("page-shell-flush")).not.toMatch(/padding-inline/);
+  });
+
+  it("still caps the flush shell, so it cannot run the full width of a monitor", () => {
+    expect(capRem("page-shell-flush")).toBe(capRem("page-shell-content"));
   });
 
   it("caps width with min(100%, …) so a shell can never exceed the viewport", () => {
@@ -98,6 +109,7 @@ describe("pageContainerClasses", () => {
   it("maps each width to its shell utility", () => {
     expect(pageContainerClasses("narrow")).toContain("page-shell-narrow");
     expect(pageContainerClasses("prose")).toContain("page-shell-prose");
+    expect(pageContainerClasses("flush")).toContain("page-shell-flush");
     expect(pageContainerClasses("content")).toContain("page-shell-content");
     expect(pageContainerClasses("full")).toContain("page-shell-full");
   });

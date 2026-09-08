@@ -18,12 +18,10 @@ export const Route = createFileRoute("/trainers/$trainerId/edit")({
     return org;
   },
   pendingComponent: () => (
-    <div className="mx-auto max-w-md px-6 pt-24 text-center text-muted-foreground">
-      Loading editor…
-    </div>
+    <div className="page-shell-narrow pt-24 text-center text-muted-foreground">Loading editor…</div>
   ),
   errorComponent: ({ error }) => (
-    <div className="mx-auto max-w-md px-6 pt-24 text-center">
+    <div className="page-shell-narrow pt-24 text-center">
       <p className="text-muted-foreground">
         {error instanceof Error ? error.message : "Couldn't open editor."}
       </p>
@@ -36,7 +34,7 @@ export const Route = createFileRoute("/trainers/$trainerId/edit")({
     </div>
   ),
   notFoundComponent: () => (
-    <div className="mx-auto max-w-md px-6 pt-24 text-center">
+    <div className="page-shell-narrow pt-24 text-center">
       <p className="text-muted-foreground">Trainer not found.</p>
       <Link
         to="/trainers"
