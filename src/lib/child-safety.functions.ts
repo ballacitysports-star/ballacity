@@ -283,12 +283,20 @@ export const approveConsentAsGuardian = createServerFn({ method: "POST" })
       .select("age_cohort")
       .eq("id", userId)
       .maybeSingle();
-    const cohort = parseCohort((me as { age_cohort?: string } | null)?.age_cohort);
+    let cohort = parseCohort((me as { age_cohort?: string } | null)?.age_cohort);
+    if (cohort !== "adult") {
+      // The profile column can lag behind (or never be set) because the real
+      // date of birth lives in a private table. Ask the authoritative routine.
+      const { data: status } = await supabase.rpc("my_platform_status");
+      const row = (Array.isArray(status) ? status[0] : status) as Record<string, unknown> | null;
+      cohort = parseCohort(row?.["cohort"]);
+    }
     if (cohort !== "adult") {
       throw new Error(
         "Only an adult account can approve a child account. Add your birthday to your profile first.",
       );
     }
+
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { error } = await supabaseAdmin.rpc("approve_parental_consent", {
       _token_hash: hashToken(data.token),
