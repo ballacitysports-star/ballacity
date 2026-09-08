@@ -23,7 +23,6 @@ import { FamilyActivityLog } from "@/components/child/FamilyActivityLog";
 import { FamilyApprovalsPanel } from "@/components/child/FamilyApprovalsPanel";
 import { FamilyRoster } from "@/components/child/FamilyRoster";
 
-
 export const Route = createFileRoute("/parent/")({
   head: () =>
     pageHead({
@@ -37,19 +36,23 @@ export const Route = createFileRoute("/parent/")({
   component: ParentCenterPage,
 });
 
-const MESSAGING_OPTIONS: Array<{ value: ChildControls["messaging"]; label: string; hint: string }> = [
-  { value: "off", label: "Off", hint: "No direct messages at all." },
-  { value: "guardian_only", label: "Guardians only", hint: "Only you can message them." },
-  { value: "teammates", label: "Teammates", hint: "People in the same game or team." },
-  { value: "peers", label: "Peers", hint: "Other members their own age." },
-];
-
-const MEDIA_OPTIONS: Array<{ value: ChildControls["mediaVisibility"]; label: string; hint: string }> =
+const MESSAGING_OPTIONS: Array<{ value: ChildControls["messaging"]; label: string; hint: string }> =
   [
-    { value: "private", label: "Private", hint: "Only your child and you." },
-    { value: "guardian", label: "Guardian review", hint: "You see everything they upload." },
-    { value: "teammates", label: "Teammates", hint: "Visible to their game or team only." },
+    { value: "off", label: "Off", hint: "No direct messages at all." },
+    { value: "guardian_only", label: "Guardians only", hint: "Only you can message them." },
+    { value: "teammates", label: "Teammates", hint: "People in the same game or team." },
+    { value: "peers", label: "Peers", hint: "Other members their own age." },
   ];
+
+const MEDIA_OPTIONS: Array<{
+  value: ChildControls["mediaVisibility"];
+  label: string;
+  hint: string;
+}> = [
+  { value: "private", label: "Private", hint: "Only your child and you." },
+  { value: "guardian", label: "Guardian review", hint: "You see everything they upload." },
+  { value: "teammates", label: "Teammates", hint: "Visible to their game or team only." },
+];
 
 function OptionRow<T extends string>({
   label,
@@ -158,7 +161,6 @@ function ChildPanel({ childUserId }: { childUserId: string }) {
         )}
       </div>
 
-
       {footprint.data ? (
         <div className="mt-3 grid grid-cols-3 gap-2 text-center text-xs">
           {[
@@ -266,7 +268,6 @@ function ChildPanel({ childUserId }: { childUserId: string }) {
           End family link
         </Button>
       </div>
-
     </section>
   );
 }
@@ -282,7 +283,7 @@ function ParentCenterPage() {
   if (!loading && !user) {
     return (
       <main className="page-shell-narrow py-10">
-        <h1 className="font-display text-2xl font-bold">Parent Center</h1>
+        <h1 className="page-title">Parent Center</h1>
         <p className="mt-2 text-sm text-muted-foreground">
           Sign in with your adult account to manage a child&rsquo;s ballaCity account.
         </p>
@@ -302,11 +303,10 @@ function ParentCenterPage() {
         <ShieldCheck className="h-5 w-5" aria-hidden />
         <span className="text-xs font-bold uppercase tracking-wide">Parent Center</span>
       </div>
-      <h1 className="mt-2 font-display text-2xl font-bold">Your family</h1>
+      <h1 className="mt-2 page-title">Your family</h1>
       <p className="mt-2 text-sm text-muted-foreground">
-        Everyone you manage, who is waiting on you, and their settings — consent, messaging,
-        videos, discoverability and data requests. You only ever see information about your own
-        children.
+        Everyone you manage, who is waiting on you, and their settings — consent, messaging, videos,
+        discoverability and data requests. You only ever see information about your own children.
       </p>
 
       <FamilyApprovalsPanel />
@@ -334,7 +334,6 @@ function ParentCenterPage() {
           />
           {selected ? <ChildPanel key={selected} childUserId={selected} /> : null}
         </>
-
       )}
 
       <AddMinorPanel />

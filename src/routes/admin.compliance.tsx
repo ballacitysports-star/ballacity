@@ -148,7 +148,7 @@ function ComplianceDashboard() {
       </div>
 
       <header className="space-y-2">
-        <h1 className="text-2xl font-bold">Compliance readiness</h1>
+        <h1 className="page-title">Compliance readiness</h1>
         <p className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-amber-700 dark:text-amber-300">
           {COMPLIANCE_DISCLAIMER}
         </p>
@@ -253,11 +253,7 @@ function ComplianceDashboard() {
                 </div>
               ))}
               <div className="flex flex-wrap items-center gap-2">
-                <Button
-                  size="sm"
-                  onClick={() => review.mutate()}
-                  disabled={review.isPending}
-                >
+                <Button size="sm" onClick={() => review.mutate()} disabled={review.isPending}>
                   <ShieldCheck className="mr-1 h-4 w-4" /> Mark security controls reviewed
                 </Button>
                 <span className="text-xs text-muted-foreground">
@@ -279,7 +275,9 @@ function ComplianceDashboard() {
               <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
                 <Stat
                   label="Account deletion requests"
-                  value={data.data.deletionRequests === null ? "n/a" : String(data.data.deletionRequests)}
+                  value={
+                    data.data.deletionRequests === null ? "n/a" : String(data.data.deletionRequests)
+                  }
                 />
                 <Stat
                   label="Data export requests"
@@ -291,10 +289,7 @@ function ComplianceDashboard() {
                   value={String(data.data.aiDeletionRequests)}
                   hint="Accounts that withdrew AI video processing"
                 />
-                <Stat
-                  label="AI training opt-outs"
-                  value={String(data.data.aiOptOuts)}
-                />
+                <Stat label="AI training opt-outs" value={String(data.data.aiOptOuts)} />
               </div>
               <p className="text-xs text-muted-foreground">{data.data.deletionNote}</p>
             </CardContent>

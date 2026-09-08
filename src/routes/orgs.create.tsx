@@ -96,7 +96,7 @@ function CreateOrg() {
     <div className="page-shell pt-4 pb-40 space-y-4">
       {finish ? <FinishSetupNotice kind="gym" /> : null}
       <header>
-        <h1 className="font-display text-3xl font-bold">Create gym.</h1>
+        <h1 className="page-title">Create gym.</h1>
         <p className="text-sm text-muted-foreground mt-1">
           Set up a training organization or gym profile.
         </p>

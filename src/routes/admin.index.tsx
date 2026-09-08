@@ -101,7 +101,7 @@ function AdminPage() {
     <div className="page-shell min-h-dvh py-4 sm:py-6 space-y-4">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-semibold">Admin Panel</h1>
+          <h1 className="page-title">Admin Panel</h1>
           <p className="text-sm text-muted-foreground">Manage users, payments, content</p>
         </div>
         <div className="flex gap-2">
@@ -117,7 +117,6 @@ function AdminPage() {
           <Button variant="outline" asChild>
             <Link to="/admin/child-safety">Child safety</Link>
           </Button>
-
 
           <Button variant="outline" asChild>
             <Link to="/admin/audit">Audit logs</Link>
@@ -158,7 +157,6 @@ function AdminPage() {
         <TabsContent value="legal">
           <LegalConsentPanel />
         </TabsContent>
-
       </Tabs>
     </div>
   );
@@ -220,7 +218,6 @@ function LegalConsentPanel() {
     </Card>
   );
 }
-
 
 function ReelsPanel() {
   const list = useServerFn(adminListReels);

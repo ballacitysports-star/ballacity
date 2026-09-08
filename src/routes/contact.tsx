@@ -27,7 +27,7 @@ function ContactPage() {
       </header>
 
       <main className="page-shell-prose py-6 pb-28">
-        <h1 className="font-display text-2xl font-bold">Contact</h1>
+        <h1 className="page-title">Contact</h1>
         <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
           Questions about your account, a game, a payment, or something you saw on ballaCity? Start
           here.

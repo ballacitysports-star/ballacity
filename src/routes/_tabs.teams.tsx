@@ -205,7 +205,7 @@ function TeamsPage() {
   return (
     <div className="page-shell-content pt-6">
       <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="mb-4">
-        <h1 className="font-display text-3xl font-bold leading-tight">Teams & clubs.</h1>
+        <h1 className="page-title">Teams & clubs.</h1>
         <p className="text-muted-foreground text-sm inline-flex items-center gap-1">
           {profile?.city ? (
             <>
@@ -292,7 +292,6 @@ function TeamsPage() {
                   />
                 </FilterSection>
                 <SortSection value={sortBy} onChange={setSortBy} options={TEAM_SORTS} />
-
               </>
             }
           />

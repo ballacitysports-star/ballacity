@@ -132,7 +132,7 @@ function ConsentApprovalPage() {
           Parent / guardian approval
         </span>
       </div>
-      <h1 className="mt-2 font-display text-2xl font-bold">
+      <h1 className="mt-2 page-title">
         Approve {info?.childDisplayName ?? "a child"}&rsquo;s ballaCity account
       </h1>
 

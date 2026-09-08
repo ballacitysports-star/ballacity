@@ -80,7 +80,7 @@ function MessagesInbox() {
     return (
       <div className="page-shell-narrow pt-10 text-center">
         <MessageCircle className="mx-auto h-10 w-10 text-muted-foreground mb-3" />
-        <h1 className="font-display text-2xl font-bold mb-2">Sign in to your inbox</h1>
+        <h1 className="page-title mb-2">Sign in to your inbox</h1>
         <Link
           to="/auth"
           className="inline-flex rounded-full bg-lime-gradient px-5 py-2.5 text-sm font-bold text-primary-foreground"
@@ -128,7 +128,7 @@ function MessagesInbox() {
         >
           <ArrowLeft className="h-5 w-5" />
         </Link>
-        <h1 className="font-display text-2xl font-bold">Inbox</h1>
+        <h1 className="page-title">Inbox</h1>
       </div>
 
       {/* Top-level Messages vs Alerts */}

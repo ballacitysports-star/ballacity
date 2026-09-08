@@ -297,7 +297,7 @@ function TeamPage() {
         />
 
         <div className="mt-3">
-          <h1 className="font-display text-2xl font-bold flex items-center gap-2 leading-tight">
+          <h1 className="page-title flex items-center gap-2">
             {org.name}
             {org.verified && (
               <span className="inline-flex items-center gap-1 rounded-full bg-lime/15 px-2 py-0.5 text-xs font-bold text-lime">

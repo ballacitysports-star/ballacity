@@ -57,7 +57,7 @@ function ShopPage() {
         >
           <ArrowLeft className="h-4 w-4" /> Profile
         </Link>
-        <h1 className="mt-4 font-display text-3xl font-bold">Shop</h1>
+        <h1 className="mt-4 page-title">Shop</h1>
         <p className="mt-1 text-sm text-muted-foreground">
           ballaCity gear, shipped to your door.{" "}
           <span className="font-semibold text-foreground">All sales final — no refunds.</span>

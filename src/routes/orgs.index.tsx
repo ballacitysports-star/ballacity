@@ -28,7 +28,7 @@ function OrgsIndex() {
     <div className="page-shell-content pt-4 pb-40 space-y-4">
       <header className="flex items-start justify-between gap-3">
         <div>
-          <h1 className="font-display text-3xl font-bold leading-tight">Gyms.</h1>
+          <h1 className="page-title">Gyms.</h1>
           <p className="text-sm text-muted-foreground mt-1">
             Training organizations and gyms with rosters of trainers.
           </p>

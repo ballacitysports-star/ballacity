@@ -56,7 +56,7 @@ function FamilyJoinPage() {
   if (!user) {
     return (
       <Shell>
-        <h1 className="font-display text-xl font-bold">Sign in to accept</h1>
+        <h1 className="page-title">Sign in to accept</h1>
         <p className="mt-2 text-sm text-muted-foreground">
           Sign in (or create your account), add your date of birth, then open this link again.
         </p>
@@ -76,7 +76,7 @@ function FamilyJoinPage() {
       <Shell>
         <div className="flex items-center gap-2">
           <ShieldCheck className="h-5 w-5 text-lime" />
-          <h1 className="font-display text-xl font-bold">You're all set</h1>
+          <h1 className="page-title">You're all set</h1>
         </div>
         <p className="mt-2 text-sm text-muted-foreground">
           Your parent or guardian is connected and can manage your safety settings.
@@ -94,7 +94,7 @@ function FamilyJoinPage() {
     <Shell>
       <div className="flex items-center gap-2">
         <Users className="h-5 w-5 text-muted-foreground" />
-        <h1 className="font-display text-xl font-bold">Family invitation</h1>
+        <h1 className="page-title">Family invitation</h1>
       </div>
 
       {query.isLoading ? (
@@ -107,9 +107,13 @@ function FamilyJoinPage() {
             {query.data?.childName ? ` (${query.data.childName})` : ""}.
           </p>
           <ul className="mt-3 space-y-2 text-xs text-muted-foreground">
-            <li>• They can see and change your safety settings — messaging, video visibility, games.</li>
+            <li>
+              • They can see and change your safety settings — messaging, video visibility, games.
+            </li>
             <li>• They can request your data or ask us to delete your account.</li>
-            <li>• If you're under 13, accepting also records their consent so your account turns on.</li>
+            <li>
+              • If you're under 13, accepting also records their consent so your account turns on.
+            </li>
           </ul>
           <Button className="mt-4 w-full" disabled={submitting} onClick={() => void accept()}>
             {submitting ? "Connecting…" : "Accept invitation"}

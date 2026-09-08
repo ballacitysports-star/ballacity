@@ -214,3 +214,51 @@ describe("full-height pages use the dynamic viewport", () => {
     expect(sourcesUsing(/\bmin-h-dvh\b/).length).toBeGreaterThan(20);
   });
 });
+
+/**
+ * One page title, and shared button behaviour.
+ *
+ * 51 routes render an <h1>, between them using more than a dozen class
+ * combinations for what is the same thing. `page-title` is the single
+ * definition, and PageHeader renders it too so the component and a plain <h1>
+ * cannot drift.
+ *
+ * The button rules are deliberately behavioural rather than visual: 624 of the
+ * app's buttons are raw <button>, 348 of them pill-shaped and 536 sized by
+ * padding rather than a height. That is the product's identity, so it is left
+ * alone and only the things every button should agree on are set globally.
+ */
+describe("shared title and button rules", () => {
+  it("defines one responsive page title", () => {
+    const body = CSS.match(/@utility page-title \{([\s\S]*?)\n\}/)?.[1];
+    expect(body, "page-title utility missing from styles.css").toBeTruthy();
+    // 2xl on a phone, 3xl from sm up — the dominant size, made responsive.
+    expect(body!).toMatch(/--text-2xl/);
+    expect(body!).toMatch(/@variant sm/);
+    expect(body!).toMatch(/--text-3xl/);
+    // A long team or player name must not overflow, nor ladder one word a line.
+    expect(body!).toMatch(/text-wrap:\s*balance/);
+    expect(body!).toMatch(/overflow-wrap:\s*break-word/);
+  });
+
+  it("has PageHeader render that same utility rather than its own copy", () => {
+    const src = readFileSync(
+      new URL("../components/layout/PageHeader.tsx", import.meta.url),
+      "utf8",
+    );
+    expect(src).toMatch(/className="page-title"/);
+    expect(src, "PageHeader should not restate the type scale").not.toMatch(
+      /text-2xl[^"]*sm:text-3xl/,
+    );
+  });
+
+  it("stops any button overflowing its container", () => {
+    expect(CSS).toMatch(/max-width:\s*100%/);
+    expect(CSS).toMatch(/\[role="button"\]/);
+  });
+
+  it("removes the iOS double-tap zoom and tap delay on buttons", () => {
+    // touch-action: manipulation is the Safari-specific half of this.
+    expect(CSS).toMatch(/touch-action:\s*manipulation/);
+  });
+});

@@ -27,10 +27,7 @@ import { toast } from "sonner";
 import { Logo } from "@/components/Logo";
 import { SportChips } from "@/components/SportChips";
 import { MyAvatar, UserAvatar } from "@/components/UserAvatar";
-import {
-  usePrefetchUserAvatars,
-  useAvatarViewportPriority,
-} from "@/lib/user-avatars";
+import { usePrefetchUserAvatars, useAvatarViewportPriority } from "@/lib/user-avatars";
 
 import { useAuth } from "@/hooks/use-auth";
 import { useUnreadNotificationCount } from "@/lib/notifications";
@@ -211,8 +208,7 @@ function PlayersPage() {
     return hideFinishedGames(
       hostedGames.filter((g) => g.hostUserId === user.id),
       now,
-    )
-      .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+    ).sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
   }, [hostedGames, user?.id]);
   const search = Route.useSearch();
   type PlayersSearch = typeof search;
@@ -505,8 +501,6 @@ function PlayersPage() {
   usePrefetchUserAvatars(resultIds.slice(8), "low");
   const avatarRowRef = useAvatarViewportPriority();
 
-
-
   return (
     <div className="page-shell-content pt-6">
       <div className="flex items-center justify-between mb-5">
@@ -531,7 +525,7 @@ function PlayersPage() {
       </div>
 
       <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="mb-4">
-        <h1 className="font-display text-3xl font-bold leading-tight">Players ready to run.</h1>
+        <h1 className="page-title">Players ready to run.</h1>
         <p className="text-muted-foreground text-sm inline-flex items-center gap-1">
           {profile?.city ? (
             <>
@@ -744,7 +738,6 @@ function PlayersPage() {
                     onChanged={() => setReloadTick((t) => t + 1)}
                   />
                 ))}
-
               </ul>
             </>
           )}
@@ -1075,8 +1068,7 @@ function AvailabilityCard({
   /** Marks the row so its avatar is prioritized as it nears the viewport. */
   rowRef?: (ids: Array<string | null | undefined>) => (el: Element | null) => void;
 }) {
-
-const navigate = useNavigate();
+  const navigate = useNavigate();
   const when = formatWindow(a);
   const authorLinks: ProfileLink[] = Array.isArray(a.author_links)
     ? (a.author_links as ProfileLink[])
@@ -1104,7 +1096,6 @@ const navigate = useNavigate();
 
   return (
     <li ref={rowRef?.([a.user_id])} className="rounded-2xl border border-border bg-surface p-4">
-
       <div className="flex items-start gap-3">
         <Link
           to="/players/$userId"
@@ -1204,9 +1195,9 @@ const navigate = useNavigate();
             <dd className="truncate text-xs font-semibold">{s.value}</dd>
           </div>
         ))}
-</dl>
+      </dl>
 
-{/* About — the player's profile bio + key identity details + links. */}
+      {/* About — the player's profile bio + key identity details + links. */}
       {(a.author_bio || a.author_city || a.travel_radius_km > 0 || authorLinks.length > 0) && (
         <div className="mt-3 rounded-2xl border border-border bg-background/40 p-3">
           {a.author_bio && (

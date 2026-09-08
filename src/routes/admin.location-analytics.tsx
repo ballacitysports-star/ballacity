@@ -211,7 +211,7 @@ function LocationAnalyticsPage() {
     <div className="page-shell space-y-4 py-4 md:py-6">
       <div className="flex items-center justify-between gap-2 flex-wrap">
         <div>
-          <h1 className="text-2xl font-semibold">Location denial analytics</h1>
+          <h1 className="page-title">Location denial analytics</h1>
           <p className="text-sm text-muted-foreground">
             Trends in geolocation permission failures across users, browsers and sports.
           </p>

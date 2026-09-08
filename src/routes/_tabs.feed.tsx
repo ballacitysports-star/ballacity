@@ -198,8 +198,7 @@ function Feed() {
   useProfileSportDefault("feed", {
     ready: !!authUser,
     current: prefs.preferredSports as string[],
-    apply: (next) =>
-      setFeedPrefs({ ...getFeedPrefsSnapshot(), preferredSports: next as Sport[] }),
+    apply: (next) => setFeedPrefs({ ...getFeedPrefsSnapshot(), preferredSports: next as Sport[] }),
   });
 
   // Reflect current state back into the URL so refresh/share preserves it.
@@ -298,9 +297,15 @@ function Feed() {
     const withDist = teamPosts.map((p) => {
       if (!validCoord(p.lat, p.lng)) {
         const status = p.lat == null || p.lng == null ? "missing" : "invalid";
-        return { ...p, distanceMi: null as number | null, geoStatus: status as "missing" | "invalid" };
+        return {
+          ...p,
+          distanceMi: null as number | null,
+          geoStatus: status as "missing" | "invalid",
+        };
       }
-      const km = coords ? haversineKm(coords, { lat: p.lat as number, lng: p.lng as number }) : null;
+      const km = coords
+        ? haversineKm(coords, { lat: p.lat as number, lng: p.lng as number })
+        : null;
       return { ...p, distanceMi: km == null ? null : km * MI_PER_KM, geoStatus: "valid" as const };
     });
     const inRange =
@@ -351,63 +356,65 @@ function Feed() {
     // Collapse multi-day series first so one event never shows duplicate cards.
     const pool = collapseSeriesGames([...hosted, ...GAMES], tab);
     const all = tab === "archive" ? onlyFinishedGames(pool) : hideFinishedGames(pool);
-    return all
-      .filter((g) =>
-        prefs.preferredSports.length ? prefs.preferredSports.includes(g.sport) : true,
-      )
-      .filter((g) =>
-        positionFilter
-          ? !!(g.positionsNeeded && (g.positionsNeeded[positionFilter] ?? 0) > 0)
-          : true,
-      )
-      .filter((g) => (prefs.mineFilter === "hosting" ? hostedIds.has(g.id) : true))
-      .filter((g) => (prefs.mineFilter === "joined" ? joinedSet.has(g.id) : true))
-      .filter((g) => (prefs.moneyFilter === "free" ? g.price === 0 : true))
-      .filter((g) => (prefs.moneyFilter === "paid" ? g.price > 0 : true))
+    return (
+      all
+        .filter((g) =>
+          prefs.preferredSports.length ? prefs.preferredSports.includes(g.sport) : true,
+        )
+        .filter((g) =>
+          positionFilter
+            ? !!(g.positionsNeeded && (g.positionsNeeded[positionFilter] ?? 0) > 0)
+            : true,
+        )
+        .filter((g) => (prefs.mineFilter === "hosting" ? hostedIds.has(g.id) : true))
+        .filter((g) => (prefs.mineFilter === "joined" ? joinedSet.has(g.id) : true))
+        .filter((g) => (prefs.moneyFilter === "free" ? g.price === 0 : true))
+        .filter((g) => (prefs.moneyFilter === "paid" ? g.price > 0 : true))
 
-      // Distance cap uses the live viewer→venue distance. Games we can't
-      // measure (no viewer location yet, or an ungeocoded venue) are never
-      // hidden — hiding them would look like the game vanished.
-      .filter((g) => {
-        if (prefs.maxDistanceMi == null) return true;
-        const mi = gameDistanceMi(g, coords);
-        return mi == null ? true : mi <= prefs.maxDistanceMi;
-      })
-      .filter((g) =>
-        q
-          ? (
-              g.title +
-              " " +
-              g.location +
-              " " +
-              g.host.name +
-              " " +
-              g.sport +
-              " " +
-              (g.neighborhood ?? "")
-            )
-              .toLowerCase()
-              .includes(q.toLowerCase())
-          : true,
-      )
-      .sort((a, b) => {
-        // Archive lists the most recently finished games first.
-        if (tab === "archive") return +new Date(b.date) - +new Date(a.date);
-        if (prefs.sortBy === "nearest") {
-          // Nearest first; prefer local city, then distanceMi, then date.
-          const la = isLocal(a) ? 0 : 1;
-          const lb = isLocal(b) ? 0 : 1;
-          if (la !== lb) return la - lb;
-          const dA = gameDistanceMi(a, coords) ?? Infinity;
-          const dB = gameDistanceMi(b, coords) ?? Infinity;
-          if (dA !== dB) return dA - dB;
-          return +new Date(a.date) - +new Date(b.date);
-        }
-        // Soonest first; break ties by distance.
-        const da = +new Date(a.date) - +new Date(b.date);
-        if (da !== 0) return da;
-        return (gameDistanceMi(a, coords) ?? Infinity) - (gameDistanceMi(b, coords) ?? Infinity);
-      });
+        // Distance cap uses the live viewer→venue distance. Games we can't
+        // measure (no viewer location yet, or an ungeocoded venue) are never
+        // hidden — hiding them would look like the game vanished.
+        .filter((g) => {
+          if (prefs.maxDistanceMi == null) return true;
+          const mi = gameDistanceMi(g, coords);
+          return mi == null ? true : mi <= prefs.maxDistanceMi;
+        })
+        .filter((g) =>
+          q
+            ? (
+                g.title +
+                " " +
+                g.location +
+                " " +
+                g.host.name +
+                " " +
+                g.sport +
+                " " +
+                (g.neighborhood ?? "")
+              )
+                .toLowerCase()
+                .includes(q.toLowerCase())
+            : true,
+        )
+        .sort((a, b) => {
+          // Archive lists the most recently finished games first.
+          if (tab === "archive") return +new Date(b.date) - +new Date(a.date);
+          if (prefs.sortBy === "nearest") {
+            // Nearest first; prefer local city, then distanceMi, then date.
+            const la = isLocal(a) ? 0 : 1;
+            const lb = isLocal(b) ? 0 : 1;
+            if (la !== lb) return la - lb;
+            const dA = gameDistanceMi(a, coords) ?? Infinity;
+            const dB = gameDistanceMi(b, coords) ?? Infinity;
+            if (dA !== dB) return dA - dB;
+            return +new Date(a.date) - +new Date(b.date);
+          }
+          // Soonest first; break ties by distance.
+          const da = +new Date(a.date) - +new Date(b.date);
+          if (da !== 0) return da;
+          return (gameDistanceMi(a, coords) ?? Infinity) - (gameDistanceMi(b, coords) ?? Infinity);
+        })
+    );
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [q, hosted, prefs, joinedSet, hostedIds, userCityToken, positionFilter, tab, coords]);
 
@@ -437,10 +444,7 @@ function Feed() {
   const isFull = (g: (typeof GAMES)[number]) => g.joined >= g.maxPlayers;
 
   const urgent = tab === "archive" ? [] : filtered.filter((g) => g.urgent && !isFull(g));
-  const finishedCount = useMemo(
-    () => onlyFinishedGames([...hosted, ...GAMES]).length,
-    [hosted],
-  );
+  const finishedCount = useMemo(() => onlyFinishedGames([...hosted, ...GAMES]).length, [hosted]);
   const activeFilterCount =
     (prefs.preferredSports.length > 0 ? 1 : 0) +
     (prefs.maxDistanceMi != null ? 1 : 0) +
@@ -604,9 +608,7 @@ function Feed() {
       </div>
 
       <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="mb-4">
-        <h1 className="font-display text-3xl font-bold leading-tight">
-          {tab === "archive" ? "Finished games." : "Tonight's run."}
-        </h1>
+        <h1 className="page-title">{tab === "archive" ? "Finished games." : "Tonight's run."}</h1>
         <p className="text-muted-foreground text-sm inline-flex items-center gap-1">
           {userCityToken ? (
             <>
@@ -782,8 +784,8 @@ function Feed() {
               )}
               {unlocatableCount > 0 && (
                 <p className="mb-2 text-xs text-coral/80">
-                  {unlocatableCount} team post{unlocatableCount === 1 ? "" : "s"} with no mappable home
-                  court — still shown below
+                  {unlocatableCount} team post{unlocatableCount === 1 ? "" : "s"} with no mappable
+                  home court — still shown below
                 </p>
               )}
               <div className="flex flex-col gap-3">

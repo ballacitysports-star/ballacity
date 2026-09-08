@@ -26,7 +26,7 @@ function GuidelinesPage() {
       </header>
 
       <main className="page-shell-prose py-6 pb-28">
-        <h1 className="font-display text-2xl font-bold">Community Guidelines</h1>
+        <h1 className="page-title">Community Guidelines</h1>
         <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
           ballaCity works when runs are honest, safe, and worth showing up for. These are the
           expectations for every player, host, team, gym, and trainer on the app.

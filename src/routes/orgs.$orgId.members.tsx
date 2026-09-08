@@ -208,7 +208,7 @@ function MembersPage() {
       </div>
 
       <header>
-        <h1 className="font-display text-3xl font-bold">Manage members.</h1>
+        <h1 className="page-title">Manage members.</h1>
         <p className="text-sm text-muted-foreground mt-1">
           {orgName ? `${orgName} · ` : ""}Invite people, review requests, and set roles.
         </p>

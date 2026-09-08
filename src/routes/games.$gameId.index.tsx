@@ -257,7 +257,7 @@ export const Route = createFileRoute("/games/$gameId/")({
   notFoundComponent: () => (
     <div className="min-h-dvh grid place-items-center px-6 text-center">
       <div>
-        <h1 className="font-display text-3xl font-bold">Game not found</h1>
+        <h1 className="page-title">Game not found</h1>
         <p className="text-muted-foreground mt-2">It may have wrapped up or been cancelled.</p>
         <Link
           to="/feed"
@@ -797,7 +797,7 @@ function GameDetail() {
     return (
       <div className="min-h-dvh grid place-items-center px-6 text-center">
         <div>
-          <h1 className="font-display text-3xl font-bold">Game not found</h1>
+          <h1 className="page-title">Game not found</h1>
           <p className="text-muted-foreground mt-2">It may have wrapped up or been cancelled.</p>
           <Link
             to="/feed"
@@ -1372,7 +1372,7 @@ function GameDetail() {
               </span>
             )}
           </div>
-          <h1 className="font-display text-3xl font-bold drop-shadow-lg">{game.title}</h1>
+          <h1 className="page-title drop-shadow-lg">{game.title}</h1>
         </div>
       </div>
 

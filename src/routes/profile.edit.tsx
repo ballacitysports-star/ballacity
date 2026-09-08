@@ -157,7 +157,7 @@ function EditProfile() {
   if (!profileUser) {
     return (
       <div className="page-shell-content flex min-h-dvh flex-col items-center justify-center text-center">
-        <h1 className="font-display text-3xl font-bold">Sign in to edit your profile</h1>
+        <h1 className="page-title">Sign in to edit your profile</h1>
         <p className="mt-2 text-sm text-muted-foreground">
           Profile changes are saved to your account.
         </p>

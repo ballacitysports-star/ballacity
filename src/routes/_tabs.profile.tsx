@@ -75,7 +75,8 @@ export const Route = createFileRoute("/_tabs/profile")({
     pageHead({
       path: "/profile",
       title: "Your profile — ballaCity",
-      description: "Your ballaCity profile: sports, skill levels, availability, games, and reviews.",
+      description:
+        "Your ballaCity profile: sports, skill levels, availability, games, and reviews.",
       noindex: true,
     }),
   // URL-persisted requests filter (all/host/player).
@@ -377,7 +378,7 @@ function PlayerProfile() {
         <div className="grid h-16 w-16 place-items-center rounded-3xl bg-lime-gradient font-display text-xl font-bold text-primary-foreground glow-lime">
           O
         </div>
-        <h1 className="mt-5 font-display text-3xl font-bold">Sign in to view your profile</h1>
+        <h1 className="mt-5 page-title">Sign in to view your profile</h1>
         <p className="mt-2 text-sm text-muted-foreground">
           Your games, reviews, and profile stay private until you sign in.
         </p>
@@ -494,10 +495,7 @@ function PlayerProfile() {
       </ProfileAboutSheet>
 
       <div className="px-4">
-        <ProfileReelsSection
-          recaps={allRecaps}
-          onChanged={() => setRecapTick((t) => t + 1)}
-        />
+        <ProfileReelsSection recaps={allRecaps} onChanged={() => setRecapTick((t) => t + 1)} />
         <ChannelTabs
           className="mt-5"
           value={activeTab}
@@ -838,7 +836,6 @@ function PlayerProfile() {
             </div>
           )}
         </section>
-
 
         <div className={activeTab === "games" ? "" : "hidden"}>
           <MyWaitlistCard />
@@ -1213,7 +1210,11 @@ function ProfileReelsSection({
             </p>
           </div>
         </div>
-        <Link to="/reels" search={{ game: "", title: "", upload: "" }} className="text-xs font-medium text-lime">
+        <Link
+          to="/reels"
+          search={{ game: "", title: "", upload: "" }}
+          className="text-xs font-medium text-lime"
+        >
           Open Reels
         </Link>
       </div>

@@ -40,9 +40,9 @@ export function PageHeader({
       <div className="flex min-w-0 flex-1 items-center gap-3">
         {leading}
         <div className="min-w-0 flex-1">
-          <Heading className="font-display text-2xl font-bold text-balance break-words sm:text-3xl">
-            {title}
-          </Heading>
+          {/* The same `page-title` utility the hand-written <h1>s use, so the
+              component and a plain heading cannot drift apart. */}
+          <Heading className="page-title">{title}</Heading>
           {description ? (
             <p className="mt-1 text-sm text-muted-foreground text-pretty">{description}</p>
           ) : null}

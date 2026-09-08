@@ -22,9 +22,7 @@ function CheckoutReturn() {
     <div className="flex min-h-dvh items-center justify-center px-4">
       <div className="max-w-md w-full rounded-2xl border border-border bg-surface p-8 text-center shadow-lg">
         <CheckCircle2 className="mx-auto h-12 w-12 text-lime" />
-        <h1 className="mt-4 text-2xl font-bold">
-          {session_id ? "Payment complete" : "Checkout complete"}
-        </h1>
+        <h1 className="mt-4 page-title">{session_id ? "Payment complete" : "Checkout complete"}</h1>
         <p className="mt-2 text-sm text-muted-foreground">
           Thanks for supporting ballaCity! Subscriptions activate immediately. For merch orders,
           you'll receive a confirmation email with shipping details.
@@ -40,7 +38,11 @@ function CheckoutReturn() {
           >
             Plans
           </Link>
-          <Link to="/reels" search={{ game: "", title: "", upload: "" }} className="rounded-xl bg-lime px-4 py-2 text-sm font-bold text-black">
+          <Link
+            to="/reels"
+            search={{ game: "", title: "", upload: "" }}
+            className="rounded-xl bg-lime px-4 py-2 text-sm font-bold text-black"
+          >
             Back to Reels
           </Link>
         </div>
