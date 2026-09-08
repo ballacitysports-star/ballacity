@@ -92,16 +92,12 @@ function ModerationPage() {
   if (!access?.isModerator) return null;
 
   return (
-    <div className="page-shell min-h-dvh space-y-4 py-4 sm:py-6">
-      <header className="flex items-center gap-3">
-        <BackHeaderInlineBack />
-        <div>
-          <h1 className="text-2xl font-semibold">Moderation</h1>
-          <p className="text-sm text-muted-foreground">
-            Reports, actions, and the moderation audit log
-          </p>
-        </div>
-      </header>
+    <div className="min-h-dvh">
+      <BackHeader title="Moderation" fallbackTo="/admin" />
+      <div className="page-shell space-y-4 py-4 sm:py-6">
+        <p className="text-sm text-muted-foreground">
+          Reports, actions, and the moderation audit log
+        </p>
 
       <Tabs defaultValue="reports">
         <TabsList>
