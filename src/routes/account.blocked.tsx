@@ -33,7 +33,7 @@ function BlockedUsersPage() {
   }
 
   return (
-    <div className="min-h-screen bg-background pb-24">
+    <div className="min-h-dvh bg-background pb-24">
       <BackHeader title="Blocked users" fallbackTo="/settings" />
 
       <main className="page-shell-narrow space-y-4 py-4">

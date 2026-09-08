@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { pageContainerClasses, type PageWidth } from "@/lib/page-shell";
 
@@ -175,5 +175,42 @@ describe("form controls do not trigger iOS zoom", () => {
     // `input { font-size: 1rem }` would shrink them.
     expect(rule![1]).not.toMatch(/(?:^|,)\s*(?:input|textarea|select)\s*\{/);
     expect(rule![1]).not.toMatch(/text-(?:base|lg|xl)/);
+  });
+});
+
+/**
+ * `min-h-screen` is `100vh`, and on mobile browsers `vh` is the *largest*
+ * viewport height — the one you get with the URL bar hidden. A page sized that
+ * way is taller than the space actually visible while the bar is showing, so
+ * its bottom sits under the browser chrome and the page gains a scroll it
+ * should not have. `dvh` tracks the viewport as the bar shows and hides.
+ *
+ * The app was split: 39 places used min-h-dvh and 10 still used min-h-screen,
+ * including the auth screen, settings, and the root error boundary.
+ */
+describe("full-height pages use the dynamic viewport", () => {
+  const ROOT = new URL("../", import.meta.url);
+
+  function sourcesUsing(pattern: RegExp): string[] {
+    const hits: string[] = [];
+    const walk = (dir: URL) => {
+      for (const entry of readdirSync(dir, { withFileTypes: true })) {
+        const child = new URL(entry.name + (entry.isDirectory() ? "/" : ""), dir);
+        if (entry.isDirectory()) walk(child);
+        else if (entry.name.endsWith(".tsx") && pattern.test(readFileSync(child, "utf8"))) {
+          hits.push(entry.name);
+        }
+      }
+    };
+    walk(ROOT);
+    return hits.sort();
+  }
+
+  it("uses no min-h-screen anywhere", () => {
+    expect(sourcesUsing(/\bmin-h-screen\b/)).toEqual([]);
+  });
+
+  it("still has full-height pages, so the check above is not vacuous", () => {
+    expect(sourcesUsing(/\bmin-h-dvh\b/).length).toBeGreaterThan(20);
   });
 });

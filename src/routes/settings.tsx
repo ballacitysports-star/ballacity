@@ -248,7 +248,7 @@ function SettingsHubPage() {
   ];
 
   return (
-    <div className="min-h-screen bg-background pb-24">
+    <div className="min-h-dvh bg-background pb-24">
       <BackHeader title="Settings" fallbackTo="/profile" />
 
       <main className="page-shell-narrow pb-4">

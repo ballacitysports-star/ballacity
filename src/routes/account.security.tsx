@@ -106,7 +106,7 @@ function AccountSecurityPage() {
   }
 
   return (
-    <div className="page-shell-content min-h-screen flex flex-col pb-12">
+    <div className="page-shell-content min-h-dvh flex flex-col pb-12">
       <BackHeader title="Account security" fallbackTo="/profile" />
 
       <div className="px-4 mt-4 space-y-5">

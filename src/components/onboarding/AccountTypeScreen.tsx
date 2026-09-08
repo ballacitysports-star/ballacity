@@ -103,14 +103,14 @@ export function AccountTypeScreen({
 
   if (loading || !user || !checked) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-background">
+      <div className="flex min-h-dvh items-center justify-center bg-background">
         <div className="text-sm text-muted-foreground">Loading…</div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-background px-4 py-10">
+    <div className="min-h-dvh bg-background px-4 py-10">
       <div className="mx-auto max-w-lg space-y-6">
         <AccountTypePicker value={choice} onChange={setChoice} />
         <div className="rounded-lg border border-border bg-surface p-3 text-xs text-muted-foreground">
