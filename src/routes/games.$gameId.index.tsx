@@ -1,4 +1,5 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { RouteFallback, FALLBACK_ACTION_CLASS } from "@/components/layout/RouteFallback";
 import { pageHead, ogImageUrl } from "@/lib/seo";
 import type { PaymentSubmissionStatus } from "@/lib/payment-states";
 
@@ -37,7 +38,6 @@ import { needsRiskAcknowledgment, RISK_ACKNOWLEDGMENT } from "@/lib/safety";
 import { recordSafetyAck, useSafetyAck } from "@/lib/safety-acks";
 import { ShieldAlert } from "lucide-react";
 
-
 import { GAMES, SPORTS, imageFor } from "@/lib/sample-data";
 import { TierChips } from "@/components/sports/TierChips";
 import {
@@ -53,10 +53,7 @@ import { formatGameEnds, formatGameWhen, formatWhen, formatWhenDate } from "@/li
 import { gameEndsAt } from "@/lib/game-time";
 import { AddToCalendarButton } from "@/components/datetime/AddToCalendarButton";
 import { GameReminderCard, GameReminderPicker } from "@/components/GameReminderSettings";
-import {
-  DEFAULT_GAME_REMINDER_OFFSETS,
-  saveMyGameReminderOffsets,
-} from "@/lib/game-reminders";
+import { DEFAULT_GAME_REMINDER_OFFSETS, saveMyGameReminderOffsets } from "@/lib/game-reminders";
 import { ReviewsSection } from "@/components/ReviewsSection";
 import { SpotsPill } from "@/components/SpotsPill";
 import { UserAvatar, UserAvatarById } from "@/components/UserAvatar";
@@ -64,9 +61,19 @@ import { computeReputation, useReviewsFor } from "@/lib/reviews";
 import { GamePolicySummary } from "@/components/games/GamePolicySummary";
 import { GamePolicyFields } from "@/components/games/GamePolicyFields";
 import { HostTrustPanel } from "@/components/games/HostTrustPanel";
-import { cancelGame, completeGame, markAttendance, useHostAttendanceStats } from "@/lib/game-lifecycle";
+import {
+  cancelGame,
+  completeGame,
+  markAttendance,
+  useHostAttendanceStats,
+} from "@/lib/game-lifecycle";
 import { resolveGameStatus, GAME_STATUS_TONE_CLASS } from "@/lib/game-status";
-import { normalizeGamePolicy, validateGamePolicy, type GamePolicy, type HostTrust } from "@/lib/game-policy";
+import {
+  normalizeGamePolicy,
+  validateGamePolicy,
+  type GamePolicy,
+  type HostTrust,
+} from "@/lib/game-policy";
 import { ReputationBadge } from "@/components/ReputationBadge";
 import { joinGame, leaveGame, useIsJoined } from "@/lib/games-store";
 import { useLiveParticipantCount } from "@/lib/game-participants-store";
@@ -219,14 +226,19 @@ export const Route = createFileRoute("/games/$gameId/")({
       path: `/games/${params.gameId}`,
       title: `${name} — ballaCity`,
       description: (
-        game?.description ?? "See the details for this pickup game and request to join on ballaCity."
+        game?.description ??
+        "See the details for this pickup game and request to join on ballaCity."
       ).slice(0, 155),
       ogType: "article",
       image: ogImageUrl({
         kind: "game",
         title: name,
-        subtitle: game ? [game.sport, game.neighborhood ?? game.location].filter(Boolean).join(" • ") : "Pickup game on ballaCity",
-        meta: game ? [formatGameWhen(game), game.location, game.price ? `$${game.price}` : "Free"] : [],
+        subtitle: game
+          ? [game.sport, game.neighborhood ?? game.location].filter(Boolean).join(" • ")
+          : "Pickup game on ballaCity",
+        meta: game
+          ? [formatGameWhen(game), game.location, game.price ? `$${game.price}` : "Free"]
+          : [],
       }),
       jsonLd: game
         ? {
@@ -256,17 +268,16 @@ export const Route = createFileRoute("/games/$gameId/")({
     </div>
   ),
   errorComponent: ({ reset }) => (
-    <div className="min-h-dvh grid place-items-center px-6 text-center">
-      <div>
-        <h1 className="font-display text-2xl font-bold">Something went wrong</h1>
-        <button
-          onClick={reset}
-          className="mt-4 rounded-full bg-lime px-5 py-2.5 text-sm font-bold text-primary-foreground"
-        >
-          Try again
-        </button>
-      </div>
-    </div>
+    <RouteFallback
+      title="Something went wrong"
+      message="This game couldn't be loaded."
+      onRetry={reset}
+      action={
+        <Link to="/feed" className={FALLBACK_ACTION_CLASS}>
+          Back to feed
+        </Link>
+      }
+    />
   ),
   component: GameDetail,
 });
@@ -435,7 +446,8 @@ function GameDetail() {
   const viewerPolicy = useMemo<GamePolicy>(
     () =>
       normalizeGamePolicy({
-        cancellationPolicy: (game?.cancellationPolicy ?? undefined) as GamePolicy["cancellationPolicy"],
+        cancellationPolicy: (game?.cancellationPolicy ??
+          undefined) as GamePolicy["cancellationPolicy"],
         cancellationNotes: game?.cancellationNotes ?? "",
         minPlayers: game?.minPlayers ?? 0,
         maxPlayers: game?.maxPlayers ?? 10,
@@ -475,9 +487,7 @@ function GameDetail() {
 
   const hostTrust = useMemo<HostTrust>(() => {
     const hostUserId = game?.hostUserId ?? settings?.host_id ?? null;
-    const gamesHosted = hostUserId
-      ? hosted.filter((g) => g.hostUserId === hostUserId).length
-      : 0;
+    const gamesHosted = hostUserId ? hosted.filter((g) => g.hostUserId === hostUserId).length : 0;
     return {
       gamesHosted,
       rating: hostRep.count > 0 ? hostRep.avg : null,
@@ -862,7 +872,6 @@ function GameDetail() {
     ...DEFAULT_GAME_REMINDER_OFFSETS,
   ]);
 
-
   const executeJoinAction = async (preselectedPosition?: string) => {
     // Expired invite → block all join actions and steer to discovery.
     if (inviteExpired && !isHost && !viewerCountsAsJoined && !viewerPending) {
@@ -1146,7 +1155,6 @@ function GameDetail() {
     }
   };
 
-
   const viewerPending =
     !isHost && requiresApproval && myReq?.status === "pending" && !viewerCountsAsJoined;
   const hostPendingReqs = isHost ? hostRequests.filter((r) => r.status === "pending") : [];
@@ -1262,7 +1270,10 @@ function GameDetail() {
               undone — you'd need to create a new game.
             </DialogDescription>
           </DialogHeader>
-          <label className="block text-xs font-semibold text-muted-foreground" htmlFor="cancel-reason">
+          <label
+            className="block text-xs font-semibold text-muted-foreground"
+            htmlFor="cancel-reason"
+          >
             Reason players will see
           </label>
           <textarea
@@ -1693,7 +1704,7 @@ function GameDetail() {
 
         {/* Meta */}
         <div className="grid grid-cols-2 gap-2">
-<Meta
+          <Meta
             icon={<Clock className="h-4 w-4 text-lime" />}
             label="Starts"
             value={game.allDay ? formatWhenDate(game.date) : formatGameWhen(game)}
@@ -2582,7 +2593,7 @@ function GameDetail() {
                 approvedReqs.length + Math.max(rosterFromLive.length, fallbackPlaceholderCount);
               return (
                 <>
-                   <h2 className="font-display text-sm font-bold uppercase tracking-wider text-muted-foreground mb-2">
+                  <h2 className="font-display text-sm font-bold uppercase tracking-wider text-muted-foreground mb-2">
                     Roster · {totalConfirmed} / {game.maxPlayers}
                   </h2>
 
@@ -2961,7 +2972,6 @@ function GameDetail() {
         />
       )}
 
-
       <AlertDialog
         open={confirmAction !== null}
         onOpenChange={(open) => {
@@ -3102,7 +3112,8 @@ function EditGameModal({
   // the existing save payload so nothing downstream changes shape.
   const [editPolicy, setEditPolicy] = useState<GamePolicy>(() =>
     normalizeGamePolicy({
-      cancellationPolicy: (game.cancellationPolicy ?? undefined) as GamePolicy["cancellationPolicy"],
+      cancellationPolicy: (game.cancellationPolicy ??
+        undefined) as GamePolicy["cancellationPolicy"],
       cancellationNotes: game.cancellationNotes ?? "",
       minPlayers: game.minPlayers ?? 0,
       maxPlayers: Math.max(2, Math.min(30, Number(game.maxPlayers) || 10)),
@@ -3194,7 +3205,11 @@ function EditGameModal({
     if (saving) return;
     setSaving(true);
     try {
-      const policyCheck = validateGamePolicy({ ...editPolicy, entryFee: Math.max(0, Number(price) || 0), requiresApproval });
+      const policyCheck = validateGamePolicy({
+        ...editPolicy,
+        entryFee: Math.max(0, Number(price) || 0),
+        requiresApproval,
+      });
       if (!policyCheck.ok) {
         toast.error(policyCheck.error);
         setSaving(false);
@@ -3287,11 +3302,7 @@ function EditGameModal({
       // Notify confirmed players when the schedule end changed (end time or
       // all-day toggle) — their plans and calendar invites depend on it.
       const prevEndMs = gameEndsAt(game);
-      const nextEndMs = allDay
-        ? prevEndMs
-        : Number.isFinite(endMs)
-          ? endMs
-          : prevEndMs;
+      const nextEndMs = allDay ? prevEndMs : Number.isFinite(endMs) ? endMs : prevEndMs;
       const endChanged = !allDay && nextEndMs !== prevEndMs;
       const allDayChanged = !!game.allDay !== allDay;
       if (endChanged || allDayChanged) {
@@ -4299,11 +4310,7 @@ function RosterPlayerRow({
   return (
     <div className="rounded-2xl border border-lime/30 bg-surface p-3">
       <div className="flex items-center gap-3">
-        <Link
-          to="/players/$userId"
-          params={{ userId: req.player_id }}
-          className="shrink-0"
-        >
+        <Link to="/players/$userId" params={{ userId: req.player_id }} className="shrink-0">
           <UserAvatar
             name={name}
             initials={initials.slice(0, 2)}

@@ -1,4 +1,5 @@
 import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
+import { RouteFallback, FALLBACK_ACTION_CLASS } from "@/components/layout/RouteFallback";
 import { pageHead } from "@/lib/seo";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
@@ -30,8 +31,29 @@ export const Route = createFileRoute("/orgs/$orgId/edit")({
     }),
   ssr: false,
   component: EditOrg,
-  errorComponent: ({ error }) => <div className="p-8 text-sm text-coral">{error.message}</div>,
-  notFoundComponent: () => <div className="p-8 text-sm text-muted-foreground">Gym not found.</div>,
+  errorComponent: ({ error, reset }) => (
+    <RouteFallback
+      title="Couldn't open this gym for editing"
+      message={error.message}
+      onRetry={reset}
+      action={
+        <Link to="/orgs" className={FALLBACK_ACTION_CLASS}>
+          Back to gyms
+        </Link>
+      }
+    />
+  ),
+  notFoundComponent: () => (
+    <RouteFallback
+      title="Gym not found"
+      message="It may have been removed, or the link may be wrong."
+      action={
+        <Link to="/orgs" className={FALLBACK_ACTION_CLASS}>
+          Back to gyms
+        </Link>
+      }
+    />
+  ),
 });
 
 type Member = {

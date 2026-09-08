@@ -1,4 +1,5 @@
-import { createFileRoute, redirect } from "@tanstack/react-router";
+import { createFileRoute, redirect, Link } from "@tanstack/react-router";
+import { RouteFallback, FALLBACK_ACTION_CLASS } from "@/components/layout/RouteFallback";
 import { pageHead } from "@/lib/seo";
 import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
@@ -56,9 +57,15 @@ export const Route = createFileRoute("/.lovable/oauth/consent")({
   },
   component: Consent,
   errorComponent: ({ error }) => (
-    <main className="mx-auto max-w-md p-6 text-sm">
-      Could not load this authorization request: {String((error as Error)?.message ?? error)}
-    </main>
+    <RouteFallback
+      title="Could not load this authorization request"
+      message={String((error as Error)?.message ?? error)}
+      action={
+        <Link to="/" className={FALLBACK_ACTION_CLASS}>
+          Go home
+        </Link>
+      }
+    />
   ),
 });
 

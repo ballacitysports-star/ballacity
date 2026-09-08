@@ -1,4 +1,5 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { RouteFallback, FALLBACK_ACTION_CLASS } from "@/components/layout/RouteFallback";
 import { pageHead } from "@/lib/seo";
 import { useEffect, useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -27,8 +28,29 @@ export const Route = createFileRoute("/orgs/$orgId/members")({
     }),
   ssr: false,
   component: MembersPage,
-  errorComponent: ({ error }) => <div className="p-8 text-sm text-coral">{error.message}</div>,
-  notFoundComponent: () => <div className="p-8 text-sm text-muted-foreground">Gym not found.</div>,
+  errorComponent: ({ error, reset }) => (
+    <RouteFallback
+      title="Couldn't load these members"
+      message={error.message}
+      onRetry={reset}
+      action={
+        <Link to="/orgs" className={FALLBACK_ACTION_CLASS}>
+          Back to gyms
+        </Link>
+      }
+    />
+  ),
+  notFoundComponent: () => (
+    <RouteFallback
+      title="Gym not found"
+      message="It may have been removed, or the link may be wrong."
+      action={
+        <Link to="/orgs" className={FALLBACK_ACTION_CLASS}>
+          Back to gyms
+        </Link>
+      }
+    />
+  ),
 });
 
 function MembersPage() {
