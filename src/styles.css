@@ -165,6 +165,34 @@ html.light {
   }
 }
 
+/* iOS Safari zooms the whole page when a focused form control's text is
+   under 16px, and does not zoom back out. Every control in the app that uses
+   text-sm or text-xs therefore lurches the layout on tap — sign-up, hosting a
+   game, creating an org, paying. The two shadcn primitives already avoid it
+   with `text-base md:text-sm`; the ~150 controls that set their own size do
+   not.
+
+   Raise exactly those sizes, and only below the md breakpoint, so the seven
+   deliberately large controls (text-xl / text-2xl in the org wizards) and the
+   desktop type scale are untouched. Written unlayered on purpose: Tailwind v4
+   puts utilities in @layer utilities, and an unlayered rule beats any layered
+   one, so this wins without !important. Above md the md: variants apply and
+   this media query does not, so the two never fight.
+
+   Deleting this re-introduces the zoom everywhere at once, which is why
+   page-shell.test.ts asserts it is here. */
+@media (max-width: 767px) {
+  input.text-xs,
+  input.text-sm,
+  textarea.text-xs,
+  textarea.text-sm,
+  select.text-xs,
+  select.text-sm {
+    font-size: 1rem;
+    line-height: 1.5rem;
+  }
+}
+
 /*
  * Page shells — the one set of page containers for the whole app.
  *
@@ -222,6 +250,16 @@ html.light {
    padding here would inset those and double up on everything else.
    Distinct from `full` below: this one is capped but unpadded, that one is
    padded but uncapped. */
+/* A single-column media feed. 29.375rem is Instagram's 470px column, which
+   the highlights feed matches deliberately; snapping it to the next step up
+   would widen the video cards. Unpadded, because the rows inside supply their
+   own px-4 and the cards themselves run edge to edge. */
+@utility page-shell-feed {
+  margin-inline: auto;
+  width: 100%;
+  max-width: min(100%, 29.375rem);
+}
+
 @utility page-shell-flush {
   margin-inline: auto;
   width: 100%;

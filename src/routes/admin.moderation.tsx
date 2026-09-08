@@ -359,9 +359,13 @@ function AuditTab() {
       </div>
     );
 
+  // overflow-x-auto, not overflow-hidden: five columns do not fit a phone, and
+  // hidden clipped them off with no way to reach them. The min-width keeps the
+  // columns legible and lets the wrapper scroll instead — the same pattern the
+  // child-safety table uses.
   return (
-    <div className="overflow-hidden rounded-xl border border-border">
-      <table className="w-full text-left text-xs">
+    <div className="overflow-x-auto rounded-xl border border-border">
+      <table className="w-full min-w-[560px] text-left text-xs">
         <thead className="bg-surface text-muted-foreground">
           <tr>
             <th className="p-2">When</th>

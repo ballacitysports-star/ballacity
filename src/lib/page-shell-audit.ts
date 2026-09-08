@@ -23,7 +23,10 @@ export type AdHocContainer = {
 };
 
 const CLASS_ATTR = /className=(?:"([^"]*)"|\{`([^`]*)`\})/g;
-const WIDTH_TOKEN = /(?:[a-z0-9]+:)?max-w-[a-z0-9-]+/g;
+// Arbitrary values count too: `max-w-[470px]` caps a container just as
+// firmly as `max-w-lg`, and matching only the named scale let three
+// hand-rolled containers sit unreported.
+const WIDTH_TOKEN = /(?:[a-z0-9]+:)?max-w-(?:\[[^\]]+\]|[a-z0-9-]+)/g;
 // Any utility that sets horizontal padding, at any breakpoint: p-, px-, pl-, pr-.
 const PADDING_X = /(?:^|\s)(?:[a-z0-9]+:)?p[xlr]?-\d/;
 

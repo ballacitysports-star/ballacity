@@ -30,6 +30,7 @@ const SHELLS = [
   "page-shell-narrow",
   "page-shell-prose",
   "page-shell-content",
+  "page-shell-feed",
   "page-shell-flush",
   "page-shell",
   "page-shell-full",
@@ -49,14 +50,22 @@ describe("page shell utilities", () => {
 
   it("gutters content away from the screen edge", () => {
     for (const name of SHELLS) {
-      // `flush` is the deliberate exception: its children own the padding.
-      if (name === "page-shell-flush") continue;
+      // `flush` and `feed` are the deliberate exceptions: their children own
+      // the padding, and a media feed runs edge to edge on a phone.
+      if (name === "page-shell-flush" || name === "page-shell-feed") continue;
       expect(shell(name), name).toMatch(/padding-inline:\s*clamp\(/);
     }
   });
 
   it("leaves the flush shell unpadded, since its children pad themselves", () => {
     expect(shell("page-shell-flush")).not.toMatch(/padding-inline/);
+  });
+
+  it("leaves the feed shell unpadded and at the media-column width", () => {
+    // 29.375rem is 470px — the highlights feed's column. Snapping it to the
+    // next step up would widen every video card on the page.
+    expect(shell("page-shell-feed")).not.toMatch(/padding-inline/);
+    expect(capRem("page-shell-feed")).toBe(29.375);
   });
 
   it("still caps the flush shell, so it cannot run the full width of a monitor", () => {
@@ -133,5 +142,38 @@ describe("pageContainerClasses", () => {
         .filter((c) => c.startsWith("page-shell"));
       expect(shells, width).toHaveLength(1);
     }
+  });
+});
+
+/**
+ * iOS Safari zooms the page when a focused input's text is under 16px, and
+ * never zooms back. Around 150 controls across the app set text-sm or text-xs
+ * themselves, so without this rule tapping almost any field — signing up,
+ * hosting a game, paying — shifts the whole layout under the user.
+ *
+ * It is one CSS rule standing in for ~150 call sites, which makes it easy to
+ * delete by accident and hard to notice missing, so it is pinned here.
+ */
+describe("form controls do not trigger iOS zoom", () => {
+  const rule = CSS.match(/@media \(max-width: 767px\) \{([\s\S]*?)\n\}/);
+
+  it("raises small controls to 16px below the md breakpoint", () => {
+    expect(rule, "the mobile form-control rule is missing from styles.css").not.toBeNull();
+    expect(rule![1]).toMatch(/font-size:\s*1rem/);
+  });
+
+  it("covers every control type at both small sizes", () => {
+    for (const el of ["input", "textarea", "select"]) {
+      for (const size of ["text-xs", "text-sm"]) {
+        expect(rule![1], `${el}.${size}`).toContain(`${el}.${size}`);
+      }
+    }
+  });
+
+  it("stays scoped to the small sizes so larger controls keep their size", () => {
+    // The org wizards use text-xl and text-2xl inputs deliberately; a blanket
+    // `input { font-size: 1rem }` would shrink them.
+    expect(rule![1]).not.toMatch(/(?:^|,)\s*(?:input|textarea|select)\s*\{/);
+    expect(rule![1]).not.toMatch(/text-(?:base|lg|xl)/);
   });
 });
