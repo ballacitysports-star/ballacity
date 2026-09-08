@@ -1,5 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { AlertTriangle, ArrowLeft, Flag, Heart, ShieldAlert, ShieldCheck } from "lucide-react";
+import { AlertTriangle, Flag, Heart, ShieldAlert, ShieldCheck } from "lucide-react";
+import { BackHeader } from "@/components/layout/BackHeader";
 import { PolicyLinks } from "@/components/PolicyLinks";
 import { pageHead } from "@/lib/seo";
 import {
