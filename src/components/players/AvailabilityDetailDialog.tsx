@@ -1,4 +1,5 @@
 import { useNavigate } from "@tanstack/react-router";
+import { describeMessagingError } from "@/lib/minor-messaging";
 import {
   Calendar,
   MapPin,
@@ -28,8 +29,6 @@ import type { AvailabilityWithAuthor } from "@/lib/availability";
 import { getOrCreateDirectConversation } from "@/lib/messages";
 import { shareAvailability } from "./share-availability";
 
-
-
 /**
  * Focused view of a single availability post — what a shared
  * `/players?post=<id>` link opens.
@@ -57,7 +56,7 @@ export function AvailabilityDetailDialog({
       const id = await getOrCreateDirectConversation(a.user_id);
       navigate({ to: "/messages/$conversationId", params: { conversationId: id } });
     } catch (e: any) {
-      toast.error(e.message || "Couldn't open chat");
+      toast.error(describeMessagingError(e));
     }
   };
 
@@ -177,7 +176,6 @@ export function AvailabilityDetailDialog({
               </Button>
             </div>
           </>
-
         )}
       </DialogContent>
     </Dialog>

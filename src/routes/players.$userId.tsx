@@ -1,4 +1,5 @@
 import { createFileRoute, Link, useNavigate, Navigate } from "@tanstack/react-router";
+import { describeMessagingError } from "@/lib/minor-messaging";
 import { pageHead, ogImageUrl } from "@/lib/seo";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useReelRealtime } from "@/hooks/use-reel-realtime";
@@ -268,7 +269,7 @@ function PlayerProfilePage() {
       const id = await getOrCreateDirectConversation(userId);
       navigate({ to: "/messages/$conversationId", params: { conversationId: id } });
     } catch (e: any) {
-      toast.error(e.message || "Couldn't open chat");
+      toast.error(describeMessagingError(e));
     } finally {
       setOpening(false);
     }

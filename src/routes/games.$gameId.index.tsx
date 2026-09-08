@@ -1,4 +1,5 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { describeMessagingError } from "@/lib/minor-messaging";
 import { RouteFallback, FALLBACK_ACTION_CLASS } from "@/components/layout/RouteFallback";
 import { pageHead, ogImageUrl } from "@/lib/seo";
 import type { PaymentSubmissionStatus } from "@/lib/payment-states";
@@ -2784,7 +2785,7 @@ function GameDetail() {
                   const cid = await getOrCreateDirectConversation(hostUid, game.id);
                   nav({ to: "/messages/$conversationId", params: { conversationId: cid } });
                 } catch (e: any) {
-                  toast.error(e.message);
+                  toast.error(describeMessagingError(e));
                 } finally {
                   setMessaging(false);
                 }
