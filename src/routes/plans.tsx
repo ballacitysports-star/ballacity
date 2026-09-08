@@ -83,7 +83,7 @@ function PlansPage() {
         >
           <ArrowLeft className="h-4 w-4" /> Profile
         </Link>
-        <h1 className="mt-4 font-display text-3xl font-bold">Plans & Subscriptions</h1>
+        <h1 className="mt-4 page-title">Plans & Subscriptions</h1>
         <p className="mt-1 text-sm text-muted-foreground">
           Subscribe or upgrade anytime. All plans are no-commitment monthly.{" "}
           <span className="font-semibold text-foreground">No refunds.</span>

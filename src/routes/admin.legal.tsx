@@ -218,10 +218,10 @@ function LegalManager() {
           <ArrowLeft className="h-5 w-5" />
         </Link>
         <div className="min-w-0 flex-1">
-          <h1 className="text-2xl font-semibold">Legal &amp; Compliance</h1>
+          <h1 className="page-title">Legal &amp; Compliance</h1>
           <p className="text-sm text-muted-foreground">
-            Draft, review, and publish versions of ballaCity's policy documents. Published versions are
-            what users see and are never edited afterwards.
+            Draft, review, and publish versions of ballaCity's policy documents. Published versions
+            are what users see and are never edited afterwards.
           </p>
         </div>
       </header>
@@ -304,7 +304,8 @@ function LegalManager() {
                   </div>
                   {meta.requiresConsent ? (
                     <p className="mt-2 text-[11px] text-muted-foreground">
-                      Consent documents can't be unpublished — publish a replacement version instead.
+                      Consent documents can't be unpublished — publish a replacement version
+                      instead.
                     </p>
                   ) : null}
                 </div>

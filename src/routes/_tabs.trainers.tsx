@@ -350,9 +350,9 @@ function TrainersPage() {
   }, [orgsListQuery.data, q]);
 
   return (
-    <div className="mx-auto w-full max-w-md sm:max-w-2xl lg:max-w-4xl px-4 pt-6">
+    <div className="page-shell-content pt-6">
       <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="mb-4">
-        <h1 className="font-display text-3xl font-bold leading-tight">
+        <h1 className="page-title">
           {mode === "gyms" ? "Gyms & organizations." : "Trainers & gyms."}
         </h1>
         <p className="text-muted-foreground text-sm inline-flex items-center gap-1">

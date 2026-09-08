@@ -69,7 +69,6 @@ import { useMyChildStatus } from "@/lib/child-safety";
 import { HOSTING_BLOCKED_MESSAGE } from "@/lib/hosting-policy";
 import { ShieldAlert } from "lucide-react";
 
-
 export const Route = createFileRoute("/_tabs/create")({
   head: () =>
     pageHead({
@@ -255,7 +254,7 @@ function Create() {
 
   if (!user) {
     return (
-      <div className="mx-auto w-full max-w-md sm:max-w-2xl lg:max-w-4xl px-4 pt-6">
+      <div className="page-shell-content pt-6">
         <div className="flex items-center gap-3 mb-5">
           <Link
             to="/feed"
@@ -263,7 +262,7 @@ function Create() {
           >
             <ArrowLeft className="h-5 w-5" />
           </Link>
-          <h1 className="font-display text-2xl font-bold">Host a game</h1>
+          <h1 className="page-title">Host a game</h1>
         </div>
         <div className="rounded-2xl border border-border bg-surface p-6 text-center space-y-4">
           <ShieldCheck className="h-8 w-8 mx-auto text-lime" />
@@ -288,7 +287,7 @@ function Create() {
   // Age gate (UX mirror of the `block_child_hosting` DB trigger).
   if (!hostingDecision.allowed) {
     return (
-      <div className="mx-auto w-full max-w-md sm:max-w-2xl lg:max-w-4xl px-4 pt-6">
+      <div className="page-shell-content pt-6">
         <div className="flex items-center gap-3 mb-5">
           <Link
             to="/feed"
@@ -296,7 +295,7 @@ function Create() {
           >
             <ArrowLeft className="h-5 w-5" />
           </Link>
-          <h1 className="font-display text-2xl font-bold">Host a game</h1>
+          <h1 className="page-title">Host a game</h1>
         </div>
         <div className="rounded-2xl border border-border bg-surface p-6 space-y-2">
           <div className="flex items-center gap-2 text-xs uppercase tracking-wider font-bold text-muted-foreground">
@@ -316,7 +315,7 @@ function Create() {
 
   if (affiliationsLoading) {
     return (
-      <div className="mx-auto w-full max-w-md sm:max-w-2xl lg:max-w-4xl px-4 pt-6">
+      <div className="page-shell-content pt-6">
         <div className="h-8 w-40 bg-surface rounded-lg animate-pulse mb-4" />
         <div className="h-32 bg-surface rounded-2xl animate-pulse" />
       </div>
@@ -325,7 +324,7 @@ function Create() {
 
   if (affiliations.length === 0) {
     return (
-      <div className="mx-auto w-full max-w-md sm:max-w-2xl lg:max-w-4xl px-4 pt-6">
+      <div className="page-shell-content pt-6">
         <div className="flex items-center gap-3 mb-5">
           <Link
             to="/feed"
@@ -333,7 +332,7 @@ function Create() {
           >
             <ArrowLeft className="h-5 w-5" />
           </Link>
-          <h1 className="font-display text-2xl font-bold">Host a game</h1>
+          <h1 className="page-title">Host a game</h1>
         </div>
         <div className="rounded-2xl border border-border bg-surface p-6 text-center space-y-4">
           <ShieldCheck className="h-8 w-8 mx-auto text-lime" />
@@ -358,7 +357,7 @@ function Create() {
   }
 
   return (
-    <div className="mx-auto w-full max-w-md sm:max-w-2xl lg:max-w-4xl px-4 pt-6">
+    <div className="page-shell-content pt-6">
       <div className="flex items-center gap-3 mb-5">
         <Link
           to="/feed"
@@ -366,7 +365,7 @@ function Create() {
         >
           <ArrowLeft className="h-5 w-5" />
         </Link>
-        <h1 className="font-display text-2xl font-bold">Host a game</h1>
+        <h1 className="page-title">Host a game</h1>
       </div>
 
       {!hostAvailGate.loading && !hostAvailGate.hasOpenAvailability && (
@@ -400,7 +399,6 @@ function Create() {
             return;
           }
           setPublishing(true);
-
 
           try {
             // Compute one or many start times, each with its own length.
@@ -509,7 +507,6 @@ function Create() {
               void recordSafetyAck({ gameId: game.id, kind: "host_responsibility" }).catch(
                 () => {},
               );
-
 
               // Persist host ownership + approval/fee preferences so the host & players see them on the detail page
               try {
@@ -870,7 +867,11 @@ function Create() {
           {/* Game policy */}
           <div ref={policyRef}>
             <Section title="Game policy" icon={<Users className="h-4 w-4" />}>
-              <GamePolicyFields value={effectivePolicy} onChange={setPolicy} idPrefix="create-policy" />
+              <GamePolicyFields
+                value={effectivePolicy}
+                onChange={setPolicy}
+                idPrefix="create-policy"
+              />
             </Section>
           </div>
 
@@ -910,7 +911,6 @@ function Create() {
                 : !hostAck
                   ? "Acknowledge host responsibilities"
                   : "Publish game"}
-
           </motion.button>
           <p className="text-center text-xs text-muted-foreground pb-6">
             Hosting is free. Pro hosts get unlimited games + analytics.

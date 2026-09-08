@@ -31,48 +31,8 @@ function readRoutes(): Record<string, string> {
  */
 const NOT_YET_MIGRATED = new Set([
   "[.]lovable.oauth.consent.tsx",
-  "_tabs.create.tsx",
-  "_tabs.feed.tsx",
-  "_tabs.notifications.tsx",
-  "_tabs.players.tsx",
-  "_tabs.profile.tsx",
-  "_tabs.teams.tsx",
-  "_tabs.trainers.tsx",
-  "account.ai-privacy.tsx",
-  "account.blocked.tsx",
-  "account.data.tsx",
-  "account.legal.tsx",
-  "account.notifications.tsx",
-  "account.privacy.tsx",
-  "account.security.tsx",
-  "admin.index.tsx",
-  "auth.tsx",
   "dev.og-preview.tsx",
   "dev.route-doctor.tsx",
-  "family.join.$token.tsx",
-  "games.$gameId.pay.tsx",
-  "games.$gameId.payment-setup.tsx",
-  "index.tsx",
-  "onboarding.child.tsx",
-  "onboarding.welcome.tsx",
-  "orgs.$orgId.edit.tsx",
-  "orgs.$orgId.index.tsx",
-  "orgs.$orgId.members.tsx",
-  "orgs.create.tsx",
-  "orgs.index.tsx",
-  "parent.consent.$token.tsx",
-  "parent.index.tsx",
-  "payments.tsx",
-  "profile.edit.tsx",
-  "reset-password.tsx",
-  "review.new.tsx",
-  "reviews.tsx",
-  "safety_.children.tsx",
-  "settings.tsx",
-  "teams.$teamId.index.tsx",
-  "teams.create.tsx",
-  "trainers.$trainerId.index.tsx",
-  "trainers.create.tsx",
 ]);
 
 describe("page container migration", () => {
@@ -118,6 +78,31 @@ describe("findAdHocContainers", () => {
       [],
     );
     expect(findAdHocContainers("x.tsx", '<div className="page-shell-content py-4" />')).toEqual([]);
+  });
+
+  it("ignores a centred text measure, but not a centred container", () => {
+    // A capped, centred <p> sets how wide the text reads. Reporting it as an
+    // unmigrated page container hides the real ones — this is what kept
+    // index.tsx on the list after every container in it was migrated.
+    expect(
+      findAdHocContainers("x.tsx", '<p className="mt-4 max-w-xl mx-auto">Subtitle</p>'),
+    ).toEqual([]);
+    expect(findAdHocContainers("x.tsx", '<h2 className="mx-auto max-w-2xl">Title</h2>')).toEqual(
+      [],
+    );
+    // The same classes on a layout element are still a container.
+    expect(findAdHocContainers("x.tsx", '<div className="mx-auto max-w-xl">x</div>')).toHaveLength(
+      1,
+    );
+    expect(
+      findAdHocContainers("x.tsx", '<section className="mx-auto max-w-xl">x</section>'),
+    ).toHaveLength(1);
+  });
+
+  it("still reports a container whose element cannot be identified", () => {
+    // Fail towards reporting: an unrecognised shape should show up as work,
+    // not vanish because the tag could not be parsed.
+    expect(findAdHocContainers("x.tsx", 'className="mx-auto max-w-xl"')).toHaveLength(1);
   });
 
   it("ignores centring that does not cap width", () => {

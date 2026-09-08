@@ -156,8 +156,8 @@ function EditProfile() {
   if (loading) return null;
   if (!profileUser) {
     return (
-      <div className="mx-auto flex min-h-dvh w-full max-w-md sm:max-w-2xl lg:max-w-4xl flex-col items-center justify-center px-6 text-center">
-        <h1 className="font-display text-3xl font-bold">Sign in to edit your profile</h1>
+      <div className="page-shell-content flex min-h-dvh flex-col items-center justify-center text-center">
+        <h1 className="page-title">Sign in to edit your profile</h1>
         <p className="mt-2 text-sm text-muted-foreground">
           Profile changes are saved to your account.
         </p>
@@ -317,7 +317,7 @@ function EditProfile() {
   };
 
   return (
-    <div className="mx-auto w-full max-w-md sm:max-w-2xl lg:max-w-4xl px-4 py-6 pb-32">
+    <div className="page-shell-content pt-6 pb-32">
       <div className="flex items-center justify-between gap-2 mb-5">
         <Link
           to="/profile"

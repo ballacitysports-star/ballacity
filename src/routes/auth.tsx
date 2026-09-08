@@ -502,7 +502,7 @@ function AuthPage() {
   };
 
   return (
-    <div className="mx-auto max-w-md min-h-screen flex flex-col pb-12">
+    <div className="page-shell-narrow min-h-dvh flex flex-col pb-12">
       <header className="flex items-center gap-2 px-4 py-3">
         <Link
           to="/"

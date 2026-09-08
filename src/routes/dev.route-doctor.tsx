@@ -59,7 +59,7 @@ function RouteDoctorPage() {
   );
 
   return (
-    <div className="min-h-screen bg-background px-4 pb-24 pt-6">
+    <div className="min-h-dvh bg-background px-4 pb-24 pt-6">
       <div className="mx-auto w-full max-w-2xl">
         <div className="flex items-center gap-2">
           <button

@@ -181,7 +181,7 @@ function OrgPage() {
   }
 
   return (
-    <div className="mx-auto w-full max-w-md sm:max-w-2xl lg:max-w-4xl p-4 pb-40 space-y-6">
+    <div className="page-shell-content pt-4 pb-40 space-y-6">
       <OrgListingHeader
         org={(orgWithContact ?? org) as unknown as OrgListingRow}
         memberCount={members.length}

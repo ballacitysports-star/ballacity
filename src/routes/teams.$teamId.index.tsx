@@ -92,7 +92,7 @@ export const Route = createFileRoute("/teams/$teamId/")({
   ),
   component: TeamPage,
   errorComponent: () => (
-    <div className="mx-auto w-full max-w-md sm:max-w-2xl lg:max-w-4xl px-6 pt-24 text-center">
+    <div className="page-shell-content pt-24 text-center">
       <p className="text-muted-foreground">Couldn't load this team.</p>
       <Link
         to="/teams"
@@ -103,7 +103,7 @@ export const Route = createFileRoute("/teams/$teamId/")({
     </div>
   ),
   notFoundComponent: () => (
-    <div className="mx-auto w-full max-w-md sm:max-w-2xl lg:max-w-4xl px-6 pt-24 text-center">
+    <div className="page-shell-content pt-24 text-center">
       <p className="text-muted-foreground">Team not found.</p>
       <Link
         to="/teams"
@@ -194,7 +194,7 @@ function TeamPage() {
   const upcomingGames = hideFinishedGames(GAMES.filter((g) => org.upcoming.includes(g.id)));
 
   return (
-    <div className="mx-auto w-full max-w-md sm:max-w-2xl lg:max-w-4xl pb-32">
+    <div className="page-shell-flush pb-32">
       {/* Cover */}
       <div className="relative h-56">
         <img src={org.cover} alt="" className="h-full w-full object-cover" />
@@ -297,7 +297,7 @@ function TeamPage() {
         />
 
         <div className="mt-3">
-          <h1 className="font-display text-2xl font-bold flex items-center gap-2 leading-tight">
+          <h1 className="page-title flex items-center gap-2">
             {org.name}
             {org.verified && (
               <span className="inline-flex items-center gap-1 rounded-full bg-lime/15 px-2 py-0.5 text-xs font-bold text-lime">

@@ -80,7 +80,7 @@ function PaymentsHub() {
   if (!user) return null;
 
   return (
-    <div className="mx-auto max-w-md px-4 pt-6 pb-24">
+    <div className="page-shell-narrow pt-6 pb-24">
       <div className="flex items-center gap-3 mb-5">
         <Link
           to="/profile"
@@ -89,7 +89,7 @@ function PaymentsHub() {
           <ArrowLeft className="h-5 w-5" />
         </Link>
         <div>
-          <h1 className="font-display text-2xl font-bold">Payments</h1>
+          <h1 className="page-title">Payments</h1>
           <p className="text-xs text-muted-foreground">
             Direct, peer-to-peer. No fees through ballaCity.
           </p>

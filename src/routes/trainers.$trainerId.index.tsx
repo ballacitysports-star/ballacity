@@ -95,7 +95,7 @@ export const Route = createFileRoute("/trainers/$trainerId/")({
   },
   component: TrainerPage,
   errorComponent: () => (
-    <div className="mx-auto w-full max-w-md sm:max-w-2xl lg:max-w-4xl px-6 pt-24 text-center">
+    <div className="page-shell-content pt-24 text-center">
       <p className="text-muted-foreground">Couldn't load this trainer.</p>
       <Link
         to="/trainers"
@@ -106,7 +106,7 @@ export const Route = createFileRoute("/trainers/$trainerId/")({
     </div>
   ),
   notFoundComponent: () => (
-    <div className="mx-auto w-full max-w-md sm:max-w-2xl lg:max-w-4xl px-6 pt-24 text-center">
+    <div className="page-shell-content pt-24 text-center">
       <p className="text-muted-foreground">Trainer not found.</p>
       <Link
         to="/trainers"
@@ -203,9 +203,8 @@ function TrainerPage() {
     return Array.from(set);
   }, [org.sports, org.sessionTypes]);
 
-
   return (
-    <div className="mx-auto w-full max-w-md sm:max-w-2xl lg:max-w-4xl pb-40">
+    <div className="page-shell-flush pb-40">
       {/* Cover */}
       <div className="relative h-56">
         <img src={org.cover} alt="" className="h-full w-full object-cover" />
@@ -316,7 +315,7 @@ function TrainerPage() {
         </div>
 
         <div className="mt-3">
-          <h1 className="font-display text-2xl font-bold flex items-center gap-2 leading-tight">
+          <h1 className="page-title flex items-center gap-2">
             {org.name}
             <span className="inline-flex items-center gap-1 rounded-full bg-lime/15 px-2 py-0.5 text-xs font-bold text-lime">
               <GraduationCap className="h-3 w-3" /> Trainer
@@ -687,7 +686,7 @@ function TrainerPage() {
       {/* Sticky CTA bar */}
       {!canEdit && (
         <div className="fixed inset-x-0 bottom-16 z-30 pointer-events-none px-4">
-          <div className="mx-auto max-w-md sm:max-w-2xl lg:max-w-4xl">
+          <div className="page-shell-flush">
             <div className="pointer-events-auto flex items-center gap-2 rounded-full border border-border bg-background/85 backdrop-blur-xl p-2 shadow-2xl">
               <Link
                 to="/messages"

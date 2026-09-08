@@ -165,6 +165,84 @@ html.light {
   }
 }
 
+/* Buttons: behaviour the app should never have to restate, and never does
+   consistently. 624 of the app's buttons are written as raw <button> rather
+   than the Button primitive, and they are not wrong to be — 348 of them are
+   pill-shaped (rounded-full) and 536 size themselves by padding rather than a
+   fixed height, which is the product's visual identity. Converting them to the
+   primitive would replace that identity wholesale. So the shared rules go
+   here, where they apply to all of them without touching appearance:
+
+   - touch-action stops iOS Safari treating a second tap as a zoom gesture and
+     removes the 300ms click delay that comes with it.
+   - tap-highlight makes the flash on tap consistent between Safari and Chrome
+     rather than Safari's default blue box.
+   - max-width keeps a long label from pushing a button past its container,
+     which is the one thing §11 says a button must never do.
+   - the disabled cursor is otherwise set per-button, or not at all. */
+button,
+[role="button"] {
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  max-width: 100%;
+}
+
+button:disabled,
+[role="button"][aria-disabled="true"] {
+  cursor: not-allowed;
+}
+
+/* One page title for the whole app. 51 routes render an <h1>, between them
+   using more than a dozen different class combinations — text-xl, text-2xl,
+   text-3xl, with and without font-display, leading-tight or font-semibold. The
+   size that dominates is 2xl, which is right on a phone and small on a
+   monitor, so this is the responsive form of it: 2xl up to `sm`, 3xl beyond.
+
+   text-balance and break-words together stop a long team or player name from
+   either overflowing or laddering down one word per line. PageHeader renders
+   this same utility, so the component and a hand-written <h1> cannot drift. */
+@utility page-title {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: var(--text-2xl);
+  line-height: var(--text-2xl--line-height);
+  text-wrap: balance;
+  overflow-wrap: break-word;
+
+  @variant sm {
+    font-size: var(--text-3xl);
+    line-height: var(--text-3xl--line-height);
+  }
+}
+
+/* iOS Safari zooms the whole page when a focused form control's text is
+   under 16px, and does not zoom back out. Every control in the app that uses
+   text-sm or text-xs therefore lurches the layout on tap — sign-up, hosting a
+   game, creating an org, paying. The two shadcn primitives already avoid it
+   with `text-base md:text-sm`; the ~150 controls that set their own size do
+   not.
+
+   Raise exactly those sizes, and only below the md breakpoint, so the seven
+   deliberately large controls (text-xl / text-2xl in the org wizards) and the
+   desktop type scale are untouched. Written unlayered on purpose: Tailwind v4
+   puts utilities in @layer utilities, and an unlayered rule beats any layered
+   one, so this wins without !important. Above md the md: variants apply and
+   this media query does not, so the two never fight.
+
+   Deleting this re-introduces the zoom everywhere at once, which is why
+   page-shell.test.ts asserts it is here. */
+@media (max-width: 767px) {
+  input.text-xs,
+  input.text-sm,
+  textarea.text-xs,
+  textarea.text-sm,
+  select.text-xs,
+  select.text-sm {
+    font-size: 1rem;
+    line-height: 1.5rem;
+  }
+}
+
 /*
  * Page shells — the one set of page containers for the whole app.
  *
@@ -222,6 +300,16 @@ html.light {
    padding here would inset those and double up on everything else.
    Distinct from `full` below: this one is capped but unpadded, that one is
    padded but uncapped. */
+/* A single-column media feed. 29.375rem is Instagram's 470px column, which
+   the highlights feed matches deliberately; snapping it to the next step up
+   would widen the video cards. Unpadded, because the rows inside supply their
+   own px-4 and the cards themselves run edge to edge. */
+@utility page-shell-feed {
+  margin-inline: auto;
+  width: 100%;
+  max-width: min(100%, 29.375rem);
+}
+
 @utility page-shell-flush {
   margin-inline: auto;
   width: 100%;

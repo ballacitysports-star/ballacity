@@ -33,10 +33,10 @@ function BlockedUsersPage() {
   }
 
   return (
-    <div className="min-h-screen bg-background pb-24">
+    <div className="min-h-dvh bg-background pb-24">
       <BackHeader title="Blocked users" fallbackTo="/settings" />
 
-      <main className="mx-auto max-w-xl space-y-4 p-4">
+      <main className="page-shell-narrow space-y-4 py-4">
         <p className="text-sm text-muted-foreground">
           Blocked accounts can't message you, send you invitations or session requests, or
           follow you. You won't see their invites either.

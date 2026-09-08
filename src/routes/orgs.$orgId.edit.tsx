@@ -212,7 +212,7 @@ function EditOrg() {
   }
   if (!isAdmin) {
     return (
-      <div className="mx-auto max-w-md p-8 text-center space-y-3">
+      <div className="page-shell-narrow py-8 text-center space-y-3">
         <ShieldCheck className="mx-auto h-8 w-8 text-muted-foreground" />
         <p className="text-sm text-muted-foreground">Only owners and admins can edit this gym.</p>
         <Link
@@ -252,7 +252,7 @@ function EditOrg() {
   }
 
   return (
-    <div className="mx-auto w-full max-w-md sm:max-w-2xl lg:max-w-5xl p-4 pb-40 space-y-4">
+    <div className="page-shell pt-4 pb-40 space-y-4">
       <div className="flex items-center gap-2">
         <Link
           to="/orgs/$orgId"
@@ -264,7 +264,7 @@ function EditOrg() {
       </div>
 
       <header>
-        <h1 className="font-display text-3xl font-bold">Edit gym.</h1>
+        <h1 className="page-title">Edit gym.</h1>
         <p className="text-sm text-muted-foreground mt-1">Update details, branding, and members.</p>
         <SaveStatus {...autosave} className="mt-2" />
       </header>

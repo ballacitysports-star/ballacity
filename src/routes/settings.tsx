@@ -248,10 +248,10 @@ function SettingsHubPage() {
   ];
 
   return (
-    <div className="min-h-screen bg-background pb-24">
+    <div className="min-h-dvh bg-background pb-24">
       <BackHeader title="Settings" fallbackTo="/profile" />
 
-      <main className="mx-auto max-w-xl pb-4">
+      <main className="page-shell-narrow pb-4">
         <AccountIdentityRow />
 
         <AgeReviewNotice />

@@ -74,7 +74,7 @@ function SuperadminPage() {
     <div className="page-shell min-h-dvh space-y-4 py-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
-          <h1 className="text-2xl font-semibold flex items-center gap-2">
+          <h1 className="page-title flex items-center gap-2">
             Control center
             <Badge variant="destructive">superadmin</Badge>
           </h1>

@@ -9,7 +9,7 @@ import { cn } from "@/lib/utils";
  * size, so the choice stays visible in review instead of buried in a class
  * list.
  */
-export type PageWidth = "narrow" | "prose" | "content" | "flush" | "default" | "full";
+export type PageWidth = "narrow" | "prose" | "content" | "feed" | "flush" | "default" | "full";
 
 /**
  * `default` maps to the original `page-shell` (72rem), so the routes that
@@ -22,6 +22,8 @@ const WIDTH_UTILITY: Record<PageWidth, string> = {
   prose: "page-shell-prose",
   // Feeds, profiles, detail pages, settings — the bulk of the app.
   content: "page-shell-content",
+  // A single-column media feed, edge to edge on a phone.
+  feed: "page-shell-feed",
   // A content column whose children supply their own horizontal padding.
   flush: "page-shell-flush",
   // Dashboards, admin, anything genuinely multi-column.

@@ -90,8 +90,8 @@ function AccountSecurityPage() {
 
   if (!user) {
     return (
-      <div className="mx-auto flex min-h-dvh w-full max-w-md sm:max-w-2xl lg:max-w-4xl flex-col items-center justify-center px-6 text-center">
-        <h1 className="font-display text-2xl font-bold">Sign in required</h1>
+      <div className="page-shell-content flex min-h-dvh flex-col items-center justify-center text-center">
+        <h1 className="page-title">Sign in required</h1>
         <p className="mt-2 text-sm text-muted-foreground">
           Sign in with Google first, then come back here to add an email password.
         </p>
@@ -106,7 +106,7 @@ function AccountSecurityPage() {
   }
 
   return (
-    <div className="mx-auto w-full max-w-md sm:max-w-2xl lg:max-w-4xl min-h-screen flex flex-col pb-12">
+    <div className="page-shell-content min-h-dvh flex flex-col pb-12">
       <BackHeader title="Account security" fallbackTo="/profile" />
 
       <div className="px-4 mt-4 space-y-5">

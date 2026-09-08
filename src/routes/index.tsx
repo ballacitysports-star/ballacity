@@ -70,7 +70,7 @@ function Landing() {
     <div className="min-h-dvh">
       {/* Top bar */}
       <header className="sticky top-0 z-30 backdrop-blur-xl bg-background/60 border-b border-border">
-        <div className="mx-auto max-w-6xl flex items-center justify-between px-5 py-3">
+        <div className="page-shell flex items-center justify-between py-3">
           <Logo />
           <nav className="hidden md:flex items-center gap-7 text-sm font-medium text-muted-foreground">
             <a href="#features" className="hover:text-foreground">
@@ -95,7 +95,7 @@ function Landing() {
       {/* Hero */}
       <section className="relative overflow-hidden bg-hero">
         <div className="absolute inset-0 grid-noise opacity-30" />
-        <div className="relative mx-auto max-w-6xl px-5 pt-12 pb-20 md:pt-20 md:pb-32 grid md:grid-cols-2 gap-10 items-center">
+        <div className="relative page-shell pt-12 pb-20 md:pt-20 md:pb-32 grid md:grid-cols-2 gap-10 items-center">
           <div>
             <div
               className="enter-up inline-flex items-center gap-2 rounded-full border border-lime/30 bg-lime/10 px-3 py-1 text-xs font-semibold text-lime"
@@ -208,7 +208,7 @@ function Landing() {
       </section>
 
       {/* Sports */}
-      <section id="sports" className="mx-auto max-w-6xl px-5 py-16">
+      <section id="sports" className="page-shell py-16">
         <div className="flex items-end justify-between gap-4 mb-6">
           <div>
             <h2 className="font-display text-3xl md:text-4xl font-bold">Every sport. One app.</h2>
@@ -235,7 +235,7 @@ function Landing() {
       </section>
 
       {/* Features */}
-      <section id="features" className="mx-auto max-w-6xl px-5 py-16">
+      <section id="features" className="page-shell py-16">
         <h2 className="font-display text-3xl md:text-4xl font-bold mb-10">
           Built for players, not paperwork.
         </h2>
@@ -299,7 +299,7 @@ function Landing() {
       </section>
 
       {/* Trending */}
-      <section id="trending" className="mx-auto max-w-6xl px-5 py-16">
+      <section id="trending" className="page-shell py-16">
         <div className="flex items-end justify-between mb-6">
           <h2 className="font-display text-3xl md:text-4xl font-bold">Trending near you</h2>
           <Link
@@ -333,7 +333,7 @@ function Landing() {
 
       {/* CTA */}
 
-      <section className="mx-auto max-w-6xl px-5 pb-24">
+      <section className="page-shell pb-24">
         <div className="relative overflow-hidden rounded-[2rem] border border-border bg-surface p-10 md:p-16 text-center">
           <div className="absolute inset-0 bg-hero opacity-60" />
           <div className="relative">
@@ -354,7 +354,7 @@ function Landing() {
       </section>
 
       <footer className="border-t border-border">
-        <div className="mx-auto max-w-6xl px-5 py-8 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-muted-foreground">
+        <div className="page-shell py-8 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-muted-foreground">
           <Logo size={22} />
           <nav className="flex flex-wrap items-center justify-center gap-x-4 gap-y-2">
             <Link to="/terms" className="hover:text-foreground">

@@ -54,8 +54,19 @@ jobs:
       - name: Install Playwright browsers
         run: bunx playwright install --with-deps chromium
 
+      # Node's default old-space limit is sized from the machine's memory, and
+      # on a GitHub runner that lands around 2 GB. The bundle outgrew it — every
+      # E2E run since #50 died here with "Reached heap limit ... JavaScript heap
+      # out of memory" and SIGABRT (exit 134), before a single test ran, on main
+      # and on pull requests alike.
+      #
+      # Reproduced locally by capping the heap at the same 2 GB, which fails
+      # identically, and confirmed fixed at 4096. Runners have 16 GB, so this is
+      # comfortable rather than generous.
       - name: Build (dev mode)
         run: bun run build:dev
+        env:
+          NODE_OPTIONS: --max-old-space-size=4096
 
       - name: Start dev server
         run: |

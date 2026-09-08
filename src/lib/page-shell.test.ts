@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { pageContainerClasses, type PageWidth } from "@/lib/page-shell";
 
@@ -30,6 +30,7 @@ const SHELLS = [
   "page-shell-narrow",
   "page-shell-prose",
   "page-shell-content",
+  "page-shell-feed",
   "page-shell-flush",
   "page-shell",
   "page-shell-full",
@@ -49,14 +50,22 @@ describe("page shell utilities", () => {
 
   it("gutters content away from the screen edge", () => {
     for (const name of SHELLS) {
-      // `flush` is the deliberate exception: its children own the padding.
-      if (name === "page-shell-flush") continue;
+      // `flush` and `feed` are the deliberate exceptions: their children own
+      // the padding, and a media feed runs edge to edge on a phone.
+      if (name === "page-shell-flush" || name === "page-shell-feed") continue;
       expect(shell(name), name).toMatch(/padding-inline:\s*clamp\(/);
     }
   });
 
   it("leaves the flush shell unpadded, since its children pad themselves", () => {
     expect(shell("page-shell-flush")).not.toMatch(/padding-inline/);
+  });
+
+  it("leaves the feed shell unpadded and at the media-column width", () => {
+    // 29.375rem is 470px — the highlights feed's column. Snapping it to the
+    // next step up would widen every video card on the page.
+    expect(shell("page-shell-feed")).not.toMatch(/padding-inline/);
+    expect(capRem("page-shell-feed")).toBe(29.375);
   });
 
   it("still caps the flush shell, so it cannot run the full width of a monitor", () => {
@@ -133,5 +142,123 @@ describe("pageContainerClasses", () => {
         .filter((c) => c.startsWith("page-shell"));
       expect(shells, width).toHaveLength(1);
     }
+  });
+});
+
+/**
+ * iOS Safari zooms the page when a focused input's text is under 16px, and
+ * never zooms back. Around 150 controls across the app set text-sm or text-xs
+ * themselves, so without this rule tapping almost any field — signing up,
+ * hosting a game, paying — shifts the whole layout under the user.
+ *
+ * It is one CSS rule standing in for ~150 call sites, which makes it easy to
+ * delete by accident and hard to notice missing, so it is pinned here.
+ */
+describe("form controls do not trigger iOS zoom", () => {
+  const rule = CSS.match(/@media \(max-width: 767px\) \{([\s\S]*?)\n\}/);
+
+  it("raises small controls to 16px below the md breakpoint", () => {
+    expect(rule, "the mobile form-control rule is missing from styles.css").not.toBeNull();
+    expect(rule![1]).toMatch(/font-size:\s*1rem/);
+  });
+
+  it("covers every control type at both small sizes", () => {
+    for (const el of ["input", "textarea", "select"]) {
+      for (const size of ["text-xs", "text-sm"]) {
+        expect(rule![1], `${el}.${size}`).toContain(`${el}.${size}`);
+      }
+    }
+  });
+
+  it("stays scoped to the small sizes so larger controls keep their size", () => {
+    // The org wizards use text-xl and text-2xl inputs deliberately; a blanket
+    // `input { font-size: 1rem }` would shrink them.
+    expect(rule![1]).not.toMatch(/(?:^|,)\s*(?:input|textarea|select)\s*\{/);
+    expect(rule![1]).not.toMatch(/text-(?:base|lg|xl)/);
+  });
+});
+
+/**
+ * `min-h-screen` is `100vh`, and on mobile browsers `vh` is the *largest*
+ * viewport height — the one you get with the URL bar hidden. A page sized that
+ * way is taller than the space actually visible while the bar is showing, so
+ * its bottom sits under the browser chrome and the page gains a scroll it
+ * should not have. `dvh` tracks the viewport as the bar shows and hides.
+ *
+ * The app was split: 39 places used min-h-dvh and 10 still used min-h-screen,
+ * including the auth screen, settings, and the root error boundary.
+ */
+describe("full-height pages use the dynamic viewport", () => {
+  const ROOT = new URL("../", import.meta.url);
+
+  function sourcesUsing(pattern: RegExp): string[] {
+    const hits: string[] = [];
+    const walk = (dir: URL) => {
+      for (const entry of readdirSync(dir, { withFileTypes: true })) {
+        const child = new URL(entry.name + (entry.isDirectory() ? "/" : ""), dir);
+        if (entry.isDirectory()) walk(child);
+        else if (entry.name.endsWith(".tsx") && pattern.test(readFileSync(child, "utf8"))) {
+          hits.push(entry.name);
+        }
+      }
+    };
+    walk(ROOT);
+    return hits.sort();
+  }
+
+  it("uses no min-h-screen anywhere", () => {
+    expect(sourcesUsing(/\bmin-h-screen\b/)).toEqual([]);
+  });
+
+  it("still has full-height pages, so the check above is not vacuous", () => {
+    expect(sourcesUsing(/\bmin-h-dvh\b/).length).toBeGreaterThan(20);
+  });
+});
+
+/**
+ * One page title, and shared button behaviour.
+ *
+ * 51 routes render an <h1>, between them using more than a dozen class
+ * combinations for what is the same thing. `page-title` is the single
+ * definition, and PageHeader renders it too so the component and a plain <h1>
+ * cannot drift.
+ *
+ * The button rules are deliberately behavioural rather than visual: 624 of the
+ * app's buttons are raw <button>, 348 of them pill-shaped and 536 sized by
+ * padding rather than a height. That is the product's identity, so it is left
+ * alone and only the things every button should agree on are set globally.
+ */
+describe("shared title and button rules", () => {
+  it("defines one responsive page title", () => {
+    const body = CSS.match(/@utility page-title \{([\s\S]*?)\n\}/)?.[1];
+    expect(body, "page-title utility missing from styles.css").toBeTruthy();
+    // 2xl on a phone, 3xl from sm up — the dominant size, made responsive.
+    expect(body!).toMatch(/--text-2xl/);
+    expect(body!).toMatch(/@variant sm/);
+    expect(body!).toMatch(/--text-3xl/);
+    // A long team or player name must not overflow, nor ladder one word a line.
+    expect(body!).toMatch(/text-wrap:\s*balance/);
+    expect(body!).toMatch(/overflow-wrap:\s*break-word/);
+  });
+
+  it("has PageHeader render that same utility rather than its own copy", () => {
+    const src = readFileSync(
+      new URL("../components/layout/PageHeader.tsx", import.meta.url),
+      "utf8",
+    );
+    expect(src).toMatch(/className="page-title"/);
+    expect(src, "PageHeader should not restate the type scale").not.toMatch(
+      /text-2xl[^"]*sm:text-3xl/,
+    );
+  });
+
+  it("stops any button overflowing its container", () => {
+    expect(CSS).toMatch(/max-width:\s*100%/);
+    expect(CSS).toMatch(/\[role="button"\]/);
+  });
+
+  it("removes the iOS double-tap zoom and tap delay on buttons", () => {
+    // touch-action: manipulation is the Safari-specific half of this.
+    expect(CSS).toMatch(/touch-action:\s*manipulation/);
   });
 });

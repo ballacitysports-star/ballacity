@@ -66,16 +66,12 @@ function ChildOnboardingPage() {
   };
 
   return (
-    <main className="mx-auto w-full max-w-lg px-4 py-6 pb-24">
+    <main className="page-shell-narrow pt-6 pb-24">
       <div className="flex items-center gap-2 text-primary">
         <ShieldCheck className="h-5 w-5" aria-hidden />
-        <span className="text-xs font-bold uppercase tracking-wide">
-          Guardian approval needed
-        </span>
+        <span className="text-xs font-bold uppercase tracking-wide">Guardian approval needed</span>
       </div>
-      <h1 className="mt-2 font-display text-2xl font-bold">
-        A parent or guardian approves this account
-      </h1>
+      <h1 className="mt-2 page-title">A parent or guardian approves this account</h1>
       <p className="mt-2 text-sm text-muted-foreground">
         ballaCity requires a parent or guardian to approve accounts for members under{" "}
         {policy.parentalConsentMaxAge + 1}. Until they do, we keep things switched off — no
@@ -252,7 +248,9 @@ function ChildOnboardingPage() {
         </>
       )}
 
-      <p className="mt-6 text-[11px] leading-relaxed text-muted-foreground">{CHILD_POLICY_DISCLAIMER}</p>
+      <p className="mt-6 text-[11px] leading-relaxed text-muted-foreground">
+        {CHILD_POLICY_DISCLAIMER}
+      </p>
       <div className="mt-3 flex flex-wrap gap-3 text-xs">
         <Link to="/safety/children" className="font-semibold text-primary underline">
           Child &amp; teen safety

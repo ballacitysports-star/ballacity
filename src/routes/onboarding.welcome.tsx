@@ -472,7 +472,7 @@ function OnboardingWizard({ type }: { type: AccountType }) {
   const pct = Math.round(((step + 1) / stepLabels.length) * 100);
 
   return (
-    <div className="mx-auto flex min-h-dvh w-full max-w-md flex-col px-4 py-8">
+    <div className="page-shell-narrow flex min-h-dvh flex-col py-8">
       <div>
         <div className="font-display text-2xl font-bold">Set up your profile</div>
         <p className="mt-1 text-sm text-muted-foreground">

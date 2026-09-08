@@ -20,7 +20,7 @@ function NotificationsPage() {
   const { user, loading } = useAuth();
 
   return (
-    <div className="mx-auto max-w-md px-4 pt-6 pb-32">
+    <div className="page-shell-narrow pt-6 pb-32">
       <div className="mb-5 flex items-center gap-3">
         <Link
           to="/feed"
@@ -28,7 +28,7 @@ function NotificationsPage() {
         >
           <ArrowLeft className="h-5 w-5" />
         </Link>
-        <h1 className="flex-1 font-display text-2xl font-bold">Notifications</h1>
+        <h1 className="flex-1 page-title">Notifications</h1>
         {/* The inbox has no bottom-nav tab of its own, so Activity is the one
             reliable entry point into it. */}
         <Link
@@ -40,7 +40,6 @@ function NotificationsPage() {
           Inbox
         </Link>
       </div>
-
 
       {loading ? (
         <div className="text-sm text-muted-foreground">Loading…</div>

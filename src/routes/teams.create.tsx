@@ -23,7 +23,7 @@ function CreateTeamPage() {
   return (
     <AccountTypeGate requires="team">
       {finish ? (
-        <div className="mx-auto w-full max-w-md p-4 pb-0 sm:max-w-2xl lg:max-w-5xl">
+        <div className="page-shell pt-4 pb-0">
           <FinishSetupNotice kind="team" />
         </div>
       ) : null}

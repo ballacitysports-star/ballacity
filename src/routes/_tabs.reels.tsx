@@ -41,10 +41,7 @@ import {
   suggestGameForReel,
 } from "@/lib/reels.functions";
 import { ReelCoach } from "@/components/reels/ReelCoach";
-import {
-  AiDisclosureDialog,
-  AiDisclosureNotice,
-} from "@/components/reels/AiVideoDisclosure";
+import { AiDisclosureDialog, AiDisclosureNotice } from "@/components/reels/AiVideoDisclosure";
 import { useMyPrivacy } from "@/lib/privacy";
 import { AI_RESULTS_CAVEAT } from "@/lib/ai-video-privacy";
 import { toast } from "sonner";
@@ -303,7 +300,9 @@ function ReelCard({ reel, onRetry }: { reel: Reel; onRetry: (id: string) => Prom
             try {
               await setReelHidden({ data: { reelId: reel.id, hidden: !reel.hidden_at } });
               toast.success(
-                reel.hidden_at ? "Reel is visible on your profile again" : "Reel hidden from your profile",
+                reel.hidden_at
+                  ? "Reel is visible on your profile again"
+                  : "Reel hidden from your profile",
               );
             } catch (e: any) {
               toast.error(e?.message ?? "Could not update this reel");
@@ -462,12 +461,10 @@ function ReelCard({ reel, onRetry }: { reel: Reel; onRetry: (id: string) => Prom
             <Eye className="h-3.5 w-3.5" />
             {showInsights ? "Hide what the AI saw" : "What the AI saw"}
           </button>
-           {showInsights && (
-             <div className="mt-2 rounded-xl border border-border bg-background/60 p-3">
-               <p className="mb-2 text-[10px] italic text-muted-foreground">
-                 {AI_RESULTS_CAVEAT}
-               </p>
-               {reel.ai_sport && (
+          {showInsights && (
+            <div className="mt-2 rounded-xl border border-border bg-background/60 p-3">
+              <p className="mb-2 text-[10px] italic text-muted-foreground">{AI_RESULTS_CAVEAT}</p>
+              {reel.ai_sport && (
                 <p className="text-[10px] font-bold uppercase tracking-wider text-lime">
                   {reel.ai_sport}
                 </p>
@@ -545,8 +542,8 @@ function ReelCard({ reel, onRetry }: { reel: Reel; onRetry: (id: string) => Prom
                 Regenerate with this style
               </button>
               <p className="mt-1 text-[10px] text-muted-foreground">
-                Reuses the captured footage analysis — only the title, caption, timeline,
-                edit plan, coaching, and overlays are rewritten in the new style.
+                Reuses the captured footage analysis — only the title, caption, timeline, edit plan,
+                coaching, and overlays are rewritten in the new style.
               </p>
             </div>
           )}
@@ -583,9 +580,12 @@ function ReelsPage() {
   /** Athlete-chosen name for the next upload (e.g. "Sunday soccer hat trick"). */
   const [titleDraft, setTitleDraft] = useState("");
   /** Best-guess game for an upload started outside a game screen. */
-  const [autoGame, setAutoGame] = useState<
-    { id: string; title: string; sport: string | null; date: string | null } | null
-  >(null);
+  const [autoGame, setAutoGame] = useState<{
+    id: string;
+    title: string;
+    sport: string | null;
+    date: string | null;
+  } | null>(null);
   const [autoLink, setAutoLink] = useState(true);
   // Sport context for style defaults: the game's sport when uploading from a
   // game, otherwise the athlete's first profile sport.
@@ -647,7 +647,6 @@ function ReelsPage() {
   const sweptRef = useRef(false);
   const gameReels = gameId ? reels.filter((r) => r.game_id === gameId) : [];
   const visibleReels = gameId ? gameReels : reels;
-
 
   const canGenerate = isActive || freeRemaining > 0;
   const lockedReason = !user
@@ -734,7 +733,6 @@ function ReelsPage() {
     return () => clearInterval(id);
   }, [user, hasWorkInFlight, busy]);
 
-
   /**
    * Nothing is uploaded until the AI disclosure has been seen and accepted at
    * least once; after that the short notice on the page carries the reminder.
@@ -770,14 +768,11 @@ function ReelsPage() {
   // Sweep anything abandoned mid-flight (tab closed, cold error) once per visit.
   useEffect(() => {
     if (!user || sweptRef.current) return;
-    const stuck = reels.some(
-      (r) => r.status === "processing" && r.processing_step !== "completed",
-    );
+    const stuck = reels.some((r) => r.status === "processing" && r.processing_step !== "completed");
     if (!stuck) return;
     sweptRef.current = true;
     void processMyReels({ data: {} }).catch(() => {});
   }, [user, reels]);
-
 
   /** Runs the pipeline for the caller's queued reels; failures stay non-fatal. */
   async function kickOffProcessing(reelId?: string) {
@@ -845,8 +840,6 @@ function ReelsPage() {
           );
       }
 
-
-
       // Sample frames + audio in the browser: they become the real thumbnail and
       // the input the sports AI agent watches/listens to (the server can't run ffmpeg).
       const framePaths: string[] = [];
@@ -900,7 +893,6 @@ function ReelsPage() {
           frame_times: frameTimes.length > 0 ? frameTimes : null,
           audio_path: audioPath,
           style_prefs: styleRef.current,
-
         } as any)
         .select("id")
         .maybeSingle();
@@ -965,7 +957,7 @@ function ReelsPage() {
       <header className="px-5 pt-6 pb-4">
         <div className="flex items-center gap-2">
           <Sparkles className="h-6 w-6 text-lime" />
-          <h1 className="text-2xl font-bold">AI Highlight Reels</h1>
+          <h1 className="page-title">AI Highlight Reels</h1>
         </div>
         <p className="mt-1 text-sm text-muted-foreground">
           Upload a clip and let AI generate your highlight.
@@ -1068,7 +1060,10 @@ function ReelsPage() {
       <section className="mx-5 mb-6">
         {/* Name the highlight before publishing — this is the title shown on the
             public highlight feed and on the player card. */}
-        <label className="mb-1.5 block text-xs font-semibold text-muted-foreground" htmlFor="reel-title">
+        <label
+          className="mb-1.5 block text-xs font-semibold text-muted-foreground"
+          htmlFor="reel-title"
+        >
           Reel title
         </label>
         <input
@@ -1092,7 +1087,9 @@ function ReelsPage() {
               className="mt-0.5 h-4 w-4 accent-lime"
             />
             <span className="min-w-0 flex-1">
-              <span className="block text-xs font-semibold">Link this reel to {autoGame.title}</span>
+              <span className="block text-xs font-semibold">
+                Link this reel to {autoGame.title}
+              </span>
               <span className="block text-[11px] text-muted-foreground">
                 {[
                   autoGame.sport,

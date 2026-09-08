@@ -75,7 +75,8 @@ export const Route = createFileRoute("/_tabs/profile")({
     pageHead({
       path: "/profile",
       title: "Your profile — ballaCity",
-      description: "Your ballaCity profile: sports, skill levels, availability, games, and reviews.",
+      description:
+        "Your ballaCity profile: sports, skill levels, availability, games, and reviews.",
       noindex: true,
     }),
   // URL-persisted requests filter (all/host/player).
@@ -91,7 +92,7 @@ function ProfileRoute() {
   const { active, loading } = useMyProfiles();
   if (!loading && active && active.kind !== "player") {
     return (
-      <div className="mx-auto w-full max-w-md sm:max-w-2xl lg:max-w-4xl">
+      <div className="page-shell-flush">
         <div className="flex items-center justify-between gap-2 px-4 pt-3">
           <ProfileSwitcher />
         </div>
@@ -373,11 +374,11 @@ function PlayerProfile() {
   if (loading) return null;
   if (!profileUser || !me) {
     return (
-      <div className="mx-auto flex min-h-dvh w-full max-w-md sm:max-w-2xl lg:max-w-4xl flex-col items-center justify-center px-6 pb-28 text-center">
+      <div className="page-shell-content flex min-h-dvh flex-col items-center justify-center pb-28 text-center">
         <div className="grid h-16 w-16 place-items-center rounded-3xl bg-lime-gradient font-display text-xl font-bold text-primary-foreground glow-lime">
           O
         </div>
-        <h1 className="mt-5 font-display text-3xl font-bold">Sign in to view your profile</h1>
+        <h1 className="mt-5 page-title">Sign in to view your profile</h1>
         <p className="mt-2 text-sm text-muted-foreground">
           Your games, reviews, and profile stay private until you sign in.
         </p>
@@ -394,7 +395,7 @@ function PlayerProfile() {
   const age = me.birthday ? ageFrom(me.birthday) : null;
 
   return (
-    <div className="mx-auto w-full max-w-md sm:max-w-2xl lg:max-w-4xl">
+    <div className="page-shell-flush">
       <div className="flex items-center justify-between gap-2 px-4 pt-3">
         <ProfileSwitcher />
       </div>
@@ -494,10 +495,7 @@ function PlayerProfile() {
       </ProfileAboutSheet>
 
       <div className="px-4">
-        <ProfileReelsSection
-          recaps={allRecaps}
-          onChanged={() => setRecapTick((t) => t + 1)}
-        />
+        <ProfileReelsSection recaps={allRecaps} onChanged={() => setRecapTick((t) => t + 1)} />
         <ChannelTabs
           className="mt-5"
           value={activeTab}
@@ -838,7 +836,6 @@ function PlayerProfile() {
             </div>
           )}
         </section>
-
 
         <div className={activeTab === "games" ? "" : "hidden"}>
           <MyWaitlistCard />
@@ -1213,7 +1210,11 @@ function ProfileReelsSection({
             </p>
           </div>
         </div>
-        <Link to="/reels" search={{ game: "", title: "", upload: "" }} className="text-xs font-medium text-lime">
+        <Link
+          to="/reels"
+          search={{ game: "", title: "", upload: "" }}
+          className="text-xs font-medium text-lime"
+        >
           Open Reels
         </Link>
       </div>

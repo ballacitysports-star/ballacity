@@ -44,6 +44,21 @@ const AUTHED_ROUTES = [
   "/create",
   "/settings",
   "/messages",
+  // The account/settings column and the other single-column screens, all now
+  // on the page-shell scale. Listed so a width regression on any of them is
+  // caught here rather than on someone's phone.
+  "/account/privacy",
+  "/account/notifications",
+  "/account/data",
+  "/account/security",
+  "/account/legal",
+  "/account/blocked",
+  "/account/ai-privacy",
+  "/profile/edit",
+  "/parent",
+  "/payments",
+  "/reviews",
+  "/orgs",
 ];
 
 const SESSION_JSON = process.env.LOVABLE_BROWSER_SUPABASE_SESSION_JSON;
@@ -97,14 +112,40 @@ async function findOverflow(page: Page) {
 
 async function sweep(page: Page, route: string) {
   await page.goto(route, { waitUntil: "domcontentloaded" });
+  // A route that bounces (a guard, a missing account type) would otherwise
+  // measure whatever it landed on and report a confident pass for a page it
+  // never opened. Say so instead of quietly testing the wrong thing.
+  const landed = new URL(page.url()).pathname;
+  if (landed !== route && landed !== `${route}/`) {
+    test.info().annotations.push({
+      type: "redirected",
+      description: `${route} redirected to ${landed}; measuring that instead.`,
+    });
+  }
   // Let the app mount so the real layout is measured, not the loading shell.
-  await page
+  //
+  // This used to swallow the timeout, on the reasoning that a route which
+  // never sets the flag is still worth measuring. It is not: a page whose
+  // client never hydrated has almost no content, and an empty page cannot
+  // overflow, so scrollWidth === clientWidth at every width and the sweep
+  // reports a confident pass for a page that never rendered. Observed for
+  // real — a stale Vite dep cache stopped the client booting, and every
+  // route still "passed". A failure to boot has to fail the test, or this
+  // whole spec quietly becomes a no-op the day the app stops loading.
+  const booted = await page
     .waitForFunction(() => (window as { __openrun_booted?: boolean }).__openrun_booted === true, {
       timeout: 20_000,
     })
-    .catch(() => {
-      // A route that never sets the flag is still worth measuring.
-    });
+    .then(() => true)
+    .catch(() => false);
+  if (!booted) {
+    const text = (await page.evaluate(() => document.body.innerText || "")).trim();
+    expect(
+      booted,
+      `${route} never finished booting, so there is nothing to measure. ` +
+        `Body text was ${text.length} chars: ${JSON.stringify(text.slice(0, 200))}`,
+    ).toBe(true);
+  }
 
   const failures: string[] = [];
   for (const width of WIDTHS) {

@@ -53,11 +53,14 @@ function AdminChildSafetyPage() {
   if (query.isError) {
     return (
       <main className="page-shell py-10">
-        <h1 className="font-display text-xl font-bold">Not authorized</h1>
+        <h1 className="page-title">Not authorized</h1>
         <p className="mt-2 text-sm text-muted-foreground">
           This page is restricted to moderators and administrators.
         </p>
-        <Link to="/admin" className="mt-4 inline-block text-sm font-semibold text-primary underline">
+        <Link
+          to="/admin"
+          className="mt-4 inline-block text-sm font-semibold text-primary underline"
+        >
           Back to admin
         </Link>
       </main>
@@ -75,7 +78,7 @@ function AdminChildSafetyPage() {
         <ShieldAlert className="h-5 w-5" aria-hidden />
         <span className="text-xs font-bold uppercase tracking-wide">Child safety</span>
       </div>
-      <h1 className="mt-1 font-display text-2xl font-bold">Consent, age reviews &amp; guardian requests</h1>
+      <h1 className="mt-1 page-title">Consent, age reviews &amp; guardian requests</h1>
 
       {query.isLoading || !data ? (
         <p className="mt-6 text-sm text-muted-foreground">Loading…</p>
@@ -151,7 +154,10 @@ function AdminChildSafetyPage() {
             ) : (
               <ul className="mt-2 space-y-2">
                 {data.openRequests.map((r) => (
-                  <li key={r.id} className="rounded-xl border border-border bg-background p-2 text-xs">
+                  <li
+                    key={r.id}
+                    className="rounded-xl border border-border bg-background p-2 text-xs"
+                  >
                     <div className="flex items-center justify-between gap-2">
                       <span className="font-semibold capitalize">{r.kind.replace("_", " ")}</span>
                       <span className="text-muted-foreground">{r.status}</span>

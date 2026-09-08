@@ -452,8 +452,36 @@ export async function markConversationRead(convId: string): Promise<boolean> {
 }
 
 export async function unsendMessage(messageId: string) {
+  // Read the attachment before the RPC nulls the reference, or the file is
+  // stranded: unsend_message clears attachment_path and sets deleted_at, but
+  // nothing ever removed the object from the bucket. The row stopped pointing
+  // at it while the file itself stayed readable to every participant of that
+  // conversation for as long as the bucket lived — and any signed URL already
+  // handed out kept working regardless. "Unsend" has to mean the file is gone.
+  const { data: row } = await supabase
+    .from("messages")
+    .select("attachment_path")
+    .eq("id", messageId)
+    .maybeSingle();
+
   const { error } = await supabase.rpc("unsend_message" as any, { _id: messageId });
   if (error) throw error;
+
+  const path = (row as { attachment_path?: string | null } | null)?.attachment_path;
+  if (path) {
+    // The bucket's DELETE policy allows the sender only, which is exactly who
+    // can reach this. Non-fatal: the message is already unsent either way, and
+    // failing here should not make the caller think it wasn't.
+    const { error: removeError } = await supabase.storage
+      .from("message-attachments")
+      .remove([path]);
+    if (removeError) {
+      console.error("[messages] attachment left in storage after unsend", {
+        messageId,
+        removeError,
+      });
+    }
+  }
 }
 
 export async function acceptConversation(convId: string) {

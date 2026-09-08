@@ -47,7 +47,7 @@ function LegalSettingsPage() {
     <div className="min-h-dvh bg-background pb-24">
       <BackHeader title="Legal & Privacy" fallbackTo="/settings" />
 
-      <main className="mx-auto max-w-xl space-y-4 px-4 py-4">
+      <main className="page-shell-narrow space-y-4 py-4">
         <LegalReviewBanner />
 
         <section className="space-y-2">

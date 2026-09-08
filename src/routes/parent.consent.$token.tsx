@@ -125,14 +125,14 @@ function ConsentApprovalPage() {
   };
 
   return (
-    <main className="mx-auto w-full max-w-lg px-4 py-6 pb-24">
+    <main className="page-shell-narrow pt-6 pb-24">
       <div className="flex items-center gap-2 text-primary">
         <ShieldCheck className="h-5 w-5" aria-hidden />
         <span className="text-xs font-bold uppercase tracking-wide">
           Parent / guardian approval
         </span>
       </div>
-      <h1 className="mt-2 font-display text-2xl font-bold">
+      <h1 className="mt-2 page-title">
         Approve {info?.childDisplayName ?? "a child"}&rsquo;s ballaCity account
       </h1>
 

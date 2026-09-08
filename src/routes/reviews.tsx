@@ -19,7 +19,8 @@ export const Route = createFileRoute("/reviews")({
   head: () =>
     pageHead({
       title: "Reviews & reputation — ballaCity",
-      description: "Read and manage reviews for players, teams, trainers, and gyms across ballaCity.",
+      description:
+        "Read and manage reviews for players, teams, trainers, and gyms across ballaCity.",
       noindex: true,
     }),
   // URL-persisted filter + sort so refresh/share preserves the view.
@@ -125,10 +126,10 @@ function ReviewsDashboard() {
   }, [filtered, sort]);
 
   return (
-    <div className="mx-auto max-w-md px-4 pt-6 pb-32">
+    <div className="page-shell-narrow pt-6 pb-32">
       <div className="flex items-center gap-2 mb-1">
         <Trophy className="h-5 w-5 text-lime" />
-        <h1 className="font-display text-xl font-bold">Reviews Hub</h1>
+        <h1 className="page-title">Reviews Hub</h1>
       </div>
       <p className="text-sm text-muted-foreground mb-5">
         Trust scores, top strengths, and AI insights for everyone on ballaCity.

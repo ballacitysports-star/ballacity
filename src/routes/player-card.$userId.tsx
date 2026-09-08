@@ -188,7 +188,7 @@ function PlayerCardPage() {
               </div>
             )}
           </div>
-          <h1 className="mt-3 font-display text-2xl font-bold leading-tight">{p.displayName}</h1>
+          <h1 className="mt-3 page-title">{p.displayName}</h1>
           <p className="mt-0.5 flex flex-wrap items-center gap-x-2 text-sm text-muted-foreground">
             {p.username && <span>@{p.username.replace(/^@/, "")}</span>}
             {p.city && (
