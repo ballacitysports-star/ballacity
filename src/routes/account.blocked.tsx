@@ -40,7 +40,7 @@ function BlockedUsersPage() {
         <h1 className="text-lg font-medium">Blocked users</h1>
       </header>
 
-      <main className="mx-auto max-w-xl space-y-4 p-4">
+      <main className="page-shell-narrow space-y-4 py-4">
         <p className="text-sm text-muted-foreground">
           Blocked accounts can't message you, send you invitations or session requests, or
           follow you. You won't see their invites either.

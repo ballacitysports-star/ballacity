@@ -140,7 +140,7 @@ function DataExportPage() {
         <h1 className="text-lg font-medium">Your data</h1>
       </header>
 
-      <main className="mx-auto max-w-xl space-y-6 px-4 py-4">
+      <main className="page-shell-narrow space-y-6 py-4">
         <section className="rounded-2xl border border-border bg-surface p-4">
           <div className="flex items-center gap-2">
             <FileJson className="h-4 w-4 text-lime" aria-hidden />

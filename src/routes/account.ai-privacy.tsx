@@ -202,7 +202,7 @@ function AiVideoPrivacyPage() {
         <h1 className="text-lg font-medium">AI &amp; Video Privacy</h1>
       </header>
 
-      <main className="mx-auto max-w-xl pb-4">
+      <main className="page-shell-narrow pb-4">
         <section className="px-4 pt-4">
           <AiDisclosureBody />
         </section>

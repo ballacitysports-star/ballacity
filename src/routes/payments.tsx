@@ -80,7 +80,7 @@ function PaymentsHub() {
   if (!user) return null;
 
   return (
-    <div className="mx-auto max-w-md px-4 pt-6 pb-24">
+    <div className="page-shell-narrow pt-6 pb-24">
       <div className="flex items-center gap-3 mb-5">
         <Link
           to="/profile"

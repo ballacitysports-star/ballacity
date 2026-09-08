@@ -51,7 +51,7 @@ function LegalSettingsPage() {
         <h1 className="text-lg font-medium">Legal & Privacy</h1>
       </header>
 
-      <main className="mx-auto max-w-xl space-y-4 px-4 py-4">
+      <main className="page-shell-narrow space-y-4 py-4">
         <LegalReviewBanner />
 
         <section className="space-y-2">

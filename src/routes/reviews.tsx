@@ -125,7 +125,7 @@ function ReviewsDashboard() {
   }, [filtered, sort]);
 
   return (
-    <div className="mx-auto max-w-md px-4 pt-6 pb-32">
+    <div className="page-shell-narrow pt-6 pb-32">
       <div className="flex items-center gap-2 mb-1">
         <Trophy className="h-5 w-5 text-lime" />
         <h1 className="font-display text-xl font-bold">Reviews Hub</h1>

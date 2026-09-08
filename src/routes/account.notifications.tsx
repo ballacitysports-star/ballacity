@@ -132,7 +132,7 @@ function NotificationSettingsPage() {
         )}
       </header>
 
-      <main className="mx-auto max-w-xl px-4">
+      <main className="page-shell-narrow">
         <p className="pt-4 text-xs text-muted-foreground">
           Every switch below turns notifications <span className="font-semibold">on</span>. In-app
           alerts appear on your Alerts tab; push alerts go to this device even when ballaCity is

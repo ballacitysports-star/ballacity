@@ -281,7 +281,7 @@ function ParentCenterPage() {
 
   if (!loading && !user) {
     return (
-      <main className="mx-auto w-full max-w-lg px-4 py-10">
+      <main className="page-shell-narrow py-10">
         <h1 className="font-display text-2xl font-bold">Parent Center</h1>
         <p className="mt-2 text-sm text-muted-foreground">
           Sign in with your adult account to manage a child&rsquo;s ballaCity account.
@@ -297,7 +297,7 @@ function ParentCenterPage() {
   }
 
   return (
-    <main className="mx-auto w-full max-w-lg px-4 py-6 pb-24">
+    <main className="page-shell-narrow pt-6 pb-24">
       <div className="flex items-center gap-2 text-primary">
         <ShieldCheck className="h-5 w-5" aria-hidden />
         <span className="text-xs font-bold uppercase tracking-wide">Parent Center</span>

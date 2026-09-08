@@ -105,7 +105,7 @@ function ReviewNew() {
   };
 
   return (
-    <div className="mx-auto max-w-md pb-32">
+    <div className="page-shell-narrow pb-32">
       <header className="sticky top-0 z-10 flex items-center justify-between gap-2 bg-background/80 px-4 py-3 backdrop-blur">
         <button
           onClick={back}

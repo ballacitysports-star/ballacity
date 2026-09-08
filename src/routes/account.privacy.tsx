@@ -114,7 +114,7 @@ function PrivacySettingsPage() {
         <h1 className="text-lg font-medium">Privacy</h1>
       </header>
 
-      <main className="mx-auto max-w-xl pb-4">
+      <main className="page-shell-narrow pb-4">
         <p className="px-4 pt-4 text-xs text-muted-foreground">
           ballaCity never shares your live position or a street address. Availability locations are
           stored as an approximate area only.

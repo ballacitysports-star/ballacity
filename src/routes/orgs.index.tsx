@@ -25,7 +25,7 @@ function OrgsIndex() {
   const rows = data ?? [];
 
   return (
-    <div className="mx-auto w-full max-w-md sm:max-w-2xl lg:max-w-4xl p-4 pb-40 space-y-4">
+    <div className="page-shell-content pt-4 pb-40 space-y-4">
       <header className="flex items-start justify-between gap-3">
         <div>
           <h1 className="font-display text-3xl font-bold leading-tight">Gyms.</h1>
