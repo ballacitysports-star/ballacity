@@ -1,5 +1,5 @@
 import { Link } from "@tanstack/react-router";
-import { ArrowLeft } from "lucide-react";
+import { BackHeader } from "@/components/layout/BackHeader";
 
 /**
  * The header every legal page wears, and the fallback shown when one cannot
@@ -14,14 +14,7 @@ import { ArrowLeft } from "lucide-react";
  */
 
 export function LegalPageHeader({ title }: { title: string }) {
-  return (
-    <header className="sticky top-0 z-10 flex items-center gap-3 border-b border-border bg-background/95 px-2 py-2.5 backdrop-blur">
-      <Link to="/" className="rounded-full p-2 hover:bg-surface" aria-label="Back">
-        <ArrowLeft className="h-5 w-5" />
-      </Link>
-      <span className="text-sm font-medium">{title}</span>
-    </header>
-  );
+  return <BackHeader title={title} />;
 }
 
 /**
