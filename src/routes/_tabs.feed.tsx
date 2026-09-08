@@ -571,7 +571,7 @@ function Feed() {
 
   return (
     <div
-      className="relative mx-auto w-full max-w-md sm:max-w-2xl lg:max-w-5xl xl:max-w-6xl px-4 pt-6"
+      className="relative page-shell pt-6"
       style={{
         transform: `translateY(${indicatorOffset}px)`,
         transition: pull === 0 || refreshing ? "transform 200ms ease" : "none",

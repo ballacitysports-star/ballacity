@@ -135,7 +135,7 @@ function FamilyJoinPage() {
 
 function Shell({ children }: { children: React.ReactNode }) {
   return (
-    <div className="mx-auto w-full max-w-md p-4">
+    <div className="page-shell-narrow py-4">
       <div className="rounded-2xl border border-border bg-surface p-5">{children}</div>
     </div>
   );

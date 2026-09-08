@@ -91,7 +91,7 @@ function ProfileRoute() {
   const { active, loading } = useMyProfiles();
   if (!loading && active && active.kind !== "player") {
     return (
-      <div className="mx-auto w-full max-w-md sm:max-w-2xl lg:max-w-4xl">
+      <div className="page-shell-flush">
         <div className="flex items-center justify-between gap-2 px-4 pt-3">
           <ProfileSwitcher />
         </div>
@@ -373,7 +373,7 @@ function PlayerProfile() {
   if (loading) return null;
   if (!profileUser || !me) {
     return (
-      <div className="mx-auto flex min-h-dvh w-full max-w-md sm:max-w-2xl lg:max-w-4xl flex-col items-center justify-center px-6 pb-28 text-center">
+      <div className="page-shell-content flex min-h-dvh flex-col items-center justify-center pb-28 text-center">
         <div className="grid h-16 w-16 place-items-center rounded-3xl bg-lime-gradient font-display text-xl font-bold text-primary-foreground glow-lime">
           O
         </div>
@@ -394,7 +394,7 @@ function PlayerProfile() {
   const age = me.birthday ? ageFrom(me.birthday) : null;
 
   return (
-    <div className="mx-auto w-full max-w-md sm:max-w-2xl lg:max-w-4xl">
+    <div className="page-shell-flush">
       <div className="flex items-center justify-between gap-2 px-4 pt-3">
         <ProfileSwitcher />
       </div>

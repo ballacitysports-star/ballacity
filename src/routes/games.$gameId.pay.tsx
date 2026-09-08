@@ -482,7 +482,7 @@ function PayPage() {
     methods.length > 0;
 
   return (
-    <div className="mx-auto max-w-md px-4 pt-6 pb-32 space-y-4">
+    <div className="page-shell-narrow pt-6 pb-32 space-y-4">
       {/* Header */}
       <div className="flex items-center gap-3">
         <Link

@@ -508,7 +508,7 @@ function PlayersPage() {
 
 
   return (
-    <div className="mx-auto w-full max-w-md sm:max-w-2xl lg:max-w-4xl px-4 pt-6">
+    <div className="page-shell-content pt-6">
       <div className="flex items-center justify-between mb-5">
         <Logo />
         <div className="flex items-center gap-2">

@@ -111,7 +111,7 @@ function SetupPage() {
   };
 
   return (
-    <form onSubmit={submit} className="mx-auto max-w-md px-4 pt-6 pb-24 space-y-5">
+    <form onSubmit={submit} className="page-shell-narrow pt-6 pb-24 space-y-5">
       <div className="flex items-center gap-3">
         <Link
           to="/games/$gameId"

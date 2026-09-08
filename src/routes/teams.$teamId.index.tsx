@@ -92,7 +92,7 @@ export const Route = createFileRoute("/teams/$teamId/")({
   ),
   component: TeamPage,
   errorComponent: () => (
-    <div className="mx-auto w-full max-w-md sm:max-w-2xl lg:max-w-4xl px-6 pt-24 text-center">
+    <div className="page-shell-content pt-24 text-center">
       <p className="text-muted-foreground">Couldn't load this team.</p>
       <Link
         to="/teams"
@@ -103,7 +103,7 @@ export const Route = createFileRoute("/teams/$teamId/")({
     </div>
   ),
   notFoundComponent: () => (
-    <div className="mx-auto w-full max-w-md sm:max-w-2xl lg:max-w-4xl px-6 pt-24 text-center">
+    <div className="page-shell-content pt-24 text-center">
       <p className="text-muted-foreground">Team not found.</p>
       <Link
         to="/teams"
@@ -194,7 +194,7 @@ function TeamPage() {
   const upcomingGames = hideFinishedGames(GAMES.filter((g) => org.upcoming.includes(g.id)));
 
   return (
-    <div className="mx-auto w-full max-w-md sm:max-w-2xl lg:max-w-4xl pb-32">
+    <div className="page-shell-flush pb-32">
       {/* Cover */}
       <div className="relative h-56">
         <img src={org.cover} alt="" className="h-full w-full object-cover" />

@@ -127,7 +127,7 @@ function MembersPage() {
   }
   if (!isAdmin) {
     return (
-      <div className="mx-auto max-w-md p-8 text-center space-y-3">
+      <div className="page-shell-narrow py-8 text-center space-y-3">
         <Shield className="mx-auto h-8 w-8 text-muted-foreground" />
         <p className="text-sm text-muted-foreground">Only owners and admins can manage members.</p>
         <Link
@@ -196,7 +196,7 @@ function MembersPage() {
   }
 
   return (
-    <div className="mx-auto w-full max-w-md sm:max-w-2xl p-4 pb-24 space-y-5">
+    <div className="page-shell-prose pt-4 pb-24 space-y-5">
       <div className="flex items-center gap-2">
         <Link
           to="/orgs/$orgId"

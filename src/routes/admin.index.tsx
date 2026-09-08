@@ -98,7 +98,7 @@ function AdminPage() {
   if (!data?.isAdmin) return null;
 
   return (
-    <div className="min-h-dvh max-w-6xl mx-auto p-4 sm:p-6 space-y-4">
+    <div className="page-shell min-h-dvh py-4 sm:py-6 space-y-4">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-semibold">Admin Panel</h1>

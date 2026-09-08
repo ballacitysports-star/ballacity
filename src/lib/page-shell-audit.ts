@@ -28,6 +28,36 @@ const WIDTH_TOKEN = /(?:[a-z0-9]+:)?max-w-[a-z0-9-]+/g;
 const PADDING_X = /(?:^|\s)(?:[a-z0-9]+:)?p[xlr]?-\d/;
 
 /**
+ * Elements whose centred width cap is a line-length measure, not a page
+ * container. A centred `<p class="max-w-xl mx-auto">` under a heading is
+ * setting how wide the text reads; wrapping it in a page shell would be
+ * wrong, and reporting it as unmigrated work is noise that hides the real
+ * containers.
+ */
+const TEXT_ELEMENTS = new Set([
+  "p",
+  "span",
+  "h1",
+  "h2",
+  "h3",
+  "h4",
+  "h5",
+  "h6",
+  "li",
+  "label",
+  "blockquote",
+  "figcaption",
+]);
+
+/** The tag name of the JSX element a className at `index` belongs to. */
+function owningElement(source: string, index: number): string | null {
+  const open = source.lastIndexOf("<", index);
+  if (open === -1) return null;
+  const name = /^<\s*([A-Za-z][\w.-]*)/.exec(source.slice(open, index));
+  return name ? name[1] : null;
+}
+
+/**
  * A container counts as hand-rolled when it centres itself with `mx-auto` and
  * caps its own width. Using a `page-shell*` utility is the migrated form, so
  * those are not reported even though they also centre and cap.
@@ -38,6 +68,8 @@ export function findAdHocContainers(file: string, source: string): AdHocContaine
     const classes = match[1] ?? match[2] ?? "";
     if (/\bpage-shell(-[a-z]+)?\b/.test(classes)) continue;
     if (!classes.includes("mx-auto")) continue;
+    const element = owningElement(source, match.index ?? 0);
+    if (element && TEXT_ELEMENTS.has(element)) continue;
     const widths = classes.match(WIDTH_TOKEN) ?? [];
     if (widths.length === 0) continue;
     found.push({
