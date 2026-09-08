@@ -2771,7 +2771,15 @@ function GameDetail() {
                   );
                   return;
                 }
-                const hostUid = settings?.host_id;
+                // game_payment_settings is readable only by the host and by
+                // players already linked to the game (approved join request,
+                // payment submission, or participant row). A prospective
+                // player browsing the game matches none of those, so RLS
+                // filters the row out silently and `settings` stays null —
+                // which is exactly the person this button exists for. Fall
+                // back to hosted_games.host_id, which the viewer *can* read,
+                // the way the other nine host_id reads in this file do.
+                const hostUid = settings?.host_id ?? game.hostUserId ?? null;
                 if (!hostUid) {
                   toast.error("This host can't be messaged yet.");
                   return;
