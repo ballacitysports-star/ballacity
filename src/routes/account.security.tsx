@@ -106,16 +106,7 @@ function AccountSecurityPage() {
 
   return (
     <div className="mx-auto w-full max-w-md sm:max-w-2xl lg:max-w-4xl min-h-screen flex flex-col pb-12">
-      <header className="flex items-center gap-2 px-4 py-3">
-        <Link
-          to="/profile"
-          className="grid h-10 w-10 place-items-center rounded-full border border-border bg-surface"
-          aria-label="Back"
-        >
-          <ArrowLeft className="h-4 w-4" />
-        </Link>
-        <h1 className="font-display text-lg font-bold">Account security</h1>
-      </header>
+      <BackHeader title="Account security" fallbackTo="/profile" />
 
       <div className="px-4 mt-4 space-y-5">
         <div className="rounded-2xl border border-border bg-surface p-4">
