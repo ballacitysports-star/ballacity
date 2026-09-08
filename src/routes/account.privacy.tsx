@@ -1,5 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { ArrowLeft, Download, Eye, MapPin, MessageSquare, Sparkles, Trash2 } from "lucide-react";
+import { BackHeader } from "@/components/layout/BackHeader";
+import { Download, Eye, MapPin, MessageSquare, Sparkles, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { useMyAgeCategory } from "@/lib/youth-features";
 import { isMinorCategory } from "@/lib/age-policy";
@@ -107,12 +108,7 @@ function PrivacySettingsPage() {
 
   return (
     <div className="min-h-dvh bg-background pb-24">
-      <header className="sticky top-0 z-10 flex items-center gap-3 border-b border-border bg-background/95 px-2 py-2.5 backdrop-blur">
-        <Link to="/settings" className="rounded-full p-2 hover:bg-surface" aria-label="Back">
-          <ArrowLeft className="h-5 w-5" />
-        </Link>
-        <h1 className="text-lg font-medium">Privacy</h1>
-      </header>
+      <BackHeader title="Privacy" fallbackTo="/settings" />
 
       <main className="mx-auto max-w-xl pb-4">
         <p className="px-4 pt-4 text-xs text-muted-foreground">

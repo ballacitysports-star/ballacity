@@ -1,5 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { ArrowLeft, CheckCircle2, AlertCircle, FileText } from "lucide-react";
+import { BackHeader } from "@/components/layout/BackHeader";
+import { CheckCircle2, AlertCircle, FileText } from "lucide-react";
 import { toast } from "sonner";
 import { useState } from "react";
 import { pageHead } from "@/lib/seo";
@@ -44,12 +45,7 @@ function LegalSettingsPage() {
 
   return (
     <div className="min-h-dvh bg-background pb-24">
-      <header className="sticky top-0 z-10 flex items-center gap-3 border-b border-border bg-background/95 px-2 py-2.5 backdrop-blur">
-        <Link to="/settings" className="rounded-full p-2 hover:bg-surface" aria-label="Back">
-          <ArrowLeft className="h-5 w-5" />
-        </Link>
-        <h1 className="text-lg font-medium">Legal & Privacy</h1>
-      </header>
+      <BackHeader title="Legal & Privacy" fallbackTo="/settings" />
 
       <main className="mx-auto max-w-xl space-y-4 px-4 py-4">
         <LegalReviewBanner />

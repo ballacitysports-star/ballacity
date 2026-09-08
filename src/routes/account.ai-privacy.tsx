@@ -1,7 +1,8 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { BackHeader } from "@/components/layout/BackHeader";
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ArrowLeft, Film, Loader2, Sparkles, Trash2 } from "lucide-react";
+import { Film, Loader2, Sparkles, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { pageHead } from "@/lib/seo";
 import { Switch } from "@/components/ui/switch";
@@ -195,12 +196,7 @@ function AiVideoPrivacyPage() {
 
   return (
     <div className="min-h-dvh bg-background pb-24">
-      <header className="sticky top-0 z-10 flex items-center gap-3 border-b border-border bg-background/95 px-2 py-2.5 backdrop-blur">
-        <Link to="/settings" className="rounded-full p-2 hover:bg-surface" aria-label="Back">
-          <ArrowLeft className="h-5 w-5" />
-        </Link>
-        <h1 className="text-lg font-medium">AI &amp; Video Privacy</h1>
-      </header>
+      <BackHeader title="AI & Video Privacy" fallbackTo="/settings" />
 
       <main className="mx-auto max-w-xl pb-4">
         <section className="px-4 pt-4">

@@ -1,5 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { AlertTriangle, ArrowLeft, Flag, Heart, ShieldAlert, ShieldCheck } from "lucide-react";
+import { AlertTriangle, Flag, Heart, ShieldAlert, ShieldCheck } from "lucide-react";
+import { BackHeader } from "@/components/layout/BackHeader";
 import { PolicyLinks } from "@/components/PolicyLinks";
 import { pageHead } from "@/lib/seo";
 import {
@@ -25,12 +26,7 @@ export const Route = createFileRoute("/safety")({
 function SafetyCenter() {
   return (
     <div className="min-h-dvh bg-background">
-      <header className="sticky top-0 z-10 flex items-center gap-3 border-b border-border bg-background/95 px-2 py-2.5 backdrop-blur">
-        <Link to="/" className="rounded-full p-2 hover:bg-surface" aria-label="Back">
-          <ArrowLeft className="h-5 w-5" />
-        </Link>
-        <span className="text-sm font-medium">Safety Center</span>
-      </header>
+      <BackHeader title="Safety Center" />
 
       <main className="page-shell-prose py-6 pb-28">
         <h1 className="font-display text-2xl font-bold">Safety Center</h1>
