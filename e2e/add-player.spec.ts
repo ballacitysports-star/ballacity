@@ -70,7 +70,10 @@ test("a parent adds a child, who gets no login", async ({ page }) => {
   await page.locator("#first-name").fill(CHILD_FIRST);
   await page.locator("#last-name").fill("Tester");
   await page.locator("#dob").fill("2015-04-02");
-  await page.locator("#sport").selectOption({ label: /Basketball/ });
+  // By value, not label: the option's text is "🏀 Basketball" (the emoji is
+  // part of it) and selectOption matches labels exactly, so a label of
+  // "Basketball" would not match. The value attribute is the bare sport name.
+  await page.locator("#sport").selectOption("Basketball");
 
   await page.getByRole("button", { name: /create player/i }).click();
 

@@ -125,18 +125,26 @@ jobs:
             const out = [];
             const walk = (s) => (s.suites ?? []).forEach(walk) ||
               (s.specs ?? []).forEach((sp) => sp.tests.forEach((t) =>
-                out.push([t.status, sp.title, sp.file])));
+                out.push({ status: t.status, title: sp.title, file: sp.file,
+                  err: (t.results ?? []).map((x) => x.error?.message).find(Boolean) ?? "" })));
             (r.suites ?? []).forEach(walk);
-            const by = (st) => out.filter((o) => o[0] === st).length;
-            const failed = out.filter((o) => o[0] !== "expected" && o[0] !== "skipped");
+            const by = (st) => out.filter((o) => o.status === st).length;
+            const failed = out.filter((o) => o.status !== "expected" && o.status !== "skipped");
             const line = `${failed.length} failed, ${by("expected")} passed, ${by("skipped")} skipped, ${out.length} total`;
             console.log(line);
-            const files = [...new Set(failed.map((f) => f[2]))].sort();
+            const files = [...new Set(failed.map((f) => f.file))].sort();
             console.log(`${files.length} spec files with failures:`);
-            files.forEach((f) => console.log("  " + f));
+            const clean = (e) => e.replace(/\u001b\[[0-9;]*m/g, "").split("\n")[0].slice(0, 160);
+            for (const f of files) {
+              console.log("  " + f);
+              for (const t of failed.filter((x) => x.file === f))
+                console.log(`      ${t.title}\n        ${clean(t.err) || "(no error message)"}`);
+            }
             const sum = process.env.GITHUB_STEP_SUMMARY;
             if (sum) require("fs").appendFileSync(sum,
-              `### E2E\n\n${line}\n\n` + files.map((f) => `- ${f}`).join("\n") + "\n");
+              `### E2E\n\n${line}\n\n` +
+              files.map((f) => `- ${f}\n` + failed.filter((x) => x.file === f)
+                .map((t) => `  - ${t.title} — \`${clean(t.err) || "no message"}\``).join("\n")).join("\n") + "\n");
           '
 
       - name: Stop dev server
