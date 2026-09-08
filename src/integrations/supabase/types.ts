@@ -3309,10 +3309,6 @@ export type Database = {
         Returns: boolean
       }
       calculate_age: { Args: { _dob: string; _now?: string }; Returns: number }
-      can_comment_on_minor_content: {
-        Args: { _commenter: string; _content_owner: string }
-        Returns: boolean
-      }
       can_notify: {
         Args: { _caller: string; _target: string }
         Returns: boolean
@@ -3325,10 +3321,6 @@ export type Database = {
       clear_age_review: {
         Args: { _approve: boolean; _user: string }
         Returns: undefined
-      }
-      comment_subject_owner: {
-        Args: { _subject_id: string; _subject_type: string }
-        Returns: string
       }
       create_direct_conversation: {
         Args: { _game_id?: string; _other_user: string }
@@ -3675,7 +3667,6 @@ export type Database = {
         }[]
       }
       reel_audience: { Args: { _reel_id: string }; Returns: string }
-      reel_publicly_visible: { Args: { _reel_id: string }; Returns: boolean }
       request_birthday_correction: {
         Args: { _evidence?: string; _reason: string; _requested: string }
         Returns: string
@@ -3704,10 +3695,6 @@ export type Database = {
       revoke_parental_consent: {
         Args: { _child: string; _reason: string }
         Returns: undefined
-      }
-      roster_row_visible: {
-        Args: { _member_user_id: string; _team_id: string }
-        Returns: boolean
       }
       set_child_controls: {
         Args: { _child: string; _controls: Json }
