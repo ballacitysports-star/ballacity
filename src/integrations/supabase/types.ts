@@ -3535,6 +3535,16 @@ export type Database = {
           user_id: string
         }[]
       }
+      list_conversation_summaries: {
+        Args: never
+        Returns: {
+          conversation_id: string
+          last_body: string
+          last_created_at: string
+          last_sender_id: string
+          unread: number
+        }[]
+      }
       list_trainer_booked_slots: {
         Args: { _date: string; _trainer_id: string }
         Returns: {
@@ -3560,6 +3570,10 @@ export type Database = {
       minor_messaging_allowed: {
         Args: { _a: string; _b: string }
         Returns: boolean
+      }
+      minor_messaging_block_reason: {
+        Args: { _a: string; _b: string }
+        Returns: string
       }
       minor_time_on_platform: {
         Args: { _days?: number }
