@@ -2031,6 +2031,63 @@ export type Database = {
         }
         Relationships: []
       }
+      player_profiles: {
+        Row: {
+          account_id: string
+          age_cohort: string
+          avatar_initials: string | null
+          avatar_url: string | null
+          bio: string | null
+          created_at: string
+          date_of_birth: string | null
+          display_name: string
+          first_name: string | null
+          id: string
+          last_name: string | null
+          location: string | null
+          primary_sport: string | null
+          slug: string | null
+          updated_at: string
+          user_id: string | null
+        }
+        Insert: {
+          account_id: string
+          age_cohort?: string
+          avatar_initials?: string | null
+          avatar_url?: string | null
+          bio?: string | null
+          created_at?: string
+          date_of_birth?: string | null
+          display_name?: string
+          first_name?: string | null
+          id?: string
+          last_name?: string | null
+          location?: string | null
+          primary_sport?: string | null
+          slug?: string | null
+          updated_at?: string
+          user_id?: string | null
+        }
+        Update: {
+          account_id?: string
+          age_cohort?: string
+          avatar_initials?: string | null
+          avatar_url?: string | null
+          bio?: string | null
+          created_at?: string
+          date_of_birth?: string | null
+          display_name?: string
+          first_name?: string | null
+          id?: string
+          last_name?: string | null
+          location?: string | null
+          primary_sport?: string | null
+          slug?: string | null
+          updated_at?: string
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       post_comments: {
         Row: {
           author_id: string
@@ -3631,6 +3688,7 @@ export type Database = {
         }
         Returns: undefined
       }
+      owns_player_profile: { Args: { _player: string }; Returns: boolean }
       parental_consent_required: { Args: { _cohort: string }; Returns: boolean }
       parental_consent_state: { Args: { _child: string }; Returns: string }
       platform_status: { Args: { _user: string }; Returns: string }
