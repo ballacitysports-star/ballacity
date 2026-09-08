@@ -45,6 +45,35 @@ export default async function globalSetup() {
 
   const player = TEST_ACCOUNTS.find((a) => a.key === "player")!;
 
+  // Everything below — the fixture accounts and the g1/g2 games — is gated on
+  // the service role key. Without it none of it runs, and until now that was
+  // silent: the only warning about seeding lived *inside* the same branch, so
+  // a missing key produced no message at all, just dozens of specs failing
+  // later with "element not found".
+  //
+  // 41 spec files hardcode the ids g1/g2. Verified against the project on
+  // 2026-09-08: hosted_games held only the two real games, so the seed had
+  // never run in CI, where this variable is empty. That is why merging the
+  // seeding change in #6 did not clear the invite/pay cluster — the code it
+  // added sits in this branch and never executed.
+  //
+  // Say so once, loudly, at the top of the run and in the job summary, so the
+  // cause is visible where the failures are read rather than inferred from
+  // them.
+  if (!SUPABASE_SERVICE_ROLE_KEY) {
+    const msg =
+      "SUPABASE_SERVICE_ROLE_KEY is not set. Fixture accounts and the g1/g2 " +
+      "fixture games will NOT be seeded, and the 41 spec files that hardcode " +
+      "those ids will fail with missing-element errors. Set it as a repository " +
+      "secret to fix this class of failure.";
+    console.warn(`\n[e2e global-setup] ${msg}\n`);
+    const summary = process.env.GITHUB_STEP_SUMMARY;
+    if (summary) {
+      const { appendFileSync } = await import("node:fs");
+      appendFileSync(summary, `### E2E setup\n\n> **${msg}**\n\n`);
+    }
+  }
+
   // (2) Best-effort idempotent seed when a service role key is available.
   if (SUPABASE_SERVICE_ROLE_KEY) {
     const admin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
