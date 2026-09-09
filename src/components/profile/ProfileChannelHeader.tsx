@@ -34,6 +34,10 @@ export function ProfileChannelHeader({
   actions?: React.ReactNode;
 }) {
   const parts = meta.filter(Boolean);
+  const [avatarFailed, setAvatarFailed] = React.useState(false);
+  React.useEffect(() => {
+    setAvatarFailed(false);
+  }, [avatarUrl]);
   return (
     <header>
       {/* Banner — full-bleed, 176px tall, heavy fade into the page background */}
@@ -61,8 +65,14 @@ export function ProfileChannelHeader({
       <div className="px-4 pt-4">
         <div className="flex items-start gap-4">
           <div className="grid h-20 w-20 shrink-0 place-items-center overflow-hidden rounded-full bg-surface-2 text-2xl font-bold">
-            {avatarUrl ? (
-              <ResponsiveAvatar src={avatarUrl} size={80} alt={name} className="h-full w-full object-cover" />
+            {avatarUrl && !avatarFailed ? (
+              <ResponsiveAvatar
+                src={avatarUrl}
+                size={80}
+                alt={name}
+                className="h-full w-full object-cover"
+                onLoadError={() => setAvatarFailed(true)}
+              />
             ) : (
               avatarFallback
             )}
