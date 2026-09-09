@@ -109,12 +109,21 @@ test("onboarding asks who the account is for", async ({ page }) => {
   await signInAs(page, "player");
   await page.goto("/onboarding/setup-for", { waitUntil: "domcontentloaded" });
 
+  // The heading and both buttons come from one synchronous render (no async
+  // gating between them in SetupForPage) — they share this timeout because
+  // there is no code reason for the buttons to lag the heading, and a fixed
+  // 5s default here was tighter than the margin already given its sibling
+  // assertion above for no principled reason, just CI-load brittleness.
   await expect(
     page.getByRole("heading", { name: /who are you setting up ballacity for/i }),
   ).toBeVisible({ timeout: 15_000 });
 
-  await expect(page.getByRole("button", { name: /i'm playing$/i })).toBeVisible();
-  await expect(page.getByRole("button", { name: /setting this up for my child/i })).toBeVisible();
+  await expect(page.getByRole("button", { name: /i'm playing$/i })).toBeVisible({
+    timeout: 15_000,
+  });
+  await expect(
+    page.getByRole("button", { name: /setting this up for my child/i }),
+  ).toBeVisible({ timeout: 15_000 });
 
   // Continue stays disabled until a choice is made.
   const cont = page.getByRole("button", { name: /^continue$/i });
