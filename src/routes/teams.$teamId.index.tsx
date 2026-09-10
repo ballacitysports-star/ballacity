@@ -17,6 +17,7 @@ import {
   Share2,
   Plus,
   Pencil,
+  Settings,
 } from "lucide-react";
 import {
   ORGS,
@@ -28,6 +29,7 @@ import {
 } from "@/lib/sample-data";
 import { isMyOrg, ensureOrgById } from "@/lib/org-store";
 import { TeamRosterPanel } from "@/components/team/TeamRosterPanel";
+import { useTeamPermissions } from "@/lib/team-roster";
 import { ProfileShareCard } from "@/components/ProfileShareCard";
 import { PostCard } from "@/components/PostCard";
 import { PostDetailsDialog } from "@/components/PostDetailsDialog";
@@ -155,6 +157,9 @@ function TeamPage() {
 
   useEffect(() => setMounted(true), []);
   const canEdit = mounted && isMyOrg(org.id);
+  // Editing the team row is owner-only in RLS; managing the roster is not.
+  const teamPerms = useTeamPermissions(org.id);
+  const canManage = mounted && teamPerms.canInvite;
 
   const orgReviews = useReviewsFor(org.id);
   const orgKind: "trainer" | "team" = org.kind === "coach" ? "trainer" : "team";
@@ -234,6 +239,16 @@ function TeamPage() {
                 className="rounded-full border border-border bg-surface px-4 py-2.5 text-sm font-bold inline-flex items-center gap-1.5 hover:border-lime/40"
               >
                 <Pencil className="h-3.5 w-3.5" /> Edit
+              </Link>
+            )}
+            {canManage && (
+              <Link
+                to="/teams/$teamId/manage"
+                params={{ teamId: org.id }}
+                data-render="client-only"
+                className="rounded-full border border-border bg-surface px-4 py-2.5 text-sm font-bold inline-flex items-center gap-1.5 hover:border-lime/40"
+              >
+                <Settings className="h-3.5 w-3.5" /> Manage
               </Link>
             )}
             {useCanReview(org.id) && (

@@ -89,6 +89,7 @@ import { Route as OrgsOrgIdMembersRouteImport } from './routes/orgs.$orgId.membe
 import { Route as ParentConsentTokenRouteImport } from './routes/parent.consent.$token'
 import { Route as TeamsTeamIdIndexRouteImport } from './routes/teams.$teamId.index'
 import { Route as TeamsTeamIdEditRouteImport } from './routes/teams.$teamId.edit'
+import { Route as TeamsTeamIdManageRouteImport } from './routes/teams.$teamId.manage'
 import { Route as TrainersTrainerIdIndexRouteImport } from './routes/trainers.$trainerId.index'
 import { Route as TrainersTrainerIdEditRouteImport } from './routes/trainers.$trainerId.edit'
 import { Route as ApiPublicNotificationsFlushRouteImport } from './routes/api/public/notifications/flush'
@@ -499,6 +500,11 @@ const TeamsTeamIdEditRoute = TeamsTeamIdEditRouteImport.update({
   path: '/teams/$teamId/edit',
   getParentRoute: () => rootRouteImport,
 } as any)
+const TeamsTeamIdManageRoute = TeamsTeamIdManageRouteImport.update({
+  id: '/teams/$teamId/manage',
+  path: '/teams/$teamId/manage',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const TrainersTrainerIdIndexRoute = TrainersTrainerIdIndexRouteImport.update({
   id: '/trainers/$trainerId/',
   path: '/trainers/$trainerId/',
@@ -614,6 +620,7 @@ export interface FileRoutesByFullPath {
   '/orgs/$orgId/members': typeof OrgsOrgIdMembersRoute
   '/parent/consent/$token': typeof ParentConsentTokenRoute
   '/teams/$teamId/edit': typeof TeamsTeamIdEditRoute
+  '/teams/$teamId/manage': typeof TeamsTeamIdManageRoute
   '/trainers/$trainerId/edit': typeof TrainersTrainerIdEditRoute
   '/games/$gameId/': typeof GamesGameIdIndexRoute
   '/orgs/$orgId/': typeof OrgsOrgIdIndexRoute
@@ -701,6 +708,7 @@ export interface FileRoutesByTo {
   '/orgs/$orgId/members': typeof OrgsOrgIdMembersRoute
   '/parent/consent/$token': typeof ParentConsentTokenRoute
   '/teams/$teamId/edit': typeof TeamsTeamIdEditRoute
+  '/teams/$teamId/manage': typeof TeamsTeamIdManageRoute
   '/trainers/$trainerId/edit': typeof TrainersTrainerIdEditRoute
   '/games/$gameId': typeof GamesGameIdIndexRoute
   '/orgs/$orgId': typeof OrgsOrgIdIndexRoute
@@ -791,6 +799,7 @@ export interface FileRoutesById {
   '/orgs/$orgId/members': typeof OrgsOrgIdMembersRoute
   '/parent/consent/$token': typeof ParentConsentTokenRoute
   '/teams/$teamId/edit': typeof TeamsTeamIdEditRoute
+  '/teams/$teamId/manage': typeof TeamsTeamIdManageRoute
   '/trainers/$trainerId/edit': typeof TrainersTrainerIdEditRoute
   '/games/$gameId/': typeof GamesGameIdIndexRoute
   '/orgs/$orgId/': typeof OrgsOrgIdIndexRoute
@@ -881,6 +890,7 @@ export interface FileRouteTypes {
     | '/orgs/$orgId/members'
     | '/parent/consent/$token'
     | '/teams/$teamId/edit'
+    | '/teams/$teamId/manage'
     | '/trainers/$trainerId/edit'
     | '/games/$gameId/'
     | '/orgs/$orgId/'
@@ -968,6 +978,7 @@ export interface FileRouteTypes {
     | '/orgs/$orgId/members'
     | '/parent/consent/$token'
     | '/teams/$teamId/edit'
+    | '/teams/$teamId/manage'
     | '/trainers/$trainerId/edit'
     | '/games/$gameId'
     | '/orgs/$orgId'
@@ -1057,6 +1068,7 @@ export interface FileRouteTypes {
     | '/orgs/$orgId/members'
     | '/parent/consent/$token'
     | '/teams/$teamId/edit'
+    | '/teams/$teamId/manage'
     | '/trainers/$trainerId/edit'
     | '/games/$gameId/'
     | '/orgs/$orgId/'
@@ -1135,6 +1147,7 @@ export interface RootRouteChildren {
   OrgsOrgIdMembersRoute: typeof OrgsOrgIdMembersRoute
   ParentConsentTokenRoute: typeof ParentConsentTokenRoute
   TeamsTeamIdEditRoute: typeof TeamsTeamIdEditRoute
+  TeamsTeamIdManageRoute: typeof TeamsTeamIdManageRoute
   TrainersTrainerIdEditRoute: typeof TrainersTrainerIdEditRoute
   OrgsOrgIdIndexRoute: typeof OrgsOrgIdIndexRoute
   TeamsTeamIdIndexRoute: typeof TeamsTeamIdIndexRoute
@@ -1708,6 +1721,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof TeamsTeamIdEditRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/teams/$teamId/manage': {
+      id: '/teams/$teamId/manage'
+      path: '/teams/$teamId/manage'
+      fullPath: '/teams/$teamId/manage'
+      preLoaderRoute: typeof TeamsTeamIdManageRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/trainers/$trainerId/': {
       id: '/trainers/$trainerId/'
       path: '/trainers/$trainerId'
@@ -1871,6 +1891,7 @@ const rootRouteChildren: RootRouteChildren = {
   OrgsOrgIdMembersRoute: OrgsOrgIdMembersRoute,
   ParentConsentTokenRoute: ParentConsentTokenRoute,
   TeamsTeamIdEditRoute: TeamsTeamIdEditRoute,
+  TeamsTeamIdManageRoute: TeamsTeamIdManageRoute,
   TrainersTrainerIdEditRoute: TrainersTrainerIdEditRoute,
   OrgsOrgIdIndexRoute: OrgsOrgIdIndexRoute,
   TeamsTeamIdIndexRoute: TeamsTeamIdIndexRoute,

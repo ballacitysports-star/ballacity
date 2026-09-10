@@ -300,13 +300,30 @@ export function useTeamRosterActions(teamId: string) {
     onSuccess: invalidate,
   });
 
+  /**
+   * Jersey and position are plain columns, not an RPC: the manager branch of
+   * `team_members_manager_update` already allows them, and the role guard only
+   * refuses `role`. A caller without rights matches no rows and no-ops.
+   */
+  const setDetails = useMutation({
+    mutationFn: async (v: { userId: string; jerseyNumber: string | null; position: string | null }) => {
+      const { error } = await supabase
+        .from("team_members")
+        .update({ jersey_number: v.jerseyNumber, position: v.position })
+        .eq("team_id", teamId)
+        .eq("user_id", v.userId);
+      if (error) throw error;
+    },
+    onSuccess: invalidate,
+  });
+
   const setRole = useMutation({
     mutationFn: (v: { userId: string; role: TeamRole }) =>
       rpc("team_set_member_role", { _team: teamId, _user: v.userId, _role: v.role }),
     onSuccess: invalidate,
   });
 
-  return { invite, cancelInvite, removeMember, setRole };
+  return { invite, cancelInvite, removeMember, setRole, setDetails };
 }
 
 /**

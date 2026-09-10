@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { Loader2, Search, UserPlus } from "lucide-react";
+import { Loader2, Search, ShieldAlert, UserPlus } from "lucide-react";
 import { toast } from "sonner";
 import {
   Dialog,
@@ -68,6 +68,14 @@ export function InvitePlayerDialog({
             They'll get an invitation to join {teamName} and can accept or decline.
           </DialogDescription>
         </DialogHeader>
+
+        <p className="flex items-start gap-2 rounded-xl border border-border bg-surface/60 p-2.5 text-xs text-muted-foreground">
+          <ShieldAlert className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+          <span>
+            Everyone on the roster counts as a teammate. Members under 16 who have limited their
+            messaging or media to teammates will become reachable by this player.
+          </span>
+        </p>
 
         <div>
           <div className="text-xs font-semibold text-muted-foreground mb-1.5">Role on the roster</div>
