@@ -97,6 +97,11 @@ const ROSTER_ORDER: Record<TeamRole, number> = {
 export function teamRosterErrorMessage(err: unknown): string {
   const raw = err instanceof Error ? err.message : String((err as { message?: string })?.message ?? err ?? "");
   if (raw.includes("NOT_TEAM_MANAGER")) return "Only the team's owner, managers or coaches can do that.";
+  if (raw.includes("NOT_TEAM_OWNER")) return "Only the team's owner can hand the team over.";
+  if (raw.includes("TARGET_NOT_MANAGER"))
+    return "A team can only be handed to a manager. Promote them first.";
+  if (raw.includes("ALREADY_OWNER")) return "You already own this team.";
+  if (raw.includes("TEAM_NOT_FOUND")) return "That team no longer exists.";
   if (raw.includes("ALREADY_MEMBER")) return "That player is already on the roster.";
   if (raw.includes("SELF_INVITE")) return "You're already on this team.";
   if (raw.includes("OWNER_NOT_INVITABLE") || raw.includes("OWNER_ROLE_FIXED"))
@@ -302,6 +307,23 @@ export function useTeamRosterActions(teamId: string) {
   });
 
   return { invite, cancelInvite, removeMember, setRole };
+}
+
+/**
+ * Hand a team to one of its managers. Everything moves together server-side —
+ * `teams.owner_id`, both roster rows and the team's single `account_profiles`
+ * row — so the whole roster and the viewer's own profile list go stale at once.
+ */
+export function useTransferTeamOwnership(teamId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (userId: string) => rpc("transfer_team_ownership", { _team: teamId, _to: userId }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["team-roster", teamId] });
+      qc.invalidateQueries({ queryKey: ["my-team-memberships"] });
+      qc.invalidateQueries({ queryKey: ["my-teams"] });
+    },
+  });
 }
 
 export function useRespondToTeamInvite() {
