@@ -48,7 +48,8 @@ export function teamPermissions(role: TeamRole | null): TeamPermissions {
     canInvite: isManager,
     canRemoveMembers: isManager,
     canAssignRoles: !!role && ROLE_ADMIN_ROLES.includes(role),
-    canEditTeam: role === "owner" || role === "manager",
+    // `teams` UPDATE is `auth.uid() = owner_id`, so a manager’s write is refused.
+    canEditTeam: role === "owner",
     canLeave: !!role && role !== "owner",
   };
 }
