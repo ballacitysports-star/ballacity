@@ -10,7 +10,7 @@ import {
 
 type TeamRow = {
   id: string;
-  owner_id: string;
+  owner_id: string | null;
   kind: string;
   name: string;
   handle: string;
@@ -55,7 +55,7 @@ type TeamRow = {
 };
 
 const myOrgIds = new Set<string>();
-const ownerByOrgId = new Map<string, string>();
+const ownerByOrgId = new Map<string, string | null>();
 const listeners = new Set<() => void>();
 let version = 0;
 let hydratePromise: Promise<void> | null = null;
@@ -408,6 +408,15 @@ export async function ensureOrgById(id: string): Promise<Org | undefined> {
 /** Returns the auth.users id of the trainer/team owner, if known locally. */
 export function getOrgOwnerId(id: string): string | null {
   return ownerByOrgId.get(id) ?? null;
+}
+
+/**
+ * True only when the team is known locally AND has no owner — a listing a
+ * moderator created that nobody has claimed yet. Distinct from getOrgOwnerId
+ * returning null, which also covers "not loaded".
+ */
+export function isOrgUnclaimed(id: string): boolean {
+  return ownerByOrgId.has(id) && ownerByOrgId.get(id) === null;
 }
 
 /** Async owner lookup: hydrates orgs from the DB when the id isn't cached. */

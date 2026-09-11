@@ -27,9 +27,10 @@ import {
   type Org,
   type OrgPost,
 } from "@/lib/sample-data";
-import { isMyOrg, ensureOrgById } from "@/lib/org-store";
+import { isMyOrg, ensureOrgById, isOrgUnclaimed } from "@/lib/org-store";
 import { TeamRosterPanel } from "@/components/team/TeamRosterPanel";
 import { useTeamPermissions } from "@/lib/team-roster";
+import { ClaimListingCard } from "@/components/listings/ClaimListingCard";
 import { ProfileShareCard } from "@/components/ProfileShareCard";
 import { PostCard } from "@/components/PostCard";
 import { PostDetailsDialog } from "@/components/PostDetailsDialog";
@@ -159,6 +160,7 @@ function TeamPage() {
   const canEdit = mounted && isMyOrg(org.id);
   // Editing the team row is owner-only in RLS; managing the roster is not.
   const teamPerms = useTeamPermissions(org.id);
+  const isUnclaimed = mounted && isOrgUnclaimed(org.id);
   const canManage = mounted && teamPerms.canInvite;
 
   const orgReviews = useReviewsFor(org.id);
@@ -216,6 +218,11 @@ function TeamPage() {
       </div>
 
       <div className="px-4 -mt-14 relative">
+        {isUnclaimed && (
+          <div className="mb-4">
+            <ClaimListingCard subjectType="team" subjectId={org.id} name={org.name} />
+          </div>
+        )}
         {/* Identity */}
         <div className="flex items-end justify-between gap-3">
           <motion.div

@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import { VenueMapPreview } from "@/components/VenueMapPreview";
 import { OrgListingHeader, type OrgListingRow } from "@/components/org/OrgListingHeader";
+import { ClaimListingCard } from "@/components/listings/ClaimListingCard";
 import { GymReviews } from "@/components/org/GymReviews";
 import { summarizeGymReviews, useGymReviews } from "@/lib/gym-reviews";
 
@@ -195,6 +196,10 @@ function OrgPage() {
           <MemberJoinCta orgId={orgId} />
         </div>
       </OrgListingHeader>
+
+      {org.owner_id === null && (
+        <ClaimListingCard subjectType="gym" subjectId={orgId} name={org.name} />
+      )}
 
       <div id="gym-reviews">
         <GymReviews orgId={orgId} orgName={org.name} isAdmin={isAdmin} />

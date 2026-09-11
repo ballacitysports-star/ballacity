@@ -57,6 +57,11 @@ export const AUDIT_ACTIONS = {
   "image.approve": { label: "Image approved", category: "content" },
   "reel.remove": { label: "Reel removed", category: "content" },
   "review.moderate": { label: "Review moderated", category: "content" },
+  "listing.create_unclaimed": { label: "Unclaimed listing created", category: "content" },
+  "listing.edit_unclaimed": { label: "Unclaimed listing edited", category: "content" },
+  "listing.delete_unclaimed": { label: "Unclaimed listing deleted", category: "content" },
+  "listing.claim_approve": { label: "Listing claim approved", category: "content" },
+  "listing.claim_deny": { label: "Listing claim denied", category: "content" },
 
   // Reports
   "report.resolve": { label: "Report resolved", category: "reports" },

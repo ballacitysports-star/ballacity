@@ -52,6 +52,7 @@ import { Route as AdminAuditRouteImport } from './routes/admin.audit'
 import { Route as AdminChildSafetyRouteImport } from './routes/admin.child-safety'
 import { Route as AdminComplianceRouteImport } from './routes/admin.compliance'
 import { Route as AdminLegalRouteImport } from './routes/admin.legal'
+import { Route as AdminListingsRouteImport } from './routes/admin.listings'
 import { Route as AdminLocationAnalyticsRouteImport } from './routes/admin.location-analytics'
 import { Route as AdminModerationRouteImport } from './routes/admin.moderation'
 import { Route as CheckoutReturnRouteImport } from './routes/checkout.return'
@@ -312,6 +313,11 @@ const AdminComplianceRoute = AdminComplianceRouteImport.update({
 const AdminLegalRoute = AdminLegalRouteImport.update({
   id: '/admin/legal',
   path: '/admin/legal',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AdminListingsRoute = AdminListingsRouteImport.update({
+  id: '/admin/listings',
+  path: '/admin/listings',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AdminLocationAnalyticsRoute = AdminLocationAnalyticsRouteImport.update({
@@ -585,6 +591,7 @@ export interface FileRoutesByFullPath {
   '/admin/child-safety': typeof AdminChildSafetyRoute
   '/admin/compliance': typeof AdminComplianceRoute
   '/admin/legal': typeof AdminLegalRoute
+  '/admin/listings': typeof AdminListingsRoute
   '/admin/location-analytics': typeof AdminLocationAnalyticsRoute
   '/admin/moderation': typeof AdminModerationRoute
   '/checkout/return': typeof CheckoutReturnRoute
@@ -674,6 +681,7 @@ export interface FileRoutesByTo {
   '/admin/child-safety': typeof AdminChildSafetyRoute
   '/admin/compliance': typeof AdminComplianceRoute
   '/admin/legal': typeof AdminLegalRoute
+  '/admin/listings': typeof AdminListingsRoute
   '/admin/location-analytics': typeof AdminLocationAnalyticsRoute
   '/admin/moderation': typeof AdminModerationRoute
   '/checkout/return': typeof CheckoutReturnRoute
@@ -764,6 +772,7 @@ export interface FileRoutesById {
   '/admin/child-safety': typeof AdminChildSafetyRoute
   '/admin/compliance': typeof AdminComplianceRoute
   '/admin/legal': typeof AdminLegalRoute
+  '/admin/listings': typeof AdminListingsRoute
   '/admin/location-analytics': typeof AdminLocationAnalyticsRoute
   '/admin/moderation': typeof AdminModerationRoute
   '/checkout/return': typeof CheckoutReturnRoute
@@ -855,6 +864,7 @@ export interface FileRouteTypes {
     | '/admin/child-safety'
     | '/admin/compliance'
     | '/admin/legal'
+    | '/admin/listings'
     | '/admin/location-analytics'
     | '/admin/moderation'
     | '/checkout/return'
@@ -944,6 +954,7 @@ export interface FileRouteTypes {
     | '/admin/child-safety'
     | '/admin/compliance'
     | '/admin/legal'
+    | '/admin/listings'
     | '/admin/location-analytics'
     | '/admin/moderation'
     | '/checkout/return'
@@ -1033,6 +1044,7 @@ export interface FileRouteTypes {
     | '/admin/child-safety'
     | '/admin/compliance'
     | '/admin/legal'
+    | '/admin/listings'
     | '/admin/location-analytics'
     | '/admin/moderation'
     | '/checkout/return'
@@ -1114,6 +1126,7 @@ export interface RootRouteChildren {
   AdminChildSafetyRoute: typeof AdminChildSafetyRoute
   AdminComplianceRoute: typeof AdminComplianceRoute
   AdminLegalRoute: typeof AdminLegalRoute
+  AdminListingsRoute: typeof AdminListingsRoute
   AdminLocationAnalyticsRoute: typeof AdminLocationAnalyticsRoute
   AdminModerationRoute: typeof AdminModerationRoute
   CheckoutReturnRoute: typeof CheckoutReturnRoute
@@ -1460,6 +1473,13 @@ declare module '@tanstack/react-router' {
       path: '/admin/legal'
       fullPath: '/admin/legal'
       preLoaderRoute: typeof AdminLegalRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/admin/listings': {
+      id: '/admin/listings'
+      path: '/admin/listings'
+      fullPath: '/admin/listings'
+      preLoaderRoute: typeof AdminListingsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/admin/location-analytics': {
@@ -1858,6 +1878,7 @@ const rootRouteChildren: RootRouteChildren = {
   AdminChildSafetyRoute: AdminChildSafetyRoute,
   AdminComplianceRoute: AdminComplianceRoute,
   AdminLegalRoute: AdminLegalRoute,
+  AdminListingsRoute: AdminListingsRoute,
   AdminLocationAnalyticsRoute: AdminLocationAnalyticsRoute,
   AdminModerationRoute: AdminModerationRoute,
   CheckoutReturnRoute: CheckoutReturnRoute,

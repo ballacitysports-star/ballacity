@@ -2,15 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { z } from "zod";
 import type { AuditAction } from "@/lib/audit-actions";
-
-/** Moderator = admin, moderator, or superadmin role. */
-async function assertModerator(ctx: { supabase: any; userId: string }) {
-  const { data, error } = await ctx.supabase.rpc("is_moderator", {
-    _user_id: ctx.userId,
-  });
-  if (error) throw new Error(error.message);
-  if (!data) throw new Error("Forbidden");
-}
+import { assertModerator } from "@/lib/moderation.server";
 
 /** Canonical audit action for each moderation outcome. */
 const MODERATION_AUDIT_ACTION = {
