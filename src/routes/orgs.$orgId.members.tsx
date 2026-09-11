@@ -31,7 +31,7 @@ export const Route = createFileRoute("/orgs/$orgId/members")({
   errorComponent: ({ error, reset }) => (
     <RouteFallback
       title="Couldn't load these members"
-      message={error.message}
+      message={error instanceof Error ? error.message : "Something went wrong."}
       onRetry={reset}
       action={
         <Link to="/orgs" className={FALLBACK_ACTION_CLASS}>
