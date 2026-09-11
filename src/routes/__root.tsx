@@ -95,13 +95,13 @@ function NotFoundComponent() {
   );
 }
 
-function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
+function ErrorComponent({ error, reset }: { error: unknown; reset: () => void }) {
   console.error(error);
   const router = useRouter();
 
   return (
     <ErrorFallback
-      error={error}
+      error={error instanceof Error ? error : new Error(String(error))}
       title="This page didn't load"
       description="Something went wrong on our end. You can try again or head back home."
       onRetry={() => {
