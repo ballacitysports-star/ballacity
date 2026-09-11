@@ -100,6 +100,13 @@ export default async function globalSetup() {
         display_name: acct.displayName,
         name: acct.displayName,
         full_name: acct.displayName,
+        // Explicit, so seeding does not depend on the handle_new_user fix in
+        // 20260911001000 having been applied to the target project yet. That
+        // trigger writes profiles.account_type straight from this value, and the
+        // column is NOT NULL, so an absent account_type fails the whole insert as
+        // "Database error creating new user" — which is what blocked CI seeding.
+        // Naming it here is also just more honest about what these fixtures are.
+        account_type: "player",
       };
       try {
         const { data: list, error: listErr } = await admin.auth.admin.listUsers({
