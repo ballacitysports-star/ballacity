@@ -41,6 +41,41 @@ describe("parseLegalContent", () => {
     const sections = parseLegalContent("## A\none\n\ntwo");
     expect(parseLegalContent(sectionsToContent(sections))).toEqual(sections);
   });
+
+  it("parses a bullet list into a ul block", () => {
+    const sections = parseLegalContent("## A\n\n- one\n- two");
+    expect(sections).toEqual([
+      {
+        heading: "A",
+        body: [],
+        blocks: [{ kind: "ul", items: ["one", "two"] }],
+      },
+    ]);
+  });
+
+  it("splits a lead-in line from the bullets that follow it", () => {
+    const sections = parseLegalContent("## A\nWe collect:\n- name\n- email");
+    expect(sections).toEqual([
+      {
+        heading: "A",
+        body: ["We collect:"],
+        blocks: [
+          { kind: "p", text: "We collect:" },
+          { kind: "ul", items: ["name", "email"] },
+        ],
+      },
+    ]);
+  });
+
+  it("leaves prose-only sections in their original shape", () => {
+    const sections = parseLegalContent("## A\njust prose");
+    expect(sections[0]).not.toHaveProperty("blocks");
+  });
+
+  it("round-trips lists through sectionsToContent", () => {
+    const sections = parseLegalContent("## A\nlead\n- one\n- two\n\ntrailing");
+    expect(parseLegalContent(sectionsToContent(sections))).toEqual(sections);
+  });
 });
 
 describe("effectiveVersion", () => {
@@ -59,7 +94,11 @@ describe("effectiveVersion", () => {
 describe("consent status against published versions", () => {
   it("flags a newly published material version for re-acceptance", () => {
     const records = [
-      { document_type: "terms" as const, document_version: "2026-09-01", accepted_at: "2026-09-02" },
+      {
+        document_type: "terms" as const,
+        document_version: "2026-09-01",
+        accepted_at: "2026-09-02",
+      },
       {
         document_type: "privacy" as const,
         document_version: "2026-09-01",
@@ -76,7 +115,11 @@ describe("consent status against published versions", () => {
 
   it("does not require acceptance for non-material updates", () => {
     const records = [
-      { document_type: "terms" as const, document_version: "2026-09-01", accepted_at: "2026-09-02" },
+      {
+        document_type: "terms" as const,
+        document_version: "2026-09-01",
+        accepted_at: "2026-09-02",
+      },
       {
         document_type: "privacy" as const,
         document_version: "2026-09-01",

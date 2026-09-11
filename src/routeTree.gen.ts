@@ -14,6 +14,7 @@ import { Route as TabsRouteImport } from './routes/_tabs'
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as CommunityGuidelinesRouteImport } from './routes/community-guidelines'
 import { Route as ContactRouteImport } from './routes/contact'
+import { Route as CookiesRouteImport } from './routes/cookies'
 import { Route as McpRouteImport } from './routes/mcp'
 import { Route as PaymentsRouteImport } from './routes/payments'
 import { Route as PickupRouteImport } from './routes/pickup'
@@ -121,6 +122,11 @@ const CommunityGuidelinesRoute = CommunityGuidelinesRouteImport.update({
 const ContactRoute = ContactRouteImport.update({
   id: '/contact',
   path: '/contact',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CookiesRoute = CookiesRouteImport.update({
+  id: '/cookies',
+  path: '/cookies',
   getParentRoute: () => rootRouteImport,
 } as any)
 const McpRoute = McpRouteImport.update({
@@ -554,6 +560,7 @@ export interface FileRoutesByFullPath {
   '/auth': typeof AuthRoute
   '/community-guidelines': typeof CommunityGuidelinesRoute
   '/contact': typeof ContactRoute
+  '/cookies': typeof CookiesRoute
   '/mcp': typeof McpRoute
   '/payments': typeof PaymentsRoute
   '/pickup': typeof PickupRoute
@@ -644,6 +651,7 @@ export interface FileRoutesByTo {
   '/auth': typeof AuthRoute
   '/community-guidelines': typeof CommunityGuidelinesRoute
   '/contact': typeof ContactRoute
+  '/cookies': typeof CookiesRoute
   '/mcp': typeof McpRoute
   '/payments': typeof PaymentsRoute
   '/pickup': typeof PickupRoute
@@ -735,6 +743,7 @@ export interface FileRoutesById {
   '/auth': typeof AuthRoute
   '/community-guidelines': typeof CommunityGuidelinesRoute
   '/contact': typeof ContactRoute
+  '/cookies': typeof CookiesRoute
   '/mcp': typeof McpRoute
   '/payments': typeof PaymentsRoute
   '/pickup': typeof PickupRoute
@@ -827,6 +836,7 @@ export interface FileRouteTypes {
     | '/auth'
     | '/community-guidelines'
     | '/contact'
+    | '/cookies'
     | '/mcp'
     | '/payments'
     | '/pickup'
@@ -917,6 +927,7 @@ export interface FileRouteTypes {
     | '/auth'
     | '/community-guidelines'
     | '/contact'
+    | '/cookies'
     | '/mcp'
     | '/payments'
     | '/pickup'
@@ -1007,6 +1018,7 @@ export interface FileRouteTypes {
     | '/auth'
     | '/community-guidelines'
     | '/contact'
+    | '/cookies'
     | '/mcp'
     | '/payments'
     | '/pickup'
@@ -1099,6 +1111,7 @@ export interface RootRouteChildren {
   AuthRoute: typeof AuthRoute
   CommunityGuidelinesRoute: typeof CommunityGuidelinesRoute
   ContactRoute: typeof ContactRoute
+  CookiesRoute: typeof CookiesRoute
   McpRoute: typeof McpRoute
   PaymentsRoute: typeof PaymentsRoute
   PickupRoute: typeof PickupRoute
@@ -1207,6 +1220,13 @@ declare module '@tanstack/react-router' {
       path: '/contact'
       fullPath: '/contact'
       preLoaderRoute: typeof ContactRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/cookies': {
+      id: '/cookies'
+      path: '/cookies'
+      fullPath: '/cookies'
+      preLoaderRoute: typeof CookiesRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/mcp': {
@@ -1850,6 +1870,7 @@ const rootRouteChildren: RootRouteChildren = {
   AuthRoute: AuthRoute,
   CommunityGuidelinesRoute: CommunityGuidelinesRoute,
   ContactRoute: ContactRoute,
+  CookiesRoute: CookiesRoute,
   McpRoute: McpRoute,
   PaymentsRoute: PaymentsRoute,
   PickupRoute: PickupRoute,

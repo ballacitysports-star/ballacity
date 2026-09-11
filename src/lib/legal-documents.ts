@@ -10,9 +10,27 @@
  * The body text below is PLACEHOLDER content and is labelled as such in the UI.
  */
 
-export type LegalDocumentType = "terms" | "privacy";
+export type LegalDocumentType = "terms" | "privacy" | "cookie_preferences";
 
-export type LegalSection = { heading: string; body: string[] };
+/**
+ * The subset users must actively accept. Cookies is informational, so keeping
+ * it out of this union stops it leaking into consent records and signup gates.
+ */
+export type ConsentDocumentType = Exclude<LegalDocumentType, "cookie_preferences">;
+
+/**
+ * A section is a heading plus alternating prose and bullet blocks, kept in
+ * source order so a list stays attached to the paragraph that introduces it.
+ */
+export type LegalBlock = { kind: "p"; text: string } | { kind: "ul"; items: string[] };
+
+export type LegalSection = {
+  heading: string;
+  /** Prose paragraphs only — kept for existing callers and round-tripping. */
+  body: string[];
+  /** Full ordered content, including bullet lists. Preferred for rendering. */
+  blocks?: LegalBlock[];
+};
 
 export type LegalDocumentVersion = {
   version: string;
@@ -27,7 +45,7 @@ export type LegalDocument = {
   type: LegalDocumentType;
   title: string;
   shortTitle: string;
-  path: "/terms" | "/privacy";
+  path: "/terms" | "/privacy" | "/cookies";
   description: string;
   /** Newest version first. */
   versions: LegalDocumentVersion[];
@@ -146,14 +164,53 @@ const PRIVACY: LegalDocument = {
   ],
 };
 
+const COOKIES: LegalDocument = {
+  type: "cookie_preferences",
+  title: "Cookies & Local Storage",
+  shortTitle: "Cookies",
+  path: "/cookies",
+  description: "What ballaCity stores in your browser, why, and how to clear it.",
+  versions: [
+    {
+      version: "2026-09-01",
+      effectiveDate: "2026-09-01",
+      material: false,
+      summary: "Placeholder notice about browser storage used for sign-in and preferences.",
+      sections: [
+        {
+          heading: "1. What we store",
+          body: [
+            "ballaCity keeps you signed in and remembers your preferences using storage in your own browser rather than advertising cookies.",
+          ],
+        },
+        {
+          heading: "2. Managing it",
+          body: [
+            "Clearing site data for ballaCity in your browser removes everything described here and signs you out.",
+          ],
+        },
+      ],
+    },
+  ],
+};
+
 export const LEGAL_DOCUMENTS: Record<LegalDocumentType, LegalDocument> = {
   terms: TERMS,
   privacy: PRIVACY,
+  cookie_preferences: COOKIES,
 };
 
+/**
+ * Documents that require explicit acceptance. Cookies is deliberately absent:
+ * it is informational, so adding it here would gate signup and re-acceptance
+ * on a document nobody needs to agree to.
+ */
 export const LEGAL_DOCUMENT_LIST: LegalDocument[] = [TERMS, PRIVACY];
 
-export const LEGAL_DOCUMENT_TYPES: LegalDocumentType[] = ["terms", "privacy"];
+export const LEGAL_DOCUMENT_TYPES: ConsentDocumentType[] = ["terms", "privacy"];
+
+/** Every document with a public page, consent-gated or not. */
+export const LEGAL_PAGE_LIST: LegalDocument[] = [TERMS, PRIVACY, COOKIES];
 
 export function getLegalDocument(type: LegalDocumentType): LegalDocument {
   return LEGAL_DOCUMENTS[type];
@@ -168,13 +225,13 @@ export function findVersion(type: LegalDocumentType, version: string) {
 }
 
 export type ConsentRecord = {
-  document_type: LegalDocumentType;
+  document_type: ConsentDocumentType;
   document_version: string;
   accepted_at: string;
 };
 
 export type ConsentStatus = {
-  type: LegalDocumentType;
+  type: ConsentDocumentType;
   title: string;
   path: "/terms" | "/privacy";
   currentVersion: string;
@@ -221,34 +278,85 @@ export function effectiveVersion(
   };
 }
 
-/** Splits stored markdown-lite content ("## Heading" + paragraphs) into sections. */
+/**
+ * Splits stored markdown-lite content into sections.
+ *
+ * Supports "## Heading", paragraphs, and "- item" bullet lists — the last
+ * because a privacy policy is mostly enumerations (data categories, who we
+ * share with, your rights) and those read terribly as run-on prose.
+ * Deliberately no bold, links or tables.
+ */
 export function parseLegalContent(content: string): LegalSection[] {
   const sections: LegalSection[] = [];
   let current: LegalSection | null = null;
+
+  const open = (heading: string) => {
+    current = { heading, body: [], blocks: [] };
+    sections.push(current);
+    return current;
+  };
+  const addText = (text: string) => {
+    const sec = current ?? open("");
+    sec.body.push(text);
+    sec.blocks!.push({ kind: "p", text });
+  };
+  const addList = (items: string[]) => {
+    const sec = current ?? open("");
+    sec.blocks!.push({ kind: "ul", items });
+  };
+
+  const isBullet = (l: string) => /^[-*]\s+/.test(l.trim());
+  const strip = (l: string) => l.trim().replace(/^[-*]\s+/, "");
+
+  /** Emit a run of lines as a paragraph, a list, or a lead-in plus a list. */
+  const emit = (lines: string[]) => {
+    if (!lines.length) return;
+    const firstBullet = lines.findIndex(isBullet);
+    if (firstBullet === -1) {
+      const text = lines.join(" ").trim();
+      if (text) addText(text);
+      return;
+    }
+    const lead = lines.slice(0, firstBullet).join(" ").trim();
+    if (lead) addText(lead);
+    addList(lines.slice(firstBullet).filter(isBullet).map(strip));
+  };
+
   for (const rawBlock of content.split(/\n{2,}/)) {
     const block = rawBlock.trim();
     if (!block) continue;
     const lines = block.split("\n");
     const first = lines[0].trim();
+
     if (first.startsWith("#")) {
-      current = { heading: first.replace(/^#+\s*/, ""), body: [] };
-      sections.push(current);
-      const rest = lines.slice(1).join(" ").trim();
-      if (rest) current.body.push(rest);
+      open(first.replace(/^#+\s*/, ""));
+      emit(lines.slice(1));
       continue;
     }
-    if (!current) {
-      current = { heading: "", body: [] };
-      sections.push(current);
-    }
-    current.body.push(lines.join(" ").trim());
+    emit(lines);
+  }
+
+  // Only carry `blocks` on sections that actually contain a list. Prose-only
+  // sections keep their original { heading, body } shape, so every existing
+  // caller and the bundled registry are untouched by list support.
+  for (const sec of sections) {
+    if (!sec.blocks?.some((b) => b.kind === "ul")) delete sec.blocks;
   }
   return sections;
 }
 
 /** Turns sections back into stored content (used to seed a draft from the registry). */
 export function sectionsToContent(sections: LegalSection[]): string {
-  return sections.map((s) => `## ${s.heading}\n${s.body.join("\n\n")}`).join("\n\n");
+  return sections
+    .map((s) => {
+      // Prefer blocks so bullet lists survive the round trip; fall back to
+      // body for sections built by hand in the bundled registry.
+      const parts = s.blocks?.length
+        ? s.blocks.map((b) => (b.kind === "ul" ? b.items.map((i) => `- ${i}`).join("\n") : b.text))
+        : s.body;
+      return `## ${s.heading}\n${parts.join("\n\n")}`;
+    })
+    .join("\n\n");
 }
 
 /**
@@ -268,9 +376,11 @@ export function buildConsentStatus(
     const accepted = mine.find((r) => r.document_version === current.version) ?? null;
     const latest = mine[0] ?? null;
     return {
-      type: doc.type,
+      // LEGAL_DOCUMENT_LIST holds only the two consent documents, so these
+      // narrow safely — cookies never reaches here.
+      type: doc.type as ConsentDocumentType,
       title: doc.title,
-      path: doc.path,
+      path: doc.path as ConsentStatus["path"],
       currentVersion: current.version,
       effectiveDate: current.effectiveDate,
       acceptedVersion: latest?.document_version ?? null,
@@ -284,9 +394,8 @@ export function buildConsentStatus(
 export function pendingRequiredTypes(
   records: ConsentRecord[],
   published?: PublishedLegalDocument[] | null,
-): LegalDocumentType[] {
+): ConsentDocumentType[] {
   return buildConsentStatus(records, published)
     .filter((s) => s.needsAcceptance && effectiveVersion(s.type, published).material)
     .map((s) => s.type);
 }
-

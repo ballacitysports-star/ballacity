@@ -363,6 +363,9 @@ function Landing() {
             <Link to="/privacy" className="hover:text-foreground">
               Privacy Policy
             </Link>
+            <Link to="/cookies" className="hover:text-foreground">
+              Cookies
+            </Link>
             <Link to="/safety" className="hover:text-foreground">
               Safety
             </Link>

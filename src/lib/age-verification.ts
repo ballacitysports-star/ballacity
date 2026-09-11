@@ -69,7 +69,6 @@ export function isAccountSetupEscape(pathname: string): boolean {
   return ACCOUNT_SETUP_ESCAPES.some((p) => pathname === p || pathname.startsWith(`${p}/`));
 }
 
-
 export function isPlatformActive(status: PlatformStatus): boolean {
   return status === "active";
 }
@@ -158,6 +157,11 @@ export type DobParts = { month: string; day: string; year: string };
 
 export const EMPTY_DOB: DobParts = { month: "", day: "", year: "" };
 
+/** Minimum age to hold a ballaCity account, per the published Terms. */
+export const MINIMUM_SIGNUP_AGE = 13;
+
+export const MIN_AGE_MESSAGE = `You need to be at least ${MINIMUM_SIGNUP_AGE} to use ballaCity.`;
+
 export type DobCheck =
   | { ok: true; iso: string; age: number; cohort: AgeCohort }
   | { ok: false; message: string };
@@ -189,7 +193,17 @@ export function checkDobParts(parts: DobParts, now: Date = new Date()): DobCheck
     }
     return { ok: false, message: `Enter a year within the last ${MAX_PLAUSIBLE_AGE_YEARS} years.` };
   }
-  return { ok: true, iso, age, cohort: cohortFromAge(age) };
+  const cohort = cohortFromAge(age);
+  // ballaCity's published Terms set 13 as the minimum age. The under-13
+  // architecture (guardian links, child_controls, parental consent) stays in
+  // place and enforced for anyone already in that cohort, but new signups stop
+  // here: the emailed-token consent flow does not meet the standard COPPA
+  // requires once a child's data is visible to teammates and sent to
+  // third-party processors.
+  if (cohort === "child_under_13") {
+    return { ok: false, message: MIN_AGE_MESSAGE };
+  }
+  return { ok: true, iso, age, cohort };
 }
 
 export const MONTHS = [
