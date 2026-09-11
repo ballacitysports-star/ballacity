@@ -39,11 +39,19 @@ jobs:
       group: e2e-shared-supabase-fixtures
       cancel-in-progress: false
     runs-on: ubuntu-latest
-    # Was 20; the suite ran with the fixture accounts genuinely signed in for
-    # the first time and hit this ceiling mid-run (single-worker by design —
-    # see playwright.config.ts — since many specs share the same few fixture
-    # accounts and parallel runs would race on them).
-    timeout-minutes: 40
+    # Single-worker by design (see playwright.config.ts): many specs share the
+    # same few fixture accounts and parallel runs would race on them.
+    #
+    # Raised 20 -> 40 once before, for a run that was believed to have the
+    # fixture accounts signed in. It did not — seeding had never actually
+    # succeeded, so ~168 specs auto-skipped for want of a session and the suite
+    # finished in about seven minutes while looking healthy.
+    #
+    # Seeding works now, so those specs execute for the first time and the suite
+    # takes far longer: run 91 reached spec 152 of 197 in 38 minutes before this
+    # ceiling killed it, which also destroyed the JSON report and with it any
+    # view of what actually failed. 75 leaves room to finish and still report.
+    timeout-minutes: 75
     env:
       # Force Playwright to use its own managed Chromium rather than the
       # sandbox-only path baked into playwright.config.ts.
