@@ -80,98 +80,151 @@ export default async function globalSetup() {
       auth: { persistSession: false, autoRefreshToken: false, storage: undefined },
     });
 
-    try {
-      const { data: list, error: listErr } = await admin.auth.admin.listUsers({
-        page: 1,
-        perPage: 1000,
-      });
-      if (listErr) throw new Error(listErr.message);
+    // Every fixture account, not just the player. Specs sign in as e2e-host too,
+    // and seeding only the player is why `e2e-host@lovable.test should be signed
+    // in` failed across three spec files.
+    //
+    // Each gets an adult birthday. age_cohort_of() reads profiles.age_cohort,
+    // which is derived from profile_birthdays by trigger and is 'unknown' until a
+    // birthday exists — and 'unknown' is not an adult, so an account with no
+    // birthday cannot host (block_child_hosting) and is treated as a minor by the
+    // child-safety policies the fixture flows exercise.
+    const ADULT_BIRTHDAY = "1990-05-04";
+
+    async function upsertAccount(acct: {
+      email: string;
+      password: string;
+      displayName: string;
+    }): Promise<string | null> {
       const metadata = {
-        display_name: player.displayName,
-        name: player.displayName,
-        full_name: player.displayName,
+        display_name: acct.displayName,
+        name: acct.displayName,
+        full_name: acct.displayName,
       };
-      const existing = list.users.find(
-        (u) => u.email?.toLowerCase() === player.email.toLowerCase(),
-      );
-      if (!existing) {
-        const { error } = await admin.auth.admin.createUser({
-          email: player.email,
-          password: player.password,
-          email_confirm: true,
-          user_metadata: metadata,
+      try {
+        const { data: list, error: listErr } = await admin.auth.admin.listUsers({
+          page: 1,
+          perPage: 1000,
         });
-        if (error && !/already/i.test(error.message)) throw error;
-      } else {
-        await admin.auth.admin.updateUserById(existing.id, {
-          password: player.password,
-          email_confirm: true,
-          user_metadata: { ...(existing.user_metadata ?? {}), ...metadata },
-        });
+        if (listErr) throw new Error(listErr.message);
+        const existing = list.users.find(
+          (u) => u.email?.toLowerCase() === acct.email.toLowerCase(),
+        );
+
+        let id: string | null = existing?.id ?? null;
+        if (!existing) {
+          const { data: created, error } = await admin.auth.admin.createUser({
+            email: acct.email,
+            password: acct.password,
+            email_confirm: true,
+            user_metadata: metadata,
+          });
+          if (error && !/already/i.test(error.message)) throw error;
+          id = created?.user?.id ?? null;
+        } else {
+          await admin.auth.admin.updateUserById(existing.id, {
+            password: acct.password,
+            email_confirm: true,
+            user_metadata: { ...(existing.user_metadata ?? {}), ...metadata },
+          });
+        }
+
+        if (id) {
+          const { error: bErr } = await admin
+            .from("profile_birthdays")
+            .upsert({ user_id: id, birthday: ADULT_BIRTHDAY }, { onConflict: "user_id" });
+          if (bErr) {
+            console.warn(
+              `[e2e global-setup] Could not set birthday for ${acct.email}: ${bErr.message}`,
+            );
+          }
+        }
+        return id;
+      } catch (err) {
+        console.warn(
+          `[e2e global-setup] Could not upsert ${acct.email}: ${
+            err instanceof Error ? err.message : String(err)
+          }.`,
+        );
+        return null;
       }
-    } catch (err) {
-      console.warn(
-        `[e2e global-setup] Could not upsert fixture account: ${
-          err instanceof Error ? err.message : String(err)
-        }. Falling through to sign-in attempt.`,
-      );
     }
 
-    // (2b) Seed the fixed "g1"/"g2" hosted_games rows a large chunk of the
-    // suite hardcodes as a lightweight, DB-free fixture game. These used to
-    // be served from a bundled sample-data fallback; that fallback is now
-    // empty (real users no longer see demo games), so the specs need a real
-    // row instead. host_id has no FK, so any UUID that isn't the signed-in
-    // player's own id keeps isHost false — no second fixture account needed.
-    try {
-      const now = Date.now();
-      const rows = [
-        {
-          id: "g1",
-          host_id: "00000000-0000-4000-8000-000000000001",
-          sport: "Basketball",
-          title: "Friday Night Run · 5v5 Full Court",
-          date: new Date(now + 3 * 3600_000).toISOString(),
-          duration: "120 min",
-          location: "Tompkins Square Courts",
-          neighborhood: "East Village",
-          max_players: 10,
-          joined: 8,
-          skill: "Intermediate",
-          price: 0,
-          indoor: false,
-          is_private: false,
-          description:
-            "Competitive but chill. We rotate teams every game to 11. Bring a light + dark shirt.",
-          host_snapshot: { name: "Marcus Lee", username: "@marcus", avatar: "ML", rating: 4.9 },
-        },
-        {
-          id: "g2",
-          host_id: "00000000-0000-4000-8000-000000000002",
-          sport: "Soccer",
-          title: "Sunday Sunset 7v7",
-          date: new Date(now + 22 * 3600_000).toISOString(),
-          duration: "90 min",
-          location: "Pier 40 Turf",
-          neighborhood: "West Side",
-          max_players: 14,
-          joined: 11,
-          skill: "All Levels",
-          price: 8,
-          indoor: false,
-          is_private: false,
-          description: "Mixed-gender, all levels. $8 covers turf rental. Cleats recommended.",
-          host_snapshot: { name: "Ana García", username: "@anagk", avatar: "AG", rating: 4.8 },
-        },
-      ];
-      const { error } = await admin.from("hosted_games").upsert(rows, { onConflict: "id" });
-      if (error) throw new Error(error.message);
-    } catch (err) {
+    for (const acct of TEST_ACCOUNTS) await upsertAccount(acct);
+
+    // (2b) Seed the fixed "g1"/"g2" hosted_games rows a large chunk of the suite
+    // hardcodes as a lightweight fixture game.
+    //
+    // These used to use a synthetic host_id that belonged to nobody. host_id has
+    // no FK so the row inserted, but block_child_hosting rejects it:
+    // age_cohort_of() resolves an unknown id to 'unknown', which is not an adult,
+    // so the seed died with CHILD_CANNOT_HOST and every spec hardcoding g1/g2
+    // failed. The host has to be a real account with an adult birthday.
+    //
+    // It is a dedicated account rather than one of the three above, so that no
+    // spec ever signs in as the host of these games and isHost stays false
+    // everywhere — the property the old synthetic id was there to provide.
+    const gamesHostId = await upsertAccount({
+      email: "e2e-games-host@lovable.test",
+      password: "E2E-games-host-pass-2026!",
+      displayName: "E2E Games Host",
+    });
+
+    if (!gamesHostId) {
       console.warn(
-        `[e2e global-setup] Could not seed fixture games g1/g2: ${
-          err instanceof Error ? err.message : String(err)
-        }. Specs that hardcode these ids will fail.`,
+        "[e2e global-setup] No games host account; skipping g1/g2. Specs that hardcode these ids will fail.",
       );
+    } else {
+      try {
+        const now = Date.now();
+        const rows = [
+          {
+            id: "g1",
+            host_id: gamesHostId,
+            sport: "Basketball",
+            title: "Friday Night Run · 5v5 Full Court",
+            date: new Date(now + 3 * 3600_000).toISOString(),
+            duration: "120 min",
+            location: "Tompkins Square Courts",
+            neighborhood: "East Village",
+            max_players: 10,
+            joined: 8,
+            skill: "Intermediate",
+            price: 0,
+            indoor: false,
+            is_private: false,
+            description:
+              "Competitive but chill. We rotate teams every game to 11. Bring a light + dark shirt.",
+            host_snapshot: { name: "Marcus Lee", username: "@marcus", avatar: "ML", rating: 4.9 },
+          },
+          {
+            id: "g2",
+            host_id: gamesHostId,
+            sport: "Soccer",
+            title: "Sunday Sunset 7v7",
+            date: new Date(now + 22 * 3600_000).toISOString(),
+            duration: "90 min",
+            location: "Pier 40 Turf",
+            neighborhood: "West Side",
+            max_players: 14,
+            joined: 11,
+            skill: "All Levels",
+            price: 8,
+            indoor: false,
+            is_private: false,
+            description: "Mixed-gender, all levels. $8 covers turf rental. Cleats recommended.",
+            host_snapshot: { name: "Ana García", username: "@anagk", avatar: "AG", rating: 4.8 },
+          },
+        ];
+        const { error } = await admin.from("hosted_games").upsert(rows, { onConflict: "id" });
+        if (error) throw new Error(error.message);
+      } catch (err) {
+        console.warn(
+          `[e2e global-setup] Could not seed fixture games g1/g2: ${
+            err instanceof Error ? err.message : String(err)
+          }. Specs that hardcode these ids will fail.`,
+        );
+      }
     }
   }
 
