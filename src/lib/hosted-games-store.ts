@@ -194,7 +194,7 @@ function gameToInsertRow(g: Game): TablesInsert<"hosted_games"> {
     signup_cutoff_min: Number((g as { signupCutoffMin?: number }).signupCutoffMin ?? 0) || 0,
     min_age: (g as { minAge?: number | null }).minAge ?? null,
     max_age: (g as { maxAge?: number | null }).maxAge ?? null,
-    host_snapshot: (g.host ?? {}) as TablesInsert<"hosted_games">["host_snapshot"],
+    host_snapshot: publicHostSnapshot(g.host) as TablesInsert<"hosted_games">["host_snapshot"],
     positions_needed: (g.positionsNeeded ?? {}) as TablesInsert<"hosted_games">["positions_needed"],
     ...(g.teamId ? { team_id: g.teamId } : {}),
     ...(g.orgId ? { org_id: g.orgId } : {}),
