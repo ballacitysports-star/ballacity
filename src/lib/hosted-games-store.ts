@@ -110,6 +110,21 @@ type DbRow = {
 };
 
 
+/**
+ * Games are publicly readable, so only intentionally public host fields may be
+ * denormalized onto the row. Never contact details or private profile fields.
+ */
+function publicHostSnapshot(host: unknown) {
+  const h = (host ?? {}) as Record<string, unknown>;
+  const str = (v: unknown) => (typeof v === "string" && v.trim() ? v.trim() : undefined);
+  const snap: { name?: string; username?: string; avatar?: string; rating?: number } = {};
+  if (str(h.name)) snap.name = str(h.name);
+  if (str(h.username)) snap.username = str(h.username);
+  if (str(h.avatar)) snap.avatar = str(h.avatar);
+  if (typeof h.rating === "number" && Number.isFinite(h.rating)) snap.rating = h.rating;
+  return snap;
+}
+
 function rowToGame(r: DbRow): Game {
   const snap = r.host_snapshot ?? {};
   return {
