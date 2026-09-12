@@ -1,0 +1,29 @@
+# Temporary diagnostic. Delete once the Actions blackout is understood.
+#
+# Every E2E run since 2026-09-11 12:02 has died in 3-4 seconds with no runner
+# assigned, no step executed and no logs produced, on main as well as on PR
+# branches. That shape is consistent with several unrelated causes: Actions
+# blocked for billing, Actions disabled by policy, or something about the E2E
+# job's own spec (its two concurrency groups, its 75-minute timeout, its
+# secrets).
+#
+# This job shares none of that. No secrets, no concurrency group, no services,
+# one step, seconds long. If it also fails to get a runner, the cause is
+# account- or repository-level and nothing in e2e.yml can fix it. If it runs,
+# the problem is specific to the E2E job and is ours to fix.
+name: Runner probe
+
+on:
+  push:
+  workflow_dispatch:
+
+jobs:
+  probe:
+    name: Probe
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Say hello
+        run: |
+          echo "Runner acquired at $(date -u) on ${RUNNER_OS}"
+          echo "If you can read this, runners are being allocated."
