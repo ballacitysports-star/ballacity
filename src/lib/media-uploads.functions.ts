@@ -14,14 +14,27 @@ const VIDEO_BUCKET = "highlight-videos";
  * Derived artefacts (extracted frames, audio track, transcoded playback copy)
  * are validated by kind so a caller can't smuggle an executable under
  * `.frame1.jpg`.
+ *
+ * `kind` splits on one question: will a viewer ever load these bytes as video?
+ *
+ *   - `video` — yes. The container is sniffed and anything unrecognised is
+ *     deleted. This is the trust boundary, and it does not move: the uploader
+ *     now accepts any source format, so this is what stops an executable being
+ *     stored at a path the feed will hand to a `<video>` element.
+ *   - `source` — no. The athlete's original in an exotic container (`.avi`,
+ *     `.mkv`, `.wmv`…), kept beside the converted copy for provenance and the
+ *     "Open or download" link. Size and ownership are still enforced; the
+ *     container check is skipped, because refusing these is exactly the bug
+ *     being fixed. A `source` is only ever written when a playable `video`
+ *     sibling exists, so nothing reaches a player through this path.
  */
 export const finalizeVideoUpload = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((d: { path: string; kind?: "video" | "frame" | "audio" }) =>
+  .inputValidator((d: { path: string; kind?: "video" | "source" | "frame" | "audio" }) =>
     z
       .object({
         path: z.string().min(1).max(500),
-        kind: z.enum(["video", "frame", "audio"]).default("video"),
+        kind: z.enum(["video", "source", "frame", "audio"]).default("video"),
       })
       .parse(d),
   )
@@ -48,7 +61,9 @@ export const finalizeVideoUpload = createServerFn({ method: "POST" })
     };
 
     if (bytes <= 0) await reject("The file is empty");
-    if (kind === "video" && bytes > MAX_VIDEO_BYTES) await reject("Video is too large (max 200 MB)");
+    if ((kind === "video" || kind === "source") && bytes > MAX_VIDEO_BYTES) {
+      await reject("Video is too large (max 200 MB)");
+    }
     if (kind === "frame" && bytes > 8 * 1024 * 1024) await reject("Frame image is too large");
     if (kind === "audio" && bytes > 50 * 1024 * 1024) await reject("Audio track is too large");
 
@@ -58,7 +73,7 @@ export const finalizeVideoUpload = createServerFn({ method: "POST" })
       if (error || !blob) await reject("Uploaded file could not be read");
       const header = new Uint8Array(await blob!.slice(0, 64).arrayBuffer());
       const container = sniffVideoContainer(header);
-      if (!container) await reject("That file is not a supported MP4, MOV or WEBM video");
+      if (!container) await reject("That file could not be prepared for playback");
       return { ok: true, bytes, container };
     }
 
