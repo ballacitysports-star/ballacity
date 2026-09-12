@@ -93,7 +93,14 @@ const ROSTER_ORDER: Record<TeamRole, number> = {
   player: 4,
 };
 
-/** Server error codes raised by the team RPCs, in plain language. */
+/**
+ * Server error codes raised by the team RPCs, in plain language.
+ *
+ * The role-guard codes come from guard_team_member_role_change() (migration
+ * 20260910000000). The same escalation is also pinned by RLS in 20260912013327,
+ * which fails silently with zero rows instead — so a blocked write may surface
+ * either as one of these messages or as "nothing changed".
+ */
 export function teamRosterErrorMessage(err: unknown): string {
   const raw = err instanceof Error ? err.message : String((err as { message?: string })?.message ?? err ?? "");
   if (raw.includes("NOT_TEAM_MANAGER")) return "Only the team's owner, managers or coaches can do that.";

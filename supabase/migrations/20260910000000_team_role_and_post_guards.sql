@@ -17,6 +17,14 @@
 -- SECURITY INVOKER on purpose: `team_role_of` is already SECURITY DEFINER and
 -- executable by `authenticated`, so the guard needs no elevated rights of its
 -- own and does not join the set of definer trigger routines revoked earlier.
+--
+-- PAIRED WITH 20260912013327. That migration closes the same escalation at the
+-- RLS layer, pinning role on a self-update against the stored value. Keep both:
+-- it does not refuse a write where OLD.role = 'owner' (its manager policy
+-- admits the owner's row and only constrains the new value), and a policy
+-- rejection is a silent zero-row result, whereas this raises NOT_TEAM_MANAGER /
+-- OWNER_ROLE_FIXED for teamRosterErrorMessage() to render. Deleting either as
+-- "duplication" reopens part of the hole.
 CREATE OR REPLACE FUNCTION public.guard_team_member_role_change()
 RETURNS trigger LANGUAGE plpgsql SET search_path = public AS $$
 DECLARE _me uuid := auth.uid();
