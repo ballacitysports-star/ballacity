@@ -110,6 +110,21 @@ type DbRow = {
 };
 
 
+/**
+ * Games are publicly readable, so only intentionally public host fields may be
+ * denormalized onto the row. Never contact details or private profile fields.
+ */
+function publicHostSnapshot(host: unknown) {
+  const h = (host ?? {}) as Record<string, unknown>;
+  const str = (v: unknown) => (typeof v === "string" && v.trim() ? v.trim() : undefined);
+  const snap: { name?: string; username?: string; avatar?: string; rating?: number } = {};
+  if (str(h.name)) snap.name = str(h.name);
+  if (str(h.username)) snap.username = str(h.username);
+  if (str(h.avatar)) snap.avatar = str(h.avatar);
+  if (typeof h.rating === "number" && Number.isFinite(h.rating)) snap.rating = h.rating;
+  return snap;
+}
+
 function rowToGame(r: DbRow): Game {
   const snap = r.host_snapshot ?? {};
   return {
@@ -194,7 +209,7 @@ function gameToInsertRow(g: Game): TablesInsert<"hosted_games"> {
     signup_cutoff_min: Number((g as { signupCutoffMin?: number }).signupCutoffMin ?? 0) || 0,
     min_age: (g as { minAge?: number | null }).minAge ?? null,
     max_age: (g as { maxAge?: number | null }).maxAge ?? null,
-    host_snapshot: (g.host ?? {}) as TablesInsert<"hosted_games">["host_snapshot"],
+    host_snapshot: publicHostSnapshot(g.host) as TablesInsert<"hosted_games">["host_snapshot"],
     positions_needed: (g.positionsNeeded ?? {}) as TablesInsert<"hosted_games">["positions_needed"],
     ...(g.teamId ? { team_id: g.teamId } : {}),
     ...(g.orgId ? { org_id: g.orgId } : {}),

@@ -1317,6 +1317,51 @@ export type Database = {
         }
         Relationships: []
       }
+      listing_claims: {
+        Row: {
+          created_at: string
+          denial_reason: string | null
+          evidence_url: string | null
+          id: string
+          message: string | null
+          reviewed_at: string | null
+          reviewed_by: string | null
+          status: string
+          subject_id: string
+          subject_type: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          denial_reason?: string | null
+          evidence_url?: string | null
+          id?: string
+          message?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+          subject_id: string
+          subject_type: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          denial_reason?: string | null
+          evidence_url?: string | null
+          id?: string
+          message?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+          subject_id?: string
+          subject_type?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       location_denial_events: {
         Row: {
           code: number | null
@@ -2770,6 +2815,7 @@ export type Database = {
           cadence: string | null
           cadences: Json
           city: string
+          claimed_at: string | null
           cover: string
           created_at: string
           credentials: string[]
@@ -2784,9 +2830,11 @@ export type Database = {
           id: string
           kind: string
           league: string | null
+          listed_at: string | null
+          listed_by: string | null
           losses: number
           name: string
-          owner_id: string
+          owner_id: string | null
           positions_needed: Json
           primary_venue: string | null
           rate_per_hour: number | null
@@ -2818,6 +2866,7 @@ export type Database = {
           cadence?: string | null
           cadences?: Json
           city?: string
+          claimed_at?: string | null
           cover?: string
           created_at?: string
           credentials?: string[]
@@ -2832,9 +2881,11 @@ export type Database = {
           id: string
           kind: string
           league?: string | null
+          listed_at?: string | null
+          listed_by?: string | null
           losses?: number
           name: string
-          owner_id: string
+          owner_id?: string | null
           positions_needed?: Json
           primary_venue?: string | null
           rate_per_hour?: number | null
@@ -2866,6 +2917,7 @@ export type Database = {
           cadence?: string | null
           cadences?: Json
           city?: string
+          claimed_at?: string | null
           cover?: string
           created_at?: string
           credentials?: string[]
@@ -2880,9 +2932,11 @@ export type Database = {
           id?: string
           kind?: string
           league?: string | null
+          listed_at?: string | null
+          listed_by?: string | null
           losses?: number
           name?: string
-          owner_id?: string
+          owner_id?: string | null
           positions_needed?: Json
           primary_venue?: string | null
           rate_per_hour?: number | null
@@ -3061,6 +3115,7 @@ export type Database = {
           bio: string | null
           category: string | null
           city: string | null
+          claimed_at: string | null
           cover_url: string | null
           created_at: string
           email: string | null
@@ -3069,8 +3124,10 @@ export type Database = {
           hidden_at: string | null
           hours: Json
           id: string
+          listed_at: string | null
+          listed_by: string | null
           name: string
-          owner_id: string
+          owner_id: string | null
           phone: string | null
           photos: string[]
           place_id: string | null
@@ -3087,6 +3144,7 @@ export type Database = {
           bio?: string | null
           category?: string | null
           city?: string | null
+          claimed_at?: string | null
           cover_url?: string | null
           created_at?: string
           email?: string | null
@@ -3095,8 +3153,10 @@ export type Database = {
           hidden_at?: string | null
           hours?: Json
           id?: string
+          listed_at?: string | null
+          listed_by?: string | null
           name: string
-          owner_id: string
+          owner_id?: string | null
           phone?: string | null
           photos?: string[]
           place_id?: string | null
@@ -3113,6 +3173,7 @@ export type Database = {
           bio?: string | null
           category?: string | null
           city?: string | null
+          claimed_at?: string | null
           cover_url?: string | null
           created_at?: string
           email?: string | null
@@ -3121,8 +3182,10 @@ export type Database = {
           hidden_at?: string | null
           hours?: Json
           id?: string
+          listed_at?: string | null
+          listed_by?: string | null
           name?: string
-          owner_id?: string
+          owner_id?: string | null
           phone?: string | null
           photos?: string[]
           place_id?: string | null
@@ -3343,6 +3406,7 @@ export type Database = {
       }
       age_verified: { Args: { _user: string }; Returns: boolean }
       ai_analysis_allowed: { Args: { _user: string }; Returns: boolean }
+      approve_listing_claim: { Args: { _claim: string }; Returns: undefined }
       approve_org_member_request: { Args: { _req: string }; Returns: string }
       approve_parental_consent: {
         Args: {
@@ -3424,10 +3488,36 @@ export type Database = {
             }
             Returns: string
           }
+      create_unclaimed_gym: {
+        Args: {
+          _address?: string
+          _category?: string
+          _city?: string
+          _handle: string
+          _name: string
+          _website?: string
+        }
+        Returns: string
+      }
+      create_unclaimed_team: {
+        Args: {
+          _city?: string
+          _handle: string
+          _id: string
+          _kind: string
+          _name: string
+          _sports?: string[]
+        }
+        Returns: string
+      }
       decline_conversation: { Args: { _conv: string }; Returns: undefined }
       default_profile_visibility_for: {
         Args: { _user: string }
         Returns: string
+      }
+      deny_listing_claim: {
+        Args: { _claim: string; _reason: string }
+        Returns: undefined
       }
       deny_org_member_request: {
         Args: { _reason: string; _req: string }
@@ -3786,6 +3876,15 @@ export type Database = {
         Returns: boolean
       }
       shares_team: { Args: { _a: string; _b: string }; Returns: boolean }
+      submit_listing_claim: {
+        Args: {
+          _evidence?: string
+          _id: string
+          _message?: string
+          _type: string
+        }
+        Returns: string
+      }
       team_cancel_invite: { Args: { _invite: string }; Returns: undefined }
       team_invite_player: {
         Args: {
@@ -3817,6 +3916,10 @@ export type Database = {
         }
         Returns: undefined
       }
+      transfer_team_ownership: {
+        Args: { _team: string; _to: string }
+        Returns: undefined
+      }
       try_uuid: { Args: { _v: string }; Returns: string }
       unpublish_legal_document: {
         Args: { _id: string; _reason?: string }
@@ -3834,6 +3937,7 @@ export type Database = {
           id: string
         }[]
       }
+      withdraw_listing_claim: { Args: { _claim: string }; Returns: undefined }
       youth_flag: { Args: { _flag: string }; Returns: boolean }
     }
     Enums: {
