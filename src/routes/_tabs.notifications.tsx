@@ -20,7 +20,7 @@ function NotificationsPage() {
   const { user, loading } = useAuth();
 
   return (
-    <div className="page-shell-narrow pt-6 pb-32">
+    <div className="page-shell-content pt-6 pb-32">
       <div className="mb-5 flex items-center gap-3">
         <Link
           to="/feed"

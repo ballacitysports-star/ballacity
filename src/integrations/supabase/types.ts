@@ -3688,6 +3688,7 @@ export type Database = {
         }
         Returns: undefined
       }
+      owns_player_profile: { Args: { _player: string }; Returns: boolean }
       parental_consent_required: { Args: { _cohort: string }; Returns: boolean }
       parental_consent_state: { Args: { _child: string }; Returns: string }
       platform_status: { Args: { _user: string }; Returns: string }

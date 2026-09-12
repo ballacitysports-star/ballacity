@@ -94,7 +94,7 @@ export const Route = createFileRoute("/orgs/$orgId/")({
   errorComponent: ({ error, reset }) => (
     <RouteFallback
       title="Couldn't load this gym"
-      message={error.message}
+      message={error instanceof Error ? error.message : "Something went wrong."}
       onRetry={reset}
       action={
         <Link to="/orgs" className={FALLBACK_ACTION_CLASS}>

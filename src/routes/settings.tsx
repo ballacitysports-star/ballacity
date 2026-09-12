@@ -251,7 +251,7 @@ function SettingsHubPage() {
     <div className="min-h-dvh bg-background pb-24">
       <BackHeader title="Settings" fallbackTo="/profile" />
 
-      <main className="page-shell-narrow pb-4">
+      <main className="page-shell-content pb-4">
         <AccountIdentityRow />
 
         <AgeReviewNotice />
