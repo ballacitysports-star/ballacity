@@ -65,6 +65,28 @@ function shiftToToday(dob: string, now: string): string {
   return `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
 }
 
+describe("checkDobParts minimum age", () => {
+  const now = new Date(2026, 8, 11);
+
+  it("refuses an under-13 birthday", () => {
+    const r = checkDobParts({ month: "1", day: "1", year: "2020" }, now);
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.message).toMatch(/at least 13/);
+  });
+
+  it("accepts exactly 13", () => {
+    const r = checkDobParts({ month: "9", day: "11", year: "2013" }, now);
+    expect(r.ok).toBe(true);
+    if (r.ok) expect(r.cohort).toBe("teen_13_15");
+  });
+
+  it("still accepts adults", () => {
+    const r = checkDobParts({ month: "5", day: "4", year: "1990" }, now);
+    expect(r.ok).toBe(true);
+    if (r.ok) expect(r.cohort).toBe("adult");
+  });
+});
+
 describe("checkDobParts", () => {
   it("requires all three parts", () => {
     const r = checkDobParts({ month: "3", day: "", year: "2010" });
@@ -88,7 +110,11 @@ describe("signup state machine", () => {
   const base = { authenticated: true, hasAccountType: false } as const;
 
   it("sends an authenticated user with no verified age to the DOB gate", () => {
-    const state = signupStateFor({ ...base, status: "age_verification_required", cohort: "unknown" });
+    const state = signupStateFor({
+      ...base,
+      status: "age_verification_required",
+      cohort: "unknown",
+    });
     expect(state).toBe("DOB_REQUIRED");
     expect(routeForSignupState(state)).toBe("/onboarding/age");
   });
@@ -128,7 +154,12 @@ describe("signup state machine", () => {
 
   it("is ACTIVE only once age and account type are both settled", () => {
     expect(
-      signupStateFor({ authenticated: true, status: "active", cohort: "adult", hasAccountType: true }),
+      signupStateFor({
+        authenticated: true,
+        status: "active",
+        cohort: "adult",
+        hasAccountType: true,
+      }),
     ).toBe("ACTIVE");
   });
 

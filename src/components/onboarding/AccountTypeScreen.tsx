@@ -21,7 +21,11 @@ export function destinationForAccountType(t: AccountType): string {
       return "/orgs/create";
     case "player":
     default:
-      return "/onboarding/welcome";
+      // Players go through "who is this for?" first (§4 step 2). That is the
+      // fork deciding whether this account gets the owner's own profile, a
+      // child's, or both, and it has to come before the profile wizard —
+      // which asks about one athlete and would otherwise assume it is them.
+      return "/onboarding/setup-for";
   }
 }
 

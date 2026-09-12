@@ -107,7 +107,7 @@ test("delayed realtime: polling flips gate once, late frames create no duplicate
   // channel objects (with bindings) so we can synthesize a "late" frame
   // later in the test.
   await page.route(
-    (u) => u.includes("/realtime/"),
+    (u) => String(u).includes("/realtime/"),
     (route: PWRoute) => route.abort(),
   );
 

@@ -5,6 +5,10 @@ on:
   push:
     branches: [main]
 
+# Two levels, because they solve different problems.
+#
+# Workflow level, keyed on the ref: a new push to the same branch cancels the
+# run it superseded. That is the usual "don't test stale code" saving.
 concurrency:
   group: e2e-${{ github.ref }}
   cancel-in-progress: true
@@ -12,12 +16,42 @@ concurrency:
 jobs:
   playwright:
     name: Playwright
+    # Job level, keyed on nothing: only one E2E job in the repository executes
+    # at a time, whatever ref it is on.
+    #
+    # The ref-keyed group above cannot do this. A PR's run and main's run sit
+    # in different groups, so they never serialise against each other — and
+    # merging a PR fires both at once, seconds apart. Runs 58/59 started 5s
+    # apart, 56/57 53s apart, and 68/69 overlapped for 23 minutes.
+    #
+    # They share one Supabase project and the same handful of fixture
+    # accounts, so an overlap is two suites signing the same users in and out,
+    # writing the same rows and cancelling each other's sessions. That is why
+    # the suite has looked non-deterministic: run 68 failed 79 tests during a
+    # 23-minute overlap, while run 70 — essentially alone — failed far fewer,
+    # with the code between them differing by one CSS rule.
+    #
+    # cancel-in-progress is false here on purpose: a queued run must wait for
+    # the database, not kill whoever holds it. GitHub keeps at most one run
+    # pending per group and drops the older pending one, so this serialises
+    # without building a backlog.
+    concurrency:
+      group: e2e-shared-supabase-fixtures
+      cancel-in-progress: false
     runs-on: ubuntu-latest
-    # Was 20; the suite ran with the fixture accounts genuinely signed in for
-    # the first time and hit this ceiling mid-run (single-worker by design —
-    # see playwright.config.ts — since many specs share the same few fixture
-    # accounts and parallel runs would race on them).
-    timeout-minutes: 40
+    # Single-worker by design (see playwright.config.ts): many specs share the
+    # same few fixture accounts and parallel runs would race on them.
+    #
+    # Raised 20 -> 40 once before, for a run that was believed to have the
+    # fixture accounts signed in. It did not — seeding had never actually
+    # succeeded, so ~168 specs auto-skipped for want of a session and the suite
+    # finished in about seven minutes while looking healthy.
+    #
+    # Seeding works now, so those specs execute for the first time and the suite
+    # takes far longer: run 91 reached spec 152 of 197 in 38 minutes before this
+    # ceiling killed it, which also destroyed the JSON report and with it any
+    # view of what actually failed. 75 leaves room to finish and still report.
+    timeout-minutes: 75
     env:
       # Force Playwright to use its own managed Chromium rather than the
       # sandbox-only path baked into playwright.config.ts.
@@ -85,6 +119,41 @@ jobs:
 
       - name: Run Playwright tests
         run: bunx playwright test
+
+      # Runs even when the suite fails, which is the only time it matters.
+      # Reads the JSON reporter's file rather than the job log, so the tally
+      # survives the stdout truncation that lost it in runs 70 and 71.
+      - name: Summarise results
+        if: always()
+        run: |
+          f=playwright-report/results.json
+          if [ ! -f "$f" ]; then echo "no results.json - the run died before writing one"; exit 0; fi
+          node -e '
+            const r = require("./playwright-report/results.json");
+            const out = [];
+            const walk = (s) => (s.suites ?? []).forEach(walk) ||
+              (s.specs ?? []).forEach((sp) => sp.tests.forEach((t) =>
+                out.push({ status: t.status, title: sp.title, file: sp.file,
+                  err: (t.results ?? []).map((x) => x.error?.message).find(Boolean) ?? "" })));
+            (r.suites ?? []).forEach(walk);
+            const by = (st) => out.filter((o) => o.status === st).length;
+            const failed = out.filter((o) => o.status !== "expected" && o.status !== "skipped");
+            const line = `${failed.length} failed, ${by("expected")} passed, ${by("skipped")} skipped, ${out.length} total`;
+            console.log(line);
+            const files = [...new Set(failed.map((f) => f.file))].sort();
+            console.log(`${files.length} spec files with failures:`);
+            const clean = (e) => e.replace(/\u001b\[[0-9;]*m/g, "").split("\n")[0].slice(0, 160);
+            for (const f of files) {
+              console.log("  " + f);
+              for (const t of failed.filter((x) => x.file === f))
+                console.log(`      ${t.title}\n        ${clean(t.err) || "(no error message)"}`);
+            }
+            const sum = process.env.GITHUB_STEP_SUMMARY;
+            if (sum) require("fs").appendFileSync(sum,
+              `### E2E\n\n${line}\n\n` +
+              files.map((f) => `- ${f}\n` + failed.filter((x) => x.file === f)
+                .map((t) => `  - ${t.title} — \`${clean(t.err) || "no message"}\``).join("\n")).join("\n") + "\n");
+          '
 
       - name: Stop dev server
         if: always()

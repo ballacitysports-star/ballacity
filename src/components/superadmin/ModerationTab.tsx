@@ -76,9 +76,13 @@ function summarize(kind: string, row: any) {
     case "games":
       return `${row.title} · ${row.sport} · ${new Date(row.date).toLocaleString()} · ${row.location}`;
     case "teams":
-      return `${row.name} @${row.handle} · ${row.kind}${row.city ? ` · ${row.city}` : ""}`;
+      return `${row.name} @${row.handle} · ${row.kind}${row.city ? ` · ${row.city}` : ""}${
+        row.owner_id ? "" : " · Unclaimed"
+      }`;
     case "gyms":
-      return `${row.name} @${row.handle}${row.city ? ` · ${row.city}` : ""}`;
+      return `${row.name} @${row.handle}${row.city ? ` · ${row.city}` : ""}${
+        row.owner_id ? "" : " · Unclaimed"
+      }`;
     case "posts":
       return `${row.title} · ${row.kind}`;
     case "availability":

@@ -109,6 +109,9 @@ function AdminPage() {
             <Link to="/admin/moderation">Moderation</Link>
           </Button>
           <Button variant="outline" asChild>
+            <Link to="/admin/listings">Listings &amp; claims</Link>
+          </Button>
+          <Button variant="outline" asChild>
             <Link to="/admin/legal">Legal &amp; Compliance</Link>
           </Button>
           <Button variant="outline" asChild>

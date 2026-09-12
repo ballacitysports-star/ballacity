@@ -80,7 +80,7 @@ export const MANAGED_LEGAL_META: Record<ManagedLegalType, ManagedLegalMeta> = {
   cookie_preferences: {
     type: "cookie_preferences",
     label: "Cookie & Privacy Preferences",
-    path: null,
+    path: "/cookies",
     requiresConsent: false,
     description: "Storage used for sign-in and preferences, and how to manage it.",
   },

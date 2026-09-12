@@ -79,7 +79,16 @@ export function GameCard({ game, index = 0 }: { game: Game; index?: number }) {
   };
 
   return (
-    <div className="enter-up" style={{ "--enter-delay": `${index * 50}ms` } as CSSProperties}>
+    // min-w-0: as a grid/flex item this wrapper defaults to min-width:auto, so
+    // it refuses to shrink below the card's min-content width. Measured at a
+    // 320px viewport the track was 294px and the card sat at 361px, pushing
+    // the page 54px wide — no single element is too long, it is the whole
+    // composition. Every consumer puts GameCard in a grid, so this belongs
+    // here rather than on each of the five call sites.
+    <div
+      className="enter-up min-w-0"
+      style={{ "--enter-delay": `${index * 50}ms` } as CSSProperties}
+    >
       <Link
         to="/games/$gameId"
         params={{ gameId: game.id }}

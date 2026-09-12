@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link } from "@tanstack/react-router";
 import {
   Building2,
@@ -106,6 +106,10 @@ export function OrgListingHeader({
   const [hoursOpen, setHoursOpen] = useState(false);
   const [lightbox, setLightbox] = useState<number | null>(null);
   const [shareOpen, setShareOpen] = useState(false);
+  const [avatarFailed, setAvatarFailed] = useState(false);
+  useEffect(() => {
+    setAvatarFailed(false);
+  }, [org.avatar_url]);
 
   const hours = parseHours(org.hours);
   const open = resolveOpenState(hours, org.timezone);
@@ -189,8 +193,14 @@ export function OrgListingHeader({
       <div className="space-y-4 p-5">
         <div className="flex items-start gap-3">
           <div className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-lime/15 text-2xl">
-            {org.avatar_url ? (
-              <ResponsiveAvatar src={org.avatar_url} size={56} alt="" className="h-full w-full object-cover" />
+            {org.avatar_url && !avatarFailed ? (
+              <ResponsiveAvatar
+                src={org.avatar_url}
+                size={56}
+                alt=""
+                className="h-full w-full object-cover"
+                onLoadError={() => setAvatarFailed(true)}
+              />
             ) : org.avatar ? (
               <span>{org.avatar}</span>
             ) : (

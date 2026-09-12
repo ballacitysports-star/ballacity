@@ -14,6 +14,7 @@ import { Route as TabsRouteImport } from './routes/_tabs'
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as CommunityGuidelinesRouteImport } from './routes/community-guidelines'
 import { Route as ContactRouteImport } from './routes/contact'
+import { Route as CookiesRouteImport } from './routes/cookies'
 import { Route as McpRouteImport } from './routes/mcp'
 import { Route as PaymentsRouteImport } from './routes/payments'
 import { Route as PickupRouteImport } from './routes/pickup'
@@ -52,6 +53,7 @@ import { Route as AdminAuditRouteImport } from './routes/admin.audit'
 import { Route as AdminChildSafetyRouteImport } from './routes/admin.child-safety'
 import { Route as AdminComplianceRouteImport } from './routes/admin.compliance'
 import { Route as AdminLegalRouteImport } from './routes/admin.legal'
+import { Route as AdminListingsRouteImport } from './routes/admin.listings'
 import { Route as AdminLocationAnalyticsRouteImport } from './routes/admin.location-analytics'
 import { Route as AdminModerationRouteImport } from './routes/admin.moderation'
 import { Route as CheckoutReturnRouteImport } from './routes/checkout.return'
@@ -63,12 +65,14 @@ import { Route as MessagesConversationIdRouteImport } from './routes/messages.$c
 import { Route as OnboardingAccountTypeRouteImport } from './routes/onboarding.account-type'
 import { Route as OnboardingAgeRouteImport } from './routes/onboarding.age'
 import { Route as OnboardingChildRouteImport } from './routes/onboarding.child'
+import { Route as OnboardingSetupForRouteImport } from './routes/onboarding.setup-for'
 import { Route as OnboardingWelcomeRouteImport } from './routes/onboarding.welcome'
 import { Route as OrgsIndexRouteImport } from './routes/orgs.index'
 import { Route as OrgsCreateRouteImport } from './routes/orgs.create'
 import { Route as ParentIndexRouteImport } from './routes/parent.index'
 import { Route as PlayerCardUserIdRouteImport } from './routes/player-card.$userId'
 import { Route as PlayersUserIdRouteImport } from './routes/players.$userId'
+import { Route as PlayersAddRouteImport } from './routes/players.add'
 import { Route as ProfileEditRouteImport } from './routes/profile.edit'
 import { Route as ReviewNewRouteImport } from './routes/review.new'
 import { Route as SafetyChildrenRouteImport } from './routes/safety_.children'
@@ -87,6 +91,7 @@ import { Route as OrgsOrgIdMembersRouteImport } from './routes/orgs.$orgId.membe
 import { Route as ParentConsentTokenRouteImport } from './routes/parent.consent.$token'
 import { Route as TeamsTeamIdIndexRouteImport } from './routes/teams.$teamId.index'
 import { Route as TeamsTeamIdEditRouteImport } from './routes/teams.$teamId.edit'
+import { Route as TeamsTeamIdManageRouteImport } from './routes/teams.$teamId.manage'
 import { Route as TrainersTrainerIdIndexRouteImport } from './routes/trainers.$trainerId.index'
 import { Route as TrainersTrainerIdEditRouteImport } from './routes/trainers.$trainerId.edit'
 import { Route as ApiPublicNotificationsFlushRouteImport } from './routes/api/public/notifications/flush'
@@ -117,6 +122,11 @@ const CommunityGuidelinesRoute = CommunityGuidelinesRouteImport.update({
 const ContactRoute = ContactRouteImport.update({
   id: '/contact',
   path: '/contact',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CookiesRoute = CookiesRouteImport.update({
+  id: '/cookies',
+  path: '/cookies',
   getParentRoute: () => rootRouteImport,
 } as any)
 const McpRoute = McpRouteImport.update({
@@ -311,6 +321,11 @@ const AdminLegalRoute = AdminLegalRouteImport.update({
   path: '/admin/legal',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AdminListingsRoute = AdminListingsRouteImport.update({
+  id: '/admin/listings',
+  path: '/admin/listings',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AdminLocationAnalyticsRoute = AdminLocationAnalyticsRouteImport.update({
   id: '/admin/location-analytics',
   path: '/admin/location-analytics',
@@ -366,6 +381,11 @@ const OnboardingChildRoute = OnboardingChildRouteImport.update({
   path: '/onboarding/child',
   getParentRoute: () => rootRouteImport,
 } as any)
+const OnboardingSetupForRoute = OnboardingSetupForRouteImport.update({
+  id: '/onboarding/setup-for',
+  path: '/onboarding/setup-for',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const OnboardingWelcomeRoute = OnboardingWelcomeRouteImport.update({
   id: '/onboarding/welcome',
   path: '/onboarding/welcome',
@@ -394,6 +414,11 @@ const PlayerCardUserIdRoute = PlayerCardUserIdRouteImport.update({
 const PlayersUserIdRoute = PlayersUserIdRouteImport.update({
   id: '/players/$userId',
   path: '/players/$userId',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PlayersAddRoute = PlayersAddRouteImport.update({
+  id: '/players/add',
+  path: '/players/add',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ProfileEditRoute = ProfileEditRouteImport.update({
@@ -487,6 +512,11 @@ const TeamsTeamIdEditRoute = TeamsTeamIdEditRouteImport.update({
   path: '/teams/$teamId/edit',
   getParentRoute: () => rootRouteImport,
 } as any)
+const TeamsTeamIdManageRoute = TeamsTeamIdManageRouteImport.update({
+  id: '/teams/$teamId/manage',
+  path: '/teams/$teamId/manage',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const TrainersTrainerIdIndexRoute = TrainersTrainerIdIndexRouteImport.update({
   id: '/trainers/$trainerId/',
   path: '/trainers/$trainerId/',
@@ -530,6 +560,7 @@ export interface FileRoutesByFullPath {
   '/auth': typeof AuthRoute
   '/community-guidelines': typeof CommunityGuidelinesRoute
   '/contact': typeof ContactRoute
+  '/cookies': typeof CookiesRoute
   '/mcp': typeof McpRoute
   '/payments': typeof PaymentsRoute
   '/pickup': typeof PickupRoute
@@ -567,6 +598,7 @@ export interface FileRoutesByFullPath {
   '/admin/child-safety': typeof AdminChildSafetyRoute
   '/admin/compliance': typeof AdminComplianceRoute
   '/admin/legal': typeof AdminLegalRoute
+  '/admin/listings': typeof AdminListingsRoute
   '/admin/location-analytics': typeof AdminLocationAnalyticsRoute
   '/admin/moderation': typeof AdminModerationRoute
   '/checkout/return': typeof CheckoutReturnRoute
@@ -577,10 +609,12 @@ export interface FileRoutesByFullPath {
   '/onboarding/account-type': typeof OnboardingAccountTypeRoute
   '/onboarding/age': typeof OnboardingAgeRoute
   '/onboarding/child': typeof OnboardingChildRoute
+  '/onboarding/setup-for': typeof OnboardingSetupForRoute
   '/onboarding/welcome': typeof OnboardingWelcomeRoute
   '/orgs/create': typeof OrgsCreateRoute
   '/player-card/$userId': typeof PlayerCardUserIdRoute
   '/players/$userId': typeof PlayersUserIdRoute
+  '/players/add': typeof PlayersAddRoute
   '/profile/edit': typeof ProfileEditRoute
   '/review/new': typeof ReviewNewRoute
   '/safety/children': typeof SafetyChildrenRoute
@@ -600,6 +634,7 @@ export interface FileRoutesByFullPath {
   '/orgs/$orgId/members': typeof OrgsOrgIdMembersRoute
   '/parent/consent/$token': typeof ParentConsentTokenRoute
   '/teams/$teamId/edit': typeof TeamsTeamIdEditRoute
+  '/teams/$teamId/manage': typeof TeamsTeamIdManageRoute
   '/trainers/$trainerId/edit': typeof TrainersTrainerIdEditRoute
   '/games/$gameId/': typeof GamesGameIdIndexRoute
   '/orgs/$orgId/': typeof OrgsOrgIdIndexRoute
@@ -616,6 +651,7 @@ export interface FileRoutesByTo {
   '/auth': typeof AuthRoute
   '/community-guidelines': typeof CommunityGuidelinesRoute
   '/contact': typeof ContactRoute
+  '/cookies': typeof CookiesRoute
   '/mcp': typeof McpRoute
   '/payments': typeof PaymentsRoute
   '/pickup': typeof PickupRoute
@@ -653,6 +689,7 @@ export interface FileRoutesByTo {
   '/admin/child-safety': typeof AdminChildSafetyRoute
   '/admin/compliance': typeof AdminComplianceRoute
   '/admin/legal': typeof AdminLegalRoute
+  '/admin/listings': typeof AdminListingsRoute
   '/admin/location-analytics': typeof AdminLocationAnalyticsRoute
   '/admin/moderation': typeof AdminModerationRoute
   '/checkout/return': typeof CheckoutReturnRoute
@@ -662,10 +699,12 @@ export interface FileRoutesByTo {
   '/onboarding/account-type': typeof OnboardingAccountTypeRoute
   '/onboarding/age': typeof OnboardingAgeRoute
   '/onboarding/child': typeof OnboardingChildRoute
+  '/onboarding/setup-for': typeof OnboardingSetupForRoute
   '/onboarding/welcome': typeof OnboardingWelcomeRoute
   '/orgs/create': typeof OrgsCreateRoute
   '/player-card/$userId': typeof PlayerCardUserIdRoute
   '/players/$userId': typeof PlayersUserIdRoute
+  '/players/add': typeof PlayersAddRoute
   '/profile/edit': typeof ProfileEditRoute
   '/review/new': typeof ReviewNewRoute
   '/safety/children': typeof SafetyChildrenRoute
@@ -685,6 +724,7 @@ export interface FileRoutesByTo {
   '/orgs/$orgId/members': typeof OrgsOrgIdMembersRoute
   '/parent/consent/$token': typeof ParentConsentTokenRoute
   '/teams/$teamId/edit': typeof TeamsTeamIdEditRoute
+  '/teams/$teamId/manage': typeof TeamsTeamIdManageRoute
   '/trainers/$trainerId/edit': typeof TrainersTrainerIdEditRoute
   '/games/$gameId': typeof GamesGameIdIndexRoute
   '/orgs/$orgId': typeof OrgsOrgIdIndexRoute
@@ -703,6 +743,7 @@ export interface FileRoutesById {
   '/auth': typeof AuthRoute
   '/community-guidelines': typeof CommunityGuidelinesRoute
   '/contact': typeof ContactRoute
+  '/cookies': typeof CookiesRoute
   '/mcp': typeof McpRoute
   '/payments': typeof PaymentsRoute
   '/pickup': typeof PickupRoute
@@ -740,6 +781,7 @@ export interface FileRoutesById {
   '/admin/child-safety': typeof AdminChildSafetyRoute
   '/admin/compliance': typeof AdminComplianceRoute
   '/admin/legal': typeof AdminLegalRoute
+  '/admin/listings': typeof AdminListingsRoute
   '/admin/location-analytics': typeof AdminLocationAnalyticsRoute
   '/admin/moderation': typeof AdminModerationRoute
   '/checkout/return': typeof CheckoutReturnRoute
@@ -750,10 +792,12 @@ export interface FileRoutesById {
   '/onboarding/account-type': typeof OnboardingAccountTypeRoute
   '/onboarding/age': typeof OnboardingAgeRoute
   '/onboarding/child': typeof OnboardingChildRoute
+  '/onboarding/setup-for': typeof OnboardingSetupForRoute
   '/onboarding/welcome': typeof OnboardingWelcomeRoute
   '/orgs/create': typeof OrgsCreateRoute
   '/player-card/$userId': typeof PlayerCardUserIdRoute
   '/players/$userId': typeof PlayersUserIdRoute
+  '/players/add': typeof PlayersAddRoute
   '/profile/edit': typeof ProfileEditRoute
   '/review/new': typeof ReviewNewRoute
   '/safety_/children': typeof SafetyChildrenRoute
@@ -773,6 +817,7 @@ export interface FileRoutesById {
   '/orgs/$orgId/members': typeof OrgsOrgIdMembersRoute
   '/parent/consent/$token': typeof ParentConsentTokenRoute
   '/teams/$teamId/edit': typeof TeamsTeamIdEditRoute
+  '/teams/$teamId/manage': typeof TeamsTeamIdManageRoute
   '/trainers/$trainerId/edit': typeof TrainersTrainerIdEditRoute
   '/games/$gameId/': typeof GamesGameIdIndexRoute
   '/orgs/$orgId/': typeof OrgsOrgIdIndexRoute
@@ -791,6 +836,7 @@ export interface FileRouteTypes {
     | '/auth'
     | '/community-guidelines'
     | '/contact'
+    | '/cookies'
     | '/mcp'
     | '/payments'
     | '/pickup'
@@ -828,6 +874,7 @@ export interface FileRouteTypes {
     | '/admin/child-safety'
     | '/admin/compliance'
     | '/admin/legal'
+    | '/admin/listings'
     | '/admin/location-analytics'
     | '/admin/moderation'
     | '/checkout/return'
@@ -838,10 +885,12 @@ export interface FileRouteTypes {
     | '/onboarding/account-type'
     | '/onboarding/age'
     | '/onboarding/child'
+    | '/onboarding/setup-for'
     | '/onboarding/welcome'
     | '/orgs/create'
     | '/player-card/$userId'
     | '/players/$userId'
+    | '/players/add'
     | '/profile/edit'
     | '/review/new'
     | '/safety/children'
@@ -861,6 +910,7 @@ export interface FileRouteTypes {
     | '/orgs/$orgId/members'
     | '/parent/consent/$token'
     | '/teams/$teamId/edit'
+    | '/teams/$teamId/manage'
     | '/trainers/$trainerId/edit'
     | '/games/$gameId/'
     | '/orgs/$orgId/'
@@ -877,6 +927,7 @@ export interface FileRouteTypes {
     | '/auth'
     | '/community-guidelines'
     | '/contact'
+    | '/cookies'
     | '/mcp'
     | '/payments'
     | '/pickup'
@@ -914,6 +965,7 @@ export interface FileRouteTypes {
     | '/admin/child-safety'
     | '/admin/compliance'
     | '/admin/legal'
+    | '/admin/listings'
     | '/admin/location-analytics'
     | '/admin/moderation'
     | '/checkout/return'
@@ -923,10 +975,12 @@ export interface FileRouteTypes {
     | '/onboarding/account-type'
     | '/onboarding/age'
     | '/onboarding/child'
+    | '/onboarding/setup-for'
     | '/onboarding/welcome'
     | '/orgs/create'
     | '/player-card/$userId'
     | '/players/$userId'
+    | '/players/add'
     | '/profile/edit'
     | '/review/new'
     | '/safety/children'
@@ -946,6 +1000,7 @@ export interface FileRouteTypes {
     | '/orgs/$orgId/members'
     | '/parent/consent/$token'
     | '/teams/$teamId/edit'
+    | '/teams/$teamId/manage'
     | '/trainers/$trainerId/edit'
     | '/games/$gameId'
     | '/orgs/$orgId'
@@ -963,6 +1018,7 @@ export interface FileRouteTypes {
     | '/auth'
     | '/community-guidelines'
     | '/contact'
+    | '/cookies'
     | '/mcp'
     | '/payments'
     | '/pickup'
@@ -1000,6 +1056,7 @@ export interface FileRouteTypes {
     | '/admin/child-safety'
     | '/admin/compliance'
     | '/admin/legal'
+    | '/admin/listings'
     | '/admin/location-analytics'
     | '/admin/moderation'
     | '/checkout/return'
@@ -1010,10 +1067,12 @@ export interface FileRouteTypes {
     | '/onboarding/account-type'
     | '/onboarding/age'
     | '/onboarding/child'
+    | '/onboarding/setup-for'
     | '/onboarding/welcome'
     | '/orgs/create'
     | '/player-card/$userId'
     | '/players/$userId'
+    | '/players/add'
     | '/profile/edit'
     | '/review/new'
     | '/safety_/children'
@@ -1033,6 +1092,7 @@ export interface FileRouteTypes {
     | '/orgs/$orgId/members'
     | '/parent/consent/$token'
     | '/teams/$teamId/edit'
+    | '/teams/$teamId/manage'
     | '/trainers/$trainerId/edit'
     | '/games/$gameId/'
     | '/orgs/$orgId/'
@@ -1051,6 +1111,7 @@ export interface RootRouteChildren {
   AuthRoute: typeof AuthRoute
   CommunityGuidelinesRoute: typeof CommunityGuidelinesRoute
   ContactRoute: typeof ContactRoute
+  CookiesRoute: typeof CookiesRoute
   McpRoute: typeof McpRoute
   PaymentsRoute: typeof PaymentsRoute
   PickupRoute: typeof PickupRoute
@@ -1078,6 +1139,7 @@ export interface RootRouteChildren {
   AdminChildSafetyRoute: typeof AdminChildSafetyRoute
   AdminComplianceRoute: typeof AdminComplianceRoute
   AdminLegalRoute: typeof AdminLegalRoute
+  AdminListingsRoute: typeof AdminListingsRoute
   AdminLocationAnalyticsRoute: typeof AdminLocationAnalyticsRoute
   AdminModerationRoute: typeof AdminModerationRoute
   CheckoutReturnRoute: typeof CheckoutReturnRoute
@@ -1088,10 +1150,12 @@ export interface RootRouteChildren {
   OnboardingAccountTypeRoute: typeof OnboardingAccountTypeRoute
   OnboardingAgeRoute: typeof OnboardingAgeRoute
   OnboardingChildRoute: typeof OnboardingChildRoute
+  OnboardingSetupForRoute: typeof OnboardingSetupForRoute
   OnboardingWelcomeRoute: typeof OnboardingWelcomeRoute
   OrgsCreateRoute: typeof OrgsCreateRoute
   PlayerCardUserIdRoute: typeof PlayerCardUserIdRoute
   PlayersUserIdRoute: typeof PlayersUserIdRoute
+  PlayersAddRoute: typeof PlayersAddRoute
   ProfileEditRoute: typeof ProfileEditRoute
   ReviewNewRoute: typeof ReviewNewRoute
   SafetyChildrenRoute: typeof SafetyChildrenRoute
@@ -1109,6 +1173,7 @@ export interface RootRouteChildren {
   OrgsOrgIdMembersRoute: typeof OrgsOrgIdMembersRoute
   ParentConsentTokenRoute: typeof ParentConsentTokenRoute
   TeamsTeamIdEditRoute: typeof TeamsTeamIdEditRoute
+  TeamsTeamIdManageRoute: typeof TeamsTeamIdManageRoute
   TrainersTrainerIdEditRoute: typeof TrainersTrainerIdEditRoute
   OrgsOrgIdIndexRoute: typeof OrgsOrgIdIndexRoute
   TeamsTeamIdIndexRoute: typeof TeamsTeamIdIndexRoute
@@ -1155,6 +1220,13 @@ declare module '@tanstack/react-router' {
       path: '/contact'
       fullPath: '/contact'
       preLoaderRoute: typeof ContactRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/cookies': {
+      id: '/cookies'
+      path: '/cookies'
+      fullPath: '/cookies'
+      preLoaderRoute: typeof CookiesRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/mcp': {
@@ -1423,6 +1495,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminLegalRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/admin/listings': {
+      id: '/admin/listings'
+      path: '/admin/listings'
+      fullPath: '/admin/listings'
+      preLoaderRoute: typeof AdminListingsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/admin/location-analytics': {
       id: '/admin/location-analytics'
       path: '/admin/location-analytics'
@@ -1500,6 +1579,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof OnboardingChildRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/onboarding/setup-for': {
+      id: '/onboarding/setup-for'
+      path: '/onboarding/setup-for'
+      fullPath: '/onboarding/setup-for'
+      preLoaderRoute: typeof OnboardingSetupForRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/onboarding/welcome': {
       id: '/onboarding/welcome'
       path: '/onboarding/welcome'
@@ -1540,6 +1626,13 @@ declare module '@tanstack/react-router' {
       path: '/players/$userId'
       fullPath: '/players/$userId'
       preLoaderRoute: typeof PlayersUserIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/players/add': {
+      id: '/players/add'
+      path: '/players/add'
+      fullPath: '/players/add'
+      preLoaderRoute: typeof PlayersAddRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/profile/edit': {
@@ -1668,6 +1761,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof TeamsTeamIdEditRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/teams/$teamId/manage': {
+      id: '/teams/$teamId/manage'
+      path: '/teams/$teamId/manage'
+      fullPath: '/teams/$teamId/manage'
+      preLoaderRoute: typeof TeamsTeamIdManageRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/trainers/$trainerId/': {
       id: '/trainers/$trainerId/'
       path: '/trainers/$trainerId'
@@ -1770,6 +1870,7 @@ const rootRouteChildren: RootRouteChildren = {
   AuthRoute: AuthRoute,
   CommunityGuidelinesRoute: CommunityGuidelinesRoute,
   ContactRoute: ContactRoute,
+  CookiesRoute: CookiesRoute,
   McpRoute: McpRoute,
   PaymentsRoute: PaymentsRoute,
   PickupRoute: PickupRoute,
@@ -1798,6 +1899,7 @@ const rootRouteChildren: RootRouteChildren = {
   AdminChildSafetyRoute: AdminChildSafetyRoute,
   AdminComplianceRoute: AdminComplianceRoute,
   AdminLegalRoute: AdminLegalRoute,
+  AdminListingsRoute: AdminListingsRoute,
   AdminLocationAnalyticsRoute: AdminLocationAnalyticsRoute,
   AdminModerationRoute: AdminModerationRoute,
   CheckoutReturnRoute: CheckoutReturnRoute,
@@ -1808,10 +1910,12 @@ const rootRouteChildren: RootRouteChildren = {
   OnboardingAccountTypeRoute: OnboardingAccountTypeRoute,
   OnboardingAgeRoute: OnboardingAgeRoute,
   OnboardingChildRoute: OnboardingChildRoute,
+  OnboardingSetupForRoute: OnboardingSetupForRoute,
   OnboardingWelcomeRoute: OnboardingWelcomeRoute,
   OrgsCreateRoute: OrgsCreateRoute,
   PlayerCardUserIdRoute: PlayerCardUserIdRoute,
   PlayersUserIdRoute: PlayersUserIdRoute,
+  PlayersAddRoute: PlayersAddRoute,
   ProfileEditRoute: ProfileEditRoute,
   ReviewNewRoute: ReviewNewRoute,
   SafetyChildrenRoute: SafetyChildrenRoute,
@@ -1829,6 +1933,7 @@ const rootRouteChildren: RootRouteChildren = {
   OrgsOrgIdMembersRoute: OrgsOrgIdMembersRoute,
   ParentConsentTokenRoute: ParentConsentTokenRoute,
   TeamsTeamIdEditRoute: TeamsTeamIdEditRoute,
+  TeamsTeamIdManageRoute: TeamsTeamIdManageRoute,
   TrainersTrainerIdEditRoute: TrainersTrainerIdEditRoute,
   OrgsOrgIdIndexRoute: OrgsOrgIdIndexRoute,
   TeamsTeamIdIndexRoute: TeamsTeamIdIndexRoute,

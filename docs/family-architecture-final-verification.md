@@ -131,6 +131,13 @@ in part 2, with these caveats recorded rather than claimed away:
   `comment_subject_owner`, `roster_row_visible`).
 - This document reports observed behaviour of specific controls. It is not a
   legal compliance certification for COPPA, GDPR-K or any other regime.
+- **This GO covers minors who have their own login, and only those.** Every
+  control verified above requires the child to have an `auth.users` row and is
+  evaluated through `auth.uid()` — `guardian_links.child_user_id` and
+  `child_controls.child_user_id` are both NOT NULL references to `auth.users`,
+  and the runtime gates (`minor_messaging_allowed`, `CHILD_CANNOT_HOST`,
+  `CHILD_CONSENT_REQUIRED`, push curfew) all match on the caller's auth id.
+  See the stage-3 blocker below.
 
 Continued in
 [`family-architecture-verification-part2.md`](./family-architecture-verification-part2.md),
@@ -138,3 +145,26 @@ which covers the remaining feature keys (teams/rosters, comments, game chat, AI
 analysis, precise location). The two public-read findings it originally recorded as
 open — comment threads (L-2) and team rosters (L-1) — were both fixed and re-verified
 live in that document, so no finding remains open across the two parts.
+
+## Open blocker for stage 3 — managed children are outside every control above
+
+Stage 1 of the Account → Player Profile refactor
+(`20260908200000_player_profiles_stage1.sql`) introduced athletes who have **no
+login**: `player_profiles.account_id` is the managing parent and `user_id` is
+NULL. A child in that shape cannot hold a `guardian_links` row, a
+`child_controls` row, or a `parental_consents` row — the foreign keys make it
+impossible — and never satisfies `auth.uid()`, so none of the gates in sections
+A–F can fire for them.
+
+This is currently **inert**: nothing reads `player_profiles`, and `createPlayer()`
+writes exactly one row and touches nothing else. It stops being inert the moment
+stage 3 repoints games, teams, media or availability at `player_profile_id`. At
+that point a managed minor participates with none of the controls this document
+signed off.
+
+**Stage 3 must not begin by repointing a table.** It must begin by giving these
+controls a path to an athlete with no auth row — deriving them from the
+already-trigger-derived `player_profiles.age_cohort`, materializing a stored row
+only when a parent loosens a default, and teaching each gate to resolve a player
+profile as actor. Re-verify sections E and F with a managed minor as the subject
+before any repointing lands.

@@ -29,9 +29,13 @@ export function LegalDocumentBody({
   history?: LegalDocumentVersion[];
 }) {
   const versions = history ?? doc.versions;
+  // effectiveVersion() sets `content` only when a published database row was
+  // found, so its absence means we are rendering the bundled placeholder copy —
+  // which is the only thing the review warning should ever sit above.
+  const isPlaceholder = !("content" in version) || !version.content;
   return (
     <article className="space-y-5">
-      <LegalReviewBanner />
+      {isPlaceholder ? <LegalReviewBanner /> : null}
       <header className="space-y-1">
         <h1 className="text-2xl font-bold tracking-tight">{doc.title}</h1>
         <p className="text-xs text-muted-foreground">
@@ -43,11 +47,28 @@ export function LegalDocumentBody({
       {version.sections.map((s) => (
         <section key={s.heading} className="space-y-2">
           <h2 className="text-base font-semibold">{s.heading}</h2>
-          {s.body.map((p, i) => (
-            <p key={i} className="text-sm leading-relaxed text-muted-foreground">
-              {p}
-            </p>
-          ))}
+          {s.blocks?.length
+            ? s.blocks.map((b, i) =>
+                b.kind === "ul" ? (
+                  <ul
+                    key={i}
+                    className="list-disc space-y-1 pl-5 text-sm leading-relaxed text-muted-foreground"
+                  >
+                    {b.items.map((item, j) => (
+                      <li key={j}>{item}</li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p key={i} className="text-sm leading-relaxed text-muted-foreground">
+                    {b.text}
+                  </p>
+                ),
+              )
+            : s.body.map((p, i) => (
+                <p key={i} className="text-sm leading-relaxed text-muted-foreground">
+                  {p}
+                </p>
+              ))}
         </section>
       ))}
       {versions.length > 1 ? (

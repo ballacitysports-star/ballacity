@@ -300,6 +300,10 @@ export const inviteTrainerToOrg = createServerFn({ method: "POST" })
       .maybeSingle();
     if (tErr) throw new Error(tErr.message);
     if (!t || t.kind !== "coach") throw new Error("Trainer profile not found");
+    // An unclaimed trainer listing has no owner, so there is nobody to invite —
+    // inviting one would write a null invitee and the invite could never be answered.
+    if (!t.owner_id)
+      throw new Error("That trainer profile is unclaimed. Ask them to claim it first.");
     const { error } = await context.supabase.from("trainer_org_invites").insert({
       org_id: data.orgId,
       invited_trainer_id: data.trainerId,

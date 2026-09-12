@@ -1,14 +1,19 @@
 import { Link } from "@tanstack/react-router";
 import { Check } from "lucide-react";
-import { LEGAL_DOCUMENT_LIST, effectiveVersion, type LegalDocumentType } from "@/lib/legal-documents";
+import {
+  LEGAL_DOCUMENT_LIST,
+  LEGAL_DOCUMENT_TYPES,
+  effectiveVersion,
+  type ConsentDocumentType,
+} from "@/lib/legal-documents";
 import { usePublishedLegalDocuments } from "@/lib/legal-consent";
 
-export type LegalConsentValue = Record<LegalDocumentType, boolean>;
+export type LegalConsentValue = Record<ConsentDocumentType, boolean>;
 
 export const emptyConsentValue: LegalConsentValue = { terms: false, privacy: false };
 
-export function allAccepted(value: LegalConsentValue, types?: LegalDocumentType[]) {
-  const list = types ?? LEGAL_DOCUMENT_LIST.map((d) => d.type);
+export function allAccepted(value: LegalConsentValue, types?: ConsentDocumentType[]) {
+  const list = types ?? LEGAL_DOCUMENT_TYPES;
   return list.every((t) => value[t]);
 }
 
@@ -26,18 +31,22 @@ export function LegalConsent({
   value: LegalConsentValue;
   onChange: (next: LegalConsentValue) => void;
   /** Limit to specific documents (defaults to all). */
-  types?: LegalDocumentType[];
+  types?: ConsentDocumentType[];
   disabled?: boolean;
   className?: string;
 }) {
   const { published } = usePublishedLegalDocuments();
-  const docs = LEGAL_DOCUMENT_LIST.filter((d) => !types || types.includes(d.type));
+  // LEGAL_DOCUMENT_LIST is the consent pair only, so the narrowing holds.
+  const docs = LEGAL_DOCUMENT_LIST.filter(
+    (d) => !types || types.includes(d.type as ConsentDocumentType),
+  );
 
   return (
     <div className={`space-y-2 ${className ?? ""}`}>
       {docs.map((doc) => {
-        const v = effectiveVersion(doc.type, published);
-        const checked = !!value[doc.type];
+        const type = doc.type as ConsentDocumentType;
+        const v = effectiveVersion(type, published);
+        const checked = !!value[type];
         const id = `legal-consent-${doc.type}`;
         return (
           <div
@@ -52,7 +61,9 @@ export function LegalConsent({
               disabled={disabled}
               onClick={() => onChange({ ...value, [doc.type]: !checked })}
               className={`mt-0.5 grid h-6 w-6 shrink-0 place-items-center rounded-md border transition disabled:opacity-50 ${
-                checked ? "border-lime bg-lime text-primary-foreground" : "border-border bg-background"
+                checked
+                  ? "border-lime bg-lime text-primary-foreground"
+                  : "border-border bg-background"
               }`}
             >
               {checked ? <Check className="h-4 w-4" aria-hidden /> : null}

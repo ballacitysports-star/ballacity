@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import { Link } from "@tanstack/react-router";
 import { motion } from "framer-motion";
 import { ShieldCheck, Star, Users } from "lucide-react";
@@ -13,6 +14,10 @@ export function OrgCard({
   index?: number;
   search?: Record<string, unknown>;
 }) {
+  const [avatarFailed, setAvatarFailed] = useState(false);
+  useEffect(() => {
+    setAvatarFailed(false);
+  }, [org.avatar]);
   return (
     <motion.div
       initial={{ opacity: 0, y: 14 }}
@@ -45,19 +50,29 @@ export function OrgCard({
           {(() => {
             const a = org.avatar || "";
             const isUrl = /^(https?:|data:|blob:)/.test(a);
-            if (isUrl) {
+            if (isUrl && !avatarFailed) {
               return (
                 <div className="h-16 w-16 overflow-hidden rounded-2xl border-4 border-surface bg-surface">
-                  <ResponsiveAvatar src={a} size={64} alt="" className="h-full w-full object-cover" />
+                  <ResponsiveAvatar
+                    src={a}
+                    size={64}
+                    alt=""
+                    className="h-full w-full object-cover"
+                    onLoadError={() => setAvatarFailed(true)}
+                  />
                 </div>
               );
             }
+            // `a` is only safe to print directly when it was already a
+            // short label (not a URL) — a failed photo falls back to the
+            // org name's initials instead of showing the raw image URL.
+            const label = isUrl ? org.name.slice(0, 2).toUpperCase() : a;
             return (
               <div
                 className="grid h-16 w-16 place-items-center rounded-2xl border-4 border-surface font-display text-xl font-bold text-primary-foreground"
                 style={{ background: `linear-gradient(135deg, ${org.accent}, ${org.accent}aa)` }}
               >
-                {a}
+                {label}
               </div>
             );
           })()}

@@ -28,7 +28,11 @@ import {
   setPendingAccountType,
 } from "@/lib/account-type";
 import { LegalConsent, allAccepted, emptyConsentValue } from "@/components/legal/LegalConsent";
-import { currentAcceptances, stashPendingConsent } from "@/lib/legal-consent";
+import {
+  currentAcceptances,
+  stashPendingConsent,
+  usePublishedLegalDocuments,
+} from "@/lib/legal-consent";
 
 
 
@@ -50,6 +54,11 @@ export const Route = createFileRoute("/auth")({
 function AuthPage() {
   const { next } = Route.useSearch();
   const { user, loading } = useAuth();
+  // Consent must be recorded against the version that is actually published,
+  // not the bundled fallback — otherwise every signup stores a stale version
+  // string and LegalReacceptGate re-gates the user immediately after. The
+  // query is already warm here because <LegalConsent> shares its key.
+  const { published: publishedLegal } = usePublishedLegalDocuments();
   const [mode, setMode] = useState<"signin" | "signup">("signin");
   // A `next` that points at an account-setup escape (guardian consent, the
   // Parent Center, safety/legal reading) has no player/team/trainer/gym
@@ -229,7 +238,7 @@ function AuthPage() {
 
         // Signup may finish without a session (email confirmation), so the exact
         // accepted versions are parked and written on first authenticated load.
-        stashPendingConsent(currentAcceptances());
+        stashPendingConsent(currentAcceptances(publishedLegal));
         setPendingAccountType(accountType);
         stashPendingDob(dobCheck.iso);
 
@@ -333,7 +342,7 @@ function AuthPage() {
       redirect_uri: window.location.origin,
     });
 
-    if (mode === "signup") stashPendingConsent(currentAcceptances());
+    if (mode === "signup") stashPendingConsent(currentAcceptances(publishedLegal));
 
 
     const providerLabel = provider === "apple" ? "Apple" : "Google";
@@ -840,6 +849,10 @@ function AuthPage() {
               ·{" "}
               <Link to="/privacy" className="underline">
                 Privacy Policy
+              </Link>{" "}
+              ·{" "}
+              <Link to="/cookies" className="underline">
+                Cookies
               </Link>
             </p>
           </>
