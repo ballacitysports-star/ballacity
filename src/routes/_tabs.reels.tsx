@@ -16,7 +16,11 @@ import {
 } from "lucide-react";
 import { captureClip } from "@/lib/reel-frames";
 import { needsPlaybackConversion } from "@/lib/video-support";
-import { convertToPlayableMp4 } from "@/lib/video-transcode";
+import {
+  assertConverterReachable,
+  convertToPlayableMp4,
+  ConverterUnavailableError,
+} from "@/lib/video-transcode";
 import { RepairPlaybackButton } from "@/components/reels/RepairPlaybackButton";
 
 import { ReelStylePanel } from "@/components/reels/ReelStylePanel";
@@ -813,6 +817,10 @@ function ReelsPage() {
       let playable: Blob = file;
       let converted = false;
       if (await needsPlaybackConversion(file)) {
+        // Check the converter exists before promising anything. Without this a
+        // missing wasm core reads as "your clip failed", sending the athlete off
+        // to re-encode on a desktop over a problem only we can fix.
+        await assertConverterReachable();
         const toastId = toast.loading("Making this clip play everywhere… 0%");
         const result = await convertToPlayableMp4(file, (r, pass) =>
           toast.loading(
@@ -936,7 +944,11 @@ function ReelsPage() {
       toast.success("Reel uploaded — AI is working on it now");
       void kickOffProcessing((inserted as { id?: string } | null)?.id);
     } catch (e: any) {
-      toast.error(e?.message ?? "Upload failed");
+      toast.error(
+        e instanceof ConverterUnavailableError
+          ? "Video conversion is temporarily unavailable. Nothing was uploaded — please try again shortly."
+          : (e?.message ?? "Upload failed"),
+      );
     } finally {
       setBusy(false);
     }
