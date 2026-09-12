@@ -145,7 +145,7 @@ function HighlightFeedPage() {
     <div className="min-h-dvh bg-background">
       {/* Instagram-style top bar: wordmark left, actions right. */}
       <header className="sticky top-0 z-10 border-b border-border/70 bg-background/90 backdrop-blur">
-        <div className="page-shell-feed flex items-center gap-3 px-4 py-3">
+        <div className="page-shell-flush flex items-center gap-3 px-4 py-3">
           <Link to="/" className="shrink-0 text-muted-foreground" aria-label="Back">
             <ArrowLeft className="h-5 w-5" />
           </Link>
@@ -170,7 +170,7 @@ function HighlightFeedPage() {
         </div>
 
         {/* Stories rail — one ring per sport, doubling as the filter. */}
-        <div className="page-shell-feed flex gap-4 overflow-x-auto px-4 pb-3">
+        <div className="page-shell-flush flex gap-4 overflow-x-auto px-4 pb-3">
           <StoryRing active={!sport} onClick={() => setSport(null)} label="All" />
           {sports.map((s) => (
             <StoryRing key={s} active={sport === s} onClick={() => setSport(s)} label={s} />
@@ -178,7 +178,7 @@ function HighlightFeedPage() {
         </div>
       </header>
 
-      <main className="page-shell-feed">
+      <main className="page-shell-flush">
         {loading ? (
           <div className="grid place-items-center py-16 text-muted-foreground">
             <Loader2 className="h-5 w-5 animate-spin" />
