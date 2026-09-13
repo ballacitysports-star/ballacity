@@ -71,8 +71,8 @@ function RouteDoctorPage() {
             <ArrowLeft className="h-4 w-4" />
           </button>
           <div>
-            <h1 className="text-xl font-semibold text-foreground">Route Doctor</h1>
-            <p className="text-xs text-muted-foreground">
+            <h1 className="page-title">Route Doctor</h1>
+            <p className="page-subtitle">
               Reproduce 404s, test any path, and find the route that should have matched.
             </p>
           </div>

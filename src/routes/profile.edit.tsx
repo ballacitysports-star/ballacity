@@ -158,7 +158,7 @@ function EditProfile() {
     return (
       <div className="page-shell-content flex min-h-dvh flex-col items-center justify-center text-center">
         <h1 className="page-title">Sign in to edit your profile</h1>
-        <p className="mt-2 text-sm text-muted-foreground">
+        <p className="mt-2 page-subtitle">
           Profile changes are saved to your account.
         </p>
         <Link
@@ -326,7 +326,7 @@ function EditProfile() {
           <ArrowLeft className="h-4 w-4" />
         </Link>
         <div className="min-w-0 flex-1 text-center">
-          <h1 className="font-display text-lg font-bold leading-tight">Edit profile</h1>
+          <h1 className="bar-title">Edit profile</h1>
           <SaveStatus {...autosave} variant="pill" className="mt-1" />
         </div>
         <button

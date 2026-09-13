@@ -92,7 +92,7 @@ function AccountSecurityPage() {
     return (
       <div className="page-shell-content flex min-h-dvh flex-col items-center justify-center text-center">
         <h1 className="page-title">Sign in required</h1>
-        <p className="mt-2 text-sm text-muted-foreground">
+        <p className="mt-2 page-subtitle">
           Sign in with Google first, then come back here to add an email password.
         </p>
         <Link

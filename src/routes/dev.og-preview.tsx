@@ -126,8 +126,8 @@ function OgPreviewPage() {
             <ArrowLeft className="h-4 w-4" />
           </button>
           <div>
-            <h1 className="text-xl font-semibold text-foreground">OG card preview</h1>
-            <p className="text-xs text-muted-foreground">
+            <h1 className="page-title">OG card preview</h1>
+            <p className="page-subtitle">
               Paste a game, player, team, trainer, or venue URL to see its share card in every
               supported size.
             </p>

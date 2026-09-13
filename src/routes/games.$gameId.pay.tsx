@@ -494,7 +494,7 @@ function PayPage() {
           <ArrowLeft className="h-5 w-5" />
         </Link>
         <div className="min-w-0 flex-1">
-          <h1 className="font-display text-xl font-bold leading-tight truncate">{game.title}</h1>
+          <h1 className="bar-title truncate">{game.title}</h1>
           <div className="text-xs text-muted-foreground truncate">{game.location}</div>
         </div>
         <PayFlowPillHeader gameId={gameId} />

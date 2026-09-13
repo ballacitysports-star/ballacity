@@ -69,7 +69,7 @@ function ResetPasswordPage() {
         >
           <ArrowLeft className="h-4 w-4" />
         </Link>
-        <h1 className="font-display text-lg font-bold">Set a new password</h1>
+        <h1 className="bar-title">Set a new password</h1>
       </header>
 
       <div className="px-4 mt-6 space-y-5">

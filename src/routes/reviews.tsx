@@ -131,7 +131,7 @@ function ReviewsDashboard() {
         <Trophy className="h-5 w-5 text-lime" />
         <h1 className="page-title">Reviews Hub</h1>
       </div>
-      <p className="text-sm text-muted-foreground mb-5">
+      <p className="mb-5 page-subtitle">
         Trust scores, top strengths, and AI insights for everyone on ballaCity.
       </p>
 

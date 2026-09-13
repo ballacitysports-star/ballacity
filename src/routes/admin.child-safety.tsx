@@ -54,7 +54,7 @@ function AdminChildSafetyPage() {
     return (
       <main className="page-shell py-10">
         <h1 className="page-title">Not authorized</h1>
-        <p className="mt-2 text-sm text-muted-foreground">
+        <p className="mt-2 page-subtitle">
           This page is restricted to moderators and administrators.
         </p>
         <Link
@@ -81,7 +81,7 @@ function AdminChildSafetyPage() {
       <h1 className="mt-1 page-title">Consent, age reviews &amp; guardian requests</h1>
 
       {query.isLoading || !data ? (
-        <p className="mt-6 text-sm text-muted-foreground">Loading…</p>
+        <p className="mt-6 page-subtitle">Loading…</p>
       ) : (
         <>
           <section className="mt-5">

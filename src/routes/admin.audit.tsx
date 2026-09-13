@@ -274,10 +274,10 @@ function AuditLogPage() {
           </Link>
         </Button>
         <div className="min-w-0 flex-1">
-          <h1 className="flex items-center gap-2 text-xl font-semibold">
+          <h1 className="page-title flex items-center gap-2">
             <ShieldAlert className="h-5 w-5 text-primary" /> Audit logs
           </h1>
-          <p className="text-sm text-muted-foreground">
+          <p className="page-subtitle">
             Append-only record of administrative and security actions. Entries can never be
             edited or deleted.
           </p>

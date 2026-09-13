@@ -76,7 +76,7 @@ function AddPlayerPage() {
           <CheckCircle2 className="h-6 w-6" />
           <h1 className="page-title">Player created!</h1>
         </div>
-        <p className="mt-2 text-sm text-muted-foreground">
+        <p className="mt-2 page-subtitle">
           Let&apos;s build {name}&apos;s profile when you&apos;re ready.
         </p>
         <div className="mt-6 flex flex-col gap-2 sm:flex-row">

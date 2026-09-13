@@ -121,7 +121,7 @@ function SetupPage() {
           <ArrowLeft className="h-5 w-5" />
         </Link>
         <div>
-          <h1 className="font-display text-xl font-bold leading-tight">Payment setup</h1>
+          <h1 className="bar-title">Payment setup</h1>
           <div className="text-xs text-muted-foreground">{game.title}</div>
         </div>
       </div>

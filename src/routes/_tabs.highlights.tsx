@@ -151,7 +151,7 @@ function HighlightFeedPage() {
           <Link to="/" className="shrink-0 text-muted-foreground" aria-label="Back">
             <ArrowLeft className="h-5 w-5" />
           </Link>
-          <h1 className="flex-1 truncate text-xl font-black tracking-tight">Highlights</h1>
+          <h1 className="page-title flex-1 truncate">Highlights</h1>
           <Link
             to="/reels"
             search={{ game: "", title: "", upload: "" }}

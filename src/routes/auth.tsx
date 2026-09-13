@@ -520,7 +520,7 @@ function AuthPage() {
         >
           <ArrowLeft className="h-4 w-4" />
         </Link>
-        <h1 className="font-display text-lg font-bold">
+        <h1 className="bar-title">
           {mode === "signin" ? "Sign in" : "Create account"}
         </h1>
       </header>
