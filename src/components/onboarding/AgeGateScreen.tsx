@@ -185,15 +185,11 @@ export function AgeGateScreen({ onResolved }: { onResolved?: (cohort: string) =>
             is never shown on your profile.
           </div>
 
-          <button
-            type="submit"
-            disabled={busy}
-            className="w-full rounded-full bg-primary px-4 py-3 text-sm font-bold text-primary-foreground disabled:opacity-50"
-          >
-            {busy ? "Saving…" : "Continue"}
-          </button>
+          <PrimaryCTA type="submit" loading={busy}>
+            Continue
+          </PrimaryCTA>
         </form>
-      </div>
-    </div>
+      </>
+    </OnboardingShell>
   );
 }
