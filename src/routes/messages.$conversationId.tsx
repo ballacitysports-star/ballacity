@@ -478,9 +478,9 @@ function Thread() {
 
       <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 py-4 space-y-3">
         {msgs.length === 0 ? (
-          <div className="text-center text-xs text-muted-foreground mt-10">
-            No messages yet. Say hi 👋
-          </div>
+          <p className="mt-10 text-center text-sm text-muted-foreground">
+            No messages yet — say hi 👋
+          </p>
         ) : (
           msgs.map((m) => {
             const mine = m.sender_id === user?.id;
@@ -788,7 +788,7 @@ function Thread() {
             type="button"
             onClick={() => fileInputRef.current?.click()}
             aria-label="Attach file"
-            className="grid h-10 w-10 shrink-0 place-items-center rounded-full border border-border bg-surface"
+            className="grid h-11 w-11 shrink-0 place-items-center rounded-full border border-border bg-surface"
           >
             <Paperclip className="h-4 w-4" />
           </button>
@@ -828,7 +828,7 @@ function Thread() {
               (!text.trim() && !pendingFile)
             }
             aria-label="Send"
-            className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-lime-gradient text-primary-foreground disabled:opacity-40"
+            className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-lime-gradient text-primary-foreground disabled:opacity-40"
           >
             {sending || uploading ? (
               <Loader2 className="h-4 w-4 animate-spin" />
