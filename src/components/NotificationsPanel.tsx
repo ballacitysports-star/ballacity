@@ -51,6 +51,8 @@ import {
 import { UserAvatarById } from "@/components/UserAvatar";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { EmptyState } from "@/components/ui/empty-state";
+import { ListSkeleton } from "@/components/ui/loading-state";
 
 const iconFor = (type: string) => {
   if (type === "message") return MessageCircle;

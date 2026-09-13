@@ -691,12 +691,12 @@ function TrainersPage() {
               );
             })}
             {list.length === 0 && (
-              <div className="rounded-2xl border border-border bg-surface p-8 text-center text-muted-foreground sm:col-span-2">
-                <div className="inline-flex items-center gap-2">
-                  <GraduationCap className="h-4 w-4 text-lime" />
-                  No trainers match.
-                </div>
-              </div>
+              <EmptyState
+                className="sm:col-span-2"
+                icon={<GraduationCap className="h-6 w-6" aria-hidden />}
+                title="No trainers match your filters"
+                description="Widen the distance or pick another sport to see more coaches near you."
+              />
             )}
           </div>
         )}
