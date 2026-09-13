@@ -145,7 +145,7 @@ export function TeamRosterPanel({ teamId, teamName }: { teamId: string; teamName
   return (
     <div className="mt-5 space-y-5">
       <div className="flex items-center justify-between gap-3">
-        <h2 className="inline-flex items-center gap-2 font-display text-sm font-bold uppercase tracking-wide text-muted-foreground">
+        <h2 className="inline-flex items-center gap-2 section-eyebrow text-muted-foreground">
           <Users className="h-4 w-4" /> Roster · {members.length}
         </h2>
         {perms.canInvite && (
@@ -186,7 +186,7 @@ export function TeamRosterPanel({ teamId, teamName }: { teamId: string; teamName
 
       {perms.canInvite && (invites.data?.length ?? 0) > 0 && (
         <div>
-          <h3 className="mb-2 inline-flex items-center gap-2 font-display text-sm font-bold uppercase tracking-wide text-muted-foreground">
+          <h3 className="mb-2 inline-flex items-center gap-2 section-eyebrow text-muted-foreground">
             <Mail className="h-4 w-4" /> Pending invites · {invites.data!.length}
           </h3>
           <div className="space-y-2">

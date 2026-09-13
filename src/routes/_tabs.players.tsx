@@ -1189,7 +1189,7 @@ function AvailabilityCard({
           { label: "Travels", value: <Distance km={a.travel_radius_km} /> },
         ].map((s) => (
           <div key={s.label}>
-            <dt className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground">
+            <dt className="micro-label text-muted-foreground">
               {s.label}
             </dt>
             <dd className="truncate text-xs font-semibold">{s.value}</dd>

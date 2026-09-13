@@ -68,7 +68,7 @@ export function PostDetailsDialog({
                 <span>{meta.emoji}</span> {meta.label}
               </span>
               {post.pinned && (
-                <span className="inline-flex items-center gap-1 rounded-full bg-lime/15 text-lime px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider">
+                <span className="inline-flex items-center gap-1 rounded-full bg-lime/15 text-lime px-2 py-0.5 micro-label">
                   <Pin className="h-3 w-3" /> Pinned
                 </span>
               )}

@@ -756,7 +756,7 @@ export function CreateTrainerWizard() {
                         {placesResults.data?.suggestions &&
                           placesResults.data.suggestions.length > 0 && (
                             <>
-                              <div className="pt-1 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                              <div className="pt-1 micro-label text-muted-foreground">
                                 From Google
                               </div>
                               {placesResults.data.suggestions.map((s) => (

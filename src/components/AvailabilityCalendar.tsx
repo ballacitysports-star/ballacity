@@ -167,7 +167,7 @@ export function AvailabilityCalendar({
       )}
 
       {/* Day-of-week header */}
-      <div className="grid grid-cols-7 gap-1 px-1 text-center text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+      <div className="grid grid-cols-7 gap-1 px-1 text-center micro-label text-muted-foreground">
         {DAY_LABELS.map((l) => (
           <div key={l}>{l}</div>
         ))}
@@ -544,7 +544,7 @@ function DayPreview({
   }
   return (
     <div className="rounded-2xl border border-border bg-surface p-3">
-      <div className="mb-1 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+      <div className="mb-1 micro-label text-muted-foreground">
         Currently
       </div>
       <ul className="space-y-1">

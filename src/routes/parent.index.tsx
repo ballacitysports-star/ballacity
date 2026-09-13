@@ -301,7 +301,7 @@ function ParentCenterPage() {
     <main className="page-shell-content pt-6 pb-24">
       <div className="flex items-center gap-2 text-primary">
         <ShieldCheck className="h-5 w-5" aria-hidden />
-        <span className="text-xs font-bold uppercase tracking-wide">Parent Center</span>
+        <span className="section-eyebrow">Parent Center</span>
       </div>
       <h1 className="mt-2 page-title">Your family</h1>
       <p className="mt-2 page-subtitle">

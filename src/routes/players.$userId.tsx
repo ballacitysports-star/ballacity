@@ -151,7 +151,7 @@ function PublicReelsSection({ userId }: { userId: string }) {
             <div className="mt-2 flex items-center gap-2">
               <p className="min-w-0 flex-1 truncate text-sm font-semibold">{reel.title}</p>
               {reel.sport && (
-                <span className="shrink-0 rounded-full bg-lime/15 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-lime">
+                <span className="shrink-0 rounded-full bg-lime/15 px-2 py-0.5 micro-label text-lime">
                   {reel.sport}
                 </span>
               )}

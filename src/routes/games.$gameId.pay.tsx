@@ -1470,7 +1470,7 @@ function PaymentInstructionsAndProof({
           <div>
             <label
               htmlFor="paid-amount"
-              className="block text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-1"
+              className="block micro-label text-muted-foreground mb-1"
             >
               Amount paid *
             </label>
@@ -1501,7 +1501,7 @@ function PaymentInstructionsAndProof({
           <div>
             <label
               htmlFor="paid-at"
-              className="block text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-1"
+              className="block micro-label text-muted-foreground mb-1"
             >
               Payment date *
             </label>

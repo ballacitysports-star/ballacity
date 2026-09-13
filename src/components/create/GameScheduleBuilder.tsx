@@ -122,7 +122,7 @@ export function GameScheduleBuilder({
       </div>
 
       <div className="flex flex-wrap items-center gap-1.5">
-        <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+        <span className="micro-label text-muted-foreground">
           Quick add
         </span>
         <button

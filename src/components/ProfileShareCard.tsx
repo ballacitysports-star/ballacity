@@ -194,7 +194,7 @@ export function ProfileShareCard({
               {data.username && (
                 <p className="truncate text-xs text-muted-foreground">{data.username}</p>
               )}
-              <p className="mt-1 inline-flex items-center gap-1 rounded-full bg-lime/15 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-lime">
+              <p className="mt-1 inline-flex items-center gap-1 rounded-full bg-lime/15 px-2 py-0.5 micro-label text-lime">
                 <ShieldCheck className="h-3 w-3" /> {kindLabel}
               </p>
             </div>

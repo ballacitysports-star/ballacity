@@ -26,7 +26,7 @@ export function SettingsTab({ teamId, teamName }: { teamId: string; teamName: st
   return (
     <div className="space-y-5">
       <section className="space-y-3 rounded-2xl border border-border bg-surface p-4">
-        <h2 className="inline-flex items-center gap-2 font-display text-sm font-bold uppercase tracking-wide text-muted-foreground">
+        <h2 className="inline-flex items-center gap-2 section-eyebrow text-muted-foreground">
           <Crown className="h-4 w-4" /> Ownership
         </h2>
         {owner ? (
@@ -49,7 +49,7 @@ export function SettingsTab({ teamId, teamName }: { teamId: string; teamName: st
 
       {isOwner && (
         <section className="space-y-3 rounded-2xl border border-coral/40 bg-surface p-4">
-          <h2 className="inline-flex items-center gap-2 font-display text-sm font-bold uppercase tracking-wide text-coral">
+          <h2 className="inline-flex items-center gap-2 section-eyebrow text-coral">
             <ShieldAlert className="h-4 w-4" /> Hand over the team
           </h2>
           <p className="text-sm text-muted-foreground">

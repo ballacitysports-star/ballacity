@@ -76,7 +76,7 @@ function AdminChildSafetyPage() {
       </Link>
       <div className="mt-2 flex items-center gap-2 text-primary">
         <ShieldAlert className="h-5 w-5" aria-hidden />
-        <span className="text-xs font-bold uppercase tracking-wide">Child safety</span>
+        <span className="section-eyebrow">Child safety</span>
       </div>
       <h1 className="mt-1 page-title">Consent, age reviews &amp; guardian requests</h1>
 

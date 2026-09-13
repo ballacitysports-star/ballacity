@@ -44,7 +44,7 @@ export function GamePolicySummary({
       <dl className="mt-3 space-y-2">
         {critical.map((l) => (
           <div key={l.id} className="rounded-xl bg-background/60 px-3 py-2">
-            <dt className="text-[10px] font-bold uppercase tracking-wider text-lime">{l.label}</dt>
+            <dt className="micro-label text-lime">{l.label}</dt>
             <dd className="mt-0.5 text-[12px] leading-relaxed">{l.value}</dd>
           </div>
         ))}
@@ -68,7 +68,7 @@ export function GamePolicySummary({
             <dl className="mt-2 space-y-2">
               {rest.map((l) => (
                 <div key={l.id} className="rounded-xl bg-background/60 px-3 py-2">
-                  <dt className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                  <dt className="micro-label text-muted-foreground">
                     {l.label}
                   </dt>
                   <dd className="mt-0.5 whitespace-pre-line text-[12px] leading-relaxed">
@@ -84,7 +84,7 @@ export function GamePolicySummary({
       <p className="mt-3 flex gap-2 text-[11px] leading-relaxed text-muted-foreground">
         <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden />
         <span>
-          <span className="mr-1 rounded bg-secondary px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider">
+          <span className="mr-1 rounded bg-secondary px-1.5 py-0.5 micro-label">
             {LEGAL_REVIEW_LABEL}
           </span>
           {HOST_ACK_DISCLAIMER}{" "}

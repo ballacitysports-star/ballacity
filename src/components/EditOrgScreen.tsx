@@ -618,7 +618,7 @@ export function EditOrgScreen({ org }: { org: Org }) {
           <h1 className="font-display text-xl font-bold leading-tight">{STEPS[step - 1]}</h1>
           <SaveStatus {...autosave} className="mt-0.5" />
         </div>
-        <div className="rounded-full bg-secondary px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+        <div className="rounded-full bg-secondary px-3 py-1 micro-label text-muted-foreground">
           {kind === "team" ? "Team" : "Trainer"}
         </div>
       </div>
@@ -922,7 +922,7 @@ export function EditOrgScreen({ org }: { org: Org }) {
                         {placesResults.data?.suggestions &&
                           placesResults.data.suggestions.length > 0 && (
                             <>
-                              <div className="pt-1 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                              <div className="pt-1 micro-label text-muted-foreground">
                                 From Google
                               </div>
                               {placesResults.data.suggestions.map((s) => (

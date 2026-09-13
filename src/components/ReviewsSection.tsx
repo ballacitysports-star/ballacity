@@ -92,7 +92,7 @@ function ReviewCard({ r, index, isOwner }: { r: Review; index: number; isOwner: 
           <div className="flex flex-wrap items-center gap-1.5">
             <span className="truncate font-semibold text-sm">{r.reviewerName}</span>
             <span
-              className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider ${
+              className={`shrink-0 rounded-full px-2 py-0.5 micro-label ${
                 meta.color === "lime" ? "bg-lime/15 text-lime" : "bg-coral/15 text-coral"
               }`}
             >

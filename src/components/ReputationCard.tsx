@@ -96,7 +96,7 @@ export function ReputationCard({ rep }: { rep: Reputation }) {
 
       {/* AI summary */}
       <div className="mt-4 rounded-2xl border border-lime/20 bg-lime/5 p-3">
-        <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-lime">
+        <div className="flex items-center gap-1.5 micro-label text-lime">
           <Sparkles className="h-3 w-3" /> AI insight
         </div>
         <p className="mt-1 text-sm text-foreground/90 leading-snug">{rep.aiSummary}</p>

@@ -773,7 +773,7 @@ function GymsView({
                 <div className="flex items-center gap-1.5">
                   <span className="truncate font-display text-base font-bold">{g.name}</span>
                   {g.verified && (
-                    <span className="rounded-full bg-lime/15 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-lime">
+                    <span className="rounded-full bg-lime/15 px-1.5 py-0.5 micro-label text-lime">
                       ✓
                     </span>
                   )}

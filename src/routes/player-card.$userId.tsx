@@ -260,7 +260,7 @@ function PlayerCardPage() {
                   <div className="flex items-center gap-2">
                     <p className="min-w-0 flex-1 truncate text-sm font-semibold">{reel.title}</p>
                     {reel.sport && (
-                      <span className="shrink-0 rounded-full bg-lime/15 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-lime">
+                      <span className="shrink-0 rounded-full bg-lime/15 px-2 py-0.5 micro-label text-lime">
                         {reel.sport}
                       </span>
                     )}
@@ -318,7 +318,7 @@ function PlayerCardPage() {
         </div>
         {stats.sports.length > 0 && (
           <div className="mt-3 rounded-2xl border border-border bg-surface p-3">
-            <p className="text-xs font-bold uppercase tracking-wide text-muted-foreground">
+            <p className="section-eyebrow text-muted-foreground">
               Sports
             </p>
             <div className="mt-2 flex flex-wrap gap-1.5">
@@ -348,7 +348,7 @@ function PlayerCardPage() {
 function GameGroup({ title, games }: { title: string; games: PlayerCardData["games"] }) {
   return (
     <div>
-      <p className="mb-1.5 text-xs font-bold uppercase tracking-wide text-muted-foreground">
+      <p className="mb-1.5 section-eyebrow text-muted-foreground">
         {title}
       </p>
       <ul className="space-y-2">
@@ -369,7 +369,7 @@ function GameGroup({ title, games }: { title: string; games: PlayerCardData["gam
                   {g.location ? ` · ${g.location}` : ""}
                 </p>
               </div>
-              <span className="shrink-0 rounded-full bg-surface-2 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-muted-foreground">
+              <span className="shrink-0 rounded-full bg-surface-2 px-2 py-0.5 micro-label text-muted-foreground">
                 {g.role === "host" ? "Host" : g.sport || "Player"}
               </span>
             </Link>

@@ -71,7 +71,7 @@ function ChildSafetyCenter() {
     <main className="page-shell-prose pt-6 pb-24">
       <div className="flex items-center gap-2 text-primary">
         <ShieldCheck className="h-5 w-5" aria-hidden />
-        <span className="text-xs font-bold uppercase tracking-wide">Safety Center</span>
+        <span className="section-eyebrow">Safety Center</span>
       </div>
       <h1 className="mt-2 page-title">Child &amp; teen safety</h1>
       <p className="mt-2 page-subtitle">

@@ -128,7 +128,7 @@ export function NextAvailableList({
                   {fmt12(s.start)}–{fmt12(s.end)}
                 </span>
                 {viewerShort && (
-                  <span className="rounded-full border border-border bg-background px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                  <span className="rounded-full border border-border bg-background px-1.5 py-0.5 micro-label text-muted-foreground">
                     {viewerShort}
                   </span>
                 )}

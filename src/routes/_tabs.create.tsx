@@ -550,7 +550,7 @@ function Create() {
             title="Host as"
             right={
               !selectedAffiliation && affiliations.length > 1 ? (
-                <span className="rounded-full bg-destructive/15 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-destructive">
+                <span className="rounded-full bg-destructive/15 px-2 py-0.5 micro-label text-destructive">
                   Required
                 </span>
               ) : undefined
