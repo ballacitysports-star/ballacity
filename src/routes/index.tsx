@@ -1,6 +1,6 @@
 import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
 import { ogImageUrl, pageHead, SITE_DESCRIPTION, SITE_TITLE, SITE_URL } from "@/lib/seo";
-import { ArrowRight, MapPin, Sparkles, Trophy, Users, Video, Zap } from "lucide-react";
+import { ArrowRight, MapPin, Users, Video, Zap } from "lucide-react";
 import { useEffect, type CSSProperties } from "react";
 import { Logo } from "@/components/Logo";
 import { HERO_IMAGE, SPORTS } from "@/lib/sample-data";
