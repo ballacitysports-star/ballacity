@@ -3,6 +3,8 @@ import { pageHead } from "@/lib/seo";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import { Megaphone, GraduationCap, MapPin, Building2 } from "lucide-react";
+import { EmptyState } from "@/components/ui/empty-state";
+import { ListSkeleton } from "@/components/ui/loading-state";
 import { FilterBar } from "@/components/FilterBar";
 import { FilterSection, ChipRow } from "@/components/FilterSheet";
 import { zodValidator, fallback } from "@tanstack/zod-adapter";
