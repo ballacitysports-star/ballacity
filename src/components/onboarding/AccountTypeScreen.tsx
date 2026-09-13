@@ -108,38 +108,37 @@ export function AccountTypeScreen({
   if (loading || !user || !checked) {
     return (
       <div className="flex min-h-dvh items-center justify-center bg-background">
-        <div className="text-sm text-muted-foreground">Loading…</div>
+        <LoadingState label="Loading your account…" />
       </div>
     );
   }
 
   return (
-    <div className="min-h-dvh bg-background px-4 py-10">
-      <div className="mx-auto max-w-lg space-y-6">
-        <AccountTypePicker value={choice} onChange={setChoice} />
-        <div className="rounded-lg border border-border bg-surface p-3 text-xs text-muted-foreground">
-          This is just your starting point. You can add other profiles later and switch between
-          them anytime.
-        </div>
-
-        <div className="flex flex-col gap-2">
-          <button
-            type="button"
-            disabled={!choice || busy}
-            onClick={submit}
-            className="inline-flex items-center justify-center rounded-md bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-50"
-          >
-            {busy ? "Saving…" : "Continue"}
-          </button>
-          <button
-            type="button"
-            onClick={signOut}
-            className="text-xs text-muted-foreground underline-offset-2 hover:underline"
-          >
-            Sign out
-          </button>
-        </div>
+    <OnboardingShell
+      step={2}
+      steps={2}
+      title="Where do you want to start?"
+      description="Pick what fits you now. You can add team, trainer, and gym profiles later and switch between them anytime."
+      footer={
+        <button
+          type="button"
+          onClick={signOut}
+          className="underline-offset-2 hover:underline"
+        >
+          Sign out
+        </button>
+      }
+    >
+      <div className="space-y-5">
+        <AccountTypePicker value={choice} onChange={setChoice} heading={false} />
+        <p className="rounded-2xl border border-border bg-surface p-3 text-xs text-muted-foreground">
+          This is just your starting point. You can add other profiles later and switch between them
+          anytime.
+        </p>
+        <PrimaryCTA type="button" disabled={!choice} loading={busy} onClick={submit}>
+          Continue
+        </PrimaryCTA>
       </div>
-    </div>
+    </OnboardingShell>
   );
 }
