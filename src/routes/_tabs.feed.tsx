@@ -610,7 +610,7 @@ function Feed() {
 
       <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="mb-4">
         <h1 className="page-title">{tab === "archive" ? "Finished games." : "Tonight's run."}</h1>
-        <p className="text-muted-foreground text-sm inline-flex items-center gap-1">
+        <p className="page-subtitle inline-flex items-center gap-1">
           {userCityToken ? (
             <>
               <MapPin className="h-3.5 w-3.5 text-lime" /> Nearest to {profile?.city} ·{" "}
@@ -647,7 +647,7 @@ function Feed() {
               role="tab"
               aria-selected={active}
               onClick={() => setTab(t.id)}
-              className={`rounded-full px-4 py-1.5 text-sm font-semibold transition-colors ${
+              className={`inline-flex min-h-9 items-center rounded-full px-4 text-sm font-semibold transition-colors ${
                 active
                   ? "bg-lime text-primary-foreground"
                   : "text-muted-foreground hover:text-foreground"
