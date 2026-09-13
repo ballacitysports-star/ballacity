@@ -736,16 +736,21 @@ function GymsView({
       />
 
       {isLoading ? (
-        <div className="rounded-2xl border border-border bg-surface p-8 text-center text-sm text-muted-foreground">
-          Loading gyms…
-        </div>
+        <ListSkeleton rows={3} label="Loading gyms…" />
       ) : gyms.length === 0 ? (
-        <div className="rounded-2xl border border-border bg-surface p-8 text-center text-muted-foreground">
-          <div className="inline-flex items-center gap-2">
-            <Building2 className="h-4 w-4 text-lime" />
-            No gyms yet.
-          </div>
-        </div>
+        <EmptyState
+          icon={<Building2 className="h-6 w-6" aria-hidden />}
+          title="No gyms listed yet"
+          description="Gyms and organizations near you will appear here. You can add yours in a minute."
+          action={
+            <Link
+              to="/orgs/create"
+              className="inline-flex rounded-full bg-lime px-5 py-2.5 text-sm font-bold text-primary-foreground"
+            >
+              Add a gym
+            </Link>
+          }
+        />
       ) : (
         <div className="space-y-3 pb-6">
           {gyms.map((g) => (
