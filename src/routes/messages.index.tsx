@@ -16,6 +16,8 @@ import { UserAvatarById } from "@/components/UserAvatar";
 import { usePrefetchUserAvatars } from "@/lib/user-avatars";
 import { supabase } from "@/integrations/supabase/client";
 import { NotificationsPanel } from "@/components/NotificationsPanel";
+import { EmptyState } from "@/components/ui/empty-state";
+import { ListSkeleton } from "@/components/ui/loading-state";
 
 const searchSchema = z.object({
   tab: fallback(z.string(), "messages").default("messages"),
