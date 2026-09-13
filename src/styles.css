@@ -304,6 +304,23 @@ button:disabled,
   text-transform: uppercase;
 }
 
+/* The tiniest uppercase label in the app: the text inside a status pill, a
+   stat caption under a number, a badge on a card. The routes wrote this nine
+   different ways — text-[9px], text-[10px] and text-[11px], sometimes bold and
+   sometimes semibold, tracking-wide and tracking-wider — so two pills sitting
+   side by side on a team or trainer card were different sizes. Colour is left
+   to the caller, exactly as with `section-eyebrow`, because these labels are
+   routinely tinted (lime for verified, coral for urgent). */
+@utility micro-label {
+  font-size: 0.625rem;
+  line-height: 1rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+
+
 /* One visible focus ring for the whole app, so keyboard focus is never
    invisible on a surface that happens to sit on a dark card. Scoped to
    :focus-visible, so it never shows on a mouse tap. */
