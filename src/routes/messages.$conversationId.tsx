@@ -561,12 +561,15 @@ function Thread() {
 
                     <div
                       onDoubleClick={() => !isDeleted && toggleReaction(m.id, "❤️")}
-                      className={`rounded-2xl px-3 py-2 text-sm space-y-2 ${
+                      // The flattened corner (bottom-right on your own message,
+                      // bottom-left on theirs) means sent and received still read
+                      // apart in high-contrast or greyscale, not by colour alone.
+                      className={`space-y-2 rounded-2xl px-3.5 py-2.5 text-sm leading-relaxed ${
                         isDeleted
                           ? "bg-surface/40 border border-dashed border-border text-muted-foreground italic"
                           : mine
-                            ? "bg-lime-gradient text-primary-foreground"
-                            : "bg-surface border border-border"
+                            ? "rounded-br-md bg-lime-gradient text-primary-foreground"
+                            : "rounded-bl-md bg-surface border border-border"
                       }`}
                     >
                       {isDeleted ? (
