@@ -81,7 +81,7 @@ function ManageTeam() {
 
       <header>
         <h1 className="page-title">Manage team</h1>
-        <p className="text-sm text-muted-foreground">
+        <p className="page-subtitle">
           Roster, invitations and ownership for {teamName}.
         </p>
       </header>

@@ -28,7 +28,7 @@ function ContactPage() {
 
       <main className="page-shell-prose py-6 pb-28">
         <h1 className="page-title">Contact</h1>
-        <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
+        <p className="mt-2 page-subtitle">
           Questions about your account, a game, a payment, or something you saw on ballaCity? Start
           here.
         </p>

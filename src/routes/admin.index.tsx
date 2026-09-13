@@ -102,7 +102,7 @@ function AdminPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="page-title">Admin Panel</h1>
-          <p className="text-sm text-muted-foreground">Manage users, payments, content</p>
+          <p className="page-subtitle">Manage users, payments, content</p>
         </div>
         <div className="flex gap-2">
           <Button variant="outline" asChild>

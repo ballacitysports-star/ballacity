@@ -379,7 +379,7 @@ function PlayerProfile() {
           O
         </div>
         <h1 className="mt-5 page-title">Sign in to view your profile</h1>
-        <p className="mt-2 text-sm text-muted-foreground">
+        <p className="mt-2 page-subtitle">
           Your games, reviews, and profile stay private until you sign in.
         </p>
         <Link

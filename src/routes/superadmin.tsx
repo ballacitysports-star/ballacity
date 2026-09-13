@@ -78,7 +78,7 @@ function SuperadminPage() {
             Control center
             <Badge variant="destructive">superadmin</Badge>
           </h1>
-          <p className="text-sm text-muted-foreground">
+          <p className="page-subtitle">
             Full control over accounts, content, payments and configuration. Every action is
             reversible and logged.
           </p>

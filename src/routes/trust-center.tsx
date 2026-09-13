@@ -56,7 +56,7 @@ function TrustCenter() {
 
       <main className="page-shell-prose py-6 pb-28">
         <h1 className="page-title">Trust Center</h1>
-        <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
+        <p className="mt-2 page-subtitle">
           Straight answers about how ballaCity works: what we do with your information, how accounts
           are protected, what happens when you report someone, and where money actually goes. This
           page describes how the product behaves today — it isn't a certification or an audit

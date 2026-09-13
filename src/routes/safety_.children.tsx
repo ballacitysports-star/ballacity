@@ -74,7 +74,7 @@ function ChildSafetyCenter() {
         <span className="text-xs font-bold uppercase tracking-wide">Safety Center</span>
       </div>
       <h1 className="mt-2 page-title">Child &amp; teen safety</h1>
-      <p className="mt-2 text-sm text-muted-foreground">
+      <p className="mt-2 page-subtitle">
         ballaCity supports players under 13, teens and adults — with a different, age-appropriate
         experience for each. Here is exactly how that works and what parents and guardians control.
       </p>

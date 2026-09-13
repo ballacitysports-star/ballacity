@@ -57,7 +57,7 @@ function FamilyJoinPage() {
     return (
       <Shell>
         <h1 className="page-title">Sign in to accept</h1>
-        <p className="mt-2 text-sm text-muted-foreground">
+        <p className="mt-2 page-subtitle">
           Sign in (or create your account), add your date of birth, then open this link again.
         </p>
         <Link
@@ -78,7 +78,7 @@ function FamilyJoinPage() {
           <ShieldCheck className="h-5 w-5 text-lime" />
           <h1 className="page-title">You're all set</h1>
         </div>
-        <p className="mt-2 text-sm text-muted-foreground">
+        <p className="mt-2 page-subtitle">
           Your parent or guardian is connected and can manage your safety settings.
         </p>
         <Button className="mt-4 w-full" onClick={() => void navigate({ to: "/settings" })}>
@@ -98,7 +98,7 @@ function FamilyJoinPage() {
       </div>
 
       {query.isLoading ? (
-        <p className="mt-3 text-sm text-muted-foreground">Checking your invitation…</p>
+        <p className="mt-3 page-subtitle">Checking your invitation…</p>
       ) : state === "pending" ? (
         <>
           <p className="mt-3 text-sm">

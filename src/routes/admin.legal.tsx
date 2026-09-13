@@ -219,7 +219,7 @@ function LegalManager() {
         </Link>
         <div className="min-w-0 flex-1">
           <h1 className="page-title">Legal &amp; Compliance</h1>
-          <p className="text-sm text-muted-foreground">
+          <p className="page-subtitle">
             Draft, review, and publish versions of ballaCity's policy documents. Published versions
             are what users see and are never edited afterwards.
           </p>

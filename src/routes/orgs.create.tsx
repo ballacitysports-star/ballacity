@@ -97,7 +97,7 @@ function CreateOrg() {
       {finish ? <FinishSetupNotice kind="gym" /> : null}
       <header>
         <h1 className="page-title">Create gym.</h1>
-        <p className="text-sm text-muted-foreground mt-1">
+        <p className="mt-1 page-subtitle">
           Set up a training organization or gym profile.
         </p>
         <SaveStatus {...draftStatus} savedLabel="Draft saved" className="mt-1" />

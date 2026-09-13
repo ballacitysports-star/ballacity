@@ -30,7 +30,7 @@ function SafetyCenter() {
 
       <main className="page-shell-prose py-6 pb-28">
         <h1 className="page-title">Safety Center</h1>
-        <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
+        <p className="mt-2 page-subtitle">
           ballaCity helps players find games — hosts organize them. ballaCity does not supervise
           games, inspect venues, referee play, or guarantee anyone's safety. These are the habits
           that keep pickup sports safe.

@@ -986,7 +986,7 @@ function ReelsPage() {
           <Sparkles className="h-6 w-6 text-lime" />
           <h1 className="page-title">AI Highlight Reels</h1>
         </div>
-        <p className="mt-1 text-sm text-muted-foreground">
+        <p className="mt-1 page-subtitle">
           Upload a clip and let AI generate your highlight.
         </p>
         <Link
