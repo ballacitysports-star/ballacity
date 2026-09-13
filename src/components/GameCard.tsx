@@ -169,14 +169,14 @@ export function GameCard({ game, index = 0 }: { game: Game; index?: number }) {
             )}
           </div>
           <div className="absolute bottom-2 left-3 right-3">
-            <h3 className="font-display text-lg font-bold text-foreground drop-shadow-lg">
+            <h3 className="line-clamp-2 font-display text-lg font-bold leading-tight text-foreground drop-shadow-lg">
               {game.title}
             </h3>
           </div>
         </div>
 
-        <div className="p-3 space-y-2">
-          <div className="flex items-center gap-3 text-xs text-muted-foreground">
+        <div className="flex flex-1 flex-col gap-2 p-3">
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
             <span className="inline-flex items-center gap-1.5" suppressHydrationWarning>
               <Clock className="h-3.5 w-3.5 text-lime" />
               {formatGameWhen(game)}

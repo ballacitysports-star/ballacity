@@ -67,7 +67,7 @@ export function GameListRow({ game, index = 0 }: { game: Game; index?: number })
       <Link
         to="/games/$gameId"
         params={{ gameId: game.id }}
-        className="group flex items-center gap-3 rounded-2xl border border-border bg-surface p-2 pr-3 transition-all hover:border-lime/40"
+        className="group flex min-h-[4.5rem] items-center gap-3 rounded-2xl border border-border bg-surface p-2 pr-3 transition-all hover:border-lime/40"
       >
         <div className="relative h-14 w-14 shrink-0 overflow-hidden rounded-xl">
           <MediaImage
