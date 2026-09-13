@@ -25,14 +25,25 @@ export function SportChips({
   const selectedSet = new Set(selectedList);
   const noneSelected = selectedSet.size === 0;
 
+  // One chip shape for every chip: a 44px tap floor, the same padding, and the
+  // same active treatment (filled + aria-pressed) so the selected sport is not
+  // signalled by colour alone. `snap-x` keeps a chip from being left half cut
+  // off at the edge of the scroller on a phone.
+  const chip =
+    "shrink-0 snap-start inline-flex min-h-11 items-center gap-1.5 rounded-full border px-4 text-sm font-semibold transition-colors";
+  const on = "border-lime bg-lime text-primary-foreground";
+
   return (
-    <div className="flex gap-2 overflow-x-auto scrollbar-hide -mx-4 px-4 pb-1">
+    <div
+      role="group"
+      aria-label="Filter by sport"
+      className="flex snap-x gap-2 overflow-x-auto scrollbar-hide -mx-4 px-4 pb-1"
+    >
       <button
         onClick={() => onSelect?.(null)}
-        className={`shrink-0 rounded-full border px-4 py-2 text-sm font-semibold transition-all ${
-          noneSelected
-            ? "border-lime bg-lime text-primary-foreground"
-            : "border-border bg-surface text-muted-foreground hover:text-foreground"
+        aria-pressed={noneSelected}
+        className={`${chip} ${
+          noneSelected ? on : "border-border bg-surface text-muted-foreground hover:text-foreground"
         }`}
       >
         All sports
@@ -46,13 +57,12 @@ export function SportChips({
             animate={{ opacity: 1, x: 0 }}
             transition={{ delay: i * 0.03 }}
             onClick={() => onSelect?.(multi ? s.name : active ? null : s.name)}
-            className={`shrink-0 inline-flex items-center gap-1.5 rounded-full border px-4 py-2 text-sm font-semibold transition-all ${
-              active
-                ? "border-lime bg-lime text-primary-foreground"
-                : "border-border bg-surface text-foreground hover:border-lime/40"
+            aria-pressed={active}
+            className={`${chip} ${
+              active ? on : "border-border bg-surface text-foreground hover:border-lime/40"
             }`}
           >
-            <span>{s.emoji}</span>
+            <span aria-hidden>{s.emoji}</span>
             <span>{s.name}</span>
           </motion.button>
         );
