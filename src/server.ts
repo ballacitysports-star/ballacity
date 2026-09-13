@@ -2,6 +2,7 @@ import "./lib/error-capture";
 
 import { consumeLastCapturedError } from "./lib/error-capture";
 import { renderErrorPage } from "./lib/error-page";
+import { isRequestAbort } from "./lib/request-abort";
 
 type ServerEntry = {
   fetch: (request: Request, env: unknown, ctx: unknown) => Promise<Response> | Response;
@@ -18,18 +19,7 @@ async function getServerEntry(): Promise<ServerEntry> {
   return serverEntryPromise;
 }
 
-function isAbortError(error: unknown): boolean {
-  let current: unknown = error;
-  for (let depth = 0; current && depth < 5; depth += 1) {
-    const candidate = current as { name?: unknown; cause?: unknown };
-    if (candidate.name === "AbortError") return true;
-    current = candidate.cause;
-  }
-  return false;
-}
-
 function brandedErrorResponse(): Response {
-
   return new Response(renderErrorPage(), {
     status: 500,
     headers: { "content-type": "text/html; charset=utf-8" },
@@ -74,7 +64,7 @@ async function normalizeCatastrophicSsrResponse(response: Response): Promise<Res
   }
 
   const captured = consumeLastCapturedError();
-  if (isAbortError(captured)) {
+  if (isRequestAbort(captured)) {
     // The visitor left before the page finished rendering; nothing is broken.
     return new Response(null, { status: 499 });
   }
@@ -96,7 +86,7 @@ export default {
       if (request.signal.aborted) return response;
       return await normalizeCatastrophicSsrResponse(response);
     } catch (error) {
-      if (request.signal.aborted || isAbortError(error)) {
+      if (request.signal.aborted || isRequestAbort(error)) {
         return new Response(null, { status: 499 });
       }
       console.error(error);
