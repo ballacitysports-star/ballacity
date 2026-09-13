@@ -1,7 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState } from "react";
 import { toast } from "sonner";
-import { CheckCircle2, Clock, Copy, ShieldCheck } from "lucide-react";
+import { CheckCircle2, Clock, Copy } from "lucide-react";
 import { pageHead } from "@/lib/seo";
 import { useMyChildStatus, useRequestParentalConsent } from "@/lib/child-safety";
 import { CHILD_POLICY_DISCLAIMER } from "@/lib/child-policy";

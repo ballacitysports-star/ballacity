@@ -62,6 +62,15 @@ function SetupForPage() {
     <OnboardingShell
       title="Who are you setting up ballaCity for?"
       description="One login covers your whole family. You can add more players any time."
+      footer={
+        <button
+          type="button"
+          onClick={() => navigate({ to: "/onboarding/account-type" })}
+          className="underline-offset-2 hover:underline"
+        >
+          Back
+        </button>
+      }
     >
       <div className="space-y-3">
         {CHOICES.map((c) => {
