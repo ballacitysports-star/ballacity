@@ -617,29 +617,25 @@ function OnboardingWizard({ type }: { type: AccountType }) {
         </Section>
       )}
 
-      <div className="mt-6 flex items-center gap-2">
+      <div className="mt-6 space-y-2">
+        <PrimaryCTA type="button" onClick={onNext} loading={saving}>
+          {isLast ? (nextCfg ? nextCfg.cta : "Continue to feed") : "Continue"}
+        </PrimaryCTA>
         <button
-          onClick={() => setStep((s) => Math.max(0, s - 1))}
-          disabled={step === 0 || saving}
-          className="rounded-full border border-border/60 bg-surface px-4 py-2 text-xs font-medium text-foreground disabled:opacity-40"
+          type="button"
+          onClick={() =>
+            step === 0
+              ? nav({ to: "/onboarding/setup-for" })
+              : setStep((s) => Math.max(0, s - 1))
+          }
+          disabled={saving}
+          className="w-full rounded-full border border-border bg-surface px-4 py-2.5 text-sm font-semibold disabled:opacity-40"
         >
           Back
         </button>
-        <button
-          onClick={onNext}
-          disabled={saving}
-          className="ml-auto rounded-full bg-lime-gradient px-5 py-2.5 text-xs font-bold text-primary-foreground disabled:opacity-50"
-        >
-          {saving ? "Saving…" : isLast ? (nextCfg ? nextCfg.cta : "Continue to feed") : "Continue"}
-        </button>
       </div>
-
-      <button
-        onClick={() => nav({ to: "/feed" })}
-        className="mt-3 w-full rounded-full px-4 py-2 text-xs text-muted-foreground"
-      >
-        I'll do this later
-      </button>
-    </div>
+      </div>
+    </OnboardingShell>
   );
+
 }
