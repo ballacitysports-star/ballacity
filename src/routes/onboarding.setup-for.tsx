@@ -2,7 +2,8 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 import { User, Users, UserPlus } from "lucide-react";
 import { pageHead } from "@/lib/seo";
-import { Button } from "@/components/ui/button";
+import { PrimaryCTA } from "@/components/PrimaryCTA";
+import { OnboardingShell } from "@/components/onboarding/OnboardingShell";
 
 export const Route = createFileRoute("/onboarding/setup-for")({
   head: () =>
