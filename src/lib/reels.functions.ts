@@ -384,15 +384,25 @@ export const setReelHidden = createServerFn({ method: "POST" })
  */
 export const setReelPlaybackPath = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input: { reelId: string; playbackPath: string }) => {
-    if (!input?.reelId) throw new Error("reelId is required");
-    if (!input?.playbackPath) throw new Error("playbackPath is required");
-    return { reelId: input.reelId, playbackPath: input.playbackPath };
-  })
+  .inputValidator(
+    (input: { reelId: string; playbackPath: string; mediaMeta?: Record<string, unknown> | null }) => {
+      if (!input?.reelId) throw new Error("reelId is required");
+      if (!input?.playbackPath) throw new Error("playbackPath is required");
+      return {
+        reelId: input.reelId,
+        playbackPath: input.playbackPath,
+        // Optional: the repair flow measures the copy it just made. Absent for
+        // older callers, which keep working unchanged.
+        mediaMeta: input.mediaMeta ?? null,
+      };
+    },
+  )
   .handler(async ({ data, context }) => {
+    const patch: Record<string, unknown> = { playback_path: data.playbackPath };
+    if (data.mediaMeta) patch["media_meta"] = data.mediaMeta;
     const { error } = await context.supabase
       .from("highlight_reels")
-      .update({ playback_path: data.playbackPath } as any)
+      .update(patch as any)
       .eq("id", data.reelId)
       .eq("user_id", context.userId);
     if (error) throw new Error(error.message);

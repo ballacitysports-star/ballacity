@@ -1,0 +1,2 @@
+ALTER TABLE public.highlight_reels ADD COLUMN IF NOT EXISTS media_meta jsonb;
+COMMENT ON COLUMN public.highlight_reels.media_meta IS 'Uploader-measured video facts: original filename/mime/bytes/duration/resolution/orientation, processed copy details, playback conversion status and error.';

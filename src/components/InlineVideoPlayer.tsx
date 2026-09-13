@@ -14,6 +14,7 @@ import { RepairPlaybackButton } from "@/components/reels/RepairPlaybackButton";
  */
 export function InlineVideoPlayer({
   videoPath,
+  fallbackVideoPath,
   videoUrl,
   fallbackVideoUrl,
   thumbnailUrl,
@@ -21,6 +22,12 @@ export function InlineVideoPlayer({
   repair,
 }: {
   videoPath?: string;
+  /**
+   * Storage path of the other copy of the same clip (usually the original when
+   * `videoPath` is the converted one). Signed lazily and switched to only if the
+   * first copy will not decode on this device.
+   */
+  fallbackVideoPath?: string | null;
   /** Pre-signed URL; when provided, client-side signing is skipped. */
   videoUrl?: string | null;
   /** Second copy of the same clip, tried automatically if the first won't decode. */
@@ -35,6 +42,7 @@ export function InlineVideoPlayer({
   const [failed, setFailed] = useState(false);
   const [unsupported, setUnsupported] = useState(false);
   const [triedFallback, setTriedFallback] = useState(false);
+  const [signedFallback, setSignedFallback] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -43,6 +51,7 @@ export function InlineVideoPlayer({
     setUnsupported(false);
     setPlaying(false);
     setTriedFallback(false);
+    setSignedFallback(null);
     if (videoUrl !== undefined) {
       setUrl(videoUrl);
       if (!videoUrl) setFailed(true);
@@ -64,10 +73,20 @@ export function InlineVideoPlayer({
         if (error || !data?.signedUrl) setFailed(true);
         else setUrl(data.signedUrl);
       });
+    // The second copy is signed alongside so the swap below is instant, but its
+    // absence never blocks the primary copy from playing.
+    if (fallbackVideoPath && fallbackVideoPath !== videoPath) {
+      supabase.storage
+        .from("highlight-videos")
+        .createSignedUrl(fallbackVideoPath, 3600)
+        .then(({ data }) => {
+          if (!cancelled && data?.signedUrl) setSignedFallback(data.signedUrl);
+        });
+    }
     return () => {
       cancelled = true;
     };
-  }, [videoPath, videoUrl]);
+  }, [videoPath, videoUrl, fallbackVideoPath]);
 
   // Probe decodability up front so the poster can tell the truth before a tap.
   useEffect(() => {

@@ -4,6 +4,7 @@ import { Download, Loader2, Wand2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { convertToPlayableMp4, MAX_TRANSCODE_BYTES } from "@/lib/video-transcode";
 import { setReelPlaybackPath } from "@/lib/reels.functions";
+import { buildMediaMeta, probeVideo } from "@/lib/video-metadata";
 
 /**
  * Owner-only repair for reels whose source clip can't be decoded everywhere
@@ -60,7 +61,17 @@ export function RepairPlaybackButton({
         .from("highlight-videos")
         .upload(path, converted.blob, { upsert: true, contentType: "video/mp4" });
       if (upErr) throw new Error(upErr.message);
-      await setReelPlaybackPath({ data: { reelId, playbackPath: path } });
+      const mediaMeta = buildMediaMeta({
+        file: { name: file.name, type: file.type, size: file.size },
+        original: await probeVideo(file),
+        processed: {
+          ...(await probeVideo(converted.blob)),
+          bytes: converted.blob.size,
+          pass: converted.pass,
+        },
+        conversionAttempted: true,
+      });
+      await setReelPlaybackPath({ data: { reelId, playbackPath: path, mediaMeta } });
       toast.success("Fixed — this reel now plays everywhere", { id: toastId });
       setFailed(null);
       onRepaired?.();
