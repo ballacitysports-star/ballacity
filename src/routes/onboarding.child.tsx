@@ -72,191 +72,190 @@ function ChildOnboardingPage() {
       description={`ballaCity requires a parent or guardian to approve accounts for members under ${policy.parentalConsentMaxAge + 1}. Until they do, we keep things switched off — no messages, no videos, no public profile.`}
     >
       <>
-
-      {!isLoading && !approved && (
-        <Link
-          to="/feed"
-          className="mt-3 inline-block text-sm font-semibold text-primary underline underline-offset-2"
-        >
-          Not now — let me look around first
-        </Link>
-      )}
-
-      {isLoading ? (
-        <p className="mt-6 text-sm text-muted-foreground">Checking your account…</p>
-      ) : approved ? (
-        <div className="mt-6 rounded-2xl border border-emerald-500/30 bg-emerald-500/10 p-4">
-          <div className="flex items-center gap-2 font-semibold text-emerald-600">
-            <CheckCircle2 className="h-5 w-5" aria-hidden /> Approved
-          </div>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Your parent or guardian approved this account. They can change your settings anytime in
-            the Parent Center.
-          </p>
+        {!isLoading && !approved && (
           <Link
             to="/feed"
-            className="mt-3 inline-block rounded-full bg-primary px-4 py-2 text-sm font-bold text-primary-foreground"
+            className="mt-3 inline-block text-sm font-semibold text-primary underline underline-offset-2"
           >
-            Go to ballaCity
+            Not now — let me look around first
           </Link>
-        </div>
-      ) : (
-        <>
-          <section className="mt-6 grid gap-3 sm:grid-cols-2">
-            <div className="rounded-2xl border border-border bg-surface p-4">
-              <h2 className="text-sm font-bold">What we collect now</h2>
-              <ul className="mt-2 space-y-1 text-xs text-muted-foreground">
-                {COLLECTED_BEFORE_CONSENT.map((i) => (
-                  <li key={i}>• {i}</li>
-                ))}
-              </ul>
-            </div>
-            <div className="rounded-2xl border border-border bg-surface p-4">
-              <h2 className="text-sm font-bold">What we do not collect yet</h2>
-              <ul className="mt-2 space-y-1 text-xs text-muted-foreground">
-                {NOT_COLLECTED_BEFORE_CONSENT.map((i) => (
-                  <li key={i}>• {i}</li>
-                ))}
-              </ul>
-            </div>
-          </section>
+        )}
 
-          {pending && status?.consent?.parentEmail ? (
-            <div className="mt-6 rounded-2xl border border-amber-500/30 bg-amber-500/10 p-4">
-              <div className="flex items-center gap-2 font-semibold text-amber-600">
-                <Clock className="h-5 w-5" aria-hidden /> Waiting for approval
-              </div>
-              <p className="mt-1 text-sm text-muted-foreground">
-                We're waiting for {status.consent.parentEmail} to approve. They need to open the
-                approval link and sign in with their own adult ballaCity account.
-              </p>
+        {isLoading ? (
+          <p className="mt-6 text-sm text-muted-foreground">Checking your account…</p>
+        ) : approved ? (
+          <div className="mt-6 rounded-2xl border border-emerald-500/30 bg-emerald-500/10 p-4">
+            <div className="flex items-center gap-2 font-semibold text-emerald-600">
+              <CheckCircle2 className="h-5 w-5" aria-hidden /> Approved
             </div>
-          ) : null}
-
-          <section className="mt-6 space-y-3 rounded-2xl border border-border bg-surface p-4">
-            <h2 className="text-sm font-bold">
-              {pending ? "Send a new approval request" : "Ask your parent or guardian"}
-            </h2>
-            <div className="space-y-1.5">
-              <Label htmlFor="parent-email">Their email address</Label>
-              <Input
-                id="parent-email"
-                type="email"
-                inputMode="email"
-                autoComplete="off"
-                placeholder="guardian@example.com"
-                value={parentEmail}
-                onChange={(e) => setParentEmail(e.target.value)}
-                maxLength={255}
-              />
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="parent-name">Their name (optional)</Label>
-              <Input
-                id="parent-name"
-                value={parentName}
-                onChange={(e) => setParentName(e.target.value)}
-                maxLength={120}
-                placeholder="Alex Rivera"
-              />
-            </div>
-            <div className="space-y-1.5">
-              <span className="text-sm font-medium">Who are they?</span>
-              <div className="flex flex-wrap gap-2">
-                {RELATIONSHIPS.map((r) => (
-                  <button
-                    key={r.value}
-                    type="button"
-                    onClick={() => setRelationship(r.value)}
-                    className={`rounded-full border px-3 py-1.5 text-xs font-semibold ${
-                      relationship === r.value
-                        ? "border-primary bg-primary/10 text-primary"
-                        : "border-border"
-                    }`}
-                  >
-                    {r.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-            <Button
-              onClick={submit}
-              disabled={request.isPending || !parentEmail.includes("@")}
-              className="w-full"
+            <p className="mt-1 text-sm text-muted-foreground">
+              Your parent or guardian approved this account. They can change your settings anytime
+              in the Parent Center.
+            </p>
+            <Link
+              to="/feed"
+              className="mt-3 inline-block rounded-full bg-primary px-4 py-2 text-sm font-bold text-primary-foreground"
             >
-              {request.isPending ? "Creating request…" : "Create approval request"}
-            </Button>
-          </section>
-
-          {link ? (
-            <section className="mt-4 rounded-2xl border border-border bg-surface p-4">
-              <h2 className="text-sm font-bold">Approval link</h2>
-              <p className="mt-1 text-xs text-muted-foreground">
-                Give this one-time link to your parent or guardian. It expires in 72 hours and can
-                only be used once, and they must sign in with their own adult account to approve.
-              </p>
-              <div className="mt-2 flex items-center gap-2">
-                <code className="min-w-0 flex-1 truncate rounded-lg bg-background px-2 py-1.5 text-[11px]">
-                  {link}
-                </code>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => {
-                    void navigator.clipboard.writeText(link);
-                    toast.success("Link copied");
-                  }}
-                >
-                  <Copy className="mr-1 h-3.5 w-3.5" aria-hidden /> Copy
-                </Button>
+              Go to ballaCity
+            </Link>
+          </div>
+        ) : (
+          <>
+            <section className="mt-6 grid gap-3 sm:grid-cols-2">
+              <div className="rounded-2xl border border-border bg-surface p-4">
+                <h2 className="text-sm font-bold">What we collect now</h2>
+                <ul className="mt-2 space-y-1 text-xs text-muted-foreground">
+                  {COLLECTED_BEFORE_CONSENT.map((i) => (
+                    <li key={i}>• {i}</li>
+                  ))}
+                </ul>
               </div>
-              <div className="mt-2 flex flex-wrap gap-2">
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => {
-                    const subject = encodeURIComponent("Please approve my ballaCity account");
-                    const body = encodeURIComponent(
-                      `Hi,\n\nPlease approve my ballaCity account by opening this one-time link and signing in with your own adult account:\n\n${link}\n\nIt expires in 72 hours.\n\nThank you!`,
-                    );
-                    window.location.href = `mailto:${encodeURIComponent(parentEmail)}?subject=${subject}&body=${body}`;
-                  }}
-                >
-                  Email this link
-                </Button>
-                {typeof navigator !== "undefined" && "share" in navigator ? (
+              <div className="rounded-2xl border border-border bg-surface p-4">
+                <h2 className="text-sm font-bold">What we do not collect yet</h2>
+                <ul className="mt-2 space-y-1 text-xs text-muted-foreground">
+                  {NOT_COLLECTED_BEFORE_CONSENT.map((i) => (
+                    <li key={i}>• {i}</li>
+                  ))}
+                </ul>
+              </div>
+            </section>
+
+            {pending && status?.consent?.parentEmail ? (
+              <div className="mt-6 rounded-2xl border border-amber-500/30 bg-amber-500/10 p-4">
+                <div className="flex items-center gap-2 font-semibold text-amber-600">
+                  <Clock className="h-5 w-5" aria-hidden /> Waiting for approval
+                </div>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  We're waiting for {status.consent.parentEmail} to approve. They need to open the
+                  approval link and sign in with their own adult ballaCity account.
+                </p>
+              </div>
+            ) : null}
+
+            <section className="mt-6 space-y-3 rounded-2xl border border-border bg-surface p-4">
+              <h2 className="text-sm font-bold">
+                {pending ? "Send a new approval request" : "Ask your parent or guardian"}
+              </h2>
+              <div className="space-y-1.5">
+                <Label htmlFor="parent-email">Their email address</Label>
+                <Input
+                  id="parent-email"
+                  type="email"
+                  inputMode="email"
+                  autoComplete="off"
+                  placeholder="guardian@example.com"
+                  value={parentEmail}
+                  onChange={(e) => setParentEmail(e.target.value)}
+                  maxLength={255}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="parent-name">Their name (optional)</Label>
+                <Input
+                  id="parent-name"
+                  value={parentName}
+                  onChange={(e) => setParentName(e.target.value)}
+                  maxLength={120}
+                  placeholder="Alex Rivera"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <span className="text-sm font-medium">Who are they?</span>
+                <div className="flex flex-wrap gap-2">
+                  {RELATIONSHIPS.map((r) => (
+                    <button
+                      key={r.value}
+                      type="button"
+                      onClick={() => setRelationship(r.value)}
+                      className={`rounded-full border px-3 py-1.5 text-xs font-semibold ${
+                        relationship === r.value
+                          ? "border-primary bg-primary/10 text-primary"
+                          : "border-border"
+                      }`}
+                    >
+                      {r.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <Button
+                onClick={submit}
+                disabled={request.isPending || !parentEmail.includes("@")}
+                className="w-full"
+              >
+                {request.isPending ? "Creating request…" : "Create approval request"}
+              </Button>
+            </section>
+
+            {link ? (
+              <section className="mt-4 rounded-2xl border border-border bg-surface p-4">
+                <h2 className="text-sm font-bold">Approval link</h2>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Give this one-time link to your parent or guardian. It expires in 72 hours and can
+                  only be used once, and they must sign in with their own adult account to approve.
+                </p>
+                <div className="mt-2 flex items-center gap-2">
+                  <code className="min-w-0 flex-1 truncate rounded-lg bg-background px-2 py-1.5 text-[11px]">
+                    {link}
+                  </code>
                   <Button
                     size="sm"
                     variant="outline"
                     onClick={() => {
-                      void navigator
-                        .share({ title: "Approve my ballaCity account", url: link })
-                        .catch(() => undefined);
+                      void navigator.clipboard.writeText(link);
+                      toast.success("Link copied");
                     }}
                   >
-                    Share
+                    <Copy className="mr-1 h-3.5 w-3.5" aria-hidden /> Copy
                   </Button>
-                ) : null}
-              </div>
-            </section>
-          ) : null}
-        </>
-      )}
+                </div>
+                <div className="mt-2 flex flex-wrap gap-2">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => {
+                      const subject = encodeURIComponent("Please approve my ballaCity account");
+                      const body = encodeURIComponent(
+                        `Hi,\n\nPlease approve my ballaCity account by opening this one-time link and signing in with your own adult account:\n\n${link}\n\nIt expires in 72 hours.\n\nThank you!`,
+                      );
+                      window.location.href = `mailto:${encodeURIComponent(parentEmail)}?subject=${subject}&body=${body}`;
+                    }}
+                  >
+                    Email this link
+                  </Button>
+                  {typeof navigator !== "undefined" && "share" in navigator ? (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => {
+                        void navigator
+                          .share({ title: "Approve my ballaCity account", url: link })
+                          .catch(() => undefined);
+                      }}
+                    >
+                      Share
+                    </Button>
+                  ) : null}
+                </div>
+              </section>
+            ) : null}
+          </>
+        )}
 
-      <p className="mt-6 text-[11px] leading-relaxed text-muted-foreground">
-        {CHILD_POLICY_DISCLAIMER}
-      </p>
-      <div className="mt-3 flex flex-wrap gap-3 text-xs">
-        <Link to="/safety/children" className="font-semibold text-primary underline">
-          Child &amp; teen safety
-        </Link>
-        <Link to="/privacy" className="font-semibold text-primary underline">
-          Privacy Policy
-        </Link>
-        <Link to="/contact" className="font-semibold text-primary underline">
-          Contact support
-        </Link>
-      </div>
+        <p className="mt-6 text-[11px] leading-relaxed text-muted-foreground">
+          {CHILD_POLICY_DISCLAIMER}
+        </p>
+        <div className="mt-3 flex flex-wrap gap-3 text-xs">
+          <Link to="/safety/children" className="font-semibold text-primary underline">
+            Child &amp; teen safety
+          </Link>
+          <Link to="/privacy" className="font-semibold text-primary underline">
+            Privacy Policy
+          </Link>
+          <Link to="/contact" className="font-semibold text-primary underline">
+            Contact support
+          </Link>
+        </div>
       </>
     </OnboardingShell>
   );
