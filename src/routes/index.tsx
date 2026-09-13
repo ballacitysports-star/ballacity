@@ -1,6 +1,6 @@
 import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
 import { ogImageUrl, pageHead, SITE_DESCRIPTION, SITE_TITLE, SITE_URL } from "@/lib/seo";
-import { ArrowRight, MapPin, Sparkles, Trophy, Users, Video, Zap } from "lucide-react";
+import { ArrowRight, MapPin, Users, Video, Zap } from "lucide-react";
 import { useEffect, type CSSProperties } from "react";
 import { Logo } from "@/components/Logo";
 import { HERO_IMAGE, SPORTS } from "@/lib/sample-data";
@@ -113,13 +113,9 @@ function Landing() {
         <div className="absolute inset-0 grid-noise opacity-30" />
         <div className="relative page-shell pt-12 pb-20 md:pt-20 md:pb-32 grid md:grid-cols-2 gap-10 items-center">
           <div>
-            <div className="enter-up inline-flex items-center gap-2 rounded-full border border-lime/30 bg-lime/10 px-3 py-1 text-xs font-semibold text-lime">
-              <span className="h-1.5 w-1.5 rounded-full bg-lime animate-pulse" />
-              Live · 1,284 games this week
-            </div>
             <h1
               style={{ "--enter-delay": "50ms" } as CSSProperties}
-              className="enter-up mt-5 font-display text-5xl md:text-7xl font-bold leading-[0.95] tracking-tight"
+              className="enter-up font-display text-5xl md:text-7xl font-bold leading-[0.95] tracking-tight"
             >
               Pickup sports.
               <br />
@@ -148,21 +144,6 @@ function Landing() {
               >
                 Host a game
               </Link>
-            </div>
-
-            <div className="mt-10 grid grid-cols-3 gap-6 max-w-md">
-              {[
-                { k: "48k", v: "players" },
-                { k: "1.2k", v: "games / wk" },
-                { k: "4.9★", v: "host rating" },
-              ].map((s) => (
-                <div key={s.v}>
-                  <div className="font-display text-3xl font-bold">{s.k}</div>
-                  <div className="text-xs uppercase tracking-wider text-muted-foreground">
-                    {s.v}
-                  </div>
-                </div>
-              ))}
             </div>
           </div>
 
@@ -198,23 +179,6 @@ function Landing() {
                 </button>
               </div>
             </div>
-            <div className="float-soft absolute -left-10 top-10 rounded-2xl border border-border bg-surface/90 backdrop-blur p-3 shadow-xl">
-              <div className="flex items-center gap-2 text-xs font-semibold">
-                <span className="grid h-7 w-7 place-items-center rounded-full bg-coral-gradient text-white">
-                  ⚡
-                </span>
-                Marcus joined your game
-              </div>
-            </div>
-            <div
-              style={{ "--enter-delay": "500ms" } as CSSProperties}
-              className="float-soft absolute -right-6 bottom-24 rounded-2xl border border-border bg-surface/90 backdrop-blur p-3 shadow-xl"
-            >
-              <div className="micro-label text-muted-foreground">
-                Reliability
-              </div>
-              <div className="font-display text-xl font-bold text-lime">98%</div>
-            </div>
           </div>
         </div>
       </section>
@@ -238,9 +202,6 @@ function Landing() {
             >
               <div className="text-3xl mb-2">{s.emoji}</div>
               <div className="font-semibold">{s.name}</div>
-              <div className="text-xs text-muted-foreground">
-                {20 + ((s.name.charCodeAt(0) * 7 + s.name.length * 13) % 80)} nearby
-              </div>
             </div>
           ))}
         </div>
@@ -272,21 +233,9 @@ function Landing() {
               color: "lime",
             },
             {
-              icon: Trophy,
-              title: "Skill-balanced teams",
-              body: "AI matchmaking builds even sides so every game is competitive.",
-              color: "coral",
-            },
-            {
               icon: MapPin,
               title: "Map-first discovery",
               body: "See every pickup game on a live map of your neighborhood.",
-              color: "lime",
-            },
-            {
-              icon: Sparkles,
-              title: "Pro tools, free to start",
-              body: "Host unlimited games. Upgrade for analytics & priority visibility.",
               color: "coral",
             },
           ].map((f, i) => {
