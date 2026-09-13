@@ -10,9 +10,10 @@ export const SITE_URL = "https://open-run-connect.lovable.app";
 export const SITE_NAME = "ballaCity";
 /** The site’s own title and description. Pages either use these verbatim or
  *  prefix/suffix their own page name onto them, so the wording stays in one place. */
-export const SITE_TITLE = "ballaCity — Find Pickup Sports Games Near You";
+export const SITE_TITLE = "ballaCity — Pickup Games, Teams & Trainers Near You";
 export const SITE_DESCRIPTION =
-  "Find and join pickup basketball, soccer, pickleball and more near you. Discover local games, teams, trainers and gyms on ballaCity and grab your spot fast.";
+  "Find and join pickup baseball, basketball, soccer, pickleball and more near you. Discover local games, teams, trainers and gyms on ballaCity and grab your spot fast.";
+
 
 type MetaTag = Record<string, string>;
 
