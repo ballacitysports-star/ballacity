@@ -83,12 +83,8 @@ function SportGuidePage() {
           className="h-40 w-full rounded-2xl object-cover"
         />
 
-        <h1 className="mt-4 page-title">
-          <span aria-hidden className="mr-2">
-            {guide.emoji}
-          </span>
-          {guide.sport}
-        </h1>
+        <h1 className="mt-4 page-title">{guide.sport}</h1>
+
         <p className="mt-2 page-subtitle">{guide.tagline}</p>
 
         <dl className="mt-4 grid grid-cols-2 gap-3">
