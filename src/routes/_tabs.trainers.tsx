@@ -3,6 +3,8 @@ import { pageHead } from "@/lib/seo";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import { Megaphone, GraduationCap, MapPin, Building2 } from "lucide-react";
+import { EmptyState } from "@/components/ui/empty-state";
+import { ListSkeleton } from "@/components/ui/loading-state";
 import { FilterBar } from "@/components/FilterBar";
 import { FilterSection, ChipRow } from "@/components/FilterSheet";
 import { zodValidator, fallback } from "@tanstack/zod-adapter";
@@ -691,12 +693,12 @@ function TrainersPage() {
               );
             })}
             {list.length === 0 && (
-              <div className="rounded-2xl border border-border bg-surface p-8 text-center text-muted-foreground sm:col-span-2">
-                <div className="inline-flex items-center gap-2">
-                  <GraduationCap className="h-4 w-4 text-lime" />
-                  No trainers match.
-                </div>
-              </div>
+              <EmptyState
+                className="sm:col-span-2"
+                icon={<GraduationCap className="h-6 w-6" aria-hidden />}
+                title="No trainers match your filters"
+                description="Widen the distance or pick another sport to see more coaches near you."
+              />
             )}
           </div>
         )}
@@ -736,16 +738,21 @@ function GymsView({
       />
 
       {isLoading ? (
-        <div className="rounded-2xl border border-border bg-surface p-8 text-center text-sm text-muted-foreground">
-          Loading gyms…
-        </div>
+        <ListSkeleton rows={3} label="Loading gyms…" />
       ) : gyms.length === 0 ? (
-        <div className="rounded-2xl border border-border bg-surface p-8 text-center text-muted-foreground">
-          <div className="inline-flex items-center gap-2">
-            <Building2 className="h-4 w-4 text-lime" />
-            No gyms yet.
-          </div>
-        </div>
+        <EmptyState
+          icon={<Building2 className="h-6 w-6" aria-hidden />}
+          title="No gyms listed yet"
+          description="Gyms and organizations near you will appear here. You can add yours in a minute."
+          action={
+            <Link
+              to="/orgs/create"
+              className="inline-flex rounded-full bg-lime px-5 py-2.5 text-sm font-bold text-primary-foreground"
+            >
+              Add a gym
+            </Link>
+          }
+        />
       ) : (
         <div className="space-y-3 pb-6">
           {gyms.map((g) => (

@@ -16,6 +16,8 @@ import { UserAvatarById } from "@/components/UserAvatar";
 import { usePrefetchUserAvatars } from "@/lib/user-avatars";
 import { supabase } from "@/integrations/supabase/client";
 import { NotificationsPanel } from "@/components/NotificationsPanel";
+import { EmptyState } from "@/components/ui/empty-state";
+import { ListSkeleton } from "@/components/ui/loading-state";
 
 const searchSchema = z.object({
   tab: fallback(z.string(), "messages").default("messages"),
@@ -172,13 +174,27 @@ function MessagesInbox() {
           </div>
 
           {fetching ? (
-            <div className="text-sm text-muted-foreground">Loading…</div>
+            <ListSkeleton rows={4} label="Loading your messages…" />
           ) : list.length === 0 ? (
-            <div className="rounded-2xl border border-dashed border-border bg-surface/40 p-8 text-center text-sm text-muted-foreground">
-              {msgTab === "primary"
-                ? "No conversations yet. Open a game and tap the chat icon to message the host."
-                : "No message requests."}
-            </div>
+            <EmptyState
+              icon={<MessageCircle className="h-6 w-6" aria-hidden />}
+              title={msgTab === "primary" ? "No conversations yet" : "No message requests"}
+              description={
+                msgTab === "primary"
+                  ? "Messages start from a game. Open a game you're in and tap the chat icon to reach the host."
+                  : "Requests from people you haven't messaged before land here first, so nothing reaches you unexpectedly."
+              }
+              action={
+                msgTab === "primary" ? (
+                  <Link
+                    to="/feed"
+                    className="inline-flex rounded-full bg-lime px-5 py-2.5 text-sm font-bold text-primary-foreground"
+                  >
+                    Find a game
+                  </Link>
+                ) : undefined
+              }
+            />
           ) : (
             <div className="space-y-2">
               {list.map((c) => (

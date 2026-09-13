@@ -1,7 +1,8 @@
 import { createFileRoute, Link, useNavigate, useRouter } from "@tanstack/react-router";
 import { pageHead } from "@/lib/seo";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Loader2, RefreshCw } from "lucide-react";
+import { CalendarSearch, Loader2, RefreshCw, Search } from "lucide-react";
+import { EmptyState } from "@/components/ui/empty-state";
 import { Bell, MessageCircle, MapPin, MapPinOff } from "lucide-react";
 import { ViewDensityToggle } from "@/components/ViewDensityToggle";
 import { PlayMapView } from "@/components/PlayMapView";
@@ -882,11 +883,12 @@ function Feed() {
                   : visible.map((g, i) => renderGame(g, i))}
                 {hasMore && !refreshing && renderSkeletons(density === "list" ? 4 : 3)}
                 {!refreshing && filtered.length === 0 && (
-                  <div
-                    className={`${emptyColSpan} rounded-2xl border border-border bg-surface p-8 text-center text-muted-foreground`}
-                  >
-                    No games match "{q}".
-                  </div>
+                  <EmptyState
+                    className={emptyColSpan}
+                    icon={<Search className="h-6 w-6" aria-hidden />}
+                    title={`No games match "${q}"`}
+                    description="Try a shorter search, or a different sport or city name."
+                  />
                 )}
               </div>
               <InfiniteSentinel ref={sentinelRef} hasMore={hasMore} total={filtered.length} />
@@ -916,21 +918,24 @@ function Feed() {
                       : visible.map((g, i) => renderGame(g, i))}
                     {hasMore && !refreshing && renderSkeletons(density === "list" ? 4 : 3)}
                     {!refreshing && filtered.length === 0 && (
-                      <div
-                        className={`${emptyColSpan} rounded-2xl border border-border bg-surface p-8 text-center text-muted-foreground space-y-3`}
-                      >
-                        <div>
-                          {tab === "archive"
-                            ? "No finished games match your filters yet."
-                            : "No games match your filters."}
-                        </div>
-                        <button
-                          onClick={() => setFeedPrefs(DEFAULT_PREFS)}
-                          className="inline-flex rounded-full bg-lime px-4 py-2 text-sm font-bold text-primary-foreground"
-                        >
-                          Clear filters
-                        </button>
-                      </div>
+                      <EmptyState
+                        className={emptyColSpan}
+                        icon={<CalendarSearch className="h-6 w-6" aria-hidden />}
+                        title={
+                          tab === "archive"
+                            ? "No finished games match your filters"
+                            : "No games match your filters"
+                        }
+                        description="Your sport, distance, date or skill filters are narrowing this down. Clearing them shows everything nearby."
+                        action={
+                          <button
+                            onClick={() => setFeedPrefs(DEFAULT_PREFS)}
+                            className="inline-flex rounded-full bg-lime px-5 py-2.5 text-sm font-bold text-primary-foreground"
+                          >
+                            Clear filters
+                          </button>
+                        }
+                      />
                     )}
                   </div>
                   <InfiniteSentinel ref={sentinelRef} hasMore={hasMore} total={filtered.length} />

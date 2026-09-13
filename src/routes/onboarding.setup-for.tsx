@@ -2,7 +2,8 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 import { User, Users, UserPlus } from "lucide-react";
 import { pageHead } from "@/lib/seo";
-import { Button } from "@/components/ui/button";
+import { PrimaryCTA } from "@/components/PrimaryCTA";
+import { OnboardingShell } from "@/components/onboarding/OnboardingShell";
 
 export const Route = createFileRoute("/onboarding/setup-for")({
   head: () =>
@@ -58,13 +59,11 @@ function SetupForPage() {
   const [choice, setChoice] = useState<Choice | null>(null);
 
   return (
-    <div className="page-shell-narrow py-10">
-      <h1 className="page-title">Who are you setting up ballaCity for?</h1>
-      <p className="mt-2 text-sm text-muted-foreground">
-        One login covers your whole family. You can add more players any time.
-      </p>
-
-      <div className="mt-6 space-y-3">
+    <OnboardingShell
+      title="Who are you setting up ballaCity for?"
+      description="One login covers your whole family. You can add more players any time."
+    >
+      <div className="space-y-3">
         {CHOICES.map((c) => {
           const Icon = c.icon;
           const active = choice === c.id;
@@ -88,8 +87,8 @@ function SetupForPage() {
         })}
       </div>
 
-      <Button
-        className="mt-6 w-full"
+      <PrimaryCTA
+        className="mt-6"
         disabled={!choice}
         onClick={() => {
           if (!choice) return;
@@ -102,7 +101,7 @@ function SetupForPage() {
         }}
       >
         Continue
-      </Button>
-    </div>
+      </PrimaryCTA>
+    </OnboardingShell>
   );
 }
