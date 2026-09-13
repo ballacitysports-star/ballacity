@@ -30,7 +30,6 @@ function readRoutes(): Record<string, string> {
  * move that file onto a page shell — never add one.
  */
 const NOT_YET_MIGRATED = new Set([
-  "[.]lovable.oauth.consent.tsx",
   "dev.og-preview.tsx",
   "dev.route-doctor.tsx",
 ]);
