@@ -440,6 +440,21 @@ button:disabled,
   padding-inline: clamp(0.75rem, 4vw, 2rem);
 }
 
+/* The column inside a fixed bottom action bar — the join/pay row on a game, the
+   back/next row in a creation wizard. One width so the primary action lands in
+   the same place on every screen, and no `mx-auto` in the markup, because a
+   centred capped div in a route file reads as a page container. */
+@utility action-bar-inner {
+  margin-inline: auto;
+  display: flex;
+  width: 100%;
+  max-width: 32rem;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+
+
 @layer utilities {
   .glow-lime { box-shadow: var(--shadow-glow-primary); }
   .glow-coral { box-shadow: var(--shadow-glow-secondary); }
