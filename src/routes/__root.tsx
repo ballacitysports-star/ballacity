@@ -10,6 +10,7 @@ import {
 import { useEffect, useState } from "react";
 
 import appCss from "../styles.css?url";
+import { SITE_DESCRIPTION, SITE_TITLE } from "@/lib/seo";
 import { DebugModeToggle } from "@/components/DebugModeToggle";
 import { BottomNav } from "@/components/BottomNav";
 import { SwipeNavigator } from "@/components/navigation/SwipeNavigator";
