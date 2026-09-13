@@ -88,6 +88,10 @@ export function InlineVideoPlayer({
     };
   }, [videoPath, videoUrl, fallbackVideoPath]);
 
+  // One name for "the other copy", whether the caller handed us a signed URL or
+  // a storage path we signed ourselves.
+  const altUrl = fallbackVideoUrl ?? signedFallback;
+
   // Probe decodability up front so the poster can tell the truth before a tap.
   useEffect(() => {
     if (!url) return;
