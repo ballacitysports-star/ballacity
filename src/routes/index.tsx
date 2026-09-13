@@ -179,23 +179,6 @@ function Landing() {
                 </button>
               </div>
             </div>
-            <div className="float-soft absolute -left-10 top-10 rounded-2xl border border-border bg-surface/90 backdrop-blur p-3 shadow-xl">
-              <div className="flex items-center gap-2 text-xs font-semibold">
-                <span className="grid h-7 w-7 place-items-center rounded-full bg-coral-gradient text-white">
-                  ⚡
-                </span>
-                Marcus joined your game
-              </div>
-            </div>
-            <div
-              style={{ "--enter-delay": "500ms" } as CSSProperties}
-              className="float-soft absolute -right-6 bottom-24 rounded-2xl border border-border bg-surface/90 backdrop-blur p-3 shadow-xl"
-            >
-              <div className="micro-label text-muted-foreground">
-                Reliability
-              </div>
-              <div className="font-display text-xl font-bold text-lime">98%</div>
-            </div>
           </div>
         </div>
       </section>
