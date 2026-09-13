@@ -420,6 +420,9 @@ const PUBLIC_ROUTES = [
   "/trust-center",
   "/community-guidelines",
   "/contact",
+  // Sports guides are public, indexable content.
+  "/guide",
+
 
   // Shareable, sign-in-free surface.
   "/highlights",
