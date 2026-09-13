@@ -180,11 +180,17 @@ function HighlightFeedPage() {
 
       <main className="page-shell-flush">
         {loading ? (
-          <div className="grid place-items-center py-16 text-muted-foreground">
-            <Loader2 className="h-5 w-5 animate-spin" />
+          <div className="grid place-items-center py-16">
+            <LoadingState label="Loading highlights…" />
           </div>
         ) : error ? (
-          <p className="px-4 py-16 text-center text-sm text-muted-foreground">{error}</p>
+          <div className="px-4 py-10">
+            <ErrorState
+              title="Highlights didn’t load"
+              description="Something went wrong while loading highlights. Check your connection and try again."
+              onRetry={() => window.location.reload()}
+            />
+          </div>
         ) : items.length === 0 ? (
           <div className="mx-4 mt-6 rounded-2xl border border-dashed border-border p-8 text-center">
             <Clapperboard className="mx-auto h-6 w-6 text-lime" />
