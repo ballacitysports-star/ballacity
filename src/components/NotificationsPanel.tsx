@@ -260,11 +260,13 @@ export function NotificationsPanel() {
       <NotificationPreferences />
 
       {fetching ? (
-        <div className="text-sm text-muted-foreground">Loading…</div>
+        <ListSkeleton rows={4} label="Loading your notifications…" />
       ) : items.length === 0 ? (
-        <div className="rounded-2xl border border-dashed border-border bg-surface/40 p-8 text-center text-sm text-muted-foreground">
-          You're all caught up. New activity will show up here.
-        </div>
+        <EmptyState
+          icon={<Bell className="h-6 w-6" aria-hidden />}
+          title="You're all caught up"
+          description="Join requests, roster changes and messages about your games will show up here."
+        />
       ) : (
         <div className="space-y-2">
           <p className="text-[10px] text-muted-foreground/70 px-1 mb-1">
