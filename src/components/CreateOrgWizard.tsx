@@ -395,7 +395,7 @@ export function CreateOrgWizard({ kind }: { kind: OrgKind }) {
   }
 
   return (
-    <div className="mx-auto max-w-md px-4 pt-6 pb-32">
+    <div className="page-shell-narrow pt-6 pb-32">
       <div className="flex items-center gap-3 mb-4">
         <Link
           to={backHref}
@@ -1395,7 +1395,7 @@ export function CreateOrgWizard({ kind }: { kind: OrgKind }) {
       </AnimatePresence>
 
       <div className="fixed bottom-[calc(env(safe-area-inset-bottom)+6rem)] left-0 right-0 z-30 px-4 pb-[max(env(safe-area-inset-bottom),0.75rem)] pt-3 bg-gradient-to-t from-background via-background/90 to-transparent">
-        <div className="mx-auto max-w-md flex gap-2">
+        <div className="mx-auto flex w-full max-w-lg gap-2">
           {step > 0 ? (
             <button
               type="button"

@@ -21,7 +21,7 @@ export function AccountTypeGate({
 
   const requiredLabel = ACCOUNT_TYPE_META[requires].label;
   return (
-    <div className="mx-auto w-full max-w-md p-6">
+    <div className="page-shell-narrow py-6">
       <div className="rounded-2xl border border-border bg-surface p-5 text-sm">
         <div className="font-display text-lg font-bold">Sign in to add a {requiredLabel}</div>
         <p className="mt-2 text-muted-foreground">

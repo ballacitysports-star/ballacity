@@ -101,7 +101,7 @@ function Consent() {
   }
 
   return (
-    <main className="mx-auto max-w-md p-6">
+    <main className="page-shell-narrow py-6">
       <h1 className="page-title">Connect {clientName} to your ballaCity account</h1>
       <p className="mt-3 text-sm text-muted-foreground">
         This lets {clientName} use ballaCity as you. It does not bypass ballaCity's permissions or
