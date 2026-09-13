@@ -86,13 +86,17 @@ export function GameCard({ game, index = 0 }: { game: Game; index?: number }) {
     // composition. Every consumer puts GameCard in a grid, so this belongs
     // here rather than on each of the five call sites.
     <div
-      className="enter-up min-w-0"
+      className="enter-up min-w-0 h-full"
       style={{ "--enter-delay": `${index * 50}ms` } as CSSProperties}
     >
+      {/* flex column + h-full: in grid mode a row of cards carries different
+          amounts of status pills and blocked-reason copy, so without this the
+          fill bar floats at a different height on every card in the row. The
+          media band and the footer stay put; only the detail block stretches. */}
       <Link
         to="/games/$gameId"
         params={{ gameId: game.id }}
-        className="group block overflow-hidden rounded-3xl border border-border bg-surface transition-all hover:border-lime/40 hover:-translate-y-0.5"
+        className="group flex h-full flex-col overflow-hidden rounded-3xl border border-border bg-surface transition-all hover:border-lime/40 hover:-translate-y-0.5"
       >
         <div className="relative h-28 overflow-hidden">
           <ResponsiveImage
