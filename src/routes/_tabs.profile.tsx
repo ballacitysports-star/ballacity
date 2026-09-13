@@ -972,6 +972,7 @@ function ProfileReelItem({
       {reel.status === "completed" ? (
         <InlineVideoPlayer
           videoPath={reel.playback_path ?? reel.video_path}
+          fallbackVideoPath={reel.playback_path ? reel.video_path : null}
           thumbnailUrl={thumbUrl}
           ariaLabel={`Highlight reel ${reel.ai_title || reel.title}`}
           repair={{ reelId: reel.id, videoPath: reel.video_path, onRepaired: onChanged }}

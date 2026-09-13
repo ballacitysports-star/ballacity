@@ -173,6 +173,7 @@ export function GameRecapPanel({
         <div className="mt-2">
           <InlineVideoPlayer
             videoPath={latest.playback_path ?? latest.video_path}
+            fallbackVideoPath={latest.playback_path ? latest.video_path : null}
             thumbnailUrl={thumbUrl}
             ariaLabel={`Highlight reel for ${gameTitle}`}
             repair={

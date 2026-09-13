@@ -93,7 +93,14 @@ export function ReelStudio({
 
   return (
     <div className="mt-3 space-y-3">
-      <video ref={videoRef} src={videoUrl} controls className="w-full rounded-lg" />
+      <video
+        ref={videoRef}
+        src={videoUrl}
+        controls
+        playsInline
+        preload="metadata"
+        className="w-full rounded-lg bg-black"
+      />
 
       {segments.length > 0 && (
         <div className="rounded-xl border border-border bg-background/60 p-3">

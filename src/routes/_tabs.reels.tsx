@@ -17,6 +17,7 @@ import {
 import { captureClip } from "@/lib/reel-frames";
 import { needsPlaybackConversion } from "@/lib/video-support";
 import { convertToPlayableMp4 } from "@/lib/video-transcode";
+import { buildMediaMeta, probeVideo, type ProbedVideo } from "@/lib/video-metadata";
 import { RepairPlaybackButton } from "@/components/reels/RepairPlaybackButton";
 
 import { ReelStylePanel } from "@/components/reels/ReelStylePanel";
@@ -810,12 +811,20 @@ function ReelsPage() {
       // Deletes the object and throws when the bytes aren't a real video.
       await finalizeVideoUpload({ data: { path: base, kind: "video" } });
 
+      // What the clip actually is (length, size, which way up). Measured here
+      // because the server runtime has no ffprobe; kept so a viewer's player and
+      // a later support question both have the facts.
+      const originalProbe = await probeVideo(file);
+
       // Every upload lands playable: unless the clip is provably H.264 in an
       // MP4 container, we build the iPhone/Safari-safe H.264 copy right here
       // (the server runtime has no encoder) instead of waiting for a manual
       // "Fix playback" tap.
       let playbackPath: string | null = null;
-      if (await needsPlaybackConversion(file)) {
+      let processedInfo: (ProbedVideo & { bytes: number; pass: string }) | null = null;
+      let playbackError: string | null = null;
+      const conversionAttempted = await needsPlaybackConversion(file);
+      if (conversionAttempted) {
         const toastId = toast.loading("Making this clip play everywhere… 0%");
         const converted = await convertToPlayableMp4(file, (r, pass) =>
           toast.loading(
@@ -830,7 +839,17 @@ function ReelsPage() {
           const { error } = await supabase.storage
             .from("highlight-videos")
             .upload(p, converted.blob, { upsert: true, contentType: "video/mp4" });
-          if (!error) playbackPath = p;
+          if (error) playbackError = "The converted copy could not be saved";
+          else {
+            playbackPath = p;
+            processedInfo = {
+              ...(await probeVideo(converted.blob)),
+              bytes: converted.blob.size,
+              pass: converted.pass,
+            };
+          }
+        } else {
+          playbackError = "This device could not convert the clip";
         }
         if (playbackPath) toast.success("Ready — this reel plays on every device", { id: toastId });
         else
@@ -839,6 +858,13 @@ function ReelsPage() {
             { id: toastId },
           );
       }
+      const mediaMeta = buildMediaMeta({
+        file: { name: file.name, type: file.type, size: file.size },
+        original: originalProbe,
+        processed: processedInfo,
+        playbackError,
+        conversionAttempted,
+      });
 
       // Sample frames + audio in the browser: they become the real thumbnail and
       // the input the sports AI agent watches/listens to (the server can't run ffmpeg).
@@ -881,6 +907,7 @@ function ReelsPage() {
             (linkedGame ? `Recap · ${linkedGame.title}` : file.name.replace(/\.[^.]+$/, "")),
           video_path: base,
           playback_path: playbackPath,
+          media_meta: mediaMeta,
           status: "processing",
           used_free: usedFree,
           environment: env,
