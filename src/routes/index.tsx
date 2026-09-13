@@ -1,5 +1,5 @@
 import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
-import { pageHead } from "@/lib/seo";
+import { pageHead, SITE_DESCRIPTION, SITE_TITLE } from "@/lib/seo";
 import { ArrowRight, MapPin, Sparkles, Trophy, Users, Video, Zap } from "lucide-react";
 import { useEffect, type CSSProperties } from "react";
 import { Logo } from "@/components/Logo";
@@ -18,9 +18,8 @@ export const Route = createFileRoute("/")({
   head: () =>
     pageHead({
       path: "/",
-      title: "ballaCity — Pickup sports games near you",
-      description:
-        "Find and host pickup sports games near you. Basketball, soccer, pickleball, tennis and more — join a game in seconds.",
+      title: SITE_TITLE,
+      description: SITE_DESCRIPTION,
       jsonLd: {
         "@context": "https://schema.org",
         "@type": "WebSite",

@@ -117,11 +117,8 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1, viewport-fit=cover" },
-      { title: "ballaCity" },
-      {
-        name: "description",
-        content: "ballaCity — pickup sports games, teams, trainers, and gyms near you.",
-      },
+      { title: SITE_TITLE },
+      { name: "description", content: SITE_DESCRIPTION },
       { name: "author", content: "ballaCity" },
       { property: "og:site_name", content: "ballaCity" },
       { property: "og:type", content: "website" },
