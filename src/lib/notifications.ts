@@ -47,7 +47,6 @@ export async function createNotification(input: {
   }
 }
 
-
 export async function listMyNotifications(): Promise<Notification[]> {
   const { data, error } = await supabase
     .from("notifications" as any)

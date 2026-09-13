@@ -240,9 +240,7 @@ function PlayerCardPage() {
         }}
         className="scroll-mt-16 px-4 pt-5"
       >
-        <h2 className="mb-2 font-display text-sm font-bold uppercase tracking-wider text-muted-foreground">
-          Highlights
-        </h2>
+        <h2 className="mb-2 section-eyebrow text-muted-foreground">Highlights</h2>
         {reels.length === 0 ? (
           <EmptyBlock text="No highlight reels published yet." />
         ) : (
@@ -292,9 +290,7 @@ function PlayerCardPage() {
         }}
         className="scroll-mt-16 px-4 pt-7"
       >
-        <h2 className="mb-2 font-display text-sm font-bold uppercase tracking-wider text-muted-foreground">
-          Games
-        </h2>
+        <h2 className="mb-2 section-eyebrow text-muted-foreground">Games</h2>
         {upcoming.length === 0 && past.length === 0 ? (
           <EmptyBlock text="No games on this player's card yet." />
         ) : (
@@ -313,9 +309,7 @@ function PlayerCardPage() {
         }}
         className="scroll-mt-16 px-4 pt-7"
       >
-        <h2 className="mb-2 font-display text-sm font-bold uppercase tracking-wider text-muted-foreground">
-          Stats
-        </h2>
+        <h2 className="mb-2 section-eyebrow text-muted-foreground">Stats</h2>
         <div className="grid grid-cols-2 gap-3">
           <StatTile label="Games played" value={stats.gamesPlayed} />
           <StatTile label="Games hosted" value={stats.gamesHosted} />

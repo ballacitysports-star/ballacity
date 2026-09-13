@@ -29,10 +29,7 @@ function readRoutes(): Record<string, string> {
  * Route files that still hand-roll a page container. Remove an entry when you
  * move that file onto a page shell — never add one.
  */
-const NOT_YET_MIGRATED = new Set([
-  "dev.og-preview.tsx",
-  "dev.route-doctor.tsx",
-]);
+const NOT_YET_MIGRATED = new Set(["dev.og-preview.tsx", "dev.route-doctor.tsx"]);
 
 describe("page container migration", () => {
   const sources = readRoutes();

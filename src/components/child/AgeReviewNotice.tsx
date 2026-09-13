@@ -46,9 +46,13 @@ export function AgeReviewNotice() {
               already set up is affected.
             </p>
             <p className="mt-2 text-xs text-muted-foreground">
-              Current age group: <span className="font-semibold">{COHORT_META[status.cohort].label}</span>
+              Current age group:{" "}
+              <span className="font-semibold">{COHORT_META[status.cohort].label}</span>
             </p>
-            <Link to="/contact" className="mt-2 inline-block text-xs font-semibold text-primary underline">
+            <Link
+              to="/contact"
+              className="mt-2 inline-block text-xs font-semibold text-primary underline"
+            >
               Contact support about this review
             </Link>
           </>

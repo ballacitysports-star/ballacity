@@ -50,9 +50,7 @@ export function GameDistance({
     if (!snap?.coords || snap.status !== "granted") setDialogOpen(true);
   };
 
-  const fallbackDialog = (
-    <LocationAccessDialog open={dialogOpen} onOpenChange={setDialogOpen} />
-  );
+  const fallbackDialog = <LocationAccessDialog open={dialogOpen} onOpenChange={setDialogOpen} />;
 
   const prompt = (label: string, title: string) => (
     <>

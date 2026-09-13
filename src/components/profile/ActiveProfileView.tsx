@@ -164,7 +164,11 @@ export function ActiveProfileView({ profile }: { profile: AccountProfile }) {
             >
               Edit {meta.label.toLowerCase()}
             </Link>
-            <Link to={vm.publicTo.to} params={vm.publicTo.params as never} className={channelPillClass()}>
+            <Link
+              to={vm.publicTo.to}
+              params={vm.publicTo.params as never}
+              className={channelPillClass()}
+            >
               View public page
             </Link>
             <Link to="/create" className={channelPillClass()}>
@@ -218,7 +222,10 @@ export function ActiveProfileView({ profile }: { profile: AccountProfile }) {
           {games.length === 0 ? (
             <div className="rounded-2xl border border-border bg-surface p-5 text-sm text-muted-foreground">
               No games hosted under {vm.name} yet.{" "}
-              <Link to="/create" className="font-medium text-foreground underline-offset-2 hover:underline">
+              <Link
+                to="/create"
+                className="font-medium text-foreground underline-offset-2 hover:underline"
+              >
                 Host a game
               </Link>
               .
@@ -241,7 +248,12 @@ export function ActiveProfileView({ profile }: { profile: AccountProfile }) {
               <Star className="h-3.5 w-3.5" /> {rep.count} review{rep.count === 1 ? "" : "s"}
             </p>
           )}
-          <ReviewsSection revieweeId={refId} revieweeKind={revieweeKind} revieweeName={vm.name} isOwner />
+          <ReviewsSection
+            revieweeId={refId}
+            revieweeKind={revieweeKind}
+            revieweeName={vm.name}
+            isOwner
+          />
         </section>
       </div>
     </>

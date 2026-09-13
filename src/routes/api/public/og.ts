@@ -32,11 +32,7 @@ const KINDS: Record<string, { label: string; accent: string }> = {
 };
 
 const esc = (s: string) =>
-  s
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;");
+  s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 
 const clamp = (s: string, n: number) => (s.length > n ? `${s.slice(0, n - 1).trimEnd()}…` : s);
 
@@ -65,7 +61,8 @@ function fallbackSvg(opts: {
 }
 
 /** Cache for a day in the browser, a year at the edge; previews are immutable per URL. */
-const CACHE_CONTROL = "public, max-age=86400, s-maxage=31536000, stale-while-revalidate=604800, stale-if-error=604800, immutable";
+const CACHE_CONTROL =
+  "public, max-age=86400, s-maxage=31536000, stale-while-revalidate=604800, stale-if-error=604800, immutable";
 
 /** Bump when the card design changes so old ETags stop matching. */
 const OG_VERSION = "v1";
@@ -142,4 +139,3 @@ export const Route = createFileRoute("/api/public/og")({
     },
   },
 });
-

@@ -23,7 +23,13 @@ const ROUTES = readdirSync(new URL("../routes", import.meta.url), { recursive: t
 
 describe("page heading scale", () => {
   it("defines every step of the scale", () => {
-    for (const name of ["page-eyebrow", "page-title", "page-subtitle", "section-title", "bar-title"])
+    for (const name of [
+      "page-eyebrow",
+      "page-title",
+      "page-subtitle",
+      "section-title",
+      "bar-title",
+    ])
       expect(() => utility(name), name).not.toThrow();
   });
 

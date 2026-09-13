@@ -104,7 +104,11 @@ export const adminComplianceOverview = createServerFn({ method: "GET" })
       countRows(admin, "user_roles", (q: any) => q.in("role", ["admin", "superadmin"])),
       countRows(admin, "privacy_preferences", (q: any) => q.eq("ai_processing", false)),
       countRows(admin, "privacy_preferences", (q: any) => q.eq("ai_training_opt_in", false)),
-      admin.from("app_settings").select("value").eq("key", "compliance_last_reviewed_at").maybeSingle(),
+      admin
+        .from("app_settings")
+        .select("value")
+        .eq("key", "compliance_last_reviewed_at")
+        .maybeSingle(),
       admin.storage.listBuckets(),
     ]);
 
@@ -281,10 +285,7 @@ export const adminYouthOversight = createServerFn({ method: "GET" })
 
     const [usageRes, consentRows, minorProfiles, minorsTotal, tracked] = await Promise.all([
       context.supabase.rpc("minor_time_on_platform", { _days: input.days }),
-      admin
-        .from("parental_consents")
-        .select("child_user_id, status, requested_at")
-        .limit(5000),
+      admin.from("parental_consents").select("child_user_id, status, requested_at").limit(5000),
       admin.from("profiles").select("id").in("age_cohort", CONSENT_COHORTS).limit(5000),
       countRows(admin, "profiles", (q: any) => q.in("age_cohort", MINOR_COHORTS)),
       countRows(admin, "session_activity"),
@@ -300,9 +301,11 @@ export const adminYouthOversight = createServerFn({ method: "GET" })
     }));
 
     const consents =
-      (consentRows as {
-        data?: Array<{ child_user_id: string; status: string; requested_at: string | null }>;
-      }).data ?? [];
+      (
+        consentRows as {
+          data?: Array<{ child_user_id: string; status: string; requested_at: string | null }>;
+        }
+      ).data ?? [];
     const countStatus = (s: string) => consents.filter((c) => c.status === s).length;
     const pending = consents
       .filter((c) => c.status === "pending")

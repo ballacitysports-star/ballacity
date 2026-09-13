@@ -75,7 +75,12 @@ export function AuditTab() {
       <div className="flex items-center justify-between text-xs text-muted-foreground">
         <span>{data?.total ?? 0} entries</span>
         <div className="flex gap-2">
-          <Button size="sm" variant="outline" disabled={page === 0} onClick={() => setPage((x) => x - 1)}>
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={page === 0}
+            onClick={() => setPage((x) => x - 1)}
+          >
             Prev
           </Button>
           <Button

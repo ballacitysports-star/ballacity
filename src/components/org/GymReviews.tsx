@@ -21,7 +21,9 @@ function Stars({ value, size = 14 }: { value: number; size?: number }) {
         <Star
           key={i}
           style={{ width: size, height: size }}
-          className={i <= Math.round(value) ? "fill-amber-400 text-amber-400" : "text-muted-foreground/40"}
+          className={
+            i <= Math.round(value) ? "fill-amber-400 text-amber-400" : "text-muted-foreground/40"
+          }
         />
       ))}
     </span>
@@ -64,7 +66,7 @@ export function GymReviews({
 
   const reviews = useMemo(() => data ?? [], [data]);
   const summary = summarizeGymReviews(reviews);
-  const mine = user ? reviews.find((r) => r.reviewer_id === user.id) ?? null : null;
+  const mine = user ? (reviews.find((r) => r.reviewer_id === user.id) ?? null) : null;
 
   const [editing, setEditing] = useState(false);
   const [rating, setRating] = useState(0);
@@ -89,7 +91,9 @@ export function GymReviews({
     }
   }
 
-  const visible = isAdmin ? reviews : reviews.filter((r) => !r.flagged || r.reviewer_id === user?.id);
+  const visible = isAdmin
+    ? reviews
+    : reviews.filter((r) => !r.flagged || r.reviewer_id === user?.id);
 
   return (
     <section className="rounded-2xl border border-border/60 bg-surface p-4 space-y-4">
@@ -107,7 +111,9 @@ export function GymReviews({
       {summary.count > 0 ? (
         <div className="flex items-center gap-5">
           <div className="text-center">
-            <div className="font-display text-3xl font-bold leading-none">{summary.avg.toFixed(1)}</div>
+            <div className="font-display text-3xl font-bold leading-none">
+              {summary.avg.toFixed(1)}
+            </div>
             <Stars value={summary.avg} />
             <div className="mt-1 text-[11px] text-muted-foreground">
               {summary.count} review{summary.count === 1 ? "" : "s"}
@@ -118,10 +124,16 @@ export function GymReviews({
               const n = summary.distribution[star - 1];
               const pct = summary.count ? (n / summary.count) * 100 : 0;
               return (
-                <li key={star} className="flex items-center gap-2 text-[11px] text-muted-foreground">
+                <li
+                  key={star}
+                  className="flex items-center gap-2 text-[11px] text-muted-foreground"
+                >
                   <span className="w-3 tabular-nums">{star}</span>
                   <span className="h-1.5 flex-1 overflow-hidden rounded-full bg-secondary">
-                    <span className="block h-full rounded-full bg-amber-400" style={{ width: `${pct}%` }} />
+                    <span
+                      className="block h-full rounded-full bg-amber-400"
+                      style={{ width: `${pct}%` }}
+                    />
                   </span>
                   <span className="w-6 text-right tabular-nums">{n}</span>
                 </li>
@@ -130,12 +142,14 @@ export function GymReviews({
           </ul>
         </div>
       ) : (
-        !isLoading && <p className="text-xs text-muted-foreground">No reviews yet. Be the first to rate this gym.</p>
+        !isLoading && (
+          <p className="text-xs text-muted-foreground">
+            No reviews yet. Be the first to rate this gym.
+          </p>
+        )
       )}
 
-      {!user && (
-        <p className="text-xs text-muted-foreground">Sign in to leave a review.</p>
-      )}
+      {!user && <p className="text-xs text-muted-foreground">Sign in to leave a review.</p>}
 
       {editing && (
         <div className="space-y-2 rounded-xl border border-border bg-background p-3">
@@ -184,7 +198,9 @@ export function GymReviews({
                 />
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-                    <span className="text-sm font-semibold">{r.reviewer?.display_name ?? "Member"}</span>
+                    <span className="text-sm font-semibold">
+                      {r.reviewer?.display_name ?? "Member"}
+                    </span>
                     {r.verified && (
                       <span className="inline-flex items-center gap-1 rounded-full bg-lime/15 px-2 py-0.5 text-[10px] font-bold text-lime">
                         <ShieldCheck className="h-3 w-3" /> Verified visit
@@ -213,10 +229,13 @@ export function GymReviews({
                           .catch((e) => toast.error(e instanceof Error ? e.message : "Failed"))
                       }
                       className={`inline-flex items-center gap-1 rounded-full border px-2 py-1 font-semibold ${
-                        r.helpful_by_me ? "border-lime/50 bg-lime/10 text-lime" : "border-border text-muted-foreground"
+                        r.helpful_by_me
+                          ? "border-lime/50 bg-lime/10 text-lime"
+                          : "border-border text-muted-foreground"
                       }`}
                     >
-                      <ThumbsUp className="h-3 w-3" /> Helpful{r.helpful_count ? ` (${r.helpful_count})` : ""}
+                      <ThumbsUp className="h-3 w-3" /> Helpful
+                      {r.helpful_count ? ` (${r.helpful_count})` : ""}
                     </button>
 
                     {isMine ? (

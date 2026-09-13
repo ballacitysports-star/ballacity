@@ -401,9 +401,7 @@ export function whenRangeToSchedule(r: WhenRange): ScheduleEntry[] {
   const days = Math.max(0, dayGap(r.startDate, r.endDate));
   const endTime = r.allDay ? undefined : r.endTime;
   if (days === 0) {
-    return normalizeSchedule([
-      { date: r.startDate, time: r.startTime, endTime, allDay: r.allDay },
-    ]);
+    return normalizeSchedule([{ date: r.startDate, time: r.startTime, endTime, allDay: r.allDay }]);
   }
   return normalizeSchedule(
     Array.from({ length: days + 1 }, (_, i) => ({

@@ -90,7 +90,9 @@ export function TrainerOrgSection({ trainerId }: Props) {
         <>
           {(invites.data ?? []).length > 0 && (
             <div className="space-y-2">
-              <div className="text-[11px] uppercase tracking-wide text-muted-foreground">Pending invites</div>
+              <div className="text-[11px] uppercase tracking-wide text-muted-foreground">
+                Pending invites
+              </div>
               {invites.data!.map((inv) => (
                 <div
                   key={inv.id}
@@ -151,8 +153,24 @@ export function TrainerOrgSection({ trainerId }: Props) {
             </div>
           )}
 
-          {mode === "join" && <JoinForm trainerId={trainerId} onDone={() => { setMode("idle"); invalidate(); }} />}
-          {mode === "create" && <CreateForm trainerId={trainerId} onDone={() => { setMode("idle"); invalidate(); }} />}
+          {mode === "join" && (
+            <JoinForm
+              trainerId={trainerId}
+              onDone={() => {
+                setMode("idle");
+                invalidate();
+              }}
+            />
+          )}
+          {mode === "create" && (
+            <CreateForm
+              trainerId={trainerId}
+              onDone={() => {
+                setMode("idle");
+                invalidate();
+              }}
+            />
+          )}
           {mode !== "idle" && (
             <button
               className="text-[11px] text-muted-foreground hover:underline"
@@ -239,7 +257,12 @@ function CreateForm({ trainerId, onDone }: { trainerId: string; onDone: () => vo
 
   return (
     <div className="space-y-2">
-      <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Gym name" className="h-9" />
+      <Input
+        value={name}
+        onChange={(e) => setName(e.target.value)}
+        placeholder="Gym name"
+        className="h-9"
+      />
       <Input
         value={handle}
         onChange={(e) => setHandle(e.target.value.toLowerCase().replace(/[^a-z0-9_-]/g, ""))}

@@ -77,7 +77,6 @@ export const AUDIT_ACTIONS = {
   "legal.unpublish": { label: "Legal document unpublished", category: "legal" },
   "compliance.review": { label: "Compliance controls reviewed", category: "legal" },
 
-
   // Feature flags & settings
   "setting.update": { label: "Setting changed", category: "settings" },
   "feature_flag.update": { label: "Feature flag changed", category: "settings" },

@@ -61,7 +61,9 @@ export function ConfirmAction({
         <div className="space-y-3">
           {requireReason ? (
             <div className="space-y-1">
-              <label className="text-xs text-muted-foreground">Reason (recorded in audit log)</label>
+              <label className="text-xs text-muted-foreground">
+                Reason (recorded in audit log)
+              </label>
               <Textarea
                 value={reason}
                 onChange={(e) => setReason(e.target.value)}

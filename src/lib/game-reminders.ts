@@ -61,7 +61,11 @@ export async function clearMyGameReminders(gameId: string): Promise<void> {
   const { data: auth } = await supabase.auth.getUser();
   const uid = auth?.user?.id;
   if (!uid) return;
-  await supabase.from("game_reminders" as any).delete().eq("game_id", gameId).eq("user_id", uid);
+  await supabase
+    .from("game_reminders" as any)
+    .delete()
+    .eq("game_id", gameId)
+    .eq("user_id", uid);
 }
 
 /**

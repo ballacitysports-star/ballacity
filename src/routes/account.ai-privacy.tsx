@@ -78,7 +78,9 @@ function AnalysisCard({
         <p className="mt-2 line-clamp-3 text-xs text-muted-foreground">{item.aiCaption}</p>
       )}
       {item.hashtags.length > 0 && (
-        <p className="mt-1 text-xs text-lime">{item.hashtags.map((h) => `#${h.replace(/^#/, "")}`).join(" ")}</p>
+        <p className="mt-1 text-xs text-lime">
+          {item.hashtags.map((h) => `#${h.replace(/^#/, "")}`).join(" ")}
+        </p>
       )}
       {item.coachingNotes.length > 0 && (
         <ul className="mt-2 space-y-1">
@@ -244,7 +246,11 @@ function AiVideoPrivacyPage() {
             ) : items.length === 0 ? (
               <p className="text-sm text-muted-foreground">
                 No clips analyzed yet.{" "}
-                <Link to="/reels" search={{ game: "", title: "", upload: "" }} className="font-semibold text-lime underline">
+                <Link
+                  to="/reels"
+                  search={{ game: "", title: "", upload: "" }}
+                  className="font-semibold text-lime underline"
+                >
                   Upload a highlight
                 </Link>
                 .

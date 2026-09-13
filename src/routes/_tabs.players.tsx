@@ -712,7 +712,7 @@ function PlayersPage() {
           ) : (
             <>
               <div className="mb-2 flex items-center justify-between gap-2">
-                <h2 className="font-display text-sm font-bold uppercase tracking-wider text-muted-foreground">
+                <h2 className="section-eyebrow text-muted-foreground">
                   {sorted.length} player{sorted.length === 1 ? "" : "s"} available
                 </h2>
                 <SortSummary value={sortBy} options={PLAYER_SORTS} />
@@ -1202,9 +1202,7 @@ function AvailabilityCard({
         <div className="mt-3 rounded-2xl border border-border bg-background/40 p-3">
           {a.author_bio && (
             <section>
-              <h2 className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                About
-              </h2>
+              <h2 className="mb-1.5 section-eyebrow text-muted-foreground">About</h2>
               <p className="text-sm leading-relaxed text-foreground/90 whitespace-pre-wrap line-clamp-3">
                 {a.author_bio}
               </p>

@@ -24,7 +24,6 @@ export type ReportReason =
   | "unsafe_conditions"
   | "injury_risk";
 
-
 export type ReportSubjectType = "user" | "game" | "message" | "reel" | "payment";
 
 type ReasonOption = { value: ReportReason; label: string };
@@ -54,7 +53,6 @@ export const GAME_REPORT_REASONS: ReasonOption[] = [
   { value: "illegal", label: "Illegal activity" },
   { value: "other", label: "Other" },
 ];
-
 
 export const MESSAGE_REPORT_REASONS: ReasonOption[] = [
   { value: "harassment", label: "Harassment" },
@@ -119,7 +117,6 @@ export function reportStatusLabel(status: string): string {
   return map[status] ?? status;
 }
 
-
 export async function blockUser(blockedId: string) {
   const { data: u } = await supabase.auth.getUser();
   if (!u.user) throw new Error("Sign in to block");
@@ -141,10 +138,7 @@ export async function unblockUser(blockedId: string) {
   if (error) throw error;
 }
 
-export async function isBlocked(
-  blockedId: string,
-  viewerId: string | null,
-): Promise<boolean> {
+export async function isBlocked(blockedId: string, viewerId: string | null): Promise<boolean> {
   if (!viewerId) return false;
   const { data, error } = await supabase
     .from("user_blocks" as any)
@@ -224,11 +218,7 @@ export async function submitReport(input: SubmitReportInput) {
   if (error) throw error;
 }
 
-export async function reportUser(
-  reportedId: string,
-  reason: ReportReason,
-  details?: string,
-) {
+export async function reportUser(reportedId: string, reason: ReportReason, details?: string) {
   await submitReport({ subjectType: "user", reportedId, reason, details });
 }
 
@@ -249,14 +239,15 @@ export function useBlockedUsersList() {
         .order("created_at", { ascending: false });
       if (error) throw error;
       const ids = (data ?? []).map((r) => r.blocked_id);
-      if (ids.length === 0) return [] as {
-        id: string;
-        displayName: string;
-        username: string | null;
-        avatarUrl: string | null;
-        initials: string | null;
-        blockedAt: string;
-      }[];
+      if (ids.length === 0)
+        return [] as {
+          id: string;
+          displayName: string;
+          username: string | null;
+          avatarUrl: string | null;
+          initials: string | null;
+          blockedAt: string;
+        }[];
       const { data: profiles } = await supabase
         .from("profiles")
         .select("id, display_name, username, avatar_url, avatar_initials")
@@ -292,13 +283,7 @@ export function useBlockedUsersList() {
   };
 }
 
-
-export type ReelQualityIssue =
-  | "blurry"
-  | "wrong_game"
-  | "not_a_highlight"
-  | "duplicate"
-  | "other";
+export type ReelQualityIssue = "blurry" | "wrong_game" | "not_a_highlight" | "duplicate" | "other";
 
 export const REEL_QUALITY_ISSUES: { value: ReelQualityIssue; label: string }[] = [
   { value: "blurry", label: "Blurry, dark, or shaky footage" },
@@ -330,5 +315,4 @@ export async function flagReelQuality(
     details,
     reelId,
   });
-
 }

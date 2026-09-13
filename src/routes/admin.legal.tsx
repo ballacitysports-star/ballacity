@@ -323,9 +323,7 @@ function LegalManager() {
 
               {drafts.length > 0 ? (
                 <div className="space-y-2">
-                  <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                    Drafts
-                  </h3>
+                  <h3 className="section-eyebrow text-muted-foreground">Drafts</h3>
                   {drafts.map((d) => (
                     <div
                       key={d.id}
@@ -359,9 +357,7 @@ function LegalManager() {
 
               {history.length > 0 ? (
                 <div className="space-y-2 border-t border-border pt-3">
-                  <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                    Previous versions
-                  </h3>
+                  <h3 className="section-eyebrow text-muted-foreground">Previous versions</h3>
                   <ul className="space-y-1.5 text-xs text-muted-foreground">
                     {history.map((h) => (
                       <li key={h.id} className="flex flex-wrap items-center gap-2">

@@ -1,5 +1,11 @@
 import { Calendar, MapPin, Users, DollarSign, Pin, Share2 } from "lucide-react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
 import { POST_KIND_META, type OrgPost } from "@/lib/sample-data";
 import { formatWhen } from "@/lib/format";
 import { Link } from "@tanstack/react-router";

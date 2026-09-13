@@ -183,9 +183,7 @@ export const superadminListUsers = createServerFn({ method: "POST" })
 
 export const superadminUserDetail = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((d: { userId: string }) =>
-    z.object({ userId: z.string().uuid() }).parse(d),
-  )
+  .inputValidator((d: { userId: string }) => z.object({ userId: z.string().uuid() }).parse(d))
   .handler(async ({ context, data }) => {
     await assertSuperadmin(context);
     const admin = await getAdmin();
@@ -281,11 +279,7 @@ export const superadminSetRole = createServerFn({ method: "POST" })
   )
   .handler(async ({ context, data }) => {
     await assertSuperadmin(context);
-    if (
-      data.role === "superadmin" &&
-      !data.grant &&
-      data.userId === context.userId
-    ) {
+    if (data.role === "superadmin" && !data.grant && data.userId === context.userId) {
       throw new Error("You cannot remove your own superadmin role.");
     }
     const admin = await getAdmin();
@@ -294,11 +288,7 @@ export const superadminSetRole = createServerFn({ method: "POST" })
         .from("user_roles")
         .upsert({ user_id: data.userId, role: data.role }, { onConflict: "user_id,role" });
     } else {
-      await admin
-        .from("user_roles")
-        .delete()
-        .eq("user_id", data.userId)
-        .eq("role", data.role);
+      await admin.from("user_roles").delete().eq("user_id", data.userId).eq("role", data.role);
     }
     await writeAudit(admin, context.userId, {
       action: data.grant ? "role.grant" : "role.revoke",
@@ -337,7 +327,10 @@ export const superadminSuspendUser = createServerFn({ method: "POST" })
       ? { suspended_at: new Date().toISOString(), suspended_reason: data.reason ?? null }
       : { suspended_at: null, suspended_reason: null };
 
-    const { error } = await admin.from("profiles").update(patch as any).eq("id", data.userId);
+    const { error } = await admin
+      .from("profiles")
+      .update(patch as any)
+      .eq("id", data.userId);
     if (error) throw new Error(error.message);
 
     if (data.suspend) {
@@ -361,15 +354,14 @@ export const superadminSuspendUser = createServerFn({ method: "POST" })
 
 export const superadminUpdateProfile = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator(
-    (d: { userId: string; patch: Record<string, unknown>; reason?: string }) =>
-      z
-        .object({
-          userId: z.string().uuid(),
-          patch: z.record(z.string(), z.any()),
-          reason: z.string().max(500).optional(),
-        })
-        .parse(d),
+  .inputValidator((d: { userId: string; patch: Record<string, unknown>; reason?: string }) =>
+    z
+      .object({
+        userId: z.string().uuid(),
+        patch: z.record(z.string(), z.any()),
+        reason: z.string().max(500).optional(),
+      })
+      .parse(d),
   )
   .handler(async ({ context, data }) => {
     await assertSuperadmin(context);
@@ -386,7 +378,10 @@ export const superadminUpdateProfile = createServerFn({ method: "POST" })
       .eq("id", data.userId)
       .maybeSingle();
 
-    const { error } = await admin.from("profiles").update(patch as any).eq("id", data.userId);
+    const { error } = await admin
+      .from("profiles")
+      .update(patch as any)
+      .eq("id", data.userId);
     if (error) throw new Error(error.message);
 
     await writeAudit(admin, context.userId, {
@@ -402,9 +397,7 @@ export const superadminUpdateProfile = createServerFn({ method: "POST" })
 
 export const superadminForceSignOut = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((d: { userId: string }) =>
-    z.object({ userId: z.string().uuid() }).parse(d),
-  )
+  .inputValidator((d: { userId: string }) => z.object({ userId: z.string().uuid() }).parse(d))
   .handler(async ({ context, data }) => {
     await assertSuperadmin(context);
     const admin = await getAdmin();
@@ -477,30 +470,29 @@ export const superadminListContent = createServerFn({ method: "POST" })
 
 export const superadminModerate = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator(
-    (d: { kind: string; id: string; action: string; reason?: string }) =>
-      z
-        .object({
-          kind: z.string().min(1).max(40),
-          id: z.string().min(1).max(200),
-          action: z.enum([
-            "hide",
-            "unhide",
-            "close_joins",
-            "open_joins",
-            "cancel_game",
-            "restore_game",
-            "close_availability",
-            "open_availability",
-            "resolve_report",
-            "dismiss_report",
-            "reopen_report",
-            "unverify",
-            "verify",
-          ]),
-          reason: z.string().max(500).optional(),
-        })
-        .parse(d),
+  .inputValidator((d: { kind: string; id: string; action: string; reason?: string }) =>
+    z
+      .object({
+        kind: z.string().min(1).max(40),
+        id: z.string().min(1).max(200),
+        action: z.enum([
+          "hide",
+          "unhide",
+          "close_joins",
+          "open_joins",
+          "cancel_game",
+          "restore_game",
+          "close_availability",
+          "open_availability",
+          "resolve_report",
+          "dismiss_report",
+          "reopen_report",
+          "unverify",
+          "verify",
+        ]),
+        reason: z.string().max(500).optional(),
+      })
+      .parse(d),
   )
   .handler(async ({ context, data }) => {
     await assertSuperadmin(context);
@@ -560,7 +552,10 @@ export const superadminModerate = createServerFn({ method: "POST" })
       .eq(cfg.idCol, data.id)
       .maybeSingle();
 
-    const { error } = await db.from(cfg.table).update(patch as any).eq(cfg.idCol, data.id);
+    const { error } = await db
+      .from(cfg.table)
+      .update(patch as any)
+      .eq(cfg.idCol, data.id);
 
     if (error) throw new Error(error.message);
 
@@ -722,20 +717,19 @@ export const superadminListSettings = createServerFn({ method: "GET" })
 
 export const superadminSetSetting = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator(
-    (d: { key: string; value: unknown; description?: string; isPublic?: boolean }) =>
-      z
-        .object({
-          key: z
-            .string()
-            .min(1)
-            .max(80)
-            .regex(/^[a-z0-9_]+$/, "Use lowercase letters, numbers and underscores"),
-          value: z.any(),
-          description: z.string().max(300).optional(),
-          isPublic: z.boolean().optional(),
-        })
-        .parse(d),
+  .inputValidator((d: { key: string; value: unknown; description?: string; isPublic?: boolean }) =>
+    z
+      .object({
+        key: z
+          .string()
+          .min(1)
+          .max(80)
+          .regex(/^[a-z0-9_]+$/, "Use lowercase letters, numbers and underscores"),
+        value: z.any(),
+        description: z.string().max(300).optional(),
+        isPublic: z.boolean().optional(),
+      })
+      .parse(d),
   )
   .handler(async ({ context, data }) => {
     await assertSuperadmin(context);
@@ -867,16 +861,15 @@ export const superadminListQueues = createServerFn({ method: "GET" })
 
 export const superadminAuditLog = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator(
-    (d: { search?: string; targetType?: string; limit?: number; offset?: number }) =>
-      z
-        .object({
-          search: z.string().max(120).optional(),
-          targetType: z.string().max(40).optional(),
-          limit: z.number().int().min(1).max(100).optional(),
-          offset: z.number().int().min(0).optional(),
-        })
-        .parse(d ?? {}),
+  .inputValidator((d: { search?: string; targetType?: string; limit?: number; offset?: number }) =>
+    z
+      .object({
+        search: z.string().max(120).optional(),
+        targetType: z.string().max(40).optional(),
+        limit: z.number().int().min(1).max(100).optional(),
+        offset: z.number().int().min(0).optional(),
+      })
+      .parse(d ?? {}),
   )
   .handler(async ({ context, data }) => {
     await assertSuperadmin(context);

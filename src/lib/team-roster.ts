@@ -102,8 +102,12 @@ const ROSTER_ORDER: Record<TeamRole, number> = {
  * either as one of these messages or as "nothing changed".
  */
 export function teamRosterErrorMessage(err: unknown): string {
-  const raw = err instanceof Error ? err.message : String((err as { message?: string })?.message ?? err ?? "");
-  if (raw.includes("NOT_TEAM_MANAGER")) return "Only the team's owner, managers or coaches can do that.";
+  const raw =
+    err instanceof Error
+      ? err.message
+      : String((err as { message?: string })?.message ?? err ?? "");
+  if (raw.includes("NOT_TEAM_MANAGER"))
+    return "Only the team's owner, managers or coaches can do that.";
   if (raw.includes("NOT_TEAM_OWNER")) return "Only the team's owner can hand the team over.";
   if (raw.includes("TARGET_NOT_MANAGER"))
     return "A team can only be handed to a manager. Promote them first.";
@@ -113,11 +117,13 @@ export function teamRosterErrorMessage(err: unknown): string {
   if (raw.includes("SELF_INVITE")) return "You're already on this team.";
   if (raw.includes("OWNER_NOT_INVITABLE") || raw.includes("OWNER_ROLE_FIXED"))
     return "The owner role follows team ownership and can't be assigned.";
-  if (raw.includes("OWNER_NOT_REMOVABLE")) return "The team owner can't be removed from the roster.";
+  if (raw.includes("OWNER_NOT_REMOVABLE"))
+    return "The team owner can't be removed from the roster.";
   if (raw.includes("BLOCKED")) return "You can't invite this player.";
   if (raw.includes("INVITE_NOT_FOUND")) return "That invitation no longer exists.";
   if (raw.includes("INVITE_NOT_PENDING")) return "That invitation was already answered.";
-  if (raw.includes("INVITE_EXPIRED")) return "That invitation expired. Ask the team to send a new one.";
+  if (raw.includes("INVITE_EXPIRED"))
+    return "That invitation expired. Ask the team to send a new one.";
   if (raw.includes("CHILD_ACTIVITY_LOCKED"))
     return "A parent or guardian has paused team activity on this account.";
   if (raw.includes("NOT_INVITEE")) return "That invitation was sent to someone else.";
@@ -166,8 +172,7 @@ export async function fetchTeamRoster(teamId: string): Promise<RosterMember[]> {
     })
     .sort(
       (a, b) =>
-        ROSTER_ORDER[a.role] - ROSTER_ORDER[b.role] ||
-        a.displayName.localeCompare(b.displayName),
+        ROSTER_ORDER[a.role] - ROSTER_ORDER[b.role] || a.displayName.localeCompare(b.displayName),
     );
 }
 
@@ -199,7 +204,9 @@ export function useTeamPendingInvites(teamId: string | undefined, enabled = true
     queryFn: async (): Promise<TeamInvite[]> => {
       const { data, error } = await supabase
         .from("team_invites")
-        .select("id, team_id, invitee_id, invited_by, role, message, status, expires_at, created_at")
+        .select(
+          "id, team_id, invitee_id, invited_by, role, message, status, expires_at, created_at",
+        )
         .eq("team_id", teamId!)
         .eq("status", "pending")
         .order("created_at", { ascending: false });
@@ -240,7 +247,9 @@ export function useMyTeamInvites() {
     queryFn: async (): Promise<TeamInvite[]> => {
       const { data, error } = await supabase
         .from("team_invites")
-        .select("id, team_id, invitee_id, invited_by, role, message, status, expires_at, created_at")
+        .select(
+          "id, team_id, invitee_id, invited_by, role, message, status, expires_at, created_at",
+        )
         .eq("invitee_id", user!.id)
         .eq("status", "pending")
         .gt("expires_at", new Date().toISOString())
@@ -313,7 +322,11 @@ export function useTeamRosterActions(teamId: string) {
    * refuses `role`. A caller without rights matches no rows and no-ops.
    */
   const setDetails = useMutation({
-    mutationFn: async (v: { userId: string; jerseyNumber: string | null; position: string | null }) => {
+    mutationFn: async (v: {
+      userId: string;
+      jerseyNumber: string | null;
+      position: string | null;
+    }) => {
       const { error } = await supabase
         .from("team_members")
         .update({ jersey_number: v.jerseyNumber, position: v.position })
@@ -386,7 +399,9 @@ export function useMyTeamMemberships() {
           "id",
           rows.map((r) => r.teamId),
         );
-      const byId = new Map(((teams ?? []) as Record<string, any>[]).map((t) => [String(t["id"]), t]));
+      const byId = new Map(
+        ((teams ?? []) as Record<string, any>[]).map((t) => [String(t["id"]), t]),
+      );
       return rows
         .map((r) => {
           const t = byId.get(r.teamId);

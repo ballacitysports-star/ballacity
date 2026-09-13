@@ -179,7 +179,6 @@ export function CreatePostSheet({
                     }}
                   />
                 </div>
-
               </div>
               <div>
                 <label className="text-xs font-semibold text-muted-foreground">Price ($)</label>

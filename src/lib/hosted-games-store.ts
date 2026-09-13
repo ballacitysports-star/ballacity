@@ -106,9 +106,7 @@ type DbRow = {
   cancellation_policy?: string | null;
   cancellation_notes?: string | null;
   game_rules?: string | null;
-
 };
-
 
 /**
  * Games are publicly readable, so only intentionally public host fields may be
@@ -176,7 +174,6 @@ function rowToGame(r: DbRow): Game {
     cancellationPolicy: r.cancellation_policy ?? "flexible",
     cancellationNotes: r.cancellation_notes ?? null,
     gameRules: r.game_rules ?? null,
-
   } as Game;
 }
 
@@ -223,7 +220,6 @@ function gameToInsertRow(g: Game): TablesInsert<"hosted_games"> {
     cancellation_notes: g.cancellationNotes ?? null,
     game_rules: g.gameRules ?? null,
   } as TablesInsert<"hosted_games">;
-
 }
 
 // ---------- DB hydration + realtime ----------
@@ -347,7 +343,6 @@ export type HostedGameInput = {
   cancellationPolicy?: string | null;
   cancellationNotes?: string | null;
   gameRules?: string | null;
-
 };
 
 export async function addHostedGame(input: HostedGameInput): Promise<Game> {
@@ -399,8 +394,6 @@ export async function addHostedGame(input: HostedGameInput): Promise<Game> {
     cancellationNotes: input.cancellationNotes ?? null,
     gameRules: input.gameRules ?? null,
   };
-
-
 
   // Optimistic local insert.
   cache = [game, ...cache];
@@ -499,7 +492,8 @@ export async function updateHostedGame(
     dbPatch.joins_closed = (patch as { joinsClosed?: boolean }).joinsClosed;
   }
   if ((patch as { signupCutoffMin?: number }).signupCutoffMin !== undefined) {
-    dbPatch.signup_cutoff_min = Number((patch as { signupCutoffMin?: number }).signupCutoffMin) || 0;
+    dbPatch.signup_cutoff_min =
+      Number((patch as { signupCutoffMin?: number }).signupCutoffMin) || 0;
   }
   if ((patch as { minAge?: number | null }).minAge !== undefined) {
     dbPatch.min_age = (patch as { minAge?: number | null }).minAge ?? null;
@@ -525,7 +519,8 @@ export async function updateHostedGame(
     dbPatch.game_rules = (patch as { gameRules?: string | null }).gameRules ?? null;
   }
   if (patch.positionsNeeded !== undefined) {
-    dbPatch.positions_needed = patch.positionsNeeded as TablesUpdate<"hosted_games">["positions_needed"];
+    dbPatch.positions_needed =
+      patch.positionsNeeded as TablesUpdate<"hosted_games">["positions_needed"];
   }
   if ((patch as { teamId?: string | null }).teamId !== undefined) {
     const v = (patch as { teamId?: string | null }).teamId;
@@ -541,7 +536,6 @@ export async function updateHostedGame(
   }
   return updated;
 }
-
 
 /** Delete a hosted game locally and in the DB. */
 export async function deleteHostedGame(id: string): Promise<void> {

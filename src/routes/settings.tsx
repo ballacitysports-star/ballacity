@@ -12,8 +12,6 @@ import {
   CreditCard,
   Download,
   FileText,
-
-
   IdCard,
   LifeBuoy,
   LogOut,
@@ -218,9 +216,7 @@ const SECTIONS: Section[] = [
       },
     ],
   },
-
 ];
-
 
 function SettingsHubPage() {
   const [theme, setTheme, , resolved] = useTheme();

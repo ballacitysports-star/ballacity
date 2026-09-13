@@ -8,11 +8,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import {
-  AI_DATA_USE,
-  AI_DISCLOSURE_POINTS,
-  AI_TRAINING_NOTE,
-} from "@/lib/ai-video-privacy";
+import { AI_DATA_USE, AI_DISCLOSURE_POINTS, AI_TRAINING_NOTE } from "@/lib/ai-video-privacy";
 
 /** The bullet list + data-use answers, reused by the dialog and the settings page. */
 export function AiDisclosureBody({ compact = false }: { compact?: boolean }) {
@@ -133,7 +129,9 @@ export function AiDisclosureNotice() {
         <DialogContent className="max-h-[85dvh] overflow-y-auto sm:max-w-lg">
           <DialogHeader>
             <DialogTitle>How AI analysis works</DialogTitle>
-            <DialogDescription>Plain-language summary of what we do with your clip.</DialogDescription>
+            <DialogDescription>
+              Plain-language summary of what we do with your clip.
+            </DialogDescription>
           </DialogHeader>
           <AiDisclosureBody />
         </DialogContent>

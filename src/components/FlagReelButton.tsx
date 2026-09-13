@@ -2,11 +2,7 @@ import { useState } from "react";
 import { Flag, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/use-auth";
-import {
-  REEL_QUALITY_ISSUES,
-  flagReelQuality,
-  type ReelQualityIssue,
-} from "@/lib/moderation";
+import { REEL_QUALITY_ISSUES, flagReelQuality, type ReelQualityIssue } from "@/lib/moderation";
 import {
   Sheet,
   SheetContent,

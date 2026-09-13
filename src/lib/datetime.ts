@@ -218,10 +218,7 @@ export function whenBounds(when: EventWhen): { start: Date; end: Date } {
   const end =
     raw && isValidDate(raw) && raw.getTime() > start.getTime()
       ? raw
-      : new Date(
-          start.getTime() +
-            (when.allDay ? ALL_DAY_MIN : DEFAULT_DURATION_MIN) * MINUTE_MS,
-        );
+      : new Date(start.getTime() + (when.allDay ? ALL_DAY_MIN : DEFAULT_DURATION_MIN) * MINUTE_MS);
   return { start, end };
 }
 
@@ -381,8 +378,7 @@ export function formatEventWhen(
     return `${day} · All day`;
   }
 
-  const length =
-    opts.withDuration === false ? "" : ` · ${formatDuration(whenDurationMin(when))}`;
+  const length = opts.withDuration === false ? "" : ` · ${formatDuration(whenDurationMin(when))}`;
 
   if (whenSpansDays(when)) {
     return `${day} ${formatTimeOfDay(start, tz)} – ${formatDay(end, tz)} ${formatTimeOfDay(
@@ -423,9 +419,7 @@ export function formatWhenStatus(when: EventWhen, now: Date = new Date()): strin
 
 /** Deadline expressed relative to the start, or pinned to an instant. */
 export type Deadline =
-  | { kind: "none" }
-  | { kind: "relative"; minutesBefore: number }
-  | { kind: "absolute"; at: string };
+  { kind: "none" } | { kind: "relative"; minutesBefore: number } | { kind: "absolute"; at: string };
 
 export const RELATIVE_DEADLINE_PRESETS = [
   { label: "At start", min: 0 },
@@ -460,9 +454,7 @@ export function formatDeadline(when: EventWhen, deadline: Deadline): string {
   if (!at) return "No deadline";
   if (deadline.kind === "relative" && deadline.minutesBefore === 0) return "At start time";
   const rel =
-    deadline.kind === "relative"
-      ? `${formatDuration(deadline.minutesBefore)} before · `
-      : "";
+    deadline.kind === "relative" ? `${formatDuration(deadline.minutesBefore)} before · ` : "";
   return `${rel}${formatRelativeDay(at, when.timezone)} ${formatTimeOfDay(at, when.timezone)}`;
 }
 
@@ -502,7 +494,10 @@ function icsStamp(at: Date | string | number): string {
 }
 
 function icsEscape(v: string): string {
-  return v.replace(/\\/g, "\\\\").replace(/\n/g, "\\n").replace(/[,;]/g, (m) => `\\${m}`);
+  return v
+    .replace(/\\/g, "\\\\")
+    .replace(/\n/g, "\\n")
+    .replace(/[,;]/g, (m) => `\\${m}`);
 }
 
 export type CalendarEvent = EventWhen & {
@@ -567,7 +562,10 @@ function allDayRangeKeys(event: CalendarEvent): { start: string; end: string } {
   // A block that ends exactly at midnight belongs to the previous day.
   const lastKey = dateKeyInZone(new Date(end.getTime() - 1), event.timezone);
   const inclusiveLast = lastKey < startKey ? startKey : lastKey;
-  return { start: startKey.replace(/-/g, ""), end: addDaysToKey(inclusiveLast, 1).replace(/-/g, "") };
+  return {
+    start: startKey.replace(/-/g, ""),
+    end: addDaysToKey(inclusiveLast, 1).replace(/-/g, ""),
+  };
 }
 
 /** A full .ics document for one event, timed in the viewer's own zone. */
@@ -608,7 +606,6 @@ export function buildIcs(event: CalendarEvent): string {
   lines.push("END:VEVENT", "END:VCALENDAR");
   return lines.join("\r\n");
 }
-
 
 /** Google Calendar "add event" link. */
 export function googleCalendarUrl(event: CalendarEvent): string {

@@ -112,7 +112,6 @@ function ErrorComponent({ error, reset }: { error: unknown; reset: () => void })
   );
 }
 
-
 export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()({
   head: () => ({
     meta: [
@@ -304,14 +303,9 @@ async function fetchOnboardingStatus() {
   return getOnboardingStatus();
 }
 
-
-
 function withDeadline<T>(operation: PromiseLike<T>, timeoutMs: number): Promise<T> {
   return new Promise<T>((resolve, reject) => {
-    const timeoutId = window.setTimeout(
-      () => reject(new Error("Operation timed out")),
-      timeoutMs,
-    );
+    const timeoutId = window.setTimeout(() => reject(new Error("Operation timed out")), timeoutMs);
     Promise.resolve(operation).then(
       (value) => {
         window.clearTimeout(timeoutId);
@@ -779,10 +773,7 @@ function AuthGate({ children }: { children: React.ReactNode }) {
       // so a social user with stripped provider metadata is still classified
       // correctly. Falls back to the client query if the server fn fails.
       try {
-        const status = await withDeadline(
-          fetchOnboardingStatus(),
-          ONBOARDING_CHECK_TIMEOUT_MS,
-        );
+        const status = await withDeadline(fetchOnboardingStatus(), ONBOARDING_CHECK_TIMEOUT_MS);
         if (cancelled) return;
         if (status.needsOnboarding) {
           // Render the picker in place; no redirect.
@@ -886,9 +877,7 @@ function AuthGate({ children }: { children: React.ReactNode }) {
         router.navigate({ to: destinationForAccountType(type), replace: true } as never);
       }
     };
-    return (
-      <AccountTypeScreen onResolved={finishType} onAlreadySet={() => finishType()} />
-    );
+    return <AccountTypeScreen onResolved={finishType} onAlreadySet={() => finishType()} />;
   }
   // Hold rendering only on a genuine first check for this user; a cached
   // "ok" keeps the page mounted across navigations.

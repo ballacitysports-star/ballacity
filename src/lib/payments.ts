@@ -3,16 +3,8 @@ import { validateImageMeta } from "@/lib/image-validation";
 import type { CancellationReason, PaymentSubmissionStatus } from "@/lib/payment-states";
 import { PAYMENTS_BLOCKED_MESSAGE } from "@/lib/payments-policy";
 
-
 export type PaymentType =
-  | "venmo"
-  | "cashapp"
-  | "zelle"
-  | "paypal"
-  | "applecash"
-  | "googlepay"
-  | "cash"
-  | "custom";
+  "venmo" | "cashapp" | "zelle" | "paypal" | "applecash" | "googlepay" | "cash" | "custom";
 
 export type PaymentMethod = {
   id: string;
@@ -158,7 +150,6 @@ export async function listPaymentMethodsForHost(
   return (data ?? []) as PaymentMethod[];
 }
 
-
 export async function createPaymentMethod(
   input: Omit<PaymentMethod, "id" | "host_id" | "is_enabled"> & { is_enabled?: boolean },
 ) {
@@ -245,7 +236,6 @@ export async function uploadProofScreenshot(file: File): Promise<string> {
   if (error) throw error;
   return path;
 }
-
 
 export async function getSignedProofUrl(path: string): Promise<string | null> {
   const { data, error } = await supabase.storage
@@ -453,9 +443,7 @@ export async function createJoinRequest(input: {
         const cooldownMs = joinResubmitCooldownRemainingMs(prev);
         if (cooldownMs > 0) {
           const secs = Math.ceil(cooldownMs / 1000);
-          throw new Error(
-            `Please wait ${formatCooldown(secs)} before resubmitting this request.`,
-          );
+          throw new Error(`Please wait ${formatCooldown(secs)} before resubmitting this request.`);
         }
         const { data: retryData, error: retryErr } = await supabase
           .from("join_requests")
@@ -487,7 +475,6 @@ function formatCooldown(secs: number): string {
   const s = secs % 60;
   return s ? `${m}m ${s}s` : `${m}m`;
 }
-
 
 export async function cancelMyJoinRequest(gameId: string) {
   const { data: u } = await supabase.auth.getUser();
@@ -545,13 +532,19 @@ export async function hostRemoveParticipant(params: {
     .delete()
     .eq("game_id", gameId)
     .eq("player_id", playerId)
-    .then(() => undefined, () => undefined);
+    .then(
+      () => undefined,
+      () => undefined,
+    );
   await supabase
     .from("payment_submissions")
     .delete()
     .eq("game_id", gameId)
     .eq("player_id", playerId)
-    .then(() => undefined, () => undefined);
+    .then(
+      () => undefined,
+      () => undefined,
+    );
 }
 
 export async function getMyJoinRequest(gameId: string): Promise<JoinRequest | null> {

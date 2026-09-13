@@ -5,7 +5,12 @@ import { reliabilityPercent, toBadgeStats, EMPTY_PLAYER_STATS } from "@/lib/play
 describe("teamPermissions", () => {
   it("gives owners full control but no leave path", () => {
     const p = teamPermissions("owner");
-    expect(p).toMatchObject({ canInvite: true, canRemoveMembers: true, canAssignRoles: true, canLeave: false });
+    expect(p).toMatchObject({
+      canInvite: true,
+      canRemoveMembers: true,
+      canAssignRoles: true,
+      canLeave: false,
+    });
   });
 
   it("lets coaches manage the roster but not roles", () => {
@@ -26,7 +31,11 @@ describe("teamPermissions", () => {
   });
 
   it("treats non-members as read-only", () => {
-    expect(teamPermissions(null)).toMatchObject({ isMember: false, canInvite: false, canLeave: false });
+    expect(teamPermissions(null)).toMatchObject({
+      isMember: false,
+      canInvite: false,
+      canLeave: false,
+    });
   });
 
   it("never offers owner as an assignable role", () => {
@@ -36,7 +45,9 @@ describe("teamPermissions", () => {
 
 describe("teamRosterErrorMessage", () => {
   it("translates server codes into plain sentences", () => {
-    expect(teamRosterErrorMessage(new Error("NOT_TEAM_MANAGER"))).toMatch(/owner, managers or coaches/);
+    expect(teamRosterErrorMessage(new Error("NOT_TEAM_MANAGER"))).toMatch(
+      /owner, managers or coaches/,
+    );
     expect(teamRosterErrorMessage(new Error("INVITE_EXPIRED"))).toMatch(/expired/);
     expect(teamRosterErrorMessage(new Error("ALREADY_MEMBER"))).toMatch(/already on the roster/);
     expect(teamRosterErrorMessage(new Error("boom"))).toMatch(/Couldn't update the roster/);
@@ -54,7 +65,14 @@ describe("reliability from real activity", () => {
   });
 
   it("feeds attendance, not skill, into badge stats", () => {
-    const s = { ...EMPTY_PLAYER_STATS, gamesAttended: 8, noShows: 2, hostedCompleted: 3, reviewAvg: 4.5, reviewCount: 6 };
+    const s = {
+      ...EMPTY_PLAYER_STATS,
+      gamesAttended: 8,
+      noShows: 2,
+      hostedCompleted: 3,
+      reviewAvg: 4.5,
+      reviewCount: 6,
+    };
     const b = toBadgeStats(s);
     expect(b.gamesPlayed).toBe(8);
     expect(b.hosted).toBe(3);

@@ -43,9 +43,9 @@ describe("gameDistanceMi", () => {
   });
 
   it("falls back to the seeded distance for demo games", () => {
-    expect(
-      gameDistanceMi({ lat: 62, lng: 40, pseudoGeo: true, distanceMi: 1.6 }, louisville),
-    ).toBe(1.6);
+    expect(gameDistanceMi({ lat: 62, lng: 40, pseudoGeo: true, distanceMi: 1.6 }, louisville)).toBe(
+      1.6,
+    );
   });
 });
 

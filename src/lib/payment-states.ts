@@ -20,11 +20,7 @@ export type PaymentState = (typeof PAYMENT_STATES)[number];
 
 /** Statuses stored on `payment_submissions.status`. */
 export type PaymentSubmissionStatus =
-  | "pending"
-  | "verified"
-  | "rejected"
-  | "disputed"
-  | "cancelled";
+  "pending" | "verified" | "rejected" | "disputed" | "cancelled";
 
 export const CANCELLATION_REASONS = [
   "host_cancelled",

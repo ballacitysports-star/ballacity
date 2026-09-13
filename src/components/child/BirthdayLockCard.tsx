@@ -45,7 +45,6 @@ export function BirthdayLockCard() {
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Could not send that request.");
     }
-
   };
 
   return (

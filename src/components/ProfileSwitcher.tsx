@@ -18,7 +18,6 @@ import {
   type AccountProfile,
 } from "@/lib/account-profiles";
 
-
 const ADDABLE: Exclude<AccountType, "player">[] = ["team", "trainer", "gym"];
 
 function Avatar({ profile, size = 8 }: { profile: AccountProfile; size?: number }) {

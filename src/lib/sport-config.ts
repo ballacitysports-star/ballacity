@@ -14,13 +14,7 @@ export type SportConfig = {
   credentialPresets: string[]; // coach chips
 };
 
-const COMMON_CADENCES = [
-  "Weekly",
-  "Bi-weekly",
-  "Monthly",
-  "Seasonal",
-  "On-demand",
-];
+const COMMON_CADENCES = ["Weekly", "Bi-weekly", "Monthly", "Seasonal", "On-demand"];
 
 const SELF_LEVELS = ["Beginner", "Recreational", "Intermediate", "Advanced", "Pro"];
 const NTRP_LEVELS = ["2.5", "3.0", "3.5", "4.0", "4.5", "5.0", "5.5+"];

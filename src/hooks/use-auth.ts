@@ -81,7 +81,6 @@ function initAuthStore() {
     });
 }
 
-
 function subscribe(listener: () => void) {
   initAuthStore();
   listeners.add(listener);

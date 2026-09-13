@@ -46,7 +46,7 @@ export function validateVenueList(
 
   list.forEach((raw, i) => {
     const res = validateVenueAddress(raw);
-    let err: string | null = res.ok ? null : res.error ?? "Invalid address";
+    let err: string | null = res.ok ? null : (res.error ?? "Invalid address");
     if (!err) {
       const key = res.value.toLowerCase();
       if (seen.has(key)) err = "Duplicate address";
@@ -74,9 +74,7 @@ export function buildVenueGeo(
   geoMap: Record<string, { placeId: string; lat: number; lng: number }>,
 ): { address: string; placeId: string; lat: number; lng: number }[] {
   const verifiedSet =
-    verified instanceof Set
-      ? verified
-      : new Set(verified.map((v) => v.trim().toLowerCase()));
+    verified instanceof Set ? verified : new Set(verified.map((v) => v.trim().toLowerCase()));
   const out: { address: string; placeId: string; lat: number; lng: number }[] = [];
   const seen = new Set<string>();
   for (const raw of addresses) {

@@ -51,9 +51,12 @@ export function dayPartOrder(part: string) {
 export function summarizeCohortUsage(rows: TimeOnPlatformRow[]): CohortUsage[] {
   const byCohort = new Map<string, CohortUsage>();
   for (const row of rows) {
-    const entry =
-      byCohort.get(row.cohort) ??
-      { cohort: row.cohort, members: 0, avgDailyMinutes: 0, overnightMinutes: 0 };
+    const entry = byCohort.get(row.cohort) ?? {
+      cohort: row.cohort,
+      members: 0,
+      avgDailyMinutes: 0,
+      overnightMinutes: 0,
+    };
     entry.members = Math.max(entry.members, row.members);
     entry.avgDailyMinutes = Math.round((entry.avgDailyMinutes + row.avgDailyMinutes) * 10) / 10;
     if (row.dayPart === "overnight_00_06") {

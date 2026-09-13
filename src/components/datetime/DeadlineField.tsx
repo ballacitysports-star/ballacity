@@ -61,7 +61,9 @@ export function DeadlineField({
         />
       )}
 
-      <DtSummary>{hint ? `${formatDeadline(when, value)} · ${hint}` : formatDeadline(when, value)}</DtSummary>
+      <DtSummary>
+        {hint ? `${formatDeadline(when, value)} · ${hint}` : formatDeadline(when, value)}
+      </DtSummary>
     </div>
   );
 }

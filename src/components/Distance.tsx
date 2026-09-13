@@ -15,6 +15,7 @@ export function Distance({
   decimals?: number;
 }) {
   const unit = useDistanceUnit();
-  const text = km != null ? formatDistanceFromKm(km, unit, decimals) : formatDistance(mi, unit, decimals);
+  const text =
+    km != null ? formatDistanceFromKm(km, unit, decimals) : formatDistance(mi, unit, decimals);
   return <>{text}</>;
 }

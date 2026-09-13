@@ -231,12 +231,7 @@ describe("notificationCurfewDecision", () => {
 
 type Row = Record<string, unknown> | null;
 
-function fakeAdmin(rows: {
-  settings?: Row;
-  profile?: Row;
-  controls?: Row;
-  throwOn?: string;
-}) {
+function fakeAdmin(rows: { settings?: Row; profile?: Row; controls?: Row; throwOn?: string }) {
   const table = (name: string) => {
     if (rows.throwOn === name) {
       throw new Error(`boom: ${name}`);
@@ -261,7 +256,9 @@ describe("loadAgePolicy", () => {
   it("parses the stored settings row", async () => {
     const policy = await loadAgePolicy(
       fakeAdmin({
-        settings: { value: { notification_curfew_start_hour: 22, notification_curfew_end_hour: 7 } },
+        settings: {
+          value: { notification_curfew_start_hour: 22, notification_curfew_end_hour: 7 },
+        },
       }),
     );
     expect(policy.notificationCurfew).toEqual({ startHour: 22, endHour: 7 });
@@ -272,9 +269,7 @@ describe("loadAgePolicy", () => {
   });
 
   it("falls back to the default policy when the lookup throws", async () => {
-    expect(await loadAgePolicy(fakeAdmin({ throwOn: "app_settings" }))).toEqual(
-      DEFAULT_AGE_POLICY,
-    );
+    expect(await loadAgePolicy(fakeAdmin({ throwOn: "app_settings" }))).toEqual(DEFAULT_AGE_POLICY);
   });
 });
 

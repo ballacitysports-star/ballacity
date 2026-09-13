@@ -103,9 +103,7 @@ function unitFromTimeZone(): DistanceUnit | null {
   try {
     const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
     if (!tz) return null;
-    return IMPERIAL_TIMEZONE_PREFIXES.some((p) =>
-      p.endsWith("/") ? tz.startsWith(p) : tz === p,
-    )
+    return IMPERIAL_TIMEZONE_PREFIXES.some((p) => (p.endsWith("/") ? tz.startsWith(p) : tz === p))
       ? "mi"
       : "km";
   } catch {

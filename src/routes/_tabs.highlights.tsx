@@ -25,7 +25,6 @@ import {
 } from "@/lib/highlight-feed.functions";
 import { useReelRealtime } from "@/hooks/use-reel-realtime";
 
-
 export const Route = createFileRoute("/_tabs/highlights")({
   head: () =>
     pageHead({
@@ -109,7 +108,6 @@ function HighlightFeedPage() {
       .catch(() => {});
   });
 
-
   const loadMore = useCallback(async () => {
     if (!cursor || loadingMore || done) return;
     setLoadingMore(true);
@@ -162,7 +160,9 @@ function HighlightFeedPage() {
           </Link>
           <button
             type="button"
-            onClick={() => setSort((s) => (s === "newest" ? "oldest" : s === "oldest" ? "sport" : "newest"))}
+            onClick={() =>
+              setSort((s) => (s === "newest" ? "oldest" : s === "oldest" ? "sport" : "newest"))
+            }
             className="shrink-0 text-muted-foreground"
             aria-label={`Sort: ${SORT_LABEL[sort]}`}
             title={`Sort: ${SORT_LABEL[sort]}`}
@@ -198,7 +198,9 @@ function HighlightFeedPage() {
             <Clapperboard className="mx-auto h-6 w-6 text-lime" />
             <p className="mt-2 text-sm font-semibold">No highlights here yet</p>
             <p className="mt-1 text-xs text-muted-foreground">
-              {sport ? "Try another sport, or be the first to post one." : "Be the first to post one."}
+              {sport
+                ? "Try another sport, or be the first to post one."
+                : "Be the first to post one."}
             </p>
             <Link
               to="/reels"
@@ -223,7 +225,9 @@ function HighlightFeedPage() {
           </div>
         )}
         {done && items.length > 0 && (
-          <p className="py-6 text-center text-xs text-muted-foreground">You&apos;re all caught up.</p>
+          <p className="py-6 text-center text-xs text-muted-foreground">
+            You&apos;re all caught up.
+          </p>
         )}
       </main>
     </div>
@@ -247,12 +251,14 @@ function StoryRing({
   label: string;
 }) {
   return (
-    <button type="button" onClick={onClick} className="flex w-16 shrink-0 flex-col items-center gap-1">
+    <button
+      type="button"
+      onClick={onClick}
+      className="flex w-16 shrink-0 flex-col items-center gap-1"
+    >
       <span
         className={`grid h-16 w-16 place-items-center rounded-full p-[2px] ${
-          active
-            ? "bg-gradient-to-tr from-lime via-lime/70 to-primary"
-            : "bg-border"
+          active ? "bg-gradient-to-tr from-lime via-lime/70 to-primary" : "bg-border"
         }`}
       >
         <span className="grid h-full w-full place-items-center rounded-full bg-background">
@@ -267,7 +273,6 @@ function StoryRing({
     </button>
   );
 }
-
 
 type SortMode = "newest" | "oldest" | "sport";
 
@@ -429,4 +434,3 @@ function FeedReelCard({ item }: { item: HighlightFeedItem }) {
     </li>
   );
 }
-

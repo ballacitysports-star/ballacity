@@ -34,12 +34,11 @@ const listeners = new Set<() => void>();
  */
 export type AvatarPriority = "high" | "low";
 
-let highQueue = new Set<string>();
-let lowQueue = new Set<string>();
+const highQueue = new Set<string>();
+const lowQueue = new Set<string>();
 /** Max ids per RPC round-trip, so a huge low-priority list can't block a batch. */
 const MAX_BATCH = 48;
 let flushTimer: ReturnType<typeof setTimeout> | null = null;
-
 
 function notify() {
   listeners.forEach((l) => l());
@@ -173,7 +172,6 @@ if (typeof window !== "undefined") {
   });
 }
 
-
 /** Pulls the next batch: everything urgent first, then filler from the low tier. */
 function takeBatch(): string[] {
   const batch: string[] = [];
@@ -207,9 +205,12 @@ async function flush() {
   // Anything left over goes out in the next round-trip, high tier first again.
   if (highQueue.size || lowQueue.size) schedule(highQueue.size ? 0 : 120);
 
-  const { data, error } = await supabase.rpc("visible_avatars" as never, {
-    _ids: ids,
-  } as never);
+  const { data, error } = await supabase.rpc(
+    "visible_avatars" as never,
+    {
+      _ids: ids,
+    } as never,
+  );
 
   ids.forEach((id) => inflight.delete(id));
 
@@ -277,7 +278,6 @@ export function promoteUserAvatars(userIds: Array<string | null | undefined>) {
     if (typeof id === "string" && id) request(id, "high");
   });
 }
-
 
 /** Drops cached entries so a freshly-saved photo or privacy change is picked up app-wide. */
 export function invalidateUserAvatar(userId?: string | null) {
@@ -352,7 +352,6 @@ export function prefetchUserAvatars(
   pending.forEach((id) => request(id, priority));
 }
 
-
 /** Prefetches avatars for a list of ids whenever that list changes. */
 export function usePrefetchUserAvatars(
   userIds: Array<string | null | undefined>,
@@ -418,7 +417,6 @@ export function useAvatarViewportPriority(rootMargin = "600px 0px") {
 
   return rowRef;
 }
-
 
 export function useUserAvatar(userId?: string | null): AvatarLookup {
   const [, bump] = useState(0);

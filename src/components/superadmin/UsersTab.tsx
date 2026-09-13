@@ -180,7 +180,9 @@ export function UsersTab({ currentUserId }: { currentUserId: string }) {
                 </CardHeader>
                 <CardContent className="text-xs space-y-1">
                   <div>Email: {userDetail.data.email ?? "—"}</div>
-                  <div>User id: <span className="font-mono">{openUser}</span></div>
+                  <div>
+                    User id: <span className="font-mono">{openUser}</span>
+                  </div>
                   <div>
                     Last sign-in:{" "}
                     {userDetail.data.lastSignInAt
@@ -251,7 +253,7 @@ export function UsersTab({ currentUserId }: { currentUserId: string }) {
                     <div key={f} className="space-y-1">
                       <label className="text-[11px] text-muted-foreground">{f}</label>
                       <Input
-                        value={edits[f] ?? (p?.[f] ?? "")}
+                        value={edits[f] ?? p?.[f] ?? ""}
                         onChange={(e) => setEdits((s) => ({ ...s, [f]: e.target.value }))}
                       />
                     </div>
@@ -338,8 +340,16 @@ export function UsersTab({ currentUserId }: { currentUserId: string }) {
                   <CardTitle className="text-sm">Owned profiles & activity</CardTitle>
                 </CardHeader>
                 <CardContent className="text-xs space-y-2">
-                  <Section title="Teams / trainers" rows={userDetail.data.teams} render={(t: any) => `${t.name} (${t.kind})`} />
-                  <Section title="Gyms / orgs" rows={userDetail.data.orgs} render={(o: any) => o.name} />
+                  <Section
+                    title="Teams / trainers"
+                    rows={userDetail.data.teams}
+                    render={(t: any) => `${t.name} (${t.kind})`}
+                  />
+                  <Section
+                    title="Gyms / orgs"
+                    rows={userDetail.data.orgs}
+                    render={(o: any) => o.name}
+                  />
                   <Section
                     title="Hosted games"
                     rows={userDetail.data.games}

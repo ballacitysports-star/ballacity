@@ -77,7 +77,6 @@ const STEP_LABELS: Record<string, string> = {
   completed: "Ready",
 };
 
-
 type ProgressInput = Pick<RecapSummary, "status" | "processing_step"> & {
   step_progress?: Record<string, any> | null;
 };
@@ -157,7 +156,6 @@ export function recapStepStates(recap: ProgressInput): RecapStepState[] {
 export function recapAttempt(recap: ProgressInput): number | null {
   return snapshotOf(recap)?.attempt ?? null;
 }
-
 
 export function isRecapReady(recap: Pick<RecapSummary, "status">) {
   return recap.status === "completed";

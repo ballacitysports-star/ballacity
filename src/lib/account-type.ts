@@ -113,9 +113,6 @@ export async function setAccountTypeForCurrentUser(type: AccountType): Promise<v
   const { data: userRes } = await supabase.auth.getUser();
   const uid = userRes.user?.id;
   if (!uid) throw new Error("Not signed in");
-  const { error } = await supabase
-    .from("profiles")
-    .update({ account_type: type })
-    .eq("id", uid);
+  const { error } = await supabase.from("profiles").update({ account_type: type }).eq("id", uid);
   if (error) throw error;
 }

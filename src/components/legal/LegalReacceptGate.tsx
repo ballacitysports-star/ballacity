@@ -50,7 +50,10 @@ export function LegalReacceptGate() {
     if (!allAccepted(value, pendingRequired)) return;
     try {
       await accept.mutateAsync(
-        pendingRequired.map((type) => ({ type, version: effectiveVersion(type, published).version })),
+        pendingRequired.map((type) => ({
+          type,
+          version: effectiveVersion(type, published).version,
+        })),
       );
       toast.success("Thanks — your agreement is recorded.");
     } catch (e) {
@@ -68,8 +71,8 @@ export function LegalReacceptGate() {
       <div className="max-h-[90dvh] w-full max-w-md overflow-y-auto rounded-3xl border border-border bg-background p-4 pb-[calc(env(safe-area-inset-bottom)+1rem)] shadow-xl">
         <h2 className="text-lg font-bold">We've updated our legal documents</h2>
         <p className="mt-1 text-sm text-muted-foreground">
-          {pendingRequired.map((t) => LEGAL_DOCUMENTS[t].title).join(" and ")} changed. Please review
-          and accept the current version to keep using ballaCity.
+          {pendingRequired.map((t) => LEGAL_DOCUMENTS[t].title).join(" and ")} changed. Please
+          review and accept the current version to keep using ballaCity.
         </p>
         <div className="mt-4">
           <LegalConsent

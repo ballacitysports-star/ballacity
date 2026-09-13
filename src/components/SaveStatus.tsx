@@ -39,13 +39,10 @@ export function SaveStatus({
   }, [status, savedAt]);
 
   const pill =
-    variant === "pill"
-      ? "rounded-full border px-2.5 py-1 font-semibold whitespace-nowrap"
-      : "";
+    variant === "pill" ? "rounded-full border px-2.5 py-1 font-semibold whitespace-nowrap" : "";
   const tone = (text: string, border: string, bg: string) =>
     variant === "pill" ? `${text} ${border} ${bg}` : text;
   const base = `inline-flex items-center gap-1.5 text-xs ${pill} ${className}`;
-
 
   if (status === "saving")
     return (
@@ -109,7 +106,6 @@ export function SaveStatus({
         <Check className="h-3.5 w-3.5" /> {savedLabel} {relative(savedAt, now)}
       </span>
     );
-
 
   return null;
 }

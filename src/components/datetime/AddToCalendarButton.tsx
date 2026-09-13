@@ -16,7 +16,10 @@ export function AddToCalendarButton({
   className?: string;
 }) {
   const [open, setOpen] = useState(false);
-  const slug = event.title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+  const slug = event.title
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "");
 
   return (
     <div className="relative">

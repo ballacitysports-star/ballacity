@@ -171,7 +171,6 @@ export const JURISDICTION_POLICY_OVERRIDES: Partial<
 /** The jurisdiction whose thresholds the current defaults are modeled on. */
 export const MODELED_CONSENT_JURISDICTION: Jurisdiction = "GEORGIA";
 
-
 const num = (v: unknown, fallback: number) => {
   const n = typeof v === "string" ? Number(v) : v;
   return typeof n === "number" && Number.isFinite(n) ? n : fallback;
@@ -214,14 +213,8 @@ export function parseAgePolicy(value: unknown): AgePolicyConfig {
       raw["biometric_age_estimation_enabled"],
       d.biometricAgeEstimationEnabled,
     ),
-    consentReverificationDays: num(
-      raw["consent_reverification_days"],
-      d.consentReverificationDays,
-    ),
-    notificationCurfew: bool(
-      raw["notification_curfew_enabled"],
-      d.notificationCurfew !== null,
-    )
+    consentReverificationDays: num(raw["consent_reverification_days"], d.consentReverificationDays),
+    notificationCurfew: bool(raw["notification_curfew_enabled"], d.notificationCurfew !== null)
       ? {
           startHour: clampHour(
             num(raw["notification_curfew_start_hour"], d.notificationCurfew?.startHour ?? 0),
@@ -263,17 +256,12 @@ export function policyForJurisdiction(
 /* ------------------------------------------------------------------ */
 
 /** True when `hour` (0–23, recipient local time) falls inside the curfew. */
-export function hourInCurfew(
-  hour: number,
-  curfew: AgePolicyConfig["notificationCurfew"],
-): boolean {
+export function hourInCurfew(hour: number, curfew: AgePolicyConfig["notificationCurfew"]): boolean {
   if (!curfew) return false;
   const h = ((Math.floor(hour) % 24) + 24) % 24;
   const { startHour, endHour } = curfew;
   if (startHour === endHour) return false;
-  return startHour < endHour
-    ? h >= startHour && h < endHour
-    : h >= startHour || h < endHour;
+  return startHour < endHour ? h >= startHour && h < endHour : h >= startHour || h < endHour;
 }
 
 /** The recipient's local hour for an instant, in an IANA timezone. */
@@ -343,7 +331,6 @@ export function notificationCurfewDecision(input: {
   return { send: false, deliverAfter, reason: "in_curfew" };
 }
 
-
 /**
  * THE age calculation for ballaCity. Calendar-based (never 365-day math) and
  * date-only, so a member's age never shifts with timezone or clock time.
@@ -404,7 +391,6 @@ export function ageFromBirthday(
 ): number | null {
   return calculateAge(iso, currentDate);
 }
-
 
 export function cohortFromAge(
   age: number | null | undefined,
@@ -738,7 +724,6 @@ export const PERMISSION_MATRIX: Record<FeatureKey, Record<MatrixCohort, Permissi
   },
 };
 
-
 export type ChildControls = {
   messaging: "off" | "guardian_only" | "teammates" | "peers";
   mediaVisibility: "private" | "guardian" | "teammates";
@@ -782,10 +767,7 @@ export function parseChildControls(row: unknown): ChildControls {
     locationPrecision: pick(r["location_precision"], ["city", "region"], d.locationPrecision),
     gameParticipation: bool(r["game_participation"], d.gameParticipation),
     notifications: bool(r["notifications"], d.notifications),
-    notificationCurfewLifted: bool(
-      r["notification_curfew_lifted"],
-      d.notificationCurfewLifted,
-    ),
+    notificationCurfewLifted: bool(r["notification_curfew_lifted"], d.notificationCurfewLifted),
   };
 }
 
@@ -951,14 +933,21 @@ const IDENTIFYING_PATTERNS: Array<{ re: RegExp; message: string }> = [
     re: /\b\d{1,5}\s+(north|south|east|west|n|s|e|w)?\s*\w+\s+(st|street|ave|avenue|rd|road|dr|drive|ln|lane|blvd|court|ct)\b/i,
     message: "looks like a street address",
   },
-  { re: /\b(19|20)\d{2}[-/.](0?[1-9]|1[0-2])[-/.](0?[1-9]|[12]\d|3[01])\b/, message: "looks like a date of birth" },
+  {
+    re: /\b(19|20)\d{2}[-/.](0?[1-9]|1[0-2])[-/.](0?[1-9]|[12]\d|3[01])\b/,
+    message: "looks like a date of birth",
+  },
   {
     re: /\b(elementary|middle\s*school|high\s*school|academy|prep)\b/i,
     message: "names a school",
   },
 ];
 
-export type UsernameCheck = { ok: boolean; level: "error" | "warning" | "ok"; message: string | null };
+export type UsernameCheck = {
+  ok: boolean;
+  level: "error" | "warning" | "ok";
+  message: string | null;
+};
 
 /**
  * Child usernames must not carry identifying information. Structural matches
@@ -983,7 +972,10 @@ export function checkChildUsername(
       };
     }
   }
-  const full = (opts.fullName ?? "").trim().toLowerCase().replace(/[^a-z]/g, "");
+  const full = (opts.fullName ?? "")
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z]/g, "");
   if (full.length >= 6 && normalized.toLowerCase().includes(full)) {
     return {
       ok: opts.cohort !== "child_under_13",

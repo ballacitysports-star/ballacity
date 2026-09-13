@@ -90,7 +90,6 @@ type OrgChoice = {
   geo?: { lat: number; lng: number } | null;
 };
 
-
 export function EditOrgScreen({ org }: { org: Org }) {
   const nav = useNavigate();
   const { user } = useAuth();
@@ -166,9 +165,7 @@ export function EditOrgScreen({ org }: { org: Org }) {
   });
   useEffect(() => {
     const m = membership.data as
-      | { role: string; org: { id: string; name: string } }
-      | null
-      | undefined;
+      { role: string; org: { id: string; name: string } } | null | undefined;
     if (!m || !m.org) return;
     setInitialOrgId(m.org.id);
     setOrgChoice({ mode: "existing", orgId: m.org.id, name: m.org.name });
@@ -1348,7 +1345,6 @@ export function EditOrgScreen({ org }: { org: Org }) {
                   showCurrentButton={false}
                   placeholder="Tompkins Square Courts"
                 />
-
               </Section>
 
               <Section title="Record (optional)">
@@ -1626,9 +1622,7 @@ function Section({
   return (
     <div>
       <div className="mb-2 flex items-baseline justify-between gap-2">
-        <div className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
-          {title}
-        </div>
+        <div className="section-eyebrow text-muted-foreground">{title}</div>
         {hint && <div className="text-[10px] text-muted-foreground text-right">{hint}</div>}
       </div>
       <div className="space-y-2">{children}</div>

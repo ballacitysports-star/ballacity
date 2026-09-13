@@ -43,7 +43,7 @@ export const deleteMyAccount = createServerFn({ method: "POST" })
         avatar_initials: "??",
         bio: null,
         city: null,
-        
+
         avatar_url: null,
         avatar_url_private: null,
         cover_url: null,
@@ -54,7 +54,6 @@ export const deleteMyAccount = createServerFn({ method: "POST" })
 
     // Birthdays live in a private table; scrub it too.
     await supabaseAdmin.from("profile_birthdays").delete().eq("user_id", userId);
-
 
     // Message bodies and attachments are stripped even though rows cascade,
     // so no personal content survives in another participant's cached thread.
@@ -87,9 +86,7 @@ export const deleteMyAccount = createServerFn({ method: "POST" })
         const { data: files } = await supabaseAdmin.storage.from(bucket).list(userId, {
           limit: 1000,
         });
-        const paths = (files ?? [])
-          .filter((f) => !!f.name)
-          .map((f) => `${userId}/${f.name}`);
+        const paths = (files ?? []).filter((f) => !!f.name).map((f) => `${userId}/${f.name}`);
         if (paths.length > 0) await supabaseAdmin.storage.from(bucket).remove(paths);
       } catch {
         // Bucket may not exist in every environment — deletion must still proceed.

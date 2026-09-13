@@ -47,7 +47,11 @@ type ImageRow = {
   status: string;
   reason: string | null;
   ownerId: string | null;
-  owner: { display_name?: string | null; username?: string | null; suspended_at?: string | null } | null;
+  owner: {
+    display_name?: string | null;
+    username?: string | null;
+    suspended_at?: string | null;
+  } | null;
 };
 
 export function ImagesTab() {
@@ -96,10 +100,10 @@ export function ImagesTab() {
         input.action === "quarantine"
           ? "Image quarantined — hidden across the app until approved"
           : input.action === "remove"
-          ? `Image removed${res?.removedRefs ? ` · ${res.removedRefs} reference(s) cleared` : ""}`
-          : input.action === "keep"
-            ? "Image approved"
-            : "Image reopened for review",
+            ? `Image removed${res?.removedRefs ? ` · ${res.removedRefs} reference(s) cleared` : ""}`
+            : input.action === "keep"
+              ? "Image approved"
+              : "Image reopened for review",
       );
       setTarget(null);
       setReason("");
@@ -331,10 +335,7 @@ export function ImagesTab() {
             rows={3}
           />
           <label className="flex items-center gap-2 text-sm">
-            <Checkbox
-              checked={suspendOwner}
-              onCheckedChange={(v) => setSuspendOwner(v === true)}
-            />
+            <Checkbox checked={suspendOwner} onCheckedChange={(v) => setSuspendOwner(v === true)} />
             Also suspend the uploader
           </label>
           <DialogFooter>

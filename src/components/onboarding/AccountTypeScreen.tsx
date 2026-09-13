@@ -123,11 +123,7 @@ export function AccountTypeScreen({
       title="Where do you want to start?"
       description="Pick what fits you now. You can add team, trainer, and gym profiles later and switch between them anytime."
       footer={
-        <button
-          type="button"
-          onClick={signOut}
-          className="underline-offset-2 hover:underline"
-        >
+        <button type="button" onClick={signOut} className="underline-offset-2 hover:underline">
           Sign out
         </button>
       }

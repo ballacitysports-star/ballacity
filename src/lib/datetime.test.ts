@@ -87,9 +87,9 @@ describe("windows", () => {
 
   it("detects multi-day windows", () => {
     expect(whenSpansDays(when)).toBe(false);
-    expect(
-      whenSpansDays({ start: when.start, end: "2026-09-06T05:00:00Z", timezone: NY }),
-    ).toBe(true);
+    expect(whenSpansDays({ start: when.start, end: "2026-09-06T05:00:00Z", timezone: NY })).toBe(
+      true,
+    );
   });
 });
 
@@ -192,7 +192,6 @@ describe("calendar export", () => {
     expect(url).toContain("20260905T220000Z%2F20260905T233000Z");
     expect(url).toContain("ctz=America%2FNew_York");
   });
-
 });
 
 describe("all-day calendar exports", () => {

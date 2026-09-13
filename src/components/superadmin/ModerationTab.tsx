@@ -112,7 +112,11 @@ export function ModerationTab() {
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<"all" | "hidden" | "visible">("all");
   const [page, setPage] = useState(0);
-  const [confirm, setConfirm] = useState<null | { title: string; destructive?: boolean; run: (reason: string) => Promise<unknown> }>(null);
+  const [confirm, setConfirm] = useState<null | {
+    title: string;
+    destructive?: boolean;
+    run: (reason: string) => Promise<unknown>;
+  }>(null);
 
   const limit = 25;
   const { data, isLoading } = useQuery({
@@ -201,7 +205,11 @@ export function ModerationTab() {
         ) : (
           data!.rows.map((row: any) => {
             const hidden =
-              data!.hideCol === "flagged" ? row.flagged === true : data!.hideCol ? !!row[data!.hideCol] : false;
+              data!.hideCol === "flagged"
+                ? row.flagged === true
+                : data!.hideCol
+                  ? !!row[data!.hideCol]
+                  : false;
             return (
               <div key={row.id} className="p-3 space-y-2">
                 <div className="flex items-start justify-between gap-3">
@@ -224,7 +232,9 @@ export function ModerationTab() {
                           title: `${a.label} — ${data!.label}`,
                           destructive: a.destructive,
                           run: (reason) =>
-                            moderate({ data: { kind, id: String(row.id), action: a.action, reason } }),
+                            moderate({
+                              data: { kind, id: String(row.id), action: a.action, reason },
+                            }),
                         })
                       }
                     >
@@ -241,7 +251,12 @@ export function ModerationTab() {
       <div className="flex items-center justify-between text-xs text-muted-foreground">
         <span>{data?.total ?? 0} items</span>
         <div className="flex gap-2">
-          <Button size="sm" variant="outline" disabled={page === 0} onClick={() => setPage((x) => x - 1)}>
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={page === 0}
+            onClick={() => setPage((x) => x - 1)}
+          >
             Prev
           </Button>
           <Button

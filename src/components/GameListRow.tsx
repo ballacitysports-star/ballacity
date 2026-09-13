@@ -43,8 +43,8 @@ export function GameListRow({ game, index = 0 }: { game: Game; index?: number })
           : gate.locked
             ? gate.label
             : game.price > 0
-                ? `$${game.price}`
-                : "Free";
+              ? `$${game.price}`
+              : "Free";
   const statusTone =
     liveStatus === "in_progress"
       ? "bg-coral text-white"

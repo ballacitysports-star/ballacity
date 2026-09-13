@@ -13,7 +13,6 @@ import {
   EMPTY_PLAYER_STATS,
 } from "@/lib/player-stats";
 
-
 /** Engine-earned badges first, stored override extras appended (deduped). */
 function mergeBadges(earned: string[], overrides?: string[]): string[] {
   return Array.from(new Set([...earned, ...(overrides ?? [])]));
@@ -24,14 +23,7 @@ import { supabase } from "@/integrations/supabase/client";
 
 // ---------- Profile overrides ----------
 export type ProfileLinkType =
-  | "perfect_game"
-  | "pbr"
-  | "hudl"
-  | "instagram"
-  | "twitter"
-  | "tiktok"
-  | "youtube"
-  | "website";
+  "perfect_game" | "pbr" | "hudl" | "instagram" | "twitter" | "tiktok" | "youtube" | "website";
 
 export type ProfileLink = {
   type: ProfileLinkType;
@@ -297,7 +289,14 @@ function defaultsFromUser(user: User): MyProfile {
     avatar: initialsFrom(name),
     bio: "",
     city: "",
-    stats: { played: 0, reliability: 100, sportsmanship: 5, friends: 0, hosted: 0, endorsements: 0 },
+    stats: {
+      played: 0,
+      reliability: 100,
+      sportsmanship: 5,
+      friends: 0,
+      hosted: 0,
+      endorsements: 0,
+    },
     sports: [],
     badges: [],
     links: [],
@@ -324,7 +323,6 @@ export function useMyProfileState(currentUser?: User | null): {
   const [tick, setTick] = useState(0);
   const [loaded, setLoaded] = useState(false);
   const [dbProfile, setDbProfile] = useState<{
-
     display_name?: string | null;
     username?: string | null;
     avatar_initials?: string | null;
@@ -431,7 +429,6 @@ export function useMyProfileState(currentUser?: User | null): {
 export function useMyProfile(currentUser?: User | null): MyProfile | null {
   return useMyProfileState(currentUser).profile;
 }
-
 
 export function useFeedPrefs(): FeedPrefs {
   const s = useSyncExternalStore(prefsStore.subscribe, prefsStore.getSnapshot, () =>

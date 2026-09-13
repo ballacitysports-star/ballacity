@@ -78,7 +78,9 @@ export function InvitePlayerDialog({
         </p>
 
         <div>
-          <div className="text-xs font-semibold text-muted-foreground mb-1.5">Role on the roster</div>
+          <div className="text-xs font-semibold text-muted-foreground mb-1.5">
+            Role on the roster
+          </div>
           <div className="flex flex-wrap gap-1.5">
             {ASSIGNABLE_ROLES.map((r) => (
               <button
@@ -151,7 +153,9 @@ export function InvitePlayerDialog({
               <div className="min-w-0 flex-1">
                 <div className="truncate text-sm font-semibold">{p.displayName}</div>
                 {p.username && (
-                  <div className="truncate text-xs text-muted-foreground">@{p.username.replace(/^@/, "")}</div>
+                  <div className="truncate text-xs text-muted-foreground">
+                    @{p.username.replace(/^@/, "")}
+                  </div>
                 )}
               </div>
               <button

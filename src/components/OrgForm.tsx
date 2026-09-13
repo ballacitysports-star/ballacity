@@ -17,11 +17,7 @@ import {
   scoreListing,
   websiteHref,
 } from "@/lib/org-listing";
-import {
-  autocompletePlaces,
-  getPlaceDetails,
-  type PlaceSuggestion,
-} from "@/lib/places.functions";
+import { autocompletePlaces, getPlaceDetails, type PlaceSuggestion } from "@/lib/places.functions";
 
 function randomToken(): string {
   try {
@@ -80,7 +76,8 @@ export function validateOrgForm(v: OrgFormValue): string | null {
   if (v.name.trim().length < 2) return "Name is too short.";
   if (!HANDLE_RE.test(v.handle.trim().toLowerCase()))
     return "Handle must be 3–40 chars: a–z, 0–9, - or _.";
-  if (v.website.trim() && !websiteHref(v.website)) return "Enter a valid website (e.g. example.com).";
+  if (v.website.trim() && !websiteHref(v.website))
+    return "Enter a valid website (e.g. example.com).";
   if (v.phone && !isValidPhone(v.phone)) return "Phone number looks invalid.";
   if (v.email && !EMAIL_RE.test(v.email.trim())) return "Email looks invalid.";
   return null;
@@ -96,7 +93,10 @@ function Section({
   children: React.ReactNode;
 }) {
   return (
-    <section id={id} className="scroll-mt-20 rounded-2xl border border-border bg-surface p-4 space-y-3">
+    <section
+      id={id}
+      className="scroll-mt-20 rounded-2xl border border-border bg-surface p-4 space-y-3"
+    >
       <h2 className="text-xs uppercase tracking-wider font-bold text-muted-foreground">{title}</h2>
       {children}
     </section>
@@ -417,8 +417,8 @@ export function OrgForm({
             />
           </label>
           <p className="text-[11px] text-muted-foreground">
-            Each day can have its own hours — set a different open and close time per day, or mark
-            a day closed or open 24 hours.
+            Each day can have its own hours — set a different open and close time per day, or mark a
+            day closed or open 24 hours.
           </p>
           <HoursEditor value={value.hours} onChange={(h) => patch({ hours: h })} />
         </Section>

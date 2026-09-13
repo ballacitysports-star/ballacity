@@ -209,7 +209,8 @@ async function runTool(name: string, args: any, ctx: Ctx): Promise<any> {
       const edit_plan = {
         segments,
         why: String(args?.why ?? "").slice(0, 240),
-        total: Math.round(segments.reduce((n: number, s: any) => n + (s.end - s.start), 0) * 10) / 10,
+        total:
+          Math.round(segments.reduce((n: number, s: any) => n + (s.end - s.start), 0) * 10) / 10,
         source: "coach",
       };
       const { error } = await ctx.supabase

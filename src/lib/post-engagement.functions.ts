@@ -58,7 +58,10 @@ export const listComments = createServerFn({ method: "GET" })
     if (error) throw new Error(error.message);
     const list = (rows ?? []) as any[];
     const authorIds = Array.from(new Set(list.map((r) => r.author_id).filter(Boolean)));
-    let profileMap = new Map<string, { display_name: string | null; avatar_url: string | null; avatar_initials: string | null }>();
+    const profileMap = new Map<
+      string,
+      { display_name: string | null; avatar_url: string | null; avatar_initials: string | null }
+    >();
     if (authorIds.length > 0) {
       const { data: profs, error: pErr } = await sb
         .from("profiles" as any)
@@ -89,7 +92,6 @@ export const listComments = createServerFn({ method: "GET" })
       };
     });
   });
-
 
 export const createComment = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
@@ -184,9 +186,7 @@ export const listMyReactions = createServerFn({ method: "GET" })
 
 export const toggleReaction = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input) =>
-    Subject.extend({ emoji: z.enum(REACTION_EMOJI) }).parse(input),
-  )
+  .inputValidator((input) => Subject.extend({ emoji: z.enum(REACTION_EMOJI) }).parse(input))
   .handler(async ({ data, context }) => {
     const { data: existing } = await context.supabase
       .from("post_reactions" as any)

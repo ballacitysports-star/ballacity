@@ -26,11 +26,19 @@ describe("gameToBusyBlock", () => {
       { id: "g1", title: "Hoops", date: start.toISOString(), duration: "90 min" },
       "joined",
     );
-    expect(b).toMatchObject({ date: toDateKey(start), start: "18:00", end: "19:30", kind: "joined" });
+    expect(b).toMatchObject({
+      date: toDateKey(start),
+      start: "18:00",
+      end: "19:30",
+      kind: "joined",
+    });
   });
   it("falls back to 90 minutes on a junk duration", () => {
     const start = new Date(2026, 7, 1, 8, 0);
-    const b = gameToBusyBlock({ id: "g", title: null, date: start.toISOString(), duration: null }, "hosting");
+    const b = gameToBusyBlock(
+      { id: "g", title: null, date: start.toISOString(), duration: null },
+      "hosting",
+    );
     expect(b?.end).toBe("09:30");
   });
 });
@@ -92,8 +100,7 @@ describe("findSelfOverlaps", () => {
 });
 
 describe("suggestSlotFixes", () => {
-  const conflict = (slot: TimeSlot, blocks: BusyBlock[]) =>
-    findSlotConflicts([slot], blocks)[0];
+  const conflict = (slot: TimeSlot, blocks: BusyBlock[]) => findSlotConflicts([slot], blocks)[0];
 
   it("offers a skip to right after the busy block", () => {
     const fixes = suggestSlotFixes(
@@ -127,7 +134,9 @@ describe("suggestSlotFixes", () => {
 
   it("keeps the weekday when skipping a recurring window", () => {
     const now = new Date(2026, 6, 30, 9, 0);
-    const c = findSlotConflicts([{ weekday: 6, start: "17:00", end: "19:00" }], [block()], { now })[0];
+    const c = findSlotConflicts([{ weekday: 6, start: "17:00", end: "19:00" }], [block()], {
+      now,
+    })[0];
     const skip = suggestSlotFixes(c).find((f) => f.id === "skip")!;
     expect(skip.slot).toMatchObject({ weekday: 6, start: "20:00" });
   });

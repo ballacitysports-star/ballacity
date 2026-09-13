@@ -1,7 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
-
 const GATEWAY_URL = "https://connector-gateway.lovable.dev/google_maps";
 
 export type PlaceSuggestion = {
@@ -109,9 +108,7 @@ export const getPlaceDetails = createServerFn({ method: "POST" })
     const gKey = process.env.GOOGLE_MAPS_API_KEY;
     if (!lovableKey || !gKey) throw new Error("Maps credentials missing");
 
-    const url = new URL(
-      `${GATEWAY_URL}/places/v1/places/${encodeURIComponent(data.placeId)}`,
-    );
+    const url = new URL(`${GATEWAY_URL}/places/v1/places/${encodeURIComponent(data.placeId)}`);
     if (data.sessionToken) url.searchParams.set("sessionToken", data.sessionToken);
 
     const res = await fetch(url.toString(), {

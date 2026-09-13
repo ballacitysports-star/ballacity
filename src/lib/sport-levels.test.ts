@@ -21,7 +21,9 @@ const raw = {
 
 describe("resolvePlayerLevel", () => {
   it("prefers the profile tier over the post's generic level", () => {
-    expect(formatSportLevel(resolvePlayerLevel(raw, "Baseball", "Advanced"))).toBe("College / Adult Competitive");
+    expect(formatSportLevel(resolvePlayerLevel(raw, "Baseball", "Advanced"))).toBe(
+      "College / Adult Competitive",
+    );
   });
   it("falls back to the post level when the profile has none", () => {
     expect(formatSportLevel(resolvePlayerLevel(raw, "Soccer", "Beginner"))).toBe("Beginner");
@@ -44,7 +46,9 @@ describe("playerLevelsForSports", () => {
 
 describe("levelMatchesFilter", () => {
   it("matches a profile tier even when the post says otherwise", () => {
-    expect(levelMatchesFilter(raw, ["Baseball"], "Advanced", "College / Adult Competitive")).toBe(true);
+    expect(levelMatchesFilter(raw, ["Baseball"], "Advanced", "College / Adult Competitive")).toBe(
+      true,
+    );
   });
   it("does not match the post level when the profile has a tier", () => {
     expect(levelMatchesFilter(raw, ["Baseball"], "Advanced", "Advanced")).toBe(false);
@@ -122,7 +126,9 @@ describe("Football formats", () => {
   it("migrates retired football tiers forward", () => {
     expect(sanitizeSkillForSport("Football", "High School")).toBe("Full contact Competitive");
     expect(
-      formatSportLevel(resolvePlayerLevel({ Football: { system: "Level", tier: "Semi-Pro" } }, "Football")),
+      formatSportLevel(
+        resolvePlayerLevel({ Football: { system: "Level", tier: "Semi-Pro" } }, "Football"),
+      ),
     ).toBe("Full contact Travel / Showcase");
   });
 
@@ -146,7 +152,9 @@ describe("feed + matchmaking with football sub-levels", () => {
 
   it("matches a post on the author's profile tier", () => {
     expect(levelMatchesFilter(football, ["Football"], "All Levels", "7v7 Competitive")).toBe(true);
-    expect(levelMatchesFilter(football, ["Football"], "All Levels", "7v7 Travel / Showcase")).toBe(false);
+    expect(levelMatchesFilter(football, ["Football"], "All Levels", "7v7 Travel / Showcase")).toBe(
+      false,
+    );
   });
 
   it("lets the profile tier win over a generic tier stored on the post", () => {
@@ -157,9 +165,14 @@ describe("feed + matchmaking with football sub-levels", () => {
   });
 
   it("falls back to the post's tier only when the profile has none", () => {
-    expect(levelMatchesFilter({}, ["Football"], "Full contact Travel / Showcase", "Full contact Travel / Showcase")).toBe(
-      true,
-    );
+    expect(
+      levelMatchesFilter(
+        {},
+        ["Football"],
+        "Full contact Travel / Showcase",
+        "Full contact Travel / Showcase",
+      ),
+    ).toBe(true);
   });
 
   it("matches a legacy football post against the migrated tier", () => {
@@ -198,14 +211,23 @@ describe("multiple football levels", () => {
 
   it("round-trips multiple tiers through storage", () => {
     const stored = serializeSportLevels([
-      { name: "Football", level: { system: "Level", tier: "Flag Rec", tiers: ["Flag Rec", "7v7 Travel / Showcase"] } },
+      {
+        name: "Football",
+        level: { system: "Level", tier: "Flag Rec", tiers: ["Flag Rec", "7v7 Travel / Showcase"] },
+      },
     ]);
     expect(stored.Football.tiers).toEqual(["Flag Rec", "7v7 Travel / Showcase"]);
     expect(parseSportLevels(stored).Football.tier).toBe("7v7 Travel / Showcase");
   });
 
   it("matches a filter against any selected tier", () => {
-    const raw = { Football: { system: "Level", tier: "7v7 Travel / Showcase", tiers: ["Flag Rec", "7v7 Travel / Showcase"] } };
+    const raw = {
+      Football: {
+        system: "Level",
+        tier: "7v7 Travel / Showcase",
+        tiers: ["Flag Rec", "7v7 Travel / Showcase"],
+      },
+    };
     expect(levelMatchesFilter(raw, ["Football"], null, "Flag Rec")).toBe(true);
     expect(levelMatchesFilter(raw, ["Football"], null, "7v7 Travel / Showcase")).toBe(true);
     expect(levelMatchesFilter(raw, ["Football"], null, "Flag Pro")).toBe(false);

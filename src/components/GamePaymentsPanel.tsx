@@ -1,7 +1,21 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "@tanstack/react-router";
 import { toast } from "sonner";
-import { Check, X as XIcon, ExternalLink, RefreshCw, Clock, ShieldCheck, ImageIcon, CalendarClock, FileText, Info, Wallet, Pencil, AlertTriangle } from "lucide-react";
+import {
+  Check,
+  X as XIcon,
+  ExternalLink,
+  RefreshCw,
+  Clock,
+  ShieldCheck,
+  ImageIcon,
+  CalendarClock,
+  FileText,
+  Info,
+  Wallet,
+  Pencil,
+  AlertTriangle,
+} from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import {
   listMySubmissionsForGame,
@@ -27,7 +41,6 @@ import { createNotification } from "@/lib/notifications";
 import { UserAvatar } from "@/components/UserAvatar";
 import { useMyChildStatus } from "@/lib/child-safety";
 import { PAYMENTS_BLOCKED_MESSAGE } from "@/lib/payments-policy";
-
 
 type Filter = "all" | "pending" | "verified" | "rejected" | "disputed";
 
@@ -58,10 +71,19 @@ function StatusPill({ status }: { status: PaymentSubmission["status"] }) {
       : status === "rejected"
         ? { text: "Declined", cls: "border-coral/50 bg-coral/15 text-coral" }
         : status === "disputed"
-          ? { text: PAYMENT_STATE_META.disputed.label, cls: "border-coral/50 bg-coral/15 text-coral" }
+          ? {
+              text: PAYMENT_STATE_META.disputed.label,
+              cls: "border-coral/50 bg-coral/15 text-coral",
+            }
           : status === "cancelled"
-            ? { text: PAYMENT_STATE_META.cancelled.label, cls: "border-border bg-background text-muted-foreground" }
-            : { text: PAYMENT_STATE_META.host_confirmation_pending.label, cls: "border-amber-400/40 bg-amber-500/15 text-amber-500" };
+            ? {
+                text: PAYMENT_STATE_META.cancelled.label,
+                cls: "border-border bg-background text-muted-foreground",
+              }
+            : {
+                text: PAYMENT_STATE_META.host_confirmation_pending.label,
+                cls: "border-amber-400/40 bg-amber-500/15 text-amber-500",
+              };
   return (
     <span
       className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-semibold ${cfg.cls}`}
@@ -208,10 +230,10 @@ export function PaymentPoliciesCard({
                       key={m.id}
                       className="inline-flex items-center gap-1.5 rounded-full border border-border bg-surface px-2.5 py-1 text-xs"
                     >
-                      <span className="font-semibold">{meta.emoji} {meta.name}</span>
-                      {m.username && (
-                        <span className="text-muted-foreground">· {m.username}</span>
-                      )}
+                      <span className="font-semibold">
+                        {meta.emoji} {meta.name}
+                      </span>
+                      {m.username && <span className="text-muted-foreground">· {m.username}</span>}
                     </li>
                   );
                 })}
@@ -224,9 +246,7 @@ export function PaymentPoliciesCard({
               <div className="flex items-center gap-2 text-[11px] uppercase tracking-wider font-bold text-muted-foreground">
                 <FileText className="h-3.5 w-3.5" /> Instructions
               </div>
-              <p className="mt-1 text-sm whitespace-pre-wrap">
-                {settings.payment_instructions}
-              </p>
+              <p className="mt-1 text-sm whitespace-pre-wrap">{settings.payment_instructions}</p>
             </div>
           )}
 
@@ -249,7 +269,6 @@ export function PaymentPoliciesCard({
 }
 
 /* --------------------------------- Host --------------------------------- */
-
 
 type HostRow = PaymentSubmission & {
   playerName: string;
@@ -339,7 +358,12 @@ export function HostPaymentsPanel({
       .channel(`host_payments:${gameId}`)
       .on(
         "postgres_changes",
-        { event: "*", schema: "public", table: "payment_submissions", filter: `game_id=eq.${gameId}` },
+        {
+          event: "*",
+          schema: "public",
+          table: "payment_submissions",
+          filter: `game_id=eq.${gameId}`,
+        },
         () => load(),
       )
       .subscribe();
@@ -360,11 +384,7 @@ export function HostPaymentsPanel({
     [rows, filter],
   );
 
-  const act = async (
-    row: HostRow,
-    next: "verified" | "rejected",
-    reasonPrompt?: boolean,
-  ) => {
+  const act = async (row: HostRow, next: "verified" | "rejected", reasonPrompt?: boolean) => {
     if (busyId) return;
     let reason: string | null = null;
     if (next === "rejected" && reasonPrompt) {
@@ -439,7 +459,6 @@ export function HostPaymentsPanel({
       <PaymentPoliciesCard gameId={gameId} settings={settings} isHost />
       {/* Header */}
       <div className="rounded-2xl border border-border bg-surface p-4">
-
         <div className="flex items-center justify-between gap-3">
           <div>
             <div className="font-display text-base font-bold flex items-center gap-2">
@@ -461,15 +480,21 @@ export function HostPaymentsPanel({
         <div className="mt-3 grid grid-cols-3 gap-2 text-center">
           <div className="rounded-xl border border-amber-400/30 bg-amber-500/10 p-2">
             <div className="font-display text-lg font-bold text-amber-500">{counts.pending}</div>
-            <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Pending</div>
+            <div className="text-[10px] uppercase tracking-wider text-muted-foreground">
+              Pending
+            </div>
           </div>
           <div className="rounded-xl border border-lime/30 bg-lime/10 p-2">
             <div className="font-display text-lg font-bold text-lime">{counts.verified}</div>
-            <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Verified</div>
+            <div className="text-[10px] uppercase tracking-wider text-muted-foreground">
+              Verified
+            </div>
           </div>
           <div className="rounded-xl border border-coral/40 bg-coral/10 p-2">
             <div className="font-display text-lg font-bold text-coral">{counts.rejected}</div>
-            <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Declined</div>
+            <div className="text-[10px] uppercase tracking-wider text-muted-foreground">
+              Declined
+            </div>
           </div>
         </div>
         <p className="mt-3 rounded-xl border border-border bg-background p-2 text-[11px] text-muted-foreground">
@@ -478,7 +503,8 @@ export function HostPaymentsPanel({
         </p>
         {settings?.entry_fee != null && (
           <div className="mt-3 text-xs text-muted-foreground">
-            Entry fee: <span className="font-semibold text-foreground">{fmtMoney(settings.entry_fee)}</span>
+            Entry fee:{" "}
+            <span className="font-semibold text-foreground">{fmtMoney(settings.entry_fee)}</span>
           </div>
         )}
       </div>
@@ -491,7 +517,9 @@ export function HostPaymentsPanel({
             type="button"
             onClick={() => setFilter(f)}
             className={`flex-1 rounded-full px-3 py-1.5 font-semibold capitalize transition ${
-              filter === f ? "bg-lime text-primary-foreground" : "text-muted-foreground hover:text-foreground"
+              filter === f
+                ? "bg-lime text-primary-foreground"
+                : "text-muted-foreground hover:text-foreground"
             }`}
           >
             {f === "all" ? "All" : f} {f !== "all" ? `· ${counts[f]}` : ""}
@@ -539,7 +567,12 @@ export function HostPaymentsPanel({
                       <Clock className="h-3 w-3" /> {fmtWhen(row.submitted_at)}
                     </span>
                     {row.paid_amount != null && (
-                      <span>Amount: <span className="font-semibold text-foreground">{fmtMoney(row.paid_amount)}</span></span>
+                      <span>
+                        Amount:{" "}
+                        <span className="font-semibold text-foreground">
+                          {fmtMoney(row.paid_amount)}
+                        </span>
+                      </span>
                     )}
                     {row.payment_type && <span>via {row.payment_type}</span>}
                   </div>
@@ -755,7 +788,8 @@ export function PlayerPaymentsPanel({
                   onClick={() => openProof(latest.screenshot_path)}
                   className="inline-flex items-center gap-1.5 rounded-full border border-border bg-background px-3 py-1.5 text-xs font-semibold hover:bg-secondary"
                 >
-                  <ImageIcon className="h-3.5 w-3.5" /> View my proof <ExternalLink className="h-3 w-3" />
+                  <ImageIcon className="h-3.5 w-3.5" /> View my proof{" "}
+                  <ExternalLink className="h-3 w-3" />
                 </button>
               )}
               {(latest.status === "rejected" || latest.status === "pending") && (
@@ -794,7 +828,9 @@ export function PlayerPaymentsPanel({
                 <div className="min-w-0 flex-1 text-xs">
                   <div className="font-semibold">
                     {s.paid_amount != null ? fmtMoney(s.paid_amount) : "—"}
-                    {s.payment_type && <span className="text-muted-foreground"> · {s.payment_type}</span>}
+                    {s.payment_type && (
+                      <span className="text-muted-foreground"> · {s.payment_type}</span>
+                    )}
                   </div>
                   <div className="text-muted-foreground">{fmtWhen(s.submitted_at)}</div>
                   {s.reviewer_notes && s.status === "rejected" && (

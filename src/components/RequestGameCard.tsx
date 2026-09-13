@@ -22,7 +22,6 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 
-
 const sportEmoji: Record<string, string> = {
   Basketball: "🏀",
   Soccer: "⚽",
@@ -54,12 +53,28 @@ export function RequestGameCard({
   onApprove?: () => void;
   onDecline?: () => void;
 }) {
-  return <RequestGameCardInner game={game} request={request} index={index} isHost={isHost} onCancel={onCancel} onWithdraw={onWithdraw} onApprove={onApprove} onDecline={onDecline} />;
+  return (
+    <RequestGameCardInner
+      game={game}
+      request={request}
+      index={index}
+      isHost={isHost}
+      onCancel={onCancel}
+      onWithdraw={onWithdraw}
+      onApprove={onApprove}
+      onDecline={onDecline}
+    />
+  );
 }
 
 function formatTs(ts: string) {
   const d = new Date(ts);
-  return d.toLocaleString(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
+  return d.toLocaleString(undefined, {
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  });
 }
 
 function RequestTimeline({ request }: { request: JoinRequest }) {
@@ -82,7 +97,11 @@ function RequestTimeline({ request }: { request: JoinRequest }) {
         <li key={e.key} className="flex items-center gap-1.5 text-[9px] text-muted-foreground">
           <span
             className={`h-1 w-1 rounded-full ${
-              e.tone === "lime" ? "bg-lime" : e.tone === "coral" ? "bg-coral" : "bg-muted-foreground/50"
+              e.tone === "lime"
+                ? "bg-lime"
+                : e.tone === "coral"
+                  ? "bg-coral"
+                  : "bg-muted-foreground/50"
             }`}
           />
           <span className="font-semibold text-foreground/80">{e.label}</span>
@@ -119,11 +138,8 @@ function RequestGameCardInner({
   const spotsLeft = Math.max(0, game.maxPlayers - joinedCount);
   const fillPct = Math.round((joinedCount / game.maxPlayers) * 100);
   const [confirm, setConfirm] = useState<null | "approve" | "decline">(null);
-  const playerName = (request as any).player_name || (request as any).player?.display_name || "this player";
-
-
-
-
+  const playerName =
+    (request as any).player_name || (request as any).player?.display_name || "this player";
 
   return (
     <motion.div
@@ -136,11 +152,7 @@ function RequestGameCardInner({
           isPending ? "border-coral/40" : isApproved ? "border-lime/40" : "border-border"
         }`}
       >
-        <Link
-          to="/games/$gameId"
-          params={{ gameId: game.id }}
-          className="group block"
-        >
+        <Link to="/games/$gameId" params={{ gameId: game.id }} className="group block">
           <div className="relative h-28 overflow-hidden">
             <MediaImage
               src={game.image}
@@ -149,28 +161,28 @@ function RequestGameCardInner({
               className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-105"
             />
             <div className="absolute inset-0 bg-gradient-to-t from-surface via-surface/30 to-transparent" />
-          <div className="absolute top-2 left-2 flex flex-wrap gap-1">
-            <span className="inline-flex items-center gap-1 rounded-full bg-background/70 backdrop-blur px-2 py-0.5 text-[11px] font-semibold">
-              <span>{sportEmoji[game.sport]}</span>
-              {game.sport}
-            </span>
-          </div>
-          <div className="absolute top-2 right-2">
-            {game.price === 0 ? (
-              <span className="rounded-full bg-lime px-2 py-0.5 text-[11px] font-bold text-primary-foreground">
-                FREE
+            <div className="absolute top-2 left-2 flex flex-wrap gap-1">
+              <span className="inline-flex items-center gap-1 rounded-full bg-background/70 backdrop-blur px-2 py-0.5 text-[11px] font-semibold">
+                <span>{sportEmoji[game.sport]}</span>
+                {game.sport}
               </span>
-            ) : (
-              <span className="rounded-full bg-background/70 backdrop-blur px-2 py-0.5 text-[11px] font-bold">
-                ${game.price}
-              </span>
-            )}
-          </div>
-          <div className="absolute bottom-2 left-3 right-3">
-            <h3 className="font-display text-lg font-bold text-foreground drop-shadow-lg">
-              {game.title}
-            </h3>
-          </div>
+            </div>
+            <div className="absolute top-2 right-2">
+              {game.price === 0 ? (
+                <span className="rounded-full bg-lime px-2 py-0.5 text-[11px] font-bold text-primary-foreground">
+                  FREE
+                </span>
+              ) : (
+                <span className="rounded-full bg-background/70 backdrop-blur px-2 py-0.5 text-[11px] font-bold">
+                  ${game.price}
+                </span>
+              )}
+            </div>
+            <div className="absolute bottom-2 left-3 right-3">
+              <h3 className="font-display text-lg font-bold text-foreground drop-shadow-lg">
+                {game.title}
+              </h3>
+            </div>
           </div>
 
           <div className="p-3 space-y-2">
@@ -189,19 +201,20 @@ function RequestGameCardInner({
                 <UserAvatar initials={game.host.avatar} name={game.host.name} size="xs" />
                 <span className="truncate">{game.host.name}</span>
                 <span className="shrink-0 text-foreground">· {game.skill}</span>
-              {ageRequirementLabel({ minAge: game.minAge, maxAge: game.maxAge }) && (
-                <span className="shrink-0 text-muted-foreground">
-                  · 🎂 {ageRequirementLabel({ minAge: game.minAge, maxAge: game.maxAge })}
-                </span>
-              )}
+                {ageRequirementLabel({ minAge: game.minAge, maxAge: game.maxAge }) && (
+                  <span className="shrink-0 text-muted-foreground">
+                    · 🎂 {ageRequirementLabel({ minAge: game.minAge, maxAge: game.maxAge })}
+                  </span>
+                )}
               </div>
               <div className="flex shrink-0 items-center gap-1 text-[11px] font-semibold">
                 <span className="text-foreground">
                   {joinedCount}/{game.maxPlayers}
                 </span>
-                {spotsLeft < game.maxPlayers && spotsLeft <= Math.max(3, Math.ceil(game.maxPlayers * 0.2)) && (
-                  <SpotsPill spotsLeft={spotsLeft} maxPlayers={game.maxPlayers} />
-                )}
+                {spotsLeft < game.maxPlayers &&
+                  spotsLeft <= Math.max(3, Math.ceil(game.maxPlayers * 0.2)) && (
+                    <SpotsPill spotsLeft={spotsLeft} maxPlayers={game.maxPlayers} />
+                  )}
               </div>
             </div>
             <div className="h-1 overflow-hidden rounded-full bg-secondary">
@@ -246,7 +259,6 @@ function RequestGameCardInner({
                     : "Declined by host."}
             </p>
             <RequestTimeline request={request} />
-
           </div>
           {isPending && (
             <div className="flex shrink-0 items-center gap-1.5">
@@ -323,7 +335,11 @@ function RequestGameCardInner({
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction
-              className={confirm === "decline" ? "bg-coral text-primary-foreground hover:bg-coral/90" : undefined}
+              className={
+                confirm === "decline"
+                  ? "bg-coral text-primary-foreground hover:bg-coral/90"
+                  : undefined
+              }
               onClick={() => {
                 const action = confirm;
                 setConfirm(null);
@@ -338,5 +354,4 @@ function RequestGameCardInner({
       </AlertDialog>
     </motion.div>
   );
-
 }

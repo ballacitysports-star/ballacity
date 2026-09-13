@@ -8,13 +8,7 @@ import {
   saveMyGameReminderOffsets,
 } from "@/lib/game-reminders";
 
-function Chips({
-  value,
-  onChange,
-}: {
-  value: number[];
-  onChange: (next: number[]) => void;
-}) {
+function Chips({ value, onChange }: { value: number[]; onChange: (next: number[]) => void }) {
   const toggle = (min: number) => {
     const set = new Set(value);
     if (set.has(min)) set.delete(min);
@@ -55,7 +49,7 @@ export function GameReminderPicker({
 }) {
   return (
     <div className="space-y-1.5 text-left">
-      <div className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
+      <div className="flex items-center gap-1.5 section-eyebrow text-muted-foreground">
         <BellRing className="size-3.5 text-lime" /> Remind me before it starts
       </div>
       <Chips value={value} onChange={onChange} />

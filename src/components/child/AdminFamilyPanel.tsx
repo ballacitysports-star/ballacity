@@ -50,7 +50,10 @@ export function AdminFamilyPanel() {
           ) : (
             <ul className="mt-3 space-y-2">
               {data.families.map((f) => (
-                <li key={f.linkId} className="rounded-xl border border-border bg-background p-3 text-xs">
+                <li
+                  key={f.linkId}
+                  className="rounded-xl border border-border bg-background p-3 text-xs"
+                >
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <span className="font-semibold">
                       {f.parentName} → {f.childName}

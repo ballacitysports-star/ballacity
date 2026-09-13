@@ -266,9 +266,5 @@ function SetupPage() {
 }
 
 function Label({ children }: { children: React.ReactNode }) {
-  return (
-    <div className="mb-1.5 text-xs font-bold uppercase tracking-wider text-muted-foreground">
-      {children}
-    </div>
-  );
+  return <div className="mb-1.5 section-eyebrow text-muted-foreground">{children}</div>;
 }

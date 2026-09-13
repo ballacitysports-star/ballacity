@@ -1,6 +1,11 @@
 import { Check } from "lucide-react";
 
-type Slot = { day: "mon" | "tue" | "wed" | "thu" | "fri" | "sat" | "sun"; start: string; end: string; venue?: string };
+type Slot = {
+  day: "mon" | "tue" | "wed" | "thu" | "fri" | "sat" | "sun";
+  start: string;
+  end: string;
+  venue?: string;
+};
 
 type Preset = {
   id: string;
@@ -79,15 +84,11 @@ export function WeeklyQuickPick({
               type="button"
               onClick={() => onChange(active ? [] : p.slots)}
               className={`flex items-center justify-between rounded-2xl border px-4 py-3 text-left transition-colors ${
-                active
-                  ? "border-lime bg-lime/10"
-                  : "border-border bg-surface hover:border-lime/40"
+                active ? "border-lime bg-lime/10" : "border-border bg-surface hover:border-lime/40"
               }`}
             >
               <div>
-                <div className={`text-sm font-bold ${active ? "text-lime" : ""}`}>
-                  {p.label}
-                </div>
+                <div className={`text-sm font-bold ${active ? "text-lime" : ""}`}>{p.label}</div>
                 <div className="text-[11px] text-muted-foreground">{p.hint}</div>
               </div>
               {active && <Check className="h-4 w-4 text-lime" />}

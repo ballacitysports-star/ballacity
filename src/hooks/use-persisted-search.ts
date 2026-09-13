@@ -20,8 +20,7 @@ const SNAPSHOT_VERSION = 2;
 
 type Snapshot = Record<string, unknown>;
 
-const useIsomorphicLayoutEffect =
-  typeof window === "undefined" ? useEffect : useLayoutEffect;
+const useIsomorphicLayoutEffect = typeof window === "undefined" ? useEffect : useLayoutEffect;
 
 function readSnapshot(storageKey: string): Snapshot | null {
   try {
@@ -56,7 +55,6 @@ function isAtDefaults(search: Record<string, unknown>, defaults: Record<string, 
   }
   return true;
 }
-
 
 export function usePersistedSearch<T extends Record<string, unknown>>(
   storageKey: string,
@@ -114,7 +112,6 @@ export function usePersistedSearch<T extends Record<string, unknown>>(
     } catch {
       setHydrated(true);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
@@ -126,16 +123,12 @@ export function usePersistedSearch<T extends Record<string, unknown>>(
         if (v === undefined) continue;
         snapshot[k] = v;
       }
-      window.localStorage.setItem(
-        storageKey,
-        JSON.stringify({ v: SNAPSHOT_VERSION, s: snapshot }),
-      );
+      window.localStorage.setItem(storageKey, JSON.stringify({ v: SNAPSHOT_VERSION, s: snapshot }));
     } catch {
       /* ignore */
     }
     // `defaults` is intentionally not a dependency: a full snapshot is
     // stored regardless of which values match a default.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [storageKey, search, hydrated]);
 
   return { hydrated };

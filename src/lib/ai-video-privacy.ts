@@ -50,8 +50,7 @@ export const AI_DATA_USE: AiDataUseItem[] = [
 /** Current AI training position. Do not soften this without a reviewed policy. */
 export const AI_TRAINING_NOTE = {
   title: "Your videos are not used to train AI",
-  body:
-    "ballaCity does not send your clips to be used as training data for AI models. If that ever changes, it will be a separate opt-in setting below — turning on AI analysis never turns on training.",
+  body: "ballaCity does not send your clips to be used as training data for AI models. If that ever changes, it will be a separate opt-in setting below — turning on AI analysis never turns on training.",
   settingLabel: "Allow my uploaded videos to be used to improve/train AI",
   settingDescription:
     "Off by default and separate from AI analysis. Nothing is used for training today; if training is ever offered, this switch is what controls it.",

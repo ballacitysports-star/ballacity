@@ -158,9 +158,7 @@ function EditProfile() {
     return (
       <div className="page-shell-content flex min-h-dvh flex-col items-center justify-center text-center">
         <h1 className="page-title">Sign in to edit your profile</h1>
-        <p className="mt-2 page-subtitle">
-          Profile changes are saved to your account.
-        </p>
+        <p className="mt-2 page-subtitle">Profile changes are saved to your account.</p>
         <Link
           to="/auth"
           className="mt-6 rounded-full bg-lime-gradient px-6 py-3 text-sm font-bold text-primary-foreground"
@@ -588,7 +586,7 @@ function EditProfile() {
           className="rounded-3xl border border-coral/40 bg-coral-gradient p-5 text-white relative overflow-hidden"
         >
           <Video className="absolute right-4 top-4 h-16 w-16 opacity-10" />
-          <div className="text-xs font-bold uppercase tracking-wider opacity-80">ballaCity Pro</div>
+          <div className="section-eyebrow opacity-80">ballaCity Pro</div>
           <h3 className="font-display text-xl font-bold mt-1">
             AI highlight reels, unlimited hosting.
           </h3>

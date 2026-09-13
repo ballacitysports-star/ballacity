@@ -97,9 +97,7 @@ function Landing() {
         <div className="absolute inset-0 grid-noise opacity-30" />
         <div className="relative page-shell pt-12 pb-20 md:pt-20 md:pb-32 grid md:grid-cols-2 gap-10 items-center">
           <div>
-            <div
-              className="enter-up inline-flex items-center gap-2 rounded-full border border-lime/30 bg-lime/10 px-3 py-1 text-xs font-semibold text-lime"
-            >
+            <div className="enter-up inline-flex items-center gap-2 rounded-full border border-lime/30 bg-lime/10 px-3 py-1 text-xs font-semibold text-lime">
               <span className="h-1.5 w-1.5 rounded-full bg-lime animate-pulse" />
               Live · 1,284 games this week
             </div>
@@ -184,9 +182,7 @@ function Landing() {
                 </button>
               </div>
             </div>
-            <div
-              className="float-soft absolute -left-10 top-10 rounded-2xl border border-border bg-surface/90 backdrop-blur p-3 shadow-xl"
-            >
+            <div className="float-soft absolute -left-10 top-10 rounded-2xl border border-border bg-surface/90 backdrop-blur p-3 shadow-xl">
               <div className="flex items-center gap-2 text-xs font-semibold">
                 <span className="grid h-7 w-7 place-items-center rounded-full bg-coral-gradient text-white">
                   ⚡
@@ -382,7 +378,6 @@ function Landing() {
           <span>© {new Date().getFullYear()} ballaCity. Built for the players.</span>
         </div>
       </footer>
-
     </div>
   );
 }

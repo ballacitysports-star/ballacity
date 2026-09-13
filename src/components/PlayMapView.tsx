@@ -51,7 +51,6 @@ export function PlayMapView<T extends MapItemLike>(props?: {
    * what is actually on screen.
    */
   onVisibleItemsChange?: (items: T[]) => void;
-
 }) {
   const { user } = useAuth();
   const profile = useMyProfile(user);
@@ -62,9 +61,7 @@ export function PlayMapView<T extends MapItemLike>(props?: {
   const defaultGames = useMemo(() => hideFinishedGames([...hosted, ...GAMES]), [hosted]);
   const items = (props?.items ?? (defaultGames as unknown as T[])) as T[];
   const noun = props?.noun ?? "game";
-  const emptyLabel =
-    props?.emptyLabel ?? `No ${noun}s in this area. Pan the map or reset.`;
-
+  const emptyLabel = props?.emptyLabel ?? `No ${noun}s in this area. Pan the map or reset.`;
 
   const pins: MapPinItem[] = useMemo(() => {
     if (props?.pins) return props.pins;
@@ -95,8 +92,7 @@ export function PlayMapView<T extends MapItemLike>(props?: {
     () => (visibleIds ? items.filter((it) => visibleIds.includes(it.id)) : items),
     [visibleIds, items],
   );
-  const activeItem =
-    visibleItems.find((it) => it.id === active) ?? visibleItems[0] ?? null;
+  const activeItem = visibleItems.find((it) => it.id === active) ?? visibleItems[0] ?? null;
 
   const onVisibleItemsChange = props?.onVisibleItemsChange;
   useEffect(() => {
@@ -104,11 +100,8 @@ export function PlayMapView<T extends MapItemLike>(props?: {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [visibleItems]);
 
-
-
   const renderCard =
-    props?.renderCard ??
-    ((item: T) => <DefaultGameCard game={item as unknown as ActiveGame} />);
+    props?.renderCard ?? ((item: T) => <DefaultGameCard game={item as unknown as ActiveGame} />);
 
   const lastTapRef = useRef<{ id: string; at: number } | null>(null);
   const handleSelect = (id: string) => {
@@ -145,8 +138,7 @@ export function PlayMapView<T extends MapItemLike>(props?: {
             <span className="font-semibold">{visibleIds ? "This area" : "Live location"}</span>
             <span className="text-muted-foreground">
               · {visibleItems.length} {noun}
-              {visibleItems.length === 1 ? "" : "s"}{" "}
-              {visibleIds ? "in view" : "nearby"}
+              {visibleItems.length === 1 ? "" : "s"} {visibleIds ? "in view" : "nearby"}
             </span>
             {visibleIds && (
               <button
@@ -181,10 +173,7 @@ export function PlayMapView<T extends MapItemLike>(props?: {
               className="rounded-3xl border border-border bg-surface/90 backdrop-blur-xl p-4 text-center text-sm text-muted-foreground shadow-2xl"
             >
               {emptyLabel}{" "}
-              <button
-                onClick={() => setVisibleIds(null)}
-                className="font-bold text-lime"
-              >
+              <button onClick={() => setVisibleIds(null)} className="font-bold text-lime">
                 reset
               </button>
             </motion.div>

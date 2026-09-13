@@ -45,8 +45,7 @@ export function gameDistanceMi(
 
 /** Reason the distance is unavailable — drives the "Enable location" prompt. */
 export type DistanceState =
-  | { mi: number; reason: null }
-  | { mi: null; reason: "no-viewer-location" | "no-venue-location" };
+  { mi: number; reason: null } | { mi: null; reason: "no-viewer-location" | "no-venue-location" };
 
 export function gameDistanceState(
   game: Pick<Game, "lat" | "lng" | "pseudoGeo" | "distanceMi">,
@@ -54,7 +53,8 @@ export function gameDistanceState(
 ): DistanceState {
   const mi = gameDistanceMi(game, viewer);
   if (mi != null) return { mi, reason: null };
-  if (!hasRealGeo(game) && game.distanceMi == null) return { mi: null, reason: "no-venue-location" };
+  if (!hasRealGeo(game) && game.distanceMi == null)
+    return { mi: null, reason: "no-venue-location" };
   return { mi: null, reason: "no-viewer-location" };
 }
 
@@ -81,7 +81,9 @@ export function useGameDistance(game: Pick<Game, "lat" | "lng" | "pseudoGeo" | "
     source,
     label,
     explanation:
-      state.reason == null ? null : distanceUnavailableExplanation(state.reason, status, remembered),
+      state.reason == null
+        ? null
+        : distanceUnavailableExplanation(state.reason, status, remembered),
     requestLocation: request,
     forgetLocation: forget,
   };

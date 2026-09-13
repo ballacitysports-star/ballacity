@@ -261,7 +261,10 @@ const STEP_RUNNERS: Record<
         progress.analysis?.summary ? `What the footage shows: ${progress.analysis.summary}` : "",
         moments.length
           ? `Detected moments: ${moments
-              .map((m) => `${m.t != null ? `${m.t}s` : `frame ${m.frame}`} — ${m.label}${m.note ? ` (${m.note})` : ""}`)
+              .map(
+                (m) =>
+                  `${m.t != null ? `${m.t}s` : `frame ${m.frame}`} — ${m.label}${m.note ? ` (${m.note})` : ""}`,
+              )
               .join("; ")}`
           : "",
         progress.transcript?.text ? `Spoken audio: ${progress.transcript.text.slice(0, 800)}` : "",
@@ -340,7 +343,8 @@ const STEP_RUNNERS: Record<
       edit_plan: {
         segments,
         why: String(out.why ?? "").slice(0, 240),
-        total: Math.round(segments.reduce((n: number, s: any) => n + (s.end - s.start), 0) * 10) / 10,
+        total:
+          Math.round(segments.reduce((n: number, s: any) => n + (s.end - s.start), 0) * 10) / 10,
       },
     };
   },

@@ -94,9 +94,7 @@ export function DateTimeRangeFields({
     <div className="space-y-3 rounded-2xl border border-border bg-surface p-3">
       {/* Day */}
       <div>
-        <span className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
-          Day
-        </span>
+        <span className="section-eyebrow text-muted-foreground">Day</span>
         <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
           {dayChips.map((c) => (
             <Chip
@@ -133,9 +131,7 @@ export function DateTimeRangeFields({
       {/* Time */}
       {!value.allDay && (
         <div>
-          <span className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
-            Starts at
-          </span>
+          <span className="section-eyebrow text-muted-foreground">Starts at</span>
           <div className="mt-1.5 flex flex-wrap items-center gap-2">
             <input
               type="time"
@@ -243,7 +239,9 @@ export function DateTimeRangeFields({
       <p
         className={`text-[11px] ${check.ok ? "text-muted-foreground" : "font-semibold text-coral"}`}
       >
-        {check.ok ? `${friendlyDayLabel(value.startDate)} · ${formatWhenRange(value)}` : check.error}
+        {check.ok
+          ? `${friendlyDayLabel(value.startDate)} · ${formatWhenRange(value)}`
+          : check.error}
       </p>
     </div>
   );

@@ -17,11 +17,7 @@ export function SportChips({
   /** Chips toggle sports in and out of a multi-sport selection. */
   multi?: boolean;
 }) {
-  const selectedList = Array.isArray(selected)
-    ? selected
-    : selected
-      ? [selected]
-      : [];
+  const selectedList = Array.isArray(selected) ? selected : selected ? [selected] : [];
   const selectedSet = new Set(selectedList);
   const noneSelected = selectedSet.size === 0;
 

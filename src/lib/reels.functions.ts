@@ -20,7 +20,6 @@ async function assertAiProcessingAllowed(context: { supabase: any; userId: strin
   }
 }
 
-
 /**
  * Runs the highlight-reel pipeline for the signed-in user's queued reels.
  *
@@ -37,9 +36,8 @@ export const processMyReels = createServerFn({ method: "POST" })
     const apiKey = process.env.LOVABLE_API_KEY;
     if (!apiKey) throw new Error("AI is not configured yet — please try again later");
 
-    const { MAX_ATTEMPTS, REEL_WORK_COLUMNS, processReel } = await import(
-      "@/lib/reels-pipeline.server"
-    );
+    const { MAX_ATTEMPTS, REEL_WORK_COLUMNS, processReel } =
+      await import("@/lib/reels-pipeline.server");
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
     let q = supabaseAdmin
@@ -147,9 +145,8 @@ export const regenerateReelStyle = createServerFn({ method: "POST" })
     const apiKey = process.env.LOVABLE_API_KEY;
     if (!apiKey) throw new Error("AI is not configured yet — please try again later");
 
-    const { MAX_ATTEMPTS, REEL_WORK_COLUMNS, prepareStyleRegen, processReel } = await import(
-      "@/lib/reels-pipeline.server"
-    );
+    const { MAX_ATTEMPTS, REEL_WORK_COLUMNS, prepareStyleRegen, processReel } =
+      await import("@/lib/reels-pipeline.server");
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
     const { data: reel, error } = await supabaseAdmin
@@ -191,7 +188,13 @@ export const regenerateReelStyle = createServerFn({ method: "POST" })
     if (upErr) throw new Error(upErr.message);
 
     const result = await processReel(
-      { ...reel, attempts: 0, processing_step: regen.processing_step, step_progress: regen.step_progress, style_prefs: data.style },
+      {
+        ...reel,
+        attempts: 0,
+        processing_step: regen.processing_step,
+        step_progress: regen.step_progress,
+        style_prefs: data.style,
+      },
       supabaseAdmin,
       apiKey,
     );
@@ -199,9 +202,7 @@ export const regenerateReelStyle = createServerFn({ method: "POST" })
     // Fresh overlays in the new style, timed to the regenerated timeline.
     if (result.status === "completed") {
       try {
-        const { REEL_COACH_COLUMNS, generateReelPackage } = await import(
-          "@/lib/reel-coach.server"
-        );
+        const { REEL_COACH_COLUMNS, generateReelPackage } = await import("@/lib/reel-coach.server");
         const { data: fresh } = await supabaseAdmin
           .from("highlight_reels")
           .select(REEL_COACH_COLUMNS)
@@ -329,7 +330,10 @@ export const applyReelStyleDraft = createServerFn({ method: "POST" })
       ai_title: d.ai_title ? String(d.ai_title).slice(0, 120) : null,
       ai_caption: d.ai_caption ? String(d.ai_caption).slice(0, 500) : null,
       ai_hashtags: Array.isArray(d.ai_hashtags)
-        ? d.ai_hashtags.map((h: unknown) => String(h).replace(/^#/, "").trim()).filter(Boolean).slice(0, 8)
+        ? d.ai_hashtags
+            .map((h: unknown) => String(h).replace(/^#/, "").trim())
+            .filter(Boolean)
+            .slice(0, 8)
         : [],
       timeline: Array.isArray(d.timeline) ? d.timeline.slice(0, 8) : [],
       edit_plan: d.edit_plan ?? null,
@@ -385,7 +389,11 @@ export const setReelHidden = createServerFn({ method: "POST" })
 export const setReelPlaybackPath = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator(
-    (input: { reelId: string; playbackPath: string; mediaMeta?: Record<string, unknown> | null }) => {
+    (input: {
+      reelId: string;
+      playbackPath: string;
+      mediaMeta?: Record<string, unknown> | null;
+    }) => {
       if (!input?.reelId) throw new Error("reelId is required");
       if (!input?.playbackPath) throw new Error("playbackPath is required");
       return {
@@ -571,7 +579,9 @@ export const listPublicReels = createServerFn({ method: "GET" })
     return Promise.all(
       reels.map(async (r) => {
         const [video, original, thumb] = await Promise.all([
-          supabaseAdmin.storage.from("highlight-videos").createSignedUrl(r.playback_path ?? r.video_path, 3600),
+          supabaseAdmin.storage
+            .from("highlight-videos")
+            .createSignedUrl(r.playback_path ?? r.video_path, 3600),
           r.playback_path
             ? supabaseAdmin.storage.from("highlight-videos").createSignedUrl(r.video_path, 3600)
             : Promise.resolve({ data: null }),
@@ -617,7 +627,13 @@ export const deleteReels = createServerFn({ method: "POST" })
     if (ids.length === 0) return { deleted: 0 };
 
     const paths = ((rows ?? []) as any[])
-      .flatMap((r) => [r.video_path, r.playback_path, r.thumbnail_path, r.audio_path, ...((r.frame_paths as string[] | null) ?? [])])
+      .flatMap((r) => [
+        r.video_path,
+        r.playback_path,
+        r.thumbnail_path,
+        r.audio_path,
+        ...((r.frame_paths as string[] | null) ?? []),
+      ])
       .filter((p): p is string => typeof p === "string" && p.length > 0);
     if (paths.length > 0) await supabaseAdmin.storage.from("highlight-videos").remove(paths);
 

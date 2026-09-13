@@ -69,7 +69,7 @@ function monthlyNext(key: string, nth: number, weekday: number): string | null {
   const nextYear = m === 12 ? y + 1 : y;
   const first = `${nextYear}-${String(nextMonth).padStart(2, "0")}-01`;
   const firstWeekday = weekdayOfKey(first);
-  const offset = (weekday - firstWeekday + 7) % 7 + (nth - 1) * 7;
+  const offset = ((weekday - firstWeekday + 7) % 7) + (nth - 1) * 7;
   const candidate = addDaysToKey(first, offset);
   // Rolled into the following month (e.g. no 5th Tuesday) — skip it.
   return candidate.slice(0, 7) === first.slice(0, 7) ? candidate : null;

@@ -1,9 +1,5 @@
 import type { Org } from "./sample-data";
-import {
-  resolveDay,
-  toDateKey,
-  type ResolvedWindow,
-} from "./availability-resolve";
+import { resolveDay, toDateKey, type ResolvedWindow } from "./availability-resolve";
 import type { TrainerBookedSlot } from "./trainer-requests";
 
 export type NextAvailableSlot = {
@@ -72,17 +68,12 @@ export function computeNextAvailable(
     d.setDate(today.getDate() + i);
     const key = toDateKey(d);
 
-    const windows = resolveDay(
-      d,
-      org.availabilitySlots ?? [],
-      org.availabilityOverrides ?? [],
-      {
-        venueFilter,
-        rules: org.availabilityRules ?? [],
-        trainerTz,
-        viewerTz,
-      },
-    );
+    const windows = resolveDay(d, org.availabilitySlots ?? [], org.availabilityOverrides ?? [], {
+      venueFilter,
+      rules: org.availabilityRules ?? [],
+      trainerTz,
+      viewerTz,
+    });
     if (windows.length === 0) continue;
 
     const booked = bookedByDate[key] ?? [];
@@ -136,21 +127,33 @@ export function computeNextAvailable(
 /** Compute the dateKeys to fetch booked slots for (top of the resolved list). */
 export function candidateDateKeys(
   org: Org,
-  opts: { now?: Date; viewerTz?: string | null; venueFilter?: string | null; horizonDays?: number; maxDays?: number } = {},
+  opts: {
+    now?: Date;
+    viewerTz?: string | null;
+    venueFilter?: string | null;
+    horizonDays?: number;
+    maxDays?: number;
+  } = {},
 ): string[] {
-  const { now = new Date(), viewerTz = null, venueFilter = null, horizonDays = 30, maxDays = 7 } = opts;
+  const {
+    now = new Date(),
+    viewerTz = null,
+    venueFilter = null,
+    horizonDays = 30,
+    maxDays = 7,
+  } = opts;
   const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
   const trainerTz = org.timezone ?? null;
   const keys: string[] = [];
   for (let i = 0; i < horizonDays && keys.length < maxDays; i++) {
     const d = new Date(today);
     d.setDate(today.getDate() + i);
-    const wins = resolveDay(
-      d,
-      org.availabilitySlots ?? [],
-      org.availabilityOverrides ?? [],
-      { venueFilter, rules: org.availabilityRules ?? [], trainerTz, viewerTz },
-    );
+    const wins = resolveDay(d, org.availabilitySlots ?? [], org.availabilityOverrides ?? [], {
+      venueFilter,
+      rules: org.availabilityRules ?? [],
+      trainerTz,
+      viewerTz,
+    });
     if (wins.length > 0) keys.push(toDateKey(d));
   }
   return keys;

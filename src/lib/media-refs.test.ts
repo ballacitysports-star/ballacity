@@ -7,11 +7,7 @@ import {
   parseStorageMediaUrl,
   resolvableMediaRef,
 } from "@/lib/media-refs";
-import {
-  sniffVideoContainer,
-  validateVideoMeta,
-  MAX_VIDEO_BYTES,
-} from "@/lib/video-validation";
+import { sniffVideoContainer, validateVideoMeta, MAX_VIDEO_BYTES } from "@/lib/video-validation";
 
 describe("media refs", () => {
   it("round-trips a bucket and path", () => {
@@ -57,12 +53,16 @@ describe("media refs", () => {
 
 describe("video upload validation", () => {
   it("accepts common phone clips", () => {
-    expect(validateVideoMeta({ name: "clip.MOV", mime: "video/quicktime", bytes: 1024 })).toBeNull();
+    expect(
+      validateVideoMeta({ name: "clip.MOV", mime: "video/quicktime", bytes: 1024 }),
+    ).toBeNull();
     expect(validateVideoMeta({ name: "clip.mp4", mime: "", bytes: 1024 })).toBeNull();
   });
 
   it("rejects disguised files, empty files and oversize uploads", () => {
-    expect(validateVideoMeta({ name: "payload.exe", mime: "video/mp4", bytes: 10 })).toMatch(/only/i);
+    expect(validateVideoMeta({ name: "payload.exe", mime: "video/mp4", bytes: 10 })).toMatch(
+      /only/i,
+    );
     expect(validateVideoMeta({ name: "clip.mp4", mime: "text/html", bytes: 10 })).toMatch(/only/i);
     expect(validateVideoMeta({ name: "clip.mp4", mime: "video/mp4", bytes: 0 })).toMatch(/empty/i);
     expect(

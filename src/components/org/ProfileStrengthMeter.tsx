@@ -35,7 +35,9 @@ export function ProfileStrengthMeter({
               <button
                 type="button"
                 onClick={() =>
-                  document.getElementById(i.section)?.scrollIntoView({ behavior: "smooth", block: "start" })
+                  document
+                    .getElementById(i.section)
+                    ?.scrollIntoView({ behavior: "smooth", block: "start" })
                 }
                 className="inline-flex items-center gap-1 rounded-full border border-border bg-background px-2.5 py-1 text-[11px] font-semibold text-muted-foreground hover:border-lime/60"
               >

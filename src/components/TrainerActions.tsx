@@ -45,7 +45,13 @@ function useMyTrainerRequest(trainerId: string) {
   return { row, refresh };
 }
 
-export function TrainerActions({ org, defaultVenue = null }: { org: Org; defaultVenue?: string | null }) {
+export function TrainerActions({
+  org,
+  defaultVenue = null,
+}: {
+  org: Org;
+  defaultVenue?: string | null;
+}) {
   const nav = useNavigate();
   const { user } = useAuth();
   const { isFollowing, pending, toggle } = useFollow(org.id);
@@ -109,7 +115,11 @@ export function TrainerActions({ org, defaultVenue = null }: { org: Org; default
           aria-pressed={isFollowing}
           aria-label={isFollowing ? "Unfollow trainer" : "Follow trainer"}
         >
-          {isFollowing ? <UserCheck className="h-3.5 w-3.5" /> : <UserPlus className="h-3.5 w-3.5" />}
+          {isFollowing ? (
+            <UserCheck className="h-3.5 w-3.5" />
+          ) : (
+            <UserPlus className="h-3.5 w-3.5" />
+          )}
           <span className="truncate">{isFollowing ? "Following" : "Follow"}</span>
         </button>
 

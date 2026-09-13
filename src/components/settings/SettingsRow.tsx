@@ -10,11 +10,7 @@ import type { LucideIcon } from "lucide-react";
 export function SettingsGroup({ title, children }: { title?: string; children: React.ReactNode }) {
   return (
     <section>
-      {title && (
-        <h2 className="px-4 pb-1 pt-4 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-          {title}
-        </h2>
-      )}
+      {title && <h2 className="px-4 pb-1 pt-4 section-eyebrow text-muted-foreground">{title}</h2>}
       <div className="divide-y divide-border border-y border-border">{children}</div>
     </section>
   );

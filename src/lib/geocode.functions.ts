@@ -1,7 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
-
 const GATEWAY_URL = "https://connector-gateway.lovable.dev/google_maps";
 
 export const reverseGeocode = createServerFn({ method: "POST" })

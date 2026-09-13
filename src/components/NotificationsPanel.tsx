@@ -44,10 +44,7 @@ import {
 import { Switch } from "@/components/ui/switch";
 
 import { resolveNotificationTarget } from "@/lib/deep-links";
-import {
-  useNotificationActorId,
-  usePrefetchNotificationActors,
-} from "@/lib/notification-actors";
+import { useNotificationActorId, usePrefetchNotificationActors } from "@/lib/notification-actors";
 import { UserAvatarById } from "@/components/UserAvatar";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";

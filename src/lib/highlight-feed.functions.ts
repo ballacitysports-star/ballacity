@@ -44,11 +44,13 @@ export type HighlightFeedItem = {
 const PAGE_SIZE = 8;
 
 export const listHighlightFeed = createServerFn({ method: "GET" })
-  .inputValidator((input: { cursor?: string | null; sport?: string | null; limit?: number } | undefined) => ({
-    cursor: typeof input?.cursor === "string" && input.cursor ? input.cursor : null,
-    sport: typeof input?.sport === "string" && input.sport ? input.sport : null,
-    limit: Math.min(Math.max(Number(input?.limit) || PAGE_SIZE, 1), 20),
-  }))
+  .inputValidator(
+    (input: { cursor?: string | null; sport?: string | null; limit?: number } | undefined) => ({
+      cursor: typeof input?.cursor === "string" && input.cursor ? input.cursor : null,
+      sport: typeof input?.sport === "string" && input.sport ? input.sport : null,
+      limit: Math.min(Math.max(Number(input?.limit) || PAGE_SIZE, 1), 20),
+    }),
+  )
   .handler(async ({ data }) => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
@@ -101,14 +103,10 @@ export const listHighlightFeed = createServerFn({ method: "GET" })
             .from("highlight-videos")
             .createSignedUrl(r.playback_path ?? r.video_path, 3600),
           r.playback_path
-            ? supabaseAdmin.storage
-                .from("highlight-videos")
-                .createSignedUrl(r.video_path, 3600)
+            ? supabaseAdmin.storage.from("highlight-videos").createSignedUrl(r.video_path, 3600)
             : Promise.resolve({ data: null as { signedUrl?: string } | null }),
           r.thumbnail_path
-            ? supabaseAdmin.storage
-                .from("highlight-videos")
-                .createSignedUrl(r.thumbnail_path, 3600)
+            ? supabaseAdmin.storage.from("highlight-videos").createSignedUrl(r.thumbnail_path, 3600)
             : Promise.resolve({ data: null as { signedUrl?: string } | null }),
         ]);
         const profile = profileById.get(r.user_id as string);

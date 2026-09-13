@@ -71,7 +71,9 @@ export const getTrainerOrg = createServerFn({ method: "GET" })
     if (!org) return null;
     const { data: members } = await sb
       .from("trainer_org_members")
-      .select("id,trainer_id,user_id,role,joined_at, teams:trainer_id(id,name,handle,avatar,city,sports)")
+      .select(
+        "id,trainer_id,user_id,role,joined_at, teams:trainer_id(id,name,handle,avatar,city,sports)",
+      )
       .eq("org_id", data.id)
       .order("joined_at", { ascending: true });
     return { org, members: members ?? [] };
@@ -91,38 +93,38 @@ export const getTrainerOrgContact = createServerFn({ method: "GET" })
     return { phone: row?.phone ?? null, email: row?.email ?? null };
   });
 
-
 export const createTrainerOrg = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((d: {
-    name: string;
-    handle: string;
-    trainerId: string;
-    bio?: string;
-    city?: string;
-    avatar?: string;
-    website?: string;
-    address?: string;
-    placeId?: string;
-    geo?: { lat: number; lng: number } | null;
-  }) =>
-    z
-      .object({
-        name: z.string().min(2).max(120),
-        handle: z.string().min(3).max(40).regex(handleRe, "3–40 chars, a–z, 0–9, - or _"),
-        trainerId: z.string().min(1),
-        bio: z.string().max(2000).optional(),
-        city: z.string().max(120).optional(),
-        avatar: z.string().max(10).optional(),
-        website: z.string().url().max(300).optional(),
-        address: z.string().max(300).optional(),
-        placeId: z.string().max(200).optional(),
-        geo: z
-          .object({ lat: z.number().min(-90).max(90), lng: z.number().min(-180).max(180) })
-          .nullable()
-          .optional(),
-      })
-      .parse(d),
+  .inputValidator(
+    (d: {
+      name: string;
+      handle: string;
+      trainerId: string;
+      bio?: string;
+      city?: string;
+      avatar?: string;
+      website?: string;
+      address?: string;
+      placeId?: string;
+      geo?: { lat: number; lng: number } | null;
+    }) =>
+      z
+        .object({
+          name: z.string().min(2).max(120),
+          handle: z.string().min(3).max(40).regex(handleRe, "3–40 chars, a–z, 0–9, - or _"),
+          trainerId: z.string().min(1),
+          bio: z.string().max(2000).optional(),
+          city: z.string().max(120).optional(),
+          avatar: z.string().max(10).optional(),
+          website: z.string().url().max(300).optional(),
+          address: z.string().max(300).optional(),
+          placeId: z.string().max(200).optional(),
+          geo: z
+            .object({ lat: z.number().min(-90).max(90), lng: z.number().min(-180).max(180) })
+            .nullable()
+            .optional(),
+        })
+        .parse(d),
   )
   .handler(async ({ data, context }) => {
     await requireAccountType(context.supabase, context.userId, "gym");
@@ -142,14 +144,15 @@ export const createTrainerOrg = createServerFn({ method: "POST" })
     return id as string;
   });
 
-
 export const listMyTrainerOrgMemberships = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: { trainerId?: string } | undefined) => d ?? {})
   .handler(async ({ data, context }) => {
     let q = context.supabase
       .from("trainer_org_members")
-      .select("id,org_id,trainer_id,role,joined_at, org:org_id(id,name,handle,avatar,city,verified)")
+      .select(
+        "id,org_id,trainer_id,role,joined_at, org:org_id(id,name,handle,avatar,city,verified)",
+      )
       .eq("user_id", context.userId);
     if (data.trainerId) q = q.eq("trainer_id", data.trainerId);
     const { data: rows, error } = await q;
@@ -177,7 +180,9 @@ export const respondToTrainerOrgInvite = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     if (data.action === "accept") {
-      const { error } = await context.supabase.rpc("accept_trainer_org_invite", { _invite: data.inviteId });
+      const { error } = await context.supabase.rpc("accept_trainer_org_invite", {
+        _invite: data.inviteId,
+      });
       if (error) throw new Error(error.message);
       return { ok: true };
     }
@@ -243,7 +248,9 @@ export const listJoinRequestsForOrg = createServerFn({ method: "GET" })
   .handler(async ({ data, context }) => {
     const { data: rows, error } = await context.supabase
       .from("trainer_org_join_requests")
-      .select("id,trainer_id,requested_by,message,status,created_at, trainer:trainer_id(id,name,handle,avatar,city)")
+      .select(
+        "id,trainer_id,requested_by,message,status,created_at, trainer:trainer_id(id,name,handle,avatar,city)",
+      )
       .eq("org_id", data.orgId)
       .eq("status", "pending");
     if (error) throw new Error(error.message);
@@ -281,15 +288,16 @@ export const reviewJoinRequest = createServerFn({ method: "POST" })
 
 export const inviteTrainerToOrg = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((d: { orgId: string; trainerId: string; role?: "member" | "admin"; message?: string }) =>
-    z
-      .object({
-        orgId: z.string().uuid(),
-        trainerId: z.string().min(1),
-        role: z.enum(["member", "admin"]).default("member"),
-        message: z.string().max(500).optional(),
-      })
-      .parse(d),
+  .inputValidator(
+    (d: { orgId: string; trainerId: string; role?: "member" | "admin"; message?: string }) =>
+      z
+        .object({
+          orgId: z.string().uuid(),
+          trainerId: z.string().min(1),
+          role: z.enum(["member", "admin"]).default("member"),
+          message: z.string().max(500).optional(),
+        })
+        .parse(d),
   )
   .handler(async ({ data, context }) => {
     // Look up the trainer profile owner
@@ -394,48 +402,49 @@ const geoSchema = z
 
 export const createStandaloneOrg = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((d: {
-    name: string;
-    handle: string;
-    bio?: string;
-    city?: string;
-    avatar?: string;
-    avatarUrl?: string;
-    coverUrl?: string;
-    website?: string;
-    address?: string;
-    placeId?: string;
-    geo?: { lat: number; lng: number } | null;
-    phone?: string;
-    email?: string;
-    category?: string;
-    amenities?: string[];
-    photos?: string[];
-    hours?: Record<string, unknown>;
-    timezone?: string;
-  }) =>
-    z
-      .object({
-        name: z.string().min(2).max(120),
-        handle: z.string().min(3).max(40).regex(handleRe, "3–40 chars, a–z, 0–9, - or _"),
-        bio: z.string().max(2000).optional(),
-        city: z.string().max(120).optional(),
-        avatar: z.string().max(10).optional(),
-        avatarUrl: z.string().url().max(1000).optional(),
-        coverUrl: z.string().url().max(1000).optional(),
-        website: z.string().url().max(300).optional(),
-        address: z.string().max(300).optional(),
-        placeId: z.string().max(200).optional(),
-        geo: geoSchema,
-        phone: z.string().max(40).optional(),
-        email: z.string().email().max(200).optional(),
-        category: z.string().max(60).optional(),
-        amenities: z.array(z.string().max(60)).max(30).optional(),
-        photos: z.array(z.string().url().max(1000)).max(12).optional(),
-        hours: z.record(z.string(), z.unknown()).optional(),
-        timezone: z.string().max(80).optional(),
-      })
-      .parse(d),
+  .inputValidator(
+    (d: {
+      name: string;
+      handle: string;
+      bio?: string;
+      city?: string;
+      avatar?: string;
+      avatarUrl?: string;
+      coverUrl?: string;
+      website?: string;
+      address?: string;
+      placeId?: string;
+      geo?: { lat: number; lng: number } | null;
+      phone?: string;
+      email?: string;
+      category?: string;
+      amenities?: string[];
+      photos?: string[];
+      hours?: Record<string, unknown>;
+      timezone?: string;
+    }) =>
+      z
+        .object({
+          name: z.string().min(2).max(120),
+          handle: z.string().min(3).max(40).regex(handleRe, "3–40 chars, a–z, 0–9, - or _"),
+          bio: z.string().max(2000).optional(),
+          city: z.string().max(120).optional(),
+          avatar: z.string().max(10).optional(),
+          avatarUrl: z.string().url().max(1000).optional(),
+          coverUrl: z.string().url().max(1000).optional(),
+          website: z.string().url().max(300).optional(),
+          address: z.string().max(300).optional(),
+          placeId: z.string().max(200).optional(),
+          geo: geoSchema,
+          phone: z.string().max(40).optional(),
+          email: z.string().email().max(200).optional(),
+          category: z.string().max(60).optional(),
+          amenities: z.array(z.string().max(60)).max(30).optional(),
+          photos: z.array(z.string().url().max(1000)).max(12).optional(),
+          hours: z.record(z.string(), z.unknown()).optional(),
+          timezone: z.string().max(80).optional(),
+        })
+        .parse(d),
   )
   .handler(async ({ data, context }) => {
     await requireAccountType(context.supabase, context.userId, "gym");
@@ -479,7 +488,10 @@ export const createStandaloneOrg = createServerFn({ method: "POST" })
       await context.supabase
         .from("trainer_org_members")
         .insert({ org_id: row.id, trainer_id: seed, user_id: context.userId, role: "owner" })
-        .then(() => undefined, () => undefined);
+        .then(
+          () => undefined,
+          () => undefined,
+        );
     }
 
     return row.id as string;
@@ -487,50 +499,51 @@ export const createStandaloneOrg = createServerFn({ method: "POST" })
 
 export const updateTrainerOrg = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((d: {
-    id: string;
-    name?: string;
-    handle?: string;
-    bio?: string | null;
-    city?: string | null;
-    website?: string | null;
-    avatar?: string | null;
-    avatarUrl?: string | null;
-    coverUrl?: string | null;
-    address?: string | null;
-    placeId?: string | null;
-    geo?: { lat: number; lng: number } | null;
-    phone?: string | null;
-    email?: string | null;
-    category?: string | null;
-    amenities?: string[];
-    photos?: string[];
-    hours?: Record<string, unknown>;
-    timezone?: string | null;
-  }) =>
-    z
-      .object({
-        id: z.string().uuid(),
-        name: z.string().min(2).max(120).optional(),
-        handle: z.string().min(3).max(40).regex(handleRe).optional(),
-        bio: z.string().max(2000).nullable().optional(),
-        city: z.string().max(120).nullable().optional(),
-        website: z.string().url().max(300).nullable().optional(),
-        avatar: z.string().max(10).nullable().optional(),
-        avatarUrl: z.string().url().max(1000).nullable().optional(),
-        coverUrl: z.string().url().max(1000).nullable().optional(),
-        address: z.string().max(300).nullable().optional(),
-        placeId: z.string().max(200).nullable().optional(),
-        geo: geoSchema,
-        phone: z.string().max(40).nullable().optional(),
-        email: z.string().email().max(200).nullable().optional(),
-        category: z.string().max(60).nullable().optional(),
-        amenities: z.array(z.string().max(60)).max(30).optional(),
-        photos: z.array(z.string().url().max(1000)).max(12).optional(),
-        hours: z.record(z.string(), z.unknown()).optional(),
-        timezone: z.string().max(80).nullable().optional(),
-      })
-      .parse(d),
+  .inputValidator(
+    (d: {
+      id: string;
+      name?: string;
+      handle?: string;
+      bio?: string | null;
+      city?: string | null;
+      website?: string | null;
+      avatar?: string | null;
+      avatarUrl?: string | null;
+      coverUrl?: string | null;
+      address?: string | null;
+      placeId?: string | null;
+      geo?: { lat: number; lng: number } | null;
+      phone?: string | null;
+      email?: string | null;
+      category?: string | null;
+      amenities?: string[];
+      photos?: string[];
+      hours?: Record<string, unknown>;
+      timezone?: string | null;
+    }) =>
+      z
+        .object({
+          id: z.string().uuid(),
+          name: z.string().min(2).max(120).optional(),
+          handle: z.string().min(3).max(40).regex(handleRe).optional(),
+          bio: z.string().max(2000).nullable().optional(),
+          city: z.string().max(120).nullable().optional(),
+          website: z.string().url().max(300).nullable().optional(),
+          avatar: z.string().max(10).nullable().optional(),
+          avatarUrl: z.string().url().max(1000).nullable().optional(),
+          coverUrl: z.string().url().max(1000).nullable().optional(),
+          address: z.string().max(300).nullable().optional(),
+          placeId: z.string().max(200).nullable().optional(),
+          geo: geoSchema,
+          phone: z.string().max(40).nullable().optional(),
+          email: z.string().email().max(200).nullable().optional(),
+          category: z.string().max(60).nullable().optional(),
+          amenities: z.array(z.string().max(60)).max(30).optional(),
+          photos: z.array(z.string().url().max(1000)).max(12).optional(),
+          hours: z.record(z.string(), z.unknown()).optional(),
+          timezone: z.string().max(80).nullable().optional(),
+        })
+        .parse(d),
   )
   .handler(async ({ data, context }) => {
     const patch: Database["public"]["Tables"]["trainer_orgs"]["Update"] = {};
@@ -553,10 +566,7 @@ export const updateTrainerOrg = createServerFn({ method: "POST" })
     if (data.photos !== undefined) extra.photos = data.photos;
     if (data.hours !== undefined) extra.hours = data.hours;
     if (data.timezone !== undefined) extra.timezone = data.timezone;
-    const { error } = await context.supabase
-      .from("trainer_orgs")
-      .update(patch)
-      .eq("id", data.id);
+    const { error } = await context.supabase.from("trainer_orgs").update(patch).eq("id", data.id);
     if (error) throw new Error(error.message);
     return { ok: true };
   });
@@ -658,7 +668,12 @@ export const listOrgMembers = createServerFn({ method: "GET" })
       .order("created_at", { ascending: true });
     if (error) throw new Error(error.message);
     const userIds = Array.from(new Set((rows ?? []).map((r) => r.user_id)));
-    let profiles: Array<{ id: string; display_name: string | null; avatar_initials: string | null; avatar_url: string | null }> = [];
+    let profiles: Array<{
+      id: string;
+      display_name: string | null;
+      avatar_initials: string | null;
+      avatar_url: string | null;
+    }> = [];
     if (userIds.length > 0) {
       const { data: profs } = await sb
         .from("profiles")
@@ -725,7 +740,12 @@ export const listOrgMemberRequests = createServerFn({ method: "GET" })
       .order("created_at", { ascending: true });
     if (error) throw new Error(error.message);
     const userIds = Array.from(new Set((rows ?? []).map((r) => r.user_id)));
-    let profiles: Array<{ id: string; display_name: string | null; avatar_initials: string | null; avatar_url: string | null }> = [];
+    let profiles: Array<{
+      id: string;
+      display_name: string | null;
+      avatar_initials: string | null;
+      avatar_url: string | null;
+    }> = [];
     if (userIds.length > 0) {
       const { data: profs } = await context.supabase
         .from("profiles")
@@ -741,7 +761,9 @@ export const approveOrgMemberRequest = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: { id: string }) => z.object({ id: z.string().uuid() }).parse(d))
   .handler(async ({ data, context }) => {
-    const { data: res, error } = await context.supabase.rpc("approve_org_member_request", { _req: data.id });
+    const { data: res, error } = await context.supabase.rpc("approve_org_member_request", {
+      _req: data.id,
+    });
     if (error) throw new Error(error.message);
     return { memberId: res as unknown as string | null };
   });
@@ -763,11 +785,13 @@ export const denyOrgMemberRequest = createServerFn({ method: "POST" })
 export const setGenericOrgMemberRole = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: { orgId: string; userId: string; role: "admin" | "member" }) =>
-    z.object({
-      orgId: z.string().uuid(),
-      userId: z.string().uuid(),
-      role: z.enum(["admin", "member"]),
-    }).parse(d),
+    z
+      .object({
+        orgId: z.string().uuid(),
+        userId: z.string().uuid(),
+        role: z.enum(["admin", "member"]),
+      })
+      .parse(d),
   )
   .handler(async ({ data, context }) => {
     const { error } = await context.supabase
@@ -807,14 +831,16 @@ export const leaveOrgMembership = createServerFn({ method: "POST" })
     return { ok: true };
   });
 
-
 export const searchProfilesForInvite = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: { orgId: string; q: string }) =>
     z.object({ orgId: z.string().uuid(), q: z.string().min(1).max(80) }).parse(d),
   )
   .handler(async ({ data, context }) => {
-    const { data: isAdmin, error: adminErr } = await context.supabase.rpc("is_trainer_org_admin", { _org: data.orgId, _user: context.userId });
+    const { data: isAdmin, error: adminErr } = await context.supabase.rpc("is_trainer_org_admin", {
+      _org: data.orgId,
+      _user: context.userId,
+    });
     if (adminErr) throw new Error(adminErr.message);
     if (!isAdmin) throw new Error("Only owners or admins can perform this action.");
 
@@ -837,14 +863,19 @@ export const searchProfilesForInvite = createServerFn({ method: "GET" })
 export const addOrgMemberDirect = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: { orgId: string; userId: string; role?: "admin" | "member" }) =>
-    z.object({
-      orgId: z.string().uuid(),
-      userId: z.string().uuid(),
-      role: z.enum(["admin", "member"]).default("member"),
-    }).parse(d),
+    z
+      .object({
+        orgId: z.string().uuid(),
+        userId: z.string().uuid(),
+        role: z.enum(["admin", "member"]).default("member"),
+      })
+      .parse(d),
   )
   .handler(async ({ data, context }) => {
-    const { data: isAdmin, error: adminErr } = await context.supabase.rpc("is_trainer_org_admin", { _org: data.orgId, _user: context.userId });
+    const { data: isAdmin, error: adminErr } = await context.supabase.rpc("is_trainer_org_admin", {
+      _org: data.orgId,
+      _user: context.userId,
+    });
     if (adminErr) throw new Error(adminErr.message);
     if (!isAdmin) throw new Error("Only owners or admins can perform this action.");
 

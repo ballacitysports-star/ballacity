@@ -35,9 +35,7 @@ export function ProfileAboutSheet({
 export function AboutBlock({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <section>
-      <h3 className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-        {label}
-      </h3>
+      <h3 className="mb-1.5 section-eyebrow text-muted-foreground">{label}</h3>
       <div className="text-sm text-foreground/90">{children}</div>
     </section>
   );

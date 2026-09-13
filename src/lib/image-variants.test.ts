@@ -1,13 +1,7 @@
 import { describe, expect, it } from "vitest";
-import {
-  imageSrcSet,
-  imageThumb,
-  imageVariant,
-  isTransformableImageUrl,
-} from "./image-variants";
+import { imageSrcSet, imageThumb, imageVariant, isTransformableImageUrl } from "./image-variants";
 
-const PUBLIC_URL =
-  "https://proj.supabase.co/storage/v1/object/public/org-covers/user-1/photo.jpg";
+const PUBLIC_URL = "https://proj.supabase.co/storage/v1/object/public/org-covers/user-1/photo.jpg";
 const SIGNED_URL =
   "https://proj.supabase.co/storage/v1/object/sign/game-covers/user-1/photo.jpg?token=abc.def";
 
@@ -22,9 +16,7 @@ describe("image-variants", () => {
 
   it("rewrites public objects to the render endpoint", () => {
     const url = new URL(imageVariant(PUBLIC_URL, { width: 640 }));
-    expect(url.pathname).toBe(
-      "/storage/v1/render/image/public/org-covers/user-1/photo.jpg",
-    );
+    expect(url.pathname).toBe("/storage/v1/render/image/public/org-covers/user-1/photo.jpg");
     expect(url.searchParams.get("width")).toBe("640");
     expect(url.searchParams.get("resize")).toBe("contain");
     expect(url.searchParams.get("quality")).toBe("74");
@@ -32,9 +24,7 @@ describe("image-variants", () => {
 
   it("preserves the signed token for private buckets", () => {
     const url = new URL(imageThumb(SIGNED_URL, 64));
-    expect(url.pathname).toBe(
-      "/storage/v1/render/image/sign/game-covers/user-1/photo.jpg",
-    );
+    expect(url.pathname).toBe("/storage/v1/render/image/sign/game-covers/user-1/photo.jpg");
     expect(url.searchParams.get("token")).toBe("abc.def");
     expect(url.searchParams.get("height")).toBe("64");
     expect(url.searchParams.get("resize")).toBe("cover");

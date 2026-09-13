@@ -3,7 +3,6 @@ import type { SportEntry } from "@/components/profile/ProfileSportsFields";
 import { serializeSportLevels } from "@/lib/sport-levels";
 import { clampDistanceMi } from "@/lib/distance";
 
-
 export type ProfileLink = { url: string; label?: string; [k: string]: unknown };
 
 export type ProfilePayloadInput = {
@@ -92,8 +91,6 @@ export async function saveProfileRow(
   }
 }
 
-
-
 /**
  * Stable fingerprint of a profile row, used as an idempotency key so repeated
  * onboarding submissions with unchanged data are skipped instead of re-written.
@@ -104,6 +101,5 @@ export function profileRowFingerprint(row: Record<string, unknown>): string {
     .map((k) => [k, row[k]] as const);
   return JSON.stringify(stable);
 }
-
 
 export const onboardingSaveKey = (userId: string) => `openrun.onboarding_saved.${userId}`;

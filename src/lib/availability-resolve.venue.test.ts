@@ -126,9 +126,7 @@ describe("resolveDay venueFilter", () => {
   });
 
   it("returns empty when no window matches the filter", () => {
-    const weekly: Slot[] = [
-      { day: "wed", start: "09:00", end: "10:00", venue: VENUE_A },
-    ];
+    const weekly: Slot[] = [{ day: "wed", start: "09:00", end: "10:00", venue: VENUE_A }];
     const out = resolveDay(DATE, weekly, [], "unknown venue");
     expect(out).toEqual([]);
   });
