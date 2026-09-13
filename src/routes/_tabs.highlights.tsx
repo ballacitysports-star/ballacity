@@ -16,6 +16,8 @@ import { InlineVideoPlayer } from "@/components/InlineVideoPlayer";
 import { FollowButton } from "@/components/FollowButton";
 import { PostEngagement } from "@/components/PostEngagement";
 import { FlagReelButton } from "@/components/FlagReelButton";
+import { LoadingState } from "@/components/ui/loading-state";
+import { ErrorState } from "@/components/ui/error-state";
 import {
   listHighlightFeed,
   listHighlightFeedSports,
