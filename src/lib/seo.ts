@@ -6,7 +6,7 @@
  * consistent across the app. New pages should call this instead of hand
  * writing meta arrays.
  */
-export const SITE_URL = "https://open-run-connect.lovable.app";
+export const SITE_URL = "https://ballacity.com";
 export const SITE_NAME = "ballaCity";
 /** The site’s own title and description. Pages either use these verbatim or
  *  prefix/suffix their own page name onto them, so the wording stays in one place. */

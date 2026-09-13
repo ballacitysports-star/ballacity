@@ -79,7 +79,7 @@ export const Route = createFileRoute("/teams/$teamId/")({
             name: o.name,
             sport: o.sports?.join(", "),
             address: o.city ?? undefined,
-            url: `https://open-run-connect.lovable.app/teams/${params.teamId}`,
+            url: `https://ballacity.com/teams/${params.teamId}`,
           }
         : undefined,
     });

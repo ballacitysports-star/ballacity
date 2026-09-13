@@ -56,7 +56,7 @@ function fallbackSvg(opts: {
     <text x="${width - s(186)}" y="${s(111)}" text-anchor="middle" fill="#0C0F0B" font-family="Arial, sans-serif" font-size="${s(26)}" font-weight="700">${esc(kind.label)}</text>
     <text x="${s(72)}" y="${Math.round(height * 0.55)}" fill="#FFFFFF" font-family="Arial, sans-serif" font-size="${titleSize}" font-weight="700">${esc(title)}</text>
     ${subtitle ? `<text x="${s(72)}" y="${Math.round(height * 0.68)}" fill="#A7B3A2" font-family="Arial, sans-serif" font-size="${s(34)}">${esc(subtitle)}</text>` : ""}
-    <text x="${width - s(72)}" y="${height - s(72)}" text-anchor="end" fill="#6F7C6B" font-family="Arial, sans-serif" font-size="${s(26)}">open-run-connect.lovable.app</text>
+    <text x="${width - s(72)}" y="${height - s(72)}" text-anchor="end" fill="#6F7C6B" font-family="Arial, sans-serif" font-size="${s(26)}">ballacity.com</text>
   </svg>`;
 }
 

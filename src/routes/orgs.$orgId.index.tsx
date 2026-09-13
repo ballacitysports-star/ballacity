@@ -80,7 +80,7 @@ export const Route = createFileRoute("/orgs/$orgId/")({
             "@type": "SportsActivityLocation",
             name: org.name,
             address: org.address ?? org.city ?? undefined,
-            url: `https://open-run-connect.lovable.app/orgs/${params.orgId}`,
+            url: `https://ballacity.com/orgs/${params.orgId}`,
           }
         : undefined,
     });

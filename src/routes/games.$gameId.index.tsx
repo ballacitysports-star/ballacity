@@ -249,7 +249,7 @@ export const Route = createFileRoute("/games/$gameId/")({
             startDate: game.date,
             location: { "@type": "Place", name: game.location, address: game.neighborhood },
             sport: game.sport,
-            url: `https://open-run-connect.lovable.app/games/${params.gameId}`,
+            url: `https://ballacity.com/games/${params.gameId}`,
           }
         : undefined,
     });

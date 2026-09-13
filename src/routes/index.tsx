@@ -24,7 +24,7 @@ export const Route = createFileRoute("/")({
         "@context": "https://schema.org",
         "@type": "WebSite",
         name: "ballaCity",
-        url: "https://open-run-connect.lovable.app",
+        url: "https://ballacity.com",
       },
     }),
   component: Landing,
