@@ -103,9 +103,9 @@ export function InlineVideoPlayer({
     // the same clip before telling the athlete anything is wrong.
     const giveUp = () => {
       if (cancelled) return;
-      if (fallbackVideoUrl && !triedFallback && fallbackVideoUrl !== url) {
+      if (altUrl && !triedFallback && altUrl !== url) {
         setTriedFallback(true);
-        setUrl(fallbackVideoUrl);
+        setUrl(altUrl);
       } else {
         setUnsupported(true);
       }
@@ -123,7 +123,7 @@ export function InlineVideoPlayer({
       cancelled = true;
       cleanup();
     };
-  }, [url, fallbackVideoUrl, triedFallback]);
+  }, [url, altUrl, triedFallback]);
 
   if (unsupported && url) {
     return (
@@ -165,9 +165,9 @@ export function InlineVideoPlayer({
         autoPlay
         playsInline
         onError={() => {
-          if (fallbackVideoUrl && !triedFallback && fallbackVideoUrl !== url) {
+          if (altUrl && !triedFallback && altUrl !== url) {
             setTriedFallback(true);
-            setUrl(fallbackVideoUrl);
+            setUrl(altUrl);
             return;
           }
           setUnsupported(true);
