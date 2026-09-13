@@ -90,7 +90,7 @@ export function TrainerOrgSection({ trainerId }: Props) {
         <>
           {(invites.data ?? []).length > 0 && (
             <div className="space-y-2">
-              <div className="text-[11px] uppercase tracking-wide text-muted-foreground">
+              <div className="micro-label text-muted-foreground">
                 Pending invites
               </div>
               {invites.data!.map((inv) => (

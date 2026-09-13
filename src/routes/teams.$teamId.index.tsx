@@ -649,7 +649,7 @@ function Stat({ label, value, icon }: { label: string; value: string; icon: Reac
         {icon}
         {value}
       </div>
-      <div className="text-[10px] uppercase tracking-wider text-muted-foreground mt-0.5">
+      <div className="micro-label text-muted-foreground mt-0.5">
         {label}
       </div>
     </div>

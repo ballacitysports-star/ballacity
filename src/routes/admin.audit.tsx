@@ -77,7 +77,7 @@ function DetailBlock({ label, value }: { label: string; value: unknown }) {
   if (typeof value === "object" && Object.keys(value as object).length === 0) return null;
   return (
     <div className="min-w-0">
-      <p className="text-[11px] uppercase tracking-wide text-muted-foreground">{label}</p>
+      <p className="micro-label text-muted-foreground">{label}</p>
       <pre className="mt-1 overflow-x-auto rounded-md bg-muted/50 p-2 text-[11px] leading-relaxed">
         {JSON.stringify(value, null, 2)}
       </pre>
