@@ -699,6 +699,19 @@ function Thread() {
         onSubmit={submit}
         className="sticky bottom-0 left-0 right-0 shrink-0 border-t border-border bg-background/95 backdrop-blur px-4 pt-3 pb-[max(env(safe-area-inset-bottom),0.75rem)] z-20"
       >
+        {/* The restriction itself is decided elsewhere and untouched here; this
+            only states it in the composer instead of leaving a greyed-out box
+            with no explanation. */}
+        {!messagingDecision.allowed && (
+          <div
+            role="status"
+            className="mb-2 rounded-xl border border-border bg-surface px-3 py-2 text-xs text-muted-foreground"
+          >
+            <span className="font-semibold text-foreground">Messaging is off for now. </span>
+            {messagingDecision.reason || "A parent or guardian must approve this account first."}
+          </div>
+        )}
+
         {replyTo && (
           <div className="mb-2 rounded-xl border-l-2 border-lime bg-surface px-3 py-2 text-xs flex items-start gap-2">
             <div className="flex-1 min-w-0">
