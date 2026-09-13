@@ -200,7 +200,7 @@ function MessagesInbox() {
               {list.map((c) => (
                 <div
                   key={c.id}
-                  className="flex items-center gap-3 rounded-2xl border border-border bg-surface p-3"
+                  className="flex min-h-[4.5rem] items-center gap-3 rounded-2xl border border-border bg-surface p-3"
                 >
                   <Link
                     to="/messages/$conversationId"
@@ -217,14 +217,20 @@ function MessagesInbox() {
                     />
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center justify-between gap-2">
-                        <span className="font-semibold text-sm truncate">
+                        <span className="truncate text-sm font-semibold">
                           {c.other_display_name}
                         </span>
-                        <span className="text-[10px] text-muted-foreground shrink-0">
+                        <span className="shrink-0 text-[11px] text-muted-foreground">
                           {timeAgo(c.last_message_at)}
                         </span>
                       </div>
-                      <p className="text-xs text-muted-foreground truncate">
+                      {/* An unread thread is weighted as well as tinted, so the
+                          state does not rest on colour alone. */}
+                      <p
+                        className={`truncate text-xs ${
+                          c.unread > 0 ? "font-semibold text-foreground" : "text-muted-foreground"
+                        }`}
+                      >
                         {c.last_message ?? "Say hi 👋"}
                       </p>
                     </div>
