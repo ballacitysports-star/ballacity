@@ -131,10 +131,13 @@ function OnboardingWizard({ type }: { type: AccountType }) {
   const isPlayer = type === "player";
   const nextCfg = isPlayer ? null : NEXT_STEPS[type as Exclude<AccountType, "player">];
 
+  // Links are optional, so they live inside the Basics step behind a
+  // disclosure rather than costing everyone a whole step of their own.
   const stepLabels = isPlayer
-    ? ["Basics", "Sports", "Links", "Location"]
-    : ["Basics", "Sports", "Links", "Location", "Next steps"];
+    ? ["Basics", "Sports", "Location"]
+    : ["Basics", "Sports", "Location", "Next steps"];
   const locationStep = stepLabels.indexOf("Location");
+
 
   const [step, setStep] = useState(0);
   const [saving, setSaving] = useState(false);
