@@ -18,7 +18,18 @@ async function getServerEntry(): Promise<ServerEntry> {
   return serverEntryPromise;
 }
 
+function isAbortError(error: unknown): boolean {
+  let current: unknown = error;
+  for (let depth = 0; current && depth < 5; depth += 1) {
+    const candidate = current as { name?: unknown; cause?: unknown };
+    if (candidate.name === "AbortError") return true;
+    current = candidate.cause;
+  }
+  return false;
+}
+
 function brandedErrorResponse(): Response {
+
   return new Response(renderErrorPage(), {
     status: 500,
     headers: { "content-type": "text/html; charset=utf-8" },
