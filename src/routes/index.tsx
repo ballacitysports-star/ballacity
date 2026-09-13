@@ -113,13 +113,9 @@ function Landing() {
         <div className="absolute inset-0 grid-noise opacity-30" />
         <div className="relative page-shell pt-12 pb-20 md:pt-20 md:pb-32 grid md:grid-cols-2 gap-10 items-center">
           <div>
-            <div className="enter-up inline-flex items-center gap-2 rounded-full border border-lime/30 bg-lime/10 px-3 py-1 text-xs font-semibold text-lime">
-              <span className="h-1.5 w-1.5 rounded-full bg-lime animate-pulse" />
-              Live · 1,284 games this week
-            </div>
             <h1
               style={{ "--enter-delay": "50ms" } as CSSProperties}
-              className="enter-up mt-5 font-display text-5xl md:text-7xl font-bold leading-[0.95] tracking-tight"
+              className="enter-up font-display text-5xl md:text-7xl font-bold leading-[0.95] tracking-tight"
             >
               Pickup sports.
               <br />
