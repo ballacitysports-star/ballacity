@@ -301,7 +301,7 @@ function PrivacySettingsPage() {
                 <span className="font-semibold text-foreground">Retained:</span> safety records
                 (reports and blocks filed about your account) and required security logs.
               </p>
-              <p className="text-[11px] uppercase tracking-wide">
+              <p className="micro-label">
                 Legal review required — retention periods are placeholders.
               </p>
             </div>

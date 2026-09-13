@@ -125,14 +125,14 @@ function ReviewCard({ r, index, isOwner }: { r: Review; index: number; isOwner: 
       <p className="mt-1 text-sm text-foreground/90">{r.body}</p>
 
       {r.context && (
-        <div className="mt-2 text-[11px] uppercase tracking-wider text-muted-foreground">
+        <div className="mt-2 micro-label text-muted-foreground">
           via {r.context}
         </div>
       )}
 
       {r.scores && Object.keys(r.scores).length > 0 && (
         <details className="mt-3 group">
-          <summary className="cursor-pointer text-[10px] uppercase tracking-wider text-muted-foreground hover:text-lime">
+          <summary className="cursor-pointer micro-label text-muted-foreground hover:text-lime">
             See all 10 criteria
           </summary>
           <div className="mt-2 grid grid-cols-2 gap-1.5">
@@ -141,7 +141,7 @@ function ReviewCard({ r, index, isOwner }: { r: Review; index: number; isOwner: 
                 key={k}
                 className="flex items-center justify-between rounded-lg border border-border bg-background/40 px-2 py-1"
               >
-                <span className="text-[10px] uppercase tracking-wide text-muted-foreground truncate">
+                <span className="micro-label text-muted-foreground truncate">
                   {k}
                 </span>
                 <span className="font-display text-xs font-bold text-lime">
@@ -307,7 +307,7 @@ export function ReviewsSection({
 
       {/* Sort */}
       <div className="mt-2 flex items-center gap-2 overflow-x-auto pb-1 -mx-1 px-1">
-        <span className="shrink-0 inline-flex items-center gap-1 text-[10px] uppercase tracking-wider text-muted-foreground">
+        <span className="shrink-0 inline-flex items-center gap-1 micro-label text-muted-foreground">
           <ArrowUpDown className="h-3 w-3" /> Sort
         </span>
         {SORTS.map((s) => (
@@ -381,7 +381,7 @@ function PaginatedList({ list, isOwner }: { list: Review[]; isOwner: boolean }) 
           >
             Load {Math.min(PAGE_SIZE, remaining)} more
           </button>
-          <span className="text-[10px] uppercase tracking-wider text-muted-foreground">
+          <span className="micro-label text-muted-foreground">
             Showing {visible} of {list.length}
           </span>
         </div>

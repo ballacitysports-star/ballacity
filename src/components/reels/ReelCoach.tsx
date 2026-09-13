@@ -177,7 +177,7 @@ export function ReelCoach({ reelId }: { reelId: string }) {
         {pkg && (
           <div className="mt-2.5 space-y-2.5">
             {pkg.sport && (
-              <p className="text-[10px] uppercase tracking-wide text-muted-foreground">
+              <p className="micro-label text-muted-foreground">
                 Tailored for {pkg.sport}
               </p>
             )}

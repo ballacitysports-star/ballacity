@@ -788,7 +788,7 @@ function PlayerOrgsSection({ userId }: { userId: string }) {
             <Building2 className="h-3.5 w-3.5" />
             <span className="truncate max-w-[160px]">{o.name}</span>
             {o.verified && <ShieldCheck className="h-3 w-3 text-lime" />}
-            <span className="text-[10px] uppercase tracking-wide text-muted-foreground">
+            <span className="micro-label text-muted-foreground">
               {r.role}
             </span>
           </Link>

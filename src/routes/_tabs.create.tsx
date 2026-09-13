@@ -564,7 +564,7 @@ function Create() {
                   </span>
                   <div className="min-w-0">
                     <div className="text-sm font-semibold truncate">{affiliations[0].name}</div>
-                    <div className="text-[11px] uppercase tracking-wider text-muted-foreground">
+                    <div className="micro-label text-muted-foreground">
                       {affiliationLabel(affiliations[0])}
                     </div>
                   </div>
@@ -592,7 +592,7 @@ function Create() {
                           {(a.name || "?").slice(0, 1).toUpperCase()}
                         </span>
                         <span className="truncate max-w-[10rem]">{a.name}</span>
-                        <span className="text-[10px] uppercase tracking-wider opacity-70">
+                        <span className="micro-label opacity-70">
                           {affiliationShortLabel(a)}
                         </span>
                       </button>

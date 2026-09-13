@@ -193,7 +193,7 @@ function Landing() {
               style={{ "--enter-delay": "500ms" } as CSSProperties}
               className="float-soft absolute -right-6 bottom-24 rounded-2xl border border-border bg-surface/90 backdrop-blur p-3 shadow-xl"
             >
-              <div className="text-[10px] uppercase tracking-wider text-muted-foreground">
+              <div className="micro-label text-muted-foreground">
                 Reliability
               </div>
               <div className="font-display text-xl font-bold text-lime">98%</div>

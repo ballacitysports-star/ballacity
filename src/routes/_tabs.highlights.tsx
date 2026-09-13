@@ -422,7 +422,7 @@ function FeedReelCard({ item }: { item: HighlightFeedItem }) {
             View comments
           </button>
         )}
-        <p className="pt-0.5 text-[10px] uppercase tracking-wide text-muted-foreground">
+        <p className="pt-0.5 micro-label text-muted-foreground">
           {relativeTime(item.createdAt)}
         </p>
         {showComments && (

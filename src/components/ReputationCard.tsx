@@ -34,7 +34,7 @@ export function ReputationCard({ rep }: { rep: Reputation }) {
     >
       <div className="flex items-start justify-between gap-3">
         <div>
-          <div className="text-[10px] uppercase tracking-wider text-muted-foreground">
+          <div className="micro-label text-muted-foreground">
             Reputation
           </div>
           <div className="mt-1 flex items-baseline gap-2">
@@ -105,7 +105,7 @@ export function ReputationCard({ rep }: { rep: Reputation }) {
       {/* Top strengths */}
       {rep.topStrengths.length > 0 && (
         <div className="mt-4">
-          <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-2">
+          <div className="micro-label text-muted-foreground mb-2">
             Top strengths
           </div>
           <div className="flex flex-wrap gap-1.5">
@@ -124,7 +124,7 @@ export function ReputationCard({ rep }: { rep: Reputation }) {
       {/* Criteria breakdown bars */}
       {rep.criteriaAverages.some((c) => c.avg > 0) && (
         <div className="mt-4">
-          <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-2">
+          <div className="micro-label text-muted-foreground mb-2">
             Breakdown
           </div>
           <div className="grid grid-cols-1 gap-1.5">

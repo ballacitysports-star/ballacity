@@ -470,10 +470,10 @@ function NotificationPreferences() {
       <div className="border-t border-border px-3 py-3 space-y-4">
         <div className="grid grid-cols-[1fr_auto_auto] gap-x-4 gap-y-1 items-center">
           <div />
-          <div className="text-[10px] uppercase tracking-wide text-muted-foreground text-center">
+          <div className="micro-label text-muted-foreground text-center">
             In-app
           </div>
-          <div className="text-[10px] uppercase tracking-wide text-muted-foreground text-center">
+          <div className="micro-label text-muted-foreground text-center">
             Push
           </div>
           {categories.map((cat) => (

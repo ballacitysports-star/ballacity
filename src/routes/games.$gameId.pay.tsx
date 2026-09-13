@@ -519,7 +519,7 @@ function PayPage() {
           </div>
           {liveCount !== undefined && maxPlayers > 0 && (
             <div className="text-right" data-testid="pay-live-roster">
-              <div className="text-[11px] uppercase tracking-wider text-muted-foreground font-bold">
+              <div className="micro-label text-muted-foreground font-bold">
                 {effectiveJoined}/{maxPlayers} in
               </div>
               <div className="mt-1">
@@ -1763,7 +1763,7 @@ function ProofUploader({
 function Field({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex items-center justify-between rounded-xl bg-background px-3 py-2 mb-1.5">
-      <span className="text-[10px] uppercase tracking-wider text-muted-foreground">{label}</span>
+      <span className="micro-label text-muted-foreground">{label}</span>
       <span className="text-sm font-semibold truncate">{value}</span>
     </div>
   );

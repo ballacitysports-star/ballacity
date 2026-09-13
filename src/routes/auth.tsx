@@ -635,7 +635,7 @@ function AuthPage() {
               </p>
             ) : null}
 
-            <div className="flex items-center gap-3 text-[10px] uppercase tracking-wider text-muted-foreground">
+            <div className="flex items-center gap-3 micro-label text-muted-foreground">
               <div className="h-px flex-1 bg-border" /> or <div className="h-px flex-1 bg-border" />
             </div>
 

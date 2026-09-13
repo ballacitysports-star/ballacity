@@ -305,7 +305,7 @@ function Queue({
 }) {
   return (
     <div className="space-y-1">
-      <div className="text-[11px] uppercase tracking-wide text-muted-foreground">{title}</div>
+      <div className="micro-label text-muted-foreground">{title}</div>
       {rows.length === 0 ? (
         <div className="text-muted-foreground">Empty</div>
       ) : (

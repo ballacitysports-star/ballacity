@@ -3399,7 +3399,7 @@ function EditGameModal({
                         {(a.name || "?").slice(0, 1).toUpperCase()}
                       </span>
                       <span className="truncate max-w-[10rem]">{a.name || "Loading…"}</span>
-                      <span className="text-[10px] uppercase tracking-wider opacity-70">
+                      <span className="micro-label opacity-70">
                         {affLabel(a)}
                       </span>
                     </button>
@@ -3877,7 +3877,7 @@ function toLocalInput(ms: number): string {
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <label className="block">
-      <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1">{label}</div>
+      <div className="micro-label text-muted-foreground mb-1">{label}</div>
       {children}
     </label>
   );
@@ -3907,7 +3907,7 @@ function Meta({
 }) {
   return (
     <div className="rounded-2xl border border-border bg-surface p-3">
-      <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-wider text-muted-foreground">
+      <div className="flex items-center gap-1.5 micro-label text-muted-foreground">
         {icon}
         {label}
       </div>
@@ -3943,7 +3943,7 @@ function BlockedUsersSection({ hostId }: { hostId: string }) {
 
   return (
     <div className="mt-4 rounded-xl border border-border bg-background p-3">
-      <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-2">
+      <div className="micro-label text-muted-foreground mb-2">
         Blocked players
       </div>
       {blocked.length === 0 ? (
