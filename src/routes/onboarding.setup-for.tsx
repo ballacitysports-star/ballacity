@@ -58,13 +58,11 @@ function SetupForPage() {
   const [choice, setChoice] = useState<Choice | null>(null);
 
   return (
-    <div className="page-shell-narrow py-10">
-      <h1 className="page-title">Who are you setting up ballaCity for?</h1>
-      <p className="mt-2 text-sm text-muted-foreground">
-        One login covers your whole family. You can add more players any time.
-      </p>
-
-      <div className="mt-6 space-y-3">
+    <OnboardingShell
+      title="Who are you setting up ballaCity for?"
+      description="One login covers your whole family. You can add more players any time."
+    >
+      <div className="space-y-3">
         {CHOICES.map((c) => {
           const Icon = c.icon;
           const active = choice === c.id;

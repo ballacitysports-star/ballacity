@@ -4,6 +4,9 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
 import { AccountTypePicker } from "@/components/AccountTypePicker";
+import { OnboardingShell } from "@/components/onboarding/OnboardingShell";
+import { PrimaryCTA } from "@/components/PrimaryCTA";
+import { LoadingState } from "@/components/ui/loading-state";
 import {
   type AccountType,
   clearPendingAccountType,
