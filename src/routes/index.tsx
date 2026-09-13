@@ -145,21 +145,6 @@ function Landing() {
                 Host a game
               </Link>
             </div>
-
-            <div className="mt-10 grid grid-cols-3 gap-6 max-w-md">
-              {[
-                { k: "48k", v: "players" },
-                { k: "1.2k", v: "games / wk" },
-                { k: "4.9★", v: "host rating" },
-              ].map((s) => (
-                <div key={s.v}>
-                  <div className="font-display text-3xl font-bold">{s.k}</div>
-                  <div className="text-xs uppercase tracking-wider text-muted-foreground">
-                    {s.v}
-                  </div>
-                </div>
-              ))}
-            </div>
           </div>
 
           <div
