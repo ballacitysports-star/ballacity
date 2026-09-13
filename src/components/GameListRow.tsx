@@ -108,7 +108,7 @@ export function GameListRow({ game, index = 0 }: { game: Game; index?: number })
         </div>
 
         <span
-          className={`shrink-0 rounded-full px-2.5 py-1 text-[10px] font-bold ${statusTone}`}
+          className={`inline-flex shrink-0 items-center rounded-full px-2.5 py-1 text-[10px] font-bold ${statusTone}`}
         >
           {statusLabel}
         </span>

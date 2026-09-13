@@ -294,7 +294,7 @@ export function GameCard({ game, index = 0 }: { game: Game; index?: number }) {
               <Users className="h-3.5 w-3.5" /> Join waitlist
             </button>
           )}
-          <div className="h-1 overflow-hidden rounded-full bg-secondary">
+          <div className="mt-auto h-1 overflow-hidden rounded-full bg-secondary">
             <div
               className={`grow-x h-full rounded-full ${spotsLeft <= 2 ? "bg-coral-gradient" : "bg-lime-gradient"}`}
               style={
