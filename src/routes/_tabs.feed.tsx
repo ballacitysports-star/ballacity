@@ -882,11 +882,12 @@ function Feed() {
                   : visible.map((g, i) => renderGame(g, i))}
                 {hasMore && !refreshing && renderSkeletons(density === "list" ? 4 : 3)}
                 {!refreshing && filtered.length === 0 && (
-                  <div
-                    className={`${emptyColSpan} rounded-2xl border border-border bg-surface p-8 text-center text-muted-foreground`}
-                  >
-                    No games match "{q}".
-                  </div>
+                  <EmptyState
+                    className={emptyColSpan}
+                    icon={<Search className="h-6 w-6" aria-hidden />}
+                    title={`No games match "${q}"`}
+                    description="Try a shorter search, or a different sport or city name."
+                  />
                 )}
               </div>
               <InfiniteSentinel ref={sentinelRef} hasMore={hasMore} total={filtered.length} />
