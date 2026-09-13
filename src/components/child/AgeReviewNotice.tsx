@@ -36,7 +36,7 @@ export function AgeReviewNotice() {
           <>
             <div className="flex items-center gap-2 text-amber-600">
               <ShieldAlert className="h-4 w-4" aria-hidden />
-              <span className="text-xs font-bold uppercase tracking-wide">
+              <span className="section-eyebrow">
                 Age change under review
               </span>
             </div>
@@ -59,7 +59,7 @@ export function AgeReviewNotice() {
         ) : (
           <div className="flex items-center gap-2 text-muted-foreground">
             <History className="h-4 w-4" aria-hidden />
-            <span className="text-xs font-bold uppercase tracking-wide">Age change history</span>
+            <span className="section-eyebrow">Age change history</span>
           </div>
         )}
 

@@ -164,7 +164,7 @@ function LinkPreview({ url, type, label }: { url: string; type: ProfileLinkType;
   const title = label?.trim() || (LINK_TYPES.find((t) => t.type === type)?.label ?? host);
   return (
     <div className="mt-3">
-      <div className="text-[10px] uppercase tracking-wide text-muted-foreground mb-1">Preview</div>
+      <div className="micro-label text-muted-foreground mb-1">Preview</div>
       <a
         href={href}
         target="_blank"

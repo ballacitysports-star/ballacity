@@ -612,13 +612,13 @@ export function EditOrgScreen({ org }: { org: Org }) {
           <ArrowLeft className="h-5 w-5" />
         </Link>
         <div className="flex-1">
-          <div className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold">
+          <div className="micro-label text-muted-foreground">
             Step {step} of {STEPS.length}
           </div>
           <h1 className="font-display text-xl font-bold leading-tight">{STEPS[step - 1]}</h1>
           <SaveStatus {...autosave} className="mt-0.5" />
         </div>
-        <div className="rounded-full bg-secondary px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+        <div className="rounded-full bg-secondary px-3 py-1 micro-label text-muted-foreground">
           {kind === "team" ? "Team" : "Trainer"}
         </div>
       </div>
@@ -847,7 +847,7 @@ export function EditOrgScreen({ org }: { org: Org }) {
                 {orgChoice.mode === "existing" && orgChoice.orgId ? (
                   <div className="flex items-center justify-between rounded-2xl border border-lime/40 bg-lime/10 px-3 py-2.5">
                     <div className="min-w-0">
-                      <div className="text-[10px] uppercase tracking-wider text-lime font-bold">
+                      <div className="micro-label text-lime">
                         {initialOrgId === orgChoice.orgId
                           ? "Current organization"
                           : "Join request on save"}
@@ -866,7 +866,7 @@ export function EditOrgScreen({ org }: { org: Org }) {
                 ) : orgChoice.mode === "new" && orgChoice.name ? (
                   <div className="flex items-center justify-between rounded-2xl border border-coral/40 bg-coral/10 px-3 py-2.5">
                     <div className="min-w-0">
-                      <div className="text-[10px] uppercase tracking-wider text-coral font-bold">
+                      <div className="micro-label text-coral">
                         You'll own this new org
                       </div>
                       <div className="truncate text-sm font-bold">{orgChoice.name}</div>
@@ -922,7 +922,7 @@ export function EditOrgScreen({ org }: { org: Org }) {
                         {placesResults.data?.suggestions &&
                           placesResults.data.suggestions.length > 0 && (
                             <>
-                              <div className="pt-1 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                              <div className="pt-1 micro-label text-muted-foreground">
                                 From Google
                               </div>
                               {placesResults.data.suggestions.map((s) => (
@@ -991,7 +991,7 @@ export function EditOrgScreen({ org }: { org: Org }) {
                   </div>
                   <div className="grid grid-cols-2 gap-2">
                     <label className="rounded-xl border border-border bg-background/60 px-3 py-2">
-                      <div className="text-[10px] uppercase tracking-wider text-muted-foreground">
+                      <div className="micro-label text-muted-foreground">
                         Min
                       </div>
                       <select
@@ -1011,7 +1011,7 @@ export function EditOrgScreen({ org }: { org: Org }) {
                       </select>
                     </label>
                     <label className="rounded-xl border border-border bg-background/60 px-3 py-2">
-                      <div className="text-[10px] uppercase tracking-wider text-muted-foreground">
+                      <div className="micro-label text-muted-foreground">
                         Max
                       </div>
                       <select
@@ -1350,7 +1350,7 @@ export function EditOrgScreen({ org }: { org: Org }) {
               <Section title="Record (optional)">
                 <div className="grid grid-cols-2 gap-2">
                   <label className="rounded-2xl border border-border bg-surface px-4 py-3">
-                    <div className="text-[10px] uppercase tracking-wider text-muted-foreground">
+                    <div className="micro-label text-muted-foreground">
                       Wins
                     </div>
                     <input
@@ -1362,7 +1362,7 @@ export function EditOrgScreen({ org }: { org: Org }) {
                     />
                   </label>
                   <label className="rounded-2xl border border-border bg-surface px-4 py-3">
-                    <div className="text-[10px] uppercase tracking-wider text-muted-foreground">
+                    <div className="micro-label text-muted-foreground">
                       Losses
                     </div>
                     <input

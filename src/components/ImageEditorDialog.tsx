@@ -500,7 +500,7 @@ export function ImageEditorDialog({
               </IconBtn>
             </div>
             <div className="flex items-center gap-3">
-              <span className="w-16 shrink-0 text-[10px] uppercase tracking-wider opacity-60">
+              <span className="w-16 shrink-0 micro-label opacity-60">
                 Straighten
               </span>
               <input
@@ -530,7 +530,7 @@ export function ImageEditorDialog({
               ] as [keyof Adjust, string, number, number][]
             ).map(([key, label, min, max]) => (
               <div key={key} className="flex items-center gap-3">
-                <span className="w-20 shrink-0 text-[10px] uppercase tracking-wider opacity-60">
+                <span className="w-20 shrink-0 micro-label opacity-60">
                   {label}
                 </span>
                 <input

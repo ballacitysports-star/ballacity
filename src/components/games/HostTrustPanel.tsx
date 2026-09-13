@@ -40,7 +40,7 @@ export function HostTrustPanel({
       <dl className="mt-3 grid grid-cols-3 gap-2">
         {stats.map((s) => (
           <div key={s.id} className="rounded-xl bg-background/60 px-2.5 py-2">
-            <dt className="text-[10px] uppercase tracking-wider text-muted-foreground">
+            <dt className="micro-label text-muted-foreground">
               {s.label}
             </dt>
             <dd className="mt-0.5 text-[13px] font-semibold leading-tight">{s.value}</dd>

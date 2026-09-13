@@ -592,7 +592,7 @@ function TrainerPage() {
                         >
                           <span className="min-w-0 truncate">{addr}</span>
                           {isPrimary && (
-                            <span className="shrink-0 rounded-full border border-lime bg-lime/20 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-lime">
+                            <span className="shrink-0 rounded-full border border-lime bg-lime/20 px-2 py-0.5 micro-label text-lime">
                               ★ Primary
                             </span>
                           )}
@@ -611,7 +611,7 @@ function TrainerPage() {
                   <>
                     <Calendar className="h-4 w-4" /> Availability
                     {selectedVenue && (
-                      <span className="ml-2 rounded-full border border-lime/50 bg-lime/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-lime">
+                      <span className="ml-2 rounded-full border border-lime/50 bg-lime/10 px-2 py-0.5 micro-label text-lime">
                         {selectedVenue.split(",")[0]}
                       </span>
                     )}
@@ -756,7 +756,7 @@ function Stat({ label, value, icon }: { label: string; value: string; icon: Reac
         {icon}
         {value}
       </div>
-      <div className="text-[10px] uppercase tracking-wider text-muted-foreground mt-0.5">
+      <div className="micro-label text-muted-foreground mt-0.5">
         {label}
       </div>
     </div>

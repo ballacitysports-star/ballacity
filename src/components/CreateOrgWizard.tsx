@@ -398,7 +398,7 @@ export function CreateOrgWizard({ kind }: { kind: OrgKind }) {
           <ArrowLeft className="h-5 w-5" />
         </Link>
         <div className="flex-1">
-          <div className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold">
+          <div className="micro-label text-muted-foreground font-bold">
             Step {step + 1} of {STEPS.length}
           </div>
           <h1 className="font-display text-xl font-bold leading-tight">{STEPS[step]}</h1>
@@ -759,7 +759,7 @@ export function CreateOrgWizard({ kind }: { kind: OrgKind }) {
                   </div>
                   <div className="grid grid-cols-2 gap-2">
                     <label className="rounded-xl border border-border bg-background/60 px-3 py-2">
-                      <div className="text-[10px] uppercase tracking-wider text-muted-foreground">
+                      <div className="micro-label text-muted-foreground">
                         Min
                       </div>
                       <select
@@ -779,7 +779,7 @@ export function CreateOrgWizard({ kind }: { kind: OrgKind }) {
                       </select>
                     </label>
                     <label className="rounded-xl border border-border bg-background/60 px-3 py-2">
-                      <div className="text-[10px] uppercase tracking-wider text-muted-foreground">
+                      <div className="micro-label text-muted-foreground">
                         Max
                       </div>
                       <select
@@ -815,7 +815,7 @@ export function CreateOrgWizard({ kind }: { kind: OrgKind }) {
                     </div>
                     <div className="grid grid-cols-2 gap-2">
                       <label className="rounded-xl border border-border bg-background/60 px-3 py-2">
-                        <div className="text-[10px] uppercase tracking-wider text-muted-foreground">
+                        <div className="micro-label text-muted-foreground">
                           Min
                         </div>
                         <select
@@ -832,7 +832,7 @@ export function CreateOrgWizard({ kind }: { kind: OrgKind }) {
                         </select>
                       </label>
                       <label className="rounded-xl border border-border bg-background/60 px-3 py-2">
-                        <div className="text-[10px] uppercase tracking-wider text-muted-foreground">
+                        <div className="micro-label text-muted-foreground">
                           Max
                         </div>
                         <select
@@ -944,7 +944,7 @@ export function CreateOrgWizard({ kind }: { kind: OrgKind }) {
                   <Section title="Record (optional)">
                     <div className="grid grid-cols-2 gap-2">
                       <label className="rounded-2xl border border-border bg-surface px-4 py-3">
-                        <div className="text-[10px] uppercase tracking-wider text-muted-foreground">
+                        <div className="micro-label text-muted-foreground">
                           Wins
                         </div>
                         <input
@@ -956,7 +956,7 @@ export function CreateOrgWizard({ kind }: { kind: OrgKind }) {
                         />
                       </label>
                       <label className="rounded-2xl border border-border bg-surface px-4 py-3">
-                        <div className="text-[10px] uppercase tracking-wider text-muted-foreground">
+                        <div className="micro-label text-muted-foreground">
                           Losses
                         </div>
                         <input

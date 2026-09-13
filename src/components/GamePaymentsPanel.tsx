@@ -204,7 +204,7 @@ export function PaymentPoliciesCard({
                 className={`h-4 w-4 mt-0.5 shrink-0 ${isPastDue ? "text-coral" : "text-lime"}`}
               />
               <div className="min-w-0 flex-1">
-                <div className="text-[11px] uppercase tracking-wider font-bold text-muted-foreground">
+                <div className="micro-label text-muted-foreground">
                   Payment deadline
                 </div>
                 <div className="text-sm font-semibold">{fmtDeadline(deadline)}</div>
@@ -219,7 +219,7 @@ export function PaymentPoliciesCard({
 
           {methods.length > 0 && (
             <div className="rounded-xl border border-border bg-background p-3">
-              <div className="flex items-center gap-2 text-[11px] uppercase tracking-wider font-bold text-muted-foreground">
+              <div className="flex items-center gap-2 micro-label text-muted-foreground">
                 <Wallet className="h-3.5 w-3.5" /> Accepted methods
               </div>
               <ul className="mt-2 flex flex-wrap gap-2">
@@ -243,7 +243,7 @@ export function PaymentPoliciesCard({
 
           {settings?.payment_instructions && (
             <div className="rounded-xl border border-border bg-background p-3">
-              <div className="flex items-center gap-2 text-[11px] uppercase tracking-wider font-bold text-muted-foreground">
+              <div className="flex items-center gap-2 micro-label text-muted-foreground">
                 <FileText className="h-3.5 w-3.5" /> Instructions
               </div>
               <p className="mt-1 text-sm whitespace-pre-wrap">{settings.payment_instructions}</p>
@@ -252,7 +252,7 @@ export function PaymentPoliciesCard({
 
           {settings?.refund_policy && (
             <div className="rounded-xl border border-border bg-background p-3">
-              <div className="flex items-center gap-2 text-[11px] uppercase tracking-wider font-bold text-muted-foreground">
+              <div className="flex items-center gap-2 micro-label text-muted-foreground">
                 <ShieldCheck className="h-3.5 w-3.5" /> Refund policy
               </div>
               <p className="mt-1 text-sm whitespace-pre-wrap">{settings.refund_policy}</p>
@@ -480,19 +480,19 @@ export function HostPaymentsPanel({
         <div className="mt-3 grid grid-cols-3 gap-2 text-center">
           <div className="rounded-xl border border-amber-400/30 bg-amber-500/10 p-2">
             <div className="font-display text-lg font-bold text-amber-500">{counts.pending}</div>
-            <div className="text-[10px] uppercase tracking-wider text-muted-foreground">
+            <div className="micro-label text-muted-foreground">
               Pending
             </div>
           </div>
           <div className="rounded-xl border border-lime/30 bg-lime/10 p-2">
             <div className="font-display text-lg font-bold text-lime">{counts.verified}</div>
-            <div className="text-[10px] uppercase tracking-wider text-muted-foreground">
+            <div className="micro-label text-muted-foreground">
               Verified
             </div>
           </div>
           <div className="rounded-xl border border-coral/40 bg-coral/10 p-2">
             <div className="font-display text-lg font-bold text-coral">{counts.rejected}</div>
-            <div className="text-[10px] uppercase tracking-wider text-muted-foreground">
+            <div className="micro-label text-muted-foreground">
               Declined
             </div>
           </div>

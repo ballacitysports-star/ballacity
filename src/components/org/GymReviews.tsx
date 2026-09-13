@@ -98,7 +98,7 @@ export function GymReviews({
   return (
     <section className="rounded-2xl border border-border/60 bg-surface p-4 space-y-4">
       <div className="flex items-start justify-between gap-3">
-        <h2 className="text-sm font-semibold flex items-center gap-2">
+        <h2 className="section-title flex items-center gap-2">
           <Star className="h-4 w-4 text-lime" /> Ratings & reviews
         </h2>
         {user && !mine && !editing && (

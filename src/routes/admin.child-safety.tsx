@@ -76,7 +76,7 @@ function AdminChildSafetyPage() {
       </Link>
       <div className="mt-2 flex items-center gap-2 text-primary">
         <ShieldAlert className="h-5 w-5" aria-hidden />
-        <span className="text-xs font-bold uppercase tracking-wide">Child safety</span>
+        <span className="section-eyebrow">Child safety</span>
       </div>
       <h1 className="mt-1 page-title">Consent, age reviews &amp; guardian requests</h1>
 
@@ -85,7 +85,7 @@ function AdminChildSafetyPage() {
       ) : (
         <>
           <section className="mt-5">
-            <h2 className="text-sm font-bold">Accounts by age group</h2>
+            <h2 className="section-title">Accounts by age group</h2>
             <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-3">
               {Object.entries(data.cohortCounts).map(([cohort, count]) => (
                 <Stat key={cohort} label={COHORT_META[parseCohort(cohort)].short} value={count} />
@@ -98,7 +98,7 @@ function AdminChildSafetyPage() {
           <BirthdayCorrectionQueue />
 
           <section className="mt-5">
-            <h2 className="text-sm font-bold">Parental consent</h2>
+            <h2 className="section-title">Parental consent</h2>
             <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-3">
               {["required", "pending", "approved", "revoked", "expired"].map((s) => (
                 <Stat key={s} label={s} value={data.consentCounts[s] ?? 0} />
@@ -107,7 +107,7 @@ function AdminChildSafetyPage() {
           </section>
 
           <section className="mt-5 rounded-2xl border border-border bg-surface p-4">
-            <h2 className="text-sm font-bold">Age changes awaiting review</h2>
+            <h2 className="section-title">Age changes awaiting review</h2>
             {data.ageReviews.length === 0 ? (
               <p className="mt-1 text-xs text-muted-foreground">Nothing to review.</p>
             ) : (
@@ -148,7 +148,7 @@ function AdminChildSafetyPage() {
           </section>
 
           <section className="mt-5 rounded-2xl border border-border bg-surface p-4">
-            <h2 className="text-sm font-bold">Guardian requests</h2>
+            <h2 className="section-title">Guardian requests</h2>
             {data.openRequests.length === 0 ? (
               <p className="mt-1 text-xs text-muted-foreground">No open requests.</p>
             ) : (
@@ -186,7 +186,7 @@ function AdminChildSafetyPage() {
           </section>
 
           <section className="mt-5 rounded-2xl border border-border bg-surface p-4 text-xs text-muted-foreground">
-            <h2 className="text-sm font-bold text-foreground">Active policy</h2>
+            <h2 className="section-title text-foreground">Active policy</h2>
             <ul className="mt-2 space-y-1">
               <li>Child cohort: up to age {data.policy.childMaxAge}</li>
               <li>

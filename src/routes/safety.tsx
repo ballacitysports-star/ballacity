@@ -74,7 +74,7 @@ function SafetyCenter() {
             points={HOST_RESPONSIBILITY.points}
           />
           <p className="text-[11px] leading-relaxed text-muted-foreground">
-            <span className="mr-1 rounded bg-secondary px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider">
+            <span className="mr-1 rounded bg-secondary px-1.5 py-0.5 micro-label">
               {LEGAL_REVIEW_LABEL}
             </span>
             These acknowledgments are placeholder drafts and are not a waiver or release of

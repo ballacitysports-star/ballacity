@@ -39,7 +39,7 @@ export function OnboardingShell({
         <div className="flex items-center justify-between gap-3">
           <div className="flex items-center gap-2 text-primary">
             <ShieldCheck className="h-5 w-5 shrink-0" aria-hidden />
-            <span className="text-xs font-bold uppercase tracking-wide">Account setup</span>
+            <span className="section-eyebrow">Account setup</span>
           </div>
           {showProgress ? (
             <span className="shrink-0 text-xs font-semibold text-muted-foreground">

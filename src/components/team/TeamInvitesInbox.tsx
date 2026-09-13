@@ -22,7 +22,7 @@ export function TeamInvitesInbox({ className = "" }: { className?: string }) {
 
   return (
     <div className={`space-y-2 ${className}`}>
-      <h3 className="inline-flex items-center gap-2 font-display text-sm font-bold uppercase tracking-wide text-muted-foreground">
+      <h3 className="inline-flex items-center gap-2 section-eyebrow text-muted-foreground">
         <Mail className="h-4 w-4" /> Team invites · {invites.data.length}
       </h3>
       {invites.data.map((inv) => (

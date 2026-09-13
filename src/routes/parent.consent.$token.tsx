@@ -128,7 +128,7 @@ function ConsentApprovalPage() {
     <main className="page-shell-narrow pt-6 pb-24">
       <div className="flex items-center gap-2 text-primary">
         <ShieldCheck className="h-5 w-5" aria-hidden />
-        <span className="text-xs font-bold uppercase tracking-wide">
+        <span className="section-eyebrow">
           Parent / guardian approval
         </span>
       </div>

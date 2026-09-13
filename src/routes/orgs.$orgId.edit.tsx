@@ -315,7 +315,7 @@ function EditOrg() {
                   <div className="truncate text-sm font-semibold">
                     {m.trainer_name || "Unnamed trainer"}
                   </div>
-                  <div className="flex items-center gap-1 text-[11px] uppercase tracking-wider text-muted-foreground">
+                  <div className="flex items-center gap-1 micro-label text-muted-foreground">
                     {m.role === "owner" && <Crown className="h-3 w-3 text-lime" />}
                     {m.role === "admin" && <Shield className="h-3 w-3 text-lime" />}
                     {m.role}
@@ -410,7 +410,7 @@ function EditOrg() {
                   </div>
                   <div className="min-w-0 flex-1">
                     <div className="truncate text-sm font-semibold">{name}</div>
-                    <div className="flex items-center gap-1 text-[11px] uppercase tracking-wider text-muted-foreground">
+                    <div className="flex items-center gap-1 micro-label text-muted-foreground">
                       {m.role === "admin" && <Shield className="h-3 w-3 text-lime" />}
                       {m.role}
                     </div>

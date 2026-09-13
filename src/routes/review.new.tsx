@@ -129,7 +129,7 @@ function ReviewNew() {
         <div className="rounded-2xl border border-border bg-surface p-3 flex items-center gap-3">
           <div className="text-2xl">{revieweeMeta.emoji}</div>
           <div className="min-w-0 flex-1">
-            <div className="text-[10px] uppercase tracking-wider text-muted-foreground">
+            <div className="micro-label text-muted-foreground">
               Reviewing {revieweeMeta.label.toLowerCase()}
             </div>
             <div className="font-semibold truncate">

@@ -122,7 +122,7 @@ export function TierChips({
       {scale.groups ? (
         scale.groups.map((g) => (
           <div key={g.label}>
-            <div className="mb-1 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/80">
+            <div className="mb-1 micro-label text-muted-foreground/80">
               {g.label}
             </div>
             <div className="flex flex-wrap items-center gap-1.5">

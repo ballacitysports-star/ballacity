@@ -201,7 +201,7 @@ export function AvailabilitySchedulePicker({
               <ChevronRight className="h-4 w-4" />
             </button>
           </div>
-          <div className="grid grid-cols-7 gap-1 px-1 text-center text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+          <div className="grid grid-cols-7 gap-1 px-1 text-center micro-label text-muted-foreground">
             {WEEKDAY_LABELS.map((l) => (
               <div key={l}>{l}</div>
             ))}
@@ -270,7 +270,7 @@ export function AvailabilitySchedulePicker({
       {rows.length > 0 && (
         <>
           <div className="flex flex-wrap items-center gap-1.5">
-            <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+            <span className="micro-label text-muted-foreground">
               Set all
             </span>
             {TIME_PRESETS.map((p) => (

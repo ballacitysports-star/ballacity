@@ -203,7 +203,7 @@ export function ReelCompare({ reel }: { reel: CompareReel }) {
 
           <div className="grid gap-3 md:grid-cols-2">
             <section className="rounded-xl border border-border p-3">
-              <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+              <p className="micro-label text-muted-foreground">
                 Current · {reelStyleSummary(normalizeReelStyle(reel.style_prefs))}
               </p>
               <CopyBlock
@@ -225,7 +225,7 @@ export function ReelCompare({ reel }: { reel: CompareReel }) {
             </section>
 
             <section className="rounded-xl border border-lime/50 p-3">
-              <p className="text-[10px] font-bold uppercase tracking-wider text-lime">
+              <p className="micro-label text-lime">
                 Restyled preview · {reelStyleSummary(style)}
               </p>
               {draft ? (

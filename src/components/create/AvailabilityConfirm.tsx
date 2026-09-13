@@ -165,7 +165,7 @@ export function AvailabilityConfirm({
           <ChevronLeft className="h-4 w-4" />
         </button>
         <div className="text-center">
-          <div className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold">
+          <div className="micro-label text-muted-foreground font-bold">
             Week {weekOffset + 1} of {weeks}
           </div>
           <div className="text-sm font-bold">{range}</div>

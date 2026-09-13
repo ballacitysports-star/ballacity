@@ -85,7 +85,7 @@ function RevieweeCard({
             </div>
             <div className="min-w-0 flex-1">
               <div className="font-semibold text-sm truncate">{revieweeName}</div>
-              <div className="text-[10px] uppercase tracking-wider text-muted-foreground">
+              <div className="micro-label text-muted-foreground">
                 {meta.label}
               </div>
             </div>
@@ -154,7 +154,7 @@ function ReviewsDashboard() {
 
       {/* Sort */}
       <div className="flex items-center gap-2 overflow-x-auto pb-1 -mx-1 px-1 mb-4">
-        <span className="shrink-0 inline-flex items-center gap-1 text-[10px] uppercase tracking-wider text-muted-foreground">
+        <span className="shrink-0 inline-flex items-center gap-1 micro-label text-muted-foreground">
           <ArrowUpDown className="h-3 w-3" /> Sort
         </span>
         {SORTS.map((s) => (

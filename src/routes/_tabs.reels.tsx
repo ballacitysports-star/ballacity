@@ -466,7 +466,7 @@ function ReelCard({ reel, onRetry }: { reel: Reel; onRetry: (id: string) => Prom
             <div className="mt-2 rounded-xl border border-border bg-background/60 p-3">
               <p className="mb-2 text-[10px] italic text-muted-foreground">{AI_RESULTS_CAVEAT}</p>
               {reel.ai_sport && (
-                <p className="text-[10px] font-bold uppercase tracking-wider text-lime">
+                <p className="micro-label text-lime">
                   {reel.ai_sport}
                 </p>
               )}
@@ -997,7 +997,7 @@ function ReelsPage() {
 
       {gameId && (
         <section className="mx-5 mb-5 rounded-2xl border border-lime/30 bg-lime/5 p-4">
-          <p className="text-[10px] font-bold uppercase tracking-wider text-lime">
+          <p className="micro-label text-lime">
             Recap for finished game
           </p>
           <p className="mt-1 text-sm font-semibold">{gameTitle || "Your game"}</p>

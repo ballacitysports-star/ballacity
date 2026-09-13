@@ -223,7 +223,7 @@ export function PostCard({
           </div>
         )}
 
-        <div className="mt-2 text-[11px] uppercase tracking-wide text-muted-foreground">
+        <div className="mt-2 micro-label text-muted-foreground">
           {formatWhen(post.postedAt)}
         </div>
       </div>
