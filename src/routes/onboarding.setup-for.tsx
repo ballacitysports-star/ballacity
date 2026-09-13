@@ -86,8 +86,8 @@ function SetupForPage() {
         })}
       </div>
 
-      <Button
-        className="mt-6 w-full"
+      <PrimaryCTA
+        className="mt-6"
         disabled={!choice}
         onClick={() => {
           if (!choice) return;
@@ -100,7 +100,7 @@ function SetupForPage() {
         }}
       >
         Continue
-      </Button>
-    </div>
+      </PrimaryCTA>
+    </OnboardingShell>
   );
 }
