@@ -475,31 +475,26 @@ function OnboardingWizard({ type }: { type: AccountType }) {
   const pct = Math.round(((step + 1) / stepLabels.length) * 100);
 
   return (
-    <div className="page-shell-narrow flex min-h-dvh flex-col py-8">
+    <OnboardingShell
+      step={step + 1}
+      steps={stepLabels.length}
+      title="Set up your profile"
+      description="Same details as Edit profile — you can change any of it later."
+      footer={
+        <button
+          type="button"
+          onClick={() => nav({ to: "/feed" })}
+          className="underline-offset-2 hover:underline"
+        >
+          I&apos;ll do this later
+        </button>
+      }
+    >
       <div>
-        <div className="font-display text-2xl font-bold">Set up your profile</div>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Same details as Edit profile — you can change any of it later.
-        </p>
-      </div>
-
-      <div className="mt-5">
-        <div className="flex items-center justify-between text-xs font-medium text-muted-foreground">
-          <span>
-            Step {step + 1} of {stepLabels.length} · {stepLabels[step]}
-          </span>
-          <span>{pct}%</span>
-        </div>
-        <div className="mt-1.5">
+        <div className="flex items-center justify-between gap-3">
+          <span className="text-xs font-semibold text-muted-foreground">{stepLabels[step]}</span>
           <SaveStatus {...autosave} variant="pill" />
         </div>
-        <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-surface">
-          <div
-            className="h-full bg-lime-gradient transition-all duration-300"
-            style={{ width: `${pct}%` }}
-          />
-        </div>
-      </div>
 
       {step === 0 && (
         <Section title="Basics">
@@ -512,6 +507,14 @@ function OnboardingWizard({ type }: { type: AccountType }) {
               if ("birthday" in patch) setBirthdayError(validateBirthday(patch.birthday ?? ""));
             }}
           />
+          <details className="mt-4 rounded-2xl border border-border bg-surface p-3">
+            <summary className="cursor-pointer text-sm font-semibold">
+              Add links (optional)
+            </summary>
+            <div className="mt-3">
+              <ProfileLinksFields links={links} onChange={setLinks} />
+            </div>
+          </details>
         </Section>
       )}
 
@@ -521,11 +524,6 @@ function OnboardingWizard({ type }: { type: AccountType }) {
         </Section>
       )}
 
-      {step === 2 && (
-        <Section title="Profile links">
-          <ProfileLinksFields links={links} onChange={setLinks} />
-        </Section>
-      )}
 
       {step === locationStep && (
         <Section title="Location">
