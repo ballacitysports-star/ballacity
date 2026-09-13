@@ -8,7 +8,7 @@
  */
 export const SITE_URL = "https://open-run-connect.lovable.app";
 export const SITE_NAME = "ballaCity";
-/** The site"s own title and description. Pages either use these verbatim or
+/** The site’s own title and description. Pages either use these verbatim or
  *  prefix/suffix their own page name onto them, so the wording stays in one place. */
 export const SITE_TITLE = "ballaCity — Find Pickup Sports Games Near You";
 export const SITE_DESCRIPTION =
