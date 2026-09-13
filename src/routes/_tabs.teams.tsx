@@ -323,9 +323,12 @@ function TeamsPage() {
             </div>
           ))}
           {list.length === 0 && (
-            <div className="rounded-2xl border border-border bg-surface p-8 text-center text-muted-foreground sm:col-span-2">
-              No teams match.
-            </div>
+            <EmptyState
+              className="sm:col-span-2"
+              icon={<Shield className="h-6 w-6" aria-hidden />}
+              title="No teams match your filters"
+              description="Try a wider distance or a different sport — new teams are added all the time."
+            />
           )}
         </div>
       )}
