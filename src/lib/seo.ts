@@ -12,7 +12,7 @@ export const SITE_NAME = "ballaCity";
  *  prefix/suffix their own page name onto them, so the wording stays in one place. */
 export const SITE_TITLE = "ballaCity — Find Pickup Sports Games Near You";
 export const SITE_DESCRIPTION =
-  "Find and join pickup basketball, soccer, pickleball and more near you. Discover local games, teams, trainers and gyms on ballaCity, and claim your spot in seconds.";
+  "Find and join pickup basketball, soccer, pickleball and more near you. Discover local games, teams, trainers and gyms on ballaCity and grab your spot fast.";
 
 type MetaTag = Record<string, string>;
 
