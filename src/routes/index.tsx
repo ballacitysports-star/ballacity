@@ -233,21 +233,9 @@ function Landing() {
               color: "lime",
             },
             {
-              icon: Trophy,
-              title: "Skill-balanced teams",
-              body: "AI matchmaking builds even sides so every game is competitive.",
-              color: "coral",
-            },
-            {
               icon: MapPin,
               title: "Map-first discovery",
               body: "See every pickup game on a live map of your neighborhood.",
-              color: "lime",
-            },
-            {
-              icon: Sparkles,
-              title: "Pro tools, free to start",
-              body: "Host unlimited games. Upgrade for analytics & priority visibility.",
               color: "coral",
             },
           ].map((f, i) => {
