@@ -744,7 +744,7 @@ function Feed() {
           {teamPosts.length > 0 && (
             <section className="mb-6">
               <div className="flex items-center justify-between mb-2">
-                <h2 className="font-display text-sm font-bold uppercase tracking-wider text-muted-foreground">
+                <h2 className="section-eyebrow text-muted-foreground">
                   From teams
                 </h2>
                 <Link to="/teams" className="text-xs font-semibold text-lime">
@@ -874,7 +874,7 @@ function Feed() {
 
           {q ? (
             <>
-              <h2 className="font-display text-sm font-bold uppercase tracking-wider text-muted-foreground mb-2">
+              <h2 className="section-eyebrow text-muted-foreground mb-2">
                 {filtered.length} result{filtered.length === 1 ? "" : "s"} for "{q}"
               </h2>
               <div className={listContainerClass}>
@@ -898,7 +898,7 @@ function Feed() {
               {prefs.sections.showUrgent && urgent.length > 0 && (
                 <div className="mb-6">
                   <div className="flex items-center justify-between mb-2">
-                    <h2 className="font-display text-sm font-bold uppercase tracking-wider text-coral">
+                    <h2 className="section-eyebrow text-coral">
                       ⚡ Needs players now
                     </h2>
                     <span className="text-xs text-muted-foreground">{urgent.length} games</span>
@@ -909,7 +909,7 @@ function Feed() {
 
               {(tab === "archive" || prefs.sections.showForYou) && (
                 <>
-                  <h2 className="font-display text-sm font-bold uppercase tracking-wider text-muted-foreground mb-2">
+                  <h2 className="section-eyebrow text-muted-foreground mb-2">
                     {tab === "archive" ? "Recently finished" : "For you"}
                   </h2>
                   <div className={listContainerClass}>
