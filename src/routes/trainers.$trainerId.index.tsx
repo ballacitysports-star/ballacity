@@ -80,7 +80,7 @@ export const Route = createFileRoute("/trainers/$trainerId/")({
             name: o.name,
             jobTitle: "Coach",
             address: o.city ?? undefined,
-            url: `https://open-run-connect.lovable.app/trainers/${params.trainerId}`,
+            url: `https://ballacity.com/trainers/${params.trainerId}`,
           }
         : undefined,
     });

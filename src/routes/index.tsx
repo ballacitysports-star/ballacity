@@ -1,5 +1,5 @@
 import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
-import { pageHead, SITE_DESCRIPTION, SITE_TITLE } from "@/lib/seo";
+import { ogImageUrl, pageHead, SITE_DESCRIPTION, SITE_TITLE, SITE_URL } from "@/lib/seo";
 import { ArrowRight, MapPin, Sparkles, Trophy, Users, Video, Zap } from "lucide-react";
 import { useEffect, type CSSProperties } from "react";
 import { Logo } from "@/components/Logo";
@@ -20,13 +20,30 @@ export const Route = createFileRoute("/")({
       path: "/",
       title: SITE_TITLE,
       description: SITE_DESCRIPTION,
-      jsonLd: {
-        "@context": "https://schema.org",
-        "@type": "WebSite",
-        name: "ballaCity",
-        url: "https://open-run-connect.lovable.app",
-      },
+      image: ogImageUrl({
+        kind: "page",
+        title: "Pickup games, teams & trainers near you",
+        subtitle: "Find a game, grab your spot, and play today.",
+        meta: ["Basketball", "Soccer", "Baseball"],
+      }),
+      jsonLd: [
+        {
+          "@context": "https://schema.org",
+          "@type": "WebSite",
+          name: "ballaCity",
+          url: `${SITE_URL}/`,
+          description: SITE_DESCRIPTION,
+        },
+        {
+          "@context": "https://schema.org",
+          "@type": "Organization",
+          name: "ballaCity",
+          url: `${SITE_URL}/`,
+          description: SITE_DESCRIPTION,
+        },
+      ],
     }),
+
   component: Landing,
 });
 

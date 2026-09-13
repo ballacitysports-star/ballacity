@@ -149,7 +149,7 @@ function OgPreviewPage() {
               id="og-url"
               value={input}
               onChange={(e) => setInput(e.target.value)}
-              placeholder="/games/abc123 or https://open-run-connect.lovable.app/players/…"
+              placeholder="/games/abc123 or https://ballacity.com/players/…"
               spellCheck={false}
               className="min-w-0 flex-1 rounded-md border border-border bg-background px-3 py-2 font-mono text-sm text-foreground outline-none focus:border-primary"
             />

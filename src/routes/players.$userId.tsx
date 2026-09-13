@@ -72,7 +72,7 @@ export const Route = createFileRoute("/players/$userId")({
       jsonLd: {
         "@context": "https://schema.org",
         "@type": "ProfilePage",
-        url: `https://open-run-connect.lovable.app/players/${params.userId}`,
+        url: `https://ballacity.com/players/${params.userId}`,
       },
     }),
   }),
