@@ -107,25 +107,20 @@ export function AgeGateScreen({ onResolved }: { onResolved?: (cohort: string) =>
   if (loading || !user) {
     return (
       <div className="grid min-h-dvh place-items-center bg-background">
-        <p className="text-sm text-muted-foreground">Loading…</p>
+        <LoadingState label="Loading your account…" />
       </div>
     );
   }
 
   return (
-    <div className="min-h-dvh bg-background px-4 py-10">
-      <div className="mx-auto w-full max-w-md">
-        <div className="flex items-center gap-2 text-primary">
-          <ShieldCheck className="h-5 w-5" aria-hidden />
-          <span className="text-xs font-bold uppercase tracking-wide">Account setup</span>
-        </div>
-        <h1 className="mt-2 font-display text-2xl font-bold">Create your account</h1>
-        <p className="mt-2 text-sm text-muted-foreground">
-          Your age helps us provide the right safety, privacy and account experience. Everyone is
-          welcome on ballaCity — we just set things up differently depending on your age.
-        </p>
-
-        <form onSubmit={onSubmit} className="mt-6 space-y-4" noValidate>
+    <OnboardingShell
+      step={1}
+      steps={2}
+      title="Your date of birth"
+      description="Your age helps us provide the right safety, privacy and account experience. Everyone is welcome on ballaCity — we just set things up differently depending on your age."
+    >
+      <>
+        <form onSubmit={onSubmit} className="space-y-4" noValidate>
           <fieldset>
             <legend className="text-sm font-semibold">Date of birth</legend>
             <div className="mt-2 grid grid-cols-3 gap-2">
