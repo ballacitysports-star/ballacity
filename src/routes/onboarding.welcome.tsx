@@ -30,6 +30,8 @@ import {
 } from "@/components/profile/ProfileLinksFields";
 import { useAutosave } from "@/hooks/use-autosave";
 import { SaveStatus } from "@/components/SaveStatus";
+import { OnboardingShell } from "@/components/onboarding/OnboardingShell";
+import { PrimaryCTA } from "@/components/PrimaryCTA";
 
 const searchSchema = z.object({
   type: z.enum(["player", "team", "trainer", "gym"]).optional(),
