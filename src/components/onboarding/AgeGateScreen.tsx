@@ -1,8 +1,10 @@
 import { useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
-import { ShieldCheck } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
+import { OnboardingShell } from "@/components/onboarding/OnboardingShell";
+import { PrimaryCTA } from "@/components/PrimaryCTA";
+import { LoadingState } from "@/components/ui/loading-state";
 import {
   ACCOUNT_TYPE_ROUTE,
   CHILD_CONSENT_ROUTE,
