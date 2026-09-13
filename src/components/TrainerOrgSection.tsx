@@ -49,7 +49,7 @@ export function TrainerOrgSection({ trainerId }: Props) {
     <div className="rounded-2xl border border-border/60 bg-surface p-4 space-y-3">
       <div className="flex items-center gap-2">
         <Building2 className="h-4 w-4 text-lime" />
-        <h3 className="text-sm font-semibold">Gym</h3>
+        <h3 className="section-title">Gym</h3>
       </div>
 
       {current ? (

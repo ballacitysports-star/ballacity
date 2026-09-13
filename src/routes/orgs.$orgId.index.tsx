@@ -206,7 +206,7 @@ function OrgPage() {
       </div>
 
       <section className="rounded-2xl border border-border/60 bg-surface p-4">
-        <h2 className="text-sm font-semibold mb-3 flex items-center gap-2">
+        <h2 className="section-title mb-3 flex items-center gap-2">
           <Users className="h-4 w-4 text-lime" /> Trainers
         </h2>
         {members.length === 0 ? (
@@ -247,7 +247,7 @@ function OrgPage() {
 
       {isAdmin && (
         <section className="rounded-2xl border border-border/60 bg-surface p-4">
-          <h2 className="text-sm font-semibold mb-3">Pending join requests</h2>
+          <h2 className="section-title mb-3">Pending join requests</h2>
           {(requests.data ?? []).length === 0 ? (
             <p className="text-xs text-muted-foreground">No pending requests.</p>
           ) : (
@@ -518,7 +518,7 @@ function MembersSection({ orgId, isAdmin }: { orgId: string; isAdmin: boolean })
 
   return (
     <section className="rounded-2xl border border-border/60 bg-surface p-4">
-      <h2 className="text-sm font-semibold mb-3 flex items-center gap-2">
+      <h2 className="section-title mb-3 flex items-center gap-2">
         <Users className="h-4 w-4 text-lime" /> Members
         <span className="text-xs font-normal text-muted-foreground">({rows.length})</span>
       </h2>
@@ -750,7 +750,7 @@ function AdminMemberRequests({ orgId }: { orgId: string }) {
 
   return (
     <section className="rounded-2xl border border-border/60 bg-surface p-4">
-      <h2 className="text-sm font-semibold mb-3">Pending member requests</h2>
+      <h2 className="section-title mb-3">Pending member requests</h2>
       {rows.length === 0 ? (
         <p className="text-xs text-muted-foreground">No pending requests.</p>
       ) : (
