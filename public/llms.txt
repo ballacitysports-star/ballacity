@@ -8,10 +8,9 @@ ballaCity is a pickup sports community app. Players discover nearby games on a m
 
 - [Home](/): What ballaCity is, featured pickup games, and how to get started.
 - [Teams, trainers & gyms](/orgs): Browse local organizations hosting games and training.
-- [Pickup games](/pickup): How pickup games work on ballaCity.
 - [Plans](/plans): Membership plans and pricing.
 - [Shop](/shop): ballaCity gear and merchandise.
-- [Reviews](/reviews): Reviews of gyms, trainers and hosts.
+
 - [Safety](/safety): Safety practices, reporting, and youth protections.
 - [Community guidelines](/community-guidelines): Expected conduct for players and hosts.
 - [Trust center](/trust-center): Privacy, security and compliance overview.
