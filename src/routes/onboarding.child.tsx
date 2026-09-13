@@ -8,6 +8,7 @@ import { CHILD_POLICY_DISCLAIMER } from "@/lib/child-policy";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { OnboardingShell } from "@/components/onboarding/OnboardingShell";
 
 export const Route = createFileRoute("/onboarding/child")({
   head: () =>
@@ -66,17 +67,11 @@ function ChildOnboardingPage() {
   };
 
   return (
-    <main className="page-shell-narrow pt-6 pb-24">
-      <div className="flex items-center gap-2 text-primary">
-        <ShieldCheck className="h-5 w-5" aria-hidden />
-        <span className="text-xs font-bold uppercase tracking-wide">Guardian approval needed</span>
-      </div>
-      <h1 className="mt-2 page-title">A parent or guardian approves this account</h1>
-      <p className="mt-2 text-sm text-muted-foreground">
-        ballaCity requires a parent or guardian to approve accounts for members under{" "}
-        {policy.parentalConsentMaxAge + 1}. Until they do, we keep things switched off — no
-        messages, no videos, no public profile.
-      </p>
+    <OnboardingShell
+      title="A parent or guardian approves this account"
+      description={`ballaCity requires a parent or guardian to approve accounts for members under ${policy.parentalConsentMaxAge + 1}. Until they do, we keep things switched off — no messages, no videos, no public profile.`}
+    >
+      <>
 
       {!isLoading && !approved && (
         <Link
@@ -262,6 +257,7 @@ function ChildOnboardingPage() {
           Contact support
         </Link>
       </div>
-    </main>
+      </>
+    </OnboardingShell>
   );
 }
