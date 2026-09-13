@@ -23,7 +23,11 @@ import {
   type TeamRole,
 } from "@/lib/team-roster";
 
-function Avatar({ member }: { member: { avatarUrl: string | null; initials: string | null; displayName: string } }) {
+function Avatar({
+  member,
+}: {
+  member: { avatarUrl: string | null; initials: string | null; displayName: string };
+}) {
   if (member.avatarUrl) {
     return <img src={member.avatarUrl} alt="" className="h-10 w-10 rounded-full object-cover" />;
   }
@@ -95,7 +99,10 @@ function MemberRow({
                       setRole.mutate(
                         { userId: member.userId, role: r },
                         {
-                          onSuccess: () => toast.success(`${member.displayName} is now ${ROLE_META[r].label.toLowerCase()}`),
+                          onSuccess: () =>
+                            toast.success(
+                              `${member.displayName} is now ${ROLE_META[r].label.toLowerCase()}`,
+                            ),
                           onError: (err) => toast.error(teamRosterErrorMessage(err)),
                         },
                       )

@@ -70,7 +70,9 @@ export const getPlayerCard = createServerFn({ method: "GET" })
     const [profRes, hostedRes, joinsRes, reelsRes] = await Promise.all([
       supabaseAdmin
         .from("profiles")
-        .select("id, display_name, username, avatar_initials, cover_url, bio, city, sport, suspended_at, moderation_state")
+        .select(
+          "id, display_name, username, avatar_initials, cover_url, bio, city, sport, suspended_at, moderation_state",
+        )
         .eq("id", data.userId)
         .maybeSingle(),
       supabaseAdmin
@@ -136,9 +138,10 @@ export const getPlayerCard = createServerFn({ method: "GET" })
       .slice(0, 30);
 
     const sports = showSports
-      ? Array.from(
-          new Set(games.map((g) => g.sport).filter((s): s is string => Boolean(s))),
-        ).slice(0, 6)
+      ? Array.from(new Set(games.map((g) => g.sport).filter((s): s is string => Boolean(s)))).slice(
+          0,
+          6,
+        )
       : [];
 
     return {
@@ -158,7 +161,9 @@ export const getPlayerCard = createServerFn({ method: "GET" })
       },
       games,
       stats: {
-        gamesPlayed: showGames ? games.filter((g) => new Date(g.date ?? 0).getTime() <= now).length : 0,
+        gamesPlayed: showGames
+          ? games.filter((g) => new Date(g.date ?? 0).getTime() <= now).length
+          : 0,
         gamesHosted: showGames ? hosted.length : 0,
         reels: reelsRes.count ?? 0,
         sports,
@@ -166,4 +171,3 @@ export const getPlayerCard = createServerFn({ method: "GET" })
       },
     };
   });
-

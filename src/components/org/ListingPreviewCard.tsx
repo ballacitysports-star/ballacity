@@ -47,12 +47,18 @@ export function ListingPreviewCard({
               onClick={() => onOpenPhoto?.(i)}
               className={`${i === 0 ? "w-2/3 shrink-0" : "w-1/3 shrink-0"} ${compact ? "h-24" : "h-32 sm:h-44"}`}
             >
-              <img src={src} alt={`${v.name || "Gym"} photo ${i + 1}`} className="h-full w-full object-cover" />
+              <img
+                src={src}
+                alt={`${v.name || "Gym"} photo ${i + 1}`}
+                className="h-full w-full object-cover"
+              />
             </button>
           ))}
         </div>
       ) : (
-        <div className={`grid ${compact ? "h-24" : "h-32 sm:h-40"} place-items-center bg-secondary/40`}>
+        <div
+          className={`grid ${compact ? "h-24" : "h-32 sm:h-40"} place-items-center bg-secondary/40`}
+        >
           <Building2 className="h-7 w-7 text-muted-foreground" />
         </div>
       )}
@@ -91,10 +97,17 @@ export function ListingPreviewCard({
                     : "font-semibold text-muted-foreground"
                 }
               >
-                {open.status === "open" ? "Open" : open.status === "closed" ? "Closed" : "Hours not set"}
+                {open.status === "open"
+                  ? "Open"
+                  : open.status === "closed"
+                    ? "Closed"
+                    : "Hours not set"}
               </span>
               {open.status !== "unknown" && (
-                <span className="text-muted-foreground"> · {open.label.replace(/^(Open|Closed) · /, "")}</span>
+                <span className="text-muted-foreground">
+                  {" "}
+                  · {open.label.replace(/^(Open|Closed) · /, "")}
+                </span>
               )}
             </div>
           </div>
@@ -102,7 +115,8 @@ export function ListingPreviewCard({
 
         {v.address && (
           <div className="flex items-start gap-1.5 text-xs text-muted-foreground">
-            <MapPin className="mt-0.5 h-3.5 w-3.5 shrink-0" /> <span className="min-w-0">{v.address}</span>
+            <MapPin className="mt-0.5 h-3.5 w-3.5 shrink-0" />{" "}
+            <span className="min-w-0">{v.address}</span>
           </div>
         )}
 

@@ -22,7 +22,10 @@ export function SortSection<T extends string>({
 }) {
   const active = options.find((o) => o.value === value);
   return (
-    <FilterSection label={label} hint={hint ?? (active ? `By ${active.label.toLowerCase()}` : undefined)}>
+    <FilterSection
+      label={label}
+      hint={hint ?? (active ? `By ${active.label.toLowerCase()}` : undefined)}
+    >
       <ChipRow value={value} onChange={onChange} options={options} />
     </FilterSection>
   );
@@ -38,5 +41,7 @@ export function SortSummary<T extends string>({
 }) {
   const active = options.find((o) => o.value === value);
   if (!active) return null;
-  return <span className="text-xs text-muted-foreground">Sorted by {active.label.toLowerCase()}</span>;
+  return (
+    <span className="text-xs text-muted-foreground">Sorted by {active.label.toLowerCase()}</span>
+  );
 }

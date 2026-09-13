@@ -1,5 +1,16 @@
 import { useState } from "react";
-import { Heart, MessageCircle, Send, Bookmark, MoreHorizontal, Calendar, MapPin, Users, DollarSign, Pin } from "lucide-react";
+import {
+  Heart,
+  MessageCircle,
+  Send,
+  Bookmark,
+  MoreHorizontal,
+  Calendar,
+  MapPin,
+  Users,
+  DollarSign,
+  Pin,
+} from "lucide-react";
 import { POST_KIND_META, type OrgPost } from "@/lib/sample-data";
 import { formatWhen } from "@/lib/format";
 
@@ -101,7 +112,10 @@ export function PostCard({
       <div className="flex items-center gap-1 px-2 pt-2">
         <button
           type="button"
-          onClick={(e) => { stop(e); setLiked((v) => !v); }}
+          onClick={(e) => {
+            stop(e);
+            setLiked((v) => !v);
+          }}
           aria-label={liked ? "Unlike" : "Like"}
           className="grid h-11 w-11 place-items-center rounded-full text-foreground transition active:scale-90"
         >
@@ -113,7 +127,14 @@ export function PostCard({
         </button>
         <button
           type="button"
-          onClick={onClick ? (e) => { stop(e); onClick(); } : stop}
+          onClick={
+            onClick
+              ? (e) => {
+                  stop(e);
+                  onClick();
+                }
+              : stop
+          }
           aria-label="Comment"
           className="grid h-11 w-11 place-items-center rounded-full text-foreground transition active:scale-90"
         >
@@ -130,7 +151,10 @@ export function PostCard({
         <div className="flex-1" />
         <button
           type="button"
-          onClick={(e) => { stop(e); setSaved((v) => !v); }}
+          onClick={(e) => {
+            stop(e);
+            setSaved((v) => !v);
+          }}
           aria-label={saved ? "Unsave" : "Save"}
           className="grid h-11 w-11 place-items-center rounded-full text-foreground transition active:scale-90"
         >

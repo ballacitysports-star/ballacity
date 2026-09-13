@@ -269,6 +269,8 @@ export function completionFor(p: PlayerProfile): { pct: number; missing: string[
     Location: !!p.location,
   };
   const missing = COMPLETION_AREAS.filter((a) => !done[a]);
-  const pct = Math.round(((COMPLETION_AREAS.length - missing.length) / COMPLETION_AREAS.length) * 100);
+  const pct = Math.round(
+    ((COMPLETION_AREAS.length - missing.length) / COMPLETION_AREAS.length) * 100,
+  );
   return { pct, missing: [...missing] };
 }

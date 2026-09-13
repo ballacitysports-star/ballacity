@@ -1,12 +1,7 @@
 import { useEffect, useSyncExternalStore } from "react";
 import { ORGS, type Org, type OrgKind, type Sport } from "./sample-data";
 import { supabase } from "@/integrations/supabase/client";
-import {
-  createTeam,
-  deleteTeam,
-  listTeams,
-  updateTeam,
-} from "./teams.functions";
+import { createTeam, deleteTeam, listTeams, updateTeam } from "./teams.functions";
 
 type TeamRow = {
   id: string;
@@ -92,13 +87,13 @@ function rowToOrg(row: TeamRow): Org {
     roster: kind === "team" ? staff.length : 0,
     bio: row.bio,
     achievements: row.achievements ?? [],
-    credentials: kind === "coach" ? row.credentials ?? [] : undefined,
-    ratePerHour: kind === "coach" ? row.rate_per_hour ?? undefined : undefined,
+    credentials: kind === "coach" ? (row.credentials ?? []) : undefined,
+    ratePerHour: kind === "coach" ? (row.rate_per_hour ?? undefined) : undefined,
     rating: undefined,
     reviews: undefined,
-    league: kind === "team" ? row.league ?? undefined : undefined,
+    league: kind === "team" ? (row.league ?? undefined) : undefined,
     record: kind === "team" ? { w: row.wins, l: row.losses } : undefined,
-    homeCourt: kind === "team" ? row.home_court ?? undefined : undefined,
+    homeCourt: kind === "team" ? (row.home_court ?? undefined) : undefined,
     staff: kind === "team" ? staff : undefined,
     skillRange: { min: row.skill_min, max: row.skill_max },
     format: row.format ?? undefined,
@@ -108,13 +103,11 @@ function rowToOrg(row: TeamRow): Org {
         ? [row.format]
         : [],
     venues: row.venues ?? [],
-    venueAddresses: Array.isArray(row.venue_addresses)
-      ? (row.venue_addresses as string[])
-      : [],
+    venueAddresses: Array.isArray(row.venue_addresses) ? (row.venue_addresses as string[]) : [],
     venueGeo: Array.isArray(row.venue_geo)
       ? (row.venue_geo as { address: string; placeId: string; lat: number; lng: number }[])
       : [],
-    primaryVenue: kind === "coach" ? row.primary_venue ?? undefined : undefined,
+    primaryVenue: kind === "coach" ? (row.primary_venue ?? undefined) : undefined,
     cadence: row.cadence ?? undefined,
     cadences: Array.isArray(row.cadences)
       ? (row.cadences as string[])
@@ -139,7 +132,7 @@ function rowToOrg(row: TeamRow): Org {
       kind === "coach" && Array.isArray(row.availability_rules)
         ? (row.availability_rules as Org["availabilityRules"])
         : [],
-    timezone: kind === "coach" ? row.timezone ?? undefined : undefined,
+    timezone: kind === "coach" ? (row.timezone ?? undefined) : undefined,
     upcoming: [],
     posts: [],
   };
@@ -173,9 +166,9 @@ function orgToInsert(org: Org) {
     formats: org.formats ?? (org.format ? [org.format] : []),
     venues: org.venues ?? [],
     venue_addresses: org.venueAddresses ?? [],
-    verified_venues: org.verifiedVenues ?? (org.venueAddresses ?? []),
+    verified_venues: org.verifiedVenues ?? org.venueAddresses ?? [],
     venue_geo: org.venueGeo ?? [],
-    primary_venue: org.kind === "coach" ? org.primaryVenue ?? null : null,
+    primary_venue: org.kind === "coach" ? (org.primaryVenue ?? null) : null,
     cadence: org.cadences?.[0] ?? org.cadence ?? null,
     cadences: org.cadences ?? (org.cadence ? [org.cadence] : []),
     positions_needed: org.positionsNeeded ?? {},
@@ -184,10 +177,10 @@ function orgToInsert(org: Org) {
     rating_max: org.ratingMax ?? null,
     distances: org.distances ?? [],
     session_types: org.sessionTypes ?? [],
-    availability_slots: org.kind === "coach" ? org.availabilitySlots ?? [] : [],
-    availability_overrides: org.kind === "coach" ? org.availabilityOverrides ?? [] : [],
-    availability_rules: org.kind === "coach" ? org.availabilityRules ?? [] : [],
-    timezone: org.kind === "coach" ? org.timezone ?? undefined : undefined,
+    availability_slots: org.kind === "coach" ? (org.availabilitySlots ?? []) : [],
+    availability_overrides: org.kind === "coach" ? (org.availabilityOverrides ?? []) : [],
+    availability_rules: org.kind === "coach" ? (org.availabilityRules ?? []) : [],
+    timezone: org.kind === "coach" ? (org.timezone ?? undefined) : undefined,
   };
 }
 
@@ -239,27 +232,23 @@ if (typeof window !== "undefined") {
   // Realtime: reflect inserts/updates/deletes from any client instantly.
   supabase
     .channel("public:teams")
-    .on(
-      "postgres_changes",
-      { event: "*", schema: "public", table: "teams" },
-      (payload) => {
-        if (payload.eventType === "DELETE") {
-          const oldRow = payload.old as { id?: string } | null;
-          const id = oldRow?.id;
-          if (!id) return;
-          const idx = ORGS.findIndex((o) => o.id === id);
-          if (idx !== -1) ORGS.splice(idx, 1);
-          myOrgIds.delete(id);
-          ownerByOrgId.delete(id);
-          emit();
-          return;
-        }
-        const row = payload.new as TeamRow | null;
-        if (!row?.id) return;
-        mergeRow(row);
+    .on("postgres_changes", { event: "*", schema: "public", table: "teams" }, (payload) => {
+      if (payload.eventType === "DELETE") {
+        const oldRow = payload.old as { id?: string } | null;
+        const id = oldRow?.id;
+        if (!id) return;
+        const idx = ORGS.findIndex((o) => o.id === id);
+        if (idx !== -1) ORGS.splice(idx, 1);
+        myOrgIds.delete(id);
+        ownerByOrgId.delete(id);
         emit();
-      },
-    )
+        return;
+      }
+      const row = payload.new as TeamRow | null;
+      if (!row?.id) return;
+      mergeRow(row);
+      emit();
+    })
     .subscribe();
 }
 
@@ -290,7 +279,11 @@ export async function addOrg(org: Org): Promise<Org> {
 
 export async function updateOrg(
   id: string,
-  patch: Partial<Omit<Org, "id" | "kind" | "upcoming" | "posts" | "primaryVenue">> & { primaryVenue?: string | null; verifiedVenues?: string[]; venueGeo?: { address: string; placeId: string; lat: number; lng: number }[] },
+  patch: Partial<Omit<Org, "id" | "kind" | "upcoming" | "posts" | "primaryVenue">> & {
+    primaryVenue?: string | null;
+    verifiedVenues?: string[];
+    venueGeo?: { address: string; placeId: string; lat: number; lng: number }[];
+  },
 ): Promise<void> {
   // Snapshot for rollback + optimistic merge
   const idx = ORGS.findIndex((o) => o.id === id);
@@ -349,9 +342,12 @@ export async function updateOrg(
   if (patch.ratingMax !== undefined) mapped.rating_max = patch.ratingMax ?? null;
   if (patch.distances !== undefined) mapped.distances = patch.distances ?? [];
   if (patch.sessionTypes !== undefined) mapped.session_types = patch.sessionTypes ?? [];
-  if (patch.availabilitySlots !== undefined) mapped.availability_slots = patch.availabilitySlots ?? [];
-  if (patch.availabilityOverrides !== undefined) mapped.availability_overrides = patch.availabilityOverrides ?? [];
-  if (patch.availabilityRules !== undefined) mapped.availability_rules = patch.availabilityRules ?? [];
+  if (patch.availabilitySlots !== undefined)
+    mapped.availability_slots = patch.availabilitySlots ?? [];
+  if (patch.availabilityOverrides !== undefined)
+    mapped.availability_overrides = patch.availabilityOverrides ?? [];
+  if (patch.availabilityRules !== undefined)
+    mapped.availability_rules = patch.availabilityRules ?? [];
   if (patch.timezone !== undefined) mapped.timezone = patch.timezone ?? null;
 
   try {

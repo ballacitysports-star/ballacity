@@ -223,7 +223,7 @@ export function ReviewsSection({
   return (
     <div className="mt-6">
       <div className="mb-2 flex items-center justify-between">
-        <h2 className="font-display text-sm font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+        <h2 className="section-eyebrow text-muted-foreground flex items-center gap-1.5">
           <Star className="h-4 w-4" /> Reviews
         </h2>
         <div className="flex items-center gap-2">
@@ -287,7 +287,6 @@ export function ReviewsSection({
           </div>
         )}
       </div>
-
 
       {/* Reviewer-kind filter chips */}
       <div className="mt-3 flex gap-2 overflow-x-auto pb-1 -mx-1 px-1">

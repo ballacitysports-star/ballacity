@@ -102,11 +102,7 @@ describe("useGameRealtimeChannels — channel key contract", () => {
       }),
     );
     expect(recorded.activeNames().sort()).toEqual(
-      [
-        "join_requests:me:g1:u1",
-        "game_payment_settings:g1",
-        "payment_submissions:me:g1:u1",
-      ].sort(),
+      ["join_requests:me:g1:u1", "game_payment_settings:g1", "payment_submissions:me:g1:u1"].sort(),
     );
     expect(recorded.subscribed).not.toContain("join_requests:host:g1:u1");
   });

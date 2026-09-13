@@ -610,7 +610,7 @@ function Feed() {
 
       <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="mb-4">
         <h1 className="page-title">{tab === "archive" ? "Finished games." : "Tonight's run."}</h1>
-        <p className="text-muted-foreground text-sm inline-flex items-center gap-1">
+        <p className="page-subtitle inline-flex items-center gap-1">
           {userCityToken ? (
             <>
               <MapPin className="h-3.5 w-3.5 text-lime" /> Nearest to {profile?.city} ·{" "}
@@ -647,7 +647,7 @@ function Feed() {
               role="tab"
               aria-selected={active}
               onClick={() => setTab(t.id)}
-              className={`rounded-full px-4 py-1.5 text-sm font-semibold transition-colors ${
+              className={`inline-flex min-h-9 items-center rounded-full px-4 text-sm font-semibold transition-colors ${
                 active
                   ? "bg-lime text-primary-foreground"
                   : "text-muted-foreground hover:text-foreground"
@@ -744,9 +744,7 @@ function Feed() {
           {teamPosts.length > 0 && (
             <section className="mb-6">
               <div className="flex items-center justify-between mb-2">
-                <h2 className="font-display text-sm font-bold uppercase tracking-wider text-muted-foreground">
-                  From teams
-                </h2>
+                <h2 className="section-eyebrow text-muted-foreground">From teams</h2>
                 <Link to="/teams" className="text-xs font-semibold text-lime">
                   See all
                 </Link>
@@ -874,7 +872,7 @@ function Feed() {
 
           {q ? (
             <>
-              <h2 className="font-display text-sm font-bold uppercase tracking-wider text-muted-foreground mb-2">
+              <h2 className="section-eyebrow text-muted-foreground mb-2">
                 {filtered.length} result{filtered.length === 1 ? "" : "s"} for "{q}"
               </h2>
               <div className={listContainerClass}>
@@ -898,9 +896,7 @@ function Feed() {
               {prefs.sections.showUrgent && urgent.length > 0 && (
                 <div className="mb-6">
                   <div className="flex items-center justify-between mb-2">
-                    <h2 className="font-display text-sm font-bold uppercase tracking-wider text-coral">
-                      ⚡ Needs players now
-                    </h2>
+                    <h2 className="section-eyebrow text-coral">⚡ Needs players now</h2>
                     <span className="text-xs text-muted-foreground">{urgent.length} games</span>
                   </div>
                   <div className={listContainerClass}>{urgent.map((g, i) => renderGame(g, i))}</div>
@@ -909,7 +905,7 @@ function Feed() {
 
               {(tab === "archive" || prefs.sections.showForYou) && (
                 <>
-                  <h2 className="font-display text-sm font-bold uppercase tracking-wider text-muted-foreground mb-2">
+                  <h2 className="section-eyebrow text-muted-foreground mb-2">
                     {tab === "archive" ? "Recently finished" : "For you"}
                   </h2>
                   <div className={listContainerClass}>

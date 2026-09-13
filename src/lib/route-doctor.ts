@@ -76,10 +76,7 @@ function segmentsOf(path: string): string[] {
   return path.split("?")[0].split("#")[0].split("/").filter(Boolean);
 }
 
-function matchPattern(
-  pattern: string,
-  path: string,
-): Record<string, string> | null {
+function matchPattern(pattern: string, path: string): Record<string, string> | null {
   const p = segmentsOf(pattern);
   const t = segmentsOf(path);
   const params: Record<string, string> = {};

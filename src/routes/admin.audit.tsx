@@ -18,11 +18,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from "@/components/ui/collapsible";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { moderationCheck } from "@/lib/moderation.functions";
 import {
   listAuditLogs,
@@ -278,8 +274,8 @@ function AuditLogPage() {
             <ShieldAlert className="h-5 w-5 text-primary" /> Audit logs
           </h1>
           <p className="page-subtitle">
-            Append-only record of administrative and security actions. Entries can never be
-            edited or deleted.
+            Append-only record of administrative and security actions. Entries can never be edited
+            or deleted.
           </p>
         </div>
         <Button variant="outline" size="sm" onClick={doExport} disabled={exporting}>

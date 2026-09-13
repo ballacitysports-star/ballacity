@@ -50,9 +50,7 @@ describe("compliance authorization", () => {
   });
 
   it("surfaces role-check errors instead of granting access", async () => {
-    await expect(assertComplianceAdmin(rpcClient({ error: "boom" }), "u1")).rejects.toThrow(
-      /boom/,
-    );
+    await expect(assertComplianceAdmin(rpcClient({ error: "boom" }), "u1")).rejects.toThrow(/boom/);
   });
 });
 

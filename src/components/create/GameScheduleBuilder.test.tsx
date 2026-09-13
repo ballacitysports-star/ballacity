@@ -13,7 +13,9 @@ function Harness() {
 describe("GameScheduleBuilder", () => {
   it("selects days and shows per-day start and end times", () => {
     render(<Harness />);
-    const cells = screen.getAllByRole("button").filter((b) => /^\d+$/.test(b.textContent ?? "") && !(b as HTMLButtonElement).disabled);
+    const cells = screen
+      .getAllByRole("button")
+      .filter((b) => /^\d+$/.test(b.textContent ?? "") && !(b as HTMLButtonElement).disabled);
     expect(cells.length).toBeGreaterThan(0);
     fireEvent.click(cells[cells.length - 1]!);
     // One start + one end input per selected day.

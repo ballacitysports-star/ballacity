@@ -46,7 +46,9 @@ export function GamePolicyFields({
               min={0}
               max={value.maxPlayers}
               value={value.minPlayers}
-              onChange={(e) => set("minPlayers", Math.max(0, Math.round(Number(e.target.value) || 0)))}
+              onChange={(e) =>
+                set("minPlayers", Math.max(0, Math.round(Number(e.target.value) || 0)))
+              }
               className="mt-1 w-full rounded-xl border border-border bg-background px-3 py-2 text-sm outline-none focus:border-lime"
             />
           </div>
@@ -69,7 +71,10 @@ export function GamePolicyFields({
                   "maxPlayers",
                   Math.min(
                     MAX_GAME_PLAYERS,
-                    Math.max(MIN_GAME_PLAYERS, Math.round(Number(e.target.value) || MIN_GAME_PLAYERS)),
+                    Math.max(
+                      MIN_GAME_PLAYERS,
+                      Math.round(Number(e.target.value) || MIN_GAME_PLAYERS),
+                    ),
                   ),
                 )
               }

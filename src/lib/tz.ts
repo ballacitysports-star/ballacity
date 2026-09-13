@@ -11,7 +11,13 @@ import type { Weekday } from "./availability-resolve";
 export type Tz = string; // IANA name, e.g. "America/Los_Angeles"
 
 const WEEKDAY_MAP: Record<string, Weekday> = {
-  Sun: "sun", Mon: "mon", Tue: "tue", Wed: "wed", Thu: "thu", Fri: "fri", Sat: "sat",
+  Sun: "sun",
+  Mon: "mon",
+  Tue: "tue",
+  Wed: "wed",
+  Thu: "thu",
+  Fri: "fri",
+  Sat: "sat",
 };
 
 /** Browser's best guess of the user's IANA timezone. Safe default fallback. */
@@ -26,8 +32,10 @@ export function getBrowserTz(): Tz {
 /** Short tz label (e.g. "PDT", "EDT") for the given instant, or the raw name on failure. */
 export function tzShortName(instant: Date, tz: Tz): string {
   try {
-    const parts = new Intl.DateTimeFormat("en-US", { timeZone: tz, timeZoneName: "short" })
-      .formatToParts(instant);
+    const parts = new Intl.DateTimeFormat("en-US", {
+      timeZone: tz,
+      timeZoneName: "short",
+    }).formatToParts(instant);
     return parts.find((p) => p.type === "timeZoneName")?.value ?? tz;
   } catch {
     return tz;
@@ -39,15 +47,26 @@ function tzOffsetMinutes(instant: Date, tz: Tz): number {
   const dtf = new Intl.DateTimeFormat("en-US", {
     timeZone: tz,
     hourCycle: "h23",
-    year: "numeric", month: "2-digit", day: "2-digit",
-    hour: "2-digit", minute: "2-digit", second: "2-digit",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
   });
   const parts = Object.fromEntries(
-    dtf.formatToParts(instant).filter((p) => p.type !== "literal").map((p) => [p.type, p.value]),
+    dtf
+      .formatToParts(instant)
+      .filter((p) => p.type !== "literal")
+      .map((p) => [p.type, p.value]),
   ) as Record<string, string>;
   const asUTC = Date.UTC(
-    Number(parts.year), Number(parts.month) - 1, Number(parts.day),
-    Number(parts.hour), Number(parts.minute), Number(parts.second),
+    Number(parts.year),
+    Number(parts.month) - 1,
+    Number(parts.day),
+    Number(parts.hour),
+    Number(parts.minute),
+    Number(parts.second),
   );
   return (asUTC - instant.getTime()) / 60000;
 }
@@ -74,12 +93,18 @@ export function instantToWall(
   const dtf = new Intl.DateTimeFormat("en-US", {
     timeZone: tz,
     hourCycle: "h23",
-    year: "numeric", month: "2-digit", day: "2-digit",
-    hour: "2-digit", minute: "2-digit",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
     weekday: "short",
   });
   const parts = Object.fromEntries(
-    dtf.formatToParts(instant).filter((p) => p.type !== "literal").map((p) => [p.type, p.value]),
+    dtf
+      .formatToParts(instant)
+      .filter((p) => p.type !== "literal")
+      .map((p) => [p.type, p.value]),
   ) as Record<string, string>;
   return {
     dateKey: `${parts.year}-${parts.month}-${parts.day}`,
@@ -94,7 +119,7 @@ export function instantToWall(
 export function fmt12(hhmm: string): string {
   const [h, m] = hhmm.split(":").map(Number);
   const ampm = (h ?? 0) < 12 ? "AM" : "PM";
-  const hr = ((h ?? 0) % 12) || 12;
+  const hr = (h ?? 0) % 12 || 12;
   return `${hr}:${String(m ?? 0).padStart(2, "0")} ${ampm}`;
 }
 

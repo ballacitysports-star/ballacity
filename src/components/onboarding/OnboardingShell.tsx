@@ -60,10 +60,7 @@ export function OnboardingShell({
             {Array.from({ length: steps! }).map((_, i) => (
               <span
                 key={i}
-                className={cn(
-                  "h-1 flex-1 rounded-full",
-                  i < step! ? "bg-lime" : "bg-secondary/60",
-                )}
+                className={cn("h-1 flex-1 rounded-full", i < step! ? "bg-lime" : "bg-secondary/60")}
               />
             ))}
           </div>

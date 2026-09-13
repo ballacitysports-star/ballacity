@@ -22,7 +22,6 @@ export function useMyBirthdayLock(enabled = true) {
   });
 }
 
-
 export function useRequestBirthdayCorrection() {
   const fn = useServerFn(requestBirthdayCorrection);
   const qc = useQueryClient();

@@ -522,9 +522,7 @@ function PlayerProfile() {
                 <Clock className="h-4 w-4" />
               </span>
               <div>
-                <h2 className="font-display text-sm font-bold uppercase tracking-wider text-foreground">
-                  Pending approvals
-                </h2>
+                <h2 className="section-eyebrow text-foreground">Pending approvals</h2>
                 <p className="text-[10px] text-muted-foreground">Join requests needing action</p>
               </div>
             </div>
@@ -678,9 +676,7 @@ function PlayerProfile() {
                 <Crown className="h-4 w-4" />
               </span>
               <div>
-                <h2 className="font-display text-sm font-bold uppercase tracking-wider text-foreground">
-                  Hosting
-                </h2>
+                <h2 className="section-eyebrow text-foreground">Hosting</h2>
                 <p className="text-[10px] text-muted-foreground">Games you're running</p>
               </div>
             </div>
@@ -718,9 +714,7 @@ function PlayerProfile() {
                 <Users className="h-4 w-4" />
               </span>
               <div>
-                <h2 className="font-display text-sm font-bold uppercase tracking-wider text-foreground">
-                  Pickup
-                </h2>
+                <h2 className="section-eyebrow text-foreground">Pickup</h2>
                 <p className="text-[10px] text-muted-foreground">Games you're joining</p>
               </div>
             </div>
@@ -769,9 +763,7 @@ function PlayerProfile() {
                         <Crown className="h-4 w-4" />
                       </span>
                       <div>
-                        <h2 className="font-display text-sm font-bold uppercase tracking-wider text-foreground">
-                          Hosted
-                        </h2>
+                        <h2 className="section-eyebrow text-foreground">Hosted</h2>
                         <p className="text-[10px] text-muted-foreground">Completed games you ran</p>
                       </div>
                     </div>
@@ -804,9 +796,7 @@ function PlayerProfile() {
                         <Users className="h-4 w-4" />
                       </span>
                       <div>
-                        <h2 className="font-display text-sm font-bold uppercase tracking-wider text-foreground">
-                          Joined
-                        </h2>
+                        <h2 className="section-eyebrow text-foreground">Joined</h2>
                         <p className="text-[10px] text-muted-foreground">
                           Completed games you played
                         </p>
@@ -843,9 +833,7 @@ function PlayerProfile() {
 
         {/* Sports */}
         <div className={`mt-8 ${activeTab === "games" && me.sports.length > 0 ? "" : "hidden"}`}>
-          <h2 className="font-display text-sm font-bold uppercase tracking-wider text-muted-foreground mb-2">
-            Sports
-          </h2>
+          <h2 className="section-eyebrow text-muted-foreground mb-2">Sports</h2>
           <div className="space-y-2">
             {me.sports.map((s) => (
               <div key={s.name} className="rounded-2xl border border-border bg-surface p-3">
@@ -1203,9 +1191,7 @@ function ProfileReelsSection({
             <Clapperboard className="h-4 w-4" />
           </span>
           <div>
-            <h2 className="font-display text-sm font-bold uppercase tracking-wider text-foreground">
-              Highlight reels
-            </h2>
+            <h2 className="section-eyebrow text-foreground">Highlight reels</h2>
             <p className="text-[10px] text-muted-foreground">
               {visible.length} of {recaps.length} shown
             </p>

@@ -18,9 +18,7 @@ import {
 export const finalizeImageUpload = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: { bucket: string; path: string }) =>
-    z
-      .object({ bucket: z.string().max(60), path: z.string().min(1).max(500) })
-      .parse(d),
+    z.object({ bucket: z.string().max(60), path: z.string().min(1).max(500) }).parse(d),
   )
   .handler(async ({ context, data }) => {
     const { bucket, path } = data;

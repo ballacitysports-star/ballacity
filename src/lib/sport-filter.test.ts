@@ -81,7 +81,9 @@ describe("matching", () => {
     expect(matchesSportSkillFilter(levels, ["Tennis"], null, ["Tennis"], skills)).toBe(false);
     // Sports without a picked tier are unconstrained.
     expect(
-      matchesSportSkillFilter(levels, ["Tennis"], null, ["Tennis"], { Baseball: "College / Adult Competitive" }),
+      matchesSportSkillFilter(levels, ["Tennis"], null, ["Tennis"], {
+        Baseball: "College / Adult Competitive",
+      }),
     ).toBe(true);
   });
 

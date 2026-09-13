@@ -173,10 +173,12 @@ export function usePublicPrivacyFlags(userId: string | null | undefined) {
     queryKey: ["public-privacy-flags", userId],
     enabled: !!userId,
     queryFn: async (): Promise<PublicPrivacyFlags> => {
-      const { data, error } = await (supabase.rpc as never as (
-        fn: string,
-        args: Record<string, unknown>,
-      ) => Promise<{ data: unknown; error: unknown }>)("public_privacy_flags", {
+      const { data, error } = await (
+        supabase.rpc as never as (
+          fn: string,
+          args: Record<string, unknown>,
+        ) => Promise<{ data: unknown; error: unknown }>
+      )("public_privacy_flags", {
         _ids: [userId],
       });
       if (error) return { show_sports: true, show_games_played: true };

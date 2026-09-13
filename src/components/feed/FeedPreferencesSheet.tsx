@@ -114,7 +114,10 @@ export function FeedViewsRow({ compact = false }: { compact?: boolean }) {
                 active ? "border-lime bg-lime text-primary-foreground" : "border-border bg-surface"
               }`}
             >
-              <button onClick={() => setFeedPrefs(applyView(prefs, v))} className="inline-flex items-center gap-1">
+              <button
+                onClick={() => setFeedPrefs(applyView(prefs, v))}
+                className="inline-flex items-center gap-1"
+              >
                 <Bookmark className="h-3.5 w-3.5" />
                 {v.name}
               </button>
@@ -149,7 +152,11 @@ export function FeedViewsRow({ compact = false }: { compact?: boolean }) {
               <button onClick={saveCurrent} aria-label="Save view" className="text-lime">
                 <Check className="h-4 w-4" />
               </button>
-              <button onClick={() => setNaming(false)} aria-label="Cancel" className="text-muted-foreground">
+              <button
+                onClick={() => setNaming(false)}
+                aria-label="Cancel"
+                className="text-muted-foreground"
+              >
                 <X className="h-4 w-4" />
               </button>
             </span>
@@ -219,7 +226,9 @@ export function FeedPreferencesBody() {
                 key={s.name}
                 onClick={() => toggleSport(s.name)}
                 className={`inline-flex items-center gap-1 rounded-full border px-3 py-1.5 text-xs font-semibold ${
-                  active ? "border-lime bg-lime text-primary-foreground" : "border-border bg-surface"
+                  active
+                    ? "border-lime bg-lime text-primary-foreground"
+                    : "border-border bg-surface"
                 }`}
               >
                 <span>{s.emoji}</span>
@@ -250,7 +259,9 @@ export function FeedPreferencesBody() {
                   key={u}
                   onClick={() => patch({ distanceUnit: u as DistanceUnitPref })}
                   className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase ${
-                    prefs.distanceUnit === u ? "bg-lime text-primary-foreground" : "text-muted-foreground"
+                    prefs.distanceUnit === u
+                      ? "bg-lime text-primary-foreground"
+                      : "text-muted-foreground"
                   }`}
                 >
                   {u === "auto" ? `Auto (${unit})` : u}
@@ -286,7 +297,9 @@ export function FeedPreferencesBody() {
                 key={label}
                 onClick={() => patch({ maxDistanceMi: mi })}
                 className={`rounded-full border px-3 py-1.5 text-xs font-semibold ${
-                  active ? "border-lime bg-lime text-primary-foreground" : "border-border bg-surface"
+                  active
+                    ? "border-lime bg-lime text-primary-foreground"
+                    : "border-border bg-surface"
                 }`}
               >
                 {label}

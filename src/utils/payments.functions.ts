@@ -104,7 +104,6 @@ export const createCheckoutSession = createServerFn({ method: "POST" })
     }
   });
 
-
 export const createPortalSession = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((data: { returnUrl?: string; environment: StripeEnv }) => data)

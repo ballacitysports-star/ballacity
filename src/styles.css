@@ -289,6 +289,21 @@ button:disabled,
   overflow-wrap: break-word;
 }
 
+/* The small label above a group of cards inside a page — "From teams",
+   "Needs players now", "Recently finished". The routes wrote this as
+   `font-display text-sm font-bold uppercase tracking-wider` in 160-odd places,
+   which is exactly why it belongs here. Colour is deliberately left to the
+   caller so a section can be tinted (coral for urgent) without fighting a
+   colour baked into the utility. */
+@utility section-eyebrow {
+  font-family: var(--font-display);
+  font-size: var(--text-xs);
+  line-height: var(--text-xs--line-height);
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
 /* One visible focus ring for the whole app, so keyboard focus is never
    invisible on a surface that happens to sit on a dark card. Scoped to
    :focus-visible, so it never shows on a mouse tap. */

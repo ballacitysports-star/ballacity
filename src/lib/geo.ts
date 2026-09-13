@@ -214,13 +214,7 @@ export function requestViewerLocation(): Promise<LocationSnapshot> {
           status: "denied",
           remembered: !!snapshot.coords,
           error:
-            code === 1
-              ? "denied"
-              : code === 3
-                ? "timeout"
-                : code === 2
-                  ? "unavailable"
-                  : "blocked",
+            code === 1 ? "denied" : code === 3 ? "timeout" : code === 2 ? "unavailable" : "blocked",
         });
         void recordDenial(err);
         finish();

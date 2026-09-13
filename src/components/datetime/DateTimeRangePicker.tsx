@@ -249,9 +249,7 @@ export function DateTimeRangePicker({
         </div>
       )}
 
-      <DtSummary ok={check.ok}>
-        {check.ok ? formatWhenRange(value) : check.error}
-      </DtSummary>
+      <DtSummary ok={check.ok}>{check.ok ? formatWhenRange(value) : check.error}</DtSummary>
 
       {check.ok && !value.allDay && (
         <DtSummary>

@@ -94,7 +94,9 @@ export function RecurrenceFields({
             <DtLabel>Ends</DtLabel>
             <DtChip
               active={value.until == null}
-              onClick={() => onChange({ ...value, until: null, count: value.count ?? DEFAULT_COUNT })}
+              onClick={() =>
+                onChange({ ...value, until: null, count: value.count ?? DEFAULT_COUNT })
+              }
             >
               After
             </DtChip>

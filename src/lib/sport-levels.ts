@@ -32,7 +32,6 @@ export type SportScale = {
   multi?: boolean;
 };
 
-
 /** Generic fallback used by any sport without a curated scale. */
 export const GENERIC_SCALE: SportScale = {
   system: "Self-rated",
@@ -51,12 +50,7 @@ const YOUTH_DIVISIONS = [
 ];
 
 /** Travel ball classifications, offered as a submenu under Travel / Showcase. */
-const TRAVEL_DIVISIONS = [
-  "Travel A / AA",
-  "Travel AAA",
-  "Travel Majors",
-  "Travel Nationals",
-];
+const TRAVEL_DIVISIONS = ["Travel A / AA", "Travel AAA", "Travel Majors", "Travel Nationals"];
 
 /**
  * Youth divisions live behind the "Rec League" chip and travel classifications
@@ -139,7 +133,6 @@ const BALL_TIER_ALIASES: Record<string, string> = {
   AAA: "Travel AAA",
   Nationals: "Travel Nationals",
 };
-
 
 const COURT_FIELD_ALIASES: Record<string, string> = {
   Rec: "Rec League",
@@ -245,7 +238,6 @@ export const LEVELS_BY_SPORT: Record<Sport, SportScale> = {
   },
 };
 
-
 export function scaleForSport(sport: Sport): SportScale {
   return LEVELS_BY_SPORT[sport] ?? GENERIC_SCALE;
 }
@@ -255,10 +247,7 @@ export function levelsForSport(sport: Sport): string[] {
 }
 
 /** Reverse lookup: submenu child tier → its parent tier (e.g. "Minors (Ages 7–11)" → "Rec League"). */
-export function submenuParentForTier(
-  scale: SportScale,
-  tier: string,
-): string | null {
+export function submenuParentForTier(scale: SportScale, tier: string): string | null {
   for (const [parent, children] of Object.entries(scale.submenus ?? {})) {
     if (children.includes(tier)) return parent;
   }
@@ -346,7 +335,6 @@ export function parseSportLevels(raw: unknown): Record<string, SportLevel> {
   return out;
 }
 
-
 /** Builds the jsonb map written to `profiles.sport_levels`. */
 export function serializeSportLevels(
   sports: { name: Sport; level?: SportLevel | null }[],
@@ -412,10 +400,7 @@ export function parseSkillTiers(
 }
 
 /** Writes tiers back into the single stored skill string. */
-export function serializeSkillTiers(
-  sport: string | null | undefined,
-  tiers: string[],
-): string {
+export function serializeSkillTiers(sport: string | null | undefined, tiers: string[]): string {
   const ordered = orderTiers(sport, Array.from(new Set(tiers.filter(Boolean))));
   return ordered.length ? ordered.join(SKILL_TIER_SEPARATOR) : ANY_SKILL;
 }
@@ -435,9 +420,7 @@ export function toggleSkillTier(
   if (!scale.multi) {
     return current.includes(tier) ? ANY_SKILL : tier;
   }
-  const next = current.includes(tier)
-    ? current.filter((t) => t !== tier)
-    : [...current, tier];
+  const next = current.includes(tier) ? current.filter((t) => t !== tier) : [...current, tier];
   return serializeSkillTiers(sport, next);
 }
 
@@ -449,10 +432,6 @@ export function formatSkillValue(
   const tiers = parseSkillTiers(sport, value);
   return tiers.length ? tiers.join(SKILL_TIER_SEPARATOR) : ANY_SKILL;
 }
-
-
-
-
 
 /**
  * Skill level to show for a player in a given sport.
@@ -478,9 +457,7 @@ export function playerLevelsForSports(
   sports: string[],
 ): { sport: string; level: SportLevel }[] {
   const levels = parseSportLevels(rawSportLevels);
-  return sports
-    .filter((s) => levels[s]?.tier)
-    .map((s) => ({ sport: s, level: levels[s] }));
+  return sports.filter((s) => levels[s]?.tier).map((s) => ({ sport: s, level: levels[s] }));
 }
 
 /** True when a resolved level matches a chosen filter tier. */

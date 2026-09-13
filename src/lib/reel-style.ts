@@ -112,14 +112,14 @@ export const OVERLAY_THEME_OPTIONS: Option<ReelOverlayTheme>[] = [
     value: "retro",
     label: "Retro",
     blurb: "Old-school broadcast chyron",
-    directive:
-      "Overlay theme: RETRO — old-school broadcast chyron wording, title-case, no emoji.",
+    directive: "Overlay theme: RETRO — old-school broadcast chyron wording, title-case, no emoji.",
   },
   {
     value: "none",
     label: "No overlays",
     blurb: "Skip on-screen text",
-    directive: "Overlay theme: NONE — the athlete does not want on-screen text cards; return an empty overlays array.",
+    directive:
+      "Overlay theme: NONE — the athlete does not want on-screen text cards; return an empty overlays array.",
   },
 ];
 

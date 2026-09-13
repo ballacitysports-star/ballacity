@@ -22,10 +22,7 @@ export function MyWaitlistCard() {
     }
     let cancelled = false;
     void (async () => {
-      const { data } = await supabase
-        .from("hosted_games")
-        .select("id, title")
-        .in("id", gameIds);
+      const { data } = await supabase.from("hosted_games").select("id, title").in("id", gameIds);
       if (cancelled || !data) return;
       const next: Record<string, string> = {};
       for (const g of data as Array<{ id: string; title: string }>) next[g.id] = g.title;
@@ -45,12 +42,8 @@ export function MyWaitlistCard() {
           <ListOrdered className="h-4 w-4" />
         </span>
         <div>
-          <h2 className="font-display text-sm font-bold uppercase tracking-wider text-foreground">
-            My waitlist
-          </h2>
-          <p className="text-[10px] text-muted-foreground">
-            Approval status from each host
-          </p>
+          <h2 className="section-eyebrow text-foreground">My waitlist</h2>
+          <p className="text-[10px] text-muted-foreground">Approval status from each host</p>
         </div>
       </div>
       <div className="space-y-2">
@@ -62,9 +55,7 @@ export function MyWaitlistCard() {
             className="flex items-center justify-between gap-3 rounded-2xl border border-border bg-surface p-3 transition-colors hover:border-coral/40"
           >
             <div className="min-w-0">
-              <div className="truncate text-sm font-semibold">
-                {titles[e.gameId] ?? "Game"}
-              </div>
+              <div className="truncate text-sm font-semibold">{titles[e.gameId] ?? "Game"}</div>
               <div className="text-[11px] text-muted-foreground">
                 {e.position}
                 {e.status === "approved"

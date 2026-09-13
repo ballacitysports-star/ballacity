@@ -37,8 +37,6 @@ export type MyProfilesResult = {
   pendingKind: Exclude<AccountType, "player"> | null;
 };
 
-
-
 function initials(name: string): string {
   return (
     name
@@ -88,7 +86,10 @@ async function fetchMyProfiles(userId: string): Promise<MyProfilesResult> {
       ? supabase.from("teams").select("id, name, handle, avatar").in("id", teamRefs)
       : Promise.resolve({ data: [] as unknown[] }),
     orgRefs.length
-      ? supabase.from("trainer_orgs").select("id, name, handle, avatar, avatar_url").in("id", orgRefs)
+      ? supabase
+          .from("trainer_orgs")
+          .select("id, name, handle, avatar, avatar_url")
+          .in("id", orgRefs)
       : Promise.resolve({ data: [] as unknown[] }),
   ]);
 
@@ -118,7 +119,6 @@ async function fetchMyProfiles(userId: string): Promise<MyProfilesResult> {
     default_profile_id?: string | null;
     account_type?: string | null;
   } | null;
-
 
   const profiles: AccountProfile[] = [];
   for (const row of list) {
@@ -201,13 +201,14 @@ async function fetchMyProfiles(userId: string): Promise<MyProfilesResult> {
   // Registered as a team/trainer/gym but that profile was never created.
   const registered = profile?.account_type;
   const pendingKind =
-    isAccountType(registered) && registered !== "player" && !profiles.some((p) => p.kind === registered)
+    isAccountType(registered) &&
+    registered !== "player" &&
+    !profiles.some((p) => p.kind === registered)
       ? (registered as Exclude<AccountType, "player">)
       : null;
 
   return { profiles, activeId, defaultId, active, pendingKind };
 }
-
 
 export function useMyProfiles() {
   const { user, loading } = useAuth();
@@ -235,8 +236,6 @@ export function useMyProfiles() {
     refetch: query.refetch,
   };
 }
-
-
 
 export function useActiveProfile() {
   const { active, loading } = useMyProfiles();
@@ -310,7 +309,6 @@ export function useSwitchProfile() {
   });
 }
 
-
 /**
  * Stores the profile the app should start in. Saved on the account, so it
  * applies on every device and every new session. Pass `null` to clear it.
@@ -336,8 +334,6 @@ export function useSetDefaultProfile() {
     },
   });
 }
-
-
 
 export function profileTypeLabel(kind: AccountType): string {
   return ACCOUNT_TYPE_META[kind].label;
@@ -367,5 +363,9 @@ export async function continueAsPlayer(): Promise<void> {
 }
 
 export function addProfileRoute(kind: Exclude<AccountType, "player">): string {
-  return kind === "team" ? "/teams/create" : kind === "trainer" ? "/trainers/create" : "/orgs/create";
+  return kind === "team"
+    ? "/teams/create"
+    : kind === "trainer"
+      ? "/trainers/create"
+      : "/orgs/create";
 }

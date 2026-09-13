@@ -156,7 +156,9 @@ export function UserAvatar({
           loading && !label && "animate-pulse",
         )}
       >
-        {label || <span aria-hidden className="block h-2 w-2 rounded-full bg-muted-foreground/50" />}
+        {label || (
+          <span aria-hidden className="block h-2 w-2 rounded-full bg-muted-foreground/50" />
+        )}
       </AvatarFallback>
     </Avatar>
   );
@@ -167,10 +169,7 @@ export function UserAvatar({
  * shared privacy-aware avatar cache and falls back to the passed-in
  * name/initials (e.g. a game's host snapshot) until it loads.
  */
-export function UserAvatarById({
-  userId,
-  ...props
-}: Props & { userId?: string | null }) {
+export function UserAvatarById({ userId, ...props }: Props & { userId?: string | null }) {
   const resolved = useUserAvatar(userId);
   return (
     <UserAvatar

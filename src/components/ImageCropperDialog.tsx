@@ -71,7 +71,10 @@ export function ImageCropperDialog({
     let bestDiff = Infinity;
     sizePresets.forEach((p, i) => {
       const d = Math.abs(p.maxSize - outputMaxSize);
-      if (d < bestDiff) { bestDiff = d; best = i; }
+      if (d < bestDiff) {
+        bestDiff = d;
+        best = i;
+      }
     });
     return best;
   })();
@@ -90,9 +93,15 @@ export function ImageCropperDialog({
     setShowOptions(false);
     let cancelled = false;
     loadNormalizedDataUrl(file)
-      .then((url) => { if (!cancelled) setImgSrc(url); })
-      .catch(() => { if (!cancelled) setImgSrc(null); });
-    return () => { cancelled = true; };
+      .then((url) => {
+        if (!cancelled) setImgSrc(url);
+      })
+      .catch(() => {
+        if (!cancelled) setImgSrc(null);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [open, file]);
 
   useEffect(() => {
@@ -108,7 +117,9 @@ export function ImageCropperDialog({
     if (!open) return;
     const prev = document.body.style.overflow;
     document.body.style.overflow = "hidden";
-    return () => { document.body.style.overflow = prev; };
+    return () => {
+      document.body.style.overflow = prev;
+    };
   }, [open]);
 
   // Compute container / crop-box size
@@ -131,9 +142,10 @@ export function ImageCropperDialog({
 
   // Crop box dimensions (fit inside container while preserving aspect)
   const gutter = isMobile ? 16 : 24;
-  const cropW = containerSize.w > 0
-    ? Math.min(containerSize.w - gutter, (containerSize.h - gutter) * aspect)
-    : 0;
+  const cropW =
+    containerSize.w > 0
+      ? Math.min(containerSize.w - gutter, (containerSize.h - gutter) * aspect)
+      : 0;
   const cropH = cropW / aspect;
 
   const maxScale = minScale * 8;
@@ -327,7 +339,6 @@ export function ImageCropperDialog({
 
         <CropConfirmBar onCancel={onCancel} onApply={confirm} applyDisabled={!img} />
       </CropBottomBar>
-
     </div>
   );
 }

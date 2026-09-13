@@ -46,7 +46,7 @@ export function SeriesSessionsStrip({ game }: { game: Game }) {
 
   return (
     <div className="rounded-2xl border border-border bg-surface p-3">
-      <div className="mb-2 flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-muted-foreground">
+      <div className="mb-2 flex items-center gap-1.5 section-eyebrow text-muted-foreground">
         <CalendarDays className="h-3.5 w-3.5 text-lime" />
         Multi-day event · {sessions.length} sessions
       </div>
@@ -65,7 +65,9 @@ export function SeriesSessionsStrip({ game }: { game: Game }) {
                   : "border-border bg-background hover:border-lime/40 hover:text-lime"
               }`}
             >
-              {s.all_day ? formatSession(s.date) : `${formatSession(s.date)} · ${formatTime(s.date)}`}
+              {s.all_day
+                ? formatSession(s.date)
+                : `${formatSession(s.date)} · ${formatTime(s.date)}`}
             </Link>
           );
         })}

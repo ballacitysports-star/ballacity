@@ -2,7 +2,6 @@ import { useMemo, useSyncExternalStore } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import type { TablesInsert } from "@/integrations/supabase/types";
 
-
 const joined = new Set<string>();
 const listeners = new Set<() => void>();
 const STORAGE_KEY = "openrun.joinedGameIds.v1";
@@ -165,7 +164,6 @@ export function joinGame(id: string, position?: string) {
     }
   })();
 }
-
 
 export function leaveGame(id: string) {
   loadJoinedGames();

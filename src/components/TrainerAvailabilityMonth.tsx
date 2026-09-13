@@ -9,13 +9,7 @@ import {
   resolveDay,
   toDateKey,
 } from "@/lib/availability-resolve";
-import {
-  DEFAULT_TZ,
-  fmt12,
-  getBrowserTz,
-  tzRelativeLabel,
-  tzShortName,
-} from "@/lib/tz";
+import { DEFAULT_TZ, fmt12, getBrowserTz, tzRelativeLabel, tzShortName } from "@/lib/tz";
 
 const DAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
@@ -147,8 +141,7 @@ export function TrainerAvailabilityMonth({
           const disabled = past || beyond;
           const override = overrides.find((o) => o.date === key);
           const closed = override?.closed;
-          const hasAny =
-            !disabled && resolveDay(d, weekly, overrides, resolverOpts).length > 0;
+          const hasAny = !disabled && resolveDay(d, weekly, overrides, resolverOpts).length > 0;
           const isSelected = key === selected;
           const state = disabled
             ? "border-border/30 bg-transparent text-muted-foreground/40 cursor-not-allowed"

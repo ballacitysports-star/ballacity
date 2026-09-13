@@ -39,12 +39,7 @@ export type ReviewPaymentResult = {
 export const reviewPaymentAction = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator(
-    (input: {
-      gameId: string;
-      playerId: string;
-      next: Next;
-      expectedFrom?: From | "none";
-    }) => {
+    (input: { gameId: string; playerId: string; next: Next; expectedFrom?: From | "none" }) => {
       if (!input?.gameId || typeof input.gameId !== "string") {
         throw new Error("gameId is required.");
       }
@@ -83,7 +78,6 @@ export const reviewPaymentAction = createServerFn({ method: "POST" })
       }
     }
 
-
     // Latest submission for this (game, player) authored under this host.
     // RLS also scopes to the caller, but we filter explicitly so the
     // idempotency check is unambiguous.
@@ -104,9 +98,7 @@ export const reviewPaymentAction = createServerFn({ method: "POST" })
         throw new Error("No payment submission to update.");
       }
       if (expectedFrom && expectedFrom !== "none") {
-        throw new Error(
-          "Payment status changed since you loaded the page. Please refresh.",
-        );
+        throw new Error("Payment status changed since you loaded the page. Please refresh.");
       }
       const nowIso = new Date().toISOString();
       const { data: inserted, error: insErr } = await supabase

@@ -115,9 +115,7 @@ export function FilterSection({
   return (
     <section className="space-y-2">
       <div className="flex items-baseline justify-between">
-        <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
-          {label}
-        </h3>
+        <h3 className="section-eyebrow text-muted-foreground">{label}</h3>
         {hint && <span className="text-[11px] text-muted-foreground">{hint}</span>}
       </div>
       {children}

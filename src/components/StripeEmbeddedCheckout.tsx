@@ -30,7 +30,6 @@ export function StripeEmbeddedCheckout({
     return result.clientSecret;
   };
 
-
   return (
     <div id="checkout">
       <EmbeddedCheckoutProvider stripe={getStripe()} options={{ fetchClientSecret }}>

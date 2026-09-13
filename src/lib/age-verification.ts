@@ -163,8 +163,7 @@ export const MINIMUM_SIGNUP_AGE = 13;
 export const MIN_AGE_MESSAGE = `You need to be at least ${MINIMUM_SIGNUP_AGE} to use ballaCity.`;
 
 export type DobCheck =
-  | { ok: true; iso: string; age: number; cohort: AgeCohort }
-  | { ok: false; message: string };
+  { ok: true; iso: string; age: number; cohort: AgeCohort } | { ok: false; message: string };
 
 /**
  * Validate a hand-entered month/day/year. Neutral wording only — the copy must

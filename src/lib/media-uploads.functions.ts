@@ -48,7 +48,8 @@ export const finalizeVideoUpload = createServerFn({ method: "POST" })
     };
 
     if (bytes <= 0) await reject("The file is empty");
-    if (kind === "video" && bytes > MAX_VIDEO_BYTES) await reject("Video is too large (max 200 MB)");
+    if (kind === "video" && bytes > MAX_VIDEO_BYTES)
+      await reject("Video is too large (max 200 MB)");
     if (kind === "frame" && bytes > 8 * 1024 * 1024) await reject("Frame image is too large");
     if (kind === "audio" && bytes > 50 * 1024 * 1024) await reject("Audio track is too large");
 

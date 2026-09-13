@@ -59,7 +59,12 @@ export type ModerationReport = {
   reviewedAt: string | null;
   resolutionNotes: string | null;
   reporter: { id: string; name: string } | null;
-  reported: { id: string; name: string; moderationState: string; suspendedAt: string | null } | null;
+  reported: {
+    id: string;
+    name: string;
+    moderationState: string;
+    suspendedAt: string | null;
+  } | null;
   gameId: string | null;
   gameTitle: string | null;
   conversationId: string | null;
@@ -136,10 +141,7 @@ export const listReports = createServerFn({ method: "GET" })
             .in("id", messageIds)
         : Promise.resolve({ data: [] as any[] }),
       reelIds.length
-        ? supabaseAdmin
-            .from("highlight_reels")
-            .select("id, title, hidden_at")
-            .in("id", reelIds)
+        ? supabaseAdmin.from("highlight_reels").select("id, title, hidden_at").in("id", reelIds)
         : Promise.resolve({ data: [] as any[] }),
     ]);
 
@@ -372,7 +374,10 @@ export const listModerationAudit = createServerFn({ method: "GET" })
     if (error) throw new Error(error.message);
     const actorIds = Array.from(new Set((data ?? []).map((r) => r.actor_id).filter(Boolean)));
     const { data: profiles } = actorIds.length
-      ? await supabaseAdmin.from("profiles").select("id, display_name").in("id", actorIds as string[])
+      ? await supabaseAdmin
+          .from("profiles")
+          .select("id, display_name")
+          .in("id", actorIds as string[])
       : { data: [] as any[] };
     const map = new Map((profiles ?? []).map((p: any) => [p.id, p.display_name]));
     return {

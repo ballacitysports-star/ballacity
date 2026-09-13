@@ -1,7 +1,11 @@
 import * as React from "react";
 import { toast } from "sonner";
 import { Copy, UserPlus } from "lucide-react";
-import { useCreateMinorInvite, useMyMinorInvites, useRevokeMinorInvite } from "@/lib/family-invites";
+import {
+  useCreateMinorInvite,
+  useMyMinorInvites,
+  useRevokeMinorInvite,
+} from "@/lib/family-invites";
 import { Button } from "@/components/ui/button";
 
 const RELATIONSHIPS = ["parent", "guardian", "grandparent", "other adult"];

@@ -659,7 +659,7 @@ function Stat({ label, value, icon }: { label: string; value: string; icon: Reac
 function Section({ title, children }: { title: React.ReactNode; children: React.ReactNode }) {
   return (
     <div>
-      <h2 className="font-display text-sm font-bold uppercase tracking-wider text-muted-foreground mb-2 flex items-center gap-1.5">
+      <h2 className="section-eyebrow text-muted-foreground mb-2 flex items-center gap-1.5">
         {title}
       </h2>
       {children}

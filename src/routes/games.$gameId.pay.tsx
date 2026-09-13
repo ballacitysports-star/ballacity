@@ -851,9 +851,7 @@ function PaymentStatusTimeline({
       data-payment-state={state}
     >
       <div className="flex items-center justify-between mb-3">
-        <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
-          Payment status
-        </h3>
+        <h3 className="section-eyebrow text-muted-foreground">Payment status</h3>
         <span
           className={`text-[10px] font-bold uppercase rounded-full px-2 py-0.5 border ${
             meta.tone === "success"
@@ -1455,9 +1453,7 @@ function PaymentInstructionsAndProof({
         onSubmit={submit}
         className="rounded-2xl border border-border bg-surface p-4 space-y-3"
       >
-        <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
-          I have paid — submit proof
-        </h3>
+        <h3 className="section-eyebrow text-muted-foreground">I have paid — submit proof</h3>
         <ProofUploader
           file={file}
           previewUrl={previewUrl}

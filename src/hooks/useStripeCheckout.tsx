@@ -8,7 +8,6 @@ interface CheckoutOptions {
   collectShipping?: boolean;
 }
 
-
 export function useStripeCheckout() {
   const [isOpen, setIsOpen] = useState(false);
   const [options, setOptions] = useState<CheckoutOptions | null>(null);

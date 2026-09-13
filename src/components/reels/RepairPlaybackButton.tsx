@@ -94,8 +94,8 @@ export function RepairPlaybackButton({
       <div className="mx-auto max-w-xs space-y-1.5 text-center">
         <p className="text-[11px] font-semibold text-amber-300">{failed}</p>
         <p className="text-[10px] text-muted-foreground">
-          Converting works best in desktop Chrome. You can also re-upload the clip from your
-          Photos app, which saves it in a format every device plays.
+          Converting works best in desktop Chrome. You can also re-upload the clip from your Photos
+          app, which saves it in a format every device plays.
         </p>
         <div className="flex flex-wrap items-center justify-center gap-1.5">
           <button

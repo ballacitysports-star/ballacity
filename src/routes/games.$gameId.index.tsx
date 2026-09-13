@@ -1891,13 +1891,11 @@ function GameDetail() {
 
         {/* About */}
         <div>
-          <h2 className="font-display text-sm font-bold uppercase tracking-wider text-muted-foreground mb-2">
-            About the run
-          </h2>
+          <h2 className="section-eyebrow text-muted-foreground mb-2">About the run</h2>
           <p className="text-sm leading-relaxed">{game.description}</p>
           {/* Safety: risk notice + safety reporting entry point */}
           <div className="mt-3 rounded-2xl border border-border bg-surface px-4 py-3">
-            <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-muted-foreground">
+            <div className="flex items-center gap-2 section-eyebrow text-muted-foreground">
               <ShieldAlert className="h-4 w-4 text-lime" aria-hidden /> Safety
             </div>
             <p className="mt-2 text-[12px] leading-relaxed text-muted-foreground">
@@ -1939,9 +1937,7 @@ function GameDetail() {
 
         {/* Discussion */}
         <div>
-          <h2 className="font-display text-sm font-bold uppercase tracking-wider text-muted-foreground mb-2">
-            Discussion
-          </h2>
+          <h2 className="section-eyebrow text-muted-foreground mb-2">Discussion</h2>
           <PostEngagement subjectType="game" subjectId={game.id} />
         </div>
 
@@ -1952,9 +1948,7 @@ function GameDetail() {
           <div className="rounded-3xl border border-border bg-surface p-4">
             <div className="flex items-center gap-2 mb-3">
               <CreditCard className="h-4 w-4 text-lime" />
-              <h2 className="font-display text-sm font-bold uppercase tracking-wider text-muted-foreground">
-                Payment settings
-              </h2>
+              <h2 className="section-eyebrow text-muted-foreground">Payment settings</h2>
             </div>
             <div className="space-y-3">
               {settings?.payment_deadline && (
@@ -1985,9 +1979,7 @@ function GameDetail() {
         {game.positionsNeeded && Object.keys(game.positionsNeeded).length > 0 && (
           <div id="waitlist" className="scroll-mt-24">
             <div className="flex items-center justify-between mb-2">
-              <h2 className="font-display text-sm font-bold uppercase tracking-wider text-muted-foreground">
-                Positions needed
-              </h2>
+              <h2 className="section-eyebrow text-muted-foreground">Positions needed</h2>
               <button
                 type="button"
                 onClick={() => setPositionRosterOpen(true)}
@@ -2260,7 +2252,7 @@ function GameDetail() {
         {/* Players */}
         <div>
           <div className="flex items-center justify-between mb-2 gap-2">
-            <h2 className="font-display text-sm font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-2 flex-wrap">
+            <h2 className="section-eyebrow text-muted-foreground flex items-center gap-2 flex-wrap">
               <span>
                 Roster (
                 <span
@@ -2547,7 +2539,7 @@ function GameDetail() {
 
           {hostRequests.length > 0 ? (
             <div>
-              <h2 className="font-display text-sm font-bold uppercase tracking-wider text-muted-foreground mb-2">
+              <h2 className="section-eyebrow text-muted-foreground mb-2">
                 Pickup requests · {hostRequests.filter((r) => r.status === "pending").length}{" "}
                 pending
               </h2>
@@ -2594,7 +2586,7 @@ function GameDetail() {
                 approvedReqs.length + Math.max(rosterFromLive.length, fallbackPlaceholderCount);
               return (
                 <>
-                  <h2 className="font-display text-sm font-bold uppercase tracking-wider text-muted-foreground mb-2">
+                  <h2 className="section-eyebrow text-muted-foreground mb-2">
                     Roster · {totalConfirmed} / {game.maxPlayers}
                   </h2>
 
@@ -2605,9 +2597,7 @@ function GameDetail() {
                   liveRoster.length > 0 &&
                   Date.now() >= new Date(game.date).getTime() ? (
                     <div className="mb-3 rounded-2xl border border-border bg-surface p-3">
-                      <div className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
-                        Attendance
-                      </div>
+                      <div className="section-eyebrow text-muted-foreground">Attendance</div>
                       <p className="mt-0.5 text-[11px] text-muted-foreground">
                         Mark who showed up. This builds your host reliability score.
                       </p>

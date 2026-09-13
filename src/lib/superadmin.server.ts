@@ -78,8 +78,7 @@ export const CONTENT_KINDS = {
     table: "player_availabilities",
     idCol: "id",
     label: "Availability post",
-    select:
-      "id, user_id, sports, skill_level, city, status, note, hidden_at, created_at",
+    select: "id, user_id, sports, skill_level, city, status, note, hidden_at, created_at",
     searchCols: ["city", "note", "skill_level"],
     orderBy: "created_at",
     hideCol: "hidden_at",
@@ -125,8 +124,7 @@ export const CONTENT_KINDS = {
     table: "messages",
     idCol: "id",
     label: "Message",
-    select:
-      "id, conversation_id, sender_id, body, is_request, deleted_at, created_at",
+    select: "id, conversation_id, sender_id, body, is_request, deleted_at, created_at",
     searchCols: ["body"],
     orderBy: "created_at",
     hideCol: null,

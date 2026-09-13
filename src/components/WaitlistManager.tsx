@@ -4,11 +4,7 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { UserAvatar } from "@/components/UserAvatar";
 import { createNotification } from "@/lib/notifications";
-import {
-  reviewWaitlistEntry,
-  type WaitlistEntry,
-  type WaitlistStatus,
-} from "@/lib/waitlist-store";
+import { reviewWaitlistEntry, type WaitlistEntry, type WaitlistStatus } from "@/lib/waitlist-store";
 
 type Profile = {
   id: string;
@@ -118,9 +114,7 @@ export function WaitlistManager({
   return (
     <div className="mt-2 border-t border-border/60 pt-2">
       <div className="mb-1.5 flex items-center justify-between">
-        <span className="text-[11px] font-bold uppercase tracking-wider text-coral">
-          Waitlist · {entries.length}
-        </span>
+        <span className="section-eyebrow text-coral">Waitlist · {entries.length}</span>
         {isHost && spotsLeft > 0 && (
           <span className="text-[10px] font-semibold text-lime">
             {spotsLeft} spot{spotsLeft === 1 ? "" : "s"} free

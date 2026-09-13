@@ -127,8 +127,7 @@ export function ProfileShareCard({
   const bioSnippet = (data.bio ?? "").trim().replace(/\s+/g, " ").slice(0, 160);
   const kindLabel = KIND_LABEL[data.kind];
 
-  const url =
-    typeof window === "undefined" ? data.path : `${window.location.origin}${data.path}`;
+  const url = typeof window === "undefined" ? data.path : `${window.location.origin}${data.path}`;
 
   const cardImage = ogImageUrl({
     kind: data.kind === "gym" ? "venue" : data.kind,
@@ -231,11 +230,7 @@ export function ProfileShareCard({
             <Share2 className="mr-1.5 h-4 w-4" /> Share
           </Button>
           <Button variant="secondary" className="flex-1" onClick={handleCopyLink}>
-            {copied ? (
-              <Check className="mr-1.5 h-4 w-4" />
-            ) : (
-              <Copy className="mr-1.5 h-4 w-4" />
-            )}
+            {copied ? <Check className="mr-1.5 h-4 w-4" /> : <Copy className="mr-1.5 h-4 w-4" />}
             Copy link
           </Button>
         </div>

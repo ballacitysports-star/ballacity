@@ -5,7 +5,7 @@ export type Weekday = Slot["day"];
 
 export type OverrideWindow = {
   start: string; // HH:MM
-  end: string;   // HH:MM
+  end: string; // HH:MM
   venue?: string;
 };
 
@@ -27,7 +27,7 @@ export type AvailabilityRule = {
   label?: string;
   weekdays: Weekday[];
   start: string; // HH:MM
-  end: string;   // HH:MM
+  end: string; // HH:MM
   venue?: string;
   freq: "weekly" | "biweekly" | "monthly-nth";
   interval?: number;
@@ -159,7 +159,9 @@ export function resolveDay(
   optsOrVenueFilter?: ResolveOpts | string | null,
 ): ResolvedWindow[] {
   const opts: ResolveOpts =
-    typeof optsOrVenueFilter === "string" || optsOrVenueFilter === null || optsOrVenueFilter === undefined
+    typeof optsOrVenueFilter === "string" ||
+    optsOrVenueFilter === null ||
+    optsOrVenueFilter === undefined
       ? { venueFilter: optsOrVenueFilter ?? null }
       : optsOrVenueFilter;
   const { venueFilter, trainerTz, viewerTz, rules = [] } = opts;
@@ -168,7 +170,11 @@ export function resolveDay(
 
   const rawFor = (
     tDate: Date,
-  ): (OverrideWindow & { source: ResolvedWindow["source"]; ruleId?: string; ruleLabel?: string })[] => {
+  ): (OverrideWindow & {
+    source: ResolvedWindow["source"];
+    ruleId?: string;
+    ruleLabel?: string;
+  })[] => {
     const tKey = toDateKey(tDate);
     const override = overrides.find((o) => o.date === tKey);
     if (override) {
@@ -230,8 +236,7 @@ export function resolveDay(
       if (e.getTime() <= s.getTime()) continue;
       const sw = instantToWall(s, viewerTz!);
       const ew = instantToWall(e, viewerTz!);
-      const endHHMM =
-        ew.dateKey !== sw.dateKey && ew.hhmm === "00:00" ? "24:00" : ew.hhmm;
+      const endHHMM = ew.dateKey !== sw.dateKey && ew.hhmm === "00:00" ? "24:00" : ew.hhmm;
       out.push({
         start: sw.hhmm,
         end: endHHMM,
@@ -256,7 +261,10 @@ export function resolveDay(
   return applyVenueFilter(dedup, venueFilter);
 }
 
-function applyVenueFilter(windows: ResolvedWindow[], venueFilter?: string | null): ResolvedWindow[] {
+function applyVenueFilter(
+  windows: ResolvedWindow[],
+  venueFilter?: string | null,
+): ResolvedWindow[] {
   if (!venueFilter) return windows;
   const target = venueFilter.trim().toLowerCase();
   return windows.filter((w) => (w.venue ?? "").trim().toLowerCase() === target);
@@ -271,5 +279,3 @@ export function hasAvailability(
 ): boolean {
   return resolveDay(date, weekly, overrides, optsOrVenueFilter).length > 0;
 }
-
-

@@ -177,7 +177,7 @@ function ReviewNew() {
         {/* Reviewer role */}
         {!lockReviewerToPlayer && (
           <section>
-            <h2 className="font-display text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2">
+            <h2 className="font-display section-eyebrow text-muted-foreground mb-2">
               I'm reviewing as
             </h2>
             <div className="grid grid-cols-2 gap-2">
@@ -208,9 +208,7 @@ function ReviewNew() {
 
         {/* Star rating */}
         <section>
-          <h2 className="font-display text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2">
-            Overall
-          </h2>
+          <h2 className="font-display section-eyebrow text-muted-foreground mb-2">Overall</h2>
           <div className="flex items-center gap-2">
             {[1, 2, 3, 4, 5].map((i) => (
               <motion.button
@@ -232,7 +230,7 @@ function ReviewNew() {
 
         {/* 10-criterion breakdown */}
         <section>
-          <h2 className="font-display text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2">
+          <h2 className="font-display section-eyebrow text-muted-foreground mb-2">
             10-point breakdown
           </h2>
           <div className="space-y-3 rounded-2xl border border-border bg-surface p-4">
@@ -261,7 +259,7 @@ function ReviewNew() {
 
         {/* Title */}
         <section>
-          <label className="font-display text-xs font-bold uppercase tracking-wider text-muted-foreground">
+          <label className="font-display section-eyebrow text-muted-foreground">
             Headline (optional)
           </label>
           <input
@@ -275,7 +273,7 @@ function ReviewNew() {
 
         {/* Body */}
         <section>
-          <label className="font-display text-xs font-bold uppercase tracking-wider text-muted-foreground">
+          <label className="font-display section-eyebrow text-muted-foreground">
             What stood out?
           </label>
           <textarea
@@ -294,7 +292,7 @@ function ReviewNew() {
 
         {/* Context */}
         <section>
-          <label className="font-display text-xs font-bold uppercase tracking-wider text-muted-foreground">
+          <label className="font-display section-eyebrow text-muted-foreground">
             Event / context (unlocks verified badge)
           </label>
           <input
@@ -308,9 +306,7 @@ function ReviewNew() {
 
         {/* Public / private */}
         <section>
-          <h2 className="font-display text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2">
-            Visibility
-          </h2>
+          <h2 className="font-display section-eyebrow text-muted-foreground mb-2">Visibility</h2>
           <div className="grid grid-cols-2 gap-2">
             <button
               onClick={() => setIsPrivate(false)}

@@ -62,7 +62,6 @@ export function pageHead(input: PageHeadInput) {
   }
   if (noindex) meta.push({ name: "robots", content: "noindex, nofollow" });
 
-
   const head: {
     meta: MetaTag[];
     links?: { rel: string; href: string }[];
@@ -111,7 +110,6 @@ export function ogImageUrl(input: {
   params.set("size", input.size ?? "og");
   return `${SITE_URL}/api/public/og?${params.toString()}`;
 }
-
 
 /** Swap the `size` preset on a generated card URL. */
 export function withOgSize(imageUrl: string, size: OgImageSize) {

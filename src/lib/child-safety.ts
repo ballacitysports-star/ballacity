@@ -31,7 +31,6 @@ import {
   type ParentRequestRow,
 } from "@/lib/child-safety.functions";
 
-
 /** The signed-in member's cohort, consent state and guardian controls. */
 export function useMyChildStatus() {
   const { user } = useAuth();
@@ -66,9 +65,7 @@ export function useMyChildStatus() {
     consentBlocked: subject ? isConsentBlocked(subject, policy) : false,
     /** Ask the policy engine whether a feature is available to this member. */
     can: (feature: FeatureKey): FeatureDecision =>
-      subject
-        ? can(feature, subject, policy)
-        : { allowed: true, level: "allowed", reason: null },
+      subject ? can(feature, subject, policy) : { allowed: true, level: "allowed", reason: null },
   };
 }
 
@@ -103,10 +100,8 @@ export function useUpdateChildControls() {
   const qc = useQueryClient();
   const run = useServerFn(updateChildControls);
   return useMutation({
-    mutationFn: (input: {
-      childUserId: string;
-      controls: Record<string, string | boolean>;
-    }) => run({ data: input as never }),
+    mutationFn: (input: { childUserId: string; controls: Record<string, string | boolean> }) =>
+      run({ data: input as never }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["guardian-children"] });
       qc.invalidateQueries({ queryKey: ["child-status"] });
@@ -176,8 +171,7 @@ export function useChildConsentTrail(childUserId: string | null) {
   const fetch = useServerFn(getChildConsentTrail);
   const query = useQuery({
     queryKey: ["child-consent-trail", childUserId],
-    queryFn: () =>
-      fetch({ data: { childUserId: childUserId! } }) as Promise<ConsentTrailEntry[]>,
+    queryFn: () => fetch({ data: { childUserId: childUserId! } }) as Promise<ConsentTrailEntry[]>,
     enabled: !!childUserId,
     staleTime: 30_000,
   });

@@ -784,9 +784,7 @@ function Create() {
               </div>
               {price > 0 && (
                 <div className="mt-3 flex items-center gap-2">
-                  <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                    Entry fee
-                  </span>
+                  <span className="section-eyebrow text-muted-foreground">Entry fee</span>
                   <div className="relative flex-1">
                     <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">
                       $
@@ -934,7 +932,7 @@ function Section({
 }) {
   return (
     <div>
-      <div className="mb-2 flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-muted-foreground">
+      <div className="mb-2 flex items-center gap-1.5 section-eyebrow text-muted-foreground">
         {icon}
         {title}
         {right && <span className="ml-auto">{right}</span>}

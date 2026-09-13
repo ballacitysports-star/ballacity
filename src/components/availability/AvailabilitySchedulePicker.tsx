@@ -83,10 +83,7 @@ export function AvailabilitySchedulePicker({
   }, [busy]);
 
   const dateSlots = value.filter(isDateSlot);
-  const weekSlots = value.filter((s) => !isDateSlot(s)) as Extract<
-    TimeSlot,
-    { weekday: number }
-  >[];
+  const weekSlots = value.filter((s) => !isDateSlot(s)) as Extract<TimeSlot, { weekday: number }>[];
 
   const commit = (next: TimeSlot[]) => onChange(normalizeSlots(next));
 
@@ -294,91 +291,89 @@ export function AvailabilitySchedulePicker({
               const selfOverlap = selfOverlaps.has(index);
               const flagged = !!conflict || selfOverlap;
               return (
-              <li
-                key={isDateSlot(slot) ? slot.date : `w${slot.weekday}`}
-                className={`flex flex-wrap items-center gap-2 rounded-2xl border px-3 py-2 ${
-                  flagged ? "border-amber-500/60 bg-amber-500/10" : "border-border bg-surface"
-                }`}
-              >
-                <span className="min-w-[86px] flex-1 text-xs font-bold">
-                  {isDateSlot(slot) ? fmtShortDate(slot.date) : WEEKDAY_LABELS[slot.weekday]}
-                </span>
-                <input
-                  type="time"
-                  aria-label="Start time"
-                  value={slot.start}
-                  step={900}
-                  onChange={(e) => patchSlot(index, { start: e.target.value })}
-                  className="rounded-xl border border-border bg-background px-2 py-1.5 text-xs [color-scheme:dark]"
-                />
-                <span className="text-xs text-muted-foreground">to</span>
-                <input
-                  type="time"
-                  aria-label="End time"
-                  value={slot.end}
-                  step={900}
-                  onChange={(e) => patchSlot(index, { end: e.target.value })}
-                  className="rounded-xl border border-border bg-background px-2 py-1.5 text-xs [color-scheme:dark]"
-                />
-                <button
-                  type="button"
-                  aria-label="Remove"
-                  onClick={() =>
-                    onChange(value.filter((_, i) => i !== index))
-                  }
-                  className="rounded-full p-1.5 text-muted-foreground hover:text-coral"
+                <li
+                  key={isDateSlot(slot) ? slot.date : `w${slot.weekday}`}
+                  className={`flex flex-wrap items-center gap-2 rounded-2xl border px-3 py-2 ${
+                    flagged ? "border-amber-500/60 bg-amber-500/10" : "border-border bg-surface"
+                  }`}
                 >
-                  <Trash2 className="h-3.5 w-3.5" />
-                </button>
-                <button
-                  type="button"
-                  onClick={() => applyToAll(slot.start, slot.end)}
-                  className="rounded-full border border-border px-2 py-1 text-[10px] font-semibold text-muted-foreground hover:border-lime/60"
-                >
-                  Apply to all
-                </button>
-                {flagged && (
-                  <div className="w-full space-y-1.5">
-                    <p className="flex items-start gap-1.5 text-[11px] font-medium text-amber-300">
-                      <AlertTriangle className="mt-0.5 h-3 w-3 shrink-0" />
-                      <span>
-                        {conflict
-                          ? `${CONFLICT_KIND_LABEL[conflict.blocks[0].kind]} — ${describeConflict(conflict)}`
-                          : "Overlaps another window you picked."}
-                      </span>
-                    </p>
-                    <div className="flex flex-wrap gap-1.5">
-                      {(conflict ? suggestSlotFixes(conflict) : []).map((fix) => (
-                        <button
-                          key={fix.id}
-                          type="button"
-                          title={fix.hint}
-                          onClick={() => applyFix(index, fix)}
-                          className={`flex items-center gap-1 rounded-full border px-2.5 py-1 text-[11px] font-bold transition-colors ${
-                            fix.id === "remove"
-                              ? "border-border text-muted-foreground hover:border-coral hover:text-coral"
-                              : "border-amber-400/70 bg-amber-400/10 text-amber-200 hover:bg-amber-400/20"
-                          }`}
-                        >
-                          {fix.id === "skip" && <SkipForward className="h-3 w-3" />}
-                          {fix.id === "shorten" && <Scissors className="h-3 w-3" />}
-                          {fix.id === "remove" && <Trash2 className="h-3 w-3" />}
-                          {fix.label}
-                        </button>
-                      ))}
-                      {!conflict && selfOverlap && (
-                        <button
-                          type="button"
-                          onClick={() => onChange(value.filter((_, i) => i !== index))}
-                          className="flex items-center gap-1 rounded-full border border-border px-2.5 py-1 text-[11px] font-bold text-muted-foreground hover:border-coral hover:text-coral"
-                        >
-                          <Trash2 className="h-3 w-3" /> Remove
-                        </button>
-                      )}
+                  <span className="min-w-[86px] flex-1 text-xs font-bold">
+                    {isDateSlot(slot) ? fmtShortDate(slot.date) : WEEKDAY_LABELS[slot.weekday]}
+                  </span>
+                  <input
+                    type="time"
+                    aria-label="Start time"
+                    value={slot.start}
+                    step={900}
+                    onChange={(e) => patchSlot(index, { start: e.target.value })}
+                    className="rounded-xl border border-border bg-background px-2 py-1.5 text-xs [color-scheme:dark]"
+                  />
+                  <span className="text-xs text-muted-foreground">to</span>
+                  <input
+                    type="time"
+                    aria-label="End time"
+                    value={slot.end}
+                    step={900}
+                    onChange={(e) => patchSlot(index, { end: e.target.value })}
+                    className="rounded-xl border border-border bg-background px-2 py-1.5 text-xs [color-scheme:dark]"
+                  />
+                  <button
+                    type="button"
+                    aria-label="Remove"
+                    onClick={() => onChange(value.filter((_, i) => i !== index))}
+                    className="rounded-full p-1.5 text-muted-foreground hover:text-coral"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => applyToAll(slot.start, slot.end)}
+                    className="rounded-full border border-border px-2 py-1 text-[10px] font-semibold text-muted-foreground hover:border-lime/60"
+                  >
+                    Apply to all
+                  </button>
+                  {flagged && (
+                    <div className="w-full space-y-1.5">
+                      <p className="flex items-start gap-1.5 text-[11px] font-medium text-amber-300">
+                        <AlertTriangle className="mt-0.5 h-3 w-3 shrink-0" />
+                        <span>
+                          {conflict
+                            ? `${CONFLICT_KIND_LABEL[conflict.blocks[0].kind]} — ${describeConflict(conflict)}`
+                            : "Overlaps another window you picked."}
+                        </span>
+                      </p>
+                      <div className="flex flex-wrap gap-1.5">
+                        {(conflict ? suggestSlotFixes(conflict) : []).map((fix) => (
+                          <button
+                            key={fix.id}
+                            type="button"
+                            title={fix.hint}
+                            onClick={() => applyFix(index, fix)}
+                            className={`flex items-center gap-1 rounded-full border px-2.5 py-1 text-[11px] font-bold transition-colors ${
+                              fix.id === "remove"
+                                ? "border-border text-muted-foreground hover:border-coral hover:text-coral"
+                                : "border-amber-400/70 bg-amber-400/10 text-amber-200 hover:bg-amber-400/20"
+                            }`}
+                          >
+                            {fix.id === "skip" && <SkipForward className="h-3 w-3" />}
+                            {fix.id === "shorten" && <Scissors className="h-3 w-3" />}
+                            {fix.id === "remove" && <Trash2 className="h-3 w-3" />}
+                            {fix.label}
+                          </button>
+                        ))}
+                        {!conflict && selfOverlap && (
+                          <button
+                            type="button"
+                            onClick={() => onChange(value.filter((_, i) => i !== index))}
+                            className="flex items-center gap-1 rounded-full border border-border px-2.5 py-1 text-[11px] font-bold text-muted-foreground hover:border-coral hover:text-coral"
+                          >
+                            <Trash2 className="h-3 w-3" /> Remove
+                          </button>
+                        )}
+                      </div>
                     </div>
-                  </div>
-                )}
-              </li>
+                  )}
+                </li>
               );
             })}
           </ul>
@@ -396,8 +391,8 @@ export function AvailabilitySchedulePicker({
               {conflicts.length + (selfOverlaps.size > 0 ? 1 : 0)} scheduling conflict
               {conflicts.length + (selfOverlaps.size > 0 ? 1 : 0) === 1 ? "" : "s"}
             </span>{" "}
-            — these windows clash with times you already joined, host, or marked
-            unavailable. You can still post; players will just see overlapping times.
+            — these windows clash with times you already joined, host, or marked unavailable. You
+            can still post; players will just see overlapping times.
           </span>
           {selfOverlaps.size > 0 && (
             <button
@@ -412,9 +407,7 @@ export function AvailabilitySchedulePicker({
       )}
       <div className="flex items-start justify-between gap-2 rounded-2xl border border-border bg-surface/60 px-3 py-2 text-[11px] text-muted-foreground">
         <span className="min-w-0 flex-1 whitespace-normal break-words">
-          {value.length === 0
-            ? "Pick dates or weekdays, then set times."
-            : summarizeSlots(value)}
+          {value.length === 0 ? "Pick dates or weekdays, then set times." : summarizeSlots(value)}
         </span>
         {value.length > 0 && (
           <button

@@ -21,11 +21,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { useMyChildStatus } from "@/lib/child-safety";
 import { supabase } from "@/integrations/supabase/client";
 import { formatWhen } from "@/lib/format";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 
 type Props = {
   subjectType: EngagementSubjectType;
@@ -102,8 +98,7 @@ export function PostEngagement({ subjectType, subjectId }: Props) {
   }, [subjectType, subjectId, user?.id]);
 
   const createMut = useMutation({
-    mutationFn: (text: string) =>
-      createCommentFn({ data: { subjectType, subjectId, body: text } }),
+    mutationFn: (text: string) => createCommentFn({ data: { subjectType, subjectId, body: text } }),
     onSuccess: () => {
       setBody("");
       qc.invalidateQueries({ queryKey: commentsKey });
@@ -216,7 +211,7 @@ export function PostEngagement({ subjectType, subjectId }: Props) {
 
       {/* Comments header */}
       <div className="flex items-center justify-between">
-        <h3 className="font-display text-sm font-bold uppercase tracking-wider text-muted-foreground">
+        <h3 className="section-eyebrow text-muted-foreground">
           Comments {commentsQ.data ? `· ${commentsQ.data.length}` : ""}
         </h3>
       </div>
@@ -262,9 +257,7 @@ export function PostEngagement({ subjectType, subjectId }: Props) {
             <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
           </div>
         ) : (commentsQ.data ?? []).length === 0 ? (
-          <p className="py-2 text-center text-xs text-muted-foreground">
-            Be the first to comment.
-          </p>
+          <p className="py-2 text-center text-xs text-muted-foreground">Be the first to comment.</p>
         ) : (
           (commentsQ.data ?? []).map((c) => {
             const isMine = user?.id === c.authorId;
@@ -279,9 +272,7 @@ export function PostEngagement({ subjectType, subjectId }: Props) {
                 />
                 <div className="flex-1 min-w-0">
                   <div className="flex items-baseline gap-2">
-                    <span className="text-xs font-bold truncate">
-                      {c.authorName ?? "Player"}
-                    </span>
+                    <span className="text-xs font-bold truncate">{c.authorName ?? "Player"}</span>
                     <span className="text-[10px] text-muted-foreground">
                       {formatWhen(c.createdAt)}
                     </span>

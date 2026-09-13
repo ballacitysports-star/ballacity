@@ -13,13 +13,7 @@
  */
 
 export type RetentionCategory =
-  | "account"
-  | "messages"
-  | "reports"
-  | "media"
-  | "ai_analysis"
-  | "logs"
-  | "payments";
+  "account" | "messages" | "reports" | "media" | "ai_analysis" | "logs" | "payments";
 
 export type RetentionRule = {
   category: RetentionCategory;
@@ -43,8 +37,7 @@ export const RETENTION_RULES: RetentionRule[] = [
     category: "account",
     label: "Account data",
     retention: "Kept while the account is active.",
-    contains:
-      "Profile details, profile types, availability, preferences and follow relationships.",
+    contains: "Profile details, profile types, availability, preferences and follow relationships.",
     onAccountDeletion:
       "Profile fields are scrubbed immediately, then the account and its own rows are deleted.",
     reason: "No reason to retain identifiable account data after deletion.",
@@ -112,8 +105,7 @@ export const RETENTION_RULES: RetentionRule[] = [
   {
     category: "ai_analysis",
     label: "AI analysis",
-    retention:
-      "Kept with the clip it describes; deletable at any time from AI & Video Privacy.",
+    retention: "Kept with the clip it describes; deletable at any time from AI & Video Privacy.",
     contains:
       "AI titles, captions, hashtags, detected moments, transcripts, sampled frames and coaching notes.",
     onAccountDeletion: "Deleted with the member's highlight reels and derived files.",
@@ -149,8 +141,7 @@ export const RETENTION_RULES: RetentionRule[] = [
       "Entry-fee submissions and their verification history, subscription status and purchase receipts. ballaCity never stores card or bank credentials.",
     onAccountDeletion:
       "The member's saved payout handles are deleted. Submissions, receipts and verification events are retained.",
-    reason:
-      "Hosts, disputes and accounting need the record of what was paid for which game.",
+    reason: "Hosts, disputes and accounting need the record of what was paid for which game.",
     survivesDeletion: true,
     sources: [
       "payment_submissions",

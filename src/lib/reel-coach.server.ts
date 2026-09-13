@@ -114,8 +114,7 @@ export async function callReelJson(
 const SPORT_HINTS: Record<string, string> = {
   basketball:
     "Use hoops language (bucket, handles, and-1, dime, poster) and reference court actions only if the footage shows them.",
-  football:
-    "Use football language (route, pocket, snag, six) and stay accurate about pass vs run.",
+  football: "Use football language (route, pocket, snag, six) and stay accurate about pass vs run.",
   soccer: "Use football/soccer language (finish, first touch, curler, keeper) with global appeal.",
   baseball: "Use baseball language (barrel, gap, frozen rope, dish) without inventing counts.",
   softball: "Use softball language (barrel, gap, dish) without inventing counts.",

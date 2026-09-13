@@ -105,7 +105,8 @@ export const EXPORT_CATEGORIES: Array<{
   {
     id: "ai_analysis",
     label: "AI analysis metadata",
-    description: "AI titles, captions, hashtags, detected moments and coaching notes on your clips.",
+    description:
+      "AI titles, captions, hashtags, detected moments and coaching notes on your clips.",
   },
   {
     id: "safety",

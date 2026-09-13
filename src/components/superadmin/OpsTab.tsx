@@ -179,18 +179,13 @@ export function OpsTab() {
               <SelectItem value="gym">Gyms</SelectItem>
             </SelectContent>
           </Select>
-          <Button
-            disabled={title.trim().length < 3}
-            onClick={() => setConfirmBroadcast(true)}
-          >
+          <Button disabled={title.trim().length < 3} onClick={() => setConfirmBroadcast(true)}>
             Send announcement
           </Button>
         </CardContent>
       </Card>
 
       <PushTester />
-
-
 
       <Card className="lg:col-span-2">
         <CardHeader className="pb-2">

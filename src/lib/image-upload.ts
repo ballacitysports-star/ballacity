@@ -75,9 +75,7 @@ export async function uploadDataUrlToBucket(
   const check = await finalizeImageUpload({ data: { bucket, path } });
   if (check?.quarantined) {
     void refreshBlockedImages();
-    throw new Error(
-      "This image was flagged by our automated safety check and is pending review.",
-    );
+    throw new Error("This image was flagged by our automated safety check and is pending review.");
   }
 
   if ((PRIVATE_BUCKETS as Record<string, true>)[bucket]) {

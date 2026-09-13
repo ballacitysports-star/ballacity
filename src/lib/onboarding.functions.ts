@@ -87,16 +87,13 @@ export const getOnboardingStatus = createServerFn({ method: "GET" })
       .select("account_type")
       .eq("id", userId)
       .maybeSingle();
-    const accountType =
-      (profile as { account_type?: string | null } | null)?.account_type ?? null;
+    const accountType = (profile as { account_type?: string | null } | null)?.account_type ?? null;
 
     let identities: Array<{ provider: string }> = [];
     let appMetadataProvider: string | null = null;
     let adminLookupFailed = false;
     try {
-      const { supabaseAdmin } = await import(
-        "@/integrations/supabase/client.server"
-      );
+      const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
       const { data } = await supabaseAdmin.auth.admin.getUserById(userId);
       identities = (data?.user?.identities ?? []).map((i) => ({
         provider: i.provider,
@@ -120,4 +117,3 @@ export const getOnboardingStatus = createServerFn({ method: "GET" })
       adminLookupFailed,
     });
   });
-

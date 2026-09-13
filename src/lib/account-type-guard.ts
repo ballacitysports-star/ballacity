@@ -24,7 +24,6 @@ export async function requireAccountType(
     throw new Error("Your account has no profile yet. Please sign in again.");
   }
   const type = (data as { account_type?: string | null }).account_type as
-    | AccountTypeName
-    | undefined;
+    AccountTypeName | undefined;
   return type ?? "player";
 }

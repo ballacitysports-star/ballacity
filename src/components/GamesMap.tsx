@@ -390,9 +390,7 @@ export function GamesMap({
 
     pins.forEach((p) => {
       if (existing.has(p.id)) return;
-      const position = p.real
-        ? { lat: p.lat, lng: p.lng }
-        : toLatLng(p.lng, p.lat, center);
+      const position = p.real ? { lat: p.lat, lng: p.lng } : toLatLng(p.lng, p.lat, center);
       const marker = new window.google.maps.Marker({
         position,
         map: mapRef.current,

@@ -152,8 +152,8 @@ export function YouthTab() {
         <p className="text-xs text-muted-foreground">{CHILD_POLICY_DISCLAIMER}</p>
         <p className="text-xs text-muted-foreground">
           Members of every age are supported. Accounts at or under the consent age stay
-          feature-locked until a parent or guardian approves them — these settings tune the
-          cohorts and protections, and the database enforces the same values.
+          feature-locked until a parent or guardian approves them — these settings tune the cohorts
+          and protections, and the database enforces the same values.
         </p>
       </div>
 

@@ -2,12 +2,7 @@ import { Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { ArrowLeft, ArrowRight, Check, Sparkles, X, Plus, MapPin } from "lucide-react";
-import {
-  SPORTS,
-  HERO_IMAGE,
-  type Sport,
-  type Org,
-} from "@/lib/sample-data";
+import { SPORTS, HERO_IMAGE, type Sport, type Org } from "@/lib/sample-data";
 import { addOrg } from "@/lib/org-store";
 import { SESSION_TYPES } from "@/lib/sport-config";
 import { LocationAutocomplete } from "@/components/LocationAutocomplete";
@@ -24,7 +19,11 @@ import { loadDraft, useDraftPersistence } from "@/components/create/useDraftPers
 import { SaveStatus } from "@/components/SaveStatus";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { listTrainerOrgs, createTrainerOrg, requestToJoinTrainerOrg } from "@/lib/trainer-orgs.functions";
+import {
+  listTrainerOrgs,
+  createTrainerOrg,
+  requestToJoinTrainerOrg,
+} from "@/lib/trainer-orgs.functions";
 import { autocompletePlaces, getPlaceDetails } from "@/lib/places.functions";
 import { toast } from "sonner";
 import { setActiveProfileByRef, myProfilesKey } from "@/lib/account-profiles";
@@ -32,9 +31,12 @@ import { setActiveProfileByRef, myProfilesKey } from "@/lib/account-profiles";
 const STEP_LABELS = ["Basics", "Expertise", "Where", "Availability"] as const;
 const SKILL_LABELS = ["Beginner", "Recreational", "Intermediate", "Advanced", "Pro"] as const;
 
-
-
-type Slot = { day: "mon" | "tue" | "wed" | "thu" | "fri" | "sat" | "sun"; start: string; end: string; venue?: string };
+type Slot = {
+  day: "mon" | "tue" | "wed" | "thu" | "fri" | "sat" | "sun";
+  start: string;
+  end: string;
+  venue?: string;
+};
 
 type VenueEntry = {
   address: string;
@@ -60,7 +62,11 @@ type Draft = {
   venues: VenueEntry[];
   primaryVenueIdx: number;
   slots: Slot[];
-  overrides: { date: string; closed?: boolean; windows?: { start: string; end: string; venue?: string }[] }[];
+  overrides: {
+    date: string;
+    closed?: boolean;
+    windows?: { start: string; end: string; venue?: string }[];
+  }[];
   rules: AvailabilityRule[];
   timezone: string;
   orgChoice: {
@@ -75,7 +81,6 @@ type Draft = {
   avatarUrl: string | null;
   coverUrl: string | null;
 };
-
 
 const DRAFT_KEY = "openrun.trainer-wizard.draft.v1";
 
@@ -135,15 +140,22 @@ export function CreateTrainerWizard() {
   const { user } = useAuth();
   const qc = useQueryClient();
 
-
   const [draft, setDraft] = useState<Draft>(() => {
     if (typeof window === "undefined") return initialDraft();
-    const stored = loadDraft<Draft & { venue?: string; venuePlaceId?: string; venueGeo?: { lat: number; lng: number } | null }>(DRAFT_KEY);
+    const stored = loadDraft<
+      Draft & {
+        venue?: string;
+        venuePlaceId?: string;
+        venueGeo?: { lat: number; lng: number } | null;
+      }
+    >(DRAFT_KEY);
     if (!stored) return initialDraft();
     // Migrate legacy single-venue drafts into the new venues[] shape.
     let venues: VenueEntry[] = Array.isArray(stored.venues) ? stored.venues : [];
     if (venues.length === 0 && stored.venue) {
-      venues = [{ address: stored.venue, placeId: stored.venuePlaceId ?? "", geo: stored.venueGeo ?? null }];
+      venues = [
+        { address: stored.venue, placeId: stored.venuePlaceId ?? "", geo: stored.venueGeo ?? null },
+      ];
     }
     return { ...initialDraft(), ...stored, venues, primaryVenueIdx: stored.primaryVenueIdx ?? 0 };
   });
@@ -173,7 +185,9 @@ export function CreateTrainerWizard() {
   const { coords: userCoords, status: geoStatus, request: requestUserLocation } = useUserLocation();
   const [orgSearchDebounced, setOrgSearchDebounced] = useState("");
   const [placesSessionToken, setPlacesSessionToken] = useState<string>(() =>
-    typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).slice(2),
+    typeof crypto !== "undefined" && crypto.randomUUID
+      ? crypto.randomUUID()
+      : Math.random().toString(36).slice(2),
   );
   useEffect(() => {
     const t = window.setTimeout(() => setOrgSearchDebounced(orgSearch.trim()), 250);
@@ -218,7 +232,9 @@ export function CreateTrainerWizard() {
     }));
     const tokenAtPick = placesSessionToken;
     setPlacesSessionToken(
-      typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).slice(2),
+      typeof crypto !== "undefined" && crypto.randomUUID
+        ? crypto.randomUUID()
+        : Math.random().toString(36).slice(2),
     );
     try {
       const details = await placesDetails({ data: { placeId: id, sessionToken: tokenAtPick } });
@@ -258,7 +274,10 @@ export function CreateTrainerWizard() {
   const setStep = (n: number) => setDraft((d) => ({ ...d, step: n }));
 
   const sports = useMemo(
-    () => (draft.primarySport ? [draft.primarySport, ...draft.extraSports.filter((s) => s !== draft.primarySport)] : []),
+    () =>
+      draft.primarySport
+        ? [draft.primarySport, ...draft.extraSports.filter((s) => s !== draft.primarySport)]
+        : [],
     [draft.primarySport, draft.extraSports],
   );
 
@@ -267,14 +286,21 @@ export function CreateTrainerWizard() {
     () => draft.venues.filter((v) => v.address.trim() && v.placeId),
     [draft.venues],
   );
-  const primaryVenue: VenueEntry | null = verifiedVenues[Math.min(draft.primaryVenueIdx, Math.max(verifiedVenues.length - 1, 0))] ?? verifiedVenues[0] ?? null;
+  const primaryVenue: VenueEntry | null =
+    verifiedVenues[Math.min(draft.primaryVenueIdx, Math.max(verifiedVenues.length - 1, 0))] ??
+    verifiedVenues[0] ??
+    null;
   const verifiedVenueAddresses = verifiedVenues.map((v) => v.address);
   const venueOk = verifiedVenues.length > 0;
 
-
   const canNext = useMemo(() => {
     if (step === 0)
-      return draft.name.trim().length > 1 && draft.handle.trim().length > 1 && !!draft.primarySport && draft.city.trim().length > 0;
+      return (
+        draft.name.trim().length > 1 &&
+        draft.handle.trim().length > 1 &&
+        !!draft.primarySport &&
+        draft.city.trim().length > 0
+      );
     if (step === 1) return bioOk;
     if (step === 2) return venueOk;
     return true;
@@ -287,7 +313,9 @@ export function CreateTrainerWizard() {
     kind: "coach",
     name: draft.name || "Your trainer profile",
     handle: draft.handle.startsWith("@") ? draft.handle : `@${draft.handle || "handle"}`,
-    tagline: draft.tagline || (draft.primarySport ? `${draft.primarySport} trainer` : "Add a short tagline"),
+    tagline:
+      draft.tagline ||
+      (draft.primarySport ? `${draft.primarySport} trainer` : "Add a short tagline"),
     city: draft.city || "Your city",
     founded: new Date().getFullYear(),
     sports: sports.length ? sports : (["Basketball"] as Sport[]),
@@ -323,7 +351,10 @@ export function CreateTrainerWizard() {
     setSubmitting(true);
     setSubmitError(null);
     const id = `c-${(draft.name || "trainer").toLowerCase().replace(/[^a-z0-9]+/g, "-")}-${Date.now().toString(36).slice(-4)}`;
-    const handleClean = draft.handle.replace(/^@/, "").replace(/[^a-z0-9_]/gi, "").toLowerCase();
+    const handleClean = draft.handle
+      .replace(/^@/, "")
+      .replace(/[^a-z0-9_]/gi, "")
+      .toLowerCase();
     const org: Org = {
       ...previewOrg,
       id,
@@ -336,11 +367,14 @@ export function CreateTrainerWizard() {
         try {
           await joinOrg({ data: { orgId: draft.orgChoice.orgId, trainerId: saved.id } });
         } catch {
-          toast.message("Profile published — couldn't send org join request. Try again from your profile.");
+          toast.message(
+            "Profile published — couldn't send org join request. Try again from your profile.",
+          );
         }
       } else if (draft.orgChoice.mode === "new" && draft.orgChoice.name) {
         try {
-          const orgHandle = slugifyHandle(draft.orgChoice.name) || `org${Date.now().toString(36).slice(-4)}`;
+          const orgHandle =
+            slugifyHandle(draft.orgChoice.name) || `org${Date.now().toString(36).slice(-4)}`;
           await createOrg({
             data: {
               name: draft.orgChoice.name,
@@ -352,7 +386,6 @@ export function CreateTrainerWizard() {
               geo: draft.orgChoice.geo ?? undefined,
             },
           });
-
         } catch {
           toast.message("Profile published — couldn't create the org. Add it from your profile.");
         }
@@ -394,7 +427,6 @@ export function CreateTrainerWizard() {
             {step === 1 && "Your expertise"}
             {step === 2 && "Where you train"}
             {step === 3 && "When you're available"}
-            
           </h1>
           <SaveStatus {...draftStatus} savedLabel="Draft saved" className="mt-0.5" />
         </div>
@@ -613,7 +645,9 @@ export function CreateTrainerWizard() {
                 {draft.orgChoice.mode === "existing" && draft.orgChoice.orgId ? (
                   <div className="flex items-center justify-between rounded-2xl border border-lime/40 bg-lime/10 px-3 py-2.5">
                     <div className="min-w-0">
-                      <div className="text-[10px] uppercase tracking-wider text-lime font-bold">Join request on publish</div>
+                      <div className="text-[10px] uppercase tracking-wider text-lime font-bold">
+                        Join request on publish
+                      </div>
                       <div className="truncate text-sm font-bold">{draft.orgChoice.name}</div>
                     </div>
                     <button
@@ -629,7 +663,9 @@ export function CreateTrainerWizard() {
                   <div className="space-y-2">
                     <div className="flex items-center justify-between rounded-2xl border border-coral/40 bg-coral/10 px-3 py-2.5">
                       <div className="min-w-0">
-                        <div className="text-[10px] uppercase tracking-wider text-coral font-bold">You'll own this new org</div>
+                        <div className="text-[10px] uppercase tracking-wider text-coral font-bold">
+                          You'll own this new org
+                        </div>
                         <div className="truncate text-sm font-bold">{draft.orgChoice.name}</div>
                       </div>
                       <button
@@ -675,7 +711,6 @@ export function CreateTrainerWizard() {
                       </div>
                     )}
                   </div>
-
                 ) : (
                   <>
                     <input
@@ -704,39 +739,47 @@ export function CreateTrainerWizard() {
                             <div className="min-w-0">
                               <div className="truncate text-sm font-bold">{o.name}</div>
                               <div className="text-[11px] text-muted-foreground">
-                                @{o.handle}{o.city ? ` · ${o.city}` : ""}
+                                @{o.handle}
+                                {o.city ? ` · ${o.city}` : ""}
                               </div>
                             </div>
                             <Plus className="h-4 w-4 text-lime shrink-0" />
                           </button>
                         ))}
-                        {orgResults.data && orgResults.data.length === 0 && !orgResults.isLoading && (
-                          <div className="text-[11px] text-muted-foreground">No match on ballaCity.</div>
-                        )}
-                        {placesResults.data?.suggestions && placesResults.data.suggestions.length > 0 && (
-                          <>
-                            <div className="pt-1 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-                              From Google
+                        {orgResults.data &&
+                          orgResults.data.length === 0 &&
+                          !orgResults.isLoading && (
+                            <div className="text-[11px] text-muted-foreground">
+                              No match on ballaCity.
                             </div>
-                            {placesResults.data.suggestions.map((s) => (
-                              <button
-                                key={s.id}
-                                type="button"
-                                onClick={() => pickPlaceAsNewOrg(s.id, s.primary, s.secondary)}
-                                className="flex w-full items-start gap-2 rounded-2xl border border-border bg-surface px-3 py-2.5 text-left hover:border-lime"
-                              >
-                                <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-coral" />
-                                <div className="min-w-0 flex-1">
-                                  <div className="truncate text-sm font-bold">{s.primary}</div>
-                                  {s.secondary && (
-                                    <div className="truncate text-[11px] text-muted-foreground">{s.secondary}</div>
-                                  )}
-                                </div>
-                                <Plus className="h-4 w-4 text-lime shrink-0" />
-                              </button>
-                            ))}
-                          </>
-                        )}
+                          )}
+                        {placesResults.data?.suggestions &&
+                          placesResults.data.suggestions.length > 0 && (
+                            <>
+                              <div className="pt-1 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                                From Google
+                              </div>
+                              {placesResults.data.suggestions.map((s) => (
+                                <button
+                                  key={s.id}
+                                  type="button"
+                                  onClick={() => pickPlaceAsNewOrg(s.id, s.primary, s.secondary)}
+                                  className="flex w-full items-start gap-2 rounded-2xl border border-border bg-surface px-3 py-2.5 text-left hover:border-lime"
+                                >
+                                  <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-coral" />
+                                  <div className="min-w-0 flex-1">
+                                    <div className="truncate text-sm font-bold">{s.primary}</div>
+                                    {s.secondary && (
+                                      <div className="truncate text-[11px] text-muted-foreground">
+                                        {s.secondary}
+                                      </div>
+                                    )}
+                                  </div>
+                                  <Plus className="h-4 w-4 text-lime shrink-0" />
+                                </button>
+                              ))}
+                            </>
+                          )}
                         {placesResults.isLoading && (
                           <div className="text-[11px] text-muted-foreground">Searching Google…</div>
                         )}
@@ -758,8 +801,6 @@ export function CreateTrainerWizard() {
                   </>
                 )}
               </Section>
-
-
 
               <Section title="Hourly rate">
                 <div className="rounded-2xl border border-border bg-surface p-4">
@@ -789,32 +830,48 @@ export function CreateTrainerWizard() {
                   </div>
                   <div className="grid grid-cols-2 gap-2">
                     <label className="rounded-xl border border-border bg-background/60 px-3 py-2">
-                      <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Min</div>
+                      <div className="text-[10px] uppercase tracking-wider text-muted-foreground">
+                        Min
+                      </div>
                       <select
                         value={draft.skillMin}
                         onChange={(e) => {
                           const v = +e.target.value;
-                          setDraft((d) => ({ ...d, skillMin: v, skillMax: Math.max(v, d.skillMax) }));
+                          setDraft((d) => ({
+                            ...d,
+                            skillMin: v,
+                            skillMax: Math.max(v, d.skillMax),
+                          }));
                         }}
                         className="w-full bg-transparent text-sm font-bold outline-none"
                       >
                         {SKILL_LABELS.map((l, i) => (
-                          <option key={l} value={i + 1}>{l}</option>
+                          <option key={l} value={i + 1}>
+                            {l}
+                          </option>
                         ))}
                       </select>
                     </label>
                     <label className="rounded-xl border border-border bg-background/60 px-3 py-2">
-                      <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Max</div>
+                      <div className="text-[10px] uppercase tracking-wider text-muted-foreground">
+                        Max
+                      </div>
                       <select
                         value={draft.skillMax}
                         onChange={(e) => {
                           const v = +e.target.value;
-                          setDraft((d) => ({ ...d, skillMax: v, skillMin: Math.min(v, d.skillMin) }));
+                          setDraft((d) => ({
+                            ...d,
+                            skillMax: v,
+                            skillMin: Math.min(v, d.skillMin),
+                          }));
                         }}
                         className="w-full bg-transparent text-sm font-bold outline-none"
                       >
                         {SKILL_LABELS.map((l, i) => (
-                          <option key={l} value={i + 1}>{l}</option>
+                          <option key={l} value={i + 1}>
+                            {l}
+                          </option>
                         ))}
                       </select>
                     </label>
@@ -843,10 +900,14 @@ export function CreateTrainerWizard() {
                             <div className="min-w-0 flex-1">
                               <div className="flex items-center gap-1.5">
                                 {isPrimary && (
-                                  <span className="text-[10px] uppercase tracking-wider text-lime font-bold">★ Primary</span>
+                                  <span className="text-[10px] uppercase tracking-wider text-lime font-bold">
+                                    ★ Primary
+                                  </span>
                                 )}
                                 {!v.placeId && (
-                                  <span className="text-[10px] uppercase tracking-wider text-coral font-bold">Unverified</span>
+                                  <span className="text-[10px] uppercase tracking-wider text-coral font-bold">
+                                    Unverified
+                                  </span>
                                 )}
                               </div>
                               <div className="truncate text-sm font-semibold">{v.address}</div>
@@ -856,8 +917,11 @@ export function CreateTrainerWizard() {
                                 <button
                                   type="button"
                                   onClick={() => {
-                                    const target = verifiedVenues.findIndex((x) => x.placeId === v.placeId);
-                                    if (target >= 0) setDraft((d) => ({ ...d, primaryVenueIdx: target }));
+                                    const target = verifiedVenues.findIndex(
+                                      (x) => x.placeId === v.placeId,
+                                    );
+                                    if (target >= 0)
+                                      setDraft((d) => ({ ...d, primaryVenueIdx: target }));
                                   }}
                                   className="rounded-full border border-border bg-background px-2 py-1 text-[10px] font-bold hover:border-lime"
                                 >
@@ -869,8 +933,13 @@ export function CreateTrainerWizard() {
                                 onClick={() =>
                                   setDraft((d) => {
                                     const nextVenues = d.venues.filter((_, i) => i !== idx);
-                                    const nextVerified = nextVenues.filter((x) => x.address.trim() && x.placeId);
-                                    const nextIdx = Math.min(d.primaryVenueIdx, Math.max(nextVerified.length - 1, 0));
+                                    const nextVerified = nextVenues.filter(
+                                      (x) => x.address.trim() && x.placeId,
+                                    );
+                                    const nextIdx = Math.min(
+                                      d.primaryVenueIdx,
+                                      Math.max(nextVerified.length - 1, 0),
+                                    );
                                     return { ...d, venues: nextVenues, primaryVenueIdx: nextIdx };
                                   })
                                 }
@@ -883,7 +952,12 @@ export function CreateTrainerWizard() {
                           </div>
                           {v.placeId && v.geo && (
                             <div className="mt-2">
-                              <VenueMapPreview address={v.address} lat={v.geo.lat} lng={v.geo.lng} placeId={v.placeId} />
+                              <VenueMapPreview
+                                address={v.address}
+                                lat={v.geo.lat}
+                                lng={v.geo.lng}
+                                placeId={v.placeId}
+                              />
                             </div>
                           )}
                         </li>
@@ -893,7 +967,9 @@ export function CreateTrainerWizard() {
                 )}
 
                 <div className="space-y-2">
-                  <label className="text-[11px] uppercase tracking-wider text-muted-foreground font-bold">Add a venue</label>
+                  <label className="text-[11px] uppercase tracking-wider text-muted-foreground font-bold">
+                    Add a venue
+                  </label>
                   <LocationAutocomplete
                     value={venueInput}
                     onChange={setVenueInput}
@@ -907,9 +983,15 @@ export function CreateTrainerWizard() {
                         }
                         const nextVenues = [
                           ...d.venues,
-                          { address: full, placeId, geo: geo ? { lat: geo.lat, lng: geo.lng } : null },
+                          {
+                            address: full,
+                            placeId,
+                            geo: geo ? { lat: geo.lat, lng: geo.lng } : null,
+                          },
                         ];
-                        const nextVerifiedLen = nextVenues.filter((x) => x.address.trim() && x.placeId).length;
+                        const nextVerifiedLen = nextVenues.filter(
+                          (x) => x.address.trim() && x.placeId,
+                        ).length;
                         const nextIdx = nextVerifiedLen === 1 ? 0 : d.primaryVenueIdx;
                         added = true;
                         return { ...d, venues: nextVenues, primaryVenueIdx: nextIdx };
@@ -919,17 +1001,18 @@ export function CreateTrainerWizard() {
                     placeholder="Start typing then pick a Google suggestion"
                   />
                   <p className="text-[11px] text-muted-foreground">
-                    You can add multiple venues and pick a different one for each availability window in the next step.
+                    You can add multiple venues and pick a different one for each availability
+                    window in the next step.
                   </p>
                 </div>
               </Section>
 
               <p className="text-[12px] text-muted-foreground">
-                Timezone auto-detected: <span className="text-foreground font-semibold">{draft.timezone}</span>
+                Timezone auto-detected:{" "}
+                <span className="text-foreground font-semibold">{draft.timezone}</span>
               </p>
             </div>
           )}
-
 
           {step === 3 && (
             <div className="space-y-5">
@@ -949,7 +1032,10 @@ export function CreateTrainerWizard() {
                 />
               </Section>
 
-              <Section title="Recurring rules (optional)" hint="For patterns like every other Tuesday.">
+              <Section
+                title="Recurring rules (optional)"
+                hint="For patterns like every other Tuesday."
+              >
                 <AvailabilityRulesEditor
                   value={draft.rules}
                   onChange={(rules) => setDraft((d) => ({ ...d, rules }))}
@@ -962,12 +1048,12 @@ export function CreateTrainerWizard() {
                   <OrgCard org={previewOrg} />
                 </div>
                 <div className="mt-2 inline-flex items-center gap-1.5 text-[11px] text-muted-foreground">
-                  <Sparkles className="h-3 w-3 text-lime" /> This is how athletes will see you in feeds.
+                  <Sparkles className="h-3 w-3 text-lime" /> This is how athletes will see you in
+                  feeds.
                 </div>
               </Section>
             </div>
           )}
-
         </motion.div>
       </AnimatePresence>
 
@@ -1046,7 +1132,7 @@ function Section({
   return (
     <div>
       <div className="mb-2 flex items-baseline justify-between gap-2">
-        <div className="text-xs font-bold uppercase tracking-wider text-muted-foreground">{title}</div>
+        <div className="section-eyebrow text-muted-foreground">{title}</div>
         {hint && <div className="text-[10px] text-muted-foreground text-right">{hint}</div>}
       </div>
       <div className="space-y-2">{children}</div>
@@ -1074,7 +1160,9 @@ function ChipPicker({
             type="button"
             onClick={() => onToggle(opt)}
             className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors ${
-              active ? "border-lime bg-lime/10 text-lime" : "border-border bg-surface text-muted-foreground hover:border-lime/40"
+              active
+                ? "border-lime bg-lime/10 text-lime"
+                : "border-border bg-surface text-muted-foreground hover:border-lime/40"
             }`}
             aria-pressed={active}
           >

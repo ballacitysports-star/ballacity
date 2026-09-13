@@ -63,7 +63,8 @@ export function buildFamilyApprovals(input: {
         id: `consent-revoked:${child.childUserId}`,
         source: "consent",
         title: `${child.displayName}'s account is paused`,
-        detail: "You withdrew consent. Their activity stays restricted until consent is given again.",
+        detail:
+          "You withdrew consent. Their activity stays restricted until consent is given again.",
         actionLabel: "Review consent",
         actionTo: "/parent",
         urgency: "action_needed",
@@ -96,7 +97,8 @@ export function buildFamilyApprovals(input: {
       id: `request:${request.id}`,
       source: "request",
       title: `${request.kind.replace(/_/g, " ")} request in progress`,
-      detail: request.details ?? "Our safety team is handling this. We'll email you when it's done.",
+      detail:
+        request.details ?? "Our safety team is handling this. We'll email you when it's done.",
       actionLabel: null,
       actionTo: null,
       urgency: "waiting",

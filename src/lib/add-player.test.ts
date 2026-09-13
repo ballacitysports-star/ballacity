@@ -48,9 +48,7 @@ describe("adding a child does not create a login", () => {
 
   it("requires only a name and a birthday to submit", () => {
     // A sport the parent does not know yet must not block creating the player.
-    expect(addPlayer).toMatch(
-      /canSubmit =[^;]*firstName\.trim\(\) !== ""[^;]*dob !== ""/,
-    );
+    expect(addPlayer).toMatch(/canSubmit =[^;]*firstName\.trim\(\) !== ""[^;]*dob !== ""/);
     expect(addPlayer).not.toMatch(/canSubmit =[^;]*sport !== ""/);
   });
 
@@ -88,9 +86,19 @@ describe("the onboarding fork", () => {
 
 describe("progressive completion (§5)", () => {
   const p: PlayerProfile = {
-    id: "p1", accountId: "a1", userId: null, displayName: "Jake Smith", slug: null,
-    dateOfBirth: "2013-06-04", ageCohort: "teen_13_15", avatarInitials: "JS",
-    avatarUrl: null, bio: null, location: null, primarySport: "Baseball", legacy: false,
+    id: "p1",
+    accountId: "a1",
+    userId: null,
+    displayName: "Jake Smith",
+    slug: null,
+    dateOfBirth: "2013-06-04",
+    ageCohort: "teen_13_15",
+    avatarInitials: "JS",
+    avatarUrl: null,
+    bio: null,
+    location: null,
+    primarySport: "Baseball",
+    legacy: false,
   };
 
   it("reports what is left rather than blocking", () => {

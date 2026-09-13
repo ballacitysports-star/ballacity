@@ -9,7 +9,6 @@ import softballCover from "@/assets/sport-softball.jpg";
 import runningCover from "@/assets/sport-running.jpg";
 import { earnedBadgeIds, makeBadgeStats, type BadgeStats } from "@/lib/badges";
 
-
 export type Sport =
   | "Baseball"
   | "Basketball"
@@ -43,7 +42,14 @@ export const POSITIONS_BY_SPORT: Record<Sport, string[]> = {
   Soccer: ["Goalkeeper", "Defender", "Midfielder", "Forward", "Winger"],
   Softball: ["Pitcher", "Catcher", "1B", "2B", "3B", "SS", "LF", "CF", "RF", "Utility"],
   Tennis: ["Singles", "Doubles"],
-  Volleyball: ["Setter", "Outside Hitter", "Opposite", "Middle Blocker", "Libero", "Defensive Specialist"],
+  Volleyball: [
+    "Setter",
+    "Outside Hitter",
+    "Opposite",
+    "Middle Blocker",
+    "Libero",
+    "Defensive Specialist",
+  ],
 };
 
 export type Game = {
@@ -117,9 +123,7 @@ export type Game = {
   cancellationNotes?: string | null;
   /** Format, scoring, and house rules players must follow. */
   gameRules?: string | null;
-
 };
-
 
 // Simple default cover: a soft duotone gradient tuned to each sport's accent
 // color, with the sport's emoji centered. Rendered as an inline SVG data URI
@@ -153,7 +157,7 @@ const sportImage: Record<Sport, string> = {
   Pickleball: pickleballCover,
   Volleyball: volleyballCover,
   Tennis: tennisCover,
-  "Football": footballCover,
+  Football: footballCover,
   Baseball: baseballCover,
   Softball: softballCover,
   Running: runningCover,
@@ -181,7 +185,6 @@ const inHours = (h: number) => new Date(now + h * 3600_000).toISOString();
 // game data: shipping fake rows into the feed and map made the live app look
 // populated with games nobody could actually attend.
 export const GAMES: Game[] = [];
-
 
 /** Sportsmanship trait tallies drawn from peer reviews. */
 export type SportsmanshipTraits = {
@@ -241,9 +244,21 @@ const ME_SPORTSMANSHIP = {
     onTime: 33,
   } satisfies SportsmanshipTraits,
   quotes: [
-    { author: "Jamie L.", body: "Always calls his own fouls. Great teammate.", sport: "Basketball" as Sport },
-    { author: "Priya S.", body: "On time, communicative, and hustles every play.", sport: "Soccer" as Sport },
-    { author: "Marcus T.", body: "Encourages everyone on the court, beginners included.", sport: "Pickleball" as Sport },
+    {
+      author: "Jamie L.",
+      body: "Always calls his own fouls. Great teammate.",
+      sport: "Basketball" as Sport,
+    },
+    {
+      author: "Priya S.",
+      body: "On time, communicative, and hustles every play.",
+      sport: "Soccer" as Sport,
+    },
+    {
+      author: "Marcus T.",
+      body: "Encourages everyone on the court, beginners included.",
+      sport: "Pickleball" as Sport,
+    },
   ],
 };
 
@@ -273,22 +288,66 @@ export const ME = {
   reliability: ME_RELIABILITY,
   sportsmanship: ME_SPORTSMANSHIP,
   sports: [
-    { name: "Basketball" as Sport, system: "SELF", tier: "Advanced", favorite: true, gamesPlayed: 24, winRate: 0.62 },
-    { name: "Soccer" as Sport, system: "SELF", tier: "Intermediate+", favorite: true, gamesPlayed: 14, winRate: 0.57 },
-    { name: "Pickleball" as Sport, system: "DUPR", tier: "3.5 DUPR", favorite: false, gamesPlayed: 9, winRate: 0.66 },
-    { name: "Tennis" as Sport, system: "NTRP", tier: "3.0 NTRP", favorite: false, gamesPlayed: 5, winRate: 0.4 },
-    { name: "Running" as Sport, system: "PACE", tier: "7:45/mi", favorite: false, gamesPlayed: 11, winRate: 0.0 },
+    {
+      name: "Basketball" as Sport,
+      system: "SELF",
+      tier: "Advanced",
+      favorite: true,
+      gamesPlayed: 24,
+      winRate: 0.62,
+    },
+    {
+      name: "Soccer" as Sport,
+      system: "SELF",
+      tier: "Intermediate+",
+      favorite: true,
+      gamesPlayed: 14,
+      winRate: 0.57,
+    },
+    {
+      name: "Pickleball" as Sport,
+      system: "DUPR",
+      tier: "3.5 DUPR",
+      favorite: false,
+      gamesPlayed: 9,
+      winRate: 0.66,
+    },
+    {
+      name: "Tennis" as Sport,
+      system: "NTRP",
+      tier: "3.0 NTRP",
+      favorite: false,
+      gamesPlayed: 5,
+      winRate: 0.4,
+    },
+    {
+      name: "Running" as Sport,
+      system: "PACE",
+      tier: "7:45/mi",
+      favorite: false,
+      gamesPlayed: 11,
+      winRate: 0.0,
+    },
   ] satisfies MeSport[],
   /** Derived from attendance reliability + sportsmanship, never from skill. */
   badges: earnedBadgeIds(ME_BADGE_STATS),
 
   recentActivity: [
-    { kind: "played", label: "Sunday Run at Rucker", when: "2 days ago", sport: "Basketball" as Sport },
-    { kind: "hosted", label: "Pickleball open play", when: "5 days ago", sport: "Pickleball" as Sport },
+    {
+      kind: "played",
+      label: "Sunday Run at Rucker",
+      when: "2 days ago",
+      sport: "Basketball" as Sport,
+    },
+    {
+      kind: "hosted",
+      label: "Pickleball open play",
+      when: "5 days ago",
+      sport: "Pickleball" as Sport,
+    },
     { kind: "review", label: "Received a 5★ review", when: "1 week ago", sport: "Soccer" as Sport },
   ],
 };
-
 
 // ============= Teams & Coaches =============
 
@@ -357,8 +416,17 @@ export type Org = {
   sessionTypes?: string[];
   /** IANA timezone the trainer's schedule is anchored to (e.g. "America/New_York"). */
   timezone?: string;
-  availabilitySlots?: { day: "mon" | "tue" | "wed" | "thu" | "fri" | "sat" | "sun"; start: string; end: string; venue?: string }[];
-  availabilityOverrides?: { date: string; closed?: boolean; windows?: { start: string; end: string; venue?: string }[] }[];
+  availabilitySlots?: {
+    day: "mon" | "tue" | "wed" | "thu" | "fri" | "sat" | "sun";
+    start: string;
+    end: string;
+    venue?: string;
+  }[];
+  availabilityOverrides?: {
+    date: string;
+    closed?: boolean;
+    windows?: { start: string; end: string; venue?: string }[];
+  }[];
   availabilityRules?: {
     id: string;
     label?: string;

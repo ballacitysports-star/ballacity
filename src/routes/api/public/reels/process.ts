@@ -29,10 +29,10 @@ export const Route = createFileRoute("/api/public/reels/process")({
           }
         } else {
           // Fail closed when the secret hasn't been configured yet.
-          return new Response(
-            JSON.stringify({ error: "REELS_WORKER_SECRET not configured" }),
-            { status: 503, headers: { "Content-Type": "application/json" } },
-          );
+          return new Response(JSON.stringify({ error: "REELS_WORKER_SECRET not configured" }), {
+            status: 503,
+            headers: { "Content-Type": "application/json" },
+          });
         }
 
         const apiKey = process.env.LOVABLE_API_KEY;

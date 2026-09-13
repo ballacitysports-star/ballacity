@@ -8,10 +8,7 @@ import {
   telHref,
   websiteHref,
 } from "@/lib/org-listing";
-import {
-  normalizeProfileUrl,
-  validateProfileUrl,
-} from "@/components/profile/ProfileLinksFields";
+import { normalizeProfileUrl, validateProfileUrl } from "@/components/profile/ProfileLinksFields";
 
 describe("listing action links", () => {
   it("normalizes scheme-less websites", () => {
@@ -56,7 +53,9 @@ describe("listing action links", () => {
   it("builds directions from address, coords, or place id", () => {
     expect(directionsHref({ address: "123 city" })).toContain("destination=123+city");
     expect(directionsHref({ lat: 30.1, lng: -97.5 })).toContain("destination=30.1%2C-97.5");
-    expect(directionsHref({ address: "x y", placeId: "abc" })).toContain("destination_place_id=abc");
+    expect(directionsHref({ address: "x y", placeId: "abc" })).toContain(
+      "destination_place_id=abc",
+    );
     expect(directionsHref({ address: "  ", lat: null, lng: null })).toBe(null);
     expect(directionsHref({})).toBe(null);
   });
@@ -67,7 +66,14 @@ const at = (iso: string) => new Date(iso);
 
 describe("org hours", () => {
   it("drops malformed ranges when parsing", () => {
-    const h = parseHours({ "1": { ranges: [{ open: "9:00", close: "21:00" }, { open: "09:00", close: "21:00" }] } });
+    const h = parseHours({
+      "1": {
+        ranges: [
+          { open: "9:00", close: "21:00" },
+          { open: "09:00", close: "21:00" },
+        ],
+      },
+    });
     expect(h["1"].ranges).toEqual([{ open: "09:00", close: "21:00" }]);
   });
 

@@ -112,10 +112,7 @@ export function NearbyPlayersPanel({
     return map;
   }, [uniqueCities, cityQueries]);
 
-  const mine = useMemo(
-    () => new Set((mySports ?? []).map((s) => s.toLowerCase())),
-    [mySports],
-  );
+  const mine = useMemo(() => new Set((mySports ?? []).map((s) => s.toLowerCase())), [mySports]);
 
   const ranked = useMemo(() => {
     if (!origin) return [];
@@ -141,16 +138,13 @@ export function NearbyPlayersPanel({
       .slice(0, limit);
   }, [candidates, cityCoords, origin, relation, mine, limit]);
 
-  const resolving =
-    !!origin && cityQueries.some((q) => q.isLoading) && ranked.length === 0;
+  const resolving = !!origin && cityQueries.some((q) => q.isLoading) && ranked.length === 0;
 
   // Nearest players render first, so their photos get the urgent tier.
   usePrefetchUserAvatars(
     ranked.map((r) => r.player.user_id),
     "high",
   );
-
-
 
   const [open, setOpen] = useState(false);
 
@@ -208,106 +202,105 @@ export function NearbyPlayersPanel({
         </DrawerHeader>
 
         <div className="overflow-y-auto px-4 pb-6">
-
-
-      <div className="mt-3 flex gap-2">
-        {RELATIONS.map((r) => {
-          const active = relation === r.id;
-          const Icon = r.icon;
-          return (
-            <button
-              key={r.id}
-              onClick={() => setRelation(r.id)}
-              aria-pressed={active}
-              className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors ${
-                active
-                  ? "border-lime bg-lime text-primary-foreground"
-                  : "border-border bg-surface text-muted-foreground"
-              }`}
-            >
-              <Icon className="h-3.5 w-3.5" />
-              {r.label}
-            </button>
-          );
-        })}
-      </div>
-
-      {status === "denied" && !origin && (
-        <p className="mt-3 text-xs text-muted-foreground">
-          Location is blocked.{" "}
-          <Link to="/profile/edit" className="text-lime font-semibold">
-            Set your city
-          </Link>{" "}
-          to see nearby players instead.
-        </p>
-      )}
-
-      {!origin && status !== "denied" && (
-        <p className="mt-3 text-xs text-muted-foreground">
-          {originQuery.isLoading
-            ? "Finding your area…"
-            : "We’ll rank players by how far they are from you."}
-        </p>
-      )}
-
-      {origin && (resolving ? (
-        <p className="mt-3 text-xs text-muted-foreground inline-flex items-center gap-2">
-          <Loader2 className="h-3.5 w-3.5 animate-spin" /> Locating players…
-        </p>
-      ) : ranked.length === 0 ? (
-        <p className="mt-3 text-xs text-muted-foreground">
-          No {relation === "all" ? "players" : relation} with a listed city yet. Try a wider
-          sport filter.
-        </p>
-      ) : (
-        <div className="-mx-4 mt-3 overflow-x-auto px-4">
-          <div className="flex gap-3 pb-1">
-            {ranked.map(({ player: p, km, shared }) => (
-              <Link
-                key={p.user_id}
-                to="/players/$userId"
-                params={{ userId: p.user_id }}
-                onClick={() => setOpen(false)}
-                className="w-40 shrink-0 rounded-2xl border border-border bg-surface p-3"
-              >
-                <UserAvatar
-                  name={p.author_name}
-                  initials={p.author_initials}
-                  avatarUrl={p.author_avatar_url}
-                  className="h-12 w-12 rounded-xl"
-                />
-                <h3 className="mt-2 truncate text-sm font-bold">{p.author_name}</h3>
-                <div className="mt-0.5 flex items-center gap-1 text-[11px] text-muted-foreground">
-                  <span>{emojiBySport[p.sports?.[0] ?? ""] ?? "🧑"}</span>
-                  <span className="truncate">{p.sports?.[0] ?? "Player"}</span>
-                </div>
-                {(() => {
-                  // Profile tier first, post's own level as fallback.
-                  const level = resolvePlayerLevel(
-                    p.author_sport_levels,
-                    p.sports?.[0] ?? null,
-                    p.skill_level,
-                  );
-                  const text = formatSportLevel(level);
-                  return text ? (
-                    <span className="mt-1 inline-block rounded-full bg-lime/15 px-2 py-0.5 text-[10px] font-bold text-lime">
-                      {text}
-                    </span>
-                  ) : null;
-                })()}
-
-                <div className="mt-1.5 flex items-center gap-1 text-[11px] font-semibold text-lime">
-                  <MapPin className="h-3 w-3" />
-                  <Distance km={km} decimals={km < 10 ? 1 : 0} /> away
-                </div>
-                <span className="mt-1.5 inline-block rounded-full border border-border px-2 py-0.5 text-[10px] text-muted-foreground">
-                  {shared ? "Teammate" : "Competitor"}
-                </span>
-              </Link>
-            ))}
+          <div className="mt-3 flex gap-2">
+            {RELATIONS.map((r) => {
+              const active = relation === r.id;
+              const Icon = r.icon;
+              return (
+                <button
+                  key={r.id}
+                  onClick={() => setRelation(r.id)}
+                  aria-pressed={active}
+                  className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors ${
+                    active
+                      ? "border-lime bg-lime text-primary-foreground"
+                      : "border-border bg-surface text-muted-foreground"
+                  }`}
+                >
+                  <Icon className="h-3.5 w-3.5" />
+                  {r.label}
+                </button>
+              );
+            })}
           </div>
-        </div>
-      ))}
+
+          {status === "denied" && !origin && (
+            <p className="mt-3 text-xs text-muted-foreground">
+              Location is blocked.{" "}
+              <Link to="/profile/edit" className="text-lime font-semibold">
+                Set your city
+              </Link>{" "}
+              to see nearby players instead.
+            </p>
+          )}
+
+          {!origin && status !== "denied" && (
+            <p className="mt-3 text-xs text-muted-foreground">
+              {originQuery.isLoading
+                ? "Finding your area…"
+                : "We’ll rank players by how far they are from you."}
+            </p>
+          )}
+
+          {origin &&
+            (resolving ? (
+              <p className="mt-3 text-xs text-muted-foreground inline-flex items-center gap-2">
+                <Loader2 className="h-3.5 w-3.5 animate-spin" /> Locating players…
+              </p>
+            ) : ranked.length === 0 ? (
+              <p className="mt-3 text-xs text-muted-foreground">
+                No {relation === "all" ? "players" : relation} with a listed city yet. Try a wider
+                sport filter.
+              </p>
+            ) : (
+              <div className="-mx-4 mt-3 overflow-x-auto px-4">
+                <div className="flex gap-3 pb-1">
+                  {ranked.map(({ player: p, km, shared }) => (
+                    <Link
+                      key={p.user_id}
+                      to="/players/$userId"
+                      params={{ userId: p.user_id }}
+                      onClick={() => setOpen(false)}
+                      className="w-40 shrink-0 rounded-2xl border border-border bg-surface p-3"
+                    >
+                      <UserAvatar
+                        name={p.author_name}
+                        initials={p.author_initials}
+                        avatarUrl={p.author_avatar_url}
+                        className="h-12 w-12 rounded-xl"
+                      />
+                      <h3 className="mt-2 truncate text-sm font-bold">{p.author_name}</h3>
+                      <div className="mt-0.5 flex items-center gap-1 text-[11px] text-muted-foreground">
+                        <span>{emojiBySport[p.sports?.[0] ?? ""] ?? "🧑"}</span>
+                        <span className="truncate">{p.sports?.[0] ?? "Player"}</span>
+                      </div>
+                      {(() => {
+                        // Profile tier first, post's own level as fallback.
+                        const level = resolvePlayerLevel(
+                          p.author_sport_levels,
+                          p.sports?.[0] ?? null,
+                          p.skill_level,
+                        );
+                        const text = formatSportLevel(level);
+                        return text ? (
+                          <span className="mt-1 inline-block rounded-full bg-lime/15 px-2 py-0.5 text-[10px] font-bold text-lime">
+                            {text}
+                          </span>
+                        ) : null;
+                      })()}
+
+                      <div className="mt-1.5 flex items-center gap-1 text-[11px] font-semibold text-lime">
+                        <MapPin className="h-3 w-3" />
+                        <Distance km={km} decimals={km < 10 ? 1 : 0} /> away
+                      </div>
+                      <span className="mt-1.5 inline-block rounded-full border border-border px-2 py-0.5 text-[10px] text-muted-foreground">
+                        {shared ? "Teammate" : "Competitor"}
+                      </span>
+                    </Link>
+                  ))}
+                </div>
+              </div>
+            ))}
         </div>
       </DrawerContent>
     </Drawer>

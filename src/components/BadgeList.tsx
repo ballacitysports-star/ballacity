@@ -1,10 +1,6 @@
 import { useState } from "react";
 import { Trophy } from "lucide-react";
-import {
-  badgesInProgress,
-  getBadge,
-  type BadgeStats,
-} from "@/lib/badges";
+import { badgesInProgress, getBadge, type BadgeStats } from "@/lib/badges";
 
 function BadgeChip({ id }: { id: string }) {
   const [open, setOpen] = useState(false);
@@ -34,9 +30,7 @@ function BadgeChip({ id }: { id: string }) {
       className={`rounded-full border px-3 py-1.5 text-left text-xs font-semibold transition-colors ${tierRing}`}
     >
       {label}
-      {open && (
-        <span className="ml-2 font-normal text-muted-foreground">{def.description}</span>
-      )}
+      {open && <span className="ml-2 font-normal text-muted-foreground">{def.description}</span>}
     </button>
   );
 }
@@ -63,7 +57,7 @@ export function BadgeList({
 
   return (
     <div className={className}>
-      <h2 className="font-display text-sm font-bold uppercase tracking-wider text-muted-foreground mb-2 flex items-center gap-1.5">
+      <h2 className="section-eyebrow text-muted-foreground mb-2 flex items-center gap-1.5">
         <Trophy className="h-4 w-4" /> {title}
       </h2>
       {badgeIds.length > 0 ? (
@@ -80,9 +74,7 @@ export function BadgeList({
 
       {upcoming.length > 0 && (
         <div className="mt-4">
-          <h3 className="mb-2 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
-            In progress
-          </h3>
+          <h3 className="mb-2 section-eyebrow text-muted-foreground">In progress</h3>
           <div className="space-y-2">
             {upcoming.map(({ badge, progress, ratio }) => (
               <div key={badge.id} className="rounded-2xl border border-border bg-surface p-3">

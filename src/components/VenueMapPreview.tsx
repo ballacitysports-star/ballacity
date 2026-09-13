@@ -69,7 +69,11 @@ export function VenueMapPreview({
   return (
     <div className="mt-2 overflow-hidden rounded-lg border border-border/60 bg-surface">
       <div className="relative h-40 w-full bg-muted/30">
-        <div ref={containerRef} className="absolute inset-0" aria-label={`Map preview for ${address}`} />
+        <div
+          ref={containerRef}
+          className="absolute inset-0"
+          aria-label={`Map preview for ${address}`}
+        />
         {!ready && !error && (
           <div className="pointer-events-none absolute inset-0 flex items-center justify-center text-muted-foreground">
             <Loader2 className="h-4 w-4 animate-spin" />
