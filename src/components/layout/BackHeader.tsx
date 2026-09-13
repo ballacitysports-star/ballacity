@@ -27,7 +27,7 @@ export function BackHeader({
       )}
     >
       <BackButton fallbackTo={fallbackTo} />
-      <span className="min-w-0 flex-1 truncate text-sm font-semibold">{title}</span>
+      <span className="bar-title min-w-0 flex-1 truncate">{title}</span>
       {actions ? <div className="flex shrink-0 items-center gap-2">{actions}</div> : null}
     </header>
   );

@@ -268,6 +268,17 @@ button:disabled,
   max-width: 60ch;
 }
 
+/* The title in a compact sticky top bar. The bars were written per page —
+   text-sm font-semibold, font-display text-lg font-bold, text-xl font-black —
+   so the same kind of screen changed weight as you moved between them. */
+@utility bar-title {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: var(--text-base);
+  line-height: var(--text-base--line-height);
+  overflow-wrap: break-word;
+}
+
 /* A heading inside the page — a card group, a settings section. Deliberately
    much smaller than `page-title` so the page keeps one obvious top heading. */
 @utility section-title {

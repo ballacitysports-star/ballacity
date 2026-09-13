@@ -326,7 +326,7 @@ function EditProfile() {
           <ArrowLeft className="h-4 w-4" />
         </Link>
         <div className="min-w-0 flex-1 text-center">
-          <h1 className="font-display text-lg font-bold leading-tight">Edit profile</h1>
+          <h1 className="bar-title">Edit profile</h1>
           <SaveStatus {...autosave} variant="pill" className="mt-1" />
         </div>
         <button

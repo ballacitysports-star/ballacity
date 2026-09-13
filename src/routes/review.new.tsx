@@ -114,7 +114,7 @@ function ReviewNew() {
         >
           <ArrowLeft className="h-4 w-4" />
         </button>
-        <h1 className="font-display text-lg font-bold">Write a review</h1>
+        <h1 className="bar-title">Write a review</h1>
         <button
           onClick={submit}
           disabled={!canSubmit}
