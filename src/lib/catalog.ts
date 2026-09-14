@@ -1,3 +1,17 @@
+/**
+ * Thin view over the monetization config so older screens keep working.
+ * New code should read `@/lib/monetization/config` (or `useMonetizationConfig`
+ * for admin-overridden prices) directly.
+ */
+import {
+  DEFAULT_MONETIZATION_CONFIG,
+  FREE_TIER_FEATURES,
+  liveProducts,
+  priceLabelFor,
+  type MonetizationConfig,
+  type MonetizationProduct,
+} from "@/lib/monetization/config";
+
 export type PlanTier = {
   priceId: string;
   name: string;
@@ -12,52 +26,29 @@ export const FREE_TIER: PlanTier = {
   priceId: "free",
   name: "Free",
   tagline: "Everything you need to start playing",
-  priceLabel: "Free",
-  features: [
-    "Create your player profile & availability",
-    "Browse and request to join games",
-    "Discover players, teams, trainers & gyms",
-    "3 free AI highlight reels",
-    "Messaging & push notifications",
-  ],
+  priceLabel: "$0",
+  features: FREE_TIER_FEATURES,
   cta: "Included",
 };
 
-export const PLAN_TIERS: PlanTier[] = [
-  {
-    priceId: "ai_highlight_reel_monthly",
-    name: "AI Highlight Reels",
-    tagline: "Unlimited reels from your game clips",
-    priceLabel: "$15/mo",
-    features: ["3 free reels to start", "Unlimited AI generation", "HD exports & captions"],
-    cta: "Subscribe",
-  },
-  {
-    priceId: "host_subscription_monthly",
-    name: "Host Subscription",
-    tagline: "For organizers running games regularly",
-    priceLabel: "$10/mo",
-    features: ["Unlimited game listings", "Featured placement", "Host analytics"],
-    cta: "Become a Host",
-    highlight: true,
-  },
-  {
-    priceId: "team_plan_monthly",
-    name: "Team Plan",
-    tagline: "Up to 10 players, shared team page",
-    priceLabel: "$49/mo",
-    features: ["Unlimited reels for 10 players", "Shared team page", "Captain controls"],
-    cta: "Start Team Plan",
-  },
-  {
-    priceId: "org_plan_monthly",
-    name: "Org Plan",
-    tagline: "For clubs and larger orgs",
-    priceLabel: "$99/mo",
-    features: ["Up to 25 players", "Branded team page", "Priority support"],
-    cta: "Start Org Plan",
-  },
-];
+export function planTierFor(product: MonetizationProduct): PlanTier {
+  return {
+    priceId: product.priceId,
+    name: product.name,
+    tagline: product.tagline,
+    priceLabel: priceLabelFor(product),
+    features: product.features,
+    cta: product.cta,
+    ...(product.highlight ? { highlight: true } : {}),
+  };
+}
+
+export function planTiersFrom(config: MonetizationConfig): PlanTier[] {
+  return liveProducts(config).map(planTierFor);
+}
+
+/** Default-priced plans, for code that cannot await the admin overrides. */
+export const PLAN_TIERS: PlanTier[] = planTiersFrom(DEFAULT_MONETIZATION_CONFIG);
 
 export type MerchItem = {
   priceId: string;

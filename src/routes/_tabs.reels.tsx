@@ -15,6 +15,8 @@ import {
   Circle,
 } from "lucide-react";
 import { captureClip } from "@/lib/reel-frames";
+import { useMonetizationConfig } from "@/hooks/useMonetizationConfig";
+import { priceLabelFor, productForEntitlement } from "@/lib/monetization/config";
 import { needsPlaybackConversion } from "@/lib/video-support";
 import { convertToPlayableMp4 } from "@/lib/video-transcode";
 import { buildMediaMeta, probeVideo, type ProbedVideo } from "@/lib/video-metadata";
@@ -572,6 +574,9 @@ function ReelsPage() {
     loading: subLoading,
   } = useSubscription();
   const { openCheckout, isOpen, checkoutElement, closeCheckout } = useStripeCheckout();
+  const { config: monetization } = useMonetizationConfig();
+  const plusProduct = productForEntitlement("player_plus", monetization);
+  const plusPriceLabel = plusProduct ? `${priceLabelFor(plusProduct)}` : "";
   const fileRef = useRef<HTMLInputElement>(null);
   const [reels, setReels] = useState<Reel[]>([]);
   const [busy, setBusy] = useState(false);
@@ -1022,8 +1027,8 @@ function ReelsPage() {
         ) : isActive ? (
           <div className="flex items-center justify-between gap-3">
             <div>
-              <p className="text-sm font-semibold text-lime">Pro · Unlimited reels</p>
-              <p className="text-xs text-muted-foreground">$15 / month</p>
+              <p className="text-sm font-semibold text-lime">ballaCity+ · Unlimited reels</p>
+              <p className="text-xs text-muted-foreground">{plusPriceLabel}</p>
             </div>
             <button
               onClick={handleManageBilling}

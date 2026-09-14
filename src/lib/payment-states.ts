@@ -142,6 +142,58 @@ export function paymentStateFor(input: {
   return input.instructionsShown ? "instructions_shown" : "payment_required";
 }
 
+/* ------------------------------------------------------------------ */
+/* Display statuses                                                    */
+/* ------------------------------------------------------------------ */
+
+/**
+ * The short, plain-language status a player or host sees at a glance. The
+ * seven internal states above stay the source of truth; this is only a view of
+ * them, so nothing about the lifecycle changes when a label is reworded.
+ */
+export const PAYMENT_DISPLAY_STATUSES = [
+  "unpaid",
+  "marked_paid",
+  "confirmed",
+  "cancelled",
+  "refunded",
+] as const;
+export type PaymentDisplayStatus = (typeof PAYMENT_DISPLAY_STATUSES)[number];
+
+export const PAYMENT_DISPLAY_STATUS_LABELS: Record<PaymentDisplayStatus, string> = {
+  unpaid: "Unpaid",
+  marked_paid: "Marked paid",
+  confirmed: "Confirmed",
+  cancelled: "Cancelled",
+  refunded: "Refunded",
+};
+
+export function displayStatusFor(
+  state: PaymentState,
+  opts?: { refunded?: boolean },
+): PaymentDisplayStatus {
+  if (opts?.refunded) return "refunded";
+  switch (state) {
+    case "confirmed":
+      return "confirmed";
+    case "payment_sent":
+    case "host_confirmation_pending":
+    case "disputed":
+      return "marked_paid";
+    case "cancelled":
+      return "cancelled";
+    default:
+      return "unpaid";
+  }
+}
+
+export function displayStatusLabel(
+  state: PaymentState,
+  opts?: { refunded?: boolean },
+): string {
+  return PAYMENT_DISPLAY_STATUS_LABELS[displayStatusFor(state, opts)];
+}
+
 /** States a player may still act on (send proof, cancel, dispute). */
 export function isOpenPaymentState(state: PaymentState): boolean {
   return state !== "confirmed" && state !== "cancelled";
