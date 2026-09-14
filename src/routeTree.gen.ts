@@ -56,6 +56,7 @@ import { Route as AdminLegalRouteImport } from './routes/admin.legal'
 import { Route as AdminListingsRouteImport } from './routes/admin.listings'
 import { Route as AdminLocationAnalyticsRouteImport } from './routes/admin.location-analytics'
 import { Route as AdminModerationRouteImport } from './routes/admin.moderation'
+import { Route as BlogHowToFindPickupSoccerGamesRouteImport } from './routes/blog.how-to-find-pickup-soccer-games'
 import { Route as CheckoutReturnRouteImport } from './routes/checkout.return'
 import { Route as DevOgPreviewRouteImport } from './routes/dev.og-preview'
 import { Route as DevRouteDoctorRouteImport } from './routes/dev.route-doctor'
@@ -338,6 +339,12 @@ const AdminModerationRoute = AdminModerationRouteImport.update({
   path: '/admin/moderation',
   getParentRoute: () => rootRouteImport,
 } as any)
+const BlogHowToFindPickupSoccerGamesRoute =
+  BlogHowToFindPickupSoccerGamesRouteImport.update({
+    id: '/blog/how-to-find-pickup-soccer-games',
+    path: '/blog/how-to-find-pickup-soccer-games',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const CheckoutReturnRoute = CheckoutReturnRouteImport.update({
   id: '/checkout/return',
   path: '/checkout/return',
@@ -613,6 +620,7 @@ export interface FileRoutesByFullPath {
   '/admin/listings': typeof AdminListingsRoute
   '/admin/location-analytics': typeof AdminLocationAnalyticsRoute
   '/admin/moderation': typeof AdminModerationRoute
+  '/blog/how-to-find-pickup-soccer-games': typeof BlogHowToFindPickupSoccerGamesRoute
   '/checkout/return': typeof CheckoutReturnRoute
   '/dev/og-preview': typeof DevOgPreviewRoute
   '/dev/route-doctor': typeof DevRouteDoctorRoute
@@ -706,6 +714,7 @@ export interface FileRoutesByTo {
   '/admin/listings': typeof AdminListingsRoute
   '/admin/location-analytics': typeof AdminLocationAnalyticsRoute
   '/admin/moderation': typeof AdminModerationRoute
+  '/blog/how-to-find-pickup-soccer-games': typeof BlogHowToFindPickupSoccerGamesRoute
   '/checkout/return': typeof CheckoutReturnRoute
   '/dev/og-preview': typeof DevOgPreviewRoute
   '/dev/route-doctor': typeof DevRouteDoctorRoute
@@ -800,6 +809,7 @@ export interface FileRoutesById {
   '/admin/listings': typeof AdminListingsRoute
   '/admin/location-analytics': typeof AdminLocationAnalyticsRoute
   '/admin/moderation': typeof AdminModerationRoute
+  '/blog/how-to-find-pickup-soccer-games': typeof BlogHowToFindPickupSoccerGamesRoute
   '/checkout/return': typeof CheckoutReturnRoute
   '/dev/og-preview': typeof DevOgPreviewRoute
   '/dev/route-doctor': typeof DevRouteDoctorRoute
@@ -895,6 +905,7 @@ export interface FileRouteTypes {
     | '/admin/listings'
     | '/admin/location-analytics'
     | '/admin/moderation'
+    | '/blog/how-to-find-pickup-soccer-games'
     | '/checkout/return'
     | '/dev/og-preview'
     | '/dev/route-doctor'
@@ -988,6 +999,7 @@ export interface FileRouteTypes {
     | '/admin/listings'
     | '/admin/location-analytics'
     | '/admin/moderation'
+    | '/blog/how-to-find-pickup-soccer-games'
     | '/checkout/return'
     | '/dev/og-preview'
     | '/dev/route-doctor'
@@ -1081,6 +1093,7 @@ export interface FileRouteTypes {
     | '/admin/listings'
     | '/admin/location-analytics'
     | '/admin/moderation'
+    | '/blog/how-to-find-pickup-soccer-games'
     | '/checkout/return'
     | '/dev/og-preview'
     | '/dev/route-doctor'
@@ -1166,6 +1179,7 @@ export interface RootRouteChildren {
   AdminListingsRoute: typeof AdminListingsRoute
   AdminLocationAnalyticsRoute: typeof AdminLocationAnalyticsRoute
   AdminModerationRoute: typeof AdminModerationRoute
+  BlogHowToFindPickupSoccerGamesRoute: typeof BlogHowToFindPickupSoccerGamesRoute
   CheckoutReturnRoute: typeof CheckoutReturnRoute
   DevOgPreviewRoute: typeof DevOgPreviewRoute
   DevRouteDoctorRoute: typeof DevRouteDoctorRoute
@@ -1540,6 +1554,13 @@ declare module '@tanstack/react-router' {
       path: '/admin/moderation'
       fullPath: '/admin/moderation'
       preLoaderRoute: typeof AdminModerationRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/blog/how-to-find-pickup-soccer-games': {
+      id: '/blog/how-to-find-pickup-soccer-games'
+      path: '/blog/how-to-find-pickup-soccer-games'
+      fullPath: '/blog/how-to-find-pickup-soccer-games'
+      preLoaderRoute: typeof BlogHowToFindPickupSoccerGamesRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/checkout/return': {
@@ -1942,6 +1963,7 @@ const rootRouteChildren: RootRouteChildren = {
   AdminListingsRoute: AdminListingsRoute,
   AdminLocationAnalyticsRoute: AdminLocationAnalyticsRoute,
   AdminModerationRoute: AdminModerationRoute,
+  BlogHowToFindPickupSoccerGamesRoute: BlogHowToFindPickupSoccerGamesRoute,
   CheckoutReturnRoute: CheckoutReturnRoute,
   DevOgPreviewRoute: DevOgPreviewRoute,
   DevRouteDoctorRoute: DevRouteDoctorRoute,

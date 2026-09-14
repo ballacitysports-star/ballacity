@@ -66,6 +66,16 @@ function GuideIndex() {
         </ul>
 
         <section className="mt-8 rounded-2xl border border-border bg-surface px-4 py-4">
+          <h2 className="text-sm font-bold">Read next</h2>
+          <Link
+            to="/blog/how-to-find-pickup-soccer-games"
+            className="mt-2 block text-sm font-semibold text-lime"
+          >
+            How to find pickup soccer games near you →
+          </Link>
+        </section>
+
+        <section className="mt-4 rounded-2xl border border-border bg-surface px-4 py-4">
           <h2 className="text-sm font-bold">Playing safely</h2>
           <p className="mt-2 text-sm text-muted-foreground">
             Games are organized by hosts, not by ballaCity. Read the Safety Center before your first
