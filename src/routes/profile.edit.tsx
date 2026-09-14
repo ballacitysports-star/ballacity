@@ -2,7 +2,7 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { pageHead } from "@/lib/seo";
 import { ArrowLeft, Check, Plus, Users, Trophy, BarChart3, CreditCard, Video } from "lucide-react";
 import { useEffect, useState } from "react";
-import { motion } from "framer-motion";
+
 import type { User } from "@supabase/supabase-js";
 import { toast } from "sonner";
 import { SPORTS, type Sport } from "@/lib/sample-data";
