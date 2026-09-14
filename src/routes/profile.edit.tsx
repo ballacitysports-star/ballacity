@@ -1,6 +1,6 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { pageHead } from "@/lib/seo";
-import { ArrowLeft, Check, Plus, Users, Trophy, BarChart3, CreditCard, Video } from "lucide-react";
+import { ArrowLeft, Check, Plus, Users, Trophy, BarChart3, CreditCard } from "lucide-react";
 import { useEffect, useState } from "react";
 
 import type { User } from "@supabase/supabase-js";
@@ -563,22 +563,6 @@ function EditProfile() {
         </Link>
       </Section>
 
-      <Section title="AI Highlight Reels">
-        <Link
-          to="/reels"
-          search={{ game: "", title: "", upload: "" }}
-          className="flex items-center gap-3 rounded-2xl border border-border bg-surface p-3 hover:border-lime/40 transition-colors"
-        >
-          <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-lime/15 text-lime">
-            <Video className="h-5 w-5" />
-          </div>
-          <div className="min-w-0 flex-1">
-            <div className="font-semibold text-sm">AI Highlight Reels</div>
-            <div className="text-xs text-muted-foreground">3 free, then $15/mo unlimited</div>
-          </div>
-          <div className="text-lime text-xs font-bold">→</div>
-        </Link>
-      </Section>
 
 
       <Section title="Plans & subscriptions">
