@@ -209,12 +209,22 @@ export async function upsertGamePaymentSettings(input: {
   refund_policy?: string | null;
   payment_instructions?: string | null;
   requires_approval?: boolean;
+  /**
+   * Only `direct_host` is live: the player pays the host in their own payment
+   * app. `ballacity_processed` exists so a future processor slots in without a
+   * schema redesign, and the database rejects it until one is wired.
+   */
+  payment_mode?: PaymentMode;
 }) {
   const { data: u } = await supabase.auth.getUser();
   if (!u.user) throw new Error("Sign in to configure payments.");
+  const payment_mode = input.payment_mode ?? "direct_host";
+  if (payment_mode !== "direct_host") {
+    throw new Error("ballaCity does not process game payments yet — hosts collect directly.");
+  }
   const { error } = await supabase
     .from("game_payment_settings")
-    .upsert({ ...input, host_id: u.user.id }, { onConflict: "game_id,host_id" });
+    .upsert({ ...input, payment_mode, host_id: u.user.id }, { onConflict: "game_id,host_id" });
   if (error) throw error;
 }
 
