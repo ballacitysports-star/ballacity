@@ -1,6 +1,7 @@
 import { supabase } from "@/integrations/supabase/client";
 import { validateImageMeta } from "@/lib/image-validation";
 import type { CancellationReason, PaymentSubmissionStatus } from "@/lib/payment-states";
+import type { PaymentMode } from "@/lib/monetization/fees";
 import { PAYMENTS_BLOCKED_MESSAGE } from "@/lib/payments-policy";
 
 export type PaymentType =
