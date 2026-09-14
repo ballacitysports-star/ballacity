@@ -29,6 +29,8 @@ export type GamePaymentSettings = {
   refund_policy: string | null;
   payment_instructions: string | null;
   requires_approval: boolean;
+  /** `direct_host` today; `ballacity_processed` is reserved for a future processor. */
+  payment_mode?: PaymentMode;
 };
 
 export type JoinRequest = {
