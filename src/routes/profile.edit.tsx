@@ -2,7 +2,7 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { pageHead } from "@/lib/seo";
 import { ArrowLeft, Check, Plus, Users, Trophy, BarChart3, CreditCard, Video } from "lucide-react";
 import { useEffect, useState } from "react";
-import { motion } from "framer-motion";
+
 import type { User } from "@supabase/supabase-js";
 import { toast } from "sonner";
 import { SPORTS, type Sport } from "@/lib/sample-data";
@@ -580,24 +580,6 @@ function EditProfile() {
         </Link>
       </Section>
 
-      <Section title="ballaCity Pro">
-        <motion.div
-          whileHover={{ scale: 1.01 }}
-          className="rounded-3xl border border-coral/40 bg-coral-gradient p-5 text-white relative overflow-hidden"
-        >
-          <Video className="absolute right-4 top-4 h-16 w-16 opacity-10" />
-          <div className="section-eyebrow opacity-80">ballaCity Pro</div>
-          <h3 className="font-display text-xl font-bold mt-1">
-            AI highlight reels, unlimited hosting.
-          </h3>
-          <p className="text-sm opacity-90 mt-1">
-            Cinematic clips from raw gameplay. One-tap export to TikTok & Reels.
-          </p>
-          <button className="mt-3 rounded-full bg-background px-4 py-2 text-sm font-bold text-foreground">
-            Upgrade · $7.99 / mo
-          </button>
-        </motion.div>
-      </Section>
 
       <Section title="Plans & subscriptions">
         <Link
