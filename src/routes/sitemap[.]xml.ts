@@ -31,6 +31,8 @@ const ENTRIES: SitemapEntry[] = [
 
 
 
+  { path: "/blog/how-to-find-pickup-soccer-games", changefreq: "monthly", priority: "0.7" },
+
   { path: "/safety", changefreq: "monthly", priority: "0.7" },
   { path: "/trust-center", changefreq: "monthly", priority: "0.7" },
   { path: "/community-guidelines", changefreq: "yearly", priority: "0.5" },
