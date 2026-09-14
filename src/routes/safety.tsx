@@ -16,7 +16,7 @@ export const Route = createFileRoute("/safety")({
   head: () =>
     pageHead({
       path: "/safety",
-      title: "Safety Center — ballaCity",
+      title: "BallaCity Safety & Community Guidelines",
       description:
         "How to stay safe on ballaCity: sports safety, meeting new players, game and payment safety, messaging, reporting, blocking, and emergency information.",
     }),

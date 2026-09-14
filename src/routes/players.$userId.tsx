@@ -59,7 +59,7 @@ export const Route = createFileRoute("/players/$userId")({
   head: ({ params }) => ({
     ...pageHead({
       path: `/players/${params.userId}`,
-      title: "Player profile — ballaCity",
+      title: "Player Profile | BallaCity Sports Profile",
       description:
         "See this player's sports, skill levels, availability, badges, and reviews on ballaCity.",
       ogType: "profile",

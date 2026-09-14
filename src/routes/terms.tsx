@@ -11,7 +11,7 @@ export const Route = createFileRoute("/terms")({
   head: () =>
     pageHead({
       path: "/terms",
-      title: "Terms of Service — ballaCity",
+      title: "Terms of Service | BallaCity",
       description:
         "ballaCity's Terms of Service: account rules, game participation, peer-to-peer payments, content, and conduct.",
     }),

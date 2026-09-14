@@ -73,7 +73,7 @@ export const Route = createFileRoute("/_tabs/feed")({
   head: () =>
     pageHead({
       path: "/feed",
-      title: "Your feed — ballaCity",
+      title: "Pickup Sports Games Near You | BallaCity",
       description: "Games, teams, and trainers picked for your sports, skill level, and distance.",
       noindex: true,
     }),
