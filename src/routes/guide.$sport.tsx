@@ -4,6 +4,21 @@ import { PolicyLinks } from "@/components/PolicyLinks";
 import { pageHead, SITE_URL } from "@/lib/seo";
 import { guideBySlug } from "@/lib/sports-guide";
 
+/**
+ * Search-facing title per sport slug. Racket sports and running read
+ * naturally without the word "Pickup", so they get their own wording.
+ */
+const SPORT_TITLES: Record<string, string> = {
+  tennis: "Tennis Games & Players Near You | BallaCity",
+  pickleball: "Pickleball Games & Players Near You | BallaCity",
+  running: "Local Running & Fitness Groups | BallaCity",
+};
+
+function sportTitle(slug: string, sport: string) {
+  return SPORT_TITLES[slug] ?? `Pickup ${sport} Games Near You | BallaCity`;
+}
+
+
 export const Route = createFileRoute("/guide/$sport")({
   loader: ({ params }) => {
     const guide = guideBySlug(params.sport);
