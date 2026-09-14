@@ -6,7 +6,10 @@ import { useAuth } from "@/hooks/use-auth";
 import { useAllSubscriptions } from "@/hooks/useAllSubscriptions";
 import { useStripeCheckout } from "@/hooks/useStripeCheckout";
 import { PaymentTestModeBanner } from "@/components/PaymentTestModeBanner";
-import { FREE_TIER, PLAN_TIERS } from "@/lib/catalog";
+import { FREE_TIER, planTiersFrom } from "@/lib/catalog";
+import { useMonetizationConfig } from "@/hooks/useMonetizationConfig";
+import { useEntitlements } from "@/hooks/useEntitlements";
+import { productForPriceId } from "@/lib/monetization/config";
 import { getStripeEnvironment } from "@/lib/stripe";
 import { createPortalSession } from "@/utils/payments.functions";
 import { useState } from "react";
@@ -25,6 +28,16 @@ export const Route = createFileRoute("/plans")({
 function PlansPage() {
   const { user } = useAuth();
   const { hasActive, anyActiveCustomerId, loading } = useAllSubscriptions();
+  const { config } = useMonetizationConfig();
+  const entitlements = useEntitlements();
+  const planTiers = planTiersFrom(config);
+  // A plan counts as current when its entitlement is held, so someone who
+  // subscribed under an older plan name still sees "Current plan".
+  const isCurrent = (priceId: string) => {
+    if (hasActive(priceId)) return true;
+    const product = productForPriceId(priceId, config);
+    return product ? entitlements.has(product.entitlement) : false;
+  };
   const { openCheckout, checkoutElement, closeCheckout, isOpen } = useStripeCheckout();
   const [portalBusy, setPortalBusy] = useState(false);
 
@@ -105,8 +118,8 @@ function PlansPage() {
         )}
 
         <div className="mt-6 grid gap-4">
-          {[FREE_TIER, ...PLAN_TIERS].map((plan) => {
-            const active = hasActive(plan.priceId);
+          {[FREE_TIER, ...planTiers].map((plan) => {
+            const active = isCurrent(plan.priceId);
             const isFree = plan.priceId === "free";
             return (
               <div

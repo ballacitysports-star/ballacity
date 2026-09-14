@@ -15,6 +15,7 @@ import { ModerationTab } from "@/components/superadmin/ModerationTab";
 import { ImagesTab } from "@/components/superadmin/ImagesTab";
 
 import { PaymentsTab } from "@/components/superadmin/PaymentsTab";
+import { MonetizationTab } from "@/components/superadmin/MonetizationTab";
 import { OpsTab } from "@/components/superadmin/OpsTab";
 import { AuditTab } from "@/components/superadmin/AuditTab";
 import { YouthTab } from "@/components/superadmin/YouthTab";
@@ -100,6 +101,7 @@ function SuperadminPage() {
           <TabsTrigger value="moderation">Content</TabsTrigger>
           <TabsTrigger value="images">Images</TabsTrigger>
           <TabsTrigger value="payments">Payments</TabsTrigger>
+          <TabsTrigger value="monetization">Revenue</TabsTrigger>
           <TabsTrigger value="ops">Ops &amp; config</TabsTrigger>
           <TabsTrigger value="youth">Youth &amp; age</TabsTrigger>
           <TabsTrigger value="audit">Audit log</TabsTrigger>
@@ -119,6 +121,9 @@ function SuperadminPage() {
 
         <TabsContent value="payments" className="pt-3">
           <PaymentsTab />
+        </TabsContent>
+        <TabsContent value="monetization" className="pt-3">
+          <MonetizationTab />
         </TabsContent>
         <TabsContent value="ops" className="pt-3">
           <OpsTab />

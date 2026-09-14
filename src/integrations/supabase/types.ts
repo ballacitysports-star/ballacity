@@ -603,6 +603,7 @@ export type Database = {
           id: string
           payment_deadline: string | null
           payment_instructions: string | null
+          payment_mode: string
           refund_policy: string | null
           requires_approval: boolean
           updated_at: string
@@ -616,6 +617,7 @@ export type Database = {
           id?: string
           payment_deadline?: string | null
           payment_instructions?: string | null
+          payment_mode?: string
           refund_policy?: string | null
           requires_approval?: boolean
           updated_at?: string
@@ -629,6 +631,7 @@ export type Database = {
           id?: string
           payment_deadline?: string | null
           payment_instructions?: string | null
+          payment_mode?: string
           refund_policy?: string | null
           requires_approval?: boolean
           updated_at?: string
@@ -2596,46 +2599,58 @@ export type Database = {
       subscriptions: {
         Row: {
           cancel_at_period_end: boolean | null
+          canceled_at: string | null
           created_at: string | null
           current_period_end: string | null
           current_period_start: string | null
           environment: string
           id: string
+          metadata: Json
           price_id: string
           product_id: string
           status: string
           stripe_customer_id: string
           stripe_subscription_id: string
+          tier: string | null
+          trial_end: string | null
           updated_at: string | null
           user_id: string
         }
         Insert: {
           cancel_at_period_end?: boolean | null
+          canceled_at?: string | null
           created_at?: string | null
           current_period_end?: string | null
           current_period_start?: string | null
           environment?: string
           id?: string
+          metadata?: Json
           price_id: string
           product_id: string
           status?: string
           stripe_customer_id: string
           stripe_subscription_id: string
+          tier?: string | null
+          trial_end?: string | null
           updated_at?: string | null
           user_id: string
         }
         Update: {
           cancel_at_period_end?: boolean | null
+          canceled_at?: string | null
           created_at?: string | null
           current_period_end?: string | null
           current_period_start?: string | null
           environment?: string
           id?: string
+          metadata?: Json
           price_id?: string
           product_id?: string
           status?: string
           stripe_customer_id?: string
           stripe_subscription_id?: string
+          tier?: string | null
+          trial_end?: string | null
           updated_at?: string | null
           user_id?: string
         }
@@ -3590,6 +3605,10 @@ export type Database = {
         Args: { check_env?: string; user_uuid: string }
         Returns: boolean
       }
+      has_entitlement: {
+        Args: { _entitlement: string; _env?: string; _user_id: string }
+        Returns: boolean
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
@@ -3919,6 +3938,7 @@ export type Database = {
         }
         Returns: undefined
       }
+      tier_for_price_id: { Args: { _price_id: string }; Returns: string }
       transfer_team_ownership: {
         Args: { _team: string; _to: string }
         Returns: undefined
