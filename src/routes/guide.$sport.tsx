@@ -37,7 +37,7 @@ export const Route = createFileRoute("/guide/$sport")({
     return pageHead({
       path: `/guide/${guide.slug}`,
       ogType: "article",
-      title: `${guide.sport} pickup guide — how to play and join games | ballaCity`,
+      title: sportTitle(guide.slug, guide.sport),
       description: `How pickup ${guide.sport.toLowerCase()} works: ${guide.groupSize}, typical session length, gear to bring, common positions, etiquette, and how to find a ${guide.sport.toLowerCase()} game near you.`,
       jsonLd: {
         "@context": "https://schema.org",
