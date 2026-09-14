@@ -1,6 +1,6 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { pageHead } from "@/lib/seo";
-import { ArrowLeft, Check, Plus, Users, Trophy, BarChart3, CreditCard, Video } from "lucide-react";
+import { ArrowLeft, Check, Plus, Users, Trophy, BarChart3, CreditCard } from "lucide-react";
 import { useEffect, useState } from "react";
 
 import type { User } from "@supabase/supabase-js";
