@@ -11,7 +11,7 @@ export const Route = createFileRoute("/privacy")({
   head: () =>
     pageHead({
       path: "/privacy",
-      title: "Privacy Policy — ballaCity",
+      title: "Privacy Policy | BallaCity",
       description:
         "ballaCity's Privacy Policy: what personal data we collect, how it's used and shared, and the privacy controls you have.",
     }),

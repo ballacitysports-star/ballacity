@@ -58,7 +58,7 @@ export const Route = createFileRoute("/_tabs/teams")({
   head: () =>
     pageHead({
       path: "/teams",
-      title: "Teams & clubs — ballaCity",
+      title: "Find Local Sports Teams & Players | BallaCity",
       description:
         "Discover teams and clubs near you. Follow squads, find tryouts, and join open runs.",
       noindex: true,

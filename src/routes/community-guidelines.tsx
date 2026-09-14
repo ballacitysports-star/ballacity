@@ -8,7 +8,7 @@ export const Route = createFileRoute("/community-guidelines")({
   head: () =>
     pageHead({
       path: "/community-guidelines",
-      title: "Community Guidelines — ballaCity",
+      title: "Community Guidelines | BallaCity",
       description:
         "The rules for playing on ballaCity: respect other players, post accurate games, play safely, keep payments clean, and upload only clips you own.",
     }),

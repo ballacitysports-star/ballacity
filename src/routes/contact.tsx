@@ -9,7 +9,7 @@ export const Route = createFileRoute("/contact")({
   head: () =>
     pageHead({
       path: "/contact",
-      title: "Contact & Report a Problem — ballaCity",
+      title: "BallaCity Help Center | Sports Community Support",
       description:
         "Reach ballaCity support, report a player, game, message, or highlight, and find out what happens after you send a report.",
     }),

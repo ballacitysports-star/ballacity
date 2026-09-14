@@ -147,7 +147,7 @@ export const Route = createFileRoute("/_tabs/players")({
   head: () =>
     pageHead({
       path: "/players",
-      title: "Players near you — ballaCity",
+      title: "Find Local Sports Players & Athletes | BallaCity",
       description:
         "Find available players and teammates nearby by sport, skill tier, and availability.",
       noindex: true,

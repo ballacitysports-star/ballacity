@@ -7,7 +7,7 @@ export const Route = createFileRoute("/_tabs/discover")({
   head: () =>
     pageHead({
       path: "/discover",
-      title: "Discover games — ballaCity",
+      title: "Pickup Sports Games Near You | BallaCity",
       description:
         "Search nearby pickup games on a map or in a list and filter by sport, skill, and time.",
       noindex: true,

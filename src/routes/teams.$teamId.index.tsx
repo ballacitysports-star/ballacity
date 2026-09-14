@@ -60,7 +60,7 @@ export const Route = createFileRoute("/teams/$teamId/")({
     const name = o?.name ?? "Team";
     return pageHead({
       path: `/teams/${params.teamId}`,
-      title: `${name} — Team on ballaCity`,
+      title: `${name} | BallaCity Sports Team`,
       description: (
         o?.bio ||
         o?.tagline ||
