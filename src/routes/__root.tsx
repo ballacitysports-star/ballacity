@@ -422,6 +422,8 @@ const PUBLIC_ROUTES = [
   "/contact",
   // Sports guides are public, indexable content.
   "/guide",
+  // Articles are public, indexable content.
+  "/blog",
 
 
   // Shareable, sign-in-free surface.
