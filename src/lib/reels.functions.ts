@@ -343,6 +343,11 @@ export const applyReelStyleDraft = createServerFn({ method: "POST" })
     };
   })
   .handler(async ({ data, context }) => {
+    // A drafted thumbnail must live in the caller's own storage folder — the
+    // same rule the enforce_reel_media_ownership_trg trigger applies on write.
+    const { assertOwnedMediaPath } = await import("@/lib/media-path-guard");
+    assertOwnedMediaPath(context.userId, data.thumbnail_path);
+
     const patch: Record<string, any> = {
       style_prefs: data.style,
       ai_title: data.ai_title,
@@ -406,6 +411,10 @@ export const setReelPlaybackPath = createServerFn({ method: "POST" })
     },
   )
   .handler(async ({ data, context }) => {
+    // The playback copy must be the caller's own object, never someone else's.
+    const { assertOwnedMediaPath } = await import("@/lib/media-path-guard");
+    assertOwnedMediaPath(context.userId, data.playbackPath);
+
     const patch: Record<string, unknown> = { playback_path: data.playbackPath };
     if (data.mediaMeta) patch["media_meta"] = data.mediaMeta;
     const { error } = await context.supabase
@@ -550,9 +559,12 @@ export const setReelsHidden = createServerFn({ method: "POST" })
 /**
  * Public, read-only list of a user's visible completed reels for the public
  * player card. Signed URLs are minted server-side because the storage bucket
- * only allows owners to read objects directly. No auth required — the rows
- * are gated by the "Anyone can view visible completed reels" policy and this
- * function applies the same filter itself.
+ * only allows owners to read objects directly.
+ *
+ * The age-cohort audience gate is applied in SQL (`public_user_reel_ids`, which
+ * uses `public.reel_audience`): reels from children and locked child accounts
+ * are never returned, and reels from 16-17 year olds only for signed-in
+ * viewers — matching the "Anyone can view visible completed reels" policy.
  */
 export const listPublicReels = createServerFn({ method: "GET" })
   .inputValidator((input: { userId: string }) => {
@@ -564,29 +576,41 @@ export const listPublicReels = createServerFn({ method: "GET" })
   .handler(async ({ data }) => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { RECAP_COLUMNS } = await import("@/lib/recaps");
+    const { eligibleUserReelIds, optionalSupabaseUserId } =
+      await import("@/lib/reel-visibility.server");
+    const { ownedMediaPathOrNull } = await import("@/lib/media-path-guard");
+
+    const viewerId = await optionalSupabaseUserId();
+    const ids = await eligibleUserReelIds(supabaseAdmin, {
+      userId: data.userId,
+      limit: 12,
+      includeMembers: viewerId !== null,
+    });
+    if (ids.length === 0) return [];
 
     const { data: rows, error } = await supabaseAdmin
       .from("highlight_reels")
       .select(RECAP_COLUMNS)
-      .eq("user_id", data.userId)
-      .eq("status", "completed")
-      .is("hidden_at", null)
-      .order("created_at", { ascending: false })
-      .limit(12);
+      .in("id", ids)
+      .order("created_at", { ascending: false });
     if (error) throw new Error(error.message);
 
     const reels = (rows ?? []) as any[];
     return Promise.all(
       reels.map(async (r) => {
+        const owner = (r.user_id as string) ?? data.userId;
+        const primaryPath = ownedMediaPathOrNull(owner, r.playback_path ?? r.video_path);
+        const originalPath = r.playback_path ? ownedMediaPathOrNull(owner, r.video_path) : null;
+        const thumbPath = ownedMediaPathOrNull(owner, r.thumbnail_path);
         const [video, original, thumb] = await Promise.all([
-          supabaseAdmin.storage
-            .from("highlight-videos")
-            .createSignedUrl(r.playback_path ?? r.video_path, 3600),
-          r.playback_path
-            ? supabaseAdmin.storage.from("highlight-videos").createSignedUrl(r.video_path, 3600)
+          primaryPath
+            ? supabaseAdmin.storage.from("highlight-videos").createSignedUrl(primaryPath, 3600)
             : Promise.resolve({ data: null }),
-          r.thumbnail_path
-            ? supabaseAdmin.storage.from("highlight-videos").createSignedUrl(r.thumbnail_path, 3600)
+          originalPath
+            ? supabaseAdmin.storage.from("highlight-videos").createSignedUrl(originalPath, 3600)
+            : Promise.resolve({ data: null }),
+          thumbPath
+            ? supabaseAdmin.storage.from("highlight-videos").createSignedUrl(thumbPath, 3600)
             : Promise.resolve({ data: null }),
         ]);
         return {

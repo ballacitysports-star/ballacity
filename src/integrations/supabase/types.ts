@@ -3838,6 +3838,31 @@ export type Database = {
           user_id: string
         }[]
       }
+      public_reel_feed_ids: {
+        Args: {
+          _cursor?: string
+          _include_members?: boolean
+          _limit?: number
+          _sport?: string
+        }
+        Returns: {
+          created_at: string
+          id: string
+        }[]
+      }
+      public_reel_feed_sports: {
+        Args: { _include_members?: boolean }
+        Returns: {
+          sport: string
+        }[]
+      }
+      public_user_reel_ids: {
+        Args: { _include_members?: boolean; _limit?: number; _user_id: string }
+        Returns: {
+          created_at: string
+          id: string
+        }[]
+      }
       publish_legal_document: { Args: { _id: string }; Returns: string }
       record_session_heartbeat: {
         Args: { _timezone?: string }

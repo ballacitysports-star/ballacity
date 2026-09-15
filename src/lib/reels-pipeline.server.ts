@@ -89,8 +89,14 @@ async function callLovableAIParts(
 }
 
 /** Downloads a storage object and returns it as a base64 data URL for the gateway. */
-async function frameDataUrl(supabaseAdmin: any, path: string): Promise<string | null> {
+async function frameDataUrl(
+  supabaseAdmin: any,
+  ownerId: string,
+  path: string,
+): Promise<string | null> {
   try {
+    const { isOwnedMediaPath } = await import("@/lib/media-path-guard");
+    if (!isOwnedMediaPath(ownerId, path)) return null;
     const { data, error } = await supabaseAdmin.storage.from("highlight-videos").download(path);
     if (error || !data) return null;
     const buf = new Uint8Array(await data.arrayBuffer());
@@ -104,8 +110,14 @@ async function frameDataUrl(supabaseAdmin: any, path: string): Promise<string | 
 }
 
 /** Downloads the extracted WAV and returns raw base64 (no data: prefix). */
-async function audioBase64(supabaseAdmin: any, path: string): Promise<string | null> {
+async function audioBase64(
+  supabaseAdmin: any,
+  ownerId: string,
+  path: string,
+): Promise<string | null> {
   try {
+    const { isOwnedMediaPath } = await import("@/lib/media-path-guard");
+    if (!isOwnedMediaPath(ownerId, path)) return null;
     const { data, error } = await supabaseAdmin.storage.from("highlight-videos").download(path);
     if (error || !data) return null;
     const buf = new Uint8Array(await data.arrayBuffer());
@@ -142,7 +154,7 @@ const STEP_RUNNERS: Record<
 
     const images: { url: string; t: number | null; index: number }[] = [];
     for (const p of picked) {
-      const url = await frameDataUrl(supabaseAdmin, p.path);
+      const url = await frameDataUrl(supabaseAdmin, reel.user_id, p.path);
       if (url) images.push({ url, t: p.t, index: p.index });
     }
     if (images.length === 0) {
@@ -213,7 +225,7 @@ const STEP_RUNNERS: Record<
    */
   transcribe: async (reel, _p, { supabaseAdmin, apiKey }) => {
     if (!reel.audio_path) return { transcript: null };
-    const b64 = await audioBase64(supabaseAdmin, reel.audio_path);
+    const b64 = await audioBase64(supabaseAdmin, reel.user_id, reel.audio_path);
     if (!b64) return { transcript: null };
     try {
       const out = await callLovableAIParts(
