@@ -240,6 +240,50 @@ export const regenerateReelStyle = createServerFn({ method: "POST" })
   });
 
 /** Applies a coach-suggested title/caption/hashtag rewrite to the caller's reel. */
+/**
+ * Safety check for copy a member writes or publishes onto a reel. Blocked copy is
+ * refused outright; borderline or unverifiable copy keeps the reel owner-only.
+ * Fails closed — never publishes when the checker could not decide.
+ */
+async function screenUserCopy(
+  userId: string,
+  reelId: string,
+  patch: Record<string, any>,
+  source: string,
+): Promise<{ blocked: boolean; hidden: boolean; message: string }> {
+  const text = [
+    patch.ai_title ?? "",
+    patch.ai_caption ?? "",
+    ...((patch.ai_hashtags ?? []) as string[]),
+    ...((patch.ai_overlays ?? []) as { text?: string }[]).map((o) => o?.text ?? ""),
+    ...((patch.ai_coaching?.notes ?? []) as string[]),
+  ]
+    .filter(Boolean)
+    .join("\n");
+  if (!text.trim()) return { blocked: false, hidden: false, message: "" };
+
+  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+  const { moderateAiText } = await import("@/lib/ai/moderation.server");
+  const outcome = await moderateAiText(supabaseAdmin, {
+    userId,
+    text,
+    context: "Reel copy written or published by the reel owner",
+    target: { table: "highlight_reels", id: reelId, field: source },
+  });
+  if (outcome.verdict === "block") {
+    return {
+      blocked: true,
+      hidden: false,
+      message: "That wording didn't pass our safety check, so it wasn't saved.",
+    };
+  }
+  return {
+    blocked: false,
+    hidden: outcome.verdict === "review",
+    message: "",
+  };
+}
+
 export const applyReelCopy = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator(
@@ -280,13 +324,17 @@ export const applyReelCopy = createServerFn({ method: "POST" })
     if (data.hashtags?.length) patch.ai_hashtags = data.hashtags;
     if (data.overlays?.length) patch.ai_overlays = data.overlays;
     if (Object.keys(patch).length === 0) return { updated: false };
+
+    const held = await screenUserCopy(context.userId, data.reelId, patch, "applyReelCopy");
+    if (held.blocked) throw new Error(held.message);
+
     const { error } = await context.supabase
       .from("highlight_reels")
-      .update(patch as any)
+      .update({ ...patch, ...(held.hidden ? { hidden_at: new Date().toISOString() } : {}) } as any)
       .eq("id", data.reelId)
       .eq("user_id", context.userId);
     if (error) throw new Error(error.message);
-    return { updated: true };
+    return { updated: true, heldForReview: held.hidden };
   });
 
 /**
@@ -376,6 +424,10 @@ export const applyReelStyleDraft = createServerFn({ method: "POST" })
     };
     if (data.overlays.length) patch.ai_overlays = data.overlays;
     if (data.thumbnail_path) patch.thumbnail_path = data.thumbnail_path;
+
+    const held = await screenUserCopy(context.userId, data.reelId, patch, "applyReelStyleDraft");
+    if (held.blocked) throw new Error(held.message);
+    if (held.hidden) patch.hidden_at = new Date().toISOString();
 
     const { error } = await context.supabase
       .from("highlight_reels")
@@ -593,7 +645,7 @@ export const listPublicReels = createServerFn({ method: "GET" })
   .handler(async ({ data }) => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { RECAP_COLUMNS } = await import("@/lib/recaps");
-    const { eligibleUserReelIds, optionalSupabaseUserId } =
+    const { eligibleUserReelIds, optionalSupabaseUserId, quarantinedMediaPaths, signablePath } =
       await import("@/lib/reel-visibility.server");
     const { ownedMediaPathOrNull } = await import("@/lib/media-path-guard");
 
@@ -613,12 +665,22 @@ export const listPublicReels = createServerFn({ method: "GET" })
     if (error) throw new Error(error.message);
 
     const reels = (rows ?? []) as any[];
+    const quarantined = await quarantinedMediaPaths(
+      supabaseAdmin,
+      reels.flatMap((r) => [r.playback_path, r.video_path, r.thumbnail_path]),
+    );
     return Promise.all(
       reels.map(async (r) => {
         const owner = (r.user_id as string) ?? data.userId;
-        const primaryPath = ownedMediaPathOrNull(owner, r.playback_path ?? r.video_path);
-        const originalPath = r.playback_path ? ownedMediaPathOrNull(owner, r.video_path) : null;
-        const thumbPath = ownedMediaPathOrNull(owner, r.thumbnail_path);
+        const primaryPath = signablePath(
+          ownedMediaPathOrNull(owner, r.playback_path ?? r.video_path),
+          quarantined,
+        );
+        const originalPath = r.playback_path
+          ? signablePath(ownedMediaPathOrNull(owner, r.video_path), quarantined)
+          : null;
+        const thumbPath = signablePath(ownedMediaPathOrNull(owner, r.thumbnail_path), quarantined);
+
         const [video, original, thumb] = await Promise.all([
           primaryPath
             ? supabaseAdmin.storage.from("highlight-videos").createSignedUrl(primaryPath, 3600)

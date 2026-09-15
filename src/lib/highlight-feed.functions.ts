@@ -53,8 +53,9 @@ export const listHighlightFeed = createServerFn({ method: "GET" })
   )
   .handler(async ({ data }) => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { eligibleFeedReelIds, optionalSupabaseUserId } =
+    const { eligibleFeedReelIds, optionalSupabaseUserId, quarantinedMediaPaths, signablePath } =
       await import("@/lib/reel-visibility.server");
+
     const { ownedMediaPathOrNull } = await import("@/lib/media-path-guard");
 
     // Age-cohort gate lives in SQL: children and locked child accounts are
@@ -104,13 +105,25 @@ export const listHighlightFeed = createServerFn({ method: "GET" })
     const avatarById = new Map(((avatars ?? []) as any[]).map((a) => [a.id as string, a]));
     const gameById = new Map(((games ?? []) as any[]).map((g) => [g.id as string, g]));
 
+    const quarantined = await quarantinedMediaPaths(
+      supabaseAdmin,
+      page.flatMap((r) => [r.playback_path, r.video_path, r.thumbnail_path]),
+    );
+
     const items: HighlightFeedItem[] = await Promise.all(
       page.map(async (r) => {
-        // Only ever sign objects inside the reel owner's own folder.
+        // Only ever sign objects inside the reel owner's own folder, and never
+        // a path quarantined for child safety.
         const owner = r.user_id as string;
-        const primaryPath = ownedMediaPathOrNull(owner, r.playback_path ?? r.video_path);
-        const originalPath = r.playback_path ? ownedMediaPathOrNull(owner, r.video_path) : null;
-        const thumbPath = ownedMediaPathOrNull(owner, r.thumbnail_path);
+        const primaryPath = signablePath(
+          ownedMediaPathOrNull(owner, r.playback_path ?? r.video_path),
+          quarantined,
+        );
+        const originalPath = r.playback_path
+          ? signablePath(ownedMediaPathOrNull(owner, r.video_path), quarantined)
+          : null;
+        const thumbPath = signablePath(ownedMediaPathOrNull(owner, r.thumbnail_path), quarantined);
+
         const [video, original, thumb] = await Promise.all([
           primaryPath
             ? supabaseAdmin.storage.from("highlight-videos").createSignedUrl(primaryPath, 3600)

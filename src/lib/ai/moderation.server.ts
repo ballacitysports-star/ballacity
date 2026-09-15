@@ -88,8 +88,10 @@ export async function moderateAiText(
   }
 
   const config = await loadAiConfig(admin);
+  // Deliberately ignores config.features.killSwitch: cost controls must never
+  // switch safety scanning off.
   const flag = config.features.features.text_moderation;
-  if (config.features.killSwitch || !flag.enabled) {
+  if (!flag.enabled) {
     // Checker deliberately off: fail closed, hold as review.
     await recordVerdict(admin, {
       userId: input.userId,
@@ -99,7 +101,12 @@ export async function moderateAiText(
       categories: ["moderation_unavailable"],
       model: null,
     });
-    return { verdict: "review", categories: ["moderation_unavailable"], value: text, unavailable: true };
+    return {
+      verdict: "review",
+      categories: ["moderation_unavailable"],
+      value: text,
+      unavailable: true,
+    };
   }
 
   const provider = createLovableGatewayProvider(config.provider);
@@ -222,8 +229,9 @@ export async function checkReelFrameSafety(
   }
 
   const config = await loadAiConfig(admin);
+  // Exempt from the kill switch for the same reason as text moderation.
   const flag = config.features.features.image_moderation;
-  if (config.features.killSwitch || !flag.enabled) {
+  if (!flag.enabled) {
     return { safe: false, csam: false, categories: ["moderation_unavailable"], unavailable: true };
   }
 

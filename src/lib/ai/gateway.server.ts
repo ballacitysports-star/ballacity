@@ -85,6 +85,7 @@ export async function rawChat(body: {
   messages: any[];
   tools?: readonly any[];
   json?: boolean;
+  modalities?: string[];
 }): Promise<{ message: any; usage: AiTokenUsage; model: string }> {
   const key = process.env["LOVABLE_API_KEY"];
   if (!key) throw new AiError("FEATURE_DISABLED", { detail: "AI key not configured" });
@@ -105,6 +106,7 @@ export async function rawChat(body: {
           model: body.model,
           messages: body.messages,
           ...(body.tools ? { tools: body.tools } : {}),
+          ...(body.modalities ? { modalities: body.modalities } : {}),
           ...(body.json ? { response_format: { type: "json_object" } } : {}),
         }),
       });

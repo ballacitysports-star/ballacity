@@ -68,3 +68,37 @@ export async function eligibleUserReelIds(
   if (error) throw new Error(error.message);
   return ((data ?? []) as any[]).map((r) => String(r.id));
 }
+
+/**
+ * Paths in the highlight-videos bucket that are quarantined for child safety.
+ *
+ * RLS blocks quarantined objects for every signed-in reader, but service-role
+ * code bypasses RLS, so every admin-side signing path must consult this first.
+ * Fails closed: if the check itself errors, all candidate paths are treated as
+ * quarantined and no URL is signed.
+ */
+export async function quarantinedMediaPaths(
+  admin: any,
+  paths: (string | null | undefined)[],
+): Promise<Set<string>> {
+  const candidates = Array.from(new Set(paths.filter((p): p is string => !!p)));
+  if (candidates.length === 0) return new Set();
+  try {
+    const { data, error } = await admin
+      .from("image_moderation")
+      .select("path")
+      .eq("bucket", "highlight-videos")
+      .eq("status", "quarantined")
+      .in("path", candidates);
+    if (error) throw new Error(error.message);
+    return new Set(((data ?? []) as any[]).map((r) => String(r.path)));
+  } catch {
+    return new Set(candidates);
+  }
+}
+
+/** Owner-scoped path that is safe to sign, or null when missing or quarantined. */
+export function signablePath(path: string | null, quarantined: Set<string>): string | null {
+  if (!path) return null;
+  return quarantined.has(path) ? null : path;
+}
