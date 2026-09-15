@@ -53,8 +53,9 @@ export const listHighlightFeed = createServerFn({ method: "GET" })
   )
   .handler(async ({ data }) => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { eligibleFeedReelIds, optionalSupabaseUserId } =
+    const { eligibleFeedReelIds, optionalSupabaseUserId, quarantinedMediaPaths, signablePath } =
       await import("@/lib/reel-visibility.server");
+
     const { ownedMediaPathOrNull } = await import("@/lib/media-path-guard");
 
     // Age-cohort gate lives in SQL: children and locked child accounts are
