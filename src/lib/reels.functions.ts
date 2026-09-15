@@ -343,6 +343,11 @@ export const applyReelStyleDraft = createServerFn({ method: "POST" })
     };
   })
   .handler(async ({ data, context }) => {
+    // A drafted thumbnail must live in the caller's own storage folder — the
+    // same rule the enforce_reel_media_ownership_trg trigger applies on write.
+    const { assertOwnedMediaPath } = await import("@/lib/media-path-guard");
+    assertOwnedMediaPath(context.userId, data.thumbnail_path);
+
     const patch: Record<string, any> = {
       style_prefs: data.style,
       ai_title: data.ai_title,

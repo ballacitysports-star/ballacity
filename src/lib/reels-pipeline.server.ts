@@ -154,7 +154,7 @@ const STEP_RUNNERS: Record<
 
     const images: { url: string; t: number | null; index: number }[] = [];
     for (const p of picked) {
-      const url = await frameDataUrl(supabaseAdmin, p.path);
+      const url = await frameDataUrl(supabaseAdmin, reel.user_id, p.path);
       if (url) images.push({ url, t: p.t, index: p.index });
     }
     if (images.length === 0) {
@@ -225,7 +225,7 @@ const STEP_RUNNERS: Record<
    */
   transcribe: async (reel, _p, { supabaseAdmin, apiKey }) => {
     if (!reel.audio_path) return { transcript: null };
-    const b64 = await audioBase64(supabaseAdmin, reel.audio_path);
+    const b64 = await audioBase64(supabaseAdmin, reel.user_id, reel.audio_path);
     if (!b64) return { transcript: null };
     try {
       const out = await callLovableAIParts(
